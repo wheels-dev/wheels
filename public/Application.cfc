@@ -91,6 +91,7 @@ component output="false" {
 	include "../config/app.cfm";
 
 	function onApplicationStart() {
+		application.env = duplicate(this.env);
 		injector = new wheels.Injector("wheels.Bindings");
 
 		/* wheels/global object */

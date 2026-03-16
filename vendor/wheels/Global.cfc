@@ -409,6 +409,29 @@ component output="false" {
 	}
 
 	/**
+	 * Returns the value of an environment variable. Checks application.env (loaded from .env files) first, then falls back to system environment variables (server.system.environment). Returns the default if the variable is not found in either location.
+	 *
+	 * [section: Configuration]
+	 * [category: Miscellaneous Functions]
+	 *
+	 * @name The environment variable name to look up.
+	 * @default Value to return if the variable is not found.
+	 */
+	public any function env(required string name, any default="") {
+		if (StructKeyExists(application, "env") && StructKeyExists(application.env, arguments.name)) {
+			return application.env[arguments.name];
+		}
+		if (
+			StructKeyExists(server, "system")
+			&& StructKeyExists(server.system, "environment")
+			&& StructKeyExists(server.system.environment, arguments.name)
+		) {
+			return server.system.environment[arguments.name];
+		}
+		return arguments.default;
+	}
+
+	/**
 	 * Use to configure a global setting or set a default for a function.
 	 *
 	 * [section: Configuration]
