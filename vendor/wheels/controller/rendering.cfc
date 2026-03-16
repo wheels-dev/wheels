@@ -174,6 +174,9 @@ component {
 		boolean hideDebugInformation = false,
 		string status = $statusCode()
 	) {
+		// Mark that renderWith was called so the auto-render block in $callAction
+		// won't attempt view file lookup if renderWith fails mid-execution.
+		variables.$instance.renderWithAttempted = true;
 		$args(name = "renderWith", args = arguments);
 		local.contentType = $requestContentType();
 		local.acceptableFormats = $acceptableFormats(action = arguments.action);
@@ -883,6 +886,14 @@ component {
 	 */
 	public boolean function $performedRender() {
 		return StructKeyExists(variables.$instance, "response");
+	}
+
+	/**
+	 * Internal function.
+	 * Returns true if renderWith() was called (even if it failed before completing).
+	 */
+	public boolean function $renderWithAttempted() {
+		return StructKeyExists(variables.$instance, "renderWithAttempted") && variables.$instance.renderWithAttempted;
 	}
 
 	/**
