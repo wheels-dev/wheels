@@ -75,7 +75,7 @@ jobs:
 
           # Check that source version in box.json is clean (no -SNAPSHOT suffix).
           # The workflow injects -SNAPSHOT for develop builds automatically.
-          BASE_VERSION=$(jq -r '.version' templates/base/src/box.json)
+          BASE_VERSION=$(jq -r '.version' box.json)
           if echo "$BASE_VERSION" | grep -qi "snapshot"; then
             echo "ERROR: Version in box.json contains -SNAPSHOT suffix ($BASE_VERSION)"
             echo "Source files should have clean versions (e.g., 3.1.0)."
