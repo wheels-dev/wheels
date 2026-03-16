@@ -300,15 +300,9 @@ component output="false" extends="wheels.Global"{
 			}
 			if (StructKeyExists(application[$wheels.appKey].mixins, $wheels.className)) {
 				if (!StructKeyExists(variablesScope, "core")) {
-					if (application[$wheels.appKey].serverName == "Railo") {
-						// this is to work around a railo bug (https://jira.jboss.org/browse/RAILO-936)
-						// NB, fixed in Railo 3.2.0, so assume this is fixed in all lucee versions
-						variablesScope.core = Duplicate(variablesScope);
-					} else {
-						variablesScope.core = {};
-						StructAppend(variablesScope.core, variablesScope);
-						StructDelete(variablesScope.core, "$wheels");
-					}
+					variablesScope.core = {};
+					StructAppend(variablesScope.core, variablesScope);
+					StructDelete(variablesScope.core, "$wheels");
 				}
 				StructAppend(variablesScope, application[$wheels.appKey].mixins[$wheels.className], true);
 
