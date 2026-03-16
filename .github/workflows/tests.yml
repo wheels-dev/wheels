@@ -236,6 +236,14 @@ jobs:
           mkdir -p /tmp/test-results
           mkdir -p /tmp/junit-results
 
+          # Warm-up: trigger Wheels onApplicationStart before first test run.
+          # The engine readiness check only verifies the web server responds —
+          # Wheels app initialization (datasource verification, model scanning)
+          # happens on the first real request.
+          echo "Warming up Wheels application before first test run..."
+          curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
+          sleep 2
+
           DB_INDEX=0
           for db in "${DBS[@]}"; do
             DB_INDEX=$((DB_INDEX + 1))
@@ -264,6 +272,14 @@ jobs:
                 fi
                 sleep 5
               done
+              # Warm-up request: trigger Wheels onApplicationStart so datasources
+              # and ORM metadata are fully initialized before running the test suite.
+              # The readiness check above only confirms the web server responds —
+              # Wheels app init (datasource verification, model scanning, etc.)
+              # happens on the first real request and can take a few seconds.
+              echo "Warming up Wheels application..."
+              curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
+              sleep 2
             fi
 
             TEST_URL="${BASE_URL}?db=${db}&format=json"
@@ -275,7 +291,7 @@ jobs:
             RETRY_COUNT=0
             HTTP_CODE="000"
 
-            while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ] && [ "$HTTP_CODE" = "000" ]; do
+            while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
               RETRY_COUNT=$((RETRY_COUNT + 1))
               echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
 
@@ -286,9 +302,16 @@ jobs:
 
               echo "HTTP Code: ${HTTP_CODE}"
 
-              if [ "$HTTP_CODE" = "000" ] && [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
-                echo "Connection failed, waiting 10 seconds before retry..."
-                sleep 10
+              # Stop retrying on success (200) or test failures (417) —
+              # 417 means tests ran to completion but some failed, which
+              # is a definitive result. Only retry on transient errors.
+              if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; then
+                break
+              fi
+
+              if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                echo "Transient error (HTTP ${HTTP_CODE}), waiting 15 seconds before retry..."
+                sleep 15
               fi
             done
 
