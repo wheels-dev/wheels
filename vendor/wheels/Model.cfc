@@ -400,8 +400,16 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.adapterNamespace = "CockroachDB";
 			local.adapterName = "CockroachDBModel";
 		} else if (FindNoCase("PostgreSQL", local.info.driver_name)) {
-			local.adapterNamespace = "PostgreSQL";
-			local.adapterName = "PostgreSQLModel";
+			// CockroachDB uses the PostgreSQL wire protocol; some JDBC drivers
+			// report "PostgreSQL" as the driver name, so fall back to version().
+			local.query = $query(sql = "SELECT version() AS versionString", datasource = variables.wheels.class.dataSource);
+			if (FindNoCase("CockroachDB", local.query.versionString)) {
+				local.adapterNamespace = "CockroachDB";
+				local.adapterName = "CockroachDBModel";
+			} else {
+				local.adapterNamespace = "PostgreSQL";
+				local.adapterName = "PostgreSQLModel";
+			}
 		} else if (FindNoCase("H2", local.info.driver_name)) {
 			local.adapterNamespace = "H2";
 			local.adapterName = "H2Model";

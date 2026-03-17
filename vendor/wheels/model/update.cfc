@@ -105,7 +105,7 @@ component {
 					ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# SET");
 				}
 			}
-			else if (ListFind('PostgreSQL,H2,Oracle,SQLite', local.migration.adapter.adapterName())){
+			else if (ListFind('PostgreSQL,H2,Oracle,SQLite,CockroachDB', local.migration.adapter.adapterName())){
 				ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# SET");
 			}
 			local.pos = 0;
