@@ -700,6 +700,64 @@ component extends="wheels.WheelsTest" {
 				expect(_controller.$useLayout("show")).toBeFalse()
 			})
 		})
+
+		describe("Tests that $callAction respects explicit rendering", () => {
+
+			it("does not trigger view lookup when renderText is called in an action", () => {
+				// Use the dummy controller which has no view files.
+				// Inject an action that calls renderText().
+				params = {controller = "dummy", action = "renderTextAction"}
+				_controller = application.wo.controller("dummy", params)
+				_controller.renderTextAction = function() {
+					renderText("hello from renderText");
+				}
+
+				// $callAction should NOT throw ViewNotFound because
+				// renderText sets the response before the auto-render block.
+				_controller.$callAction(action = "renderTextAction")
+
+				expect(_controller.response()).toBe("hello from renderText")
+			})
+
+			it("does not trigger view lookup when renderNothing is called in an action", () => {
+				params = {controller = "dummy", action = "renderNothingAction"}
+				_controller = application.wo.controller("dummy", params)
+				_controller.renderNothingAction = function() {
+					renderNothing();
+				}
+
+				_controller.$callAction(action = "renderNothingAction")
+
+				expect(_controller.response()).toBe("")
+			})
+
+			it("re-throws action errors instead of producing ViewNotFound", () => {
+				params = {controller = "dummy", action = "brokenAction"}
+				_controller = application.wo.controller("dummy", params)
+				_controller.brokenAction = function() {
+					Throw(type = "CustomAppError", message = "Something broke in the action");
+				}
+
+				expect(function() {
+					_controller.$callAction(action = "brokenAction")
+				}).toThrow("CustomAppError")
+			})
+
+			it("skips view lookup when renderWith was attempted but failed", () => {
+				// Simulate renderWith being called by setting the flag directly.
+				params = {controller = "dummy", action = "noViewAction"}
+				_controller = application.wo.controller("dummy", params)
+
+				// Manually mark renderWith as attempted (simulates renderWith()
+				// entering and then failing before it could call renderText).
+				_controller.$injectIntoVariablesScope = this.$injectInstanceFlag
+				_controller.$injectIntoVariablesScope()
+
+				// The auto-render block should skip view lookup because
+				// renderWith was attempted.
+				expect(_controller.$renderWithAttempted()).toBeTrue()
+			})
+		})
 	}
 
 	function $injectIntoVariablesScope(required string name, required any data) {
@@ -722,5 +780,9 @@ component extends="wheels.WheelsTest" {
 		if (arguments.action eq "show") {
 			return "show_layout_ajax"
 		}
+	}
+
+	function $injectInstanceFlag() {
+		variables.$instance.renderWithAttempted = true;
 	}
 }
