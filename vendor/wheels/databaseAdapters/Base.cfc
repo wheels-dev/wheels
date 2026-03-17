@@ -104,11 +104,18 @@ component output=false extends="wheels.Global"{
 			wheels.rv.query = local[args.debugName];
 		}
 
+		// Capture query result set for adapters that use RETURNING (e.g. CockroachDB).
+		// Adobe CF populates local.query; Lucee may not, so default to empty string.
+		if (!structKeyExists(local, "query")) {
+			local.query = "";
+		}
+
 		// Manual identity retrieval for Lucee / ACF
 		wheels.id = $identitySelect(
-			primaryKey      = args.primaryKey,
-			queryAttributes = args.queryAttributes,
-			result          = wheels.result
+			primaryKey        = args.primaryKey,
+			queryAttributes   = args.queryAttributes,
+			result            = wheels.result,
+			returningIdentity = local.query
 		);
 
 		if (structKeyExists(wheels,"id") && isStruct(wheels.id) && !structIsEmpty(wheels.id)) {
