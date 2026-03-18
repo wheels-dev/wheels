@@ -403,6 +403,7 @@ component output=false extends="wheels.Global"{
 			case "CF_SQL_TIMESTAMP":
 				return "datetime";
 			case "CF_SQL_BIT":
+			case "CF_SQL_BOOLEAN":
 				return "boolean";
 			case "CF_SQL_ARRAY":
 				return "array";
