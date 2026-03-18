@@ -708,8 +708,11 @@ component extends="wheels.WheelsTest" {
 				// Inject an action that calls renderText().
 				params = {controller = "dummy", action = "renderTextAction"}
 				_controller = application.wo.controller("dummy", params)
+				// Reference the controller instance explicitly because CFML closures
+				// execute in their defining scope, not the controller's variables scope.
+				var ctrl = _controller;
 				_controller.renderTextAction = function() {
-					renderText("hello from renderText");
+					ctrl.renderText("hello from renderText");
 				}
 
 				// $callAction should NOT throw ViewNotFound because
@@ -722,8 +725,9 @@ component extends="wheels.WheelsTest" {
 			it("does not trigger view lookup when renderNothing is called in an action", () => {
 				params = {controller = "dummy", action = "renderNothingAction"}
 				_controller = application.wo.controller("dummy", params)
+				var ctrl = _controller;
 				_controller.renderNothingAction = function() {
-					renderNothing();
+					ctrl.renderNothing();
 				}
 
 				_controller.$callAction(action = "renderNothingAction")
