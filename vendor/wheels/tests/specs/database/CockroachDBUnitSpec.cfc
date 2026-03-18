@@ -89,26 +89,26 @@ component extends="wheels.WheelsTest" {
 					var result = {
 						sql = "INSERT INTO users (id, firstname) VALUES (1, 'test')"
 					};
-					var rv = adapter.$identitySelect(
+					// CFML void functions don't return null — the variable simply
+					// won't exist. Use IsNull() on the raw call to verify no return.
+					expect(IsNull(adapter.$identitySelect(
 						queryAttributes = {},
 						result = result,
 						primaryKey = "id",
 						returningIdentity = ""
-					);
-					expect(rv).toBeNull();
+					))).toBeTrue();
 				});
 
 				it("returns void for non-INSERT statements", () => {
 					var result = {
 						sql = "SELECT * FROM users WHERE id = 1"
 					};
-					var rv = adapter.$identitySelect(
+					expect(IsNull(adapter.$identitySelect(
 						queryAttributes = {},
 						result = result,
 						primaryKey = "id",
 						returningIdentity = ""
-					);
-					expect(rv).toBeNull();
+					))).toBeTrue();
 				});
 
 				it("returns void when result already has lastId key", () => {
@@ -116,13 +116,12 @@ component extends="wheels.WheelsTest" {
 						sql = "INSERT INTO users (firstname) VALUES ('test')",
 						lastId = 10
 					};
-					var rv = adapter.$identitySelect(
+					expect(IsNull(adapter.$identitySelect(
 						queryAttributes = {},
 						result = result,
 						primaryKey = "id",
 						returningIdentity = ""
-					);
-					expect(rv).toBeNull();
+					))).toBeTrue();
 				});
 			});
 
