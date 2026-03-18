@@ -39,16 +39,16 @@ jobs:
         id: db-list
         run: |
           # Every engine gets these databases
-          DATABASES="mysql,postgres,sqlserver,oracle,sqlite"
+          DATABASES="mysql,postgres,sqlserver,oracle,sqlite,cockroachdb"
 
           # Add h2 only for engines that support it (Lucee only)
           case "${{ matrix.cfengine }}" in
             lucee5|lucee6|lucee7)
-              DATABASES="mysql,postgres,sqlserver,h2,oracle,sqlite"
+              DATABASES="mysql,postgres,sqlserver,h2,oracle,sqlite,cockroachdb"
               ;;
             adobe2018)
               # adobe2018 also excludes sqlite
-              DATABASES="mysql,postgres,sqlserver,oracle"
+              DATABASES="mysql,postgres,sqlserver,oracle,cockroachdb"
               ;;
           esac
 
@@ -210,6 +210,11 @@ jobs:
                 echo "Waiting for SQL Server..."
                 timeout 120 bash -c 'until docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "SELECT 1" -C 2>/dev/null | grep -q "1"; do sleep 5; done'
                 echo "SQL Server is ready"
+                ;;
+              cockroachdb)
+                echo "Waiting for CockroachDB..."
+                timeout 60 bash -c 'until docker exec wheels-cockroachdb-1 cockroach sql --insecure --host=localhost:26257 --execute="SELECT 1" 2>/dev/null; do sleep 2; done'
+                echo "CockroachDB is ready"
                 ;;
               h2|sqlite)
                 echo "$db requires no external container"
@@ -533,13 +538,13 @@ jobs:
           MATRIX_MD="${MATRIX_MD}
           "
           MATRIX_MD="${MATRIX_MD}
-          | Engine | MySQL | PostgreSQL | SQL Server | H2 | Oracle | SQLite |"
+          | Engine | MySQL | PostgreSQL | SQL Server | H2 | Oracle | SQLite | CockroachDB |"
           MATRIX_MD="${MATRIX_MD}
-          |--------|:-----:|:----------:|:----------:|:--:|:------:|:------:|"
+          |--------|:-----:|:----------:|:----------:|:--:|:------:|:------:|:-----------:|"
 
           for engine in lucee5 lucee6 lucee7 adobe2018 adobe2021 adobe2023 adobe2025 boxlang; do
             ROW="| **${engine}** |"
-            for db in mysql postgres sqlserver h2 oracle sqlite; do
+            for db in mysql postgres sqlserver h2 oracle sqlite cockroachdb; do
               FILE="results/test-results-${engine}/${engine}-${db}-result.txt"
               if [ -f "$FILE" ]; then
                 FAIL=$(python3 -c "
