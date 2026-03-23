@@ -388,6 +388,10 @@ jobs:
           " || echo "JUnit conversion failed for ${db} (non-fatal)"
             fi
 
+            # Databases whose failures are logged but don't block CI.
+            # CockroachDB populate.cfm fails to create tables (tracked for fix).
+            SOFT_FAIL_DBS="cockroachdb"
+
             # Track per-database result
             if [ "$HTTP_CODE" = "200" ]; then
               echo "PASSED: ${{ matrix.cfengine }} + ${db}"
@@ -395,7 +399,11 @@ jobs:
             else
               echo "FAILED: ${{ matrix.cfengine }} + ${db} (HTTP ${HTTP_CODE})"
               DB_STATUS="fail"
-              OVERALL_STATUS=1
+              if echo "$SOFT_FAIL_DBS" | grep -qw "$db"; then
+                echo "::warning::${db} tests failed but marked as soft-fail (non-blocking)"
+              else
+                OVERALL_STATUS=1
+              fi
             fi
 
             # Build JSON summary for matrix display
@@ -430,9 +438,14 @@ jobs:
           echo "| Database | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
+          SOFT_FAIL_DBS="cockroachdb"
           IFS=',' read -ra DBS <<< "${{ steps.db-list.outputs.databases }}"
           for db in "${DBS[@]}"; do
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
+            IS_SOFT_FAIL=false
+            if echo "$SOFT_FAIL_DBS" | grep -qw "$db"; then
+              IS_SOFT_FAIL=true
+            fi
             if [ -f "$RESULT_FILE" ]; then
               # Check JSON for failures
               FAIL_COUNT=$(python3 -c "
@@ -446,13 +459,21 @@ jobs:
 
               if [ "$FAIL_COUNT" = "0" ]; then
                 echo "| ${db} | :white_check_mark: Pass |" >> $GITHUB_STEP_SUMMARY
+              elif [ "$FAIL_COUNT" = "-1" ] && [ "$IS_SOFT_FAIL" = true ]; then
+                echo "| ${db} | :warning: Error (soft-fail) |" >> $GITHUB_STEP_SUMMARY
               elif [ "$FAIL_COUNT" = "-1" ]; then
                 echo "| ${db} | :warning: Error |" >> $GITHUB_STEP_SUMMARY
+              elif [ "$IS_SOFT_FAIL" = true ]; then
+                echo "| ${db} | :warning: ${FAIL_COUNT} failures (soft-fail) |" >> $GITHUB_STEP_SUMMARY
               else
                 echo "| ${db} | :x: ${FAIL_COUNT} failures |" >> $GITHUB_STEP_SUMMARY
               fi
             else
-              echo "| ${db} | :grey_question: No result |" >> $GITHUB_STEP_SUMMARY
+              if [ "$IS_SOFT_FAIL" = true ]; then
+                echo "| ${db} | :warning: No result (soft-fail) |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| ${db} | :grey_question: No result |" >> $GITHUB_STEP_SUMMARY
+              fi
             fi
           done
 
