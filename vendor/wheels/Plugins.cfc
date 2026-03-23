@@ -165,11 +165,15 @@ component output="false" extends="wheels.Global"{
 				variables.$class.plugins[local.pluginKey] = local.plugin;
 				// Call onPluginLoad lifecycle hook if defined
 				if (StructKeyExists(local.plugin, "onPluginLoad") && IsCustomFunction(local.plugin.onPluginLoad)) {
-					$installPluginLoadAPI(local.pluginKey);
+					// Build a context struct (not the application scope itself) so that
+					// registerMiddleware works on Adobe CF where application scope doesn't
+					// support function members.
+					local.loadContext = Duplicate(application);
+					$installPluginLoadAPI(local.pluginKey, local.loadContext);
 					try {
-						local.plugin.onPluginLoad(application);
+						local.plugin.onPluginLoad(local.loadContext);
 					} finally {
-						$removePluginLoadAPI();
+						// No cleanup needed — loadContext is discarded
 					}
 				}
 				// Track plugins that implement ServiceProviderInterface
@@ -284,25 +288,18 @@ component output="false" extends="wheels.Global"{
 	 * so plugins can call app.registerMiddleware() during onPluginLoad.
 	 * Removed after each plugin's onPluginLoad returns via $removePluginLoadAPI().
 	 */
-	private void function $installPluginLoadAPI(required string pluginName) {
+	private void function $installPluginLoadAPI(required string pluginName, required struct context) {
 		var ctx = {
 			pluginMiddleware = variables.$class.pluginMiddleware,
 			pluginName = arguments.pluginName
 		};
-		application.registerMiddleware = function(required any middleware, struct options = {}) {
+		arguments.context.registerMiddleware = function(required any middleware, struct options = {}) {
 			ArrayAppend(ctx.pluginMiddleware, {
 				middleware = arguments.middleware,
 				options = arguments.options,
 				pluginName = ctx.pluginName
 			});
 		};
-	}
-
-	/**
-	 * Removes the temporary plugin load API from the application scope.
-	 */
-	private void function $removePluginLoadAPI() {
-		StructDelete(application, "registerMiddleware");
 	}
 
 	/**

@@ -34,7 +34,7 @@
  *     }
  *     public void function register(required any container) {
  *         this.container = arguments.container;
- *         arguments.container.map("myService").to("app.lib.MyService").asSingleton();
+ *         arguments.container.mapInstance("myService").to("app.lib.MyService").asSingleton();
  *     }
  *     public void function boot(required struct app) {
  *         var svc = this.container.getInstance("myService");

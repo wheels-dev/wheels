@@ -58,6 +58,15 @@ component {
 	}
 
 	/**
+	 * Alias for map() that avoids collision with Lucee/Adobe built-in struct.map().
+	 * Use this when calling from plugin ServiceProviders where the container is
+	 * passed as a generic `any` argument.
+	 */
+	public Injector function mapInstance(required string name) {
+		return map(argumentCollection = arguments);
+	}
+
+	/**
 	 * Complete a mapping by specifying the component path.
 	 *
 	 * @componentPath Dotted component path (e.g. "wheels.Global")
