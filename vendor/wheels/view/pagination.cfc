@@ -395,7 +395,7 @@ component {
 	/**
 	 * Internal: renders a disabled span element for pagination.
 	 */
-	private string function $paginationDisabledElement(
+	public string function $paginationDisabledElement(
 		required string text,
 		string class = "",
 		any encode = false
@@ -418,7 +418,7 @@ component {
 	/**
 	 * Internal: builds linkTo arguments for a specific page number.
 	 */
-	private struct function $paginationLinkToArgs(
+	public struct function $paginationLinkToArgs(
 		required numeric page,
 		required string text,
 		required string name,
@@ -468,7 +468,7 @@ component {
 	/**
 	 * Internal: creates a page link via linkTo().
 	 */
-	private string function $paginationPageLink(
+	public string function $paginationPageLink(
 		required numeric page,
 		required string text,
 		required string name,

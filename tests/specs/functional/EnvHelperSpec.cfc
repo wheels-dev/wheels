@@ -4,9 +4,18 @@ component extends="wheels.WheelsTest" {
 
 		describe("env()", () => {
 
+			beforeEach(() => {
+				// Save original application.env so we can restore it
+				_savedEnv = StructKeyExists(application, "env") ? Duplicate(application.env) : "__missing__";
+			})
+
 			afterEach(() => {
-				// Clean up any test keys we added
-				StructDelete(application, "env");
+				// Restore original application.env
+				if (IsSimpleValue(_savedEnv) && _savedEnv == "__missing__") {
+					StructDelete(application, "env");
+				} else {
+					application.env = _savedEnv;
+				}
 			})
 
 			it("returns value from application.env when present", () => {

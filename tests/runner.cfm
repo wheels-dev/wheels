@@ -256,6 +256,6 @@
     if(!structKeyExists(url, "format") || url.format eq "html"){
         // Use our html template
         type = "App";
-        include "/wheels/tests_testbox/html.cfm";
+        include "/wheels/tests/html.cfm";
     }
 </cfscript>

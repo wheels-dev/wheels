@@ -2,30 +2,32 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		g = application.wo
+
 		describe("Route Model Binding", function() {
 
 			beforeEach(function() {
 				// Store original setting so we can restore it.
-				_originalBinding = application.$wheels.routeModelBinding;
+				_originalBinding = g.$get("routeModelBinding");
 				// Default to off for isolation.
-				application.$wheels.routeModelBinding = false;
+				g.$set(routeModelBinding = false);
 
-				// Get a reference to the Dispatch object for calling internal methods.
-				_dispatch = application.wheels.dispatch;
+				// Get the Dispatch object via the DI container.
+				_dispatch = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
 			});
 
 			afterEach(function() {
-				application.$wheels.routeModelBinding = _originalBinding;
+				g.$set(routeModelBinding = _originalBinding);
 			});
 
 			describe("when binding is enabled on a route", function() {
 
 				it("resolves a model instance into params", function() {
 					// Find an existing post to use as test data.
-					var post = model("Post").findOne(order="id");
+					var post = g.model("Post").findOne(order="id");
 					if (IsBoolean(post) && !post) {
 						// Skip if no test data — create one.
-						post = model("Post").create(
+						post = g.model("Post").create(
 							authorId = 1,
 							title = "Binding Test",
 							body = "Test body",
@@ -67,7 +69,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("does not resolve models when per-route binding is false even if global is true", function() {
-					application.$wheels.routeModelBinding = true;
+					g.$set(routeModelBinding = true);
 
 					var params = {controller = "posts", action = "show", key = "1"};
 					var route = {binding = false};
@@ -82,9 +84,9 @@ component extends="wheels.WheelsTest" {
 			describe("with explicit model name", function() {
 
 				it("uses the specified model name instead of deriving from controller", function() {
-					var author = model("Author").findOne(order="id");
+					var author = g.model("Author").findOne(order="id");
 					if (IsBoolean(author) && !author) {
-						author = model("Author").create(firstName = "Test", lastName = "Author");
+						author = g.model("Author").create(firstName = "Test", lastName = "Author");
 					}
 
 					var params = {controller = "writers", action = "show", key = author.key()};
@@ -101,9 +103,9 @@ component extends="wheels.WheelsTest" {
 			describe("controller resolution", function() {
 
 				it("derives model from route.controller when params.controller is not set", function() {
-					var post = model("Post").findOne(order="id");
+					var post = g.model("Post").findOne(order="id");
 					if (IsBoolean(post) && !post) {
-						post = model("Post").create(
+						post = g.model("Post").create(
 							authorId = 1,
 							title = "Route Controller Test",
 							body = "Test body",
@@ -144,11 +146,11 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("resolves models when global setting is enabled and no per-route binding", function() {
-					application.$wheels.routeModelBinding = true;
+					g.$set(routeModelBinding = true);
 
-					var post = model("Post").findOne(order="id");
+					var post = g.model("Post").findOne(order="id");
 					if (IsBoolean(post) && !post) {
-						post = model("Post").create(
+						post = g.model("Post").create(
 							authorId = 1,
 							title = "Global Binding Test",
 							body = "Test body",
@@ -172,16 +174,17 @@ component extends="wheels.WheelsTest" {
 				it("produces routes with binding property when binding=true on resources", function() {
 					// Create a temporary mapper to test route generation.
 					var testRoutes = [];
-					var mapper = application.wheels.mapper;
-					var originalRoutes = Duplicate(application.wheels.routes);
+					var appKey = g.$appKey();
+					var mapper = application[appKey].mapper;
+					var originalRoutes = Duplicate(application[appKey].routes);
 
 					// Clear routes and add a test resource with binding.
-					application.wheels.routes = [];
-					mapper.draw(restful = true, methods = true);
+					application[appKey].routes = [];
+					mapper.$draw(restful = true, methods = true);
 						mapper.resources(name = "posts", binding = true);
 					mapper.end();
 
-					var routes = application.wheels.routes;
+					var routes = application[appKey].routes;
 
 					// Check that the show route has binding property.
 					var showRoute = {};
@@ -196,7 +199,7 @@ component extends="wheels.WheelsTest" {
 					expect(showRoute.binding).toBeTrue();
 
 					// Restore original routes.
-					application.wheels.routes = originalRoutes;
+					application[appKey].routes = originalRoutes;
 				});
 
 			});

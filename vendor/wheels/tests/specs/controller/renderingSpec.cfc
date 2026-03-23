@@ -710,7 +710,7 @@ component extends="wheels.WheelsTest" {
 				_controller = application.wo.controller("dummy", params)
 				var ctx = {ctrl: _controller}
 				_controller.renderTextAction = function() {
-					ctx.ctrl.renderText("hello from renderText");
+				ctx.ctrl.renderText("hello from renderText");
 				}
 
 				// $callAction should NOT throw ViewNotFound because
@@ -725,7 +725,7 @@ component extends="wheels.WheelsTest" {
 				_controller = application.wo.controller("dummy", params)
 				var ctx = {ctrl: _controller}
 				_controller.renderNothingAction = function() {
-					ctx.ctrl.renderNothing();
+				ctx.ctrl.renderNothing();
 				}
 
 				_controller.$callAction(action = "renderNothingAction")
