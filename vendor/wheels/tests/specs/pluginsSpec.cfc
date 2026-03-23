@@ -625,13 +625,14 @@ component extends="wheels.WheelsTest" {
 				expect(plugin.containerReceived).toBeInstanceOf("wheels.Injector")
 			})
 
-			it("does not inject register and boot as mixins", () => {
+			it("excludes ServiceProvider plugins from mixin injection entirely", () => {
 				PluginObj = $pluginObj(config)
 				mixins = PluginObj.getMixins()
 
 				for (target in mixins) {
 					expect(mixins[target]).notToHaveKey("register")
 					expect(mixins[target]).notToHaveKey("boot")
+					expect(mixins[target]).notToHaveKey("testServiceHelper")
 				}
 			})
 

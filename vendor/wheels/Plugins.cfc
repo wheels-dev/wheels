@@ -313,6 +313,12 @@ component output="false" extends="wheels.Global"{
 		local.pluginKeys = ListToArray(ListSort(StructKeyList(variables.$class.plugins), "textnocase", variables.sort));
 
 		for (local.iPlugin in local.pluginKeys) {
+			// Skip ServiceProvider plugins — they use the DI container lifecycle
+			// (register/boot) instead of mixin injection
+			if (ArrayFind(variables.$class.serviceProviders, local.iPlugin)) {
+				continue;
+			}
+
 			// reference the plugin
 			local.plugin = variables.$class.plugins[local.iPlugin];
 			// grab meta data of the plugin

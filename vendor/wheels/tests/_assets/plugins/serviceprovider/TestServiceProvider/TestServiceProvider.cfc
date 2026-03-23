@@ -23,4 +23,12 @@ component implements="wheels.ServiceProviderInterface" {
 		this.appReceived = arguments.app;
 	}
 
+	/**
+	 * Helper method that would normally be mixed into framework objects.
+	 * ServiceProvider plugins should NOT have their methods mixed in.
+	 */
+	public string function testServiceHelper() {
+		return "from-service-provider";
+	}
+
 }
