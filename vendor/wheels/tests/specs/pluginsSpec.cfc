@@ -625,6 +625,21 @@ component extends="wheels.WheelsTest" {
 				expect(plugin.containerReceived).toBeInstanceOf("wheels.Injector")
 			})
 
+			it("allows plugins to register services into the container", () => {
+				PluginObj = $pluginObj(config)
+
+				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
+
+				// The TestServiceProvider registers "pluginGreeting" in register()
+				expect(application.wheelsdi.containsInstance("pluginGreeting")).toBeTrue()
+
+				var svc = application.wheelsdi.getInstance("pluginGreeting")
+				expect(svc).toBeInstanceOf(
+					"wheels.tests._assets.plugins.serviceprovider.TestServiceProvider.PluginGreetingService"
+				)
+				expect(svc.greet("Wheels")).toBe("Hello from plugin, Wheels!")
+			})
+
 			it("excludes ServiceProvider plugins from mixin injection entirely", () => {
 				PluginObj = $pluginObj(config)
 				mixins = PluginObj.getMixins()

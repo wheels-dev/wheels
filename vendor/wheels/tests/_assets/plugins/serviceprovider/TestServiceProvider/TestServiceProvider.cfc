@@ -16,6 +16,11 @@ component implements="wheels.ServiceProviderInterface" {
 	public void function register(required any container) {
 		this.registerCalled = true;
 		this.containerReceived = arguments.container;
+
+		// Register a real service into the container to prove end-to-end wiring
+		arguments.container.map("pluginGreeting").to(
+			"wheels.tests._assets.plugins.serviceprovider.TestServiceProvider.PluginGreetingService"
+		).asSingleton();
 	}
 
 	public void function boot(required struct app) {
