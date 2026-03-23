@@ -708,8 +708,9 @@ component extends="wheels.WheelsTest" {
 				// Inject an action that calls renderText().
 				params = {controller = "dummy", action = "renderTextAction"}
 				_controller = application.wo.controller("dummy", params)
+				var ctx = {ctrl: _controller}
 				_controller.renderTextAction = function() {
-					this.renderText("hello from renderText");
+					ctx.ctrl.renderText("hello from renderText");
 				}
 
 				// $callAction should NOT throw ViewNotFound because
@@ -722,8 +723,9 @@ component extends="wheels.WheelsTest" {
 			it("does not trigger view lookup when renderNothing is called in an action", () => {
 				params = {controller = "dummy", action = "renderNothingAction"}
 				_controller = application.wo.controller("dummy", params)
+				var ctx = {ctrl: _controller}
 				_controller.renderNothingAction = function() {
-					this.renderNothing();
+					ctx.ctrl.renderNothing();
 				}
 
 				_controller.$callAction(action = "renderNothingAction")
