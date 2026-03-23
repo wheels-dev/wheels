@@ -171,10 +171,12 @@ component output="false" extends="wheels.Global"{
 					local.loadContext = Duplicate(application);
 					$installPluginLoadAPI(local.pluginKey, local.loadContext);
 					local.plugin.onPluginLoad(local.loadContext);
-					// Sync any new keys the plugin added back to application scope,
-					// but skip the injected API functions (they're closures, not data).
+					// Sync all non-function keys back to application scope.
+					// The Duplicate creates a deep copy so unchanged structs are
+					// written back identically (harmless). Closures injected by
+					// $installPluginLoadAPI are skipped to keep application clean.
 					for (local.contextKey in local.loadContext) {
-						if (!StructKeyExists(application, local.contextKey) && !IsCustomFunction(local.loadContext[local.contextKey])) {
+						if (!IsCustomFunction(local.loadContext[local.contextKey])) {
 							application[local.contextKey] = local.loadContext[local.contextKey];
 						}
 					}
