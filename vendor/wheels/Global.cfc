@@ -2807,6 +2807,8 @@ component output="false" {
 		application[local.appKey].dependantPlugins = application[local.appKey].PluginObj.getDependantPlugins();
 		application[local.appKey].mixinCollisions = application[local.appKey].PluginObj.getMixinCollisions();
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
+		// Invoke onPluginActivate lifecycle hook on all plugins now that everything is in the application scope
+		application[local.appKey].PluginObj.$invokeOnPluginActivate();
 	}
 
 	/**

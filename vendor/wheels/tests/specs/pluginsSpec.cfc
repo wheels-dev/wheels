@@ -387,6 +387,115 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that lifecycle hooks", () => {
+
+			beforeEach(() => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/lifecycle",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/lifecycle"
+
+				// Clean up any previous lifecycle log
+				StructDelete(application, "$wheelstestLifecycleLog")
+			})
+
+			afterEach(() => {
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+				StructDelete(application, "$wheelstestLifecycleLog")
+			})
+
+			it("calls onPluginLoad during plugin loading", () => {
+				PluginObj = $pluginObj(config)
+				log = application.$wheelstestLifecycleLog
+
+				expect(log).toBeArray()
+				expect(ArrayFind(log, "A:onPluginLoad")).toBeGT(0)
+				expect(ArrayFind(log, "B:onPluginLoad")).toBeGT(0)
+			})
+
+			it("calls onPluginLoad in alphabetical order", () => {
+				PluginObj = $pluginObj(config)
+				log = application.$wheelstestLifecycleLog
+
+				posA = ArrayFind(log, "A:onPluginLoad")
+				posB = ArrayFind(log, "B:onPluginLoad")
+				expect(posA).toBeLT(posB)
+			})
+
+			it("calls all onPluginLoad before any onPluginActivate", () => {
+				PluginObj = $pluginObj(config)
+				// onPluginActivate is called from $loadPlugins in Global.cfc, not from $init
+				// so after $pluginObj (which calls $init), only onPluginLoad should have fired
+				log = application.$wheelstestLifecycleLog
+
+				expect(ArrayFind(log, "A:onPluginLoad")).toBeGT(0)
+				expect(ArrayFind(log, "B:onPluginLoad")).toBeGT(0)
+				// onPluginActivate should NOT have been called yet (it's called from $loadPlugins)
+				expect(ArrayFind(log, "A:onPluginActivate")).toBe(0)
+				expect(ArrayFind(log, "B:onPluginActivate")).toBe(0)
+			})
+
+			it("calls onPluginActivate when invoked explicitly", () => {
+				PluginObj = $pluginObj(config)
+				PluginObj.$invokeOnPluginActivate()
+				log = application.$wheelstestLifecycleLog
+
+				expect(ArrayFind(log, "A:onPluginActivate")).toBeGT(0)
+				expect(ArrayFind(log, "B:onPluginActivate")).toBeGT(0)
+			})
+
+			it("calls onPluginActivate in alphabetical order", () => {
+				PluginObj = $pluginObj(config)
+				PluginObj.$invokeOnPluginActivate()
+				log = application.$wheelstestLifecycleLog
+
+				posA = ArrayFind(log, "A:onPluginActivate")
+				posB = ArrayFind(log, "B:onPluginActivate")
+				expect(posA).toBeLT(posB)
+			})
+
+			it("calls all onPluginLoad before any onPluginActivate in full sequence", () => {
+				PluginObj = $pluginObj(config)
+				PluginObj.$invokeOnPluginActivate()
+				log = application.$wheelstestLifecycleLog
+
+				lastLoad = 0
+				firstActivate = ArrayLen(log) + 1
+				for (i = 1; i <= ArrayLen(log); i++) {
+					if (FindNoCase("onPluginLoad", log[i])) {
+						lastLoad = i
+					}
+					if (FindNoCase("onPluginActivate", log[i]) && i < firstActivate) {
+						firstActivate = i
+					}
+				}
+				expect(lastLoad).toBeLT(firstActivate)
+			})
+
+			it("does not inject lifecycle hooks as mixins", () => {
+				PluginObj = $pluginObj(config)
+				mixins = PluginObj.getMixins()
+
+				// Lifecycle hooks should NOT be in the mixins
+				for (target in mixins) {
+					expect(mixins[target]).notToHaveKey("onPluginLoad")
+					expect(mixins[target]).notToHaveKey("onPluginActivate")
+				}
+
+				// But regular mixin methods should still be injected
+				expect(mixins.controller).toHaveKey("$LifecycleTestMethodA")
+				expect(mixins.model).toHaveKey("$LifecycleTestMethodB")
+			})
+		})
+
 		describe("Tests that unpacking", () => {
 
 			it("is unpacking plugins", () => {

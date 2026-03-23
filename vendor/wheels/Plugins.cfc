@@ -161,6 +161,10 @@ component output="false" extends="wheels.Global"{
 				|| variables.$class.loadIncompatiblePlugins
 			) {
 				variables.$class.plugins[local.pluginKey] = local.plugin;
+				// Call onPluginLoad lifecycle hook if defined
+				if (StructKeyExists(local.plugin, "onPluginLoad") && IsCustomFunction(local.plugin.onPluginLoad)) {
+					local.plugin.onPluginLoad(application);
+				}
 				// If plugin author has specified compatibility version as 2.0, only check against that major version
 				// If they've specified 2.0.1, then be more specific
 				if (StructKeyExists(local.plugin, "version")) {
@@ -214,6 +218,20 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Invokes the onPluginActivate lifecycle hook on all loaded plugins.
+	 * Called after all plugins are loaded, mixins processed, and data stored in the application scope.
+	 */
+	public void function $invokeOnPluginActivate() {
+		local.pluginKeys = ListToArray(ListSort(StructKeyList(variables.$class.plugins), "textnocase", variables.sort));
+		for (local.iPlugin in local.pluginKeys) {
+			local.plugin = variables.$class.plugins[local.iPlugin];
+			if (StructKeyExists(local.plugin, "onPluginActivate") && IsCustomFunction(local.plugin.onPluginActivate)) {
+				local.plugin.onPluginActivate(application);
+			}
+		}
+	}
+
+	/**
 	 * MIXINS
 	 */
 
@@ -256,8 +274,11 @@ component output="false" extends="wheels.Global"{
 				// entire component)
 				local.pluginMethods = StructKeyList(local.plugin);
 
+				// lifecycle hooks that should not be injected as mixins
+				local.lifecycleHooks = "init,onPluginLoad,onPluginActivate";
+
 				for (local.iPluginMethods in local.pluginMethods) {
-					if (IsCustomFunction(local.plugin[local.iPluginMethods]) && local.iPluginMethods neq "init") {
+					if (IsCustomFunction(local.plugin[local.iPluginMethods]) && !ListFindNoCase(local.lifecycleHooks, local.iPluginMethods)) {
 						local.methodMeta = GetMetadata(local.plugin[local.iPluginMethods]);
 						local.methodMixins = local.pluginMixins;
 						if (StructKeyExists(local.methodMeta, "mixin")) {
