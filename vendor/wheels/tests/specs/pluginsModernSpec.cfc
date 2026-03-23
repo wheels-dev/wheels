@@ -4,9 +4,9 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
-		describe("Tests that mixin collision detection", () => {
+		describe("Tests that mixin collision detection", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				config = {
@@ -21,11 +21,11 @@ component extends="wheels.WheelsTest" {
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/collision"
 			})
 
-			afterEach(() => {
+			afterEach(function() {
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
-			it("detects collisions when two plugins provide the same method for the same target", () => {
+			it("detects collisions when two plugins provide the same method for the same target", function() {
 				PluginObj = $pluginObj(config)
 				collisions = PluginObj.getMixinCollisions()
 
@@ -44,7 +44,7 @@ component extends="wheels.WheelsTest" {
 				expect(found).toBeTrue()
 			})
 
-			it("does not report collisions for unique methods", () => {
+			it("does not report collisions for unique methods", function() {
 				PluginObj = $pluginObj(config)
 				collisions = PluginObj.getMixinCollisions()
 
@@ -54,7 +54,7 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
-			it("still allows the overriding plugin method to win", () => {
+			it("still allows the overriding plugin method to win", function() {
 				PluginObj = $pluginObj(config)
 				mixins = PluginObj.getMixins()
 
@@ -63,7 +63,7 @@ component extends="wheels.WheelsTest" {
 				expect(result).toBe("FromPluginB")
 			})
 
-			it("returns empty array when no collisions exist", () => {
+			it("returns empty array when no collisions exist", function() {
 				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
 				PluginObj = $pluginObj(config)
@@ -74,9 +74,9 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
-		describe("Tests that lifecycle hooks", () => {
+		describe("Tests that lifecycle hooks", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				config = {
@@ -94,12 +94,12 @@ component extends="wheels.WheelsTest" {
 				StructDelete(application, "$wheelstestLifecycleLog")
 			})
 
-			afterEach(() => {
+			afterEach(function() {
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 				StructDelete(application, "$wheelstestLifecycleLog")
 			})
 
-			it("calls onPluginLoad during plugin loading", () => {
+			it("calls onPluginLoad during plugin loading", function() {
 				PluginObj = $pluginObj(config)
 				log = application.$wheelstestLifecycleLog
 
@@ -108,7 +108,7 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayFind(log, "B:onPluginLoad")).toBeGT(0)
 			})
 
-			it("calls onPluginLoad in alphabetical order", () => {
+			it("calls onPluginLoad in alphabetical order", function() {
 				PluginObj = $pluginObj(config)
 				log = application.$wheelstestLifecycleLog
 
@@ -117,7 +117,7 @@ component extends="wheels.WheelsTest" {
 				expect(posA).toBeLT(posB)
 			})
 
-			it("calls all onPluginLoad before any onPluginActivate", () => {
+			it("calls all onPluginLoad before any onPluginActivate", function() {
 				PluginObj = $pluginObj(config)
 				log = application.$wheelstestLifecycleLog
 
@@ -127,7 +127,7 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayFind(log, "B:onPluginActivate")).toBe(0)
 			})
 
-			it("calls onPluginActivate when invoked explicitly", () => {
+			it("calls onPluginActivate when invoked explicitly", function() {
 				PluginObj = $pluginObj(config)
 				PluginObj.$invokeOnPluginActivate()
 				log = application.$wheelstestLifecycleLog
@@ -136,7 +136,7 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayFind(log, "B:onPluginActivate")).toBeGT(0)
 			})
 
-			it("calls onPluginActivate in alphabetical order", () => {
+			it("calls onPluginActivate in alphabetical order", function() {
 				PluginObj = $pluginObj(config)
 				PluginObj.$invokeOnPluginActivate()
 				log = application.$wheelstestLifecycleLog
@@ -146,7 +146,7 @@ component extends="wheels.WheelsTest" {
 				expect(posA).toBeLT(posB)
 			})
 
-			it("calls all onPluginLoad before any onPluginActivate in full sequence", () => {
+			it("calls all onPluginLoad before any onPluginActivate in full sequence", function() {
 				PluginObj = $pluginObj(config)
 				PluginObj.$invokeOnPluginActivate()
 				log = application.$wheelstestLifecycleLog
@@ -164,7 +164,7 @@ component extends="wheels.WheelsTest" {
 				expect(lastLoad).toBeLT(firstActivate)
 			})
 
-			it("does not inject lifecycle hooks as mixins", () => {
+			it("does not inject lifecycle hooks as mixins", function() {
 				PluginObj = $pluginObj(config)
 				mixins = PluginObj.getMixins()
 
@@ -178,9 +178,9 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
-		describe("Tests that plugin middleware registration", () => {
+		describe("Tests that plugin middleware registration", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				config = {
@@ -195,11 +195,11 @@ component extends="wheels.WheelsTest" {
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/middleware"
 			})
 
-			afterEach(() => {
+			afterEach(function() {
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
-			it("collects middleware registered via onPluginLoad", () => {
+			it("collects middleware registered via onPluginLoad", function() {
 				PluginObj = $pluginObj(config)
 				pluginMiddleware = PluginObj.getPluginMiddleware()
 
@@ -207,7 +207,7 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayLen(pluginMiddleware)).toBe(2)
 			})
 
-			it("records the plugin name that registered each middleware", () => {
+			it("records the plugin name that registered each middleware", function() {
 				PluginObj = $pluginObj(config)
 				pluginMiddleware = PluginObj.getPluginMiddleware()
 
@@ -215,7 +215,7 @@ component extends="wheels.WheelsTest" {
 				expect(pluginMiddleware[2].pluginName).toBe("TestMiddlewarePluginB")
 			})
 
-			it("stores the middleware CFC path", () => {
+			it("stores the middleware CFC path", function() {
 				PluginObj = $pluginObj(config)
 				pluginMiddleware = PluginObj.getPluginMiddleware()
 
@@ -223,7 +223,7 @@ component extends="wheels.WheelsTest" {
 				expect(pluginMiddleware[2].middleware).toBe("wheels.tests._assets.middleware.TestMiddlewareB")
 			})
 
-			it("stores options when provided", () => {
+			it("stores options when provided", function() {
 				PluginObj = $pluginObj(config)
 				pluginMiddleware = PluginObj.getPluginMiddleware()
 
@@ -234,13 +234,13 @@ component extends="wheels.WheelsTest" {
 				expect(pluginMiddleware[2].options.priority).toBe(10)
 			})
 
-			it("passes application scope data in the onPluginLoad context", () => {
+			it("passes application scope data in the onPluginLoad context", function() {
 				PluginObj = $pluginObj(config)
 				pluginMiddleware = PluginObj.getPluginMiddleware()
 				expect(ArrayLen(pluginMiddleware)).toBeGT(0)
 			})
 
-			it("returns empty array when no plugins register middleware", () => {
+			it("returns empty array when no plugins register middleware", function() {
 				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
 				PluginObj = $pluginObj(config)
@@ -251,9 +251,9 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
-		describe("Tests that ServiceProviderInterface plugins", () => {
+		describe("Tests that ServiceProviderInterface plugins", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				config = {
@@ -268,11 +268,11 @@ component extends="wheels.WheelsTest" {
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/serviceprovider"
 			})
 
-			afterEach(() => {
+			afterEach(function() {
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
-			it("detects plugins implementing ServiceProviderInterface", () => {
+			it("detects plugins implementing ServiceProviderInterface", function() {
 				PluginObj = $pluginObj(config)
 				serviceProviders = PluginObj.getServiceProviders()
 
@@ -281,7 +281,7 @@ component extends="wheels.WheelsTest" {
 				expect(serviceProviders[1]).toBe("TestServiceProvider")
 			})
 
-			it("calls register(container) when $invokeServiceProviderRegister is invoked", () => {
+			it("calls register(container) when $invokeServiceProviderRegister is invoked", function() {
 				PluginObj = $pluginObj(config)
 				var fakeContainer = CreateObject("component",
 					"wheels.tests._assets.plugins.serviceprovider.FakeContainer").init()
@@ -293,7 +293,7 @@ component extends="wheels.WheelsTest" {
 				expect(plugin.containerReceived).toBe(fakeContainer)
 			})
 
-			it("passes the actual Injector when available", () => {
+			it("passes the actual Injector when available", function() {
 				PluginObj = $pluginObj(config)
 
 				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
@@ -303,7 +303,7 @@ component extends="wheels.WheelsTest" {
 				expect(plugin.containerReceived).toBeInstanceOf("wheels.Injector")
 			})
 
-			it("allows plugins to register services into the container", () => {
+			it("allows plugins to register services into the container", function() {
 				PluginObj = $pluginObj(config)
 
 				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
@@ -317,7 +317,7 @@ component extends="wheels.WheelsTest" {
 				expect(svc.greet("Wheels")).toBe("Hello from plugin, Wheels!")
 			})
 
-			it("excludes ServiceProvider plugins from mixin injection entirely", () => {
+			it("excludes ServiceProvider plugins from mixin injection entirely", function() {
 				PluginObj = $pluginObj(config)
 				mixins = PluginObj.getMixins()
 
@@ -328,7 +328,7 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
-			it("returns empty service providers for standard plugins", () => {
+			it("returns empty service providers for standard plugins", function() {
 				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
 				PluginObj = $pluginObj(config)
@@ -338,9 +338,9 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayLen(serviceProviders)).toBe(0)
 			})
 
-			it("calls boot(app) when $invokeServiceProviderBoot is invoked", () => {
+			it("calls boot(app) when $invokeServiceProviderBoot is invoked", function() {
 				PluginObj = $pluginObj(config)
-				var fakeApp = {environment: "testing", version: "3.0.0"}
+				var fakeApp = {environment = "testing", version = "3.0.0"}
 
 				PluginObj.$invokeServiceProviderBoot(fakeApp)
 
@@ -349,7 +349,7 @@ component extends="wheels.WheelsTest" {
 				expect(plugin.appReceived).toBe(fakeApp)
 			})
 
-			it("calls boot after register in the correct lifecycle order", () => {
+			it("calls boot after register in the correct lifecycle order", function() {
 				PluginObj = $pluginObj(config)
 
 				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
@@ -360,7 +360,7 @@ component extends="wheels.WheelsTest" {
 				expect(plugin.bootCalled).toBeTrue()
 			})
 
-			it("allows plugins to resolve services registered during register() when boot() is called", () => {
+			it("allows plugins to resolve services registered during register() when boot() is called", function() {
 				PluginObj = $pluginObj(config)
 
 				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
@@ -371,7 +371,7 @@ component extends="wheels.WheelsTest" {
 				expect(plugin.resolvedDuringBoot.greet("Test")).toBe("Hello from plugin, Test!")
 			})
 
-			it("does not call boot on standard plugins", () => {
+			it("does not call boot on standard plugins", function() {
 				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
 				PluginObj = $pluginObj(config)
