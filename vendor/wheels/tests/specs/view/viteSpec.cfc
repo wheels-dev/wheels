@@ -1,22 +1,23 @@
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
-		// Ensure Vite settings exist (may not be present if app was not reloaded after Vite feature was added)
-		if (!StructKeyExists(application.wheels, "viteDevMode")) {
-			application.wheels.viteDevMode = false;
-		}
-		if (!StructKeyExists(application.wheels, "viteDevServerUrl")) {
-			application.wheels.viteDevServerUrl = "http://localhost:5173";
-		}
-		if (!StructKeyExists(application.wheels, "viteBuildPath")) {
-			application.wheels.viteBuildPath = "build";
-		}
-		if (!StructKeyExists(application.wheels, "viteManifestFile")) {
-			application.wheels.viteManifestFile = ".vite/manifest.json";
-		}
-		// Ensure $wheels struct exists for manifest cache operations
-		if (!StructKeyExists(application, "$wheels")) {
-			application.$wheels = {};
+		// Ensure Vite settings exist in BOTH application scopes.
+		// $get() reads from application.$wheels (via $appKey()), so we must set there.
+		// application.wheels is a reference to $wheels after init, but app reloads
+		// during CI can break that reference — set both to be safe.
+		var defaults = {
+			viteDevMode = false,
+			viteDevServerUrl = "http://localhost:5173",
+			viteBuildPath = "build",
+			viteManifestFile = ".vite/manifest.json"
+		};
+		for (var key in defaults) {
+			if (!StructKeyExists(application.$wheels, key)) {
+				application.$wheels[key] = defaults[key];
+			}
+			if (!StructKeyExists(application.wheels, key)) {
+				application.wheels[key] = defaults[key];
+			}
 		}
 	}
 

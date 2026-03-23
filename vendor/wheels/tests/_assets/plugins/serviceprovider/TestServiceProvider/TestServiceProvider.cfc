@@ -19,10 +19,12 @@ component implements="wheels.ServiceProviderInterface" {
 		this.registerCalled = true;
 		this.containerReceived = arguments.container;
 
-		// Register a real service into the container to prove end-to-end wiring
-		arguments.container.map("pluginGreeting").to(
-			"wheels.tests._assets.plugins.serviceprovider.TestServiceProvider.PluginGreetingService"
-		).asSingleton();
+		// Register a real service into the container to prove end-to-end wiring.
+		// Use invoke() to avoid Lucee resolving .map() as the built-in struct
+		// member function instead of the Injector's CFC method.
+		var mapping = invoke(arguments.container, "map", {name: "pluginGreeting"});
+		invoke(mapping, "to", {componentPath: "wheels.tests._assets.plugins.serviceprovider.TestServiceProvider.PluginGreetingService"});
+		invoke(mapping, "asSingleton");
 	}
 
 	public void function boot(required struct app) {
