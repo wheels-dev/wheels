@@ -336,7 +336,7 @@
 				</cfif>
 			</div>
 			<!--- Warnings --->
-			<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins)>
+			<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins) OR (isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions))>
 				<div class="wdb-section">
 					<div class="wdb-section-title" style="color:##f38ba8;">Warnings</div>
 					<div style="color:##f38ba8;font-size:12px;">
@@ -349,6 +349,11 @@
 							<cfloop list="#application.wheels.dependantPlugins#" index="local.di">
 								<cfset local.needs = ListLast(local.di, "|")>
 								<p><strong>#ListFirst(local.di, "|")#</strong> needs: #local.needs#</p>
+							</cfloop>
+						</cfif>
+						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>
+							<cfloop array="#application.wheels.mixinCollisions#" index="local.ci">
+								<p>Method <strong>#local.ci.method#</strong> on <strong>#local.ci.target#</strong>: <strong>#local.ci.existingPlugin#</strong> overridden by <strong>#local.ci.overridingPlugin#</strong></p>
 							</cfloop>
 						</cfif>
 					</div>

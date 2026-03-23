@@ -15,6 +15,7 @@ component output="false" extends="wheels.Global"{
 		variables.$class.mixableComponents = "application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test";
 		variables.$class.incompatiblePlugins = "";
 		variables.$class.dependantPlugins = "";
+		variables.$class.mixinCollisions = [];
 		StructAppend(variables.$class, arguments);
 		/* handle pathing for different operating systems */
 		variables.$class.pluginPathFull = ReplaceNoCase(ExpandPath(variables.$class.pluginPath), "\", "/", "all");
@@ -222,6 +223,12 @@ component output="false" extends="wheels.Global"{
 			variables.$class.mixins[local.iMixableComponents] = {};
 		}
 
+		// track which plugin provided each method per mixin target for collision detection
+		local.methodProviders = {};
+		for (local.iMixableComponents in variables.$class.mixableComponents) {
+			local.methodProviders[local.iMixableComponents] = {};
+		}
+
 		// get a sorted list of plugins so that we run through them the same on
 		// every platform
 		local.pluginKeys = ListToArray(ListSort(StructKeyList(variables.$class.plugins), "textnocase", variables.sort));
@@ -261,14 +268,35 @@ component output="false" extends="wheels.Global"{
 						if (local.methodMixins != "none") {
 							for (local.iMixableComponent in variables.$class.mixableComponents) {
 								if (local.methodMixins == "global" || ListFindNoCase(local.methodMixins, local.iMixableComponent)) {
+									// detect collision: another plugin already provided this method for this target
+									if (StructKeyExists(local.methodProviders[local.iMixableComponent], local.iPluginMethods)) {
+										local.existingPlugin = local.methodProviders[local.iMixableComponent][local.iPluginMethods];
+										ArrayAppend(variables.$class.mixinCollisions, {
+											method = local.iPluginMethods,
+											target = local.iMixableComponent,
+											existingPlugin = local.existingPlugin,
+											overridingPlugin = local.iPlugin
+										});
+									}
 									// cfformat-ignore-start
 									variables.$class.mixins[local.iMixableComponent][local.iPluginMethods] = local.plugin[local.iPluginMethods];
+									local.methodProviders[local.iMixableComponent][local.iPluginMethods] = local.iPlugin;
 									// cfformat-ignore-end
 								}
 							}
 						}
 					}
 				}
+			}
+		}
+
+		// log any detected collisions
+		if (ArrayLen(variables.$class.mixinCollisions)) {
+			for (local.collision in variables.$class.mixinCollisions) {
+				WriteLog(
+					type = "warning",
+					text = "Wheels plugin mixin collision: method '#local.collision.method#' on '#local.collision.target#' provided by '#local.collision.existingPlugin#' is overridden by '#local.collision.overridingPlugin#'"
+				);
 			}
 		}
 	}
@@ -345,6 +373,10 @@ component output="false" extends="wheels.Global"{
 
 	public any function getMixins() {
 		return variables.$class.mixins;
+	}
+
+	public any function getMixinCollisions() {
+		return variables.$class.mixinCollisions;
 	}
 
 	public any function getMixableComponents() {

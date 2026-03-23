@@ -317,6 +317,76 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that mixin collision detection", () => {
+
+			beforeEach(() => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/collision",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/collision"
+			})
+
+			afterEach(() => {
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("detects collisions when two plugins provide the same method for the same target", () => {
+				PluginObj = $pluginObj(config)
+				collisions = PluginObj.getMixinCollisions()
+
+				expect(collisions).toBeArray()
+				expect(arrayLen(collisions)).toBeGT(0)
+
+				// Find the collision for $CollidingMethod on controller
+				found = false
+				for (c in collisions) {
+					if (c.method == "$CollidingMethod" && c.target == "controller") {
+						found = true
+						expect(c.existingPlugin).toBe("TestCollisionPluginA")
+						expect(c.overridingPlugin).toBe("TestCollisionPluginB")
+					}
+				}
+				expect(found).toBeTrue()
+			})
+
+			it("does not report collisions for unique methods", () => {
+				PluginObj = $pluginObj(config)
+				collisions = PluginObj.getMixinCollisions()
+
+				for (c in collisions) {
+					expect(c.method).notToBe("$UniqueToA")
+					expect(c.method).notToBe("$UniqueToB")
+				}
+			})
+
+			it("still allows the overriding plugin method to win", () => {
+				PluginObj = $pluginObj(config)
+				mixins = PluginObj.getMixins()
+
+				// The last plugin alphabetically (B) should win
+				result = mixins.controller["$CollidingMethod"]()
+				expect(result).toBe("FromPluginB")
+			})
+
+			it("returns empty array when no collisions exist", () => {
+				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
+				PluginObj = $pluginObj(config)
+				collisions = PluginObj.getMixinCollisions()
+
+				expect(collisions).toBeArray()
+				expect(arrayLen(collisions)).toBe(0)
+			})
+		})
+
 		describe("Tests that unpacking", () => {
 
 			it("is unpacking plugins", () => {

@@ -39,6 +39,11 @@ if (request.wheels.params.format == "json") {
 		}
 	}
 
+	// Add mixin collisions if any
+	if (isDefined("application.wheels.mixinCollisions") && arrayLen(application.wheels.mixinCollisions)) {
+		local.pluginsData.plugins.mixinCollisions = application.wheels.mixinCollisions;
+	}
+
 	local.pluginsData.plugins.count = structCount(loadedPlugins);
 
 	cfcontent(type="application/json", reset=true);
@@ -53,7 +58,7 @@ if (request.wheels.params.format == "json") {
 <div class="ui container">
 	#pageHeader("Plugins", "What you've got loaded..")#
 
-		<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins)>
+		<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins) OR (isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions))>
 			<div class="ui error message">
 				<div class="header">
 					Warnings:
@@ -63,6 +68,9 @@ if (request.wheels.params.format == "json") {
 						</cfif>
 						<cfif Len(application.wheels.dependantPlugins)>
 							<cfloop list="#application.wheels.dependantPlugins#" index="local.i"><cfset needs = ListLast(local.i, "|")>The #ListFirst(local.i, "|")# plugin needs the following plugin<cfif ListLen(needs) GT 1>s</cfif> to work properly: #needs#<br></cfloop>
+						</cfif>
+						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>
+							<cfloop array="#application.wheels.mixinCollisions#" index="local.c">Method <strong>#local.c.method#</strong> on <strong>#local.c.target#</strong>: provided by <strong>#local.c.existingPlugin#</strong>, overridden by <strong>#local.c.overridingPlugin#</strong><br></cfloop>
 						</cfif>
 			</div>
 		</cfif>

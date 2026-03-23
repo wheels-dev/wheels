@@ -2805,6 +2805,7 @@ component output="false" {
 		application[local.appKey].pluginMeta = application[local.appKey].PluginObj.getPluginMeta();
 		application[local.appKey].incompatiblePlugins = application[local.appKey].PluginObj.getIncompatiblePlugins();
 		application[local.appKey].dependantPlugins = application[local.appKey].PluginObj.getDependantPlugins();
+		application[local.appKey].mixinCollisions = application[local.appKey].PluginObj.getMixinCollisions();
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
 	}
 
