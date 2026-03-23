@@ -265,6 +265,11 @@ component {
 			application.wheels.migrator = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Migrator", method = "init");
 		}
 
+		// Initialize the seeder component (always available when migrator is enabled)
+		if (application.wheels.enableMigratorComponent) {
+			application.wheels.seeder = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Seeder", method = "init");
+		}
+
 		// Run the developer's on application start code.
 		application.wo.$include(template = "#application.wheels.eventPath#/onapplicationstart.cfm");
 

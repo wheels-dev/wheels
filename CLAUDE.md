@@ -6,7 +6,8 @@ CFML MVC framework with ActiveRecord ORM. Models in `app/models/`, controllers i
 
 ```
 app/controllers/    app/models/    app/views/    app/views/layout.cfm
-app/migrator/migrations/    app/events/    app/global/    app/lib/
+app/migrator/migrations/    app/db/seeds.cfm    app/db/seeds/
+app/events/    app/global/    app/lib/
 app/mailers/    app/jobs/    app/plugins/    app/snippets/
 config/settings.cfm    config/routes.cfm    config/environment.cfm
 public/    tests/    vendor/    .env (never commit)
@@ -422,6 +423,41 @@ component extends="wheels.WheelsTest" {
 - **Force reload**: append `&reload=true` after adding new model CFCs
 - **Closure gotcha**: CFML closures can't access outer `local` vars — use shared structs (`var result = {count: 0}`)
 - Run with MCP `wheels_test()` or CLI `wheels test run`
+
+## Database Seeding Quick Reference
+
+Convention-based, idempotent seeding with CLI support.
+
+```cfm
+// app/db/seeds.cfm — Shared seeds (runs in all environments)
+seedOnce(modelName="Role", uniqueProperties="name", properties={
+    name: "admin", description: "Administrator"
+});
+seedOnce(modelName="Role", uniqueProperties="name", properties={
+    name: "member", description: "Regular member"
+});
+
+// app/db/seeds/development.cfm — Dev-only seeds (runs after seeds.cfm)
+seedOnce(modelName="User", uniqueProperties="email", properties={
+    firstName: "Dev", lastName: "User", email: "dev@example.com"
+});
+```
+
+**CLI:**
+```bash
+wheels db:seed                          # Run convention seeds (auto-detect)
+wheels db:seed --environment=production # Seed for specific environment
+wheels db:seed --generate               # Generate random test data (legacy)
+wheels db:seed --generate --count=10    # Generate 10 records per model
+wheels generate seed                    # Create app/db/seeds.cfm
+wheels generate seed --all              # Create seeds.cfm + dev/prod stubs
+```
+
+**`seedOnce()`** — idempotent: checks `uniqueProperties` via `findOne()`, creates only if not found. Re-running seeds is always safe.
+
+**Execution order:** `app/db/seeds.cfm` (shared) → `app/db/seeds/<environment>.cfm` (env-specific). Wrapped in a transaction.
+
+**Seeder component:** `application.wheels.seeder` (initialized alongside migrator). Call `application.wheels.seeder.runSeeds()` programmatically.
 
 ## Background Jobs Quick Reference
 

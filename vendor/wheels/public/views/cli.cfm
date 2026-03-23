@@ -197,89 +197,109 @@ try {
 				break;
 				
 			case "dbSeed":
-				// Seed database with test data
-				local.count = structKeyExists(request.wheels.params, "count") ? val(request.wheels.params.count) : 10;
-				local.models = structKeyExists(request.wheels.params, "models") ? request.wheels.params.models : "";
+				local.mode = structKeyExists(request.wheels.params, "mode") ? request.wheels.params.mode : "auto";
+				local.environment = structKeyExists(request.wheels.params, "environment") ? request.wheels.params.environment : get("environment");
 				data.success = true;
-				data.seeded = [];
-				
+				data.mode = local.mode;
+
 				try {
-					// Get all model files if no specific models requested
-					local.modelList = [];
-					if (len(local.models)) {
-						local.modelList = listToArray(local.models);
+					// Determine seed mode: convention files vs generated test data
+					local.useConvention = false;
+					if (local.mode == "convention") {
+						local.useConvention = true;
+					} else if (local.mode == "generate") {
+						local.useConvention = false;
 					} else {
-						// Find all model files in the app/models directory
-						local.modelPath = expandPath("/app/models");
-						if (directoryExists(local.modelPath)) {
-							local.modelFiles = directoryList(local.modelPath, false, "name", "*.cfc");
-							for (local.file in local.modelFiles) {
-								// Skip any files that start with underscore (partials/helpers)
-								if (left(local.file, 1) != "_") {
-									arrayAppend(local.modelList, listFirst(local.file, "."));
-								}
-							}
+						// Auto-detect: use convention if seed files exist
+						if (structKeyExists(application.wheels, "seeder") && application.wheels.seeder.hasSeedFiles()) {
+							local.useConvention = true;
 						}
 					}
-					
-					// Seed each model
-					for (local.modelName in local.modelList) {
-						try {
-							// Create model instance
-							local.model = model(local.modelName);
-							local.seededCount = 0;
-							
-							// Get model properties
-							local.properties = [];
-							if (structKeyExists(local.model, "$classData") && structKeyExists(local.model.$classData(), "properties")) {
-								local.properties = local.model.$classData().properties;
-							}
-							
-							// Generate test data for each record
-							for (local.i = 1; local.i <= local.count; local.i++) {
-								local.record = {};
-								
-								// Generate data based on property names and types
-								for (local.prop in local.properties) {
-									if (local.prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", local.prop.name)) {
-										// Generate appropriate test data based on property name and type
-										local.record[local.prop.name] = generateTestData(local.prop.name, local.prop.type, local.i);
+
+					if (local.useConvention) {
+						// Run convention-based seed files (app/db/seeds.cfm + environment)
+						data.mode = "convention";
+						local.seeder = application.wheels.seeder;
+						local.seedResult = local.seeder.runSeeds(environment = local.environment);
+						data.success = local.seedResult.success;
+						data.message = local.seedResult.message;
+						data.environment = local.environment;
+						data.totalCreated = local.seedResult.totalCreated;
+						data.totalSkipped = local.seedResult.totalSkipped;
+						data.results = local.seedResult.results;
+						if (structKeyExists(local.seedResult, "detail")) {
+							data.detail = local.seedResult.detail;
+						}
+					} else {
+						// Generate random test data (legacy behavior)
+						data.mode = "generate";
+						local.count = structKeyExists(request.wheels.params, "count") ? val(request.wheels.params.count) : 10;
+						local.models = structKeyExists(request.wheels.params, "models") ? request.wheels.params.models : "";
+						data.seeded = [];
+
+						// Get all model files if no specific models requested
+						local.modelList = [];
+						if (len(local.models)) {
+							local.modelList = listToArray(local.models);
+						} else {
+							local.modelPath = expandPath("/app/models");
+							if (directoryExists(local.modelPath)) {
+								local.modelFiles = directoryList(local.modelPath, false, "name", "*.cfc");
+								for (local.file in local.modelFiles) {
+									if (left(local.file, 1) != "_") {
+										arrayAppend(local.modelList, listFirst(local.file, "."));
 									}
 								}
-								
-								// Create the record
-								local.newRecord = local.model.new(local.record);
-								if (local.newRecord.save()) {
-									local.seededCount++;
-								}
 							}
-							
-							arrayAppend(data.seeded, {
-								model = local.modelName,
-								count = local.seededCount,
-								success = true
-							});
-							
-						} catch (any modelError) {
-							arrayAppend(data.seeded, {
-								model = local.modelName,
-								count = 0,
-								success = false,
-								error = modelError.message
-							});
 						}
-					}
-					
-					// Build success message
-					local.totalSeeded = 0;
-					for (local.result in data.seeded) {
-						if (local.result.success) {
-							local.totalSeeded += local.result.count;
+
+						// Seed each model with generated data
+						for (local.modelName in local.modelList) {
+							try {
+								local.model = model(local.modelName);
+								local.seededCount = 0;
+
+								local.properties = [];
+								if (structKeyExists(local.model, "$classData") && structKeyExists(local.model.$classData(), "properties")) {
+									local.properties = local.model.$classData().properties;
+								}
+
+								for (local.i = 1; local.i <= local.count; local.i++) {
+									local.record = {};
+									for (local.prop in local.properties) {
+										if (local.prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", local.prop.name)) {
+											local.record[local.prop.name] = generateTestData(local.prop.name, local.prop.type, local.i);
+										}
+									}
+									local.newRecord = local.model.new(local.record);
+									if (local.newRecord.save()) {
+										local.seededCount++;
+									}
+								}
+
+								arrayAppend(data.seeded, {
+									model = local.modelName,
+									count = local.seededCount,
+									success = true
+								});
+							} catch (any modelError) {
+								arrayAppend(data.seeded, {
+									model = local.modelName,
+									count = 0,
+									success = false,
+									error = modelError.message
+								});
+							}
 						}
+
+						local.totalSeeded = 0;
+						for (local.result in data.seeded) {
+							if (local.result.success) {
+								local.totalSeeded += local.result.count;
+							}
+						}
+						data.message = "Database seeding completed. Created #local.totalSeeded# records across #arrayLen(data.seeded)# models.";
 					}
-					
-					data.message = "Database seeding completed. Created #local.totalSeeded# records across #arrayLen(data.seeded)# models.";
-					
 				} catch (any e) {
 					data.success = false;
 					data.message = "Error during database seeding: " & e.message;
