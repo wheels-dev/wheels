@@ -1,0 +1,45 @@
+# Wheels Development Environment
+#
+# Quick start:
+#   docker compose -f docker-compose.dev.yml up
+#
+# With a database profile (provided by docker-compose.db-*.yml):
+#   docker compose -f docker-compose.dev.yml -f docker-compose.db-mysql.yml up
+#
+# The app source is volume-mounted for live editing — code changes
+# are picked up automatically without rebuilding or restarting.
+
+networks:
+  wheels-dev:
+    driver: bridge
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Mount the full project for live code editing
+      - .:/app
+      # Preserve CommandBox artifacts across restarts (not overwritten by bind mount)
+      - commandbox_home:/root/.CommandBox
+    ports:
+      - "${WHEELS_DEV_PORT:-8080}:8080"
+    environment:
+      - WHEELS_ENV=${WHEELS_ENV:-development}
+      - BOX_SERVER_PROFILE=development
+      - BOX_SERVER_APP_CFENGINE=${WHEELS_CFENGINE:-lucee@6}
+    env_file:
+      - path: .env
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - wheels-dev
+
+volumes:
+  commandbox_home:
