@@ -1,0 +1,44 @@
+# IDE and editor files
+.project
+.settings
+.classpath
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# CFML engine artifacts
+.CommandBox
+CFIDE
+cfide
+WEB-INF
+
+# Build and temp
+/target/
+/temp/
+/bin/
+
+# Vendor dependencies (install with: wheels install)
+/vendor/
+
+# Database files
+/db/
+
+# Server state
+settings.json
+settings.xml
+*.db
+.wheels/
+
+# Environment files (contain secrets)
+.env
+.env.*
+!.env.example
+
+# Test output
+/test-output/
+/test-artifacts/
+
+# OS files
+.DS_Store
+Thumbs.db

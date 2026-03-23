@@ -1013,87 +1013,37 @@ component extends="modules.BaseModule" {
 		out("Creating new Wheels application: #appName#...", "cyan");
 		out("");
 
-		// Create directory structure
-		var dirs = [
-			"app/controllers",
-			"app/models",
-			"app/views/layout",
-			"app/views/main",
-			"app/migrator/migrations",
-			"app/events",
-			"app/global",
-			"app/lib",
-			"config",
-			"public",
-			"tests/specs/models",
-			"tests/specs/controllers",
-			"tests/specs/functional",
-			"vendor"
-		];
-
-		for (var dir in dirs) {
-			ensureDirectory(targetDir & "/" & dir);
-			printCreated(appName & "/" & dir & "/");
+		// Locate the project template directory
+		var templateDir = variables.moduleRoot & "templates/app";
+		if (!directoryExists(templateDir)) {
+			out("Project template not found at: #templateDir#", "red");
+			return "";
 		}
 
-		// Create index.cfm (front controller)
-		fileWrite(
-			targetDir & "/public/index.cfm",
-			'<cfinclude template="../vendor/wheels/public/root.cfm">'
-		);
-		printCreated(appName & "/public/index.cfm");
-
-		// Create Application.cfc
-		fileWrite(
-			targetDir & "/config/app.cfm",
-			'<cfset set(dataSourceName="#lCase(appName)#")>#chr(10)#<cfset set(reloadPassword="")>'
-		);
-		printCreated(appName & "/config/app.cfm");
-
-		// Create routes.cfm
-		fileWrite(
-			targetDir & "/config/routes.cfm",
-			'<cfscript>#chr(10)#mapper()#chr(10)##chr(9)#.root(to="main##index")#chr(10)##chr(9)#.wildcard()#chr(10)#.end();#chr(10)#</cfscript>'
-		);
-		printCreated(appName & "/config/routes.cfm");
-
-		// Create lucee.json
-		var luceeConfig = {
-			"name": appName,
-			"version": "7.0.2.101",
-			"port": 8080,
-			"shutdownPort": 8081,
-			"webroot": "./public",
-			"openBrowser": true,
-			"jvm": {"maxMemory": "512m", "minMemory": "128m"},
-			"urlRewrite": {"enabled": true, "routerFile": "index.cfm"},
-			"admin": {"enabled": true},
-			"enableLucee": true,
-			"monitoring": {"enabled": false},
-			"configuration": {
-				"datasources": {},
-				"mappings": {
-					"/wheels": "../vendor/wheels",
-					"/app": "../app",
-					"/config": "../config",
-					"/tests": "../tests"
-				}
-			}
+		// Template variable context
+		var context = {
+			"appName": appName,
+			"datasourceName": lCase(appName),
+			"reloadPassword": lCase(appName)
 		};
-		fileWrite(targetDir & "/lucee.json", serializeJSON(var = luceeConfig, compact = false));
-		printCreated(appName & "/lucee.json");
 
-		// Create main controller
+		// Copy template directory tree to target, processing placeholders
+		copyTemplateDir(templateDir, targetDir, appName, context);
+
+		// Create the default Main controller and index view (not in template
+		// because they are app-specific starter content, not framework structure)
+		ensureDirectory(targetDir & "/app/views/main");
+		var nl = chr(10);
+		var tab = chr(9);
 		fileWrite(
 			targetDir & "/app/controllers/Main.cfc",
-			'component extends="Controller" {#chr(10)##chr(10)##chr(9)#function index() {#chr(10)##chr(9)##chr(9)#// Default action#chr(10)##chr(9)#}#chr(10)##chr(10)#}'
+			'component extends="Controller" {' & nl & nl & tab & 'function index() {' & nl & tab & tab & '// Default action' & nl & tab & '}' & nl & nl & '}'& nl
 		);
 		printCreated(appName & "/app/controllers/Main.cfc");
 
-		// Create main index view
 		fileWrite(
 			targetDir & "/app/views/main/index.cfm",
-			'<h1>Welcome to #appName#</h1>#chr(10)#<p>Your Wheels application is running. Edit this file at app/views/main/index.cfm</p>'
+			'<h1>Welcome to ' & appName & '</h1>' & nl & '<p>Your Wheels application is running. Edit this file at app/views/main/index.cfm</p>' & nl
 		);
 		printCreated(appName & "/app/views/main/index.cfm");
 
@@ -1104,6 +1054,62 @@ component extends="modules.BaseModule" {
 		out("  cd #appName#");
 		out("  wheels start");
 		return "";
+	}
+
+	/**
+	 * Recursively copy a template directory to a target, processing {{variable}}
+	 * placeholders in file contents and renaming underscore-prefixed dot files
+	 * (e.g. _env -> .env, _gitignore -> .gitignore).
+	 */
+	private void function copyTemplateDir(
+		required string sourceDir,
+		required string targetDir,
+		required string appName,
+		required struct context
+	) {
+		ensureDirectory(arguments.targetDir);
+
+		var entries = directoryList(arguments.sourceDir, false, "query");
+
+		for (var entry in entries) {
+			var sourcePath = arguments.sourceDir & "/" & entry.name;
+			var targetName = entry.name;
+
+			// Rename _env -> .env, _gitignore -> .gitignore
+			if (targetName == "_env") targetName = ".env";
+			else if (targetName == "_gitignore") targetName = ".gitignore";
+
+			var targetPath = arguments.targetDir & "/" & targetName;
+			var relativePath = arguments.appName & replace(targetPath, arguments.targetDir, "");
+
+			if (entry.type == "Dir") {
+				ensureDirectory(targetPath);
+				printCreated(relativePath & "/");
+				// Recurse into subdirectory
+				copyTemplateDir(sourcePath, targetPath, arguments.appName, arguments.context);
+			} else {
+				// Skip .gitkeep files — they exist only to keep empty dirs in git
+				if (entry.name == ".gitkeep") {
+					continue;
+				}
+				// Read template, process placeholders, write to target
+				var content = fileRead(sourcePath);
+				content = processPlaceholders(content, arguments.context);
+				fileWrite(targetPath, content);
+				printCreated(relativePath);
+			}
+		}
+	}
+
+	/**
+	 * Replace {{key}} placeholders in content with context values.
+	 */
+	private string function processPlaceholders(required string content, required struct context) {
+		var result = arguments.content;
+		for (var key in arguments.context) {
+			result = replace(result, "{{#key#}}", arguments.context[key], "all");
+		}
+		return result;
 	}
 
 	// ── Inline Template Fallback ─────────────────────

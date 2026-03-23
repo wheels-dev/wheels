@@ -1,0 +1,5 @@
+# Environment configuration for {{appName}}
+# Copy this file to .env and update values for your environment.
+# Never commit .env to version control.
+
+WHEELS_ENV=development
