@@ -330,6 +330,34 @@ services:
     networks:
       - wheels-network
 
+  cockroachdb:
+    image: cockroachdb/cockroach:latest-v24.3
+    restart: always
+    command: start-single-node --insecure --advertise-addr=cockroachdb
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health?ready=1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - cockroachdb_data:/cockroach/cockroach-data
+    networks:
+      - wheels-network
+
+  cockroachdb-init:
+    image: cockroachdb/cockroach:latest-v24.3
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    restart: "no"
+    command: sql --insecure --host=cockroachdb:26257 -e "CREATE DATABASE IF NOT EXISTS wheelstestdb; CREATE USER IF NOT EXISTS wheelstestdb; GRANT ALL ON DATABASE wheelstestdb TO wheelstestdb;"
+    networks:
+      - wheels-network
+
   oracle:
     image: gvenzl/oracle-free:23-slim
     restart: always
@@ -361,3 +389,4 @@ volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
+  cockroachdb_data:
