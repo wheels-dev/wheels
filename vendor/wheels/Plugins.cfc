@@ -255,6 +255,19 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Invokes boot(app) on all plugins that implement ServiceProviderInterface.
+	 * Called after ALL register() methods have completed and user services.cfm has been loaded,
+	 * so plugins can safely resolve services from the container.
+	 *
+	 * @app The Wheels application configuration struct (application.wheels or application.$wheels during init)
+	 */
+	public void function $invokeServiceProviderBoot(required struct app) {
+		for (local.pluginKey in variables.$class.serviceProviders) {
+			variables.$class.plugins[local.pluginKey].boot(arguments.app);
+		}
+	}
+
+	/**
 	 * Checks whether a plugin implements ServiceProviderInterface via component metadata.
 	 *
 	 * @plugin The plugin instance to check

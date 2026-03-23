@@ -1,6 +1,7 @@
 /**
  * Test plugin that implements ServiceProviderInterface.
- * Used to verify the interface contract is implementable.
+ * Used to verify the interface contract is implementable and the full
+ * register/boot lifecycle works including service resolution during boot.
  */
 component implements="wheels.ServiceProviderInterface" {
 
@@ -10,6 +11,7 @@ component implements="wheels.ServiceProviderInterface" {
 		this.bootCalled = false;
 		this.containerReceived = javacast("null", "");
 		this.appReceived = javacast("null", "");
+		this.resolvedDuringBoot = javacast("null", "");
 		return this;
 	}
 
@@ -26,6 +28,12 @@ component implements="wheels.ServiceProviderInterface" {
 	public void function boot(required struct app) {
 		this.bootCalled = true;
 		this.appReceived = arguments.app;
+		// Resolve the service registered during register() to prove DI works at boot time
+		if (!IsNull(this.containerReceived) && IsObject(this.containerReceived) && StructKeyExists(this.containerReceived, "containsInstance")) {
+			if (this.containerReceived.containsInstance("pluginGreeting")) {
+				this.resolvedDuringBoot = this.containerReceived.getInstance("pluginGreeting");
+			}
+		}
 	}
 
 	/**

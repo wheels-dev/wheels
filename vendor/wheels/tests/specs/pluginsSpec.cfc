@@ -660,6 +660,53 @@ component extends="wheels.WheelsTest" {
 				expect(serviceProviders).toBeArray()
 				expect(ArrayLen(serviceProviders)).toBe(0)
 			})
+
+			it("calls boot(app) when $invokeServiceProviderBoot is invoked", () => {
+				PluginObj = $pluginObj(config)
+				var fakeApp = {environment: "testing", version: "3.0.0"}
+
+				PluginObj.$invokeServiceProviderBoot(fakeApp)
+
+				var plugin = PluginObj.getPlugins().TestServiceProvider
+				expect(plugin.bootCalled).toBeTrue()
+				expect(plugin.appReceived).toBe(fakeApp)
+			})
+
+			it("calls boot after register in the correct lifecycle order", () => {
+				PluginObj = $pluginObj(config)
+
+				// register first, then boot — mirrors $loadPlugins behavior
+				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
+				PluginObj.$invokeServiceProviderBoot(application.wheels)
+
+				var plugin = PluginObj.getPlugins().TestServiceProvider
+				expect(plugin.registerCalled).toBeTrue()
+				expect(plugin.bootCalled).toBeTrue()
+			})
+
+			it("allows plugins to resolve services registered during register() when boot() is called", () => {
+				PluginObj = $pluginObj(config)
+
+				// Full lifecycle: register → boot
+				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
+				PluginObj.$invokeServiceProviderBoot(application.wheels)
+
+				var plugin = PluginObj.getPlugins().TestServiceProvider
+				expect(plugin.resolvedDuringBoot).notToBeNull()
+				expect(plugin.resolvedDuringBoot.greet("Test")).toBe("Hello from plugin, Test!")
+			})
+
+			it("does not call boot on standard plugins", () => {
+				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
+				PluginObj = $pluginObj(config)
+
+				// Should not throw when called with no service providers
+				PluginObj.$invokeServiceProviderBoot(application.wheels)
+
+				// No service providers means no boot calls
+				expect(ArrayLen(PluginObj.getServiceProviders())).toBe(0)
+			})
 		})
 
 		describe("Tests that unpacking", () => {

@@ -2811,6 +2811,8 @@ component output="false" {
 		// Invoke register(container) on ServiceProviderInterface plugins before activation
 		if (isDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PluginObj.getServiceProviders())) {
 			application[local.appKey].PluginObj.$invokeServiceProviderRegister(application.wheelsdi);
+			// Boot after all register() calls complete — plugins can now resolve services
+			application[local.appKey].PluginObj.$invokeServiceProviderBoot(application[local.appKey]);
 		}
 		// Invoke onPluginActivate lifecycle hook on all plugins now that everything is in the application scope
 		application[local.appKey].PluginObj.$invokeOnPluginActivate();
