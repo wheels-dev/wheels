@@ -205,6 +205,7 @@ nav:
       - 'Service Architecture': 'command-line-tools/cli-guides/service-architecture.md'
       - 'Migrations Guide': 'command-line-tools/cli-guides/migrations.md'
       - 'Testing Guide': 'command-line-tools/cli-guides/testing.md'
+      - 'Migrating from CommandBox to LuCLI': 'command-line-tools/cli-guides/migration-from-commandbox.md'
   - 'Working with Wheels':
     - 'Conventions': 'working-with-wheels/conventions.md'
     - 'Configuration and Defaults': 'working-with-wheels/configuration-and-defaults.md'

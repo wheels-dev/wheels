@@ -40,6 +40,9 @@ Get up and running with Wheels CLI in minutes. Learn how to:
 - [Template System](guides/template-system.md) - Customize code generation templates
 - [Testing Guide](guides/testing.md) - Write and run tests effectively
 
+#### Switching CLIs
+- [Migrating from CommandBox to LuCLI](cli-guides/migration-from-commandbox.md) - Command mapping, config changes, and side-by-side usage
+
 #### Best Practices
 - [Migration Guide](guides/migrations.md) - Database migration best practices
 - [Security Guide](guides/security.md) - Security scanning and hardening
