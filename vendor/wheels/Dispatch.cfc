@@ -35,13 +35,17 @@ component output="false" extends="wheels.Global"{
 			}
 		}
 
-		// 2. Append plugin-registered middleware (from onPluginLoad registerMiddleware calls).
+		// 2. Append plugin-registered middleware, sorted by priority and before/after constraints.
 		local.pluginMiddleware = $getPluginMiddlewareConfig();
-		for (local.entry in local.pluginMiddleware) {
-			if (IsSimpleValue(local.entry.middleware)) {
-				ArrayAppend(local.middlewareInstances, CreateObject("component", local.entry.middleware).init());
-			} else {
-				ArrayAppend(local.middlewareInstances, local.entry.middleware);
+		if (ArrayLen(local.pluginMiddleware)) {
+			local.resolver = new wheels.middleware.MiddlewareOrderResolver();
+			local.sorted = local.resolver.resolve(local.pluginMiddleware);
+			for (local.entry in local.sorted) {
+				if (IsSimpleValue(local.entry.middleware)) {
+					ArrayAppend(local.middlewareInstances, CreateObject("component", local.entry.middleware).init());
+				} else {
+					ArrayAppend(local.middlewareInstances, local.entry.middleware);
+				}
 			}
 		}
 
