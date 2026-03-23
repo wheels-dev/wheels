@@ -13,7 +13,7 @@ component extends="wheels.WheelsTest" {
 
 			it("has a register method that accepts a container argument", () => {
 				var provider = CreateObject("component", "wheels.tests._assets.plugins.serviceprovider.TestServiceProvider.TestServiceProvider").init()
-				var fakeContainer = {map: true, bind: true}
+				var fakeContainer = CreateObject("component", "wheels.tests._assets.plugins.serviceprovider.FakeContainer").init()
 
 				provider.register(container=fakeContainer)
 
@@ -33,7 +33,7 @@ component extends="wheels.WheelsTest" {
 
 			it("supports the full register-then-boot lifecycle", () => {
 				var provider = CreateObject("component", "wheels.tests._assets.plugins.serviceprovider.TestServiceProvider.TestServiceProvider").init()
-				var fakeContainer = {map: true}
+				var fakeContainer = CreateObject("component", "wheels.tests._assets.plugins.serviceprovider.FakeContainer").init()
 				var fakeApp = {environment: "testing"}
 
 				provider.register(container=fakeContainer)

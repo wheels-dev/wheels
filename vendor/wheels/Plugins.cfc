@@ -170,10 +170,13 @@ component output="false" extends="wheels.Global"{
 					// support function members.
 					local.loadContext = Duplicate(application);
 					$installPluginLoadAPI(local.pluginKey, local.loadContext);
-					try {
-						local.plugin.onPluginLoad(local.loadContext);
-					} finally {
-						// No cleanup needed — loadContext is discarded
+					local.plugin.onPluginLoad(local.loadContext);
+					// Sync any new keys the plugin added back to application scope,
+					// but skip the injected API functions (they're closures, not data).
+					for (local.contextKey in local.loadContext) {
+						if (!StructKeyExists(application, local.contextKey) && !IsCustomFunction(local.loadContext[local.contextKey])) {
+							application[local.contextKey] = local.loadContext[local.contextKey];
+						}
 					}
 				}
 				// Track plugins that implement ServiceProviderInterface

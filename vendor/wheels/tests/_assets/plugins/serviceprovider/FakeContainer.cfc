@@ -14,6 +14,10 @@ component {
 		return this;
 	}
 
+	public FakeContainer function mapInstance(required string name) {
+		return this;
+	}
+
 	public FakeContainer function to(required string componentPath) {
 		return this;
 	}
