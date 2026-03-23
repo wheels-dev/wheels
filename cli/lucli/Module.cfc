@@ -234,17 +234,62 @@ component extends="modules.BaseModule" {
 		var args = __arguments ?: [];
 
 		if (!arrayLen(args)) {
-			out("Usage: wheels new <appname>", "yellow");
+			out("Usage: wheels new <appname> [options]", "yellow");
 			out("");
 			out("Creates a new Wheels application in the specified directory.");
 			out("");
-			out("Example:", "bold");
+			out("Options:", "bold");
+			out("  --port=<number>           Server port (default: 8080)");
+			out("  --datasource=<name>       Datasource name (default: app name)");
+			out("  --reload-password=<pw>    Reload password (default: app name)");
+			out("  --setup-h2                Configure H2 embedded database");
+			out("  --no-open-browser         Don't open browser on server start");
+			out("");
+			out("Examples:", "bold");
 			out("  wheels new myapp");
+			out("  wheels new myapp --port=3000 --setup-h2");
+			out("  wheels new myapp --datasource=mydb --reload-password=secret");
 			return "";
 		}
 
-		var appName = args[1];
-		return scaffoldNewApp(appName);
+		var appName = "";
+		var options = {
+			port: 8080,
+			datasource: "",
+			reloadPassword: "",
+			setupH2: false,
+			openBrowser: true
+		};
+
+		// Parse arguments: first non-flag arg is app name, flags are options
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (reFindNoCase("^--port=", arg)) {
+				options.port = val(valueAfterEquals(arg));
+			} else if (reFindNoCase("^--datasource=", arg)) {
+				options.datasource = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--reload-password=", arg)) {
+				options.reloadPassword = valueAfterEquals(arg);
+			} else if (arg == "--setup-h2") {
+				options.setupH2 = true;
+			} else if (arg == "--no-open-browser") {
+				options.openBrowser = false;
+			} else if (!arg.startsWith("--") && !len(appName)) {
+				appName = arg;
+			}
+		}
+
+		if (!len(appName)) {
+			out("Error: app name is required.", "red");
+			out("Usage: wheels new <appname>");
+			return "";
+		}
+
+		// Default datasource and reload password to app name if not specified
+		if (!len(options.datasource)) options.datasource = lCase(appName);
+		if (!len(options.reloadPassword)) options.reloadPassword = lCase(appName);
+
+		return scaffoldNewApp(appName, options);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1002,13 +1047,22 @@ component extends="modules.BaseModule" {
 
 	// ── New App Scaffolding ──────────────────────────
 
-	private string function scaffoldNewApp(required string appName) {
+	private string function scaffoldNewApp(required string appName, struct options = {}) {
 		var targetDir = variables.cwd & "/" & appName;
 
 		if (directoryExists(targetDir)) {
 			out("Directory already exists: #appName#", "red");
 			return "";
 		}
+
+		// Merge defaults for any missing options
+		var opts = {
+			port: structKeyExists(options, "port") ? options.port : 8080,
+			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
+			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : lCase(appName),
+			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
+			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
+		};
 
 		out("Creating new Wheels application: #appName#...", "cyan");
 		out("");
@@ -1020,15 +1074,23 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Template variable context
+		// Template variable context — all config values flow through here
 		var context = {
 			"appName": appName,
-			"datasourceName": lCase(appName),
-			"reloadPassword": lCase(appName)
+			"datasourceName": opts.datasource,
+			"reloadPassword": opts.reloadPassword,
+			"port": opts.port,
+			"shutdownPort": opts.port + 1,
+			"openBrowser": opts.openBrowser ? "true" : "false"
 		};
 
 		// Copy template directory tree to target, processing placeholders
 		copyTemplateDir(templateDir, targetDir, appName, context);
+
+		// Set up H2 embedded database if requested
+		if (opts.setupH2) {
+			configureH2Database(targetDir, appName, opts.datasource);
+		}
 
 		// Create the default Main controller and index view (not in template
 		// because they are app-specific starter content, not framework structure)
@@ -1050,10 +1112,61 @@ component extends="modules.BaseModule" {
 		out("");
 		out("Application created!", "green");
 		out("");
+		out("Configuration:", "bold");
+		out("  Port:       #opts.port#");
+		out("  Datasource: #opts.datasource#");
+		if (opts.setupH2) out("  Database:   H2 embedded (db/h2/)", "green");
+		out("");
 		out("Next steps:", "bold");
 		out("  cd #appName#");
 		out("  wheels start");
 		return "";
+	}
+
+	/**
+	 * Configure H2 embedded database by creating the db directory
+	 * and injecting datasource configuration into config/app.cfm.
+	 */
+	private void function configureH2Database(
+		required string targetDir,
+		required string appName,
+		required string datasourceName
+	) {
+		var nl = chr(10);
+		var tab = chr(9);
+
+		// Create db/h2 directory for H2 data files
+		var dbDir = targetDir & "/db/h2";
+		ensureDirectory(dbDir);
+		printCreated(appName & "/db/h2/");
+
+		// Build H2 datasource configuration for config/app.cfm
+		var h2Config = "";
+		h2Config &= tab & "// H2 embedded database (configured by wheels new --setup-h2)" & nl;
+		h2Config &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
+		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/#datasourceName#") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'username: "sa"' & nl;
+		h2Config &= tab & "};";
+
+		// Also add a test database datasource
+		h2Config &= nl & tab & 'this.datasources["wheelstestdb"] = {' & nl;
+		h2Config &= tab & tab & 'class: "org.h2.Driver",' & nl;
+		h2Config &= tab & tab & 'connectionString: "jdbc:h2:file:" & expandPath("../db/h2/wheelstestdb") & ";MODE=MySQL",' & nl;
+		h2Config &= tab & tab & 'username: "sa"' & nl;
+		h2Config &= tab & "};";
+
+		// Inject into config/app.cfm at the CLI-Appends-Here marker
+		var appCfmPath = targetDir & "/config/app.cfm";
+		if (fileExists(appCfmPath)) {
+			var content = fileRead(appCfmPath);
+			var marker = tab & "// CLI-Appends-Here";
+			if (find(marker, content)) {
+				content = replace(content, marker, h2Config & nl & nl & marker, "one");
+				fileWrite(appCfmPath, content);
+				out("  config  #appName#/config/app.cfm (H2 datasource)", "green");
+			}
+		}
 	}
 
 	/**

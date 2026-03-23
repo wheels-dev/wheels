@@ -1,10 +1,10 @@
 {
   "name": "{{appName}}",
   "version": "7.0.2.101",
-  "port": 8080,
-  "shutdownPort": 8081,
+  "port": {{port}},
+  "shutdownPort": {{shutdownPort}},
   "webroot": "./public",
-  "openBrowser": true,
+  "openBrowser": {{openBrowser}},
   "jvm": {
     "maxMemory": "512m",
     "minMemory": "128m"
