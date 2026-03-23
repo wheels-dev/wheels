@@ -41,9 +41,21 @@ We welcome contributions via **Issues** and **Pull Requests (PRs)**. Before you 
 
 ### Development Environment Setup
 
+**Quick Start (recommended):**
+
+```bash
+git clone https://github.com/wheels-dev/wheels.git
+cd wheels
+bash tools/scripts/setup.sh
+```
+
+This single command checks prerequisites, starts a MySQL container, installs dependencies via CommandBox, and verifies the environment. Run `bash tools/scripts/setup.sh --help` for options including `--full` (all databases) and `--docker` (no local CommandBox needed).
+
 **System Requirements:**
 
+* Docker and Docker Compose
 * Adobe ColdFusion 2018/2021/2023/2025 OR Lucee 5/6/7
+* CommandBox (optional with `--docker` mode)
 * Supported database: H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle, SQLite
 * Git for version control
 
@@ -52,11 +64,12 @@ In general, we follow the ["fork-and-pull" Git workflow](https://github.com/susa
 
 1. Fork the [wheels-dev/wheels](https://github.com/wheels-dev/wheels) repository to your own Github account
 2. Clone the project to your machine
-3. Create a branch locally with a succinct but descriptive name
-4. Commit changes to the branch
-5. Following the formatting and testing guidelines
-6. Push changes to your fork
-7. Open a PR in the [wheels-dev/wheels](https://github.com/wheels-dev/wheels) repository and follow the PR template so that we can efficiently review the changes.
+3. Run `bash tools/scripts/setup.sh` to set up your dev environment
+4. Create a branch locally with a succinct but descriptive name
+5. Commit changes to the branch
+6. Following the formatting and testing guidelines
+7. Push changes to your fork
+8. Open a PR in the [wheels-dev/wheels](https://github.com/wheels-dev/wheels) repository and follow the PR template so that we can efficiently review the changes.
 
 ---
 
