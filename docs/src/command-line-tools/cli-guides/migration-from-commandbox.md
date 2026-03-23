@@ -245,7 +245,7 @@ Some features are CommandBox-only (LuCLI equivalents are planned for future rele
 | Feature | CommandBox Command | LuCLI Status |
 |---------|-------------------|-------------|
 | ForgeBox packages | `box install <package>` | Not available — use Lucee modules |
-| Interactive console/REPL | `box repl` | Planned (blocked on Lucee JSR223) |
+| Interactive console/REPL | `box repl` | `wheels console` (HTTP-backed, requires running server) |
 | Plugin management | `wheels plugins install` | Planned |
 | Environment switching | `wheels env switch production` | Planned |
 | Security scanning | `wheels security scan` | Planned |

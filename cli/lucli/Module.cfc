@@ -446,6 +446,345 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  console — Interactive REPL
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Launch interactive CFML console with Wheels app context (model, service, get)
+	 */
+	public string function console() {
+		var args = __arguments ?: [];
+		var password = "";
+
+		// Parse --password=value
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (reFindNoCase("^--password=", arg)) {
+				password = valueAfterEquals(arg);
+			} else if (arg == "--password" && i < arrayLen(args)) {
+				password = args[++i];
+			}
+		}
+
+		// Detect server
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running Wheels server detected.", "red");
+			out("The console requires a running server. Start with: wheels start");
+			return "";
+		}
+
+		// Auto-detect reload password if not provided
+		if (!len(password)) {
+			password = detectReloadPassword();
+		}
+
+		// Verify connectivity with a ping
+		var evalUrl = "http://localhost:#serverPort#/wheels/console/eval";
+		try {
+			var pingResult = makeHttpPost(evalUrl, serializeJSON({expression: "__ping__", password: password}));
+			if (isJSON(pingResult)) {
+				var pingData = deserializeJSON(pingResult);
+				if (!pingData.success) {
+					out("Console connection failed: #pingData.error#", "red");
+					return "";
+				}
+				var wheelsVersion = pingData.version ?: "unknown";
+				var wheelsEnv = pingData.environment ?: "unknown";
+			} else {
+				out("Server returned unexpected response. Is this a Wheels 3.x application?", "red");
+				return "";
+			}
+		} catch (any e) {
+			out("Cannot connect to console endpoint at #evalUrl#", "red");
+			out("Ensure your Wheels app is v3.1+ with console support.", "yellow");
+			out("Error: #e.message#", "yellow");
+			return "";
+		}
+
+		// Banner
+		out("", "");
+		out("Wheels Console v#version()#", "bold");
+		out("Connected to localhost:#serverPort# (#wheelsEnv#) — Wheels #wheelsVersion#", "cyan");
+		out("Type expressions to evaluate in your app context. /help for commands.", "");
+		out("", "");
+
+		// Interactive REPL loop
+		var System = createObject("java", "java.lang.System");
+		var reader = createObject("java", "java.io.BufferedReader").init(
+			createObject("java", "java.io.InputStreamReader").init(System.in)
+		);
+
+		var running = true;
+		while (running) {
+			// Print prompt
+			System.out.print("wheels> ");
+			System.out.flush();
+
+			// Read input
+			var line = reader.readLine();
+
+			// Handle EOF (Ctrl+D)
+			if (isNull(line)) {
+				out("");
+				out("Bye!", "cyan");
+				break;
+			}
+
+			line = trim(line);
+
+			// Skip empty lines
+			if (!len(line)) continue;
+
+			// Handle REPL commands
+			switch (lCase(line)) {
+				case "/exit":
+				case "/quit":
+				case "/q":
+					out("Bye!", "cyan");
+					running = false;
+					continue;
+
+				case "/help":
+				case "/h":
+					printConsoleHelp();
+					continue;
+
+				case "/env":
+					consoleExec(evalUrl, "__env__", password);
+					continue;
+
+				case "/reload":
+					out("Reloading application...", "cyan");
+					try {
+						var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
+						makeHttpRequest(reloadUrl);
+						out("Application reloaded.", "green");
+					} catch (any e) {
+						out("Reload failed: #e.message#", "red");
+					}
+					continue;
+
+				case "/clear":
+					// ANSI clear screen
+					System.out.print(chr(27) & "[2J" & chr(27) & "[H");
+					System.out.flush();
+					continue;
+			}
+
+			// Evaluate expression
+			consoleExec(evalUrl, line, password);
+		}
+
+		return "";
+	}
+
+	/**
+	 * Execute a single expression and display the result
+	 */
+	private void function consoleExec(required string url, required string expression, string password = "") {
+		try {
+			var body = serializeJSON({expression: expression, password: password});
+			var httpResult = makeHttpPost(url, body);
+
+			if (!isJSON(httpResult)) {
+				out("Server returned non-JSON response.", "red");
+				verbose(httpResult);
+				return;
+			}
+
+			var result = deserializeJSON(httpResult);
+
+			// Display captured output (from writeOutput calls)
+			if (len(result.output ?: "")) {
+				out(result.output);
+			}
+
+			if (!result.success) {
+				out("Error: #result.error#", "red");
+				return;
+			}
+
+			// Display result based on type
+			var resultType = result.type ?: "void";
+			var resultValue = result.result ?: "";
+
+			if (resultType == "void" && !len(resultValue)) {
+				// No return value and no output — nothing to display
+				return;
+			}
+
+			switch (resultType) {
+				case "query":
+					displayQueryResult(resultValue);
+					break;
+
+				case "model":
+					displayModelResult(resultValue);
+					break;
+
+				case "struct":
+				case "array":
+					displayJsonResult(resultValue, resultType);
+					break;
+
+				case "number":
+				case "boolean":
+				case "string":
+					out("=> #resultValue#", "green");
+					break;
+
+				case "object":
+					out("=> [#resultValue#]", "cyan");
+					break;
+
+				default:
+					if (len(resultValue)) {
+						out("=> #resultValue#");
+					}
+			}
+
+		} catch (any e) {
+			out("Request failed: #e.message#", "red");
+		}
+	}
+
+	/**
+	 * Display a query result as a formatted table
+	 */
+	private void function displayQueryResult(required string jsonResult) {
+		try {
+			var data = deserializeJSON(jsonResult);
+			var columns = data.columns ?: [];
+			var rows = data.data ?: [];
+			var recordCount = data.recordCount ?: 0;
+
+			if (!arrayLen(columns)) {
+				out("(empty query)", "yellow");
+				return;
+			}
+
+			// Calculate column widths
+			var widths = {};
+			for (var col in columns) {
+				widths[col] = len(col);
+			}
+			for (var row in rows) {
+				for (var col in columns) {
+					var val = toString(row[col] ?: "");
+					if (len(val) > 40) val = left(val, 37) & "...";
+					widths[col] = max(widths[col], len(val));
+				}
+			}
+
+			// Header
+			var header = "";
+			var separator = "";
+			for (var col in columns) {
+				var w = widths[col];
+				header &= " " & lCase(col) & repeatString(" ", w - len(col)) & " |";
+				separator &= repeatString("-", w + 2) & "+";
+			}
+			out(header, "bold");
+			out(separator, "");
+
+			// Rows
+			for (var row in rows) {
+				var line = "";
+				for (var col in columns) {
+					var w = widths[col];
+					var val = toString(row[col] ?: "");
+					if (len(val) > 40) val = left(val, 37) & "...";
+					line &= " " & val & repeatString(" ", w - len(val)) & " |";
+				}
+				out(line);
+			}
+
+			// Footer
+			if (recordCount > arrayLen(rows)) {
+				out("(#recordCount# rows, showing first #arrayLen(rows)#)", "yellow");
+			} else {
+				out("(#recordCount# row#recordCount != 1 ? 's' : ''#)", "yellow");
+			}
+
+		} catch (any e) {
+			// Fallback: show raw JSON
+			out(jsonResult);
+		}
+	}
+
+	/**
+	 * Display a model result as key-value pairs
+	 */
+	private void function displayModelResult(required string jsonResult) {
+		try {
+			var props = deserializeJSON(jsonResult);
+			out("=> {", "green");
+			var keys = structKeyArray(props);
+			arraySort(keys, "textnocase");
+			for (var key in keys) {
+				if (left(key, 1) == "_") continue; // Skip meta keys in main display
+				var val = isNull(props[key]) ? "null" : toString(props[key]);
+				if (len(val) > 80) val = left(val, 77) & "...";
+				out("    #lCase(key)#: #val#");
+			}
+			// Show meta info
+			if (structKeyExists(props, "_key")) {
+				out("    _key: #props._key#", "cyan");
+			}
+			if (structKeyExists(props, "_isNew")) {
+				out("    _isNew: #props._isNew#", "cyan");
+			}
+			out("  }", "green");
+		} catch (any e) {
+			out("=> #jsonResult#");
+		}
+	}
+
+	/**
+	 * Display a struct or array result as indented JSON
+	 */
+	private void function displayJsonResult(required string jsonResult, required string type) {
+		try {
+			// Simple indentation for readability
+			var formatted = jsonResult;
+			// Basic pretty-print: add newlines after { [ , and before } ]
+			formatted = replace(formatted, "{", "{#chr(10)#  ", "all");
+			formatted = replace(formatted, "}", "#chr(10)#}", "all");
+			formatted = replace(formatted, "[", "[#chr(10)#  ", "all");
+			formatted = replace(formatted, "]", "#chr(10)#]", "all");
+			formatted = replace(formatted, ",", ",#chr(10)#  ", "all");
+			out("=> #formatted#", "green");
+		} catch (any e) {
+			out("=> #jsonResult#");
+		}
+	}
+
+	/**
+	 * Print console help text
+	 */
+	private void function printConsoleHelp() {
+		out("");
+		out("Wheels Console Commands:", "bold");
+		out("  /help, /h     Show this help");
+		out("  /env          Show environment info");
+		out("  /reload       Reload the application");
+		out("  /clear        Clear the screen");
+		out("  /exit, /quit  Exit the console");
+		out("");
+		out("Expression Examples:", "bold");
+		out('  model("User").findAll()                      Query all users');
+		out('  model("User").findByKey(1)                   Find user by ID');
+		out('  model("User").findByKey(1).properties()      Get user properties');
+		out('  model("User").count()                        Count records');
+		out('  model("Post").findAll(where="status=''draft''")  Filtered query');
+		out('  get("environment")                           Framework setting');
+		out('  application.wheels.version                   Wheels version');
+		out('  service("emailService")                      Resolve a service');
+		out("");
+	}
+
+	// ─────────────────────────────────────────────────
 	//  analyze — Code analysis
 	// ─────────────────────────────────────────────────
 
@@ -1697,6 +2036,36 @@ component extends="modules.BaseModule" {
 		conn.setReadTimeout(10000);
 
 		var scanner = createObject("java", "java.util.Scanner").init(conn.getInputStream(), "UTF-8");
+		var response = "";
+		while (scanner.hasNextLine()) {
+			response &= scanner.nextLine() & chr(10);
+		}
+		scanner.close();
+		return trim(response);
+	}
+
+	/**
+	 * Make an HTTP POST request with a JSON body and return the response
+	 */
+	private string function makeHttpPost(required string url, required string body) {
+		var URL = createObject("java", "java.net.URL").init(url);
+		var conn = URL.openConnection();
+		conn.setRequestMethod("POST");
+		conn.setConnectTimeout(5000);
+		conn.setReadTimeout(30000);
+		conn.setDoOutput(true);
+		conn.setRequestProperty("Content-Type", "application/json");
+
+		// Write request body
+		var writer = createObject("java", "java.io.OutputStreamWriter").init(conn.getOutputStream(), "UTF-8");
+		writer.write(body);
+		writer.flush();
+		writer.close();
+
+		// Read response (handle both success and error streams)
+		var responseCode = conn.getResponseCode();
+		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {
 			response &= scanner.nextLine() & chr(10);

@@ -108,15 +108,19 @@ Exposes Wheels tools as MCP over stdin/stdout for AI editors. This is the key di
 
 **Approach**: LuCLI already has MCP module support (`McpCommand.java`). The Wheels module registers tool definitions that map to the existing subcommand functions.
 
-### 2F: Console REPL (P3)
+### 2F: Console REPL (Done)
 
 ```
 wheels console
 ```
 
-Interactive CFML console with Wheels app context (`model()`, `service()`, etc.). Requires bootstrapping `application.cfc` within LuCLI's JSR223 engine.
+Interactive CFML console with Wheels app context (`model()`, `service()`, etc.).
 
-**Blocked on**: Understanding Lucee JSR223 application lifecycle support. Coordinate with Mark Drew.
+**Implementation**: HTTP-backed REPL — the CLI sends expressions to a POST endpoint on the running Wheels server (`/wheels/console/eval`), which evaluates them in the full application context using `evaluate()`. This bypasses the JSR223 application lifecycle issue entirely since the server already has the bootstrapped application.
+
+**Security**: localhost-only + development mode + reload password.
+
+**Limitations**: Single-expression evaluation only (no cross-call variable persistence, no multi-statement blocks). These can be added in a future iteration using temp-file-include with session-scoped state.
 
 ---
 

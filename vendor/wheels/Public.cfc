@@ -106,6 +106,10 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/migrator/sql.cfm";
 		return "";
 	}
+	function consoleeval() {
+		include "/wheels/public/views/consoleeval.cfm";
+		return "";
+	}
 	function cli() {
 		include "/wheels/public/views/cli.cfm";
 		return "";
