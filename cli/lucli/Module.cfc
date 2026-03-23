@@ -251,18 +251,20 @@ component extends="modules.BaseModule" {
 			out("Usage: wheels new <appname> [options]", "yellow");
 			out("");
 			out("Creates a new Wheels application in the specified directory.");
+			out("By default, SQLite is configured as the zero-config database.");
 			out("");
 			out("Options:", "bold");
 			out("  --port=<number>           Server port (default: 8080)");
 			out("  --datasource=<name>       Datasource name (default: app name)");
 			out("  --reload-password=<pw>    Reload password (default: app name)");
-			out("  --setup-h2                Configure H2 embedded database");
+			out("  --no-sqlite               Skip default SQLite database setup");
+			out("  --setup-h2                Use H2 embedded database instead of SQLite");
 			out("  --no-open-browser         Don't open browser on server start");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels new myapp");
 			out("  wheels new myapp --port=3000 --setup-h2");
-			out("  wheels new myapp --datasource=mydb --reload-password=secret");
+			out("  wheels new myapp --datasource=mydb --no-sqlite");
 			return "";
 		}
 
@@ -272,6 +274,7 @@ component extends="modules.BaseModule" {
 			datasource: "",
 			reloadPassword: "",
 			setupH2: false,
+			noSQLite: false,
 			openBrowser: true
 		};
 
@@ -286,6 +289,8 @@ component extends="modules.BaseModule" {
 				options.reloadPassword = valueAfterEquals(arg);
 			} else if (arg == "--setup-h2") {
 				options.setupH2 = true;
+			} else if (arg == "--no-sqlite") {
+				options.noSQLite = true;
 			} else if (arg == "--no-open-browser") {
 				options.openBrowser = false;
 			} else if (!arg.startsWith("--") && !len(appName)) {
@@ -1279,6 +1284,7 @@ component extends="modules.BaseModule" {
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : lCase(appName),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
+			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
 		};
 
@@ -1305,9 +1311,11 @@ component extends="modules.BaseModule" {
 		// Copy template directory tree to target, processing placeholders
 		copyTemplateDir(templateDir, targetDir, appName, context);
 
-		// Set up H2 embedded database if requested
+		// Set up embedded database: H2 if explicitly requested, SQLite by default
 		if (opts.setupH2) {
 			configureH2Database(targetDir, appName, opts.datasource);
+		} else if (!opts.noSQLite) {
+			configureSQLiteDatabase(targetDir, appName, opts.datasource);
 		}
 
 		// Create the default Main controller and index view (not in template
@@ -1333,7 +1341,11 @@ component extends="modules.BaseModule" {
 		out("Configuration:", "bold");
 		out("  Port:       #opts.port#");
 		out("  Datasource: #opts.datasource#");
-		if (opts.setupH2) out("  Database:   H2 embedded (db/h2/)", "green");
+		if (opts.setupH2) {
+			out("  Database:   H2 embedded (db/h2/)", "green");
+		} else if (!opts.noSQLite) {
+			out("  Database:   SQLite (db/development.sqlite)", "green");
+		}
 		out("");
 		out("Next steps:", "bold");
 		out("  cd #appName#");
@@ -1383,6 +1395,53 @@ component extends="modules.BaseModule" {
 				content = replace(content, marker, h2Config & nl & nl & marker, "one");
 				fileWrite(appCfmPath, content);
 				out("  config  #appName#/config/app.cfm (H2 datasource)", "green");
+			}
+		}
+	}
+
+	/**
+	 * Configure SQLite as the zero-config default database by creating the db
+	 * directory and injecting datasource configuration into config/app.cfm.
+	 * Lucee auto-downloads the SQLite JDBC bundle via the bundleName hint.
+	 */
+	private void function configureSQLiteDatabase(
+		required string targetDir,
+		required string appName,
+		required string datasourceName
+	) {
+		var nl = chr(10);
+		var tab = chr(9);
+
+		// Create db directory for SQLite data files
+		var dbDir = targetDir & "/db";
+		ensureDirectory(dbDir);
+		printCreated(appName & "/db/");
+
+		// Build SQLite datasource configuration for config/app.cfm
+		var sqliteConfig = "";
+		sqliteConfig &= tab & "// SQLite zero-config database (configured by wheels new)" & nl;
+		sqliteConfig &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
+		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
+		sqliteConfig &= tab & tab & 'bundleName: "org.xerial.sqlite-jdbc",' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/development.sqlite")' & nl;
+		sqliteConfig &= tab & "};";
+
+		// Also add a test database datasource
+		sqliteConfig &= nl & tab & 'this.datasources["wheelstestdb"] = {' & nl;
+		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
+		sqliteConfig &= tab & tab & 'bundleName: "org.xerial.sqlite-jdbc",' & nl;
+		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")' & nl;
+		sqliteConfig &= tab & "};";
+
+		// Inject into config/app.cfm at the CLI-Appends-Here marker
+		var appCfmPath = targetDir & "/config/app.cfm";
+		if (fileExists(appCfmPath)) {
+			var content = fileRead(appCfmPath);
+			var marker = tab & "// CLI-Appends-Here";
+			if (find(marker, content)) {
+				content = replace(content, marker, sqliteConfig & nl & nl & marker, "one");
+				fileWrite(appCfmPath, content);
+				out("  config  #appName#/config/app.cfm (SQLite datasource)", "green");
 			}
 		}
 	}

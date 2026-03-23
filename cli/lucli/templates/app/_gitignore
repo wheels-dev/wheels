@@ -28,6 +28,7 @@ WEB-INF
 settings.json
 settings.xml
 *.db
+*.sqlite
 .wheels/
 
 # Environment files (contain secrets)
