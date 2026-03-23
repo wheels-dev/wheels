@@ -428,50 +428,62 @@ component extends="wheels.WheelsTest" {
 
 **IMPORTANT: Always run the test suite before pushing.** Do not rely on CI alone.
 
-### Quick start (Lucee 6 + H2, no external DB needed)
+### Minimum: test both Lucee AND Adobe before pushing
+Lucee and Adobe CF have different runtime behaviors (struct member functions,
+application scope, closure scoping). Always test at least **two engines**:
 ```bash
 cd /path/to/wheels/rig    # must be in the repo root with compose.yml
-docker compose up -d lucee6
-# Wait ~30s for engine startup, then:
-curl -s -o /dev/null -w "%{http_code}" "http://localhost:60002/wheels/core/tests?db=h2&format=json"
-# 200 = all pass, 417 = failures exist
-```
 
-### Full test with specific database
-```bash
-# Start engine + database (pick one combo)
-docker compose up -d lucee6 mysql      # Lucee 6 + MySQL
-docker compose up -d lucee6 postgres   # Lucee 6 + PostgreSQL
-docker compose up -d lucee6 sqlserver  # Lucee 6 + SQL Server
+# Start both engines (H2 is built-in, no external DB needed)
+docker compose up -d lucee6 adobe2025
 
-# Wait for DB to be ready, then run tests
-curl -sf "http://localhost:60002/wheels/core/tests?db=mysql&format=json" > /tmp/results.json
+# Wait ~60s for startup, then run both:
+curl -s -o /tmp/lucee6-results.json "http://localhost:60006/wheels/core/tests?db=h2&format=json"
+curl -s -o /tmp/adobe2025-results.json "http://localhost:62025/wheels/core/tests?db=h2&format=json"
 
-# Parse failures from JSON results
-python3 -c "
-import json, sys
-d = json.load(open('/tmp/results.json'))
-print(f\"Pass: {d['totalPass']}, Fail: {d['totalFail']}, Error: {d['totalError']}\")
+# Check results (HTTP 200=pass, 417=failures)
+for f in /tmp/lucee6-results.json /tmp/adobe2025-results.json; do
+  python3 -c "
+import json
+d = json.load(open('$f'))
+engine = '$f'.split('/')[-1].replace('-results.json','')
+print(f'{engine}: {d[\"totalPass\"]} pass, {d[\"totalFail\"]} fail, {d[\"totalError\"]} error')
 for b in d.get('bundleStats',[]):
   for s in b.get('suiteStats',[]):
     for sp in s.get('specStats',[]):
       if sp.get('status') in ('Failed','Error'):
-        print(f\"  {sp['status']}: {sp['name']}: {sp.get('failMessage','')[:120]}\")
+        print(f'  {sp[\"status\"]}: {sp[\"name\"]}: {sp.get(\"failMessage\",\"\")[:120]}')
 "
+done
 ```
 
 ### Engine ports
 | Engine | Port |
 |--------|------|
-| lucee5 | 60001 |
-| lucee6 | 60002 |
-| lucee7 | 60003 |
-| boxlang | 60010 |
+| lucee5 | 60005 |
+| lucee6 | 60006 |
+| lucee7 | 60007 |
+| adobe2018 | 62018 |
+| adobe2021 | 62021 |
+| adobe2023 | 62023 |
+| adobe2025 | 62025 |
+| boxlang | 60001 |
+
+### Test with a specific database
+```bash
+docker compose up -d lucee6 mysql
+curl -sf "http://localhost:60006/wheels/core/tests?db=mysql&format=json" > /tmp/results.json
+```
 
 ### Run a specific test directory
 ```bash
-curl "http://localhost:60002/wheels/core/tests?db=h2&format=json&directory=tests.specs.controller"
+curl "http://localhost:60006/wheels/core/tests?db=h2&format=json&directory=tests.specs.controller"
 ```
+
+### Known cross-engine gotchas
+- **struct.map()**: Lucee/Adobe resolve `obj.map()` as the built-in struct member function, not the CFC method. Use `mapInstance()` on the Injector.
+- **Application scope**: Adobe CF doesn't support function members on the `application` scope. Pass a plain struct context instead.
+- **Closure this**: CFML closures capture `this` from the declaring scope. Use `var ctx = {ref: obj}` to share references across closures.
 
 ### Cleanup
 ```bash
