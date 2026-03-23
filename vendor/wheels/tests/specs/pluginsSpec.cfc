@@ -606,7 +606,8 @@ component extends="wheels.WheelsTest" {
 
 			it("calls register(container) when $invokeServiceProviderRegister is invoked", () => {
 				PluginObj = $pluginObj(config)
-				var fakeContainer = {map: true, bind: true, to: true}
+				var fakeContainer = CreateObject("component",
+					"wheels.tests._assets.plugins.serviceprovider.FakeContainer").init()
 
 				PluginObj.$invokeServiceProviderRegister(fakeContainer)
 
