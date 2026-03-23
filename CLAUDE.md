@@ -424,6 +424,60 @@ component extends="wheels.WheelsTest" {
 - **Closure gotcha**: CFML closures can't access outer `local` vars — use shared structs (`var result = {count: 0}`)
 - Run with MCP `wheels_test()` or CLI `wheels test run`
 
+## Running Tests Locally (Docker)
+
+**IMPORTANT: Always run the test suite before pushing.** Do not rely on CI alone.
+
+### Quick start (Lucee 6 + H2, no external DB needed)
+```bash
+cd /path/to/wheels/rig    # must be in the repo root with compose.yml
+docker compose up -d lucee6
+# Wait ~30s for engine startup, then:
+curl -s -o /dev/null -w "%{http_code}" "http://localhost:60002/wheels/core/tests?db=h2&format=json"
+# 200 = all pass, 417 = failures exist
+```
+
+### Full test with specific database
+```bash
+# Start engine + database (pick one combo)
+docker compose up -d lucee6 mysql      # Lucee 6 + MySQL
+docker compose up -d lucee6 postgres   # Lucee 6 + PostgreSQL
+docker compose up -d lucee6 sqlserver  # Lucee 6 + SQL Server
+
+# Wait for DB to be ready, then run tests
+curl -sf "http://localhost:60002/wheels/core/tests?db=mysql&format=json" > /tmp/results.json
+
+# Parse failures from JSON results
+python3 -c "
+import json, sys
+d = json.load(open('/tmp/results.json'))
+print(f\"Pass: {d['totalPass']}, Fail: {d['totalFail']}, Error: {d['totalError']}\")
+for b in d.get('bundleStats',[]):
+  for s in b.get('suiteStats',[]):
+    for sp in s.get('specStats',[]):
+      if sp.get('status') in ('Failed','Error'):
+        print(f\"  {sp['status']}: {sp['name']}: {sp.get('failMessage','')[:120]}\")
+"
+```
+
+### Engine ports
+| Engine | Port |
+|--------|------|
+| lucee5 | 60001 |
+| lucee6 | 60002 |
+| lucee7 | 60003 |
+| boxlang | 60010 |
+
+### Run a specific test directory
+```bash
+curl "http://localhost:60002/wheels/core/tests?db=h2&format=json&directory=tests.specs.controller"
+```
+
+### Cleanup
+```bash
+docker compose down    # Stop all containers
+```
+
 ## Database Seeding Quick Reference
 
 Convention-based, idempotent seeding with CLI support.
