@@ -16,7 +16,7 @@ if(structKeyExists(url, "db") && url.db == "sqlserver"){
 		END", {}, {datasource = "msdb_sqlserver"});
 }
 
-if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2", url.db)){
+if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2,cockroachdb", url.db)){
 	application.wheels.dataSourceName = "wheelstestdb_" & url.db;
 } else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
 	application.wheels.dataSourceName = "wheelstestdb";

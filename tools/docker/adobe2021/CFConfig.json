@@ -40,6 +40,21 @@
 			"username": "wheelstestdb",
 			"validate": "false"
 		},
+		"wheelstestdb_cockroachdb": {
+			"blob": "false",
+			"class": "org.postgresql.Driver",
+			"clob": "false",
+			"connectionLimit": "-1",
+			"connectionTimeout": "20",
+			"database": "wheelstestdb",
+			"dbdriver": "PostgreSql",
+			"dsn": "jdbc:postgresql://{host}:{port}/{database}",
+			"host": "cockroachdb",
+			"password": "",
+			"port": "26257",
+			"username": "wheelstestdb",
+			"validate": "false"
+		},
 		"wheelstestdb_sqlserver": {
 			"blob": "false",
 			"class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
