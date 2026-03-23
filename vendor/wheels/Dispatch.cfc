@@ -11,10 +11,14 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Build the middleware pipeline from application.wheels.middleware (array of component instances or paths).
+	 * Build the middleware pipeline from application.wheels.middleware (user-configured)
+	 * and application.wheels.pluginMiddleware (registered by plugins via onPluginLoad).
+	 * Plugin middleware runs after user-configured global middleware.
 	 */
 	private any function $buildMiddlewarePipeline() {
 		local.middlewareInstances = [];
+
+		// 1. Load user-configured global middleware.
 		if (StructKeyExists(application, "$wheels") && StructKeyExists(application.$wheels, "middleware")) {
 			local.configured = application.$wheels.middleware;
 		} else if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "middleware")) {
@@ -25,15 +29,36 @@ component output="false" extends="wheels.Global"{
 
 		for (local.item in local.configured) {
 			if (IsSimpleValue(local.item)) {
-				// It's a CFC path — instantiate it.
 				ArrayAppend(local.middlewareInstances, CreateObject("component", local.item).init());
 			} else {
-				// Already an instance.
 				ArrayAppend(local.middlewareInstances, local.item);
 			}
 		}
 
+		// 2. Append plugin-registered middleware (from onPluginLoad registerMiddleware calls).
+		local.pluginMiddleware = $getPluginMiddlewareConfig();
+		for (local.entry in local.pluginMiddleware) {
+			if (IsSimpleValue(local.entry.middleware)) {
+				ArrayAppend(local.middlewareInstances, CreateObject("component", local.entry.middleware).init());
+			} else {
+				ArrayAppend(local.middlewareInstances, local.entry.middleware);
+			}
+		}
+
 		return new wheels.middleware.Pipeline(middleware = local.middlewareInstances);
+	}
+
+	/**
+	 * Retrieve plugin-registered middleware from the application scope.
+	 * Returns the pluginMiddleware array or an empty array if not present.
+	 */
+	private array function $getPluginMiddlewareConfig() {
+		if (StructKeyExists(application, "$wheels") && StructKeyExists(application.$wheels, "pluginMiddleware")) {
+			return application.$wheels.pluginMiddleware;
+		} else if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "pluginMiddleware")) {
+			return application.wheels.pluginMiddleware;
+		}
+		return [];
 	}
 
 	/**
