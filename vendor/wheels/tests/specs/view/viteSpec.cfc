@@ -1,5 +1,25 @@
 component extends="wheels.WheelsTest" {
 
+	function beforeAll() {
+		// Ensure Vite settings exist (may not be present if app was not reloaded after Vite feature was added)
+		if (!StructKeyExists(application.wheels, "viteDevMode")) {
+			application.wheels.viteDevMode = false;
+		}
+		if (!StructKeyExists(application.wheels, "viteDevServerUrl")) {
+			application.wheels.viteDevServerUrl = "http://localhost:5173";
+		}
+		if (!StructKeyExists(application.wheels, "viteBuildPath")) {
+			application.wheels.viteBuildPath = "build";
+		}
+		if (!StructKeyExists(application.wheels, "viteManifestFile")) {
+			application.wheels.viteManifestFile = ".vite/manifest.json";
+		}
+		// Ensure $wheels struct exists for manifest cache operations
+		if (!StructKeyExists(application, "$wheels")) {
+			application.$wheels = {};
+		}
+	}
+
 	function run() {
 
 		g = application.wo
@@ -22,7 +42,9 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteBuildPath = _origBuildPath
 				application.wheels.viteManifestFile = _origManifestFile
 				// Clear manifest cache
-				StructDelete(application.$wheels, "viteManifestCache")
+				if (StructKeyExists(application, "$wheels")) {
+					StructDelete(application.$wheels, "viteManifestCache")
+				}
 			})
 
 			it("returns dev server URL in dev mode", () => {
@@ -90,7 +112,9 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteDevMode = _origDevMode
 				application.wheels.viteDevServerUrl = _origDevUrl
 				application.wheels.viteBuildPath = _origBuildPath
-				StructDelete(application.$wheels, "viteManifestCache")
+				if (StructKeyExists(application, "$wheels")) {
+					StructDelete(application.$wheels, "viteManifestCache")
+				}
 			})
 
 			it("includes vite client and module script in dev mode", () => {
@@ -159,7 +183,9 @@ component extends="wheels.WheelsTest" {
 			afterEach(() => {
 				application.wheels.viteDevMode = _origDevMode
 				application.wheels.viteBuildPath = _origBuildPath
-				StructDelete(application.$wheels, "viteManifestCache")
+				if (StructKeyExists(application, "$wheels")) {
+					StructDelete(application.$wheels, "viteManifestCache")
+				}
 			})
 
 			it("returns empty string in dev mode", () => {
@@ -258,7 +284,9 @@ component extends="wheels.WheelsTest" {
 			afterEach(() => {
 				application.wheels.viteBuildPath = _origBuildPath
 				application.wheels.viteManifestFile = _origManifestFile
-				StructDelete(application.$wheels, "viteManifestCache")
+				if (StructKeyExists(application, "$wheels")) {
+					StructDelete(application.$wheels, "viteManifestCache")
+				}
 			})
 
 			it("returns cached manifest on second call", () => {
@@ -273,7 +301,9 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("throws when manifest file does not exist", () => {
-				StructDelete(application.$wheels, "viteManifestCache")
+				if (StructKeyExists(application, "$wheels")) {
+					StructDelete(application.$wheels, "viteManifestCache")
+				}
 				application.wheels.viteBuildPath = "nonexistent_build_path"
 				application.wheels.viteManifestFile = "nonexistent_manifest.json"
 

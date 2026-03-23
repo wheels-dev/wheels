@@ -1,5 +1,25 @@
 component extends="wheels.WheelsTest" {
 
+	function beforeAll() {
+		// Ensure Vite settings exist (may not be present if app was not reloaded after Vite feature was added)
+		if (!StructKeyExists(application.wheels, "viteDevMode")) {
+			application.wheels.viteDevMode = false;
+		}
+		if (!StructKeyExists(application.wheels, "viteDevServerUrl")) {
+			application.wheels.viteDevServerUrl = "http://localhost:5173";
+		}
+		if (!StructKeyExists(application.wheels, "viteBuildPath")) {
+			application.wheels.viteBuildPath = "build";
+		}
+		if (!StructKeyExists(application.wheels, "viteManifestFile")) {
+			application.wheels.viteManifestFile = ".vite/manifest.json";
+		}
+		// Ensure $wheels struct exists for manifest cache operations
+		if (!StructKeyExists(application, "$wheels")) {
+			application.$wheels = {};
+		}
+	}
+
 	function run() {
 
 		g = application.wo
@@ -23,7 +43,9 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteBuildPath = _origBuildPath
 				application.wheels.viteManifestFile = _origManifestFile
 				application.wheels.environment = _origEnvironment
-				StructDelete(application.$wheels, "viteManifestCache")
+				if (StructKeyExists(application, "$wheels")) {
+					StructDelete(application.$wheels, "viteManifestCache")
+				}
 			})
 
 			it("has viteDevServerUrl default matching standard Vite port", () => {
@@ -70,7 +92,9 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteDevMode = _origDevMode
 				application.wheels.viteDevServerUrl = _origDevUrl
 				application.wheels.viteBuildPath = _origBuildPath
-				StructDelete(application.$wheels, "viteManifestCache")
+				if (StructKeyExists(application, "$wheels")) {
+					StructDelete(application.$wheels, "viteManifestCache")
+				}
 			})
 
 			it("generates script tags pointing to Vite dev server in dev mode", () => {
