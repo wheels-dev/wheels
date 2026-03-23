@@ -16,6 +16,7 @@ component output="false" extends="wheels.Global"{
 		variables.$class.incompatiblePlugins = "";
 		variables.$class.dependantPlugins = "";
 		variables.$class.mixinCollisions = [];
+		variables.$class.pluginMiddleware = [];
 		StructAppend(variables.$class, arguments);
 		/* handle pathing for different operating systems */
 		variables.$class.pluginPathFull = ReplaceNoCase(ExpandPath(variables.$class.pluginPath), "\", "/", "all");
@@ -163,7 +164,9 @@ component output="false" extends="wheels.Global"{
 				variables.$class.plugins[local.pluginKey] = local.plugin;
 				// Call onPluginLoad lifecycle hook if defined
 				if (StructKeyExists(local.plugin, "onPluginLoad") && IsCustomFunction(local.plugin.onPluginLoad)) {
+					$installPluginLoadAPI(local.pluginKey);
 					local.plugin.onPluginLoad(application);
+					$removePluginLoadAPI();
 				}
 				// If plugin author has specified compatibility version as 2.0, only check against that major version
 				// If they've specified 2.0.1, then be more specific
@@ -229,6 +232,32 @@ component output="false" extends="wheels.Global"{
 				local.plugin.onPluginActivate(application);
 			}
 		}
+	}
+
+	/**
+	 * Temporarily installs the registerMiddleware() API on the application scope
+	 * so plugins can call app.registerMiddleware() during onPluginLoad.
+	 * Removed after each plugin's onPluginLoad returns via $removePluginLoadAPI().
+	 */
+	private void function $installPluginLoadAPI(required string pluginName) {
+		var ctx = {
+			pluginMiddleware = variables.$class.pluginMiddleware,
+			pluginName = arguments.pluginName
+		};
+		application.registerMiddleware = function(required any middleware, struct options = {}) {
+			ArrayAppend(ctx.pluginMiddleware, {
+				middleware = arguments.middleware,
+				options = arguments.options,
+				pluginName = ctx.pluginName
+			});
+		};
+	}
+
+	/**
+	 * Removes the temporary plugin load API from the application scope.
+	 */
+	private void function $removePluginLoadAPI() {
+		StructDelete(application, "registerMiddleware");
 	}
 
 	/**
@@ -398,6 +427,10 @@ component output="false" extends="wheels.Global"{
 
 	public any function getMixinCollisions() {
 		return variables.$class.mixinCollisions;
+	}
+
+	public array function getPluginMiddleware() {
+		return variables.$class.pluginMiddleware;
 	}
 
 	public any function getMixableComponents() {

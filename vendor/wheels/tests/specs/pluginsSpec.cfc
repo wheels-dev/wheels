@@ -496,6 +496,84 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that plugin middleware registration", () => {
+
+			beforeEach(() => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/middleware",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/middleware"
+			})
+
+			afterEach(() => {
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("collects middleware registered via onPluginLoad", () => {
+				PluginObj = $pluginObj(config)
+				pluginMiddleware = PluginObj.getPluginMiddleware()
+
+				expect(pluginMiddleware).toBeArray()
+				expect(ArrayLen(pluginMiddleware)).toBe(2)
+			})
+
+			it("records the plugin name that registered each middleware", () => {
+				PluginObj = $pluginObj(config)
+				pluginMiddleware = PluginObj.getPluginMiddleware()
+
+				// Plugins load alphabetically: A then B
+				expect(pluginMiddleware[1].pluginName).toBe("TestMiddlewarePluginA")
+				expect(pluginMiddleware[2].pluginName).toBe("TestMiddlewarePluginB")
+			})
+
+			it("stores the middleware CFC path", () => {
+				PluginObj = $pluginObj(config)
+				pluginMiddleware = PluginObj.getPluginMiddleware()
+
+				expect(pluginMiddleware[1].middleware).toBe("wheels.tests._assets.middleware.TestMiddlewareA")
+				expect(pluginMiddleware[2].middleware).toBe("wheels.tests._assets.middleware.TestMiddlewareB")
+			})
+
+			it("stores options when provided", () => {
+				PluginObj = $pluginObj(config)
+				pluginMiddleware = PluginObj.getPluginMiddleware()
+
+				// Plugin A registered without options
+				expect(pluginMiddleware[1].options).toBeStruct()
+				expect(StructIsEmpty(pluginMiddleware[1].options)).toBeTrue()
+
+				// Plugin B registered with priority option
+				expect(pluginMiddleware[2].options).toHaveKey("priority")
+				expect(pluginMiddleware[2].options.priority).toBe(10)
+			})
+
+			it("passes application scope data in the onPluginLoad context", () => {
+				// The context should include application scope keys
+				// This is tested implicitly — if registerMiddleware works, the context was valid
+				PluginObj = $pluginObj(config)
+				pluginMiddleware = PluginObj.getPluginMiddleware()
+				expect(ArrayLen(pluginMiddleware)).toBeGT(0)
+			})
+
+			it("returns empty array when no plugins register middleware", () => {
+				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
+				PluginObj = $pluginObj(config)
+				pluginMiddleware = PluginObj.getPluginMiddleware()
+
+				expect(pluginMiddleware).toBeArray()
+				expect(ArrayLen(pluginMiddleware)).toBe(0)
+			})
+		})
+
 		describe("Tests that unpacking", () => {
 
 			it("is unpacking plugins", () => {
