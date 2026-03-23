@@ -26,6 +26,10 @@ settings.json
 settings.xml
 *.db
 .claude/settings.local.json
+
+# Node.js (dev tooling: husky, commitlint)
+node_modules/
+package-lock.json
 # CLI test output (but track spec sources)
 cli/tests/*
 !cli/tests/specs/

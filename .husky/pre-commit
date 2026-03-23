@@ -1,0 +1,17 @@
+# Check formatting of staged CFML files only (not the entire project)
+if command -v box &> /dev/null; then
+  STAGED_CFC=$(git diff --cached --name-only --diff-filter=ACM -- '*.cfc' '*.cfm')
+  if [ -n "$STAGED_CFC" ]; then
+    FAILED=0
+    for file in $STAGED_CFC; do
+      if [ -f "$file" ]; then
+        box cfformat check "$file" 2>/dev/null || FAILED=1
+      fi
+    done
+    if [ "$FAILED" -ne 0 ]; then
+      echo ""
+      echo "cfformat check failed on staged files. Run 'box run-script format' to fix."
+      exit 1
+    fi
+  fi
+fi

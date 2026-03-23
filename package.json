@@ -1,0 +1,15 @@
+{
+  "name": "wheels",
+  "version": "3.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Wheels CFML MVC Framework — dev tooling only",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "husky": "^9.0.0"
+  }
+}
