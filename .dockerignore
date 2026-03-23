@@ -23,9 +23,8 @@ test-output/
 # Node (testui has its own Docker build)
 node_modules/
 
-# Database files
+# Database files (H2/SQLite)
 *.db
-db/
 
 # CI/CD workflows
 .github/

@@ -294,12 +294,15 @@ component output="false" extends="wheels.Global"{
 	 * Removed after each plugin's onPluginLoad returns via $removePluginLoadAPI().
 	 */
 	private void function $installPluginLoadAPI(required string pluginName, required struct context) {
+		// Use variables.$class (a struct) as the anchor — struct references are
+		// by-ref on both Lucee and Adobe CF. Direct array assignment into a struct
+		// literal copies the array on Adobe CF, so appending would modify the copy.
 		var ctx = {
-			pluginMiddleware = variables.$class.pluginMiddleware,
+			owner = variables.$class,
 			pluginName = arguments.pluginName
 		};
 		arguments.context.registerMiddleware = function(required any middleware, struct options = {}) {
-			ArrayAppend(ctx.pluginMiddleware, {
+			ArrayAppend(ctx.owner.pluginMiddleware, {
 				middleware = arguments.middleware,
 				options = arguments.options,
 				pluginName = ctx.pluginName
