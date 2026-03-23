@@ -26,7 +26,9 @@ settings.json
 settings.xml
 *.db
 .claude/settings.local.json
-cli/tests/
+# CLI test output (but track spec sources)
+cli/tests/*
+!cli/tests/specs/
 test-output/
 .worktrees/
 .grove/
