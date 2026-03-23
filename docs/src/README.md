@@ -4,79 +4,314 @@ description: Install Wheels and get a local development server running
 
 # Getting Started
 
-By far the quickest way to get started with Wheels is via [CommandBox](https://www.ortussolutions.com/products/commandbox). CommandBox brings a whole host of command line capabilities to the CFML developer. It allows you to write scripts that can be executed at the command line written entirely in CFML. It allows you to start a CFML server from any directory on your machine and wire up the code in that directory as the web root of the server. What's more is, those servers can be either Lucee servers or Adobe ColdFusion servers. You can even specify what version of each server to launch. Lastly, CommandBox is a package manager for CFML. That means you can take some CFML code and package it up into a module, host it on ForgeBox.io, and make it available to other CFML developers. In fact we make extensive use of these capabilities to distribute Wheels plugins and templates. More on that later.
+The quickest way to get started with Wheels 3.1 is via [LuCLI](https://github.com/cybersonic/LuCLI) — a lightweight, Lucee-native command line tool. LuCLI starts in under a second, includes built-in MCP support for AI-assisted development, and provides everything you need for your daily development workflow.
 
-One module that we have created is a module that extends CommandBox itself with commands and features specific to the Wheels framework. The Wheels CLI module for CommandBox is modeled after the Ruby on Rails CLI module and gives similar capabilities to the Wheels developer.
+If you're already using [CommandBox](https://www.ortussolutions.com/products/commandbox), it continues to work with Wheels 3.1. See the [alternative setup with CommandBox](#alternative-setup-with-commandbox) section below, or the full [Migration Guide](command-line-tools/cli-guides/migration-from-commandbox.md) for a detailed comparison.
 
-### Install CommandBox
+## Install LuCLI
 
-The first step is to get [CommandBox](https://www.ortussolutions.com/products/commandbox) downloaded and running. CommandBox is available for Windows, Mac & Linux, and can be installed manually or using one of the respective package managers for each OS. You can use [Chocolatey](https://chocolatey.org) on Windows, [Homebrew](https://brew.sh) on MacOS, or Yum/Apt on Linux depending on your flavor of Linux. Please follow the instructions on how to install CommandBox on your particular operating system. At the end of the installation process you want to make sure the `box` command is part of your system path so you can call the command from any directory on your system.
+Install LuCLI using your platform's package manager:
 
-Once installed, you can either double-click on the `box` executable which opens the CommandBox shell window, or run `box` from a CMD window in Windows, Terminal window in MacOS, or shell prompt on a Linux server. Sometimes you only want to call a single CommandBox command and don't need to launch a whole CommandBox shell window to do that, for these instances you can call the CommandBox command directly from your default system terminal window by prefixing the command with the `box` prefix.
+```bash
+# macOS
+brew install lucli
 
-So to run the CommandBox `version` command you could run box version from the shell or you could launch the CommandBox shell and run version inside it.
+# Windows
+choco install lucli
 
-{% tabs %}
-{% tab title="Shell" %}
-box version
-{% endtab %}
+# Manual (any OS)
+# Download from https://github.com/cybersonic/LuCLI/releases
+```
 
-{% tab title="CommandBox" %}
-version
-{% endtab %}
-{% endtabs %}
+Verify the installation:
 
-This is a good concept to grasp, cause depending on your workflow, you may find it easier to do one versus the other. Most of the commands you will see in these CLI guides will assume that you are entering the command in the actual CommandBox shell so the `box` prefix is left off.
+```bash
+lucli --version
+```
 
-### Install the wheels-cli CommandBox Module
+### Install the Wheels Module
 
-Okay, now that we have CommandBox installed, let's add the Wheels CLI module.
+LuCLI uses modules to extend its functionality. Install the Wheels module to get all framework-specific commands:
 
-{% tabs %}
-{% tab title="CommandBox" %}
-install wheels-cli
-{% endtab %}
-{% endtabs %}
+```bash
+lucli modules install wheels
+```
 
-Installing this module will add a number of commands to your default CommandBox installation. All of these commands are prefixed by the `wheels` name space. There are commands to create a brand new Wheels application or scaffold out sections of your application. We'll see some of these commands in action momentarily.
+This adds the `wheels` command to your terminal with commands for creating applications, generating code, running migrations, testing, and more.
 
-### Start a new Application using the Wizard
+## Create Your First Application
 
-To install a new application using version 3.0, we can use the new application wizard and select Bleeding Edge when prompted to select the template to use.
+### Using the Wizard (Recommended)
 
-{% tabs %}
-{% tab title="CommandBox" %}
+The interactive wizard walks you through project setup options — template selection, database configuration, and more:
+
+```bash
 wheels new
-{% endtab %}
-{% endtabs %}
+```
 
-### Start a New Application Using the Command Line
+Follow the prompts to configure your application. For your first project, the defaults work well.
 
-Now that we have CommandBox installed and extended it with the Wheels CLI module, let's start our first Wheels app from the command line. We'll look at the simplest method for creating a Wheels app and starting our development server.
+### Using the Command Line
 
-{% tabs %}
-{% tab title="CommandBox" %}
-wheels generate app myApp\
-server start
-{% endtab %}
-{% endtabs %}
+If you prefer a single command, use `wheels generate app` (or the shorthand `wheels g app`):
 
-![](/wheels/guides-assets/73279f3-wheels_generate_app_larger.gif)
+```bash
+wheels generate app myApp
+cd myApp
+```
 
-A few minutes after submitting the above commands a new browser window should open up and display the default Wheels congratulations screen.
+This scaffolds a complete Wheels application with:
+
+- The standard MVC directory structure (`app/controllers/`, `app/models/`, `app/views/`)
+- Configuration files (`config/settings.cfm`, `config/routes.cfm`)
+- An embedded H2 database (ready to use, no setup needed)
+- The Wheels framework in `vendor/wheels/`
+
+{% hint style="info" %}
+**Command Aliases**
+
+`generate` can be shortened to `g`, so `wheels generate app` and `wheels g app` are identical. LuCLI also supports shorthand aliases for common generators: `m` (model), `c` (controller), `v` (view), `s` (scaffold).
+{% endhint %}
+
+## Start the Development Server
+
+From your application directory, start the embedded Lucee server:
+
+```bash
+wheels start
+```
+
+A browser window will open automatically, showing the Wheels congratulations screen:
 
 ![Figure: Wheels congratulations screen](/wheels/guides-assets/a1f5810-Screen\_Shot\_2022-03-25\_at\_8.59.25\_AM.png)
 
-So what just happened? Since we only passed the application name `myApp` to the `wheels generate app` command, it used default values for most of its parameters and downloaded our Base template (wheels-base-template) from ForgeBox.io, then downloaded the framework core files (wheels.dev) from ForgeBox.io and placed it in the `vendor/wheels` directory, then configured the application name and reload password, and started a Lucee server on a random port.
+The server runs on a local port (shown in the terminal output). Your application code is served from the `public/` directory, and code changes are reflected immediately — no restart needed.
+
+To stop the server:
+
+```bash
+wheels stop
+```
+
+## Build a Feature
+
+Let's create a simple blog post resource to see the full development workflow.
+
+### 1. Generate a Scaffold
+
+A scaffold creates the model, controller, views, migration, and tests all at once:
+
+```bash
+wheels generate scaffold Post title:string body:text published:boolean
+```
+
+### 2. Run the Migration
+
+Apply the database migration to create the `posts` table:
+
+```bash
+wheels migrate latest
+```
+
+### 3. Add Routes
+
+Open `config/routes.cfm` and add a resource route for posts. Place it before the wildcard route:
+
+```cfm
+mapper()
+    .resources("posts")
+    .wildcard()
+    .root(to="wheels##congratulations", method="get")
+.end();
+```
+
+### 4. Reload and Visit
+
+Reload the application to pick up the new routes:
+
+```bash
+wheels reload
+```
+
+Visit `http://localhost:<port>/posts` in your browser. You now have a working CRUD interface for blog posts — list, create, edit, and delete — all generated from a single command.
+
+## Run Tests
+
+Wheels generates test files alongside your code. Run them with:
+
+```bash
+wheels test
+```
+
+To run tests for a specific area:
+
+```bash
+wheels test --filter=models
+```
+
+## Project Structure
+
+Here's what `wheels generate app` created:
+
+```
+myApp/
+├── lucee.json              # Server and project configuration
+├── config/
+│   ├── settings.cfm        # Framework settings (datasource, reload password)
+│   ├── routes.cfm          # URL routes
+│   ├── app.cfm             # Application configuration
+│   └── environment.cfm     # Environment detection
+├── app/
+│   ├── controllers/        # Request handlers
+│   ├── models/             # Database-backed objects
+│   ├── views/              # HTML templates
+│   │   └── layout.cfm      # Default page layout
+│   ├── migrator/           # Database migrations
+│   │   └── migrations/
+│   └── events/             # Application event handlers
+├── public/                 # Web root (static assets, entry point)
+├── tests/                  # Test files
+└── vendor/                 # Framework and dependencies
+    └── wheels/
+```
+
+**Key files to know:**
+
+| File | Purpose |
+|------|---------|
+| `config/settings.cfm` | Datasource name, reload password, framework settings |
+| `config/routes.cfm` | URL routing — maps URLs to controller actions |
+| `lucee.json` | Server port, JVM settings, Lucee mappings |
+| `app/views/layout.cfm` | HTML layout wrapping all views |
+
+## Configure a Database
+
+New applications come with an embedded H2 database that works out of the box. When you're ready to use MySQL, PostgreSQL, or another database:
+
+1. **Set the datasource name** in `config/settings.cfm`:
+
+```cfm
+set(dataSourceName="myapp_dev");
+```
+
+2. **Define the datasource connection** in `config/app.cfm`:
+
+```cfm
+this.datasources["myapp_dev"] = {
+    class: "com.mysql.cj.jdbc.Driver",
+    connectionString: "jdbc:mysql://localhost:3306/myapp_dev",
+    username: "root",
+    password: ""
+};
+```
+
+3. **Run migrations** to create your tables:
+
+```bash
+wheels migrate latest
+```
+
+See the [Hello Database](introduction/readme/beginner-tutorial-hello-database.md) tutorial for a complete walkthrough of database interaction.
+
+## Set Up AI-Assisted Development
+
+LuCLI includes a built-in MCP server that integrates with AI editors like Claude Code, Cursor, and VS Code Copilot. This gives your AI assistant direct access to Wheels commands — generating code, running migrations, and running tests.
+
+Start the MCP server:
+
+```bash
+lucli mcp wheels
+```
+
+For Claude Code, add this to your project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "wheels": {
+      "command": "lucli",
+      "args": ["mcp", "wheels"]
+    }
+  }
+}
+```
+
+Once configured, your AI editor can use tools like `wheels_generate`, `wheels_migrate`, and `wheels_test` directly.
+
+## Deploy to Production
+
+When you're ready to deploy your Wheels application:
+
+1. **Set the environment** to production in `config/environment.cfm` or via your server's configuration.
+
+2. **Configure a production datasource** in `config/production/settings.cfm`:
+
+```cfm
+set(dataSourceName="myapp_production");
+set(reloadPassword="a-strong-secret");
+```
+
+3. **Run migrations** on the production database:
+
+```bash
+wheels migrate latest
+```
+
+4. **Deploy your code** to a Lucee or Adobe ColdFusion server. Wheels runs on any CFML engine behind Apache, Nginx, IIS, or Tomcat. See the [Requirements](introduction/requirements.md) page for supported engines and databases.
 
 {% hint style="info" %}
-**A Word About Command Aliases**
+**Docker Deployment**
 
-CommandBox commands have the capability to be called by multiple names or aliases. The command above `wheels generate app` can also be initiated by typing `wheels g app`. In fact `g` is an alias for `generate` so wherever you see a command in the CLI documentation that has `generate` in it you can substitute `g` instead.
-
-In addition to shortening `generate` to `g`, aliases can completely change the name space as well. A command that you haven't seen yet is the `wheels generate app-wizard` command. This command guides the user through a series of menu options, building up all the parameters needed to customize the start of a new Wheels project. You're likely to use the wizard when starting a new Wheels application so it's good to become familiar with it.
-
-This command has the normal alias referenced above at `wheels g app-wizard` but it also has an additional alias at `wheels new` which is the command more prevalent in the Rails community. So the three commands `wheels generate app-wizard`, `wheels g app-wizard`, and `wheels new` all call the same functionality which guides the user though a set of menus, collecting details on how to configure the desired app. Once all the parameters have been gathered, this command actually calls the `wheels generate app` command to create the actual Wheels application.
+For containerized deployments, use `wheels docker init` to generate a `Dockerfile` and `docker-compose.yml` tailored to your CFML engine and database. See [Running Local Development Servers](introduction/readme/running-local-development-servers.md) for details.
 {% endhint %}
 
-This **Getting Started** guide has taken you from the very beginning and gotten you to the point where you can go into any empty directory on your local development machine and start a Wheels project by issuing a couple of CLI commands. In later guides we'll explore these options further and see what else the CLI can do for us.
+## Next Steps
+
+You now have a working Wheels application with a database-backed feature, tests, and a development server. Here's where to go next:
+
+- **[Hello World Tutorial](introduction/readme/beginner-tutorial-hello-world.md)** — Build a controller and view from scratch to understand the MVC fundamentals
+- **[Hello Database Tutorial](introduction/readme/beginner-tutorial-hello-database.md)** — Create a full CRUD application with forms, validations, and database interaction
+- **[Conventions](working-with-wheels/conventions.md)** — Learn the naming conventions that make Wheels productive
+- **[Routing](handling-requests-with-controllers/routing.md)** — Define URL patterns for your application
+- **[CLI Command Reference](command-line-tools/commands/README.md)** — Explore all available commands
+
+## Alternative Setup with CommandBox
+
+[CommandBox](https://www.ortussolutions.com/products/commandbox) is a full-featured CFML toolbox that also works with Wheels. It offers additional capabilities like ForgeBox package management, an interactive REPL, and support for both Lucee and Adobe ColdFusion servers.
+
+### Install CommandBox
+
+```bash
+# macOS
+brew install commandbox
+
+# Windows
+choco install commandbox
+```
+
+### Install the Wheels CLI Module
+
+```bash
+box install wheels-cli
+```
+
+### Create and Start an Application
+
+```bash
+wheels new myApp
+cd myApp
+box server start
+```
+
+### Command Differences
+
+The daily workflow is nearly identical. The key differences:
+
+| Task | LuCLI | CommandBox |
+|------|-------|-----------|
+| Start server | `wheels start` | `box server start` |
+| Run migrations | `wheels migrate latest` | `wheels dbmigrate latest` |
+| Run tests | `wheels test` | `wheels test run` |
+| Config file | `lucee.json` | `box.json` + `server.json` |
+
+For a complete mapping of all commands, see the [Migration Guide](command-line-tools/cli-guides/migration-from-commandbox.md).
