@@ -1,5 +1,20 @@
 component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator" {
 
+	variables.sqlTypes = {};
+	variables.sqlTypes['biginteger'] = {name = 'INT8'};
+	variables.sqlTypes['binary'] = {name = 'BYTES'};
+	variables.sqlTypes['boolean'] = {name = 'BOOL'};
+	variables.sqlTypes['date'] = {name = 'DATE'};
+	variables.sqlTypes['datetime'] = {name = 'TIMESTAMP'};
+	variables.sqlTypes['decimal'] = {name = 'DECIMAL'};
+	variables.sqlTypes['float'] = {name = 'FLOAT8'};
+	variables.sqlTypes['integer'] = {name = 'INT'};
+	variables.sqlTypes['string'] = {name = 'STRING', limit = 255};
+	variables.sqlTypes['text'] = {name = 'STRING'};
+	variables.sqlTypes['time'] = {name = 'TIME'};
+	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
+	variables.sqlTypes['uuid'] = {name = 'UUID'};
+
 	/**
 	 * name of database adapter
 	 */
@@ -13,7 +28,7 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator" {
 	 */
 	public string function addPrimaryKeyOptions(required string sql, struct options = {}) {
 		if (StructKeyExists(arguments.options, "autoIncrement") && arguments.options.autoIncrement) {
-			arguments.sql = ReplaceNoCase(arguments.sql, "INTEGER", "INT DEFAULT unique_rowid()", "all");
+			arguments.sql = REReplace(arguments.sql, "\bINT\b", "INT DEFAULT unique_rowid()");
 		}
 		arguments.sql = arguments.sql & " PRIMARY KEY";
 		return arguments.sql;
