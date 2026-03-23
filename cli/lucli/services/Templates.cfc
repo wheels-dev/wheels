@@ -158,23 +158,43 @@ component {
 	// ── Private helpers ──────────────────────────────
 
 	/**
-	 * Resolve the shared template directory
+	 * Resolve the shared template directory.
+	 *
+	 * Search order:
+	 *   1. Bundled templates at moduleRoot/templates/codegen/ (standalone install)
+	 *   2. Monorepo layout: walk up from cli/lucli/ to cli/src/templates/
+	 *   3. Project vendor: projectRoot/vendor/wheels/cli/src/templates/
+	 *   4. Legacy fallback: projectRoot/cli/src/templates/
 	 */
 	private string function resolveTemplateDir() {
-		// In monorepo: cli/src/templates/ relative to project root's cli/ directory
-		var monorepoPath = variables.moduleRoot;
-		// Walk up from cli/lucli/ to cli/src/templates/
-		var File = createObject("java", "java.io.File");
-		var lucliDir = File.init(monorepoPath);
-		var cliDir = lucliDir.getParentFile(); // cli/
-		var srcTemplates = cliDir.getCanonicalPath() & "/src/templates";
-		if (directoryExists(srcTemplates)) {
-			return srcTemplates;
+		// 1. Bundled codegen templates (standalone / distribution install)
+		var bundledPath = variables.moduleRoot & "templates/codegen";
+		if (directoryExists(bundledPath)) {
+			return bundledPath;
 		}
-		// Fallback: relative to project root
+
+		// 2. Monorepo: walk up from cli/lucli/ to cli/src/templates/
+		var File = createObject("java", "java.io.File");
+		var lucliDir = File.init(variables.moduleRoot);
+		var cliDir = lucliDir.getParentFile(); // cli/
+		if (!isNull(cliDir)) {
+			var srcTemplates = cliDir.getCanonicalPath() & "/src/templates";
+			if (directoryExists(srcTemplates)) {
+				return srcTemplates;
+			}
+		}
+
+		// 3. Project vendor (Wheels vendored into project)
+		var vendorPath = variables.projectRoot & "/vendor/wheels/cli/src/templates";
+		if (directoryExists(vendorPath)) {
+			return vendorPath;
+		}
+
+		// 4. Legacy fallback: projectRoot/cli/src/templates
 		if (directoryExists(variables.projectRoot & "/cli/src/templates")) {
 			return variables.projectRoot & "/cli/src/templates";
 		}
+
 		return "";
 	}
 
