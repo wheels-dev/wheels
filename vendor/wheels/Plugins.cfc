@@ -165,8 +165,11 @@ component output="false" extends="wheels.Global"{
 				// Call onPluginLoad lifecycle hook if defined
 				if (StructKeyExists(local.plugin, "onPluginLoad") && IsCustomFunction(local.plugin.onPluginLoad)) {
 					$installPluginLoadAPI(local.pluginKey);
-					local.plugin.onPluginLoad(application);
-					$removePluginLoadAPI();
+					try {
+						local.plugin.onPluginLoad(application);
+					} finally {
+						$removePluginLoadAPI();
+					}
 				}
 				// If plugin author has specified compatibility version as 2.0, only check against that major version
 				// If they've specified 2.0.1, then be more specific
