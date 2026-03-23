@@ -574,6 +574,78 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that ServiceProviderInterface plugins", () => {
+
+			beforeEach(() => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/serviceprovider",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/serviceprovider"
+			})
+
+			afterEach(() => {
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("detects plugins implementing ServiceProviderInterface", () => {
+				PluginObj = $pluginObj(config)
+				serviceProviders = PluginObj.getServiceProviders()
+
+				expect(serviceProviders).toBeArray()
+				expect(ArrayLen(serviceProviders)).toBe(1)
+				expect(serviceProviders[1]).toBe("TestServiceProvider")
+			})
+
+			it("calls register(container) when $invokeServiceProviderRegister is invoked", () => {
+				PluginObj = $pluginObj(config)
+				var fakeContainer = {map: true, bind: true, to: true}
+
+				PluginObj.$invokeServiceProviderRegister(fakeContainer)
+
+				var plugin = PluginObj.getPlugins().TestServiceProvider
+				expect(plugin.registerCalled).toBeTrue()
+				expect(plugin.containerReceived).toBe(fakeContainer)
+			})
+
+			it("passes the actual Injector when available", () => {
+				PluginObj = $pluginObj(config)
+
+				PluginObj.$invokeServiceProviderRegister(application.wheelsdi)
+
+				var plugin = PluginObj.getPlugins().TestServiceProvider
+				expect(plugin.registerCalled).toBeTrue()
+				expect(plugin.containerReceived).toBeInstanceOf("wheels.Injector")
+			})
+
+			it("does not inject register and boot as mixins", () => {
+				PluginObj = $pluginObj(config)
+				mixins = PluginObj.getMixins()
+
+				for (target in mixins) {
+					expect(mixins[target]).notToHaveKey("register")
+					expect(mixins[target]).notToHaveKey("boot")
+				}
+			})
+
+			it("returns empty service providers for standard plugins", () => {
+				config.pluginPath = "/wheels/tests/_assets/plugins/standard"
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/standard"
+				PluginObj = $pluginObj(config)
+				serviceProviders = PluginObj.getServiceProviders()
+
+				expect(serviceProviders).toBeArray()
+				expect(ArrayLen(serviceProviders)).toBe(0)
+			})
+		})
+
 		describe("Tests that unpacking", () => {
 
 			it("is unpacking plugins", () => {

@@ -17,6 +17,7 @@ component output="false" extends="wheels.Global"{
 		variables.$class.dependantPlugins = "";
 		variables.$class.mixinCollisions = [];
 		variables.$class.pluginMiddleware = [];
+		variables.$class.serviceProviders = [];
 		StructAppend(variables.$class, arguments);
 		/* handle pathing for different operating systems */
 		variables.$class.pluginPathFull = ReplaceNoCase(ExpandPath(variables.$class.pluginPath), "\", "/", "all");
@@ -171,6 +172,10 @@ component output="false" extends="wheels.Global"{
 						$removePluginLoadAPI();
 					}
 				}
+				// Track plugins that implement ServiceProviderInterface
+				if ($isServiceProvider(local.plugin)) {
+					ArrayAppend(variables.$class.serviceProviders, local.pluginKey);
+				}
 				// If plugin author has specified compatibility version as 2.0, only check against that major version
 				// If they've specified 2.0.1, then be more specific
 				if (StructKeyExists(local.plugin, "version")) {
@@ -235,6 +240,30 @@ component output="false" extends="wheels.Global"{
 				local.plugin.onPluginActivate(application);
 			}
 		}
+	}
+
+	/**
+	 * Invokes register(container) on all plugins that implement ServiceProviderInterface.
+	 * Called after all plugins are loaded, passing the DI Injector so plugins can register services.
+	 *
+	 * @container The Wheels DI container (Injector instance)
+	 */
+	public void function $invokeServiceProviderRegister(required any container) {
+		for (local.pluginKey in variables.$class.serviceProviders) {
+			variables.$class.plugins[local.pluginKey].register(arguments.container);
+		}
+	}
+
+	/**
+	 * Checks whether a plugin implements ServiceProviderInterface via component metadata.
+	 *
+	 * @plugin The plugin instance to check
+	 */
+	private boolean function $isServiceProvider(required any plugin) {
+		local.meta = GetMetadata(arguments.plugin);
+		return StructKeyExists(local.meta, "implements")
+			&& IsStruct(local.meta.implements)
+			&& StructKeyExists(local.meta.implements, "wheels.ServiceProviderInterface");
 	}
 
 	/**
@@ -307,7 +336,7 @@ component output="false" extends="wheels.Global"{
 				local.pluginMethods = StructKeyList(local.plugin);
 
 				// lifecycle hooks that should not be injected as mixins
-				local.lifecycleHooks = "init,onPluginLoad,onPluginActivate";
+				local.lifecycleHooks = "init,onPluginLoad,onPluginActivate,register,boot";
 
 				for (local.iPluginMethods in local.pluginMethods) {
 					if (IsCustomFunction(local.plugin[local.iPluginMethods]) && !ListFindNoCase(local.lifecycleHooks, local.iPluginMethods)) {
@@ -434,6 +463,10 @@ component output="false" extends="wheels.Global"{
 
 	public array function getPluginMiddleware() {
 		return variables.$class.pluginMiddleware;
+	}
+
+	public array function getServiceProviders() {
+		return variables.$class.serviceProviders;
 	}
 
 	public any function getMixableComponents() {

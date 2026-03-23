@@ -2808,6 +2808,10 @@ component output="false" {
 		application[local.appKey].mixinCollisions = application[local.appKey].PluginObj.getMixinCollisions();
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
 		application[local.appKey].pluginMiddleware = application[local.appKey].PluginObj.getPluginMiddleware();
+		// Invoke register(container) on ServiceProviderInterface plugins before activation
+		if (isDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PluginObj.getServiceProviders())) {
+			application[local.appKey].PluginObj.$invokeServiceProviderRegister(application.wheelsdi);
+		}
 		// Invoke onPluginActivate lifecycle hook on all plugins now that everything is in the application scope
 		application[local.appKey].PluginObj.$invokeOnPluginActivate();
 	}
