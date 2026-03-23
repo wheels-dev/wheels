@@ -20,6 +20,12 @@
 		application.$wheels.viewPath = "/app/views";
 		application.$wheels.controllerPath = "/app/controllers";
 
+		// Vite asset pipeline settings.
+		application.$wheels.viteDevServerUrl = "http://localhost:5173";
+		application.$wheels.viteBuildPath = "build";
+		application.$wheels.viteManifestFile = ".vite/manifest.json";
+		application.$wheels.viteDevMode = (application.$wheels.environment == "development");
+
 		// Test framework settings.
 		application.$wheels.validateTestPackageMetaData = true;
 		application.$wheels.restoreTestRunnerApplicationScope = true;
