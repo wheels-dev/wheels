@@ -23,6 +23,13 @@ component {
 	}
 
 	/**
+	 * Return the resolved shared template directory path
+	 */
+	public string function getTemplateDir() {
+		return variables.templateDir;
+	}
+
+	/**
 	 * Generate file from template
 	 */
 	public struct function generateFromTemplate(

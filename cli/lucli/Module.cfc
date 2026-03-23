@@ -39,7 +39,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property)
+	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, snippets)
 	 */
 	public string function generate() {
 		var args = __arguments ?: [];
@@ -48,23 +48,29 @@ component extends="modules.BaseModule" {
 			out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
 			out("");
 			out("Types:", "bold");
-			out("  model       Generate a model CFC");
-			out("  controller  Generate a controller CFC");
-			out("  view        Generate a view template");
-			out("  migration   Generate a database migration");
-			out("  scaffold    Generate model + controller + views + migration + tests + routes");
-			out("  route       Add a resource route to config/routes.cfm");
-			out("  test        Generate a test spec file");
-			out("  property    Generate an add-column migration for a model property");
+			out("  model         Generate a model CFC");
+			out("  controller    Generate a controller CFC");
+			out("  view          Generate a view template");
+			out("  migration     Generate a database migration");
+			out("  scaffold      Generate model + controller + views + migration + tests + routes");
+			out("  api-resource  Generate API-only model + controller + migration + tests + routes (no views)");
+			out("  route         Add a resource route to config/routes.cfm");
+			out("  test          Generate a test spec file");
+			out("  property      Generate an add-column migration for a model property");
+			out("  helper        Generate a helper file in app/helpers/");
+			out("  snippets      Copy snippet templates to app/snippets/ for customization");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate model User name email:string active:boolean");
 			out("  wheels generate controller Users index show create");
 			out("  wheels generate migration CreateUsers");
 			out("  wheels generate scaffold Post title body:text publishedAt:datetime");
+			out("  wheels generate api-resource Product name price:decimal sku:string");
 			out("  wheels generate route posts");
 			out("  wheels generate test model User");
 			out("  wheels generate property User email:string");
+			out("  wheels generate helper formatting");
+			out("  wheels generate snippets");
 			return "";
 		}
 
@@ -87,6 +93,9 @@ component extends="modules.BaseModule" {
 			case "scaffold":
 			case "s":
 				return generateScaffold(remaining);
+			case "api-resource":
+			case "api":
+				return generateApiResource(remaining);
 			case "route":
 			case "r":
 				return generateRoute(remaining);
@@ -95,6 +104,11 @@ component extends="modules.BaseModule" {
 			case "property":
 			case "prop":
 				return generateProperty(remaining);
+			case "helper":
+			case "h":
+				return generateHelper(remaining);
+			case "snippets":
+				return generateSnippets(remaining);
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
@@ -840,6 +854,210 @@ component extends="modules.BaseModule" {
 		out('  validatesPresenceOf("#propName#");');
 
 		return "";
+	}
+
+	private string function generateApiResource(required array args) {
+		if (!arrayLen(args)) {
+			out("Usage: wheels generate api-resource <Name> [properties...]", "yellow");
+			out("  Example: wheels generate api-resource Product name price:decimal sku:string");
+			return "";
+		}
+
+		var modelName = capitalize(args[1]);
+		var controllerName = getService("helpers").pluralize(modelName);
+		var properties = args.len() > 1 ? args.slice(2) : [];
+
+		out("Generating API resource #modelName#...", "cyan");
+		out("");
+
+		// Parse properties and associations
+		var parsed = parseGeneratorArgs(properties);
+
+		var scaffold = getService("scaffold");
+		var results = scaffold.generateScaffold(
+			name = modelName,
+			properties = parsed.properties,
+			belongsTo = arrayToList(parsed.belongsTo),
+			hasMany = arrayToList(parsed.hasMany),
+			api = true
+		);
+
+		if (results.success) {
+			for (var item in results.generated) {
+				var relPath = listLast(item.path, "/\");
+				printCreated("#item.type#: #relPath#");
+			}
+
+			out("");
+			out("API resource complete! Next steps:", "green");
+			out("  1. Run migrations: wheels migrate latest");
+			out("  2. Start server: wheels start");
+			out("  3. Test: curl http://localhost:8080/#lCase(controllerName)#.json");
+		} else {
+			out("API resource generation failed:", "red");
+			for (var err in results.errors) {
+				out("  #err#", "red");
+			}
+		}
+
+		return "";
+	}
+
+	private string function generateHelper(required array args) {
+		if (!arrayLen(args)) {
+			out("Usage: wheels generate helper <name> [functions...]", "yellow");
+			out("  Example: wheels generate helper formatting truncateText formatCurrency");
+			return "";
+		}
+
+		var helperName = args[1];
+		// Ensure name ends with Helper
+		if (!reFindNoCase("Helper$", helperName)) {
+			helperName = helperName & "Helper";
+		}
+		helperName = capitalize(helperName);
+
+		var functions = args.len() > 1 ? args.slice(2) : [];
+		var helperDir = variables.projectRoot & "/app/helpers";
+		var helperPath = helperDir & "/" & helperName & ".cfm";
+		var globalPath = variables.projectRoot & "/app/global/functions.cfm";
+
+		// Check for existing file
+		if (fileExists(helperPath)) {
+			out("Helper already exists: app/helpers/#helperName#.cfm", "yellow");
+			out("Use --force to overwrite (not yet supported).");
+			return "";
+		}
+
+		ensureDirectory(helperDir);
+
+		// Build helper content
+		var nl = chr(10);
+		var tab = chr(9);
+		var content = "<!--- app/helpers/#helperName#.cfm --->" & nl;
+		content &= "<!--- Custom helper functions --->" & nl & nl;
+
+		if (arrayLen(functions)) {
+			for (var funcName in functions) {
+				content &= '<cffunction name="#funcName#" access="public" returntype="string">' & nl;
+				content &= tab & '<cfargument name="value" type="string" required="true">' & nl;
+				content &= tab & '<cfreturn arguments.value>' & nl;
+				content &= '</cffunction>' & nl & nl;
+			}
+		} else {
+			// Default template with a sample function
+			var baseName = reReplace(helperName, "Helper$", "");
+			content &= '<cffunction name="#lCase(baseName)#Format" access="public" returntype="string">' & nl;
+			content &= tab & '<cfargument name="value" type="string" required="true">' & nl;
+			content &= tab & '<!--- TODO: Implement formatting logic --->' & nl;
+			content &= tab & '<cfreturn arguments.value>' & nl;
+			content &= '</cffunction>' & nl;
+		}
+
+		fileWrite(helperPath, content);
+		printCreated("app/helpers/#helperName#.cfm");
+
+		// Auto-include in app/global/functions.cfm
+		ensureDirectory(getDirectoryFromPath(globalPath));
+		var includeLine = '<cfinclude template="../helpers/#helperName#.cfm">';
+
+		if (fileExists(globalPath)) {
+			var globalContent = fileRead(globalPath);
+			if (!findNoCase(includeLine, globalContent)) {
+				globalContent = globalContent & nl & includeLine & nl;
+				fileWrite(globalPath, globalContent);
+				out("  update  app/global/functions.cfm (added include)", "green");
+			}
+		} else {
+			fileWrite(globalPath, "<!--- Auto-included helper files --->" & nl & includeLine & nl);
+			printCreated("app/global/functions.cfm");
+		}
+
+		out("");
+		out("Helper created! Next steps:", "green");
+		out("  1. Edit app/helpers/#helperName#.cfm to add your functions");
+		out("  2. Use functions in views: ##yourFunction(value)##");
+		return "";
+	}
+
+	private string function generateSnippets(required array args) {
+		var force = false;
+		for (var arg in args) {
+			if (arg == "--force") force = true;
+		}
+
+		var snippetsDir = variables.projectRoot & "/app/snippets";
+		var templates = getService("templates");
+		var templateDir = templates.getTemplateDir();
+
+		if (!len(templateDir) || !directoryExists(templateDir)) {
+			out("Template directory not found.", "red");
+			return "";
+		}
+
+		ensureDirectory(snippetsDir);
+
+		var copied = 0;
+		var skipped = 0;
+		var entries = directoryList(templateDir, false, "name");
+
+		for (var entry in entries) {
+			var sourcePath = templateDir & "/" & entry;
+			var destPath = snippetsDir & "/" & entry;
+
+			// Skip directories — only copy top-level template files
+			if (directoryExists(sourcePath)) {
+				// Recursively copy subdirectories too
+				copySnippetDir(sourcePath, destPath, force);
+				continue;
+			}
+
+			if (fileExists(destPath) && !force) {
+				skipped++;
+				continue;
+			}
+
+			fileCopy(sourcePath, destPath);
+			printCreated("app/snippets/#entry#");
+			copied++;
+		}
+
+		out("");
+		if (copied > 0) {
+			out("#copied# template(s) copied to app/snippets/", "green");
+		}
+		if (skipped > 0) {
+			out("#skipped# existing file(s) skipped (use --force to overwrite)", "yellow");
+		}
+		if (copied == 0 && skipped == 0) {
+			out("No templates found to copy.", "yellow");
+		}
+
+		out("");
+		out("Customize templates in app/snippets/ to change generated code.");
+		out("Templates in app/snippets/ override defaults for all generators.");
+		return "";
+	}
+
+	/**
+	 * Recursively copy a snippet template subdirectory
+	 */
+	private void function copySnippetDir(required string source, required string dest, boolean force = false) {
+		ensureDirectory(arguments.dest);
+		var entries = directoryList(arguments.source, false, "name");
+		for (var entry in entries) {
+			var sourcePath = arguments.source & "/" & entry;
+			var destPath = arguments.dest & "/" & entry;
+			if (directoryExists(sourcePath)) {
+				copySnippetDir(sourcePath, destPath, arguments.force);
+			} else {
+				if (!fileExists(destPath) || arguments.force) {
+					fileCopy(sourcePath, destPath);
+					var relPath = replace(destPath, variables.projectRoot & "/", "");
+					printCreated(relPath);
+				}
+			}
+		}
 	}
 
 	// ── Migration Execution ──────────────────────────
