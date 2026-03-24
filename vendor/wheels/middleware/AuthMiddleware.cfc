@@ -177,13 +177,16 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 	/**
 	 * Produce the default JSON error response and set the HTTP status code.
+	 * Only sets cfheader when running inside a real HTTP dispatch (not during tests).
 	 */
 	private string function $defaultFailureResponse(required struct authResult) {
-		try {
-			cfheader(statuscode = arguments.authResult.statusCode, statustext = $statusText(arguments.authResult.statusCode));
-			cfheader(name = "Content-Type", value = "application/json");
-		} catch (any e) {
-			// cfheader may not be available in test context
+		if ($isHttpDispatch()) {
+			try {
+				cfheader(statusCode = "#arguments.authResult.statusCode#", statusText = $statusText(arguments.authResult.statusCode));
+				cfheader(name = "Content-Type", value = "application/json");
+			} catch (any e) {
+				// cfheader unavailable in some contexts
+			}
 		}
 
 		return SerializeJSON({
@@ -193,14 +196,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	}
 
 	/**
+	 * Check if we are in a real Wheels HTTP dispatch (not a unit test pipeline).
+	 * Returns true when request.wheels exists (set by Dispatch.$paramParser).
+	 */
+	private boolean function $isHttpDispatch() {
+		return StructKeyExists(request, "wheels");
+	}
+
+	/**
 	 * Map status codes to text for the cfheader call.
 	 */
 	private string function $statusText(required numeric code) {
-		switch (arguments.code) {
-			case 401: return "Unauthorized";
-			case 403: return "Forbidden";
-			default: return "Error";
-		}
+		if (arguments.code == 401) return "Unauthorized";
+		if (arguments.code == 403) return "Forbidden";
+		return "Error";
 	}
 
 }
