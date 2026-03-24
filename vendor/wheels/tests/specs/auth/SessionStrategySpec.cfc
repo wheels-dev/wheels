@@ -93,8 +93,10 @@ component extends="wheels.WheelsTest" {
 
 				it("invokes the onLogin callback", function() {
 					var captured = {principal = {}};
+					// Adobe CF throws ArrayStoreException on inline function() in new() calls
+					var loginCallback = function(p) { captured.principal = p; };
 					strategy = new wheels.auth.SessionStrategy(
-						onLogin = function(p) { captured.principal = p; }
+						onLogin = loginCallback
 					);
 
 					strategy.login(principal = {id = 99});
@@ -130,8 +132,10 @@ component extends="wheels.WheelsTest" {
 
 				it("invokes the onLogout callback", function() {
 					var captured = {called = false};
+					// Adobe CF throws ArrayStoreException on inline function() in new() calls
+					var logoutCallback = function() { captured.called = true; };
 					strategy = new wheels.auth.SessionStrategy(
-						onLogout = function() { captured.called = true; }
+						onLogout = logoutCallback
 					);
 
 					strategy.login(principal = {id = 1});
