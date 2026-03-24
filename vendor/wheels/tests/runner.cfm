@@ -78,6 +78,14 @@
         } else {
             application.wheels.dataSourceName = application.wheels.coreTestDataSourceName;
         }
+
+        // Clear model cache when switching datasources so models are
+        // re-initialized with the correct adapter for the target database.
+        // Without this, models cached from a prior datasource (e.g. H2 from
+        // the warm-up request) retain the wrong adapter when testing against
+        // a different database like CockroachDB.
+        StructClear(application.wheels.models);
+
         application.testenv.db = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
 
         // Setting up test database for test environment

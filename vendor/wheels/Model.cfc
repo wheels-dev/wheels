@@ -400,8 +400,25 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.adapterNamespace = "CockroachDB";
 			local.adapterName = "CockroachDBModel";
 		} else if (FindNoCase("PostgreSQL", local.info.driver_name)) {
-			local.adapterNamespace = "PostgreSQL";
-			local.adapterName = "PostgreSQLModel";
+			// The PostgreSQL JDBC driver reports "PostgreSQL" as product name even
+			// when connected to CockroachDB. Query version() to distinguish.
+			try {
+				local.versionQuery = queryExecute(
+					"SELECT version() AS v",
+					[],
+					{datasource: variables.wheels.class.dataSource}
+				);
+				if (IsQuery(local.versionQuery) && FindNoCase("CockroachDB", local.versionQuery.v)) {
+					local.adapterNamespace = "CockroachDB";
+					local.adapterName = "CockroachDBModel";
+				} else {
+					local.adapterNamespace = "PostgreSQL";
+					local.adapterName = "PostgreSQLModel";
+				}
+			} catch (any e) {
+				local.adapterNamespace = "PostgreSQL";
+				local.adapterName = "PostgreSQLModel";
+			}
 		} else if (FindNoCase("H2", local.info.driver_name)) {
 			local.adapterNamespace = "H2";
 			local.adapterName = "H2Model";

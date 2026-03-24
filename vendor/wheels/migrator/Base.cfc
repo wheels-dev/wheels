@@ -34,7 +34,22 @@ component extends="wheels.Global"{
 		} else if (local.info.database_productname Contains "CockroachDB") {
 			local.adapterName = "CockroachDB";
 		} else if (local.info.driver_name Contains "PostgreSQL") {
-			local.adapterName = "PostgreSQL";
+			// The PostgreSQL JDBC driver reports "PostgreSQL" as product name even
+			// when connected to CockroachDB. Query version() to distinguish.
+			try {
+				local.versionQuery = queryExecute(
+					"SELECT version() AS v",
+					[],
+					{datasource: local.dsName}
+				);
+				if (IsQuery(local.versionQuery) && FindNoCase("CockroachDB", local.versionQuery.v)) {
+					local.adapterName = "CockroachDB";
+				} else {
+					local.adapterName = "PostgreSQL";
+				}
+			} catch (any e) {
+				local.adapterName = "PostgreSQL";
+			}
 			// NB: using mySQL adapter for H2 as the cli defaults to this for development
 		} else if (local.info.driver_name Contains "H2") {
 			// determine the emulation mode
