@@ -667,8 +667,8 @@ Ensure all queries work correctly with the new database adapter. Watch for:
 
 - [SQLite Official Documentation](https://www.sqlite.org/docs.html)
 - [SQLite JDBC Driver](https://github.com/xerial/sqlite-jdbc)
-- [Wheels Database Interaction Guide](../database-interaction-through-models/)
-- [Wheels Migrations Guide](./database-migrations.md)
+- [Reading Records](reading-records.md)
+- [Database Migrations](database-migrations/README.md)
 
 ## Summary
 

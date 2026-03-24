@@ -669,4 +669,4 @@ component extends="wheels-cli.models.BaseCommand" {
 - [Service Architecture](service-architecture.md)
 - [Testing Guide](testing.md)
 - [CommandBox Documentation](https://commandbox.ortusbooks.com/)
-- [Contributing to Wheels CLI](../CONTRIBUTING.md)
+- [Wheels CLI GitHub](https://github.com/wheels-dev/wheels)

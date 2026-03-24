@@ -11,14 +11,14 @@ Wheels provides comprehensive benchmarking tools to measure, analyze, and optimi
 ## Available Commands
 
 ### Core Benchmarking Commands
-- [`wheels benchmark run`](./benchmark-run.md) - Run performance benchmarks
-- [`wheels benchmark compare`](./benchmark-compare.md) - Compare benchmark results
-- [`wheels benchmark report`](./benchmark-report.md) - Generate performance reports
+- `wheels benchmark run` - Run performance benchmarks
+- `wheels benchmark compare` - Compare benchmark results
+- `wheels benchmark report` - Generate performance reports
 
 ### Specialized Benchmarks
-- [`wheels benchmark database`](./benchmark-database.md) - Database query performance
-- [`wheels benchmark memory`](./benchmark-memory.md) - Memory usage analysis
-- [`wheels benchmark load`](./benchmark-load.md) - Load testing and stress testing
+- `wheels benchmark database` - Database query performance
+- `wheels benchmark memory` - Memory usage analysis
+- `wheels benchmark load` - Load testing and stress testing
 
 ## Quick Start
 
@@ -409,7 +409,6 @@ jobs:
 
 ## Related Documentation
 
-- [Performance Optimization Guide](../../working-with-wheels/performance-optimization.md)
-- [Database Optimization](../../database-interaction-through-models/performance.md)
-- [Caching Strategies](../../working-with-wheels/caching.md)
-- [Testing](../../working-with-wheels/testing-your-application.md)
+- [Configuration and Defaults](../../../working-with-wheels/configuration-and-defaults.md)
+- [Caching](../../../handling-requests-with-controllers/caching.md)
+- [Testing](../../../working-with-wheels/testing-your-application.md)

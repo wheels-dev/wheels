@@ -264,6 +264,4 @@ The MCP integration continues to evolve with:
 
 - [MCP Configuration Guide](./mcp-configuration-guide.md) - Per-IDE setup with LuCLI and HTTP transports
 - [Wheels CLI Overview](../README.md)
-- [AI Integration Guide](../../../AI_INTEGRATION_GUIDE.md)
-- [Development Server](../core/server.md)
-- [Code Generation](../generate/README.md)
+- [Code Generation](../generate/app.md)

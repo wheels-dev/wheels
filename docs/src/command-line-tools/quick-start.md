@@ -312,9 +312,9 @@ wheels db shell --web
 ## Next Steps
 
 1. **Read the Guides:**
-   - [Service Architecture](service-architecture.md)
-   - [Testing Guide](testing.md)
-   - [Migration Guide](migrations.md)
+   - [Service Architecture](cli-guides/service-architecture.md)
+   - [Testing Guide](cli-guides/testing.md)
+   - [Migration Guide](cli-guides/migrations.md)
 
 2. **Explore Commands:**
    - `wheels --help`

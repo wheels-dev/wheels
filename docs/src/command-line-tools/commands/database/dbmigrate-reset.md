@@ -112,4 +112,3 @@ The reset process rolls back migrations in reverse chronological order. Ensure a
 - [`wheels dbmigrate down`](dbmigrate-down.md) - Rollback last migration
 - [`wheels dbmigrate latest`](dbmigrate-latest.md) - Run all pending migrations
 - [`wheels dbmigrate info`](dbmigrate-info.md) - View migration status
-- [`wheels db seed`](db-seed.md) - Seed the database with data

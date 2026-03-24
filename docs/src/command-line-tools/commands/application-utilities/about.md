@@ -165,9 +165,7 @@ Statistics are gathered by counting files in:
 ## Related Commands
 
 - [`wheels version`](../core/info.md#version) - Show just version information
-- [`wheels doctor`](doctor.md) - Run health checks
-- [`wheels stats`](stats.md) - Detailed code statistics
-- [`wheels env`](../environment/env.md) - Manage environments
+- [`wheels env list`](../environment/env-list.md) - List environments
 
 ## Tips
 

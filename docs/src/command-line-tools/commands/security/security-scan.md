@@ -395,6 +395,5 @@ The security scan checks for compliance with:
 
 ## Additional Resources
 
-- [Wheels Security Guide](../../handling-requests-with-controllers/verification.md)
-- [CSRF Protection Documentation](../../handling-requests-with-controllers/request-handling.md)
-- [Authentication Patterns](../../database-interaction-through-models/README.md)
+- [Verification](../../../handling-requests-with-controllers/verification.md)
+- [Request Handling](../../../handling-requests-with-controllers/request-handling.md)

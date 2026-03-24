@@ -388,8 +388,6 @@ wheels env switch development --quiet
 
 ## See Also
 
-- [wheels env](env.md) - Environment management overview
 - [wheels env list](env-list.md) - List available environments
 - [wheels env setup](env-setup.md) - Setup new environments
-- [wheels env current](env-current.md) - Show current environment
 - [wheels reload](../core/reload.md) - Reload application

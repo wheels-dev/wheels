@@ -576,4 +576,4 @@ Planned service architecture improvements:
 - [Creating Custom Commands](creating-commands.md)
 - [Template System](template-system.md)
 - [Testing Guide](testing.md)
-- [Contributing Guide](../CONTRIBUTING.md)
+- [Wheels CLI GitHub](https://github.com/wheels-dev/wheels)

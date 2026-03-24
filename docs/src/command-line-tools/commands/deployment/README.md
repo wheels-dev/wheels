@@ -11,21 +11,21 @@ Wheels provides comprehensive deployment automation tools to streamline the proc
 ## Available Commands
 
 ### Core Deployment Commands
-- [`wheels deploy setup`](./deploy-setup.md) - Initialize deployment configuration
-- [`wheels deploy push`](./deploy-push.md) - Deploy application to target environment
-- [`wheels deploy rollback`](./deploy-rollback.md) - Rollback to previous deployment
-- [`wheels deploy status`](./deploy-status.md) - Check deployment status
+- `wheels deploy setup` - Initialize deployment configuration
+- `wheels deploy push` - Deploy application to target environment
+- `wheels deploy rollback` - Rollback to previous deployment
+- `wheels deploy status` - Check deployment status
 
 ### Environment Management
-- [`wheels deploy init`](./deploy-init.md) - Initialize new deployment environment
-- [`wheels deploy audit`](./deploy-audit.md) - Audit deployment security and configuration
-- [`wheels deploy logs`](./deploy-logs.md) - View deployment and application logs
+- `wheels deploy init` - Initialize new deployment environment
+- `wheels deploy audit` - Audit deployment security and configuration
+- `wheels deploy logs` - View deployment and application logs
 
 ### Advanced Operations
-- [`wheels deploy lock`](./deploy-lock.md) - Lock/unlock deployments
-- [`wheels deploy hooks`](./deploy-hooks.md) - Manage deployment hooks
-- [`wheels deploy secrets`](./deploy-secrets.md) - Manage deployment secrets
-- [`wheels deploy stop`](./deploy-stop.md) - Stop running deployment
+- `wheels deploy lock` - Lock/unlock deployments
+- `wheels deploy hooks` - Manage deployment hooks
+- `wheels deploy secrets` - Manage deployment secrets
+- `wheels deploy stop` - Stop running deployment
 
 ## Quick Start
 
@@ -341,7 +341,7 @@ wheels deploy logs --environment=production --verbose --lines=500
 
 ## Related Documentation
 
-- [Configuration Management](../../working-with-wheels/configuration-and-defaults.md)
-- [Database Migrations](../../database-interaction-through-models/database-migrations/README.md)
-- [Testing](../../working-with-wheels/testing-your-application.md)
+- [Configuration Management](../../../working-with-wheels/configuration-and-defaults.md)
+- [Database Migrations](../../../database-interaction-through-models/database-migrations/README.md)
+- [Testing](../../../working-with-wheels/testing-your-application.md)
 - [Security](../security/README.md)

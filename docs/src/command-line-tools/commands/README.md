@@ -188,8 +188,8 @@ Commands for analyzing code quality and patterns.
 - **`wheels analyze performance`** - Performance analysis
   [Documentation](analysis/analyze-performance.md)
 
-- **`wheels analyze security`** - Security analysis
-  [Documentation](analysis/analyze-security.md)
+- **`wheels security scan`** - Security scanning
+  [Documentation](security/security-scan.md)
 
 ## Config Commands
 

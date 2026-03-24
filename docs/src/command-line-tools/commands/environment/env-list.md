@@ -274,7 +274,6 @@ When using `--verbose`, shows:
 
 ## See Also
 
-- [wheels env](env.md) - Environment management overview
 - [wheels env setup](env-setup.md) - Setup new environment
 - [wheels env switch](env-switch.md) - Switch environments
-- [wheels config list](../config/config-list.md) - List configuration
+- [wheels config dump](../config/config-dump.md) - Dump configuration

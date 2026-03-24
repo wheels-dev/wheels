@@ -657,5 +657,4 @@ wheels env setup environment=variant-b --base=production --database=variant_b_db
 
 - [wheels env list](env-list.md) - List all environments
 - [wheels env switch](env-switch.md) - Switch between environments
-- [wheels env current](env-current.md) - Show current environment
-- [Environment Configuration Guide](../../working-with-wheels/switching-environments.md)
+- [Switching Environments](../../../working-with-wheels/switching-environments.md)

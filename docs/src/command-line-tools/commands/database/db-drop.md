@@ -239,5 +239,4 @@ The database file remains locked even after stopping the server.
 ## Related Commands
 
 - [`wheels db create`](db-create.md) - Create a new database
-- [`wheels db reset`](db-reset.md) - Drop and recreate database
-- [`wheels db dump`](db-dump.md) - Backup before dropping
+- [`wheels dbmigrate reset`](dbmigrate-reset.md) - Reset all migrations
