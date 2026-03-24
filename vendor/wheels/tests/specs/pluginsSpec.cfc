@@ -404,6 +404,142 @@ component extends="wheels.WheelsTest" {
 				expect(c).toHaveKey("$ConventionalPluginMixin")
 			})
 		})
+
+		describe("Tests that symlinked plugin directories", () => {
+
+			it("discovers a symlinked plugin via absolute symlink", () => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")
+				symlinkTargetDir = ExpandPath("/wheels/tests/_assets/plugins/_symlink_targets/TestSymlinkPlugin")
+				symlinkLinkPath = symlinkDir & "/TestSymlinkPlugin"
+
+				// Absolute symlink: TestSymlinkPlugin -> /abs/path/to/_symlink_targets/TestSymlinkPlugin
+				$createSymlink(symlinkTargetDir, symlinkLinkPath)
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/symlinked",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/symlinked"
+
+				PluginObj = $pluginObj(config)
+				plugins = PluginObj.getPlugins()
+
+				// The symlinked directory should be discovered and loaded
+				expect(plugins).toHaveKey("TestSymlinkPlugin")
+				// Verify the plugin's method is callable
+				expect(plugins.TestSymlinkPlugin).toHaveKey("$SymlinkedPluginTestMethod")
+
+				$deleteSymlink(symlinkLinkPath)
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("discovers a symlinked plugin via relative symlink", () => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")
+				symlinkLinkPath = symlinkDir & "/TestSymlinkPlugin"
+
+				// Relative symlink: TestSymlinkPlugin -> ../_symlink_targets/TestSymlinkPlugin
+				$createSymlink("../_symlink_targets/TestSymlinkPlugin", symlinkLinkPath)
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/symlinked",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/symlinked"
+
+				PluginObj = $pluginObj(config)
+				plugins = PluginObj.getPlugins()
+
+				expect(plugins).toHaveKey("TestSymlinkPlugin")
+				expect(plugins.TestSymlinkPlugin).toHaveKey("$SymlinkedPluginTestMethod")
+
+				$deleteSymlink(symlinkLinkPath)
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("preserves symlinked directories during plugin delete", () => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")
+				symlinkTargetDir = ExpandPath("/wheels/tests/_assets/plugins/_symlink_targets/TestSymlinkPlugin")
+				symlinkLinkPath = symlinkDir & "/TestSymlinkPlugin"
+
+				$createSymlink(symlinkTargetDir, symlinkLinkPath)
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/symlinked",
+					deletePluginDirectories = true,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/symlinked"
+
+				PluginObj = $pluginObj(config)
+
+				// Symlink should still exist after $pluginDelete runs
+				expect($symlinkExists(symlinkLinkPath)).toBeTrue()
+				// Target directory should also be intact
+				expect(DirectoryExists(symlinkTargetDir)).toBeTrue()
+
+				$deleteSymlink(symlinkLinkPath)
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("does not extract zip into a symlinked directory", () => {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				// The unpacking fixture has TestGlobalMixins-0.0.2.zip which
+				// extracts to a folder named "testglobalmixins". Create a symlink
+				// with that name so it looks like the folder already exists.
+				unpackDir = ExpandPath("/wheels/tests/_assets/plugins/unpacking")
+				symlinkTargetDir = ExpandPath("/wheels/tests/_assets/plugins/_symlink_targets/TestSymlinkPlugin")
+				symlinkLinkPath = unpackDir & "/testglobalmixins"
+
+				$deleteTestFolders()
+				$createSymlink(symlinkTargetDir, symlinkLinkPath)
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/unpacking",
+					deletePluginDirectories = false,
+					overwritePlugins = true,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/unpacking"
+
+				// $pluginObj runs the full init pipeline including $pluginsProcess()
+				// which may fail to load the symlinked "plugin". That's expected —
+				// we only care that $pluginsExtract() didn't unzip into the symlink.
+				try { $pluginObj(config) } catch (any e) {}
+
+				// The symlink should still be a symlink (not replaced by zip extraction)
+				expect($isSymlinkCheck(symlinkLinkPath)).toBeTrue()
+				// The target should not contain extracted zip artifacts (index.cfm)
+				expect(FileExists(symlinkTargetDir & "/index.cfm")).toBeFalse()
+
+				$deleteSymlink(symlinkLinkPath)
+				$deleteTestFolders()
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+		})
 	}
 
 	function $pluginObj(required struct config) {
@@ -440,14 +576,57 @@ component extends="wheels.WheelsTest" {
 
 	function $deleteTestFolders() {
 		var q = DirectoryList(ExpandPath('/wheels/tests/_assets/plugins/unpacking'), false, "query")
+		var jFiles = CreateObject("java", "java.nio.file.Files")
 		for (row in q) {
 			dir = ListChangeDelims(ListAppend(row.directory, row.name, "/"), "/", "\")
 			if (StructKeyExists(server, "boxlang") && !dir.startsWith("/")) {
 				dir = "/" & dir;
 			}
+			// Remove symlinks via NIO (DirectoryDelete follows symlinks)
+			if (jFiles.isSymbolicLink($toPath(dir))) {
+				jFiles.delete($toPath(dir))
+				continue;
+			}
 			if (DirectoryExists(dir)) {
 				DirectoryDelete(dir, true)
 			}
 		}
+	}
+
+	function $toPath(required string filePath) {
+		return CreateObject("java", "java.io.File").init(arguments.filePath).toPath()
+	}
+
+	function $createSymlink(required string target, required string link) {
+		// Clean up stale symlink from a prior failed test run
+		$deleteSymlink(arguments.link)
+		// Use Java ProcessBuilder to create symlink (avoids varargs issues with
+		// Files.createSymbolicLink on CFML). ProcessBuilder takes a List, not
+		// varargs, so CFML resolves it correctly.
+		var pb = CreateObject("java", "java.lang.ProcessBuilder")
+			.init(["ln", "-s", arguments.target, arguments.link])
+		var proc = pb.start()
+		proc.waitFor()
+		if (proc.exitValue() != 0) {
+			throw(type="Wheels.Test.SymlinkError", message="Failed to create symlink: #arguments.link# -> #arguments.target#")
+		}
+	}
+
+	function $deleteSymlink(required string link) {
+		var jFiles = CreateObject("java", "java.nio.file.Files")
+		var linkPath = $toPath(arguments.link)
+		if (jFiles.isSymbolicLink(linkPath)) {
+			jFiles.delete(linkPath)
+		}
+	}
+
+	function $symlinkExists(required string link) {
+		// Can't use Files.exists() (varargs). Use File.exists() instead.
+		return CreateObject("java", "java.io.File").init(arguments.link).exists()
+	}
+
+	function $isSymlinkCheck(required string path) {
+		var jFiles = CreateObject("java", "java.nio.file.Files")
+		return jFiles.isSymbolicLink($toPath(arguments.path))
 	}
 }

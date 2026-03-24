@@ -105,6 +105,12 @@ component output="false" extends="wheels.Global"{
 		local.plugins = $pluginFiles();
 		for (local.p in local.plugins) {
 			local.plugin = local.plugins[local.p];
+			// Never extract into a symlinked directory — it would pollute the
+			// symlink target (e.g. a git-cloned source tree). Symlinked plugins
+			// are already "installed" via the link itself (GH#1978).
+			if (local.plugin.folderExists && $isSymlink(local.plugin.folderPath)) {
+				continue;
+			}
 			if (!local.plugin.folderExists || (local.plugin.folderExists && variables.$class.overwritePlugins)) {
 				if (!local.plugin.folderExists) {
 					try {
@@ -810,6 +816,22 @@ component output="false" extends="wheels.Global"{
 			query = local.query,
 			sql = "select * from query where name not like '.%' ORDER BY name #variables.sort#"
 		);
+	}
+
+	/**
+	 * Checks whether a path is a symbolic link using Java NIO.
+	 * Used to protect symlinked plugin directories from extraction and deletion.
+	 *
+	 * @path Absolute filesystem path to check
+	 */
+	public boolean function $isSymlink(required string path) {
+		try {
+			local.Files = CreateObject("java", "java.nio.file.Files");
+			local.filePath = CreateObject("java", "java.io.File").init(arguments.path).toPath();
+			return local.Files.isSymbolicLink(local.filePath);
+		} catch (any e) {
+			return false;
+		}
 	}
 
 }
