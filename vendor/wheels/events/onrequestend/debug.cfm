@@ -336,7 +336,7 @@
 				</cfif>
 			</div>
 			<!--- Warnings --->
-			<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins) OR (isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions))>
+			<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins) OR (isDefined("application.wheels.versionMismatchPlugins") AND Len(application.wheels.versionMismatchPlugins)) OR (isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions))>
 				<div class="wdb-section">
 					<div class="wdb-section-title" style="color:##f38ba8;">Warnings</div>
 					<div style="color:##f38ba8;font-size:12px;">
@@ -349,6 +349,11 @@
 							<cfloop list="#application.wheels.dependantPlugins#" index="local.di">
 								<cfset local.needs = ListLast(local.di, "|")>
 								<p><strong>#ListFirst(local.di, "|")#</strong> needs: #local.needs#</p>
+							</cfloop>
+						</cfif>
+						<cfif isDefined("application.wheels.versionMismatchPlugins") AND Len(application.wheels.versionMismatchPlugins)>
+							<cfloop list="#application.wheels.versionMismatchPlugins#" index="local.vm">
+								<p><strong>#ListGetAt(local.vm, 1, "|")#</strong> requires <strong>#ListGetAt(local.vm, 2, "|")#</strong> #ListGetAt(local.vm, 3, "|")# but version <strong>#ListGetAt(local.vm, 4, "|")#</strong> is loaded</p>
 							</cfloop>
 						</cfif>
 						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>

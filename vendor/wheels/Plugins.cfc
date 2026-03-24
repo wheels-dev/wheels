@@ -19,6 +19,7 @@ component output="false" extends="wheels.Global"{
 		variables.$class.pluginMiddleware = [];
 		variables.$class.serviceProviders = [];
 		variables.$class.deprecationWarnings = [];
+		variables.$class.versionMismatchPlugins = "";
 		StructAppend(variables.$class, arguments);
 		/* handle pathing for different operating systems */
 		variables.$class.pluginPathFull = ReplaceNoCase(ExpandPath(variables.$class.pluginPath), "\", "/", "all");
@@ -222,13 +223,17 @@ component output="false" extends="wheels.Global"{
 	 */
 	public void function $pluginMetaData() {
 		for (local.plugin in variables.$class.plugins) {
-			variables.$class.pluginMeta[local.plugin] = {"version" = "", "boxjson" = {}, "manifest" = {}};
+			variables.$class.pluginMeta[local.plugin] = {"version" = "", "boxjson" = {}, "manifest" = {}, "dependencies" = {}};
 			local.boxJsonLocation = $fullPathToPlugin(local.plugin & "/" & 'box.json');
 			if (FileExists(local.boxJsonLocation)) {
 				local.boxJson = DeserializeJSON(FileRead(local.boxJsonLocation));
 				variables.$class.pluginMeta[local.plugin]["boxjson"] = local.boxJson;
 				if (StructKeyExists(local.boxJson, "version")) {
 					variables.$class.pluginMeta[local.plugin]["version"] = local.boxJson.version;
+				}
+				// box.json dependencies as fallback source for semver resolution
+				if (StructKeyExists(local.boxJson, "dependencies") && IsStruct(local.boxJson.dependencies)) {
+					StructAppend(variables.$class.pluginMeta[local.plugin]["dependencies"], local.boxJson.dependencies);
 				}
 			}
 			// Read plugin.json manifest if present (takes precedence over box.json for version)
@@ -240,6 +245,19 @@ component output="false" extends="wheels.Global"{
 					// plugin.json version takes precedence over box.json version
 					if (StructKeyExists(local.parsed.manifest, "version") && Len(local.parsed.manifest.version)) {
 						variables.$class.pluginMeta[local.plugin]["version"] = local.parsed.manifest.version;
+					}
+					// plugin.json dependencies override box.json dependencies for semver resolution
+					if (StructKeyExists(local.parsed.manifest, "dependencies")) {
+						if (IsStruct(local.parsed.manifest.dependencies)) {
+							variables.$class.pluginMeta[local.plugin]["dependencies"] = local.parsed.manifest.dependencies;
+						} else if (IsArray(local.parsed.manifest.dependencies)) {
+							// Convert array form ["PluginA","PluginB"] to struct form {"PluginA":"","PluginB":""}
+							local.depStruct = {};
+							for (local.depItem in local.parsed.manifest.dependencies) {
+								local.depStruct[Trim(local.depItem)] = "";
+							}
+							variables.$class.pluginMeta[local.plugin]["dependencies"] = local.depStruct;
+						}
 					}
 				} else {
 					WriteLog(
@@ -292,7 +310,7 @@ component output="false" extends="wheels.Global"{
 	 *   version      (string, required)  - Semver-compatible version
 	 *   author       (string, optional)  - Plugin author
 	 *   description  (string, optional)  - Short description
-	 *   dependencies (array, optional)   - Array of plugin name strings this plugin requires
+	 *   dependencies (array|struct, optional) - Array of plugin names or struct of name→semver constraints
 	 *   mixins       (string, optional)  - Mixin target: "global","controller","model","none", or comma-delimited list
 	 *   middleware    (array, optional)   - Array of middleware declaration structs
 	 *   wheelsVersion(string, optional)  - Compatible Wheels version(s), comma-delimited
@@ -340,17 +358,25 @@ component output="false" extends="wheels.Global"{
 			}
 		}
 
-		// Validate dependencies (must be array of strings)
+		// Validate dependencies: array of strings (presence-only) or struct of version constraints
 		if (StructKeyExists(arguments.manifest, "dependencies")) {
-			if (!IsArray(arguments.manifest.dependencies)) {
-				ArrayAppend(local.errors, "Field 'dependencies' must be an array");
-			} else {
+			if (IsArray(arguments.manifest.dependencies)) {
 				for (local.dep in arguments.manifest.dependencies) {
 					if (!IsSimpleValue(local.dep) || !Len(Trim(local.dep))) {
 						ArrayAppend(local.errors, "Each dependency must be a non-empty string");
 						break;
 					}
 				}
+			} else if (IsStruct(arguments.manifest.dependencies)) {
+				// Struct form: {"pluginName": ">=1.0.0 <2.0.0"} for semver constraints
+				for (local.depKey in arguments.manifest.dependencies) {
+					if (!IsSimpleValue(arguments.manifest.dependencies[local.depKey])) {
+						ArrayAppend(local.errors, "Dependency constraint for '#local.depKey#' must be a string");
+						break;
+					}
+				}
+			} else {
+				ArrayAppend(local.errors, "Field 'dependencies' must be an array or struct");
 			}
 		}
 
@@ -385,28 +411,80 @@ component output="false" extends="wheels.Global"{
 			"version" = {"type" = "string", "required" = true, "description" = "Semver-compatible version string"},
 			"author" = {"type" = "string", "required" = false, "description" = "Plugin author name or email"},
 			"description" = {"type" = "string", "required" = false, "description" = "Short description of the plugin"},
-			"dependencies" = {"type" = "array", "required" = false, "description" = "Array of plugin name strings this plugin requires"},
+			"dependencies" = {"type" = "array|struct", "required" = false, "description" = "Array of plugin names or struct of name-to-semver-constraint pairs"},
 			"mixins" = {"type" = "string", "required" = false, "description" = "Mixin target: global, controller, model, none, or comma-delimited list"},
 			"middleware" = {"type" = "array", "required" = false, "description" = "Array of middleware declaration objects with 'component' field"},
 			"wheelsVersion" = {"type" = "string", "required" = false, "description" = "Compatible Wheels version(s), comma-delimited"}
 		};
 	}
 
+	/**
+	 * Resolves plugin dependencies with semver-aware version constraint checking.
+	 *
+	 * Two dependency sources (checked in order):
+	 * 1. plugin.json / box.json "dependencies" struct (semver constraints, e.g., {"authPlugin": ">=1.0.0 <2.0.0"})
+	 * 2. CFC metadata "dependency" attribute (legacy presence-only check, e.g., dependency="PluginA,PluginB")
+	 *
+	 * Missing plugins are reported in dependantPlugins (existing behavior).
+	 * Version mismatches are reported in versionMismatchPlugins (new).
+	 * In non-production environments, a version mismatch throws to surface problems early.
+	 */
 	public void function $determineDependency() {
-		for (local.iPlugins in variables.$class.plugins) {
-			local.pluginMeta = GetMetadata(variables.$class.plugins[local.iPlugins]);
-			if (StructKeyExists(local.pluginMeta, "dependency")) {
-				for (local.iDependency in local.pluginMeta.dependency) {
-					local.iDependency = Trim(local.iDependency);
-					if (!StructKeyExists(variables.$class.plugins, local.iDependency)) {
+		local.semver = CreateObject("component", "wheels.SemVer");
+		for (local.pluginName in variables.$class.plugins) {
+			local.meta = variables.$class.pluginMeta[local.pluginName];
+			local.deps = local.meta.dependencies;
+			// Source 1: Versioned dependencies from plugin.json or box.json
+			if (IsStruct(local.deps) && !StructIsEmpty(local.deps)) {
+				for (local.depName in local.deps) {
+					local.constraint = Trim(local.deps[local.depName]);
+					if (!StructKeyExists(variables.$class.plugins, local.depName)) {
 						variables.$class.dependantPlugins = ListAppend(
 							variables.$class.dependantPlugins,
-							Reverse(SpanExcluding(Reverse(local.pluginMeta.name), ".")) & "|" & local.iDependency
+							local.pluginName & "|" & local.depName
 						);
+					} else if (Len(local.constraint)) {
+						local.depVersion = "";
+						if (StructKeyExists(variables.$class.pluginMeta, local.depName)) {
+							local.depVersion = variables.$class.pluginMeta[local.depName].version;
+						}
+						if (Len(local.depVersion)) {
+							if (!local.semver.satisfiesAll(local.depVersion, local.constraint)) {
+								local.msg = "Plugin '#local.pluginName#' requires '#local.depName#' #local.constraint# but version #local.depVersion# is loaded";
+								variables.$class.versionMismatchPlugins = ListAppend(
+									variables.$class.versionMismatchPlugins,
+									local.pluginName & "|" & local.depName & "|" & local.constraint & "|" & local.depVersion
+								);
+								if (variables.$class.wheelsEnvironment != "production") {
+									Throw(type="Wheels.PluginVersionMismatch", message=local.msg);
+								}
+							}
+						} else {
+							WriteLog(
+								type="warning",
+								text="Wheels: Plugin '#local.pluginName#' requires '#local.depName#' #local.constraint# but no version metadata found for '#local.depName#'"
+							);
+						}
 					}
-				};
+				}
 			}
-		};
+			// Source 2: Legacy CFC metadata dependency attribute (presence-only)
+			local.cfcMeta = GetMetadata(variables.$class.plugins[local.pluginName]);
+			if (StructKeyExists(local.cfcMeta, "dependency")) {
+				for (local.iDependency in local.cfcMeta.dependency) {
+					local.iDependency = Trim(local.iDependency);
+					if (!StructKeyExists(variables.$class.plugins, local.iDependency)) {
+						local.entry = local.pluginName & "|" & local.iDependency;
+						if (!ListFind(variables.$class.dependantPlugins, local.entry)) {
+							variables.$class.dependantPlugins = ListAppend(
+								variables.$class.dependantPlugins,
+								Reverse(SpanExcluding(Reverse(local.cfcMeta.name), ".")) & "|" & local.iDependency
+							);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -656,6 +734,10 @@ component output="false" extends="wheels.Global"{
 
 	public any function getDependantPlugins() {
 		return variables.$class.dependantPlugins;
+	}
+
+	public any function getVersionMismatchPlugins() {
+		return variables.$class.versionMismatchPlugins;
 	}
 
 	public any function getMixins() {
