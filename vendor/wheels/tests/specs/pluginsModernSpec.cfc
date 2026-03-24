@@ -81,7 +81,8 @@ component extends="wheels.WheelsTest" {
 				PluginObj = $pluginObj(config)
 				var mixins = PluginObj.getMixins()
 
-				var result = mixins.controller["$CollidingMethod"]()
+				var fn = mixins.controller["$CollidingMethod"]
+				var result = fn()
 				expect(result).toBe("FromPluginB")
 
 				application.wheels.pluginComponentPath = originalPluginComponentPath
