@@ -18,6 +18,7 @@ component output="false" extends="wheels.Global"{
 		variables.$class.mixinCollisions = [];
 		variables.$class.pluginMiddleware = [];
 		variables.$class.serviceProviders = [];
+		variables.$class.deprecationWarnings = [];
 		StructAppend(variables.$class, arguments);
 		/* handle pathing for different operating systems */
 		variables.$class.pluginPathFull = ReplaceNoCase(ExpandPath(variables.$class.pluginPath), "\", "/", "all");
@@ -185,6 +186,19 @@ component output="false" extends="wheels.Global"{
 				if ($isServiceProvider(local.plugin)) {
 					ArrayAppend(variables.$class.serviceProviders, local.pluginKey);
 				}
+				// In development mode, warn about mixin-only plugins that lack modern manifests
+				if (
+					variables.$class.wheelsEnvironment == "development"
+					&& !$isServiceProvider(local.plugin)
+					&& !$hasPluginManifest(local.pluginKey)
+				) {
+					local.warning = 'Plugin "#local.pluginKey#" uses legacy mixin injection without a plugin.json manifest or ServiceProvider.cfc. Mixin-only plugins will be deprecated in Wheels 4.0. See: https://guides.cfwheels.org/docs/migrating-plugins-to-service-providers';
+					ArrayAppend(variables.$class.deprecationWarnings, {
+						plugin = local.pluginKey,
+						message = local.warning
+					});
+					WriteLog(type="warning", text="[Wheels] #local.warning#");
+				}
 				// If plugin author has specified compatibility version as 2.0, only check against that major version
 				// If they've specified 2.0.1, then be more specific
 				if (StructKeyExists(local.plugin, "version")) {
@@ -286,6 +300,15 @@ component output="false" extends="wheels.Global"{
 		return StructKeyExists(local.meta, "implements")
 			&& IsStruct(local.meta.implements)
 			&& StructKeyExists(local.meta.implements, "wheels.ServiceProviderInterface");
+	}
+
+	/**
+	 * Checks whether a plugin folder contains a plugin.json manifest file.
+	 *
+	 * @pluginName The plugin folder name
+	 */
+	private boolean function $hasPluginManifest(required string pluginName) {
+		return FileExists($fullPathToPlugin(arguments.pluginName) & "/plugin.json");
 	}
 
 	/**
@@ -491,6 +514,10 @@ component output="false" extends="wheels.Global"{
 
 	public array function getServiceProviders() {
 		return variables.$class.serviceProviders;
+	}
+
+	public array function getDeprecationWarnings() {
+		return variables.$class.deprecationWarnings;
 	}
 
 	public any function getMixableComponents() {

@@ -421,6 +421,133 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that deprecation warnings for mixin-only plugins", function() {
+
+			it("warns about legacy plugins without plugin.json or ServiceProvider in development mode", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/deprecation",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true,
+					wheelsEnvironment = "development"
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/deprecation"
+
+				PluginObj = $pluginObj(config)
+				var warnings = PluginObj.getDeprecationWarnings()
+
+				expect(warnings).toBeArray()
+				expect(ArrayLen(warnings)).toBe(1)
+				expect(warnings[1].plugin).toBe("LegacyMixinPlugin")
+				expect(warnings[1].message).toInclude("legacy mixin injection")
+				expect(warnings[1].message).toInclude("plugin.json")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("does not warn about plugins that have plugin.json", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/deprecation",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true,
+					wheelsEnvironment = "development"
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/deprecation"
+
+				PluginObj = $pluginObj(config)
+				var warnings = PluginObj.getDeprecationWarnings()
+
+				for (var w in warnings) {
+					expect(w.plugin).notToBe("ModernJsonPlugin")
+				}
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("does not warn about ServiceProvider plugins", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/serviceprovider",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true,
+					wheelsEnvironment = "development"
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/serviceprovider"
+
+				PluginObj = $pluginObj(config)
+				var warnings = PluginObj.getDeprecationWarnings()
+
+				expect(warnings).toBeArray()
+				expect(ArrayLen(warnings)).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("does not warn in production mode", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/deprecation",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true,
+					wheelsEnvironment = "production"
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/deprecation"
+
+				PluginObj = $pluginObj(config)
+				var warnings = PluginObj.getDeprecationWarnings()
+
+				expect(warnings).toBeArray()
+				expect(ArrayLen(warnings)).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("does not warn in testing mode", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/deprecation",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true,
+					wheelsEnvironment = "testing"
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/deprecation"
+
+				PluginObj = $pluginObj(config)
+				var warnings = PluginObj.getDeprecationWarnings()
+
+				expect(warnings).toBeArray()
+				expect(ArrayLen(warnings)).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+		})
+
 	}
 
 	function $pluginObj(required struct config) {
