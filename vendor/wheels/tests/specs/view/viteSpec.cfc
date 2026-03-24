@@ -1,10 +1,10 @@
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
-		// Ensure Vite settings exist in BOTH application scopes.
-		// $get() reads from application.$wheels (via $appKey()), so we must set there.
-		// application.wheels is a reference to $wheels after init, but app reloads
-		// during CI can break that reference — set both to be safe.
+		// Ensure Vite settings exist in the active application scope.
+		// After framework init, application.$wheels is deleted and application.wheels
+		// is the sole settings struct. $appKey() returns the correct key.
+		var appKey = application.wo.$appKey();
 		var defaults = {
 			viteDevMode = false,
 			viteDevServerUrl = "http://localhost:5173",
@@ -12,11 +12,8 @@ component extends="wheels.WheelsTest" {
 			viteManifestFile = ".vite/manifest.json"
 		};
 		for (var key in defaults) {
-			if (StructKeyExists(application, "$wheels") && !StructKeyExists(application.$wheels, key)) {
-				application.$wheels[key] = defaults[key];
-			}
-			if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, key)) {
-				application.wheels[key] = defaults[key];
+			if (!StructKeyExists(application[appKey], key)) {
+				application[appKey][key] = defaults[key];
 			}
 		}
 	}
@@ -42,10 +39,9 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteDevServerUrl = _origDevUrl
 				application.wheels.viteBuildPath = _origBuildPath
 				application.wheels.viteManifestFile = _origManifestFile
-				// Clear manifest cache
-				if (StructKeyExists(application, "$wheels")) {
-					StructDelete(application.$wheels, "viteManifestCache")
-				}
+				// Clear manifest cache from the active application scope
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
 			})
 
 			it("returns dev server URL in dev mode", () => {
@@ -77,7 +73,7 @@ component extends="wheels.WheelsTest" {
 
 			it("resolves fingerprinted path from manifest in production", () => {
 				application.wheels.viteDevMode = false
-				application.$wheels.viteManifestCache = {
+				application.wheels.viteManifestCache = {
 					"src/main.js": {
 						file: "assets/main-BRBhM4rY.js",
 						src: "src/main.js",
@@ -92,7 +88,7 @@ component extends="wheels.WheelsTest" {
 
 			it("throws when entrypoint not in manifest", () => {
 				application.wheels.viteDevMode = false
-				application.$wheels.viteManifestCache = {}
+				application.wheels.viteManifestCache = {}
 
 				expect(function() {
 					_controller.viteAsset("src/missing.js")
@@ -113,9 +109,8 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteDevMode = _origDevMode
 				application.wheels.viteDevServerUrl = _origDevUrl
 				application.wheels.viteBuildPath = _origBuildPath
-				if (StructKeyExists(application, "$wheels")) {
-					StructDelete(application.$wheels, "viteManifestCache")
-				}
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
 			})
 
 			it("includes vite client and module script in dev mode", () => {
@@ -131,7 +126,7 @@ component extends="wheels.WheelsTest" {
 
 			it("returns script tag with fingerprinted path in production", () => {
 				application.wheels.viteDevMode = false
-				application.$wheels.viteManifestCache = {
+				application.wheels.viteManifestCache = {
 					"src/main.js": {
 						file: "assets/main-BRBhM4rY.js",
 						src: "src/main.js",
@@ -147,7 +142,7 @@ component extends="wheels.WheelsTest" {
 
 			it("includes CSS link tags from manifest in production", () => {
 				application.wheels.viteDevMode = false
-				application.$wheels.viteManifestCache = {
+				application.wheels.viteManifestCache = {
 					"src/main.js": {
 						file: "assets/main-BRBhM4rY.js",
 						src: "src/main.js",
@@ -165,7 +160,7 @@ component extends="wheels.WheelsTest" {
 
 			it("throws when entrypoint not in manifest", () => {
 				application.wheels.viteDevMode = false
-				application.$wheels.viteManifestCache = {}
+				application.wheels.viteManifestCache = {}
 
 				expect(function() {
 					_controller.viteScriptTag("src/missing.js")
@@ -184,9 +179,8 @@ component extends="wheels.WheelsTest" {
 			afterEach(() => {
 				application.wheels.viteDevMode = _origDevMode
 				application.wheels.viteBuildPath = _origBuildPath
-				if (StructKeyExists(application, "$wheels")) {
-					StructDelete(application.$wheels, "viteManifestCache")
-				}
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
 			})
 
 			it("returns empty string in dev mode", () => {
@@ -199,7 +193,7 @@ component extends="wheels.WheelsTest" {
 
 			it("returns link tag with fingerprinted path in production", () => {
 				application.wheels.viteDevMode = false
-				application.$wheels.viteManifestCache = {
+				application.wheels.viteManifestCache = {
 					"src/main.css": {
 						file: "assets/main-DiwrgTda.css",
 						src: "src/main.css"
@@ -214,7 +208,7 @@ component extends="wheels.WheelsTest" {
 
 			it("throws when entrypoint not in manifest", () => {
 				application.wheels.viteDevMode = false
-				application.$wheels.viteManifestCache = {}
+				application.wheels.viteManifestCache = {}
 
 				expect(function() {
 					_controller.viteStyleTag("src/missing.css")
@@ -285,16 +279,15 @@ component extends="wheels.WheelsTest" {
 			afterEach(() => {
 				application.wheels.viteBuildPath = _origBuildPath
 				application.wheels.viteManifestFile = _origManifestFile
-				if (StructKeyExists(application, "$wheels")) {
-					StructDelete(application.$wheels, "viteManifestCache")
-				}
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
 			})
 
 			it("returns cached manifest on second call", () => {
 				local.testManifest = {
 					"src/main.js": {file: "assets/main-abc123.js"}
 				}
-				application.$wheels.viteManifestCache = local.testManifest
+				application.wheels.viteManifestCache = local.testManifest
 
 				e = _controller.$viteManifest()
 
@@ -302,9 +295,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("throws when manifest file does not exist", () => {
-				if (StructKeyExists(application, "$wheels")) {
-					StructDelete(application.$wheels, "viteManifestCache")
-				}
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
 				application.wheels.viteBuildPath = "nonexistent_build_path"
 				application.wheels.viteManifestFile = "nonexistent_manifest.json"
 

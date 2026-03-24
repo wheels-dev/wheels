@@ -121,12 +121,12 @@ component {
 	 * scope for the lifetime of the application (cleared on reload).
 	 */
 	public struct function $viteManifest() {
+		local.appKey = $appKey();
 		if (
-			StructKeyExists(application, "$wheels")
-			&& StructKeyExists(application.$wheels, "viteManifestCache")
-			&& IsStruct(application.$wheels.viteManifestCache)
+			StructKeyExists(application[local.appKey], "viteManifestCache")
+			&& IsStruct(application[local.appKey].viteManifestCache)
 		) {
-			return application.$wheels.viteManifestCache;
+			return application[local.appKey].viteManifestCache;
 		}
 
 		local.manifestPath = $viteManifestPath();
@@ -145,7 +145,7 @@ component {
 		local.manifest = DeserializeJSON(local.manifestContent);
 
 		// Cache in application scope
-		application.$wheels.viteManifestCache = local.manifest;
+		application[local.appKey].viteManifestCache = local.manifest;
 
 		return local.manifest;
 	}

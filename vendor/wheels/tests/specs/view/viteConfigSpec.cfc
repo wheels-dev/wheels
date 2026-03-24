@@ -1,8 +1,10 @@
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
-		// Ensure Vite settings exist in BOTH application scopes.
-		// $get() reads from application.$wheels (via $appKey()), so we must set there.
+		// Ensure Vite settings exist in the active application scope.
+		// After framework init, application.$wheels is deleted and application.wheels
+		// is the sole settings struct. $appKey() returns the correct key.
+		var appKey = application.wo.$appKey();
 		var defaults = {
 			viteDevMode = false,
 			viteDevServerUrl = "http://localhost:5173",
@@ -10,11 +12,8 @@ component extends="wheels.WheelsTest" {
 			viteManifestFile = ".vite/manifest.json"
 		};
 		for (var key in defaults) {
-			if (StructKeyExists(application, "$wheels") && !StructKeyExists(application.$wheels, key)) {
-				application.$wheels[key] = defaults[key];
-			}
-			if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, key)) {
-				application.wheels[key] = defaults[key];
+			if (!StructKeyExists(application[appKey], key)) {
+				application[appKey][key] = defaults[key];
 			}
 		}
 	}
@@ -42,9 +41,8 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteBuildPath = _origBuildPath
 				application.wheels.viteManifestFile = _origManifestFile
 				application.wheels.environment = _origEnvironment
-				if (StructKeyExists(application, "$wheels")) {
-					StructDelete(application.$wheels, "viteManifestCache")
-				}
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
 			})
 
 			it("has viteDevServerUrl default matching standard Vite port", () => {
@@ -91,9 +89,8 @@ component extends="wheels.WheelsTest" {
 				application.wheels.viteDevMode = _origDevMode
 				application.wheels.viteDevServerUrl = _origDevUrl
 				application.wheels.viteBuildPath = _origBuildPath
-				if (StructKeyExists(application, "$wheels")) {
-					StructDelete(application.$wheels, "viteManifestCache")
-				}
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
 			})
 
 			it("generates script tags pointing to Vite dev server in dev mode", () => {
@@ -110,7 +107,7 @@ component extends="wheels.WheelsTest" {
 			it("generates fingerprinted paths matching build output in production", () => {
 				application.wheels.viteDevMode = false
 				application.wheels.viteBuildPath = "build"
-				application.$wheels.viteManifestCache = {
+				application.wheels.viteManifestCache = {
 					"src/main.js": {
 						file: "assets/main-abc123.js",
 						src: "src/main.js",
