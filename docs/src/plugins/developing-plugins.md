@@ -184,8 +184,8 @@ jdk:
   - oraclejdk8
 before_install:
   # Get Commandbox
-  - sudo apt-key adv --keyserver keys.gnupg.net --recv 6DA70622
-  - sudo echo "deb http://downloads.ortussolutions.com/debs/noarch /" | sudo tee -a /etc/apt/sources.list.d/commandbox.list
+  - curl -fsSl https://downloads.ortussolutions.com/debs/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/commandbox.gpg > /dev/null
+  - sudo echo "deb [signed-by=/usr/share/keyrings/commandbox.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/commandbox.list
 install:
   # Install Commandbox
   - sudo apt-get update && sudo apt-get --assume-yes install CommandBox

@@ -19,13 +19,15 @@ Get up and running with Wheels CLI in minutes.
 ### Install CommandBox
 
 ```bash
-# macOS/Linux
-curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo apt-key add -
-echo "deb https://downloads.ortussolutions.com/debs/noarch /" | sudo tee -a /etc/apt/sources.list.d/commandbox.list
+# macOS
+brew install commandbox
+
+# Linux (Debian/Ubuntu)
+curl -fsSl https://downloads.ortussolutions.com/debs/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/commandbox.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/commandbox.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/commandbox.list
 sudo apt-get update && sudo apt-get install commandbox
 
-# Windows (PowerShell as Admin)
-iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+# Windows
 choco install commandbox
 ```
 

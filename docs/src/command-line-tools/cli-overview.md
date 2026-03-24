@@ -120,10 +120,8 @@ wheels security scan
 
 1. **Install CommandBox** (if not already installed):
    ```bash
-   # macOS/Linux
-   curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo apt-key add -
-   or
-	brew install commandbox
+   # macOS
+   brew install commandbox
 
    # Windows
    choco install commandbox

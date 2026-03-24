@@ -208,7 +208,6 @@
 
 * [Source Code](https://github.com/wheels-dev/wheels)
 * [Issue Tracker](https://github.com/wheels-dev/wheels/issues)
-* [Sponsor Us](https://opencollective.com/wheels)
 * [Community](https://github.com/wheels-dev/wheels/discussions)
 
 ## Plugins
