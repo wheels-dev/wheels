@@ -12,10 +12,10 @@ component extends="wheels.WheelsTest" {
 			viteManifestFile = ".vite/manifest.json"
 		};
 		for (var key in defaults) {
-			if (!StructKeyExists(application.$wheels, key)) {
+			if (StructKeyExists(application, "$wheels") && !StructKeyExists(application.$wheels, key)) {
 				application.$wheels[key] = defaults[key];
 			}
-			if (!StructKeyExists(application.wheels, key)) {
+			if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, key)) {
 				application.wheels[key] = defaults[key];
 			}
 		}
