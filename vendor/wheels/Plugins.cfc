@@ -277,6 +277,13 @@ component output="false" extends="wheels.Global"{
 						text = "Wheels plugin '#local.plugin#' has an invalid plugin.json: #ArrayToList(local.parsed.errors, '; ')#"
 					);
 				}
+			} else {
+				// No plugin.json found — plugin uses legacy init()-based metadata extraction.
+				// Log an info-level suggestion so authors know about the new manifest option.
+				WriteLog(
+					type = "information",
+					text = "[Wheels] Plugin '#local.plugin#' does not have a plugin.json manifest. Consider adding one for declarative metadata, dependency management, and middleware registration. See: https://guides.cfwheels.org/docs/plugin-json-manifest"
+				);
 			}
 		}
 	}

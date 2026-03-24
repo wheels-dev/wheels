@@ -318,6 +318,138 @@ component extends="wheels.WheelsTest" {
 
 		})
 
+		describe("Tests that plugins without plugin.json fall back gracefully", function() {
+
+			it("loads plugin via init()-based metadata when no plugin.json exists", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var plugins = PluginObj.getPlugins()
+
+				// TestNoManifestPlugin has no plugin.json but should still load via init()
+				expect(plugins).toHaveKey("TestNoManifestPlugin")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("uses CFC this.version when no plugin.json provides version", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var meta = PluginObj.getPluginMeta()
+
+				// TestNoManifestPlugin sets this.version = "99.9.9" in init()
+				// Without a plugin.json, version should come from box.json or remain empty
+				// (the CFC this.version is used for compatibility checks, not stored in pluginMeta)
+				expect(meta).toHaveKey("TestNoManifestPlugin")
+				expect(meta.TestNoManifestPlugin.manifest).toBeStruct()
+				expect(StructIsEmpty(meta.TestNoManifestPlugin.manifest)).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("applies global mixins when no plugin.json and no CFC mixin attribute", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var mixins = PluginObj.getMixins()
+
+				// TestNoManifestPlugin has no mixin attribute and no plugin.json
+				// Should default to "global" — method available in all targets
+				expect(mixins.controller).toHaveKey("$NoManifestTestMethod")
+				expect(mixins.model).toHaveKey("$NoManifestTestMethod")
+				expect(mixins.application).toHaveKey("$NoManifestTestMethod")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("does not register middleware for plugins without plugin.json", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var pluginMiddleware = PluginObj.getPluginMiddleware()
+
+				// No middleware should be auto-registered for TestNoManifestPlugin
+				var found = 0
+				for (var mw in pluginMiddleware) {
+					if (mw.pluginName == "TestNoManifestPlugin") {
+						found++
+					}
+				}
+				expect(found).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("has empty dependencies when no plugin.json and no box.json", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var meta = PluginObj.getPluginMeta()
+
+				expect(meta.TestNoManifestPlugin).toHaveKey("dependencies")
+				expect(StructIsEmpty(meta.TestNoManifestPlugin.dependencies)).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+		})
+
 	}
 
 	function $pluginObj(required struct config) {
