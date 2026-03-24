@@ -421,6 +421,295 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that plugin.json manifest parsing", function() {
+
+			it("parses a full plugin.json manifest and stores it on metadata", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var meta = PluginObj.getPluginMeta()
+
+				expect(meta).toHaveKey("TestManifestPlugin")
+				expect(meta.TestManifestPlugin).toHaveKey("manifest")
+
+				var manifest = meta.TestManifestPlugin.manifest
+				expect(manifest.name).toBe("TestManifestPlugin")
+				expect(manifest.version).toBe("2.1.0")
+				expect(manifest.author).toBe("Wheels Test Suite")
+				expect(manifest.description).toBe("A full plugin.json manifest for testing")
+				expect(manifest.dependencies).toBeArray()
+				expect(manifest.dependencies[1]).toBe("SomeOtherPlugin")
+				expect(manifest.mixins).toBe("controller")
+				expect(manifest.wheelsVersion).toBe("3.0")
+				expect(manifest.middleware).toBeArray()
+				expect(manifest.middleware[1].component).toBe("TestMiddleware")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("uses plugin.json version over box.json version", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var meta = PluginObj.getPluginMeta()
+
+				// The CFC sets this.version = "99.9.9" but plugin.json has "2.1.0"
+				// plugin.json should take precedence via $pluginMetaData
+				expect(meta.TestManifestPlugin.version).toBe("2.1.0")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("parses a minimal manifest with only required fields", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var meta = PluginObj.getPluginMeta()
+
+				expect(meta.TestMinimalManifestPlugin.manifest.name).toBe("TestMinimalManifestPlugin")
+				expect(meta.TestMinimalManifestPlugin.manifest.version).toBe("1.0.0")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("rejects a manifest missing required fields", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var meta = PluginObj.getPluginMeta()
+
+				// Bad manifest should result in empty manifest struct
+				expect(StructIsEmpty(meta.TestBadManifestPlugin.manifest)).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("leaves manifest empty when no plugin.json exists", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+				var meta = PluginObj.getPluginMeta()
+
+				expect(StructIsEmpty(meta.TestNoManifestPlugin.manifest)).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("validates required name and version fields", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+
+				var errors = PluginObj.$validatePluginManifest({})
+				expect(ArrayLen(errors)).toBeGTE(2)
+
+				var hasNameError = false
+				var hasVersionError = false
+				for (var e in errors) {
+					if (FindNoCase("name", e)) hasNameError = true
+					if (FindNoCase("version", e)) hasVersionError = true
+				}
+				expect(hasNameError).toBeTrue()
+				expect(hasVersionError).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("validates that dependencies must be an array of strings", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+
+				var errors = PluginObj.$validatePluginManifest({
+					name = "Test",
+					version = "1.0.0",
+					dependencies = "notAnArray"
+				})
+				expect(ArrayLen(errors)).toBeGTE(1)
+
+				var foundError = false
+				for (var e in errors) {
+					if (FindNoCase("dependencies", e) && FindNoCase("array", e)) foundError = true
+				}
+				expect(foundError).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("validates that middleware entries must have a component field", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+
+				var errors = PluginObj.$validatePluginManifest({
+					name = "Test",
+					version = "1.0.0",
+					middleware = [{"notComponent" = "bad"}]
+				})
+				expect(ArrayLen(errors)).toBeGTE(1)
+
+				var foundError = false
+				for (var e in errors) {
+					if (FindNoCase("middleware", e) && FindNoCase("component", e)) foundError = true
+				}
+				expect(foundError).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("returns the schema definition with expected fields", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+
+				var schema = PluginObj.$pluginManifestSchema()
+				expect(schema).toHaveKey("name")
+				expect(schema).toHaveKey("version")
+				expect(schema).toHaveKey("author")
+				expect(schema).toHaveKey("description")
+				expect(schema).toHaveKey("dependencies")
+				expect(schema).toHaveKey("mixins")
+				expect(schema).toHaveKey("middleware")
+				expect(schema).toHaveKey("wheelsVersion")
+
+				expect(schema.name.required).toBeTrue()
+				expect(schema.version.required).toBeTrue()
+				expect(schema.author.required).toBeFalse()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("accepts valid manifest without errors", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/manifest",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/manifest"
+
+				PluginObj = $pluginObj(config)
+
+				var errors = PluginObj.$validatePluginManifest({
+					name = "ValidPlugin",
+					version = "1.0.0",
+					author = "Test Author",
+					description = "A test plugin",
+					dependencies = ["dep1", "dep2"],
+					mixins = "controller,model",
+					middleware = [{"component" = "MyMiddleware"}],
+					wheelsVersion = "3.0"
+				})
+				expect(ArrayLen(errors)).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+		})
+
 		describe("Tests that deprecation warnings for mixin-only plugins", function() {
 
 			it("warns about legacy plugins without plugin.json or ServiceProvider in development mode", function() {

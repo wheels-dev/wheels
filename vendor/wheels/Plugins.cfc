@@ -216,12 +216,13 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Attempt to extract version numbers from box.json and/or corresponding .zip files
-	 * Storing box.json data too as this may be useful later
+	 * Attempt to extract version numbers from box.json and/or corresponding .zip files.
+	 * Also reads and validates plugin.json manifests when present.
+	 * Storing box.json and manifest data for use by the plugin system.
 	 */
 	public void function $pluginMetaData() {
 		for (local.plugin in variables.$class.plugins) {
-			variables.$class.pluginMeta[local.plugin] = {"version" = "", "boxjson" = {}};
+			variables.$class.pluginMeta[local.plugin] = {"version" = "", "boxjson" = {}, "manifest" = {}};
 			local.boxJsonLocation = $fullPathToPlugin(local.plugin & "/" & 'box.json');
 			if (FileExists(local.boxJsonLocation)) {
 				local.boxJson = DeserializeJSON(FileRead(local.boxJsonLocation));
@@ -230,7 +231,165 @@ component output="false" extends="wheels.Global"{
 					variables.$class.pluginMeta[local.plugin]["version"] = local.boxJson.version;
 				}
 			}
+			// Read plugin.json manifest if present (takes precedence over box.json for version)
+			local.manifestLocation = $fullPathToPlugin(local.plugin & "/" & "plugin.json");
+			if (FileExists(local.manifestLocation)) {
+				local.parsed = $parsePluginManifest(local.manifestLocation);
+				if (local.parsed.valid) {
+					variables.$class.pluginMeta[local.plugin]["manifest"] = local.parsed.manifest;
+					// plugin.json version takes precedence over box.json version
+					if (StructKeyExists(local.parsed.manifest, "version") && Len(local.parsed.manifest.version)) {
+						variables.$class.pluginMeta[local.plugin]["version"] = local.parsed.manifest.version;
+					}
+				} else {
+					WriteLog(
+						type = "warning",
+						text = "Wheels plugin '#local.plugin#' has an invalid plugin.json: #ArrayToList(local.parsed.errors, '; ')#"
+					);
+				}
+			}
 		}
+	}
+
+	/**
+	 * Parses a plugin.json manifest file and validates it against the schema.
+	 *
+	 * @manifestPath Full filesystem path to the plugin.json file
+	 * @return Struct with keys: valid (boolean), manifest (struct), errors (array of strings)
+	 */
+	public struct function $parsePluginManifest(required string manifestPath) {
+		local.result = {valid = false, manifest = {}, errors = []};
+
+		// Read and parse JSON
+		try {
+			local.raw = FileRead(arguments.manifestPath);
+			local.manifest = DeserializeJSON(local.raw);
+		} catch (any e) {
+			ArrayAppend(local.result.errors, "Failed to parse plugin.json: " & e.message);
+			return local.result;
+		}
+
+		if (!IsStruct(local.manifest)) {
+			ArrayAppend(local.result.errors, "plugin.json must be a JSON object");
+			return local.result;
+		}
+
+		// Validate against schema
+		local.result.errors = $validatePluginManifest(local.manifest);
+		local.result.valid = ArrayLen(local.result.errors) == 0;
+		if (local.result.valid) {
+			local.result.manifest = local.manifest;
+		}
+
+		return local.result;
+	}
+
+	/**
+	 * Validates a parsed plugin.json manifest struct against the expected schema.
+	 *
+	 * Schema:
+	 *   name         (string, required)  - Plugin display name
+	 *   version      (string, required)  - Semver-compatible version
+	 *   author       (string, optional)  - Plugin author
+	 *   description  (string, optional)  - Short description
+	 *   dependencies (array, optional)   - Array of plugin name strings this plugin requires
+	 *   mixins       (string, optional)  - Mixin target: "global","controller","model","none", or comma-delimited list
+	 *   middleware    (array, optional)   - Array of middleware declaration structs
+	 *   wheelsVersion(string, optional)  - Compatible Wheels version(s), comma-delimited
+	 *
+	 * @manifest The deserialized plugin.json struct
+	 * @return Array of validation error strings (empty if valid)
+	 */
+	public array function $validatePluginManifest(required struct manifest) {
+		local.errors = [];
+
+		// Required fields
+		if (!StructKeyExists(arguments.manifest, "name")) {
+			ArrayAppend(local.errors, "Missing required field: name");
+		} else if (!IsSimpleValue(arguments.manifest.name)) {
+			ArrayAppend(local.errors, "Field 'name' must be a string");
+		} else if (!Len(Trim(arguments.manifest.name))) {
+			ArrayAppend(local.errors, "Missing required field: name");
+		}
+
+		if (!StructKeyExists(arguments.manifest, "version")) {
+			ArrayAppend(local.errors, "Missing required field: version");
+		} else if (!IsSimpleValue(arguments.manifest.version)) {
+			ArrayAppend(local.errors, "Field 'version' must be a string");
+		} else if (!Len(Trim(arguments.manifest.version))) {
+			ArrayAppend(local.errors, "Missing required field: version");
+		}
+
+		// Optional string fields
+		local.optionalStrings = ListToArray("author,description,mixins,wheelsVersion");
+		for (local.field in local.optionalStrings) {
+			local.field = Trim(local.field);
+			if (StructKeyExists(arguments.manifest, local.field) && !IsSimpleValue(arguments.manifest[local.field])) {
+				ArrayAppend(local.errors, "Field '#local.field#' must be a string");
+			}
+		}
+
+		// Validate mixins value if present
+		if (StructKeyExists(arguments.manifest, "mixins") && IsSimpleValue(arguments.manifest.mixins) && Len(Trim(arguments.manifest.mixins))) {
+			local.validMixins = "global,none,application,dispatch,controller,model,base,test,sqlserver,mysql,postgresql,h2";
+			for (local.mixin in ListToArray(arguments.manifest.mixins)) {
+				local.mixin = Trim(local.mixin);
+				if (!ListFindNoCase(local.validMixins, local.mixin)) {
+					ArrayAppend(local.errors, "Invalid mixin target: '#local.mixin#'");
+				}
+			}
+		}
+
+		// Validate dependencies (must be array of strings)
+		if (StructKeyExists(arguments.manifest, "dependencies")) {
+			if (!IsArray(arguments.manifest.dependencies)) {
+				ArrayAppend(local.errors, "Field 'dependencies' must be an array");
+			} else {
+				for (local.dep in arguments.manifest.dependencies) {
+					if (!IsSimpleValue(local.dep) || !Len(Trim(local.dep))) {
+						ArrayAppend(local.errors, "Each dependency must be a non-empty string");
+						break;
+					}
+				}
+			}
+		}
+
+		// Validate middleware (must be array)
+		if (StructKeyExists(arguments.manifest, "middleware")) {
+			if (!IsArray(arguments.manifest.middleware)) {
+				ArrayAppend(local.errors, "Field 'middleware' must be an array");
+			} else {
+				for (local.mw in arguments.manifest.middleware) {
+					if (!IsStruct(local.mw)) {
+						ArrayAppend(local.errors, "Each middleware entry must be an object");
+						break;
+					}
+					if (!StructKeyExists(local.mw, "component")) {
+						ArrayAppend(local.errors, "Each middleware entry must have a 'component' field");
+						break;
+					}
+				}
+			}
+		}
+
+		return local.errors;
+	}
+
+	/**
+	 * Returns the plugin.json schema definition as a struct.
+	 * Useful for documentation and tooling.
+	 */
+	public struct function $pluginManifestSchema() {
+		return {
+			"name" = {"type" = "string", "required" = true, "description" = "Plugin display name"},
+			"version" = {"type" = "string", "required" = true, "description" = "Semver-compatible version string"},
+			"author" = {"type" = "string", "required" = false, "description" = "Plugin author name or email"},
+			"description" = {"type" = "string", "required" = false, "description" = "Short description of the plugin"},
+			"dependencies" = {"type" = "array", "required" = false, "description" = "Array of plugin name strings this plugin requires"},
+			"mixins" = {"type" = "string", "required" = false, "description" = "Mixin target: global, controller, model, none, or comma-delimited list"},
+			"middleware" = {"type" = "array", "required" = false, "description" = "Array of middleware declaration objects with 'component' field"},
+			"wheelsVersion" = {"type" = "string", "required" = false, "description" = "Compatible Wheels version(s), comma-delimited"}
+		};
 	}
 
 	public void function $determineDependency() {
