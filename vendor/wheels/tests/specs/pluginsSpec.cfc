@@ -324,7 +324,7 @@ component extends="wheels.WheelsTest" {
 			it("is unpacking plugins", () => {
 				// Store original values
 				originalPluginComponentPath = application.wheels.pluginComponentPath
-				
+
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -345,11 +345,63 @@ component extends="wheels.WheelsTest" {
 
 				expect(ListFind(dirs, "testdefaultassignmixins")).toBeTrue()
 				expect(ListFind(dirs, "testglobalmixins")).toBeTrue()
-				
+
 				$deleteTestFolders()
-				
+
 				// Restore original value
 				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+		})
+
+		describe("Tests that directory-based plugin discovery", () => {
+
+			beforeEach(() => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				originalMixins = Duplicate(application.wheels.mixins)
+
+				config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/directory",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/directory"
+			})
+
+			afterEach(() => {
+				// Restore original values
+				application.wheels.mixins = originalMixins
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
+
+			it("discovers a directory plugin whose CFC name differs from folder name", () => {
+				PluginObj = $pluginObj(config)
+				plugins = PluginObj.getPlugins()
+
+				expect(plugins).toHaveKey("DirPlugin")
+			})
+
+			it("discovers a conventional directory plugin alongside a non-matching one", () => {
+				PluginObj = $pluginObj(config)
+				plugins = PluginObj.getPlugins()
+
+				expect(plugins).toHaveKey("ConventionalPlugin")
+				expect(plugins).toHaveKey("DirPlugin")
+			})
+
+			it("injects mixins from directory-based plugins", () => {
+				PluginObj = $pluginObj(config)
+				application.wheels.mixins = PluginObj.getMixins()
+				_params = {controller = "test", action = "index"}
+				c = g.controller("test", _params)
+
+				expect(c).toHaveKey("$DirPluginMixin")
+				expect(c).toHaveKey("$ConventionalPluginMixin")
 			})
 		})
 	}

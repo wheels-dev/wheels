@@ -55,39 +55,27 @@ component output="false" extends="wheels.Global"{
 				sql = "SELECT name FROM query WHERE LOWER(name) = '#LCase(local.folders["name"][i])#.cfc'"
 			);
 			local.temp = {};
-			if (structKeyExists(server, "boxlang")) {
-				// BoxLang compatibility: Handle case where query returns no results
-				if (local.pluginCfc.recordCount > 0) {
-					local.temp.name = Replace(local.pluginCfc.name, ".cfc", "");
-				} else {
-					local.cfcFiles = $query(
-						dbtype = "query",
-						query = local.subfolder,
-						sql = "SELECT name FROM query WHERE LOWER(name) LIKE '%.cfc' ORDER BY name"
-					);
-					if (local.cfcFiles.recordCount > 0) {
-						local.temp.name = Replace(local.cfcFiles.name, ".cfc", "");
-					} else {
-						local.folderPattern = local.folders["name"][i];
-						local.possibleFiles = $query(
-							dbtype = "query", 
-							query = local.subfolder,
-							sql = "SELECT name FROM query WHERE LOWER(name) LIKE '%#LCase(local.folderPattern)#%.cfc'"
-						);
-						if (local.possibleFiles.recordCount > 0) {
-							local.temp.name = Replace(local.possibleFiles.name, ".cfc", "");
-						} else {
-							local.temp.name = local.folders["name"][i];
-						}
-					}
-				}
-				local.temp.folderPath = $fullPathToPlugin(local.folders["name"][i]);
-				local.temp.componentName = local.folders["name"][i] & "." & local.temp.name;
-			} else {
+			if (local.pluginCfc.recordCount > 0) {
+				// Exact match: CFC name matches directory name (conventional plugins)
 				local.temp.name = Replace(local.pluginCfc.name, ".cfc", "");
-				local.temp.folderPath = $fullPathToPlugin(local.folders["name"][i]);
-				local.temp.componentName = local.folders["name"][i] & "." & Replace(local.pluginCfc.name, ".cfc", "");
+			} else {
+				// Directory-based plugin discovery: the CFC name may not match the
+				// directory name (e.g. git-cloned or symlinked plugins). Fall back
+				// to the first CFC file found in the directory (GH#1978).
+				local.cfcFiles = $query(
+					dbtype = "query",
+					query = local.subfolder,
+					sql = "SELECT name FROM query WHERE LOWER(name) LIKE '%.cfc' ORDER BY name"
+				);
+				if (local.cfcFiles.recordCount > 0) {
+					local.temp.name = Replace(local.cfcFiles.name, ".cfc", "");
+				} else {
+					// No CFC files found — not a valid plugin directory, skip it
+					continue;
+				}
 			}
+			local.temp.folderPath = $fullPathToPlugin(local.folders["name"][i]);
+			local.temp.componentName = local.folders["name"][i] & "." & local.temp.name;
 			local.plugins[local.folders["name"][i]] = local.temp;
 		}
 		return local.plugins;
