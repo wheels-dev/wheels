@@ -111,6 +111,7 @@
   * [Service Architecture](command-line-tools/cli-guides/service-architecture.md)
   * [Migrations Guide](command-line-tools/cli-guides/migrations.md)
   * [Testing Guide](command-line-tools/cli-guides/testing.md)
+  * [lucee.json Reference](command-line-tools/cli-guides/lucee-json-reference.md)
 
 ## Working with Wheels
 
