@@ -408,6 +408,8 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that symlinked plugin directories", () => {
 
 			it("discovers a symlinked plugin via absolute symlink", () => {
+				// BoxLang cannot resolve component paths through symlinks
+				if (StructKeyExists(server, "boxlang")) return;
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")
@@ -441,6 +443,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("discovers a symlinked plugin via relative symlink", () => {
+				// BoxLang cannot resolve component paths through symlinks
+				if (StructKeyExists(server, "boxlang")) return;
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")

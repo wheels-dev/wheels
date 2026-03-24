@@ -124,12 +124,14 @@ component extends="wheels.WheelsTest" {
 			describe("authenticate() with validator callback", function() {
 
 				it("succeeds when callback returns a principal struct", function() {
-					var strategy = new wheels.auth.TokenStrategy(validator = function(token) {
+					// Adobe CF cannot parse inline function() inside new constructor calls
+					var validatorFn = function(token) {
 						if (arguments.token == "good-token") {
 							return {id = 99, role = "api"};
 						}
 						return false;
-					});
+					};
+					var strategy = new wheels.auth.TokenStrategy(validator = validatorFn);
 
 					var req = {headers = {authorization = "Bearer good-token"}};
 					var result = strategy.authenticate(req);
@@ -140,9 +142,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("fails when callback returns false", function() {
-					var strategy = new wheels.auth.TokenStrategy(validator = function(token) {
+					var validatorFn = function(token) {
 						return false;
-					});
+					};
+					var strategy = new wheels.auth.TokenStrategy(validator = validatorFn);
 
 					var req = {headers = {authorization = "Bearer any-token"}};
 					var result = strategy.authenticate(req);
@@ -152,9 +155,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("fails when callback returns struct with success=false", function() {
-					var strategy = new wheels.auth.TokenStrategy(validator = function(token) {
+					var validatorFn = function(token) {
 						return {success = false, reason = "expired"};
-					});
+					};
+					var strategy = new wheels.auth.TokenStrategy(validator = validatorFn);
 
 					var req = {headers = {authorization = "Bearer expired-token"}};
 					var result = strategy.authenticate(req);
@@ -163,10 +167,11 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("callback takes priority over static tokens", function() {
+					var validatorFn = function(token) {
+						return {id = 100, source = "callback"};
+					};
 					var strategy = new wheels.auth.TokenStrategy(
-						validator = function(token) {
-							return {id = 100, source = "callback"};
-						},
+						validator = validatorFn,
 						tokens = {"some-key" = {id = 1, source = "static"}}
 					);
 
