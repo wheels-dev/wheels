@@ -182,7 +182,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	private string function $defaultFailureResponse(required struct authResult) {
 		if ($isHttpDispatch()) {
 			try {
-				cfheader(statusCode = "#arguments.authResult.statusCode#", statusText = $statusText(arguments.authResult.statusCode));
+				cfheader(statusCode = "#arguments.authResult.statusCode#");
 				cfheader(name = "Content-Type", value = "application/json");
 			} catch (any e) {
 				// cfheader unavailable in some contexts
@@ -201,15 +201,6 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 */
 	private boolean function $isHttpDispatch() {
 		return StructKeyExists(request, "wheels");
-	}
-
-	/**
-	 * Map status codes to text for the cfheader call.
-	 */
-	private string function $statusText(required numeric code) {
-		if (arguments.code == 401) return "Unauthorized";
-		if (arguments.code == 403) return "Forbidden";
-		return "Error";
 	}
 
 }

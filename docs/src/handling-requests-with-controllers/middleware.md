@@ -196,7 +196,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
         // Check rate limit (pseudo-code)
         local.clientIp = cgi.remote_addr;
         if ($isRateLimited(local.clientIp)) {
-            cfheader(statusCode="429", statusText="Too Many Requests");
+            cfheader(statusCode="429");
             return "Rate limit exceeded. Try again later.";
         }
 

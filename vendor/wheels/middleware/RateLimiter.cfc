@@ -100,7 +100,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Block if over limit.
 		if (!local.result.allowed) {
 			try {
-				cfheader(statusCode = "429", statusText = "Too Many Requests");
+				cfheader(statusCode = "429");
 				cfheader(name = "Retry-After", value = Ceiling(local.result.resetAt - local.now));
 			} catch (any e) {
 			}
