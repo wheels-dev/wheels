@@ -133,16 +133,15 @@ component output="false" extends="wheels.Global"{
 		local.folders = $pluginFolders();
 		// put zip files into a list
 		local.files = $pluginFiles();
-		local.files = StructKeyList(local.files);
-		// loop through the plugins folders
-		for (local.iFolder in $pluginFolders()) {
+		local.fileList = StructKeyList(local.files);
+		// loop through the plugin folders
+		for (local.iFolder in local.folders) {
 			local.folder = local.folders[local.iFolder];
-			// see if a folder is in the list of plugin files
-			if (!ListContainsNoCase(local.files, local.folder.name)) {
-				if (StructKeyExists(server, "boxlang") && !local.folder.folderPath.startsWith("/")) {
-					local.folder.folderPath = "/" & local.folder.folderPath;
-				}
-				DirectoryDelete(local.folder.folderPath, true);
+			// Skip directories without a matching zip file — they may be
+			// directory-based plugins (git-cloned, symlinked, or manually
+			// installed) rather than orphaned zip extractions (GH#1978).
+			if (!ListContainsNoCase(local.fileList, local.folder.name)) {
+				continue;
 			}
 		};
 	}

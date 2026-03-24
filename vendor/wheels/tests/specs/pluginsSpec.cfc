@@ -132,10 +132,10 @@ component extends="wheels.WheelsTest" {
 
 		describe("Tests that removing", () => {
 
-			it("removes unused plugin directories", () => {
+			it("preserves directories without a matching zip file", () => {
 				// Store original values
 				originalPluginComponentPath = application.wheels.pluginComponentPath
-				
+
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -147,7 +147,7 @@ component extends="wheels.WheelsTest" {
 				}
 				// Set pluginComponentPath to match the test plugin path
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/removing"
-				
+
 				dir = ExpandPath(config.pluginPath)
 				badDir = dir & "/testing"
 				goodDir = dir & "/testglobalmixins"
@@ -158,10 +158,12 @@ component extends="wheels.WheelsTest" {
 				expect(DirectoryExists(badDir)).toBeTrue()
 				PluginObj = $pluginObj(config)
 				expect(DirectoryExists(goodDir)).toBeTrue()
-				expect(DirectoryExists(badDir)).notToBeTrue()
+				// Directory without a matching zip should be preserved (GH#1978)
+				// — it may be a git-cloned or symlinked plugin
+				expect(DirectoryExists(badDir)).toBeTrue()
 
 				$deleteDirs()
-				
+
 				// Restore original value
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
