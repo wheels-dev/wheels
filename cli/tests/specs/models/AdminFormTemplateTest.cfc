@@ -1,13 +1,20 @@
-component extends="wheels.WheelsTest" {
+/**
+ * Tests for admin form template generation methods in TemplateService.
+ *
+ * Tests generateAdminFormFieldsCode() and generateAdminSelectParams()
+ * which map AdminIntrospectionService field metadata to Wheels form helpers.
+ */
+component extends="testbox.system.BaseSpec" {
+
+	function beforeAll() {
+		// Instantiate TemplateService directly — the admin form methods are pure functions
+		// that don't depend on injected helpers.
+		variables.templateService = new cli.src.models.TemplateService();
+	}
 
 	function run() {
 
 		describe("Admin form field generation", () => {
-
-			beforeEach(() => {
-				// Create a TemplateService instance for testing
-				templateService = createObject("component", "wheels.cli.src.models.TemplateService");
-			});
 
 			it("generates a text field for string input type", () => {
 				var fields = [{
@@ -282,10 +289,6 @@ component extends="wheels.WheelsTest" {
 		});
 
 		describe("Admin select cfparam generation", () => {
-
-			beforeEach(() => {
-				templateService = createObject("component", "wheels.cli.src.models.TemplateService");
-			});
 
 			it("generates cfparam for foreign key select options", () => {
 				var fields = [{
