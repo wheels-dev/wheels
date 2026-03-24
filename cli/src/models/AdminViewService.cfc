@@ -205,9 +205,9 @@ component {
 			return h & 'timeFormat(' & qv & ', "HH:nn:ss")' & h;
 		}
 
-		// Text / textarea — truncate in list view
+		// Text / textarea — truncate in list view (encode after truncating to avoid splitting HTML entities)
 		if (field.inputType == "textarea" || field.dataType == "text") {
-			return h & "left(encodeForHTML(" & qv & "), 100)" & h;
+			return h & "encodeForHTML(left(" & qv & ", 100))" & h;
 		}
 
 		// Default — encode for safety
