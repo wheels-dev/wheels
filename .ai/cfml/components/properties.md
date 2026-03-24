@@ -181,4 +181,3 @@ component accessors="true" {
 - [Component Basics](component-basics.md)
 - [Functions](functions.md)
 - [Variable Scopes](../data-types/variable-scopes.md)
-- [ORM Basics](../database/orm-basics.md)

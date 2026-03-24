@@ -205,7 +205,4 @@ qResults = queryExecute(
 - Monitor query execution times
 
 ## Related Concepts
-- [Query Methods](query-methods.md)
-- [Query of Queries](query-of-queries.md)
 - [Exception Handling](../control-flow/exception-handling.md)
-- [Application Configuration](../advanced/application-cfc.md)

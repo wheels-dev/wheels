@@ -158,4 +158,4 @@ mapper()
 ## Related
 - [Controller Rendering](./rendering.md)
 - [API Controllers](./api.md)
-- [CORS Requests](../../configuration/security.md)
+- [CORS Requests](../configuration/security.md)

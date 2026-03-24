@@ -703,4 +703,3 @@ filters(through="filter1");
 - [Controller Architecture](./architecture.md)
 - [Controller Security](./security.md)
 - [Controller Rendering](./rendering.md)
-- [Authentication Patterns](../security/authentication.md)

@@ -62,7 +62,6 @@ Format and display dates, times, and relative time information in views with con
 ## Related
 - [Custom Helpers](./custom.md)
 - [Form Helpers](./forms.md)
-- [Automatic Time Stamps](../../database/automatic-time-stamps.md)
 
 ## Important Notes
 - Check for valid dates with `IsDate()` before formatting

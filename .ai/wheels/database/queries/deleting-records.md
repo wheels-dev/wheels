@@ -44,7 +44,6 @@ if (author.delete()) {
 
 ## Related
 - [Finding Records](./finding-records.md)
-- [Soft Delete](../soft-delete.md)
 - [Associations](../associations/has-many.md)
 
 ## Important Notes

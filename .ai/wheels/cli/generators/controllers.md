@@ -85,7 +85,6 @@ component extends="Controller" {
 ## Related
 - [MVC Controllers](../../core-concepts/mvc-architecture/controllers.md)
 - [Routing Resources](../../core-concepts/routing/resources.md)
-- [View Generation](./views.md)
 
 ## Important Notes
 - Controller names should be plural (Users, not User)

@@ -103,8 +103,6 @@ Configure different settings for development, testing, and production environmen
 5. Test configuration in each environment
 
 ## Related
-- [Settings Configuration](./settings.md)
-- [Database Configuration](./datasources.md)
 - [Security Configuration](./security.md)
 
 ## Important Notes

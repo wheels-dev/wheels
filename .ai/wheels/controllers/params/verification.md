@@ -68,8 +68,6 @@ component extends="Controller" {
 
 ## Related
 - [Before and After Filters](../filters/before-after.md)
-- [Parameter Types](./types.md)
-- [Security Best Practices](./security.md)
 
 ## Important Notes
 - Verification runs before filters and actions

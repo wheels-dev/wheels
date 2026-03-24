@@ -475,4 +475,3 @@ user.generatePasswordResetToken();
 - [Model Associations](./associations.md)
 - [Model Validations](./validations.md)
 - [Model Callbacks](./callbacks.md)
-- [Security Best Practices](../../security/authentication.md)

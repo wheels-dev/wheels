@@ -106,7 +106,6 @@ Create reusable view helper functions to reduce code duplication and standardize
 ## Related
 - [Form Helpers](./forms.md)
 - [Link Helpers](./links.md)
-- [Global Functions](../../patterns/service-layer.md)
 
 ## Important Notes
 - Helpers available in all views automatically

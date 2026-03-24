@@ -830,5 +830,3 @@ private function logSecurityEvent(required string event, struct details = {}) {
 - [Controller Architecture](./architecture.md)
 - [Controller Filters](./filters.md)
 - [API Controllers](./api.md)
-- [Authentication Patterns](../security/authentication.md)
-- [Input Validation](../security/validation.md)

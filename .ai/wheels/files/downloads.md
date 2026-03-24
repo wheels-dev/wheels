@@ -281,7 +281,6 @@ function upload() {
 - `disposition` (optional) - "attachment" (download) or "inline" (display)
 
 ## Related
-- [File Uploads](./uploads.md)
 - [Security](../security/https-detection.md)
 - [Controller Filters](../controllers/filters/authentication.md)
 

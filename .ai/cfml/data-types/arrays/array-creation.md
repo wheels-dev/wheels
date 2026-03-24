@@ -109,4 +109,3 @@ meals[5] = "Snack";
 - [Array Methods](array-methods.md)
 - [Array Iteration](array-iteration.md)
 - [Variables](../variables.md)
-- [Threading](../../advanced/threading.md)

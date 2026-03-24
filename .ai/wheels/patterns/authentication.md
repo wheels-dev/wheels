@@ -124,8 +124,6 @@ component extends="Controller" {
 5. Provide helper methods for current user access
 
 ## Related
-- [Controller Filters](../controllers/filters/authentication.md)
-- [Authorization Patterns](./authorization.md)
 - [User Management](../database/validations/presence.md)
 
 ## Important Notes

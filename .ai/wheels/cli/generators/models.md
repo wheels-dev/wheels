@@ -46,7 +46,6 @@ component extends="Model" {
 
 ## Related
 - [ORM Mapping](../../core-concepts/orm/mapping-basics.md)
-- [Creating Migrations](../database/migrations/creating-migrations.md)
 - [Object Validation](../../database/validations/presence.md)
 
 ## Important Notes
