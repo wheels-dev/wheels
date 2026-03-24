@@ -875,11 +875,42 @@ component output="false" extends="wheels.Global"{
 			type = "dir",
 			sort = "name #variables.sort#"
 		);
-		return $query(
+		local.result = $query(
 			dbtype = "query",
 			query = local.query,
 			sql = "select * from query where name not like '.%' ORDER BY name #variables.sort#"
 		);
+		// Some engines (BoxLang) don't include symlinked directories in type="dir"
+		// results. Do a second pass with type="any" to find symlinks to directories.
+		try {
+			local.jFiles = CreateObject("java", "java.nio.file.Files");
+			local.allEntries = $directory(
+				action = "list",
+				directory = variables.$class.pluginPathFull,
+				type = "any",
+				sort = "name #variables.sort#"
+			);
+			local.existingNames = ValueList(local.result.name);
+			for (local.row = 1; local.row <= local.allEntries.recordCount; local.row++) {
+				local.entryName = local.allEntries["name"][local.row];
+				// Skip hidden entries, already-found dirs, and non-symlinks
+				if (Left(local.entryName, 1) == ".") continue;
+				if (ListFindNoCase(local.existingNames, local.entryName)) continue;
+				local.entryPath = local.allEntries["directory"][local.row] & "/" & local.entryName;
+				local.entryFile = CreateObject("java", "java.io.File").init(local.entryPath);
+				if (local.jFiles.isSymbolicLink(local.entryFile.toPath()) && local.entryFile.isDirectory()) {
+					QueryAddRow(local.result);
+					QuerySetCell(local.result, "name", local.entryName, local.result.recordCount);
+					QuerySetCell(local.result, "directory", local.allEntries["directory"][local.row], local.result.recordCount);
+					if (StructKeyExists(local.allEntries, "type")) {
+						QuerySetCell(local.result, "type", "Dir", local.result.recordCount);
+					}
+				}
+			}
+		} catch (any e) {
+			// If symlink detection fails, proceed with what cfdirectory found
+		}
+		return local.result;
 	}
 
 	public query function $files() {

@@ -41,7 +41,9 @@ component extends="wheels.WheelsTest" {
 
 				it("preserves explicit iat and exp in claims", function() {
 					var token = jwt.encode(claims = {sub = 1, iat = 1000000, exp = 1003600});
-					var claims = jwt.decode(token);
+					// Use ignoreExpiry: we're testing encode() preservation, not decode() validation.
+					// The explicit timestamps are in the past so decode() would reject them.
+					var claims = jwt.decode(token = token, ignoreExpiry = true);
 					expect(claims.iat).toBe(1000000);
 					expect(claims.exp).toBe(1003600);
 				});
@@ -313,11 +315,12 @@ component extends="wheels.WheelsTest" {
 						b64 = b64 & RepeatString("=", padLen);
 					}
 					var json = ToString(ToBinary(b64));
-					// Keys should be lowercase in the JSON
+					// Keys should be lowercase in the JSON.
+					// Use case-sensitive Find() because TestBox's toInclude uses FindNoCase.
 					expect(json).toInclude('"sub"');
 					expect(json).toInclude('"role"');
-					expect(json).notToInclude('"SUB"');
-					expect(json).notToInclude('"ROLE"');
+					expect(Find('"SUB"', json)).toBe(0, "Expected no uppercase SUB key in JWT JSON");
+					expect(Find('"ROLE"', json)).toBe(0, "Expected no uppercase ROLE key in JWT JSON");
 				});
 
 			});
