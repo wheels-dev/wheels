@@ -402,6 +402,12 @@ Disabled links render as `<span class="disabled">` by default. All helpers accep
 
 **All new tests use TestBox BDD syntax.** RocketUnit (`test_` prefix, `assert()`) is legacy only — never use it for new tests.
 
+### Two test suites
+- **App tests**: `/wheels/app/tests` — project-specific tests in `tests/specs/`. Uses `tests/populate.cfm` for test data and `tests/TestRunner.cfc` for setup.
+- **Core tests**: `/wheels/core/tests` — framework tests in `vendor/wheels/tests/specs/`. Uses `vendor/wheels/tests/populate.cfm`. This is what CI runs across all engines × databases.
+
+**Critical**: Core tests use `directory="wheels.tests.specs"` which compiles EVERY CFC in the directory. One compilation error in any spec file crashes the entire suite for that engine.
+
 ```cfm
 // tests/specs/models/MyFeatureSpec.cfc
 component extends="wheels.WheelsTest" {
@@ -422,6 +428,7 @@ component extends="wheels.WheelsTest" {
 - **Runner URL**: `/wheels/app/tests?format=json&directory=tests.specs.models`
 - **Force reload**: append `&reload=true` after adding new model CFCs
 - **Closure gotcha**: CFML closures can't access outer `local` vars — use shared structs (`var result = {count: 0}`)
+- **Scope gotcha in test infra**: Wheels internal functions (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - Run with MCP `wheels_test()` or CLI `wheels test run`
 
 ## Running Tests Locally (Docker)
@@ -481,9 +488,22 @@ curl "http://localhost:60006/wheels/core/tests?db=h2&format=json&directory=tests
 ```
 
 ### Known cross-engine gotchas
+
+**Always verify Adobe CF fixes locally before pushing** — don't iterate via CI. Test against the local container directly:
+```bash
+curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass',0),'pass',d.get('totalFail',0),'fail',d.get('totalError',0),'error')"
+```
+
 - **struct.map()**: Lucee/Adobe resolve `obj.map()` as the built-in struct member function, not the CFC method. Use `mapInstance()` on the Injector.
 - **Application scope**: Adobe CF doesn't support function members on the `application` scope. Pass a plain struct context instead.
 - **Closure this**: CFML closures capture `this` from the declaring scope. Use `var ctx = {ref: obj}` to share references across closures.
+- **Bracket-notation function call**: `obj["key"]()` crashes Adobe CF 2021/2023 parser inside closures. Split into two statements: `var fn = obj["key"]; fn()`.
+- **Array by-value in struct literals**: Adobe CF copies arrays by value in `{arr = myArray}`. Closures that append to the copy won't affect the original. Reference via parent struct instead: `{owner = parentStruct}` then `owner.arr`.
+- **`private` view helpers not integrated**: `$integrateComponents()` only copies `public` methods into controllers. Use `public` access with `$` prefix for internal helper functions in view CFCs.
+
+### CI soft-fail databases
+CockroachDB is marked as soft-fail in `.github/workflows/tests.yml` — failures are logged as warnings but don't block the build. The `SOFT_FAIL_DBS` variable controls this. Remove a database from the list once its tests are fixed.
 
 ### Cleanup
 ```bash
