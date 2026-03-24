@@ -69,6 +69,10 @@ component {
             .to("#moduleMapping#.models.MCPService");
         binder.map("TestMigrationService@wheels-cli")
             .to("#moduleMapping#.models.TestMigrationService");
+        binder.map("AdminIntrospectionService@wheels-cli")
+            .to("#moduleMapping#.models.AdminIntrospectionService");
+        binder.map("AdminViewService@wheels-cli")
+            .to("#moduleMapping#.models.AdminViewService");
 
         log.info('Wheels CLI Module loaded successfully.');
     }
