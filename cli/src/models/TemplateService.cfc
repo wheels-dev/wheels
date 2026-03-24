@@ -164,6 +164,18 @@ component {
             processed = replace(processed, "|FormFields|", "", "all");
         }
         
+        // Process admin form fields if adminFields are provided (from AdminIntrospectionService)
+        if (structKeyExists(arguments.context, "adminFields") && isArray(arguments.context.adminFields) && arrayLen(arguments.context.adminFields)) {
+            var adminFormCode = generateAdminFormFieldsCode(arguments.context.adminFields);
+            processed = replace(processed, "|AdminFormFields|", adminFormCode, "all");
+
+            var adminSelectParams = generateAdminSelectParams(arguments.context.adminFields);
+            processed = replace(processed, "|AdminSelectParams|", adminSelectParams, "all");
+        } else {
+            processed = replace(processed, "|AdminFormFields|", "", "all");
+            processed = replace(processed, "|AdminSelectParams|", "", "all");
+        }
+
         // Process controller includes for associations
         if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
             processed = addControllerIncludes(processed, arguments.context.belongsTo);
@@ -554,5 +566,156 @@ component {
         processed = replace(processed, 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);', 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key, ' & includeParam & ');', 'all');
 
         return processed;
+    }
+
+    /**
+     * Generate admin form fields code from AdminIntrospectionService field metadata.
+     * Produces Wheels form helpers with proper HTML5 input types, wrapped in form-group divs.
+     *
+     * @fields Array of field metadata structs from AdminIntrospectionService.introspect().fields
+     */
+    public function generateAdminFormFieldsCode(required array fields) {
+        var fieldBlocks = [];
+        var t = chr(9);
+
+        for (var field in arguments.fields) {
+            // Skip fields not meant for forms (primary keys)
+            if (structKeyExists(field, "inForm") && !field.inForm) {
+                continue;
+            }
+
+            var inputType = structKeyExists(field, "inputType") ? field.inputType : "text";
+            var propName = field.name;
+            var label = structKeyExists(field, "label") ? field.label : propName;
+            var fieldCode = "";
+
+            switch (inputType) {
+                case "select":
+                    fieldCode = generateAdminSelectField(field, label);
+                    break;
+                case "textarea":
+                    fieldCode = '<div class="form-group">' & chr(10);
+                    fieldCode &= t & '##textArea(objectName="|ObjectNameSingular|", property="#propName#", label="#label#", class="form-control", rows="5")##' & chr(10);
+                    fieldCode &= '</div>';
+                    break;
+                case "checkbox":
+                    fieldCode = '<div class="form-group">' & chr(10);
+                    fieldCode &= t & '<div class="checkbox">' & chr(10);
+                    fieldCode &= t & t & '##checkBox(objectName="|ObjectNameSingular|", property="#propName#", label="#label#")##' & chr(10);
+                    fieldCode &= t & '</div>' & chr(10);
+                    fieldCode &= '</div>';
+                    break;
+                case "datetime-local":
+                    fieldCode = '<div class="form-group">' & chr(10);
+                    fieldCode &= t & '##dateTimeSelect(objectName="|ObjectNameSingular|", property="#propName#", label="#label#")##' & chr(10);
+                    fieldCode &= '</div>';
+                    break;
+                case "time":
+                    fieldCode = '<div class="form-group">' & chr(10);
+                    fieldCode &= t & '##timeSelect(objectName="|ObjectNameSingular|", property="#propName#", label="#label#")##' & chr(10);
+                    fieldCode &= '</div>';
+                    break;
+                case "file":
+                    fieldCode = '<div class="form-group">' & chr(10);
+                    fieldCode &= t & '##fileFieldTag(name="|ObjectNameSingular|[#propName#]", label="#label#", class="form-control")##' & chr(10);
+                    fieldCode &= '</div>';
+                    break;
+                default:
+                    // HTML5 input types: text, email, password, url, tel, color, search, number, date
+                    var helperName = mapInputTypeToHelper(inputType);
+                    fieldCode = '<div class="form-group">' & chr(10);
+                    fieldCode &= t & '###helperName#(objectName="|ObjectNameSingular|", property="#propName#", label="#label#", class="form-control")##' & chr(10);
+                    fieldCode &= '</div>';
+            }
+
+            arrayAppend(fieldBlocks, fieldCode);
+        }
+
+        return arrayToList(fieldBlocks, chr(10));
+    }
+
+    /**
+     * Generate a select field for foreign keys or enums.
+     */
+    private function generateAdminSelectField(required struct field, required string label) {
+        var t = chr(9);
+        var propName = arguments.field.name;
+        var fieldCode = '<div class="form-group">' & chr(10);
+
+        if (structKeyExists(arguments.field, "isForeignKey") && arguments.field.isForeignKey) {
+            // Foreign key — render select with options from associated model
+            var assocModel = arguments.field.foreignKeyTo;
+            var optionsVar = lCase(assocModel) & "Options";
+            fieldCode &= t & '##select(objectName="|ObjectNameSingular|", property="#propName#", options=#optionsVar#, label="#arguments.label#", includeBlank="Select #assocModel#", class="form-control")##' & chr(10);
+        } else if (structKeyExists(arguments.field, "isEnum") && arguments.field.isEnum) {
+            // Enum — render select with enum values as options list
+            var enumValues = arguments.field.enumValues;
+            var optionsList = "";
+            if (isStruct(enumValues)) {
+                optionsList = structKeyList(enumValues);
+            } else if (isSimpleValue(enumValues)) {
+                optionsList = enumValues;
+            }
+            fieldCode &= t & '##select(objectName="|ObjectNameSingular|", property="#propName#", options="#optionsList#", label="#arguments.label#", includeBlank="Select #arguments.label#", class="form-control")##' & chr(10);
+        } else {
+            // Generic select fallback
+            fieldCode &= t & '##select(objectName="|ObjectNameSingular|", property="#propName#", options="", label="#arguments.label#", class="form-control")##' & chr(10);
+        }
+
+        fieldCode &= '</div>';
+        return fieldCode;
+    }
+
+    /**
+     * Map an HTML5 input type to the corresponding Wheels form helper function name.
+     */
+    private function mapInputTypeToHelper(required string inputType) {
+        switch (arguments.inputType) {
+            case "email":
+                return "emailField";
+            case "password":
+                return "passwordField";
+            case "url":
+                return "urlField";
+            case "tel":
+                return "telField";
+            case "color":
+                return "colorField";
+            case "search":
+                return "searchField";
+            case "number":
+                return "numberField";
+            case "date":
+                return "dateField";
+            default:
+                return "textField";
+        }
+    }
+
+    /**
+     * Generate cfparam declarations for select option variables needed by admin forms.
+     * Foreign key fields need option query objects; enum fields use inline values.
+     *
+     * @fields Array of field metadata structs from AdminIntrospectionService
+     */
+    public function generateAdminSelectParams(required array fields) {
+        var params = [];
+
+        for (var field in arguments.fields) {
+            if (structKeyExists(field, "inForm") && !field.inForm) {
+                continue;
+            }
+
+            var inputType = structKeyExists(field, "inputType") ? field.inputType : "text";
+            if (inputType != "select") continue;
+
+            if (structKeyExists(field, "isForeignKey") && field.isForeignKey) {
+                var assocModel = field.foreignKeyTo;
+                var optionsVar = lCase(assocModel) & "Options";
+                arrayAppend(params, '<cfparam name="#optionsVar#" default="##queryNew('''')##">');
+            }
+        }
+
+        return arrayToList(params, chr(10));
     }
 }

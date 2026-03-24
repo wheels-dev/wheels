@@ -1,0 +1,14 @@
+<!--- Edit |ObjectNameSingularC| --->
+<cfparam name="|ObjectNameSingular|">
+|AdminSelectParams|
+<cfoutput>
+<h1>Edit |ObjectNameSingularC|</h1>
+#errorMessagesFor("|ObjectNameSingular|")#
+#startFormTag(id="|ObjectNameSingular|EditForm", route="|ObjectNameSingularC|", method="patch", key=params.key)#
+	#includePartial("form")#
+	<div class="form-actions">
+		#submitTag(value="Update |ObjectNameSingularC|", class="btn btn-primary")#
+		#linkTo(route="|ObjectNameSingularC|", key=params.key, text="Cancel", class="btn btn-default")#
+	</div>
+#endFormTag()#
+</cfoutput>
