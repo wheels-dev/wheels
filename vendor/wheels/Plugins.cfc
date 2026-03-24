@@ -35,6 +35,8 @@ component output="false" extends="wheels.Global"{
 		$pluginsProcess();
 		/* get versions */
 		$pluginMetaData();
+		/* auto-register middleware from plugin.json manifests */
+		$processManifestMiddleware();
 		/* process mixins */
 		$processMixins();
 		/* dependencies */
@@ -152,9 +154,17 @@ component output="false" extends="wheels.Global"{
 		for (local.pluginKey in local.pluginKeys) {
 			local.pluginValue = local.plugins[local.pluginKey];
 			local.plugin = CreateObject("component", $componentPathToPlugin(local.pluginKey, local.pluginValue.name)).init();
+			// Determine the compatibility version list. If a plugin.json exists and
+			// declares wheelsVersion, use that instead of the CFC's this.version
+			// property. This lets plugin authors declare compatibility declaratively.
+			local.compatVersion = StructKeyExists(local.plugin, "version") ? local.plugin.version : "";
+			local.manifestWheelsVersion = $readManifestField(local.pluginValue.folderPath, "wheelsVersion");
+			if (Len(local.manifestWheelsVersion)) {
+				local.compatVersion = local.manifestWheelsVersion;
+			}
 			if (
-				!StructKeyExists(local.plugin, "version")
-				|| ListFind(local.plugin.version, local.wheelsVersion)
+				!Len(local.compatVersion)
+				|| ListFind(local.compatVersion, local.wheelsVersion)
 				|| variables.$class.loadIncompatiblePlugins
 			) {
 				variables.$class.plugins[local.pluginKey] = local.plugin;
@@ -194,13 +204,14 @@ component output="false" extends="wheels.Global"{
 					WriteLog(type="warning", text="[Wheels] #local.warning#");
 				}
 				// If plugin author has specified compatibility version as 2.0, only check against that major version
-				// If they've specified 2.0.1, then be more specific
-				if (StructKeyExists(local.plugin, "version")) {
+				// If they've specified 2.0.1, then be more specific.
+				// Manifest wheelsVersion (already in local.compatVersion) takes precedence over CFC this.version.
+				if (Len(local.compatVersion)) {
 					if (
-						(ListLen(local.plugin.version, ".") > 2 && !ListFind(local.plugin.version, local.wheelsVersion))
+						(ListLen(local.compatVersion, ".") > 2 && !ListFind(local.compatVersion, local.wheelsVersion))
 						|| (
-							ListLen(local.plugin.version, ".") == 2
-							&& !ListFind(local.plugin.version, ListDeleteAt(local.wheelsVersion, 3, "."))
+							ListLen(local.compatVersion, ".") == 2
+							&& !ListFind(local.compatVersion, ListDeleteAt(local.wheelsVersion, 3, "."))
 						)
 					) {
 						variables.$class.incompatiblePlugins = ListAppend(variables.$class.incompatiblePlugins, local.pluginKey);
@@ -217,7 +228,7 @@ component output="false" extends="wheels.Global"{
 	 */
 	public void function $pluginMetaData() {
 		for (local.plugin in variables.$class.plugins) {
-			variables.$class.pluginMeta[local.plugin] = {"version" = "", "boxjson" = {}, "manifest" = {}, "dependencies" = {}};
+			variables.$class.pluginMeta[local.plugin] = {"version" = "", "author" = "", "description" = "", "boxjson" = {}, "manifest" = {}, "dependencies" = {}};
 			local.boxJsonLocation = $fullPathToPlugin(local.plugin & "/" & 'box.json');
 			if (FileExists(local.boxJsonLocation)) {
 				local.boxJson = DeserializeJSON(FileRead(local.boxJsonLocation));
@@ -240,6 +251,13 @@ component output="false" extends="wheels.Global"{
 					if (StructKeyExists(local.parsed.manifest, "version") && Len(local.parsed.manifest.version)) {
 						variables.$class.pluginMeta[local.plugin]["version"] = local.parsed.manifest.version;
 					}
+					// Surface author and description from manifest as top-level metadata fields
+					if (StructKeyExists(local.parsed.manifest, "author") && Len(Trim(local.parsed.manifest.author))) {
+						variables.$class.pluginMeta[local.plugin]["author"] = Trim(local.parsed.manifest.author);
+					}
+					if (StructKeyExists(local.parsed.manifest, "description") && Len(Trim(local.parsed.manifest.description))) {
+						variables.$class.pluginMeta[local.plugin]["description"] = Trim(local.parsed.manifest.description);
+					}
 					// plugin.json dependencies override box.json dependencies for semver resolution
 					if (StructKeyExists(local.parsed.manifest, "dependencies")) {
 						if (IsStruct(local.parsed.manifest.dependencies)) {
@@ -259,6 +277,32 @@ component output="false" extends="wheels.Global"{
 						text = "Wheels plugin '#local.plugin#' has an invalid plugin.json: #ArrayToList(local.parsed.errors, '; ')#"
 					);
 				}
+			}
+		}
+	}
+
+	/**
+	 * Auto-registers middleware declared in plugin.json manifests.
+	 * Runs after $pluginMetaData() so manifests are already parsed and validated.
+	 * This allows plugins to declare middleware declaratively instead of requiring
+	 * an onPluginLoad hook with app.registerMiddleware().
+	 */
+	public void function $processManifestMiddleware() {
+		for (local.pluginName in variables.$class.plugins) {
+			if (!StructKeyExists(variables.$class.pluginMeta, local.pluginName)) {
+				continue;
+			}
+			local.manifest = variables.$class.pluginMeta[local.pluginName].manifest;
+			if (StructIsEmpty(local.manifest) || !StructKeyExists(local.manifest, "middleware") || !IsArray(local.manifest.middleware)) {
+				continue;
+			}
+			for (local.mw in local.manifest.middleware) {
+				local.options = StructKeyExists(local.mw, "options") ? local.mw.options : {};
+				ArrayAppend(variables.$class.pluginMiddleware, {
+					middleware = local.mw.component,
+					options = local.options,
+					pluginName = local.pluginName
+				});
 			}
 		}
 	}
@@ -542,6 +586,31 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Reads a single field from a plugin.json manifest without full validation.
+	 * Used for early-stage checks (e.g. wheelsVersion) before the full manifest
+	 * is parsed in $pluginMetaData().
+	 *
+	 * @folderPath Full filesystem path to the plugin directory
+	 * @fieldName  The JSON field to read
+	 * @return     The field value as a string, or empty string if not found
+	 */
+	private string function $readManifestField(required string folderPath, required string fieldName) {
+		local.manifestPath = arguments.folderPath & "/plugin.json";
+		if (!FileExists(local.manifestPath)) {
+			return "";
+		}
+		try {
+			local.manifest = DeserializeJSON(FileRead(local.manifestPath));
+			if (IsStruct(local.manifest) && StructKeyExists(local.manifest, arguments.fieldName) && IsSimpleValue(local.manifest[arguments.fieldName])) {
+				return Trim(local.manifest[arguments.fieldName]);
+			}
+		} catch (any e) {
+			// Invalid JSON — will be reported later during full validation
+		}
+		return "";
+	}
+
+	/**
 	 * Temporarily installs the registerMiddleware() API on the application scope
 	 * so plugins can call app.registerMiddleware() during onPluginLoad.
 	 * Removed after each plugin's onPluginLoad returns via $removePluginLoadAPI().
@@ -605,6 +674,16 @@ component output="false" extends="wheels.Global"{
 				// if the component has a default mixin value, assign that value
 				if (StructKeyExists(local.pluginMeta, "mixin")) {
 					local.pluginMixins = local.pluginMeta["mixin"];
+				}
+
+				// plugin.json mixins field takes precedence over CFC mixin attribute
+				if (
+					StructKeyExists(variables.$class.pluginMeta, local.iPlugin)
+					&& !StructIsEmpty(variables.$class.pluginMeta[local.iPlugin].manifest)
+					&& StructKeyExists(variables.$class.pluginMeta[local.iPlugin].manifest, "mixins")
+					&& Len(Trim(variables.$class.pluginMeta[local.iPlugin].manifest.mixins))
+				) {
+					local.pluginMixins = Trim(variables.$class.pluginMeta[local.iPlugin].manifest.mixins);
 				}
 
 				// loop through all plugin methods and enter injection info accordingly
