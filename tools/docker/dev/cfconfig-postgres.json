@@ -1,0 +1,14 @@
+{
+	"datasources": {
+		"wheels-dev": {
+			"class": "org.postgresql.Driver",
+			"database": "wheelstestdb",
+			"dbdriver": "PostgreSql",
+			"dsn": "jdbc:postgresql://{host}:{port}/{database}",
+			"host": "postgres",
+			"password": "wheelstestdb",
+			"port": "5432",
+			"username": "wheelstestdb"
+		}
+	}
+}

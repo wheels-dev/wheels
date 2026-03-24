@@ -1,10 +1,12 @@
 # Wheels Development Environment
 #
-# Quick start:
+# Quick start (no database):
 #   docker compose -f docker-compose.dev.yml up
 #
-# With a database profile (provided by docker-compose.db-*.yml):
+# With a database profile:
+#   docker compose -f docker-compose.dev.yml -f docker-compose.db-h2.yml up
 #   docker compose -f docker-compose.dev.yml -f docker-compose.db-mysql.yml up
+#   docker compose -f docker-compose.dev.yml -f docker-compose.db-postgres.yml up
 #
 # The app source is volume-mounted for live editing — code changes
 # are picked up automatically without rebuilding or restarting.
