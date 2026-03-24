@@ -4,12 +4,14 @@
  * Provides code generation, migrations, testing, and server management
  * for CFWheels applications. Each public function is a subcommand:
  *
+ *   wheels new myapp
+ *   wheels create app myapp --port=3000
  *   wheels generate model User name email
  *   wheels migrate latest
  *   wheels test --filter=models
  *   wheels start
  *
- * hint: CFWheels framework CLI - generate, migrate, test, and manage your app
+ * hint: CFWheels framework CLI - create, generate, migrate, test, and manage your app
  */
 component extends="modules.BaseModule" {
 
@@ -48,6 +50,7 @@ component extends="modules.BaseModule" {
 			out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
 			out("");
 			out("Types:", "bold");
+			out("  app           Create a new Wheels application (alias for 'wheels new')");
 			out("  model         Generate a model CFC");
 			out("  controller    Generate a controller CFC");
 			out("  view          Generate a view template");
@@ -61,6 +64,7 @@ component extends="modules.BaseModule" {
 			out("  snippets      Copy snippet templates to app/snippets/ for customization");
 			out("");
 			out("Examples:", "bold");
+			out("  wheels generate app myapp");
 			out("  wheels generate model User name email:string active:boolean");
 			out("  wheels generate controller Users index show create");
 			out("  wheels generate migration CreateUsers");
@@ -78,6 +82,11 @@ component extends="modules.BaseModule" {
 		var remaining = args.len() > 1 ? args.slice(2) : [];
 
 		switch (lCase(type)) {
+			case "app":
+			case "a":
+				// Delegate to wheels new — pass remaining args as __arguments
+				__arguments = remaining;
+				return new();
 			case "model":
 			case "m":
 				return generateModel(remaining);
@@ -309,6 +318,42 @@ component extends="modules.BaseModule" {
 		if (!len(options.reloadPassword)) options.reloadPassword = lCase(appName);
 
 		return scaffoldNewApp(appName, options);
+	}
+
+	// ─────────────────────────────────────────────────
+	//  create — Create application components
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Create application components (wheels create app <name> [options])
+	 */
+	public string function create() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args)) {
+			out("Usage: wheels create <type> <name> [options]", "yellow");
+			out("");
+			out("Types:", "bold");
+			out("  app    Create a new Wheels application");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels create app myapp");
+			out("  wheels create app myapp --port=3000 --setup-h2");
+			return "";
+		}
+
+		var type = lCase(args[1]);
+		var remaining = args.len() > 1 ? args.slice(2) : [];
+
+		switch (type) {
+			case "app":
+				__arguments = remaining;
+				return new();
+			default:
+				out("Unknown create type: #type#", "red");
+				out("Run 'wheels create' for available types.");
+				return "";
+		}
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1650,6 +1695,9 @@ component extends="modules.BaseModule" {
 		// Copy template directory tree to target, processing placeholders
 		copyTemplateDir(templateDir, targetDir, appName, context);
 
+		// Install Wheels framework into vendor/wheels/
+		installWheelsFramework(targetDir, appName);
+
 		// Set up embedded database: H2 if explicitly requested, SQLite by default
 		if (opts.setupH2) {
 			configureH2Database(targetDir, appName, opts.datasource);
@@ -1783,6 +1831,32 @@ component extends="modules.BaseModule" {
 				out("  config  #appName#/config/app.cfm (SQLite datasource)", "green");
 			}
 		}
+	}
+
+	/**
+	 * Copy the Wheels framework into the new application's vendor/wheels/ directory.
+	 * Resolves the framework source from the current project installation.
+	 */
+	private void function installWheelsFramework(required string targetDir, required string appName) {
+		var wheelsSource = "";
+
+		// Look for vendor/wheels in the resolved project root
+		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
+			wheelsSource = variables.projectRoot & "/vendor/wheels";
+		}
+
+		if (!len(wheelsSource)) {
+			out("  Warning: Could not locate Wheels framework source.", "yellow");
+			out("  You will need to install the framework manually into vendor/wheels/");
+			out("  See: https://guides.cfwheels.org/docs/installing-cfwheels");
+			return;
+		}
+
+		out("Installing Wheels framework...");
+		var vendorDir = targetDir & "/vendor/wheels";
+		ensureDirectory(vendorDir);
+		directoryCopy(wheelsSource, vendorDir, true);
+		printCreated(appName & "/vendor/wheels/");
 	}
 
 	/**
