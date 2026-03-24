@@ -73,7 +73,7 @@ To stay true to our ColdFusion and Java roots, all names must be camelCase. In s
 
 #### Local Variables
 
-Since moving to Wheels 2.x, the old `loc` scope has now been deprecated and you should use the function `local` scope.
+The old `loc` scope has been deprecated and you should use the function `local` scope.
 
 Code Example
 

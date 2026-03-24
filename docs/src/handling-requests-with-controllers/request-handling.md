@@ -168,7 +168,7 @@ So in the same way that the `url` and `form` scopes are merged, so a valid `json
 {% hint style="info" %}
 #### NOTE
 
-The mapping of a json array to params.json was introduced in Wheels 2.1
+When a JSON array is the root element, it is mapped to `params._json` following Rails conventions.
 {% endhint %}
 
 ### Routing

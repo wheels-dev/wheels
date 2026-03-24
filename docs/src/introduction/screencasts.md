@@ -6,24 +6,28 @@ description: >-
 
 # Screencasts
 
-### Wheels 2.x
+### Wheels 3.x
 
-Create a basic CRUD interface in Wheels 2.x\
+{% hint style="info" %}
+The screencasts below were recorded with Wheels 2.x but the core concepts (CRUD, routing, testing) remain applicable to Wheels 3.x.
+{% endhint %}
+
+Create a basic CRUD interface\
 [https://youtu.be/K5HLItTru1g](https://youtu.be/K5HLItTru1g)
 
-Create a basic JSON API in Wheels 2.x\
+Create a basic JSON API\
 [https://youtu.be/qZr5JzO0vo4](https://youtu.be/qZr5JzO0vo4)
 
-Routing in Wheels 2.x - Part 1\
+Routing in Wheels - Part 1\
 [https://youtu.be/BnPGApAvMVQ](https://youtu.be/BnPGApAvMVQ)
 
-Routing in Wheels 2.x - Part 2\
+Routing in Wheels - Part 2\
 [https://youtu.be/0CiGxJyJEIQ](https://youtu.be/0CiGxJyJEIQ)
 
-Introduction to Unit Testing in Wheels 2.x\
+Introduction to Unit Testing in Wheels\
 [https://youtu.be/XgMuzzmBQ98](https://youtu.be/XgMuzzmBQ98)
 
-Unit Testing Controllers in Wheels 2.x\
+Unit Testing Controllers in Wheels\
 [https://youtu.be/cygj9WDqHjY](https://youtu.be/cygj9WDqHjY)
 
 ### Wheels 1.x

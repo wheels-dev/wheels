@@ -29,7 +29,7 @@ Once you have added the rewrite rules (usually in either `.htaccess`, `web.confi
 {% hint style="info" %}
 #### Head's Up!
 
-Since 2.x, engine specific URL rewrite files are not included in the default distribution. Don't worry - we've got you covered though!
+Engine specific URL rewrite files are not included in the default distribution. Don't worry - we've got you covered though!
 {% endhint %}
 
 For webserver specific instructions look at the following pages:

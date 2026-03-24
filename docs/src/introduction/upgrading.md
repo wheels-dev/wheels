@@ -309,11 +309,11 @@ For many applications, you need to follow these steps:
 
 See documentation for the [CSRF Protection Plugin](https://github.com/liquifusion/wheels-csrf-protection) for more information.
 
-Note: If you had previously installed the [CSRF Protection plugin](https://github.com/liquifusion/wheels-csrf-protection), you may remove it and rely on the functionality included in the Wheels 2 core.
+Note: If you had previously installed the [CSRF Protection plugin](https://github.com/liquifusion/wheels-csrf-protection), you may remove it and rely on the functionality included in the Wheels core.
 
 #### Database Migrations
 
-If you have previously been using the dbmigrate plugin, you can now use the inbuilt version within the Wheels 2 core.&#x20;
+If you have previously been using the dbmigrate plugin, you can now use the inbuilt version within the Wheels core.&#x20;
 
 Database Migration files in `/db/migrate/` should now be moved to `/app/migrator/migrations/` and extend `wheels.migrator.Migration`, not `plugins.dbmigrate.Migration` which can be changed with a simple find and replace. Note: Oracle is not currently supported for Migrator.
 

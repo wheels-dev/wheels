@@ -409,7 +409,7 @@ GET /news/show/5
 
 With this convention, the URL above told Wheels to invoke the `show` action in the `news` controller. It also passed a parameter called `key` to the action, with a value of `5`.
 
-If you're upgrading from 1.x or still prefer this style of routing for your Wheels 2+ application, you can use the [wildcard()](https://wheels.dev/api/v3.1.0/mapper.wildcard.html) method to enable it part of it:&#x20;
+If you're upgrading from 1.x or still prefer this style of routing for your Wheels application, you can use the [wildcard()](https://wheels.dev/api/v3.1.0/mapper.wildcard.html) method to enable it part of it:&#x20;
 
 ```javascript
 mapper()
@@ -417,7 +417,7 @@ mapper()
 .end();
 ```
 
-Wheels 2 will only generate routes for `[controller]/[action]`, however, because resources and the other routing methods are more appropriate for working with records identified by primary keys.
+Wheels will only generate routes for `[controller]/[action]`, however, because resources and the other routing methods are more appropriate for working with records identified by primary keys.
 
 Here is a sample of the patterns that `wildcard` generates:
 
@@ -601,7 +601,7 @@ mapper()
 
 ### Redirection
 
-As of Wheels 2.1, you can now use a `redirect` argument on `GET`, `POST`, `PUT`, `PATCH`, and `DELETE` requests. This will execute before reaching any controllers, and perform a `302` redirect immediately after the route is matched.
+You can use a `redirect` argument on `GET`, `POST`, `PUT`, `PATCH`, and `DELETE` requests. This will execute before reaching any controllers, and perform a `302` redirect immediately after the route is matched.
 
 CFScript
 
@@ -618,12 +618,6 @@ mapper()
 This is useful for the occasional redirect, and saves you having to create a dedicated controller filter or action just to perform a simple task. For large amounts of redirects, you may want to look into adding them at a higher level - e.g in an Apache VirtualHost configuration, as that will be more performant.
 
 ### Disabling automatic \[format] routes
-
-{% hint style="info" %}
-#### Note
-
-Introduced in Wheels 2.1
-{% endhint %}
 
 By default, Wheels will add `.[format]` routes when using `resources()`. You may wish to disable this behavior to trim down the number of generated routes for clarity and performance reasons (or you just don't use this feature!).
 

@@ -266,7 +266,7 @@ To link to the `pages` resource, you add the parent resource's singular name fir
 
 ### Linking to a Delete Action
 
-Wheels 2.0 introduced security improvements for actions that change data in your applications (i.e., creating, updating, and deleting database records). Wheels protects these actions by requiring that they happen along with a form `POST` in the browser.
+Wheels includes security improvements for actions that change data in your applications (i.e., creating, updating, and deleting database records). Wheels protects these actions by requiring that they happen along with a form `POST` in the browser.
 
 A common UI pattern is to have a link to delete a record, usually in an admin area. Unfortunately, links can only trigger `GET` requests, so we need to work around this.
 

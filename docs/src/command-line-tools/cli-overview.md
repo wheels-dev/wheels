@@ -159,8 +159,8 @@ wheels security scan
 
 | Wheels CLI | Wheels | CommandBox | CFML Engine |
 |------------|----------|------------|-------------|
-| 3.0.x | 2.5+ | 5.0+ | Lucee 5.3+, Adobe 2018+ |
-| 2.0.x | 2.0-2.4 | 4.0+ | Lucee 5.2+, Adobe 2016+ |
+| 3.0.x | 3.0+ | 5.0+ | Lucee 5.3+, Adobe 2018+ |
+| 2.0.x | 2.0-2.5 | 4.0+ | Lucee 5.2+, Adobe 2016+ |
 
 ## Community & Support
 

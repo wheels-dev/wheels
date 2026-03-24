@@ -236,7 +236,7 @@ considerations.
 
 ### Appending to, rather than replacing the flash
 
-From Wheels 2.1, you can now change the default flash behavior to append to an existing key, rather than directly replacing it. To turn on this behavior, add `set(flashAppend=true)` to you `/config/settings.cfm` file.
+You can change the default flash behavior to append to an existing key, rather than directly replacing it. To turn on this behavior, add `set(flashAppend=true)` to you `/config/settings.cfm` file.
 
 An example of where this might be useful:
 
@@ -270,8 +270,6 @@ flashInsert(info=msgs);
 
 ### Disabling the Flash Cookie
 
-In `2.2` upwards:
+There are certain circumstances where you might not be using the flash: for example, if you have Wheels setup as a stateless API (perhaps in a cluster behind a load balancer) where you're using tokens vs sessions. In this circumstance, you've probably turned off session management, which only leaves `cookie` as a viable route. But if set to `cookie`, you always get `Set-Cookie` being returned, which is unnecessary.
 
-There are certain circumstances where you might not be using the flash: for example, if you have wheels setup as a stateless API (perhaps in a cluster behind a load balancer) where you're using tokens vs sessions. In this circumstance, you've probably turned off session management, which only leaves `cookie` as a viable route. But if set to `cookie`, you always get `Set-Cookie` being returned, which is unnecessary.
-
-In wheels 2.2 you can now `set(flashStorage = "none")` which will prevent the creation of the cookie, and also not try and write to a session.
+You can set `set(flashStorage = "none")` which will prevent the creation of the cookie, and also not try and write to a session.

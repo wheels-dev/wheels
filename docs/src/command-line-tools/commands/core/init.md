@@ -94,7 +94,7 @@ Please enter a default cfengine: lucee5
   "name": "myapp",
   "version": "1.0.0",
   "dependencies": {
-    "wheels": "^2.5.0"
+    "wheels": "^3.1.0"
   }
 }
 ```

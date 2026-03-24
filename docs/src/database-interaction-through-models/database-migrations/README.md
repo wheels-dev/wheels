@@ -6,7 +6,7 @@ description: >-
 
 # Database Migrations
 
-With Wheels 2.x, you can now create, alter and populate your database via cfscript in an organized manner. Using custom CFC files, you can create an organized database schema, and move between versions easily, either programmatically, via the provided GUI, or via the CLI.&#x20;
+Wheels allows you to create, alter and populate your database via cfscript in an organized manner. Using custom CFC files, you can create an organized database schema, and move between versions easily, either programmatically, via the provided GUI, or via the CLI.&#x20;
 
 ### Getting Started
 

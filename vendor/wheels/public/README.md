@@ -1,6 +1,6 @@
 # Wheels GUI
 
-Everything in `/wheels/public/` is aimed at the local developer. `/wheels/public/assets/` should be on the developers urlrewriting exemption for local CSS and JS already as it was introduced in wheels 2.x.
+Everything in `/wheels/public/` is aimed at the local developer. `/wheels/public/assets/` should be on the developers urlrewriting exemption for local CSS and JS.
 
 ## Building
 
