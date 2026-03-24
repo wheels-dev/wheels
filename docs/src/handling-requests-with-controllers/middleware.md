@@ -88,7 +88,7 @@ mapper()
 
 ## Built-in Middleware
 
-Wheels ships with three middleware components you can use immediately.
+Wheels ships with four middleware components you can use immediately.
 
 ### RequestId
 
