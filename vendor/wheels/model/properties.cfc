@@ -670,6 +670,96 @@ component {
 	}
 
 	/**
+	 * Returns a struct containing all association definitions for this model.
+	 * Each key is the association name, and the value is a struct with association metadata
+	 * including `type` (belongsTo, hasMany, hasOne), `modelName`, `foreignKey`, `joinKey`, and `dependent`.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function associationInfo() {
+		return variables.wheels.class.associations;
+	}
+
+	/**
+	 * Returns a list of association names defined on this model.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public string function associationNames() {
+		return StructKeyList(variables.wheels.class.associations);
+	}
+
+	/**
+	 * Returns a struct containing all validation rules for this model, keyed by trigger (`onSave`, `onCreate`, `onUpdate`).
+	 * Each trigger contains an array of validation rule structs with `method`, `properties`, `message`, and other parameters.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function validationInfo() {
+		return variables.wheels.class.validations;
+	}
+
+	/**
+	 * Returns a struct containing all enum definitions for this model.
+	 * Each key is the property name, and the value contains `values` (name-to-stored-value mapping) and `names` (list of enum names).
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function enumInfo() {
+		return variables.wheels.class.enums;
+	}
+
+	/**
+	 * Returns a struct containing all named scope definitions for this model.
+	 * Each key is the scope name, and the value is a struct with query fragment keys like `where`, `order`, `select`, `include`.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function scopeInfo() {
+		return variables.wheels.class.scopes;
+	}
+
+	/**
+	 * Returns a struct containing all callback definitions for this model, keyed by callback type
+	 * (e.g., `beforeSave`, `afterCreate`). Each callback type contains an array of callback method names.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function callbackInfo() {
+		return variables.wheels.class.callbacks;
+	}
+
+	/**
+	 * Returns a comprehensive struct of all model metadata suitable for code generation and introspection tools.
+	 * Includes model name, table name, primary keys, properties, associations, validations, enums, scopes, and callbacks.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function classInfo() {
+		local.rv = {};
+		local.rv.modelName = variables.wheels.class.modelName;
+		local.rv.tableName = tableName();
+		local.rv.primaryKeys = primaryKeys();
+		local.rv.propertyNames = propertyNames();
+		local.rv.properties = variables.wheels.class.properties;
+		local.rv.associations = variables.wheels.class.associations;
+		local.rv.validations = variables.wheels.class.validations;
+		local.rv.enums = variables.wheels.class.enums;
+		local.rv.scopes = variables.wheels.class.scopes;
+		local.rv.callbacks = variables.wheels.class.callbacks;
+		local.rv.calculatedProperties = variables.wheels.class.calculatedProperties;
+		local.rv.softDeletion = StructKeyExists(variables.wheels.class, "softDeletion") ? variables.wheels.class.softDeletion : false;
+		return local.rv;
+	}
+
+	/**
 	 * Defines a named query scope that can be chained onto finders.
 	 * Scopes allow you to define reusable query fragments in the model config and compose them together.
 	 *
