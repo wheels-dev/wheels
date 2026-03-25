@@ -27,10 +27,6 @@ component output="false" extends="wheels.Global"{
 		variables.sort = "ASC";
 		/* extract out plugins */
 		$pluginsExtract();
-		/* remove orphan plugin directories */
-		if (variables.$class.deletePluginDirectories) {
-			$pluginDelete();
-		}
 		/* process plugins */
 		$pluginsProcess();
 		/* get versions */
@@ -113,12 +109,12 @@ component output="false" extends="wheels.Global"{
 			if (local.plugin.folderExists && $isSymlink(local.plugin.folderPath)) {
 				continue;
 			}
-			if (!local.plugin.folderExists || (local.plugin.folderExists && variables.$class.overwritePlugins)) {
+			if (!local.plugin.folderExists || variables.$class.overwritePlugins) {
 				if (!local.plugin.folderExists) {
 					try {
 						DirectoryCreate(local.plugin.folderPath);
 					} catch (any e) {
-						//
+						WriteLog(type="warning", text="[Wheels] Failed to create plugin directory '#local.plugin.folderPath#': #e.message#");
 					}
 				}
 				$zip(action = "unzip", destination = local.plugin.folderPath, file = local.plugin.file, overwrite = true);
@@ -126,21 +122,12 @@ component output="false" extends="wheels.Global"{
 		};
 	}
 
+	/**
+	 * Retained for API compatibility. The original orphan-directory cleanup logic
+	 * was neutered by GH#1978 (directory-based plugins are indistinguishable from
+	 * orphaned zip extractions). No longer called from $init().
+	 */
 	public void function $pluginDelete() {
-		local.folders = $pluginFolders();
-		// put zip files into a list
-		local.files = $pluginFiles();
-		local.fileList = StructKeyList(local.files);
-		// loop through the plugin folders
-		for (local.iFolder in local.folders) {
-			local.folder = local.folders[local.iFolder];
-			// Skip directories without a matching zip file — they may be
-			// directory-based plugins (git-cloned, symlinked, or manually
-			// installed) rather than orphaned zip extractions (GH#1978).
-			if (!ListContainsNoCase(local.fileList, local.folder.name)) {
-				continue;
-			}
-		};
 	}
 
 	public void function $pluginsProcess() {
