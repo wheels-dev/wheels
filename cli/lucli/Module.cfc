@@ -61,7 +61,7 @@ component extends="modules.BaseModule" {
 			out("  test          Generate a test spec file");
 			out("  property      Generate an add-column migration for a model property");
 			out("  helper        Generate a helper file in app/helpers/");
-			out("  snippets      Copy snippet templates to app/snippets/ for customization");
+			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate app myapp");
@@ -74,7 +74,7 @@ component extends="modules.BaseModule" {
 			out("  wheels generate test model User");
 			out("  wheels generate property User email:string");
 			out("  wheels generate helper formatting");
-			out("  wheels generate snippets");
+			out("  wheels generate snippets auth");
 			return "";
 		}
 
@@ -1351,10 +1351,600 @@ component extends="modules.BaseModule" {
 
 	private string function generateSnippets(required array args) {
 		var force = false;
+		var positional = [];
 		for (var arg in args) {
-			if (arg == "--force") force = true;
+			if (arg == "--force") {
+				force = true;
+			} else if (left(arg, 2) != "--") {
+				arrayAppend(positional, arg);
+			}
 		}
 
+		// No args or --list: show available snippets
+		if (!arrayLen(positional)) {
+			return listSnippets();
+		}
+
+		var pattern = lCase(positional[1]);
+
+		// "templates" subcommand: copy raw template files (old behavior)
+		if (pattern == "templates") {
+			return copySnippetTemplates(force);
+		}
+
+		// Look up the named snippet pattern
+		var snippets = getSnippetRegistry();
+		if (!structKeyExists(snippets, pattern)) {
+			out("Unknown snippet pattern: #pattern#", "red");
+			out("Run 'wheels generate snippets' for available patterns.");
+			return "";
+		}
+
+		var snippet = snippets[pattern];
+		var files = snippet.generate(variables.projectRoot, force);
+
+		out("");
+		if (arrayLen(files)) {
+			out("#snippet.name# snippet generated (#arrayLen(files)# file(s)):", "green");
+			for (var f in files) {
+				printCreated(f);
+			}
+		} else {
+			out("All files already exist (use --force to overwrite).", "yellow");
+		}
+
+		if (structKeyExists(snippet, "hint") && len(snippet.hint)) {
+			out("");
+			out(snippet.hint, "cyan");
+		}
+		return "";
+	}
+
+	/**
+	 * List all available snippet patterns
+	 */
+	private string function listSnippets() {
+		out("Usage: wheels generate snippets <pattern> [--force]", "yellow");
+		out("");
+		out("Available snippet patterns:", "bold");
+		out("");
+		var snippets = getSnippetRegistry();
+		var keys = structKeyArray(snippets);
+		arraySort(keys, "textnocase");
+		for (var key in keys) {
+			var s = snippets[key];
+			out("  #key##repeatString(' ', 20 - len(key))##s.description#");
+		}
+		out("");
+		out("Special commands:", "bold");
+		out("  templates           Copy raw generator templates to app/snippets/ for customization");
+		out("");
+		out("Examples:", "bold");
+		out("  wheels generate snippets auth");
+		out("  wheels generate snippets soft-delete");
+		out("  wheels generate snippets api-controller --force");
+		out("  wheels generate snippets templates");
+		return "";
+	}
+
+	/**
+	 * Registry of named snippet patterns.
+	 * Each entry has: name, description, hint, generate(projectRoot, force) -> array of relative paths
+	 */
+	private struct function getSnippetRegistry() {
+		var nl = chr(10);
+		var tab = chr(9);
+
+		return {
+			"auth": {
+				name: "Authentication",
+				description: "Session controller, login view, and auth filter",
+				hint: "Add filters(through=""authenticate"") to controllers that need protection.",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					// Session controller
+					var sessionCtrl = 'component extends="Controller" {' & nl
+						& nl
+						& tab & 'function config() {' & nl
+						& tab & tab & 'verifies(only="create", params="username,password");' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & '/**' & nl
+						& tab & ' * Login form' & nl
+						& tab & ' */' & nl
+						& tab & 'function new() {' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & '/**' & nl
+						& tab & ' * Process login' & nl
+						& tab & ' */' & nl
+						& tab & 'function create() {' & nl
+						& tab & tab & 'var user = model("User").findOne(where="username=''##params.username##''");' & nl
+						& tab & tab & 'if (IsObject(user) && user.authenticate(params.password)) {' & nl
+						& tab & tab & tab & 'session.currentUserId = user.key();' & nl
+						& tab & tab & tab & 'flashInsert(success="Logged in successfully.");' & nl
+						& tab & tab & tab & 'redirectTo(route="root");' & nl
+						& tab & tab & '} else {' & nl
+						& tab & tab & tab & 'flashInsert(error="Invalid username or password.");' & nl
+						& tab & tab & tab & 'renderView(action="new");' & nl
+						& tab & tab & '}' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & '/**' & nl
+						& tab & ' * Logout' & nl
+						& tab & ' */' & nl
+						& tab & 'function delete() {' & nl
+						& tab & tab & 'structDelete(session, "currentUserId");' & nl
+						& tab & tab & 'flashInsert(success="You have been logged out.");' & nl
+						& tab & tab & 'redirectTo(route="root");' & nl
+						& tab & '}' & nl
+						& nl
+						& '}';
+					var p = writeSnippetFile(projectRoot, "app/controllers/Sessions.cfc", sessionCtrl, force);
+					if (len(p)) arrayAppend(created, p);
+
+					// Login view
+					var loginView = '<cfparam name="params.username" default="">' & nl
+						& nl
+						& '<h1>Log In</h1>' & nl
+						& nl
+						& '##flashMessages()##' & nl
+						& nl
+						& '##startFormTag(route="sessions", method="post")##' & nl
+						& tab & '<div class="mb-3">' & nl
+						& tab & tab & '##textField(name="username", label="Username", class="form-control")##' & nl
+						& tab & '</div>' & nl
+						& tab & '<div class="mb-3">' & nl
+						& tab & tab & '##passwordField(name="password", label="Password", class="form-control")##' & nl
+						& tab & '</div>' & nl
+						& tab & '##submitTag(value="Log In", class="btn btn-primary")##' & nl
+						& '##endFormTag()##';
+					p = writeSnippetFile(projectRoot, "app/views/sessions/new.cfm", loginView, force);
+					if (len(p)) arrayAppend(created, p);
+
+					// Auth filter helper (for Controller.cfc)
+					var authFilter = '<!--- Include in your base Controller.cfc config(): filters(through="authenticate") --->' & nl
+						& nl
+						& '<cfscript>' & nl
+						& 'private function authenticate() {' & nl
+						& tab & 'if (!structKeyExists(session, "currentUserId")) {' & nl
+						& tab & tab & 'flashInsert(error="Please log in to continue.");' & nl
+						& tab & tab & 'redirectTo(controller="sessions", action="new");' & nl
+						& tab & '}' & nl
+						& tab & 'currentUser = model("User").findByKey(session.currentUserId);' & nl
+						& tab & 'if (!IsObject(currentUser)) {' & nl
+						& tab & tab & 'structDelete(session, "currentUserId");' & nl
+						& tab & tab & 'redirectTo(controller="sessions", action="new");' & nl
+						& tab & '}' & nl
+						& '}' & nl
+						& '</cfscript>';
+					p = writeSnippetFile(projectRoot, "app/snippets/auth-filter.cfm", authFilter, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			},
+			"soft-delete": {
+				name: "Soft Delete",
+				description: "Model callbacks for soft delete instead of hard delete",
+				hint: "Add this to any model: include(template=""/app/snippets/soft-delete.cfm"").",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					// Soft delete model mixin
+					var content = '<!---' & nl
+						& tab & 'Soft Delete Pattern' & nl
+						& tab & 'Requires: deletedAt (datetime, nullable) column on the table.' & nl
+						& tab & 'Migration: t.datetime(columnNames="deletedAt", null=true, default="NULL");' & nl
+						& nl
+						& tab & 'Usage in your model config():' & nl
+						& tab & tab & 'beforeDelete("softDelete");' & nl
+						& tab & tab & 'scope(name="active", where="deletedAt IS NULL");' & nl
+						& tab & tab & 'scope(name="trashed", where="deletedAt IS NOT NULL");' & nl
+						& '--->' & nl
+						& nl
+						& '<cfscript>' & nl
+						& '/**' & nl
+						& ' * Soft delete: set deletedAt instead of removing the row.' & nl
+						& ' * Return false to prevent the actual DELETE.' & nl
+						& ' */' & nl
+						& 'private boolean function softDelete() {' & nl
+						& tab & 'this.updateProperty(property="deletedAt", value=Now());' & nl
+						& tab & 'return false;' & nl
+						& '}' & nl
+						& nl
+						& '/**' & nl
+						& ' * Restore a soft-deleted record.' & nl
+						& ' */' & nl
+						& 'public boolean function restore() {' & nl
+						& tab & 'return this.updateProperty(property="deletedAt", value="");' & nl
+						& '}' & nl
+						& nl
+						& '/**' & nl
+						& ' * Check if the record has been soft-deleted.' & nl
+						& ' */' & nl
+						& 'public boolean function isTrashed() {' & nl
+						& tab & 'return len(this.deletedAt) && isDate(this.deletedAt);' & nl
+						& '}' & nl
+						& '</cfscript>';
+					var p = writeSnippetFile(projectRoot, "app/snippets/soft-delete.cfm", content, force);
+					if (len(p)) arrayAppend(created, p);
+
+					// Migration
+					var migration = 'component extends="wheels.migrator.Migration" {' & nl
+						& nl
+						& tab & 'function up() {' & nl
+						& tab & tab & '// Add to your table: change "tablename" below' & nl
+						& tab & tab & 'addColumn(table="tablename", columnType="datetime", columnName="deletedAt", null=true, default="NULL");' & nl
+						& tab & tab & 'addIndex(table="tablename", columnNames="deletedAt");' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function down() {' & nl
+						& tab & tab & 'removeIndex(table="tablename", columnNames="deletedAt");' & nl
+						& tab & tab & 'removeColumn(table="tablename", columnName="deletedAt");' & nl
+						& tab & '}' & nl
+						& nl
+						& '}';
+					p = writeSnippetFile(projectRoot, "app/snippets/soft-delete-migration.cfc", migration, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			},
+			"api-controller": {
+				name: "API Controller",
+				description: "JSON API controller with error handling and content negotiation",
+				hint: "Rename the component and model references, then add a route: .resources(name=""items"").",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					var content = 'component extends="Controller" {' & nl
+						& nl
+						& tab & 'function config() {' & nl
+						& tab & tab & 'provides("json");' & nl
+						& tab & tab & 'verifies(params="key", paramsTypes="integer", only="show,update,delete");' & nl
+						& tab & tab & 'filters(through="findRecord", only="show,update,delete");' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function index() {' & nl
+						& tab & tab & 'var page = val(params.page) > 0 ? val(params.page) : 1;' & nl
+						& tab & tab & 'records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");' & nl
+						& tab & tab & 'renderWith(data=records, layout=false);' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function show() {' & nl
+						& tab & tab & 'renderWith(data=record, layout=false);' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function create() {' & nl
+						& tab & tab & 'record = model("Item").new(params.item);' & nl
+						& tab & tab & 'if (record.save()) {' & nl
+						& tab & tab & tab & 'renderWith(data=record, layout=false, status=201);' & nl
+						& tab & tab & '} else {' & nl
+						& tab & tab & tab & 'renderWith(data={errors: record.allErrors()}, layout=false, status=422);' & nl
+						& tab & tab & '}' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function update() {' & nl
+						& tab & tab & 'if (record.update(properties=params.item)) {' & nl
+						& tab & tab & tab & 'renderWith(data=record, layout=false);' & nl
+						& tab & tab & '} else {' & nl
+						& tab & tab & tab & 'renderWith(data={errors: record.allErrors()}, layout=false, status=422);' & nl
+						& tab & tab & '}' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function delete() {' & nl
+						& tab & tab & 'record.delete();' & nl
+						& tab & tab & 'renderWith(data={message: "Record deleted."}, layout=false);' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'private function findRecord() {' & nl
+						& tab & tab & 'record = model("Item").findByKey(params.key);' & nl
+						& tab & tab & 'if (!IsObject(record)) {' & nl
+						& tab & tab & tab & 'renderWith(data={error: "Record not found."}, layout=false, status=404);' & nl
+						& tab & tab & '}' & nl
+						& tab & '}' & nl
+						& nl
+						& '}';
+					var p = writeSnippetFile(projectRoot, "app/snippets/api-controller.cfc", content, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			},
+			"crud-controller": {
+				name: "CRUD Controller",
+				description: "Full CRUD controller with flash messages and error handling",
+				hint: "Rename the component and model references. Add route: .resources(name=""items"").",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					var content = 'component extends="Controller" {' & nl
+						& nl
+						& tab & 'function config() {' & nl
+						& tab & tab & 'verifies(params="key", paramsTypes="integer", only="show,edit,update,delete");' & nl
+						& tab & tab & 'filters(through="findRecord", only="show,edit,update,delete");' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function index() {' & nl
+						& tab & tab & 'var page = val(params.page) > 0 ? val(params.page) : 1;' & nl
+						& tab & tab & 'records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function show() {' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function new() {' & nl
+						& tab & tab & 'record = model("Item").new();' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function create() {' & nl
+						& tab & tab & 'record = model("Item").new(params.item);' & nl
+						& tab & tab & 'if (record.save()) {' & nl
+						& tab & tab & tab & 'flashInsert(success="Item was created successfully.");' & nl
+						& tab & tab & tab & 'redirectTo(action="index");' & nl
+						& tab & tab & '} else {' & nl
+						& tab & tab & tab & 'flashInsert(error="There was a problem creating the item.");' & nl
+						& tab & tab & tab & 'renderView(action="new");' & nl
+						& tab & tab & '}' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function edit() {' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function update() {' & nl
+						& tab & tab & 'if (record.update(properties=params.item)) {' & nl
+						& tab & tab & tab & 'flashInsert(success="Item was updated successfully.");' & nl
+						& tab & tab & tab & 'redirectTo(action="index");' & nl
+						& tab & tab & '} else {' & nl
+						& tab & tab & tab & 'flashInsert(error="There was a problem updating the item.");' & nl
+						& tab & tab & tab & 'renderView(action="edit");' & nl
+						& tab & tab & '}' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'function delete() {' & nl
+						& tab & tab & 'record.delete();' & nl
+						& tab & tab & 'flashInsert(success="Item was deleted successfully.");' & nl
+						& tab & tab & 'redirectTo(action="index");' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & 'private function findRecord() {' & nl
+						& tab & tab & 'record = model("Item").findByKey(params.key);' & nl
+						& tab & tab & 'if (!IsObject(record)) {' & nl
+						& tab & tab & tab & 'flashInsert(error="Item not found.");' & nl
+						& tab & tab & tab & 'redirectTo(action="index");' & nl
+						& tab & tab & '}' & nl
+						& tab & '}' & nl
+						& nl
+						& '}';
+					var p = writeSnippetFile(projectRoot, "app/snippets/crud-controller.cfc", content, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			},
+			"flash-messages": {
+				name: "Flash Messages",
+				description: "Partial view for displaying flash messages with Bootstrap styling",
+				hint: "Include in your layout: ##includePartial(partial=""/shared/flash"")##.",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					var content = '<!--- app/views/shared/_flash.cfm --->' & nl
+						& '<cfparam name="flash" default="##flashMessages(includeEmptyContainer=false)##">' & nl
+						& nl
+						& '<cfif structKeyExists(flash(), "success")>' & nl
+						& tab & '<div class="alert alert-success alert-dismissible fade show" role="alert">' & nl
+						& tab & tab & '##flash("success")##' & nl
+						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
+						& tab & '</div>' & nl
+						& '</cfif>' & nl
+						& nl
+						& '<cfif structKeyExists(flash(), "error")>' & nl
+						& tab & '<div class="alert alert-danger alert-dismissible fade show" role="alert">' & nl
+						& tab & tab & '##flash("error")##' & nl
+						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
+						& tab & '</div>' & nl
+						& '</cfif>' & nl
+						& nl
+						& '<cfif structKeyExists(flash(), "warning")>' & nl
+						& tab & '<div class="alert alert-warning alert-dismissible fade show" role="alert">' & nl
+						& tab & tab & '##flash("warning")##' & nl
+						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
+						& tab & '</div>' & nl
+						& '</cfif>' & nl
+						& nl
+						& '<cfif structKeyExists(flash(), "info")>' & nl
+						& tab & '<div class="alert alert-info alert-dismissible fade show" role="alert">' & nl
+						& tab & tab & '##flash("info")##' & nl
+						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
+						& tab & '</div>' & nl
+						& '</cfif>';
+					var p = writeSnippetFile(projectRoot, "app/views/shared/_flash.cfm", content, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			},
+			"pagination": {
+				name: "Pagination",
+				description: "Paginated list view with navigation controls",
+				hint: "Use with: records = model(""Item"").findAll(page=params.page, perPage=25).",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					var content = '<!--- app/snippets/pagination-view.cfm --->' & nl
+						& '<!--- Example paginated list view --->' & nl
+						& '<cfparam name="records" default="">' & nl
+						& nl
+						& '<h1>Items</h1>' & nl
+						& nl
+						& '##paginationNav(showInfo=true)##' & nl
+						& nl
+						& '<table class="table table-striped">' & nl
+						& tab & '<thead>' & nl
+						& tab & tab & '<tr>' & nl
+						& tab & tab & tab & '<th>ID</th>' & nl
+						& tab & tab & tab & '<th>Name</th>' & nl
+						& tab & tab & tab & '<th>Created</th>' & nl
+						& tab & tab & tab & '<th>Actions</th>' & nl
+						& tab & tab & '</tr>' & nl
+						& tab & '</thead>' & nl
+						& tab & '<tbody>' & nl
+						& tab & tab & '<cfoutput query="records">' & nl
+						& tab & tab & '<tr>' & nl
+						& tab & tab & tab & '<td>##records.id##</td>' & nl
+						& tab & tab & tab & '<td>##encodeForHTML(records.name)##</td>' & nl
+						& tab & tab & tab & '<td>##dateFormat(records.createdAt, "mmm d, yyyy")##</td>' & nl
+						& tab & tab & tab & '<td>' & nl
+						& tab & tab & tab & tab & '##linkTo(text="View", route="item", key=records.id)##' & nl
+						& tab & tab & tab & tab & '##linkTo(text="Edit", route="editItem", key=records.id)##' & nl
+						& tab & tab & tab & '</td>' & nl
+						& tab & tab & '</tr>' & nl
+						& tab & tab & '</cfoutput>' & nl
+						& tab & '</tbody>' & nl
+						& '</table>' & nl
+						& nl
+						& '##paginationNav()##';
+					var p = writeSnippetFile(projectRoot, "app/snippets/pagination-view.cfm", content, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			},
+			"seed-data": {
+				name: "Seed Data",
+				description: "Database seeding template with seedOnce() examples",
+				hint: "Run seeds with: wheels db:seed.",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					// Main seeds file
+					var content = '<!--- app/db/seeds.cfm --->' & nl
+						& '<!--- Shared seeds: run in all environments --->' & nl
+						& '<cfscript>' & nl
+						& nl
+						& '// Roles' & nl
+						& 'seedOnce(modelName="Role", uniqueProperties="name", properties={' & nl
+						& tab & 'name: "admin", description: "Administrator with full access"' & nl
+						& '});' & nl
+						& 'seedOnce(modelName="Role", uniqueProperties="name", properties={' & nl
+						& tab & 'name: "member", description: "Regular member"' & nl
+						& '});' & nl
+						& nl
+						& '// Settings' & nl
+						& 'seedOnce(modelName="Setting", uniqueProperties="key", properties={' & nl
+						& tab & 'key: "site.name", value: "My Wheels App"' & nl
+						& '});' & nl
+						& 'seedOnce(modelName="Setting", uniqueProperties="key", properties={' & nl
+						& tab & 'key: "site.perPage", value: "25"' & nl
+						& '});' & nl
+						& nl
+						& '</cfscript>';
+					var p = writeSnippetFile(projectRoot, "app/snippets/seeds.cfm", content, force);
+					if (len(p)) arrayAppend(created, p);
+
+					// Development seeds
+					var devContent = '<!--- app/db/seeds/development.cfm --->' & nl
+						& '<!--- Development-only seeds: test data --->' & nl
+						& '<cfscript>' & nl
+						& nl
+						& '// Dev admin user' & nl
+						& 'seedOnce(modelName="User", uniqueProperties="email", properties={' & nl
+						& tab & 'firstName: "Dev", lastName: "Admin",' & nl
+						& tab & 'email: "admin@example.com", roleId: 1' & nl
+						& '});' & nl
+						& nl
+						& '// Sample records for development' & nl
+						& 'for (var i = 1; i <= 10; i++) {' & nl
+						& tab & 'seedOnce(modelName="User", uniqueProperties="email", properties={' & nl
+						& tab & tab & 'firstName: "Test", lastName: "User ##i##",' & nl
+						& tab & tab & 'email: "user##i##@example.com", roleId: 2' & nl
+						& tab & '});' & nl
+						& '}' & nl
+						& nl
+						& '</cfscript>';
+					p = writeSnippetFile(projectRoot, "app/snippets/seeds-development.cfm", devContent, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			},
+			"mailer": {
+				name: "Mailer",
+				description: "Email sending with Wheels mailer pattern",
+				hint: "Call from controller: new app.mailers.UserMailer().sendWelcome(user).",
+				generate: function(string projectRoot, boolean force) {
+					var created = [];
+
+					var content = 'component extends="wheels.Mailer" {' & nl
+						& nl
+						& tab & '/**' & nl
+						& tab & ' * Send welcome email to a new user.' & nl
+						& tab & ' */' & nl
+						& tab & 'public void function sendWelcome(required any user) {' & nl
+						& tab & tab & 'mail(' & nl
+						& tab & tab & tab & 'to=arguments.user.email,' & nl
+						& tab & tab & tab & 'from="noreply@example.com",' & nl
+						& tab & tab & tab & 'subject="Welcome to the app!",' & nl
+						& tab & tab & tab & 'template="/app/views/mailers/user/welcome",' & nl
+						& tab & tab & tab & 'layout="/app/views/mailers/layout",' & nl
+						& tab & tab & tab & 'user=arguments.user' & nl
+						& tab & tab & ');' & nl
+						& tab & '}' & nl
+						& nl
+						& tab & '/**' & nl
+						& tab & ' * Send password reset instructions.' & nl
+						& tab & ' */' & nl
+						& tab & 'public void function sendPasswordReset(required any user, required string token) {' & nl
+						& tab & tab & 'mail(' & nl
+						& tab & tab & tab & 'to=arguments.user.email,' & nl
+						& tab & tab & tab & 'from="noreply@example.com",' & nl
+						& tab & tab & tab & 'subject="Password Reset",' & nl
+						& tab & tab & tab & 'template="/app/views/mailers/user/password_reset",' & nl
+						& tab & tab & tab & 'layout="/app/views/mailers/layout",' & nl
+						& tab & tab & tab & 'user=arguments.user,' & nl
+						& tab & tab & tab & 'token=arguments.token' & nl
+						& tab & tab & ');' & nl
+						& tab & '}' & nl
+						& nl
+						& '}';
+					var p = writeSnippetFile(projectRoot, "app/snippets/user-mailer.cfc", content, force);
+					if (len(p)) arrayAppend(created, p);
+
+					return created;
+				}
+			}
+		};
+	}
+
+	/**
+	 * Write a snippet file, respecting the force flag.
+	 * Returns the relative path if written, empty string if skipped.
+	 */
+	private string function writeSnippetFile(
+		required string projectRoot,
+		required string relativePath,
+		required string content,
+		boolean force = false
+	) {
+		var fullPath = arguments.projectRoot & "/" & arguments.relativePath;
+		if (fileExists(fullPath) && !arguments.force) {
+			return "";
+		}
+		var dir = getDirectoryFromPath(fullPath);
+		if (!directoryExists(dir)) {
+			directoryCreate(dir, true);
+		}
+		fileWrite(fullPath, arguments.content);
+		return arguments.relativePath;
+	}
+
+	/**
+	 * Copy raw generator template files to app/snippets/ for customization (original behavior)
+	 */
+	private string function copySnippetTemplates(boolean force = false) {
 		var snippetsDir = variables.projectRoot & "/app/snippets";
 		var templates = getService("templates");
 		var templateDir = templates.getTemplateDir();
@@ -1374,9 +1964,7 @@ component extends="modules.BaseModule" {
 			var sourcePath = templateDir & "/" & entry;
 			var destPath = snippetsDir & "/" & entry;
 
-			// Skip directories — only copy top-level template files
 			if (directoryExists(sourcePath)) {
-				// Recursively copy subdirectories too
 				copySnippetDir(sourcePath, destPath, force);
 				continue;
 			}
