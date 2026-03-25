@@ -535,7 +535,7 @@ component {
 	 * Handles property existence checks, Oracle TIMESTAMP objects in BoxLang,
 	 * and the uniqueness-validation special case (always invokes regardless of value).
 	 */
-	private boolean function $shouldInvokeValidation(required struct validation) {
+	public boolean function $shouldInvokeValidation(required struct validation) {
 		// No property constraint — always invoke
 		if (!StructKeyExists(arguments.validation.args, "property")) {
 			return true;
@@ -777,7 +777,7 @@ component {
 	 * Builds a single WHERE clause fragment for a property, quoting the value
 	 * and converting blank numeric properties to IS NULL.
 	 */
-	private string function $buildWhereClausePart(required string property) {
+	public string function $buildWhereClausePart(required string property) {
 		local.part = arguments.property & "=" & variables.wheels.class.adapter.$quoteValue(
 			str = this[arguments.property],
 			type = validationTypeForProperty(arguments.property)
@@ -844,7 +844,7 @@ component {
 	/**
 	 * Normalizes symbolic comparison operators to their CFML string equivalents.
 	 */
-	private string function $normalizeConditionOperators(required string condition) {
+	public string function $normalizeConditionOperators(required string condition) {
 		local.rv = ReplaceList(arguments.condition, "==,!=,<,<=,>,>=", "eq,neq,lt,lte,gt,gte");
 		return Replace(local.rv, "  ", " ", "all");
 	}
@@ -853,7 +853,7 @@ component {
 	 * Splits a normalized condition on the last matching comparison operator.
 	 * Returns {expression} always, plus {operator, rightOperand} when an operator is found.
 	 */
-	private struct function $splitConditionOnOperator(required string condition) {
+	public struct function $splitConditionOnOperator(required string condition) {
 		local.rv = {expression: arguments.condition};
 		for (local.op in ListToArray("eq,neq,lt,lte,gt,gte")) {
 			local.position = FindNoCase(local.op, arguments.condition);
@@ -871,7 +871,7 @@ component {
 	 * a zero-arg method, or a simple property lookup.
 	 * Returns {value: result} if resolved, or {} if not found.
 	 */
-	private struct function $resolveThisReference(required string key) {
+	public struct function $resolveThisReference(required string key) {
 		local.rv = {};
 
 		// Try method call with parenthesized arguments
@@ -908,7 +908,7 @@ component {
 	 * Parses a comma-delimited argument string (e.g. "key1='val1',key2='val2'")
 	 * into a struct of named arguments.
 	 */
-	private struct function $parseConditionArgs(required string argsString) {
+	public struct function $parseConditionArgs(required string argsString) {
 		local.rv = {};
 		for (local.param in ListToArray(arguments.argsString, ",")) {
 			local.param = Trim(local.param);
@@ -929,7 +929,7 @@ component {
 	/**
 	 * Evaluates a bare function call like "isActive()" or "!isActive()".
 	 */
-	private any function $evaluateBareCall(required string condition) {
+	public any function $evaluateBareCall(required string condition) {
 		local.negate = Find("!", arguments.condition);
 		local.methodName = arguments.condition;
 		if (local.negate) {
@@ -943,7 +943,7 @@ component {
 	/**
 	 * Evaluates a space-separated logical expression like "1 eq 0" or "5 gt 3".
 	 */
-	private any function $evaluateLogicalExpression(required string condition) {
+	public any function $evaluateLogicalExpression(required string condition) {
 		local.tokens = ListToArray(arguments.condition, " ");
 		if (ArrayLen(local.tokens) < 3) {
 			return false;
@@ -956,7 +956,7 @@ component {
 	/**
 	 * Strips surrounding single or double quotes from a condition value.
 	 */
-	private string function $unquoteConditionValue(required string value) {
+	public string function $unquoteConditionValue(required string value) {
 		local.rv = arguments.value;
 		if (REFindNoCase("^'.*'$", local.rv)) {
 			local.rv = Replace(local.rv, "'", "", "all");
