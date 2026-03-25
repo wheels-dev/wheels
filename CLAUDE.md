@@ -502,7 +502,7 @@ curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
 - **Closure this**: CFML closures capture `this` from the declaring scope. Use `var ctx = {ref: obj}` to share references across closures.
 - **Bracket-notation function call**: `obj["key"]()` crashes Adobe CF 2021/2023 parser inside closures. Split into two statements: `var fn = obj["key"]; fn()`.
 - **Array by-value in struct literals**: Adobe CF copies arrays by value in `{arr = myArray}`. Closures that append to the copy won't affect the original. Reference via parent struct instead: `{owner = parentStruct}` then `owner.arr`.
-- **`private` view helpers not integrated**: `$integrateComponents()` only copies `public` methods into controllers. Use `public` access with `$` prefix for internal helper functions in view CFCs.
+- **`private` mixin functions not integrated**: `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helper functions in mixin CFCs (`vendor/wheels/model/*.cfc`, view helpers, etc.) MUST use `public` access. Use `$` prefix for internal scope instead of `private` keyword. BoxLang handles this differently, so `private` may pass BoxLang tests but fail Lucee/Adobe.
 
 ### CI soft-fail databases
 CockroachDB is marked as soft-fail in `.github/workflows/tests.yml` — failures are logged as warnings but don't block the build. The `SOFT_FAIL_DBS` variable controls this. Remove a database from the list once its tests are fixed.
