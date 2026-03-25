@@ -16,23 +16,16 @@ component output="false" extends="wheels.Global"{
 	 * Plugin middleware runs after user-configured global middleware.
 	 */
 	private any function $buildMiddlewarePipeline() {
+		local.appKey = $appKey();
 		local.middlewareInstances = [];
 
 		// 1. Load user-configured global middleware.
-		if (StructKeyExists(application, "$wheels") && StructKeyExists(application.$wheels, "middleware")) {
-			local.configured = application.$wheels.middleware;
-		} else if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "middleware")) {
-			local.configured = application.wheels.middleware;
-		} else {
-			local.configured = [];
-		}
+		local.configured = StructKeyExists(application[local.appKey], "middleware")
+			? application[local.appKey].middleware
+			: [];
 
 		for (local.item in local.configured) {
-			if (IsSimpleValue(local.item)) {
-				ArrayAppend(local.middlewareInstances, CreateObject("component", local.item).init());
-			} else {
-				ArrayAppend(local.middlewareInstances, local.item);
-			}
+			ArrayAppend(local.middlewareInstances, $resolveMiddlewareInstance(local.item));
 		}
 
 		// 2. Append plugin-registered middleware, sorted by priority and before/after constraints.
@@ -41,11 +34,7 @@ component output="false" extends="wheels.Global"{
 			local.resolver = new wheels.middleware.MiddlewareOrderResolver();
 			local.sorted = local.resolver.resolve(local.pluginMiddleware);
 			for (local.entry in local.sorted) {
-				if (IsSimpleValue(local.entry.middleware)) {
-					ArrayAppend(local.middlewareInstances, CreateObject("component", local.entry.middleware).init());
-				} else {
-					ArrayAppend(local.middlewareInstances, local.entry.middleware);
-				}
+				ArrayAppend(local.middlewareInstances, $resolveMiddlewareInstance(local.entry.middleware));
 			}
 		}
 
@@ -57,12 +46,21 @@ component output="false" extends="wheels.Global"{
 	 * Returns the pluginMiddleware array or an empty array if not present.
 	 */
 	private array function $getPluginMiddlewareConfig() {
-		if (StructKeyExists(application, "$wheels") && StructKeyExists(application.$wheels, "pluginMiddleware")) {
-			return application.$wheels.pluginMiddleware;
-		} else if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "pluginMiddleware")) {
-			return application.wheels.pluginMiddleware;
+		local.appKey = $appKey();
+		if (StructKeyExists(application[local.appKey], "pluginMiddleware")) {
+			return application[local.appKey].pluginMiddleware;
 		}
 		return [];
+	}
+
+	/**
+	 * Resolve a middleware item: instantiate from component path string, or return as-is if already an object.
+	 */
+	private any function $resolveMiddlewareInstance(required any middleware) {
+		if (IsSimpleValue(arguments.middleware)) {
+			return CreateObject("component", arguments.middleware).init();
+		}
+		return arguments.middleware;
 	}
 
 	/**
@@ -88,12 +86,6 @@ component output="false" extends="wheels.Global"{
 		local.rv = $ensureControllerAndAction(params = local.rv, route = arguments.route);
 		local.rv = $addRouteFormat(params = local.rv, route = arguments.route);
 		local.rv = $addRouteName(params = local.rv, route = arguments.route);
-		
-		// Debug log for testbox route
-		if (structKeyExists(arguments.route, "name") && arguments.route.name == "wheelsTestbox") {
-			writeLog(file="application", text="Route details - controller: #arguments.route.controller#, action: #arguments.route.action#");
-			writeLog(file="application", text="Final params - controller: #local.rv.controller#, action: #local.rv.action#");
-		}
 
 		return local.rv;
 	}
@@ -220,12 +212,8 @@ component output="false" extends="wheels.Global"{
 			// Try and provide some more information for why the route hasn't matched:
 			// For example, the developer is accidentally GETing to a route which only allows POST.
 			for (local.route in arguments.routes) {
-				// Make sure route has been converted to regular expression.
-				if (!StructKeyExists(local.route, "regex")) {
-					local.route.regex = arguments.mapper.$patternToRegex(local.route.pattern);
-				}
-
 				// If route matches regular expression, append to alternatives to display.
+				// (regex was already compiled during the main matching loop above)
 				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
 					local.alternativeMatchingMethodsForURL = ListAppend(local.alternativeMatchingMethodsForURL, local.route.methods);
 				}
@@ -308,11 +296,6 @@ component output="false" extends="wheels.Global"{
 					local.method = application.wheels.public[local.params.action];
 					local.method();
 				} else {
-					// Debug log the controller and action being called
-					writeLog(file="application", text="Wheels dispatch - controller: #local.params.controller#, action: #local.params.action#");
-
-					// Call the action method directly on the component to preserve context
-					// Use 'object' and 'methodname' for older Adobe CF versions compatibility
 					invoke(object=application.wheels.public, methodname=local.params.action);
 				}
 				// The wheels controller methods handle their own output and abort
@@ -372,11 +355,7 @@ component output="false" extends="wheels.Global"{
 		}
 
 		for (local.item in local.routeMiddleware) {
-			if (IsSimpleValue(local.item)) {
-				ArrayAppend(local.instances, CreateObject("component", local.item).init());
-			} else {
-				ArrayAppend(local.instances, local.item);
-			}
+			ArrayAppend(local.instances, $resolveMiddlewareInstance(local.item));
 		}
 
 		return local.instances;
@@ -425,10 +404,7 @@ component output="false" extends="wheels.Global"{
 	/**
 	 * If content type is JSON, deserialize it into a struct and add to the params struct.
 	 */
-	public struct function $parseJsonBody(
-		required struct params,
-		struct httpRequestData = GetHTTPRequestData()
-	) {
+	public struct function $parseJsonBody(required struct params) {
 		local.headers = request.wheels.httpRequestData.headers;
 		local.content = request.wheels.httpRequestData.content;
 		if (StructKeyExists(local.headers, "Content-Type")) {
@@ -662,10 +638,6 @@ component output="false" extends="wheels.Global"{
 		local.rv.controller = ReReplace(local.rv.controller, "[^0-9A-Za-z-_\.]", "", "all");
 
 		// Filter out illegal characters from the controller and action arguments.
-		// Debug log before filtering
-		if (local.rv.controller == "wheels.public" && local.rv.action == "tests_testbox") { // keep action name for route compat
-			writeLog(file="application", text="Before filter - action: #local.rv.action#");
-		}
 		local.rv.action = ReReplace(local.rv.action, "[^0-9A-Za-z-_\.]", "", "all");
 
 		// Convert controller to upperCamelCase.
@@ -694,11 +666,6 @@ component output="false" extends="wheels.Global"{
 
 		// Action to normal camelCase.
 		local.rv.action = ReReplace(local.rv.action, "-([a-z])", "\u\1", "all");
-		
-		// Debug log final values
-		if (local.rv.controller == "wheels.public") {
-			writeLog(file="application", text="Final dispatch params - controller: #local.rv.controller#, action: #local.rv.action#");
-		}
 
 		return local.rv;
 	}
