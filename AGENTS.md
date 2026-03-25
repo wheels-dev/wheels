@@ -1,213 +1,43 @@
 # AGENTS.md
 
-This file provides guidance to AI Agents when working with a Wheels application.
+Guidance for AI coding assistants working with Wheels (CFML MVC framework).
 
-## 🚨 MANDATORY: Pre-Implementation Workflow
+## Before You Start
 
-**AI ASSISTANTS MUST FOLLOW THIS EXACT ORDER:**
+### 1. Check for MCP Tools
 
-### 🛑 STEP 1: CHECK MCP TOOLS AVAILABILITY (ALWAYS FIRST)
-```bash
-# Check if .mcp.json exists - if YES, MCP tools are MANDATORY
-ls .mcp.json
-```
+If `.mcp.json` exists in the project root, prefer MCP tools (`mcp__wheels__*`) over CLI commands for generation, migration, testing, and reload operations.
 
-**If `.mcp.json` exists, YOU MUST:**
-- ✅ Use `mcp__wheels__*` tools for ALL development tasks
-- ❌ NEVER use CLI commands (`wheels g`, `wheels test`, etc.)
-- ❌ NEVER use bash/curl for Wheels operations
+| Task | MCP Tool | CLI Fallback |
+|------|----------|-------------|
+| Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
+| Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels dbmigrate latest\|up\|down\|info` |
+| Test | `wheels_test()` | `wheels test run` |
+| Reload | `wheels_reload()` | `?reload=true&password=...` |
+| Server | `wheels_server(action="status")` | `wheels server start\|stop\|status` |
+| Analyze | `wheels_analyze(target="all")` | — |
 
-### 🛑 STEP 2: VERIFY MCP TOOLS WORK
-```javascript
-// Test MCP server connection BEFORE any development
-mcp__wheels__wheels_server(action="status")
-```
+### 2. Load Reference Documentation
 
-### 🛑 STEP 3: Load Documentation
-1. **📖 Load Relevant .ai Documentation**
-   - Check if `.ai/` folder exists in project root
-   - Load appropriate documentation sections:
-     - For models: Read `.ai/wheels/database/` and `.ai/cfml/components/`
-     - For controllers: Read `.ai/wheels/controllers/` and `.ai/cfml/syntax/`
-     - For CFML syntax: Read `.ai/cfml/syntax/` and `.ai/cfml/best-practices/`
-     - For patterns: Read `.ai/wheels/patterns/` and `.ai/wheels/snippets/`
+The `.ai/` directory contains searchable reference docs:
+- **Models**: `.ai/wheels/models/`, `.ai/wheels/database/`
+- **Controllers**: `.ai/wheels/controllers/`
+- **Views**: `.ai/wheels/views/`
+- **CFML syntax**: `.ai/cfml/syntax/`, `.ai/cfml/best-practices/`
+- **Patterns**: `.ai/wheels/patterns/`, `.ai/wheels/snippets/`
+- **Cross-engine rules**: `.ai/wheels/cross-engine-compatibility.md`
 
-2. **✅ Validate Against Standards**
-   - Confirm implementation matches patterns in `.ai/wheels/patterns/`
-   - Verify CFML syntax follows `.ai/cfml/best-practices/`
-   - Check security practices from `.ai/wheels/security/`
-   - Ensure naming conventions match `.ai/wheels/core-concepts/`
+### MCP Slash Commands
 
-3. **🔍 Use Established Code Examples**
-   - Reference code templates from `.ai/wheels/snippets/`
-   - Follow model patterns from `.ai/wheels/database/models/`
-   - Apply controller patterns from `.ai/wheels/controllers/`
+When the Wheels MCP server is available, these slash commands provide streamlined workflows:
 
-**If `.ai/` folder is not available, use the MCP resources:**
-- `wheels://.ai/cfml/syntax` - CFML language fundamentals
-- `wheels://.ai/wheels/patterns` - Framework patterns
-- `wheels://.ai/wheels/snippets` - Code examples
-
-## 🎯 Slash Commands (NEW!)
-
-**The Wheels MCP server now supports slash commands for faster development workflows!**
-
-### ✅ Available Slash Commands
-
-Use these slash commands in supported MCP clients:
-
-- **`/wheels-develop`** - Complete end-to-end development workflow
-  - Example: `/wheels-develop create a blog with posts and comments`
-  - Parameters: `task` (required), `verbose` (optional), `skip_browser_test` (optional)
-
-- **`/wheels-generate`** - Generate Wheels components
-  - Example: `/wheels-generate model User name:string,email:string`
-  - Parameters: `type` (required), `name` (required), `attributes` (optional), `actions` (optional)
-
-- **`/wheels-migrate`** - Run database migrations
-  - Example: `/wheels-migrate latest`
-  - Parameters: `action` (required: latest, up, down, reset, info)
-
-- **`/wheels-test`** - Run tests
-  - Example: `/wheels-test`
-  - Parameters: `target` (optional), `verbose` (optional)
-
-- **`/wheels-server`** - Manage development server
-  - Example: `/wheels-server status`
-  - Parameters: `action` (required: start, stop, restart, status)
-
-- **`/wheels-reload`** - Reload application
-  - Example: `/wheels-reload`
-  - Parameters: `password` (optional)
-
-- **`/wheels-analyze`** - Analyze project structure
-  - Example: `/wheels-analyze all`
-  - Parameters: `target` (required: models, controllers, routes, migrations, tests, all), `verbose` (optional)
-
-### 🚀 Slash Command Benefits
-
-- **Faster workflows** - Single command for complex operations
-- **Natural language** - Describe what you want to build
-- **Integrated testing** - Automatic validation and browser testing
-- **Documentation loading** - Auto-loads relevant .ai docs
-- **Error handling** - Intelligent error recovery
-
-## Quick Start
-
-### MCP-Enabled Wheels Development
-
-**🚨 CRITICAL: If `.mcp.json` exists, use MCP tools exclusively**
-
-### ✅ Common Development Tasks (MCP Tools)
-- **Create a model**: `mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string,active:boolean")`
-- **Create a controller**: `mcp__wheels__wheels_generate(type="controller", name="Users", actions="index,show,new,create,edit,update,delete")`
-- **Create full scaffold**: `mcp__wheels__wheels_generate(type="scaffold", name="Product", attributes="name:string,price:decimal,instock:boolean")`
-- **Run migrations**: `mcp__wheels__wheels_migrate(action="latest")` or `mcp__wheels__wheels_migrate(action="up")` or `mcp__wheels__wheels_migrate(action="down")`
-- **Run tests**: `mcp__wheels__wheels_test()`
-- **Reload application**: `mcp__wheels__wheels_reload()`
-- **Check server status**: `mcp__wheels__wheels_server(action="status")`
-- **Analyze project**: `mcp__wheels__wheels_analyze(target="all")`
-
-### ❌ Legacy CLI Commands (DO NOT USE if .mcp.json exists)
-~~- Create a model: `wheels g model User name:string,email:string,active:boolean`~~
-~~- Create a controller: `wheels g controller Users index,show,new,create,edit,update,delete`~~
-~~- Create full scaffold: `wheels g scaffold Product name:string,price:decimal,instock:boolean`~~
-~~- Run migrations: `wheels dbmigrate latest` `wheels dbmigrate up` `wheels dbmigrate down`~~
-~~- Run tests: `wheels test run`~~
-~~- Reload application: Visit `/?reload=true&password=yourpassword`~~
-
-**⚠️ Only use CLI commands if:**
-1. `.mcp.json` does not exist
-2. MCP tools are not available
-3. You are setting up a new Wheels project from scratch
-
-## 🔍 MCP Workflow Validation
-
-**Before proceeding with ANY development task, AI assistants MUST verify:**
-
-### ✅ MCP Tools Checklist
-1. **Check MCP availability**: `ls .mcp.json` (if exists → MCP is mandatory)
-2. **Test MCP connection**: `mcp__wheels__wheels_server(action="status")`
-3. **Verify MCP tools list**: `ListMcpResourcesTool(server="wheels")`
-
-### 🚨 Enforcement Rules
-- **If ANY of the following are detected, STOP and use MCP tools instead:**
-  - Using `wheels g` commands
-  - Using `wheels dbmigrate` commands
-  - Using `wheels test` commands
-  - Using `wheels server` commands
-  - Using `curl` for Wheels operations
-  - Using bash commands for Wheels development
-
-### 🔄 Correct MCP Usage Pattern
-```javascript
-// 1. Always check server status first
-mcp__wheels__wheels_server(action="status")
-
-// 2. Use MCP tools for all operations
-mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string")
-mcp__wheels__wheels_migrate(action="latest")
-mcp__wheels__wheels_test()
-mcp__wheels__wheels_reload()
-
-// 3. Analyze results
-mcp__wheels__wheels_analyze(target="all")
-```
-
-## 📚 MCP Tool Usage Examples
-
-### 🎯 Complete Development Workflow Example
-```javascript
-// 1. Start every session by checking MCP availability
-mcp__wheels__wheels_server(action="status")
-
-// 2. Create a complete blog system
-mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text,published:boolean")
-mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create,edit,update,delete")
-mcp__wheels__wheels_migrate(action="latest")
-
-// 3. Test and validate
-mcp__wheels__wheels_test()
-mcp__wheels__wheels_analyze(target="all")
-
-// 4. Reload when making configuration changes
-mcp__wheels__wheels_reload()
-```
-
-### ❌ WRONG: CLI-Based Approach (DO NOT USE)
-```bash
-# These commands are FORBIDDEN when .mcp.json exists
-wheels g model Post title:string,content:text,published:boolean
-wheels g controller Posts index,show,new,create,edit,update,delete
-wheels dbmigrate latest
-wheels test run
-curl "http://localhost:8080/?reload=true"
-```
-
-### ✅ CORRECT: MCP-Based Approach (MANDATORY)
-```javascript
-// Always use MCP tools - they provide better integration and error handling
-mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text,published:boolean")
-mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create,edit,update,delete")
-mcp__wheels__wheels_migrate(action="latest")
-mcp__wheels__wheels_test()
-mcp__wheels__wheels_reload()
-```
-
-### 🔍 Debugging with MCP Tools
-```javascript
-// Check project status
-mcp__wheels__wheels_analyze(target="all", verbose=true)
-
-// Check migrations
-mcp__wheels__wheels_migrate(action="info")
-
-// Validate models
-mcp__wheels__wheels_validate(model="all")
-
-// Check server status
-mcp__wheels__wheels_server(action="status")
-```
+- `/wheels-develop` — End-to-end development (task, verbose, skip_browser_test)
+- `/wheels-generate` — Generate components (type, name, attributes, actions)
+- `/wheels-migrate` — Run migrations (action: latest, up, down, reset, info)
+- `/wheels-test` — Run tests (target, verbose)
+- `/wheels-server` — Server management (action: start, stop, restart, status)
+- `/wheels-reload` — Reload application (password)
+- `/wheels-analyze` — Analyze project (target: models, controllers, routes, migrations, tests, all)
 
 ## Application Architecture
 
@@ -506,28 +336,22 @@ component extends="Model" {
         // Nested properties for associations
         nestedProperties(association="addresses", allowDelete=true, autoSave=true);
 
-        // Custom finder methods (Wheels doesn't have scope() - use custom finder methods instead)
+        // Query scopes — reusable, composable query fragments
+        scope(name="active", where="status = 'active'");
+        scope(name="recent", order="createdAt DESC");
+        scope(name="byRole", handler="scopeByRole");
+
+        // Enums — named values with auto-generated checkers and scopes
+        enum(property="status", values="draft,published,archived");
     }
 
-    function findByEmail(required string email) {
-        return findOne(where="email = '#arguments.email#'");
-    }
-
-    function findActive() {
-        return findAll(where="active = 1");
-    }
-
-    function findFirst() {
-        return findFirst(property="createdAt");
+    // Dynamic scope handler
+    private struct function scopeByRole(required string role) {
+        return {where: "role = '#arguments.role#'"};
     }
 
     function fullName() {
         return trim("#firstname# #lastname#");
-    }
-
-    function reload() {
-        // Reload this model instance from the database
-        return super.reload();
     }
 }
 ```
@@ -848,24 +672,11 @@ Access in configuration:
 </cfscript>
 ```
 
-## 🚨 MANDATORY: Native MCP Server
+## Native MCP Server
 
-**This Wheels application includes a native CFML MCP (Model Context Protocol) server that MUST be used by AI assistants for all development tasks.**
+Wheels includes a built-in CFML MCP server at `/wheels/mcp`. When available, MCP tools provide better integration than CLI commands.
 
-**🔴 CRITICAL RULE: If `.mcp.json` exists, ALL development MUST use MCP tools - no exceptions.**
-
-The MCP server eliminates the need for Node.js dependencies and provides AI coding assistants with direct, integrated access to your Wheels application.
-
-### Accessing the MCP Server
-
-The MCP server is available at `/wheels/mcp` and supports:
-- **Resources**: Documentation, guides, project context, patterns
-- **Tools**: Code generation (models, controllers, views, migrations)
-- **Prompts**: Context-aware help for Wheels development
-
-### MCP Client Configuration
-
-Configure your AI coding assistant to use the native MCP server:
+### Client Configuration
 
 ```json
 {
@@ -878,26 +689,7 @@ Configure your AI coding assistant to use the native MCP server:
 }
 ```
 
-Replace `8080` with your development server port.
-
-### Available Tools
-
-- `wheels_generate` - Generate components (models, controllers, etc.)
-- `wheels_migrate` - Run database migrations
-- `wheels_test` - Execute tests
-- `wheels_server` - Manage development server
-- `wheels_reload` - Reload application
-
-### Route Configuration
-
-The MCP server routes are pre-configured in `/config/routes.cfm`:
-
-```cfm
-.post(pattern="/wheels/mcp", to="##mcp")
-.get(pattern="/wheels/mcp", to="##mcp")
-```
-
-These routes must come before the `.wildcard()` route to function correctly.
+Replace `8080` with your development server port. MCP routes must come before `.wildcard()` in `config/routes.cfm`.
 
 ## Common Patterns
 
@@ -981,37 +773,46 @@ hasMany("comments");
 Wheels requires consistent parameter syntax - either all positional or all named parameters.
 
 ### Routing Issues
-**Incorrect .resources() syntax**
-Wheels resource routing syntax differs from Rails:
+**Nested resources syntax**
+Wheels supports nested resources via the `callback` parameter:
 
-❌ **Incorrect (Rails-style nested):**
+❌ **Incorrect (Rails-style inline function block):**
 ```cfm
-.resources("posts", function(nested) {
-    nested.resources("comments");
+.resources("posts", function(r) { r.resources("comments"); })
+```
+
+✅ **Correct (callback syntax — recommended):**
+```cfm
+.resources(name="posts", callback=function(map) {
+    map.resources("comments");
 })
 ```
 
-✅ **Correct (separate declarations):**
+✅ **Also correct (flat separate declarations — no URL nesting):**
 ```cfm
 .resources("posts")
 .resources("comments")
 ```
 
-**Route ordering matters:** resources → custom routes → root → wildcard
+**Route ordering matters:** MCP routes → resources → custom routes → root → wildcard (last!)
 
-### Form Helper Limitations
-Wheels has more limited form helpers compared to Rails:
+### HTML5 Form Helpers
+Wheels includes dedicated HTML5 input helpers. Use them directly:
 
-❌ **Not available:**
 ```cfm
-#emailField()#    // Doesn't exist
-#label(text="Name")#    // text parameter not supported
-```
+// Object-bound helpers
+#emailField(objectName="user", property="email")#
+#urlField(objectName="user", property="website")#
+#numberField(objectName="product", property="quantity", min="1", max="100")#
+#telField(objectName="user", property="phone")#
+#dateField(objectName="event", property="startDate")#
+#colorField(objectName="theme", property="primaryColor")#
+#rangeField(objectName="settings", property="volume", min="0", max="100")#
+#searchField(objectName="search", property="query")#
 
-✅ **Use instead:**
-```cfm
-#textField(type="email")#
-<label>Name</label>
+// Tag-based helpers (not bound to an object)
+#emailFieldTag(name="email", value="")#
+#numberFieldTag(name="qty", value="1", min="0", step="1")#
 ```
 
 ### Migration Data Seeding
