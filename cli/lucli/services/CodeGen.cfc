@@ -253,6 +253,42 @@ component {
 	}
 
 	/**
+	 * Generate a helper CFC file
+	 */
+	public struct function generateHelper(
+		required string name,
+		array functions = [],
+		string description = "",
+		boolean force = false
+	) {
+		var helperName = variables.helpers.capitalize(arguments.name);
+		if (!reFindNoCase("Helper$", helperName)) {
+			helperName &= "Helper";
+		}
+		var filePath = variables.projectRoot & "/app/helpers/#helperName#.cfc";
+
+		if (fileExists(filePath) && !arguments.force) {
+			return {success: false, error: "Helper already exists: app/helpers/#helperName#.cfc", path: filePath};
+		}
+
+		var context = {
+			helperName: helperName,
+			name: helperName,
+			description: arguments.description,
+			functions: arguments.functions,
+			timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
+		};
+
+		var result = variables.templateService.generateFromTemplate(
+			template = "HelperContent.txt",
+			destination = "app/helpers/#helperName#.cfc",
+			context = context
+		);
+
+		return result;
+	}
+
+	/**
 	 * Validate name for code generation
 	 */
 	public struct function validateName(required string name, required string type) {

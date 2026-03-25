@@ -107,6 +107,14 @@ component {
 			processed = replace(processed, "|Actions|", "", "all");
 		}
 
+		// Process helper functions
+		if (structKeyExists(arguments.context, "functions") && isArray(arguments.context.functions)) {
+			var helperFunctionsCode = generateHelperFunctionsCode(arguments.context.functions, arguments.context);
+			processed = replace(processed, "|HelperFunctions|", helperFunctionsCode, "all");
+		} else {
+			processed = replace(processed, "|HelperFunctions|", "", "all");
+		}
+
 		// Process description comment
 		if (structKeyExists(arguments.context, "description") && len(trim(arguments.context.description))) {
 			var descComment = "/**" & chr(10) & " * " & arguments.context.description & chr(10) & " */" & chr(10);
@@ -283,6 +291,35 @@ component {
 			arrayAppend(code, "    }");
 		}
 		return arrayToList(code, chr(10));
+	}
+
+	/**
+	 * Generate helper function stubs
+	 */
+	private string function generateHelperFunctionsCode(required array functions, required struct context) {
+		var code = [];
+		var nl = chr(10);
+		var helperName = structKeyExists(arguments.context, "helperName") ? arguments.context.helperName : "";
+		var baseName = reFindNoCase("Helper$", helperName) ? reReplaceNoCase(helperName, "Helper$", "") : helperName;
+
+		if (arrayLen(arguments.functions)) {
+			for (var funcName in arguments.functions) {
+				arrayAppend(code, "");
+				arrayAppend(code, "	public string function #funcName#(required string value) {");
+				arrayAppend(code, "		return arguments.value;");
+				arrayAppend(code, "	}");
+			}
+		} else {
+			// Default sample function based on helper name
+			var sampleName = len(baseName) ? lCase(baseName) & "Format" : "format";
+			arrayAppend(code, "");
+			arrayAppend(code, "	public string function #sampleName#(required string value) {");
+			arrayAppend(code, "		// TODO: Implement formatting logic");
+			arrayAppend(code, "		return arguments.value;");
+			arrayAppend(code, "	}");
+		}
+
+		return arrayToList(code, nl);
 	}
 
 	/**

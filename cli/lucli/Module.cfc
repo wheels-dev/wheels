@@ -1306,73 +1306,46 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var helperName = args[1];
-		// Ensure name ends with Helper
-		if (!reFindNoCase("Helper$", helperName)) {
-			helperName = helperName & "Helper";
-		}
-		helperName = capitalize(helperName);
-
+		var helperName = capitalize(args[1]);
 		var functions = args.len() > 1 ? args.slice(2) : [];
-		var helperDir = variables.projectRoot & "/app/helpers";
-		var helperPath = helperDir & "/" & helperName & ".cfm";
-		var globalPath = variables.projectRoot & "/app/global/functions.cfm";
 
-		// Check for existing file
-		if (fileExists(helperPath)) {
-			out("Helper already exists: app/helpers/#helperName#.cfm", "yellow");
-			out("Use --force to overwrite (not yet supported).");
+		// Parse --force flag from functions list
+		var force = false;
+		var cleanFunctions = [];
+		for (var f in functions) {
+			if (f == "--force") {
+				force = true;
+			} else {
+				arrayAppend(cleanFunctions, f);
+			}
+		}
+
+		var codegen = getService("codegen");
+		var validation = codegen.validateName(helperName, "helper");
+		if (!validation.valid) {
+			out("Invalid helper name: #arrayToList(validation.errors, '; ')#", "red");
 			return "";
 		}
 
-		ensureDirectory(helperDir);
+		var result = codegen.generateHelper(
+			name = helperName,
+			functions = cleanFunctions,
+			force = force
+		);
 
-		// Build helper content
-		var nl = chr(10);
-		var tab = chr(9);
-		var content = "<!--- app/helpers/#helperName#.cfm --->" & nl;
-		content &= "<!--- Custom helper functions --->" & nl & nl;
-
-		if (arrayLen(functions)) {
-			for (var funcName in functions) {
-				content &= '<cffunction name="#funcName#" access="public" returntype="string">' & nl;
-				content &= tab & '<cfargument name="value" type="string" required="true">' & nl;
-				content &= tab & '<cfreturn arguments.value>' & nl;
-				content &= '</cffunction>' & nl & nl;
-			}
+		if (result.success) {
+			// Derive the actual file name (CodeGen appends "Helper" suffix)
+			var fileName = listLast(result.path, "/\");
+			printCreated("app/helpers/#fileName#");
 		} else {
-			// Default template with a sample function
-			var baseName = reReplace(helperName, "Helper$", "");
-			content &= '<cffunction name="#lCase(baseName)#Format" access="public" returntype="string">' & nl;
-			content &= tab & '<cfargument name="value" type="string" required="true">' & nl;
-			content &= tab & '<!--- TODO: Implement formatting logic --->' & nl;
-			content &= tab & '<cfreturn arguments.value>' & nl;
-			content &= '</cffunction>' & nl;
-		}
-
-		fileWrite(helperPath, content);
-		printCreated("app/helpers/#helperName#.cfm");
-
-		// Auto-include in app/global/functions.cfm
-		ensureDirectory(getDirectoryFromPath(globalPath));
-		var includeLine = '<cfinclude template="../helpers/#helperName#.cfm">';
-
-		if (fileExists(globalPath)) {
-			var globalContent = fileRead(globalPath);
-			if (!findNoCase(includeLine, globalContent)) {
-				globalContent = globalContent & nl & includeLine & nl;
-				fileWrite(globalPath, globalContent);
-				out("  update  app/global/functions.cfm (added include)", "green");
-			}
-		} else {
-			fileWrite(globalPath, "<!--- Auto-included helper files --->" & nl & includeLine & nl);
-			printCreated("app/global/functions.cfm");
+			out(result.error, "red");
+			return "";
 		}
 
 		out("");
 		out("Helper created! Next steps:", "green");
-		out("  1. Edit app/helpers/#helperName#.cfm to add your functions");
-		out("  2. Use functions in views: ##yourFunction(value)##");
+		out("  1. Edit app/helpers/#fileName# to add your logic");
+		out("  2. Include in your controller: new app.helpers.#reReplace(fileName, '\.cfc$', '')#()");
 		return "";
 	}
 
