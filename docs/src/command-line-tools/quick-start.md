@@ -10,13 +10,32 @@ Get up and running with Wheels CLI in minutes.
 
 ## Prerequisites
 
-- CommandBox 5.0+
-- Java 8+
+- **LuCLI** (recommended) or CommandBox 5.0+
 - Database (MySQL, PostgreSQL, SQL Server, or H2)
 
 ## Installation
 
-### Install CommandBox
+### Option A: LuCLI (Recommended)
+
+LuCLI is faster (< 1s startup), lighter (~40 MB), and includes built-in MCP support for AI editors.
+
+```bash
+# macOS
+brew install lucli
+
+# Windows
+choco install lucli
+
+# Manual (any OS) — download from https://github.com/cybersonic/LuCLI/releases
+```
+
+Then install the Wheels module:
+
+```bash
+lucli modules install wheels
+```
+
+### Option B: CommandBox
 
 ```bash
 # macOS
@@ -31,7 +50,7 @@ sudo apt-get update && sudo apt-get install commandbox
 choco install commandbox
 ```
 
-### Install Wheels CLI
+Then install the Wheels CLI module:
 
 ```bash
 box install wheels-cli

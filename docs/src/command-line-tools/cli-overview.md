@@ -118,7 +118,32 @@ wheels security scan
 
 ## Getting Started
 
-1. **Install CommandBox** (if not already installed):
+### Option A: LuCLI (Recommended)
+
+1. **Install LuCLI**:
+   ```bash
+   # macOS
+   brew install lucli
+
+   # Windows
+   choco install lucli
+   ```
+
+2. **Install Wheels module**:
+   ```bash
+   lucli modules install wheels
+   ```
+
+3. **Create Your First App**:
+   ```bash
+   wheels new myapp
+   cd myapp
+   wheels start
+   ```
+
+### Option B: CommandBox
+
+1. **Install CommandBox**:
    ```bash
    # macOS
    brew install commandbox

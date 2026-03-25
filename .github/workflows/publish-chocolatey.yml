@@ -1,0 +1,76 @@
+name: Publish Chocolatey Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'LuCLI version to package (e.g. 0.2.23)'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Build and Push to Chocolatey
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tools/installer/chocolatey
+    env:
+      LUCLI_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Validate version format
+        shell: pwsh
+        run: |
+          if ($env:LUCLI_VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid version format: $env:LUCLI_VERSION (expected X.Y.Z)"
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download LuCLI and compute checksum
+        shell: pwsh
+        run: |
+          $url = "https://github.com/cybersonic/LuCLI/releases/download/v$($env:LUCLI_VERSION)/lucli-$($env:LUCLI_VERSION).bat"
+          $dest = Join-Path $env:TEMP "lucli-$($env:LUCLI_VERSION).bat"
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+          $hash = (Get-FileHash -Path $dest -Algorithm SHA256).Hash.ToLower()
+          Remove-Item $dest -Force
+          echo "CHECKSUM=$hash" >> $env:GITHUB_ENV
+          Write-Host "SHA256: $hash"
+
+      - name: Patch version and checksum
+        shell: pwsh
+        run: |
+          # Patch nuspec
+          [xml]$nuspec = Get-Content lucli.nuspec
+          $nuspec.package.metadata.version = $env:LUCLI_VERSION
+          $nuspec.Save((Resolve-Path lucli.nuspec))
+
+          # Patch install script
+          $path = "tools\chocolateyinstall.ps1"
+          $content = Get-Content $path -Raw
+          $content = $content -replace "(?<=\`$version\s*=\s*')[^']+", $env:LUCLI_VERSION
+          $content = $content -replace "(?<=checksum\s*=\s*')[^']*", $env:CHECKSUM
+          Set-Content -Path $path -Value $content -NoNewline
+
+      - name: Build .nupkg
+        shell: pwsh
+        run: choco pack lucli.nuspec
+
+      - name: Push to Chocolatey
+        shell: pwsh
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          $nupkg = Get-ChildItem -Filter "lucli.*.nupkg" | Select-Object -First 1
+          if (-not $nupkg) { throw "No .nupkg file found" }
+          Write-Host "Pushing $($nupkg.Name)"
+          choco push $nupkg.FullName --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chocolatey-package
+          path: tools/installer/chocolatey/lucli.*.nupkg
