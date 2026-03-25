@@ -133,12 +133,8 @@ component output="false" extends="wheels.Global"{
 
 	public void function $pluginsProcess() {
 		local.plugins = $pluginFolders();
-		local.pluginKeys = ListSort(StructKeyList(local.plugins), "textnocase", variables.sort);
-		if (SpanExcluding(variables.$class.wheelsVersion, " ") == "@build.version@") {
-			local.wheelsVersion = "0.0.0";
-		} else {
-			local.wheelsVersion = SpanExcluding(variables.$class.wheelsVersion, " ");
-		}
+		local.pluginKeys = $sortedPluginKeys(local.plugins);
+		local.wheelsVersion = $normalizeWheelsVersion();
 		for (local.pluginKey in local.pluginKeys) {
 			local.pluginValue = local.plugins[local.pluginKey];
 			local.plugin = CreateObject("component", $componentPathToPlugin(local.pluginKey, local.pluginValue.name)).init();
@@ -478,7 +474,7 @@ component output="false" extends="wheels.Global"{
 						if (!ListFind(variables.$class.dependantPlugins, local.entry)) {
 							variables.$class.dependantPlugins = ListAppend(
 								variables.$class.dependantPlugins,
-								Reverse(SpanExcluding(Reverse(local.cfcMeta.name), ".")) & "|" & local.iDependency
+								ListLast(local.cfcMeta.name, ".") & "|" & local.iDependency
 							);
 						}
 					}
@@ -492,7 +488,7 @@ component output="false" extends="wheels.Global"{
 	 * Called after all plugins are loaded, mixins processed, and data stored in the application scope.
 	 */
 	public void function $invokeOnPluginActivate() {
-		local.pluginKeys = ListToArray(ListSort(StructKeyList(variables.$class.plugins), "textnocase", variables.sort));
+		local.pluginKeys = $sortedPluginKeys();
 		for (local.iPlugin in local.pluginKeys) {
 			local.plugin = variables.$class.plugins[local.iPlugin];
 			if (StructKeyExists(local.plugin, "onPluginActivate") && IsCustomFunction(local.plugin.onPluginActivate)) {
@@ -695,7 +691,7 @@ component output="false" extends="wheels.Global"{
 
 		// get a sorted list of plugins so that we run through them the same on
 		// every platform
-		local.pluginKeys = ListToArray(ListSort(StructKeyList(variables.$class.plugins), "textnocase", variables.sort));
+		local.pluginKeys = $sortedPluginKeys();
 
 		for (local.iPlugin in local.pluginKeys) {
 			// Skip ServiceProvider plugins — they use the DI container lifecycle
@@ -870,6 +866,24 @@ component output="false" extends="wheels.Global"{
 	/**
 	 * PRIVATE
 	 */
+
+	/**
+	 * Returns the Wheels version string normalised for comparison.
+	 * Dev builds stamp "@build.version@" which isn't a valid semver —
+	 * treat it as 0.0.0 so compatibility checks always pass.
+	 */
+	private string function $normalizeWheelsVersion() {
+		local.raw = SpanExcluding(variables.$class.wheelsVersion, " ");
+		return (local.raw == "@build.version@") ? "0.0.0" : local.raw;
+	}
+
+	/**
+	 * Returns plugin keys sorted case-insensitively. Accepts an optional
+	 * plugins struct; defaults to the loaded plugins registry.
+	 */
+	private array function $sortedPluginKeys(struct plugins = variables.$class.plugins) {
+		return ListToArray(ListSort(StructKeyList(arguments.plugins), "textnocase", variables.sort));
+	}
 
 	public string function $fullPathToPlugin(required string folder) {
 		return ListAppend(variables.$class.pluginPathFull, arguments.folder, "/");
