@@ -158,25 +158,13 @@ component {
 				property(name = local.propertyName, label = humanize(arguments.name));
 			}
 			
-			// BoxLang compatibility: Ensure foreign key has proper validation type
-			if (StructKeyExists(server, "boxlang")) {
-				if (!StructKeyExists(variables.wheels.class.properties, local.propertyName)) {
-					property(name = local.propertyName, type = "integer");
-				}
-			}
+			$registerBoxLangForeignKey(local.propertyName);
 		}
-		
-		// BoxLang compatibility: Register foreign key properties for hasMany and hasOne associations
-		if (StructKeyExists(server, "boxlang") && ListFindNoCase("hasMany,hasOne", arguments.type)) {
-			if (Len(arguments.foreignKey)) {
-				local.foreignKeyName = arguments.foreignKey;
-			} else {
-				local.foreignKeyName = "#LCase(variables.wheels.class.modelName)#id";
-			}
-			
-			if (!StructKeyExists(variables.wheels.class.properties, local.foreignKeyName)) {
-				property(name = local.foreignKeyName, type = "integer");
-			}
+
+		// BoxLang compatibility: Register foreign key properties for hasMany and hasOne associations.
+		if (ListFindNoCase("hasMany,hasOne", arguments.type)) {
+			local.foreignKeyName = Len(arguments.foreignKey) ? arguments.foreignKey : "#LCase(variables.wheels.class.modelName)#id";
+			$registerBoxLangForeignKey(local.foreignKeyName);
 		}
 
 		// Store all the settings for the association in the class data.
@@ -228,6 +216,16 @@ component {
 						);
 				}
 			}
+		}
+	}
+
+	/**
+	 * Internal function.
+	 * Registers a foreign key property with integer type for BoxLang compatibility.
+	 */
+	private void function $registerBoxLangForeignKey(required string propertyName) {
+		if (StructKeyExists(server, "boxlang") && !StructKeyExists(variables.wheels.class.properties, arguments.propertyName)) {
+			property(name = arguments.propertyName, type = "integer");
 		}
 	}
 }

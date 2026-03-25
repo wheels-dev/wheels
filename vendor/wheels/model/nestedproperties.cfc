@@ -229,29 +229,15 @@ component {
 			}
 		} else if (IsArray(arguments.value)) {
 			for (local.i = 1; local.i <= ArrayLen(arguments.value); local.i++) {
-				if (
-					IsObject(arguments.value[local.i])
-					&& ArrayLen(this[arguments.property]) >= local.i
-					&& IsObject(this[arguments.property][local.i])
-					&& this[arguments.property][local.i].compareTo(arguments.value[local.i])
-				) {
-					this[arguments.property][local.i] = $getAssociationObject(
-						property = arguments.property,
-						value = arguments.value[local.i],
-						association = arguments.association,
-						delete = arguments.delete
-					);
-					if (!IsStruct(this[arguments.property][local.i]) && !this[arguments.property][local.i]) {
-						ArrayDeleteAt(this[arguments.property], local.i);
-						local.i--;
-					} else {
-						$updateCollectionObject(property = arguments.property, value = arguments.value[local.i], position = local.i);
-					}
-				} else if (
-					IsStruct(arguments.value[local.i])
-					&& ArrayLen(this[arguments.property]) >= local.i
-					&& IsObject(this[arguments.property][local.i])
-				) {
+				// Check if we're replacing an existing object at this position.
+				local.hasExisting = ArrayLen(this[arguments.property]) >= local.i
+					&& IsObject(this[arguments.property][local.i]);
+				local.isReplacement = local.hasExisting && (
+					(IsObject(arguments.value[local.i]) && this[arguments.property][local.i].compareTo(arguments.value[local.i]))
+					|| IsStruct(arguments.value[local.i])
+				);
+
+				if (local.isReplacement) {
 					this[arguments.property][local.i] = $getAssociationObject(
 						property = arguments.property,
 						value = arguments.value[local.i],
