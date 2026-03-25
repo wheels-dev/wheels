@@ -4,17 +4,11 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
-		beforeEach(function() {
-			_originalPluginComponentPath = application.wheels.pluginComponentPath;
-		});
-
-		afterEach(function() {
-			application.wheels.pluginComponentPath = _originalPluginComponentPath;
-		});
-
 		describe("Tests that manifest mixins override CFC metadata", function() {
 
 			it("uses plugin.json mixins field instead of CFC mixin attribute", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -33,9 +27,13 @@ component extends="wheels.WheelsTest" {
 				// plugin.json declares mixins="model". Manifest should win.
 				expect(mixins.model).toHaveKey("$ManifestMixinTestMethod")
 				expect(mixins.controller).notToHaveKey("$ManifestMixinTestMethod")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("falls back to CFC mixin attribute when no manifest mixins field", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				// Use the standard manifest fixture (TestManifestPlugin has mixin="controller" on CFC
 				// AND mixins="controller" in plugin.json — both agree, but test that the CFC attribute
 				// works when there is no manifest)
@@ -56,6 +54,8 @@ component extends="wheels.WheelsTest" {
 				// TestNoManifestPlugin has no plugin.json and no mixin attribute → global mixins
 				expect(mixins.controller).toHaveKey("$NoManifestTestMethod")
 				expect(mixins.model).toHaveKey("$NoManifestTestMethod")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 		})
@@ -63,6 +63,8 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that manifest middleware auto-registration", function() {
 
 			it("auto-registers middleware declared in plugin.json", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -86,9 +88,13 @@ component extends="wheels.WheelsTest" {
 					}
 				}
 				expect(found).toBe(2)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("preserves middleware options from plugin.json", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -120,9 +126,13 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(foundWithOptions).toBeTrue()
 				expect(foundWithoutOptions).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not register middleware for plugins without manifest middleware", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -150,6 +160,8 @@ component extends="wheels.WheelsTest" {
 					}
 				}
 				expect(found).toBe(1)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 		})
@@ -157,6 +169,8 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that manifest wheelsVersion compatibility", function() {
 
 			it("uses manifest wheelsVersion for compatibility check", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -174,9 +188,13 @@ component extends="wheels.WheelsTest" {
 
 				// IncompatManifestPlugin declares wheelsVersion: "1.0" but we're running "3.0.0"
 				expect(ListFind(incompatible, "IncompatManifestPlugin")).toBeGT(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("allows compatible plugins via manifest wheelsVersion", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -194,9 +212,13 @@ component extends="wheels.WheelsTest" {
 
 				// ManifestCompatPlugin declares wheelsVersion: "3.0" and we're running "3.0.0"
 				expect(ListFind(incompatible, "ManifestCompatPlugin")).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("manifest wheelsVersion overrides CFC this.version for compatibility", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				// IncompatManifestPlugin CFC has no this.version but manifest has wheelsVersion: "1.0"
 				var config = {
 					path = "wheels",
@@ -215,6 +237,8 @@ component extends="wheels.WheelsTest" {
 
 				// wheelsVersion "1.0" should match "1.0.0" (major.minor matching)
 				expect(ListFind(incompatible, "IncompatManifestPlugin")).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 		})
@@ -222,6 +246,8 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that manifest author and description surfacing", function() {
 
 			it("surfaces author from plugin.json as top-level metadata", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -238,9 +264,13 @@ component extends="wheels.WheelsTest" {
 
 				expect(meta.ManifestMiddlewarePlugin).toHaveKey("author")
 				expect(meta.ManifestMiddlewarePlugin.author).toBe("Wheels Test Suite")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("surfaces description from plugin.json as top-level metadata", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -257,9 +287,13 @@ component extends="wheels.WheelsTest" {
 
 				expect(meta.ManifestMiddlewarePlugin).toHaveKey("description")
 				expect(meta.ManifestMiddlewarePlugin.description).toBe("Plugin that declares middleware via manifest")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("defaults author and description to empty string without manifest", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -278,6 +312,8 @@ component extends="wheels.WheelsTest" {
 				expect(meta.TestNoManifestPlugin.author).toBe("")
 				expect(meta.TestNoManifestPlugin).toHaveKey("description")
 				expect(meta.TestNoManifestPlugin.description).toBe("")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 		})
@@ -285,6 +321,8 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that plugins without plugin.json fall back gracefully", function() {
 
 			it("loads plugin via init()-based metadata when no plugin.json exists", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -301,9 +339,13 @@ component extends="wheels.WheelsTest" {
 
 				// TestNoManifestPlugin has no plugin.json but should still load via init()
 				expect(plugins).toHaveKey("TestNoManifestPlugin")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("uses CFC this.version when no plugin.json provides version", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -324,9 +366,13 @@ component extends="wheels.WheelsTest" {
 				expect(meta).toHaveKey("TestNoManifestPlugin")
 				expect(meta.TestNoManifestPlugin.manifest).toBeStruct()
 				expect(StructIsEmpty(meta.TestNoManifestPlugin.manifest)).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("applies global mixins when no plugin.json and no CFC mixin attribute", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -346,9 +392,13 @@ component extends="wheels.WheelsTest" {
 				expect(mixins.controller).toHaveKey("$NoManifestTestMethod")
 				expect(mixins.model).toHaveKey("$NoManifestTestMethod")
 				expect(mixins.application).toHaveKey("$NoManifestTestMethod")
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not register middleware for plugins without plugin.json", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -371,9 +421,13 @@ component extends="wheels.WheelsTest" {
 					}
 				}
 				expect(found).toBe(0)
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("has empty dependencies when no plugin.json and no box.json", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -390,6 +444,8 @@ component extends="wheels.WheelsTest" {
 
 				expect(meta.TestNoManifestPlugin).toHaveKey("dependencies")
 				expect(StructIsEmpty(meta.TestNoManifestPlugin.dependencies)).toBeTrue()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 		})

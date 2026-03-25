@@ -4,7 +4,8 @@ LABEL maintainer "Wheels Core Team"
 
 # Install Lucee extensions (H2, Oracle) and SQLite JDBC driver in a single
 # layer to reduce image size and improve cache efficiency.
-RUN wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
+RUN mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy \
+ && wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
       https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex \
  && wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
       https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex \

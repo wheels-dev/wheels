@@ -5,7 +5,6 @@ component extends="wheels.WheelsTest" {
 		// After framework init, application.$wheels is deleted and application.wheels
 		// is the sole settings struct. $appKey() returns the correct key.
 		var appKey = application.wo.$appKey();
-		_beforeAllViteKeys = [];
 		var defaults = {
 			viteDevMode = false,
 			viteDevServerUrl = "http://localhost:5173",
@@ -15,16 +14,7 @@ component extends="wheels.WheelsTest" {
 		for (var key in defaults) {
 			if (!StructKeyExists(application[appKey], key)) {
 				application[appKey][key] = defaults[key];
-				ArrayAppend(_beforeAllViteKeys, key);
 			}
-		}
-	}
-
-	function afterAll() {
-		// Remove any Vite keys that beforeAll injected (they didn't exist before)
-		var appKey = application.wo.$appKey();
-		for (var key in _beforeAllViteKeys) {
-			StructDelete(application[appKey], key);
 		}
 	}
 
