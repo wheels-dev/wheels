@@ -326,6 +326,7 @@ component {
 	 */
 	public struct function properties(boolean returnIncluded = true) {
 		local.rv = {};
+		local.propNames = propertyNames();
 		// loop through all properties and functions in the this scope
 		for (local.key in this) {
 			// don't return nested properties if returnIncluded is false
@@ -338,9 +339,9 @@ component {
 			}
 			if ($get("resetPropertiesStructKeyCase")) {
 				// try to get the property name from the list set on the object, this is just to avoid returning everything in ugly upper case which Adobe ColdFusion does by default
-				local.listPosition = ListFindNoCase(propertyNames(), local.key);
+				local.listPosition = ListFindNoCase(local.propNames, local.key);
 				if (local.listPosition) {
-					local.key = ListGetAt(propertyNames(), local.listPosition);
+					local.key = ListGetAt(local.propNames, local.listPosition);
 				}
 			}
 			// set property from the this scope in the struct that we will return
@@ -539,23 +540,7 @@ component {
 		struct associations = variables.wheels.class.associations
 	) {
 		if (IsObject(arguments.value)) {
-			// Handle Oracle BLOB objects in BoxLang
-			if (structKeyExists(server, "boxlang") && !IsStruct(arguments.value)) {
-				try {
-					local.className = GetMetadata(arguments.value).getName();
-					if (local.className == "oracle.sql.BLOB") {
-						// Convert Oracle BLOB to binary using getBytes() method
-						this[arguments.property] = arguments.value.getBytes();
-					} else {
-						this[arguments.property] = arguments.value;
-					}
-				} catch (any e) {
-					// If getMetadata fails, treat as regular object
-					this[arguments.property] = arguments.value;
-				}
-			} else {
-				this[arguments.property] = arguments.value;
-			}
+			this[arguments.property] = $resolveObjectValue(arguments.value);
 		} else if (
 			IsStruct(arguments.value)
 			&& StructKeyExists(arguments.associations, arguments.property)
@@ -597,6 +582,22 @@ component {
 	}
 
 	/**
+	 * Resolves an object value, converting Oracle BLOB objects to binary in BoxLang.
+	 */
+	private any function $resolveObjectValue(required any value) {
+		if (StructKeyExists(server, "boxlang") && !IsStruct(arguments.value)) {
+			try {
+				if (GetMetadata(arguments.value).getName() == "oracle.sql.BLOB") {
+					return arguments.value.getBytes();
+				}
+			} catch (any e) {
+				// If getMetadata fails, return as-is
+			}
+		}
+		return arguments.value;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $updatePersistedProperties(string property) {
@@ -612,24 +613,16 @@ component {
 	 * Internal function.
 	 */
 	public any function $setDefaultValues() {
-		// persisted properties
-		for (local.key in variables.wheels.class.properties) {
-			if (
-				StructKeyExists(variables.wheels.class.properties[local.key], "defaultValue")
-				&& (!StructKeyExists(this, local.key) || !Len(this[local.key]))
-			) {
-				// set the default value unless it is blank or a value already exists for that property on the object
-				this[local.key] = variables.wheels.class.properties[local.key].defaultValue;
-			}
-		}
-		// non-persisted properties
-		for (local.key in variables.wheels.class.mapping) {
-			if (
-				StructKeyExists(variables.wheels.class.mapping[local.key], "defaultValue")
-				&& (!StructKeyExists(this, local.key) || !Len(this[local.key]))
-			) {
-				// set the default value unless it is blank or a value already exists for that property on the object
-				this[local.key] = variables.wheels.class.mapping[local.key].defaultValue;
+		// Set defaults from both persisted properties and non-persisted mappings
+		local.sources = [variables.wheels.class.properties, variables.wheels.class.mapping];
+		for (local.source in local.sources) {
+			for (local.key in local.source) {
+				if (
+					StructKeyExists(local.source[local.key], "defaultValue")
+					&& (!StructKeyExists(this, local.key) || !Len(this[local.key]))
+				) {
+					this[local.key] = local.source[local.key].defaultValue;
+				}
 			}
 		}
 	}
