@@ -699,13 +699,15 @@ component {
 	 */
 	public void function $validatesNumericalityOf() {
 		local.value = this[arguments.property];
+		local.isValidNumber = IsNumeric(local.value);
 
 		// BoxLang compatibility — reject numbers with commas
-		if (StructKeyExists(server, "boxlang") && IsNumeric(local.value) && Find(",", local.value)) {
-			local.value = "NaN";
+		// (BoxLang's IsNumeric is locale-aware and accepts "1,000.00")
+		if (StructKeyExists(server, "boxlang") && local.isValidNumber && Find(",", local.value)) {
+			local.isValidNumber = false;
 		}
 
-		local.failed = !IsNumeric(local.value)
+		local.failed = !local.isValidNumber
 			|| (arguments.onlyInteger && Round(local.value) != local.value)
 			|| (IsNumeric(arguments.greaterThan) && local.value <= arguments.greaterThan)
 			|| (IsNumeric(arguments.greaterThanOrEqualTo) && local.value < arguments.greaterThanOrEqualTo)
