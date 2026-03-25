@@ -4,11 +4,18 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
+		beforeEach(function() {
+			_originalPluginComponentPath = application.wheels.pluginComponentPath;
+		});
+
+		afterEach(function() {
+			application.wheels.pluginComponentPath = _originalPluginComponentPath;
+			StructDelete(application, "$wheelstestLifecycleLog");
+		});
+
 		describe("Tests that mixin collision detection", function() {
 
 			it("detects collisions when two plugins provide the same method for the same target", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -36,12 +43,9 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(found).toBeTrue()
 
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not report collisions for unique methods", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -61,12 +65,9 @@ component extends="wheels.WheelsTest" {
 					expect(c.method).notToBe("$UniqueToB")
 				}
 
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("still allows the overriding plugin method to win", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -85,12 +86,9 @@ component extends="wheels.WheelsTest" {
 				var result = fn()
 				expect(result).toBe("FromPluginB")
 
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("returns empty array when no collisions exist", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -108,16 +106,12 @@ component extends="wheels.WheelsTest" {
 				expect(collisions).toBeArray()
 				expect(arrayLen(collisions)).toBe(0)
 
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
 		describe("Tests that lifecycle hooks", function() {
 
 			it("calls onPluginLoad during plugin loading", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-				StructDelete(application, "$wheelstestLifecycleLog")
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -136,14 +130,9 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayFind(log, "A:onPluginLoad")).toBeGT(0)
 				expect(ArrayFind(log, "B:onPluginLoad")).toBeGT(0)
 
-				application.wheels.pluginComponentPath = originalPluginComponentPath
-				StructDelete(application, "$wheelstestLifecycleLog")
 			})
 
 			it("calls onPluginLoad in alphabetical order", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-				StructDelete(application, "$wheelstestLifecycleLog")
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -162,14 +151,9 @@ component extends="wheels.WheelsTest" {
 				var posB = ArrayFind(log, "B:onPluginLoad")
 				expect(posA).toBeLT(posB)
 
-				application.wheels.pluginComponentPath = originalPluginComponentPath
-				StructDelete(application, "$wheelstestLifecycleLog")
 			})
 
 			it("does not inject lifecycle hooks as mixins", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-				StructDelete(application, "$wheelstestLifecycleLog")
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -192,16 +176,12 @@ component extends="wheels.WheelsTest" {
 				expect(mixins.controller).toHaveKey("$LifecycleTestMethodA")
 				expect(mixins.model).toHaveKey("$LifecycleTestMethodB")
 
-				application.wheels.pluginComponentPath = originalPluginComponentPath
-				StructDelete(application, "$wheelstestLifecycleLog")
 			})
 		})
 
 		describe("Tests that plugin middleware registration", function() {
 
 			it("collects middleware registered via onPluginLoad", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -218,13 +198,9 @@ component extends="wheels.WheelsTest" {
 
 				expect(pluginMiddleware).toBeArray()
 				expect(ArrayLen(pluginMiddleware)).toBe(2)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("records the plugin name that registered each middleware", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -241,13 +217,9 @@ component extends="wheels.WheelsTest" {
 
 				expect(pluginMiddleware[1].pluginName).toBe("TestMiddlewarePluginA")
 				expect(pluginMiddleware[2].pluginName).toBe("TestMiddlewarePluginB")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("returns empty array when no plugins register middleware", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -264,16 +236,12 @@ component extends="wheels.WheelsTest" {
 
 				expect(pluginMiddleware).toBeArray()
 				expect(ArrayLen(pluginMiddleware)).toBe(0)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
 		describe("Tests that ServiceProviderInterface plugins", function() {
 
 			it("detects plugins implementing ServiceProviderInterface", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -291,13 +259,9 @@ component extends="wheels.WheelsTest" {
 				expect(serviceProviders).toBeArray()
 				expect(ArrayLen(serviceProviders)).toBe(1)
 				expect(serviceProviders[1]).toBe("TestServiceProvider")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("calls register(container) when $invokeServiceProviderRegister is invoked", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -318,13 +282,9 @@ component extends="wheels.WheelsTest" {
 				var plugin = PluginObj.getPlugins().TestServiceProvider
 				expect(plugin.registerCalled).toBeTrue()
 				expect(plugin.containerReceived).toBe(fakeContainer)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("excludes ServiceProvider plugins from mixin injection entirely", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -344,13 +304,9 @@ component extends="wheels.WheelsTest" {
 					expect(mixins[target]).notToHaveKey("boot")
 					expect(mixins[target]).notToHaveKey("testServiceHelper")
 				}
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("returns empty service providers for standard plugins", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -367,13 +323,9 @@ component extends="wheels.WheelsTest" {
 
 				expect(serviceProviders).toBeArray()
 				expect(ArrayLen(serviceProviders)).toBe(0)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("calls boot(app) when $invokeServiceProviderBoot is invoked", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -393,13 +345,9 @@ component extends="wheels.WheelsTest" {
 				var plugin = PluginObj.getPlugins().TestServiceProvider
 				expect(plugin.bootCalled).toBeTrue()
 				expect(plugin.appReceived).toBe(fakeApp)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not call boot on standard plugins", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -416,16 +364,12 @@ component extends="wheels.WheelsTest" {
 				PluginObj.$invokeServiceProviderBoot(application.wheels)
 
 				expect(ArrayLen(PluginObj.getServiceProviders())).toBe(0)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
 		describe("Tests that plugin.json manifest parsing", function() {
 
 			it("parses a full plugin.json manifest and stores it on metadata", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -454,13 +398,9 @@ component extends="wheels.WheelsTest" {
 				expect(manifest.wheelsVersion).toBe("3.0")
 				expect(manifest.middleware).toBeArray()
 				expect(manifest.middleware[1].component).toBe("TestMiddleware")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("uses plugin.json version over box.json version", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -478,13 +418,9 @@ component extends="wheels.WheelsTest" {
 				// The CFC sets this.version = "99.9.9" but plugin.json has "2.1.0"
 				// plugin.json should take precedence via $pluginMetaData
 				expect(meta.TestManifestPlugin.version).toBe("2.1.0")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("parses a minimal manifest with only required fields", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -501,13 +437,9 @@ component extends="wheels.WheelsTest" {
 
 				expect(meta.TestMinimalManifestPlugin.manifest.name).toBe("TestMinimalManifestPlugin")
 				expect(meta.TestMinimalManifestPlugin.manifest.version).toBe("1.0.0")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("rejects a manifest missing required fields", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -524,13 +456,9 @@ component extends="wheels.WheelsTest" {
 
 				// Bad manifest should result in empty manifest struct
 				expect(StructIsEmpty(meta.TestBadManifestPlugin.manifest)).toBeTrue()
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("leaves manifest empty when no plugin.json exists", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -546,13 +474,9 @@ component extends="wheels.WheelsTest" {
 				var meta = PluginObj.getPluginMeta()
 
 				expect(StructIsEmpty(meta.TestNoManifestPlugin.manifest)).toBeTrue()
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("validates required name and version fields", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -577,13 +501,9 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(hasNameError).toBeTrue()
 				expect(hasVersionError).toBeTrue()
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("validates that dependencies must be an array of strings", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -609,13 +529,9 @@ component extends="wheels.WheelsTest" {
 					if (FindNoCase("dependencies", e) && FindNoCase("array", e)) foundError = true
 				}
 				expect(foundError).toBeTrue()
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("validates that middleware entries must have a component field", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -641,13 +557,9 @@ component extends="wheels.WheelsTest" {
 					if (FindNoCase("middleware", e) && FindNoCase("component", e)) foundError = true
 				}
 				expect(foundError).toBeTrue()
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("returns the schema definition with expected fields", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -674,13 +586,9 @@ component extends="wheels.WheelsTest" {
 				expect(schema.name.required).toBeTrue()
 				expect(schema.version.required).toBeTrue()
 				expect(schema.author.required).toBeFalse()
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("accepts valid manifest without errors", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -705,16 +613,12 @@ component extends="wheels.WheelsTest" {
 					wheelsVersion = "3.0"
 				})
 				expect(ArrayLen(errors)).toBe(0)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
 		describe("Tests that deprecation warnings for mixin-only plugins", function() {
 
 			it("warns about legacy plugins without plugin.json or ServiceProvider in development mode", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -735,13 +639,9 @@ component extends="wheels.WheelsTest" {
 				expect(warnings[1].plugin).toBe("LegacyMixinPlugin")
 				expect(warnings[1].message).toInclude("legacy mixin injection")
 				expect(warnings[1].message).toInclude("plugin.json")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not warn about plugins that have plugin.json", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -760,13 +660,9 @@ component extends="wheels.WheelsTest" {
 				for (var w in warnings) {
 					expect(w.plugin).notToBe("ModernJsonPlugin")
 				}
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not warn about ServiceProvider plugins", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -784,13 +680,9 @@ component extends="wheels.WheelsTest" {
 
 				expect(warnings).toBeArray()
 				expect(ArrayLen(warnings)).toBe(0)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not warn in production mode", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -808,13 +700,9 @@ component extends="wheels.WheelsTest" {
 
 				expect(warnings).toBeArray()
 				expect(ArrayLen(warnings)).toBe(0)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not warn in testing mode", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -832,8 +720,6 @@ component extends="wheels.WheelsTest" {
 
 				expect(warnings).toBeArray()
 				expect(ArrayLen(warnings)).toBe(0)
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 

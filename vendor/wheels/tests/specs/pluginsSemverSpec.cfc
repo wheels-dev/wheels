@@ -4,10 +4,17 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
+		beforeEach(function() {
+			_originalPluginComponentPath = application.wheels.pluginComponentPath;
+		});
+
+		afterEach(function() {
+			application.wheels.pluginComponentPath = _originalPluginComponentPath;
+		});
+
 		describe("Tests that semver-aware dependency resolution", function() {
 
 			it("reports no version mismatches when constraint is satisfied", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				var config = {
 					path = "wheels",
@@ -24,13 +31,9 @@ component extends="wheels.WheelsTest" {
 				var mismatches = PluginObj.getVersionMismatchPlugins()
 
 				expect(mismatches).toBe("")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("reports version mismatch when constraint is not satisfied", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -49,13 +52,9 @@ component extends="wheels.WheelsTest" {
 				expect(Len(mismatches)).toBeGT(0)
 				expect(mismatches).toInclude("NeedyPlugin")
 				expect(mismatches).toInclude("OldDep")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("throws in non-production environment on version mismatch", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -71,13 +70,9 @@ component extends="wheels.WheelsTest" {
 				expect(function() {
 					$pluginObj(config)
 				}).toThrow("Wheels.PluginVersionMismatch")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("reads dependencies from plugin.json over box.json", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -96,13 +91,9 @@ component extends="wheels.WheelsTest" {
 				// box.json says >=9.0.0 (would NOT be satisfied)
 				// If plugin.json takes precedence, no mismatch
 				expect(mismatches).toBe("")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("populates pluginMeta dependencies struct from box.json", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -121,13 +112,9 @@ component extends="wheels.WheelsTest" {
 				expect(meta.PluginWithDeps).toHaveKey("dependencies")
 				expect(IsStruct(meta.PluginWithDeps.dependencies)).toBeTrue()
 				expect(meta.PluginWithDeps.dependencies).toHaveKey("DepPlugin")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("reads version from box.json into pluginMeta", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				var config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -144,8 +131,6 @@ component extends="wheels.WheelsTest" {
 
 				expect(meta).toHaveKey("DepPlugin")
 				expect(meta.DepPlugin.version).toBe("2.1.0")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 		})

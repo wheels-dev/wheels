@@ -6,31 +6,31 @@ component extends="wheels.WheelsTest" {
 
 		describe("Tests that dependant", () => {
 
+			beforeEach(() => {
+				_origPluginComponentPath = application.wheels.pluginComponentPath
+			})
+
+			afterEach(() => {
+				application.wheels.pluginComponentPath = _origPluginComponentPath
+			})
+
 			it("works", () => {
-				// Store original values
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests/_assets/plugins/standard",
+					pluginPath = "/wheels/tests/_assets/plugins/dependant",
 					deletePluginDirectories = false,
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
 
-				config.pluginPath = "/wheels/tests/_assets/plugins/dependant"
-				// Set pluginComponentPath to match the test plugin path
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/dependant"
-				
+
 				PluginObj = $pluginObj(config)
 				iplugins = PluginObj.getDependantPlugins()
 
 				expect(iplugins).toBe("TestPlugin1|TestPlugin2,TestPlugin1|TestPlugin3")
-				
-				// Restore original value
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
@@ -132,10 +132,16 @@ component extends="wheels.WheelsTest" {
 
 		describe("Tests that removing", () => {
 
-			it("preserves directories without a matching zip file", () => {
-				// Store original values
-				originalPluginComponentPath = application.wheels.pluginComponentPath
+			beforeEach(() => {
+				_origPluginComponentPath = application.wheels.pluginComponentPath
+			})
 
+			afterEach(() => {
+				$deleteDirs()
+				application.wheels.pluginComponentPath = _origPluginComponentPath
+			})
+
+			it("preserves directories without a matching zip file", () => {
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -145,7 +151,6 @@ component extends="wheels.WheelsTest" {
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
-				// Set pluginComponentPath to match the test plugin path
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/removing"
 
 				dir = ExpandPath(config.pluginPath)
@@ -161,11 +166,6 @@ component extends="wheels.WheelsTest" {
 				// Directory without a matching zip should be preserved (GH#1978)
 				// — it may be a git-cloned or symlinked plugin
 				expect(DirectoryExists(badDir)).toBeTrue()
-
-				$deleteDirs()
-
-				// Restore original value
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
@@ -175,6 +175,7 @@ component extends="wheels.WheelsTest" {
 				// Store original values
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 				previousMixins = Duplicate(application.wheels.mixins)
+				_origIncludePartialStack = StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "includePartialStack") ? Duplicate(request.wheels.includePartialStack) : "__MISSING__"
 				
 				config = {
 					path = "wheels",
@@ -201,6 +202,11 @@ component extends="wheels.WheelsTest" {
 				// Restore original values
 				application.wheels.mixins = previousMixins
 				application.wheels.pluginComponentPath = originalPluginComponentPath
+				if (_origIncludePartialStack == "__MISSING__") {
+					if (StructKeyExists(request, "wheels")) StructDelete(request.wheels, "includePartialStack");
+				} else {
+					request.wheels.includePartialStack = _origIncludePartialStack;
+				}
 			})
 
 			it("calls plugin methods from other methods", () => {
@@ -321,10 +327,16 @@ component extends="wheels.WheelsTest" {
 
 		describe("Tests that unpacking", () => {
 
-			it("is unpacking plugins", () => {
-				// Store original values
-				originalPluginComponentPath = application.wheels.pluginComponentPath
+			beforeEach(() => {
+				_origPluginComponentPath = application.wheels.pluginComponentPath
+			})
 
+			afterEach(() => {
+				$deleteTestFolders()
+				application.wheels.pluginComponentPath = _origPluginComponentPath
+			})
+
+			it("is unpacking plugins", () => {
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -334,7 +346,6 @@ component extends="wheels.WheelsTest" {
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
-				// Set pluginComponentPath to match the test plugin path
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/unpacking"
 
 				$deleteTestFolders()
@@ -345,11 +356,6 @@ component extends="wheels.WheelsTest" {
 
 				expect(ListFind(dirs, "testdefaultassignmixins")).toBeTrue()
 				expect(ListFind(dirs, "testglobalmixins")).toBeTrue()
-
-				$deleteTestFolders()
-
-				// Restore original value
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
@@ -407,14 +413,27 @@ component extends="wheels.WheelsTest" {
 
 		describe("Tests that symlinked plugin directories", () => {
 
+			beforeEach(() => {
+				_origPluginComponentPath = application.wheels.pluginComponentPath
+				_symlinkCleanupPaths = []
+			})
+
+			afterEach(() => {
+				for (var lp in _symlinkCleanupPaths) {
+					try { $deleteSymlink(lp) } catch (any e) {}
+				}
+				$deleteTestFolders()
+				application.wheels.pluginComponentPath = _origPluginComponentPath
+			})
+
 			it("discovers a symlinked plugin via absolute symlink", () => {
 				// BoxLang cannot resolve component paths through symlinks
 				if (StructKeyExists(server, "boxlang")) return;
-				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")
 				symlinkTargetDir = ExpandPath("/wheels/tests/_assets/plugins/_symlink_targets/TestSymlinkPlugin")
 				symlinkLinkPath = symlinkDir & "/TestSymlinkPlugin"
+				ArrayAppend(_symlinkCleanupPaths, symlinkLinkPath)
 
 				// Absolute symlink: TestSymlinkPlugin -> /abs/path/to/_symlink_targets/TestSymlinkPlugin
 				$createSymlink(symlinkTargetDir, symlinkLinkPath)
@@ -437,18 +456,15 @@ component extends="wheels.WheelsTest" {
 				expect(plugins).toHaveKey("TestSymlinkPlugin")
 				// Verify the plugin's method is callable
 				expect(plugins.TestSymlinkPlugin).toHaveKey("$SymlinkedPluginTestMethod")
-
-				$deleteSymlink(symlinkLinkPath)
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("discovers a symlinked plugin via relative symlink", () => {
 				// BoxLang cannot resolve component paths through symlinks
 				if (StructKeyExists(server, "boxlang")) return;
-				originalPluginComponentPath = application.wheels.pluginComponentPath
 
 				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")
 				symlinkLinkPath = symlinkDir & "/TestSymlinkPlugin"
+				ArrayAppend(_symlinkCleanupPaths, symlinkLinkPath)
 
 				// Relative symlink: TestSymlinkPlugin -> ../_symlink_targets/TestSymlinkPlugin
 				$createSymlink("../_symlink_targets/TestSymlinkPlugin", symlinkLinkPath)
@@ -469,17 +485,13 @@ component extends="wheels.WheelsTest" {
 
 				expect(plugins).toHaveKey("TestSymlinkPlugin")
 				expect(plugins.TestSymlinkPlugin).toHaveKey("$SymlinkedPluginTestMethod")
-
-				$deleteSymlink(symlinkLinkPath)
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("preserves symlinked directories during plugin delete", () => {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				symlinkDir = ExpandPath("/wheels/tests/_assets/plugins/symlinked")
 				symlinkTargetDir = ExpandPath("/wheels/tests/_assets/plugins/_symlink_targets/TestSymlinkPlugin")
 				symlinkLinkPath = symlinkDir & "/TestSymlinkPlugin"
+				ArrayAppend(_symlinkCleanupPaths, symlinkLinkPath)
 
 				$createSymlink(symlinkTargetDir, symlinkLinkPath)
 
@@ -500,20 +512,16 @@ component extends="wheels.WheelsTest" {
 				expect($symlinkExists(symlinkLinkPath)).toBeTrue()
 				// Target directory should also be intact
 				expect(DirectoryExists(symlinkTargetDir)).toBeTrue()
-
-				$deleteSymlink(symlinkLinkPath)
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("does not extract zip into a symlinked directory", () => {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
-
 				// The unpacking fixture has TestGlobalMixins-0.0.2.zip which
 				// extracts to a folder named "testglobalmixins". Create a symlink
 				// with that name so it looks like the folder already exists.
 				unpackDir = ExpandPath("/wheels/tests/_assets/plugins/unpacking")
 				symlinkTargetDir = ExpandPath("/wheels/tests/_assets/plugins/_symlink_targets/TestSymlinkPlugin")
 				symlinkLinkPath = unpackDir & "/testglobalmixins"
+				ArrayAppend(_symlinkCleanupPaths, symlinkLinkPath)
 
 				$deleteTestFolders()
 				$createSymlink(symlinkTargetDir, symlinkLinkPath)
@@ -538,10 +546,6 @@ component extends="wheels.WheelsTest" {
 				expect($isSymlinkCheck(symlinkLinkPath)).toBeTrue()
 				// The target should not contain extracted zip artifacts (index.cfm)
 				expect(FileExists(symlinkTargetDir & "/index.cfm")).toBeFalse()
-
-				$deleteSymlink(symlinkLinkPath)
-				$deleteTestFolders()
-				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 	}

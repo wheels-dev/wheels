@@ -21,11 +21,13 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(() => {
 				_controller = g.controller(name = "dummy")
+				_origAssetPaths = application.wheels.assetPaths
 				application.wheels.assetPaths = {http = "asset0.localhost, asset2.localhost", https = "secure.localhost"}
 			})
 
 			afterEach(() => {
-				application.wheels.assetPaths = false
+				application.wheels.assetPaths = _origAssetPaths
+				request.cgi.server_port_secure = ""
 			})
 
 			it("returns protocol", () => {
@@ -41,8 +43,6 @@ component extends="wheels.WheelsTest" {
 				e = _controller.$assetDomain(assetPath)
 
 				expect(FindNoCase("https://", e)).toBeTrue()
-
-				request.cgi.server_port_secure = ""
 			})
 
 			it("returns same domain for asset", () => {
@@ -61,8 +61,6 @@ component extends="wheels.WheelsTest" {
 				e = _controller.$assetDomain(assetPath)
 
 				expect(e).toBe(assetPath)
-
-				application.wheels.assetPaths = {http = "asset0.localhost, asset2.localhost", https = "secure.localhost"}
 			})
 		})
 
@@ -70,11 +68,12 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(() => {
 				_controller = g.controller(name = "dummy")
+				_origAssetQueryString = application.wheels.assetQueryString
 				application.wheels.assetQueryString = true
 			})
 
 			afterEach(() => {
-				application.wheels.assetQueryString = false
+				application.wheels.assetQueryString = _origAssetQueryString
 			})
 
 			it("returns empty string when set false", () => {
@@ -120,12 +119,14 @@ component extends="wheels.WheelsTest" {
 				args.class = "wheelstestlogoclass"
 				args.id = "wheelstestlogoid"
 				imagePath = application.wheels.webPath & application.wheels.imagePath
+				_origCacheImages = application.wheels.cacheImages
 
 				g.set(functionName = "imageTag", encode = false)
 			})
 
 			afterEach(() => {
 				g.set(functionName = "imageTag", encode = true)
+				application.wheels.cacheImages = _origCacheImages
 			})
 
 			it("works with just source", () => {
@@ -148,7 +149,6 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with supplying an id when caching is on", () => {
-				cacheImages = application.wheels.cacheImages
 				application.wheels.cacheImages = true
 				StructDelete(args, "alt")
 				StructDelete(args, "class")
@@ -156,8 +156,6 @@ component extends="wheels.WheelsTest" {
 				e = _controller.imageTag(argumentCollection = args)
 
 				expect(e).toBe(r)
-
-				application.wheels.cacheImages = cacheImages
 			})
 
 			it("works with supplying class and id", () => {
@@ -310,6 +308,11 @@ component extends="wheels.WheelsTest" {
 				_controller = g.controller(name = "dummy")
 				args = {}
 				webPath = Replace(application.wheels.webpath, "/", "&##x2f;", "all")
+				_origEncodeHtmlAttributes = application.wheels.encodeHtmlAttributes
+			})
+
+			afterEach(() => {
+				application.wheels.encodeHtmlAttributes = _origEncodeHtmlAttributes
 			})
 
 			it("should handle extensions, nonextensions and multiple extensions", () => {
@@ -357,10 +360,8 @@ component extends="wheels.WheelsTest" {
 
 			it("no encoding", () => {
 				args.source = "<test>.css"
-				local.encodeHtmlAttributes = application.wheels.encodeHtmlAttributes
 				application.wheels.encodeHtmlAttributes = false
 				result = _controller.styleSheetLinkTag(argumentcollection = args)
-				application.wheels.encodeHtmlAttributes = local.encodeHtmlAttributes
 				expected = '<link href="#application.wheels.webPath#stylesheets/<test>.css" media="all" rel="stylesheet" type="text/css">#Chr(10)#'
 
 				expect(result).toBe(expected)
