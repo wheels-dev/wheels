@@ -25,6 +25,8 @@ Prefer MCP tools when the Wheels MCP server is available (`mcp__wheels__*`). Fal
 | Reload | `wheels_reload()` | `?reload=true&password=...` |
 | Server | `wheels_server(action="status")` | `wheels server start\|stop\|status` |
 | Analyze | `wheels_analyze(target="all")` | — |
+| Admin | — | `wheels g admin ModelName` |
+| Seed | — | `wheels db:seed` |
 
 ## Critical Anti-Patterns (Top 10)
 
@@ -618,13 +620,15 @@ Client-side: `const es = new EventSource('/controller/notifications');`
 ## Reference Docs
 
 Deeper documentation lives in `.ai/` — Claude will search it automatically when needed:
+- `.ai/wheels/cross-engine-compatibility.md` — **Start here** for Lucee/Adobe/H2 gotchas
 - `.ai/cfml/` — CFML language reference (syntax, data types, components)
-- `.ai/wheels/models/` — ORM details, associations, validations
+- `.ai/wheels/models/` — ORM details, associations, validations, scopes, enums
 - `.ai/wheels/controllers/` — filters, rendering, security
-- `.ai/wheels/views/` — layouts, partials, form helpers, link helpers
-- `.ai/wheels/database/` — migration column types, queries, advanced operations
+- `.ai/wheels/views/` — layouts, partials, form helpers (including HTML5), link helpers
+- `.ai/wheels/database/` — migrations, queries, seeding, advanced operations
+- `.ai/wheels/cli/` — generators (including admin generator)
 - `.ai/wheels/testing/` — unit testing with TestBox, test infrastructure, common gotchas
-- `.ai/wheels/configuration/` — routing, environments, settings
+- `.ai/wheels/configuration/` — routing, environments, settings, DI container
 
 ## MCP Server
 
