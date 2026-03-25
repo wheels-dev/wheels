@@ -208,23 +208,7 @@ component {
 		struct constraints,
 		any callback
 	) {
-		local.args = {};
-		local.args.path = arguments.path;
-		local.args.name = arguments.name;
-		local.args.$call = "group";
-
-		if (StructKeyExists(arguments, "constraints")) {
-			local.args.constraints = arguments.constraints;
-		}
-
-		scope(argumentCollection = local.args);
-
-		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
-			arguments.callback(this);
-			end();
-		}
-
-		return this;
+		return group(argumentCollection = arguments);
 	}
 
 	/**
@@ -244,18 +228,8 @@ component {
 		string name = "v#Int(arguments.number)#",
 		any callback
 	) {
-		local.args = {};
-		local.args.path = arguments.path;
-		local.args.name = arguments.name;
-		local.args.$call = "group";
-
-		scope(argumentCollection = local.args);
-
-		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
-			arguments.callback(this);
-			end();
-		}
-
-		return this;
+		// Remove number so it doesn't pollute the scope stack.
+		StructDelete(arguments, "number");
+		return group(argumentCollection = arguments);
 	}
 }

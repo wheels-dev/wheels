@@ -166,17 +166,17 @@ component {
 			local.pattern = "/";
 		}
 
-	  // If arguments.to is not passed in, we check for the existence of app/views/home/index.cfm if found we set that as the root
-	  // else we set wheels##wheels as the root.
-	  if (!structKeyExists(arguments, "to")) {
-	    if (fileExists(application.AppDir & "views/home/index.cfm")) {
-	      arguments.to = "home##index";
-	      arguments.method = "get";
-	    } else {
-	      arguments.to = "wheels##wheels";
-	      arguments.method = "get";
-	    }
-	  }
+		// If arguments.to is not passed in, we check for the existence of app/views/home/index.cfm if found we set that as the root
+		// else we set wheels##wheels as the root.
+		if (!structKeyExists(arguments, "to")) {
+			if (fileExists(application.AppDir & "views/home/index.cfm")) {
+				arguments.to = "home##index";
+				arguments.method = "get";
+			} else {
+				arguments.to = "wheels##wheels";
+				arguments.method = "get";
+			}
+		}
 
 		return $match(name = "root", pattern = local.pattern, argumentCollection = arguments);
 
@@ -296,7 +296,7 @@ component {
 		// Use scoped package if found.
 		if (StructKeyExists(variables.scopeStack[1], "package")) {
 			if (StructKeyExists(arguments, "package")) {
-				arguments.package &= "." & variables.scopeStack[1].package;
+				arguments.package = variables.scopeStack[1].package & "." & arguments.package;
 			} else {
 				arguments.package = variables.scopeStack[1].package;
 			}
