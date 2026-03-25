@@ -2,10 +2,10 @@ FROM ortussolutions/commandbox:jdk21
 
 LABEL maintainer "Wheels Core Team"
 
-#Add Sqlite
-RUN apt update -y && apt install -y sqlite3 libsqlite3-dev
-RUN pwd
-RUN sqlite3 wheelstestdb.db
+# Install SQLite and create test database
+RUN apt-get update -y && apt-get install -y --no-install-recommends sqlite3 libsqlite3-dev \
+ && rm -rf /var/lib/apt/lists/* \
+ && sqlite3 wheelstestdb.db "SELECT 1;"
 
 ENV PORT 62025
 ENV APP_DIR                 "/wheels-test-suite"

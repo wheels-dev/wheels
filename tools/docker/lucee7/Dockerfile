@@ -2,22 +2,19 @@ FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
-#Add the H2 extension
-# ADD https://ext.lucee.org/org.h2-1.3.172.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.h2-1.3.172.lex
-ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
+# Install Lucee extensions (H2, Oracle) and SQLite JDBC driver in a single layer
+RUN wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
+      https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex \
+ && wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
+      https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
+ && mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib \
+ && wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar \
+      https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar
 
-#Add the Oracle extension
-ADD https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex
-
-#Add sqltie jdbc driver
-RUN mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib \
- && wget -O /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar \
-    https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar
-
-#Add Sqlite
-RUN apt update -y && apt install -y sqlite3 libsqlite3-dev
-RUN pwd
-RUN sqlite3 wheelstestdb.db
+# Install SQLite and create test database
+RUN apt-get update -y && apt-get install -y --no-install-recommends sqlite3 libsqlite3-dev \
+ && rm -rf /var/lib/apt/lists/* \
+ && sqlite3 wheelstestdb.db "SELECT 1;"
 
 ENV PORT 60007
 ENV APP_DIR                 "/wheels-test-suite"
