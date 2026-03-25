@@ -584,7 +584,7 @@ component {
 	/**
 	 * Resolves an object value, converting Oracle BLOB objects to binary in BoxLang.
 	 */
-	private any function $resolveObjectValue(required any value) {
+	public any function $resolveObjectValue(required any value) {
 		if (StructKeyExists(server, "boxlang") && !IsStruct(arguments.value)) {
 			try {
 				if (GetMetadata(arguments.value).getName() == "oracle.sql.BLOB") {
