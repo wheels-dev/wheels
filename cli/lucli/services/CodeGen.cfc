@@ -74,11 +74,20 @@ component {
 		string description = "",
 		boolean force = false
 	) {
-		var controllerName = variables.helpers.capitalize(arguments.name);
-		var filePath = variables.projectRoot & "/app/controllers/#controllerName#.cfc";
+		// Support package-prefixed names like "api/Products"
+		var packagePath = "";
+		var baseName = arguments.name;
+		if (find("/", arguments.name)) {
+			packagePath = lCase(listFirst(arguments.name, "/")) & "/";
+			baseName = listLast(arguments.name, "/");
+		}
+
+		var controllerName = variables.helpers.capitalize(baseName);
+		var relativePath = "app/controllers/#packagePath##controllerName#.cfc";
+		var filePath = variables.projectRoot & "/" & relativePath;
 
 		if (fileExists(filePath) && !arguments.force) {
-			return {success: false, error: "Controller already exists: app/controllers/#controllerName#.cfc", path: filePath};
+			return {success: false, error: "Controller already exists: #relativePath#", path: filePath};
 		}
 
 		var crudActions = ["index", "show", "new", "create", "edit", "update", "delete"];
@@ -114,7 +123,7 @@ component {
 
 		return variables.templateService.generateFromTemplate(
 			template = template,
-			destination = "app/controllers/#controllerName#.cfc",
+			destination = relativePath,
 			context = context
 		);
 	}

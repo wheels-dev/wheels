@@ -1249,6 +1249,14 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate api-resource <Name> [properties...]", "yellow");
 			out("  Example: wheels generate api-resource Product name price:decimal sku:string");
+			out("");
+			out("Generates:");
+			out("  Model:      app/models/<Name>.cfc");
+			out("  Controller: app/controllers/api/<Names>.cfc (JSON-only, no views)");
+			out("  Migration:  app/migrator/migrations/<timestamp>_create_<names>_table.cfc");
+			out("  Tests:      tests/specs/models/<Name>Spec.cfc");
+			out("              tests/specs/controllers/Api<Names>ControllerSpec.cfc");
+			out("  Routes:     .namespace(""api"").resources(name=""<names>"", except=""new,edit"")");
 			return "";
 		}
 
@@ -1263,12 +1271,11 @@ component extends="modules.BaseModule" {
 		var parsed = parseGeneratorArgs(properties);
 
 		var scaffold = getService("scaffold");
-		var results = scaffold.generateScaffold(
+		var results = scaffold.generateApiResource(
 			name = modelName,
 			properties = parsed.properties,
 			belongsTo = arrayToList(parsed.belongsTo),
-			hasMany = arrayToList(parsed.hasMany),
-			api = true
+			hasMany = arrayToList(parsed.hasMany)
 		);
 
 		if (results.success) {
@@ -1281,7 +1288,7 @@ component extends="modules.BaseModule" {
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
 			out("  2. Start server: wheels start");
-			out("  3. Test: curl http://localhost:8080/#lCase(controllerName)#.json");
+			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
 		} else {
 			out("API resource generation failed:", "red");
 			for (var err in results.errors) {

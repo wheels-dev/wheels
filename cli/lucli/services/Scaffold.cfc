@@ -207,7 +207,263 @@ component {
 		return false;
 	}
 
+	/**
+	 * Generate an API-only resource (model, migration, API controller, API routes, tests)
+	 *
+	 * Unlike generateScaffold(api=true) which just skips views, this creates:
+	 * - A controller in the api/ package (app/controllers/api/)
+	 * - Routes scoped under .namespace("api") with except="new,edit"
+	 * - API-specific tests that verify JSON responses
+	 */
+	public struct function generateApiResource(
+		required string name,
+		required array properties,
+		string belongsTo = "",
+		string hasMany = "",
+		boolean tests = true,
+		boolean force = false
+	) {
+		var results = {success: true, generated: [], errors: [], rollback: []};
+		var pluralName = variables.helpers.pluralize(arguments.name);
+
+		try {
+			// Add foreign key columns for belongsTo relationships
+			var props = duplicate(arguments.properties);
+			if (len(arguments.belongsTo)) {
+				for (var parent in listToArray(arguments.belongsTo)) {
+					var fkName = lCase(parent) & "Id";
+					var hasFK = false;
+					for (var p in props) {
+						if (p.name == fkName) { hasFK = true; break; }
+					}
+					if (!hasFK) {
+						arrayAppend(props, {name: fkName, type: "integer"});
+					}
+				}
+			}
+
+			// 1. Generate Model
+			var modelResult = variables.codeGenService.generateModel(
+				name = arguments.name,
+				properties = props,
+				belongsTo = arguments.belongsTo,
+				hasMany = arguments.hasMany,
+				force = arguments.force
+			);
+			if (modelResult.success) {
+				arrayAppend(results.generated, {type: "model", path: modelResult.path});
+				arrayAppend(results.rollback, modelResult.path);
+			} else {
+				throw(type="ScaffoldError", message="Model: #modelResult.error#");
+			}
+
+			// 2. Generate Migration
+			var migrationPath = createMigrationWithProperties(arguments.name, props);
+			arrayAppend(results.generated, {type: "migration", path: migrationPath});
+			arrayAppend(results.rollback, migrationPath);
+
+			// 3. Generate API Controller (in api/ package)
+			var controllerResult = variables.codeGenService.generateController(
+				name = "api/" & pluralName,
+				crud = true,
+				api = true,
+				force = arguments.force,
+				belongsTo = arguments.belongsTo,
+				hasMany = arguments.hasMany
+			);
+			if (controllerResult.success) {
+				arrayAppend(results.generated, {type: "controller", path: controllerResult.path});
+				arrayAppend(results.rollback, controllerResult.path);
+			} else {
+				throw(type="ScaffoldError", message="Controller: #controllerResult.error#");
+			}
+
+			// 4. Generate API-specific tests
+			if (arguments.tests) {
+				var modelTestResult = variables.codeGenService.generateTest(type="model", name=arguments.name);
+				if (modelTestResult.success) {
+					arrayAppend(results.generated, {type: "test", path: modelTestResult.path});
+					arrayAppend(results.rollback, modelTestResult.path);
+				}
+
+				var apiTestResult = generateApiTest(pluralName, arguments.name);
+				if (apiTestResult.success) {
+					arrayAppend(results.generated, {type: "test", path: apiTestResult.path});
+					arrayAppend(results.rollback, apiTestResult.path);
+				}
+			}
+
+			// 5. Update routes with API namespace
+			updateApiRoutes(arguments.name);
+
+		} catch (any e) {
+			results.success = false;
+			arrayAppend(results.errors, e.message);
+			if (e.type == "ScaffoldError") {
+				rollbackScaffold(results.rollback);
+			}
+		}
+
+		return results;
+	}
+
+	/**
+	 * Update routes.cfm with an API-namespaced resource route.
+	 *
+	 * Inserts or appends to an existing .namespace("api") block:
+	 *   .namespace("api")
+	 *       .resources(name="products", except="new,edit")
+	 *   .end()
+	 */
+	public boolean function updateApiRoutes(required string name) {
+		try {
+			var routesPath = variables.projectRoot & "/config/routes.cfm";
+			if (!fileExists(routesPath)) return false;
+
+			var content = fileRead(routesPath);
+			var resourceName = lCase(arguments.name);
+			var nl = chr(10);
+			var t = chr(9);
+
+			// Skip if this API resource route already exists
+			if (findNoCase('.resources(name="' & resourceName & '", except="new,edit")', content)) return false;
+			if (findNoCase(".resources(name='#resourceName#', except='new,edit')", content)) return false;
+
+			// Check if an API namespace block already exists
+			if (findNoCase('.namespace("api")', content) || findNoCase(".namespace('api')", content)) {
+				// Append inside the existing namespace block — find the .end() that closes it
+				var apiNsPos = findNoCase('.namespace("api")', content);
+				if (apiNsPos == 0) apiNsPos = findNoCase(".namespace('api')", content);
+
+				// Find the matching .end() after the namespace declaration
+				var afterNs = mid(content, apiNsPos, len(content));
+				var endPos = findNoCase(".end()", afterNs);
+				if (endPos > 0) {
+					// Detect indentation of the namespace line
+					var nsIndent = detectIndent(content, apiNsPos);
+					var resourceLine = nsIndent & t & '.resources(name="#resourceName#", except="new,edit")';
+					var insertPos = apiNsPos + endPos - 2;
+					var before = mid(content, 1, insertPos);
+					var after = mid(content, insertPos + 1, len(content));
+					content = before & resourceLine & nl & after;
+					fileWrite(routesPath, content);
+					return true;
+				}
+			}
+
+			// No existing API namespace — create one
+			var markerPattern = '// CLI-Appends-Here';
+			var indent = '';
+
+			if (find(t & t & t & markerPattern, content)) {
+				indent = t & t & t;
+			} else if (find(t & t & markerPattern, content)) {
+				indent = t & t;
+			} else if (find(t & markerPattern, content)) {
+				indent = t;
+			}
+
+			var fullMarker = indent & markerPattern;
+			var apiBlock = indent & '.namespace("api")' & nl;
+			apiBlock &= indent & t & '.resources(name="#resourceName#", except="new,edit")' & nl;
+			apiBlock &= indent & '.end()' & nl;
+
+			if (find(fullMarker, content)) {
+				content = replace(content, fullMarker, apiBlock & fullMarker, 'all');
+				fileWrite(routesPath, content);
+				return true;
+			}
+
+			// Fallback: insert before last .end()
+			if (find('.end()', content)) {
+				var lastEnd = content.lastIndexOf('.end()');
+				if (lastEnd >= 0) {
+					var before = mid(content, 1, lastEnd);
+					var after = mid(content, lastEnd + 1, len(content));
+					content = before & t & '.namespace("api")' & nl;
+					content &= t & t & '.resources(name="#resourceName#", except="new,edit")' & nl;
+					content &= t & '.end()' & nl & t;
+					content &= after;
+					fileWrite(routesPath, content);
+					return true;
+				}
+			}
+		} catch (any e) {
+			// Routes update is non-critical
+		}
+		return false;
+	}
+
+	/**
+	 * Generate an API-specific controller test that verifies JSON responses
+	 */
+	public struct function generateApiTest(required string controllerName, required string modelName) {
+		var testName = "Api" & arguments.controllerName & "ControllerSpec";
+		var testDir = variables.projectRoot & "/tests/specs/controllers/";
+		var filePath = testDir & testName & ".cfc";
+
+		if (fileExists(filePath)) {
+			return {success: false, error: "Test already exists: #filePath#", path: filePath};
+		}
+
+		if (!directoryExists(testDir)) {
+			directoryCreate(testDir, true);
+		}
+
+		var singular = lCase(arguments.modelName);
+		var plural = lCase(arguments.controllerName);
+		var nl = chr(10);
+		var t = chr(9);
+
+		var c = 'component extends="wheels.WheelsTest" {' & nl & nl;
+		c &= t & 'function run() {' & nl;
+		c &= t & t & 'describe("API #arguments.controllerName# Controller", () => {' & nl & nl;
+		c &= t & t & t & 'beforeEach(() => {' & nl;
+		c &= t & t & t & t & '// Setup test data' & nl;
+		c &= t & t & t & '})' & nl & nl;
+		c &= t & t & t & 'it("GET /api/#plural# returns JSON list", () => {' & nl;
+		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#", method="get", params={format: "json"});' & nl;
+		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
+		c &= t & t & t & t & 'expect(result.status).toBe(200);' & nl;
+		c &= t & t & t & '})' & nl & nl;
+		c &= t & t & t & 'it("GET /api/#plural#/:key returns JSON record", () => {' & nl;
+		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#/1", method="get", params={format: "json"});' & nl;
+		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
+		c &= t & t & t & '})' & nl & nl;
+		c &= t & t & t & 'it("POST /api/#plural# creates record", () => {' & nl;
+		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#", method="post", params={format: "json", #singular#: {}});' & nl;
+		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
+		c &= t & t & t & '})' & nl & nl;
+		c &= t & t & t & 'it("PUT /api/#plural#/:key updates record", () => {' & nl;
+		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#/1", method="put", params={format: "json", #singular#: {}});' & nl;
+		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
+		c &= t & t & t & '})' & nl & nl;
+		c &= t & t & t & 'it("DELETE /api/#plural#/:key deletes record", () => {' & nl;
+		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#/1", method="delete", params={format: "json"});' & nl;
+		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
+		c &= t & t & t & '})' & nl & nl;
+		c &= t & t & '})' & nl;
+		c &= t & '}' & nl;
+		c &= '}' & nl;
+
+		fileWrite(filePath, c);
+		return {success: true, path: filePath, message: "Generated API controller test"};
+	}
+
 	// ── Private helpers ──────────────────────────────
+
+	/**
+	 * Detect the indentation used before a given position in content
+	 */
+	private string function detectIndent(required string content, required numeric position) {
+		var indent = "";
+		var i = arguments.position - 1;
+		while (i > 0 && mid(arguments.content, i, 1) == chr(9)) {
+			indent &= chr(9);
+			i--;
+		}
+		return indent;
+	}
 
 	/**
 	 * Generate migration content with column definitions
