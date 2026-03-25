@@ -20,6 +20,7 @@ component output="false" extends="wheels.Global"{
 		variables.$class.serviceProviders = [];
 		variables.$class.deprecationWarnings = [];
 		variables.$class.versionMismatchPlugins = "";
+		variables.$class.manifestCache = {};
 		StructAppend(variables.$class, arguments);
 		/* handle pathing for different operating systems */
 		variables.$class.pluginPathFull = ReplaceNoCase(ExpandPath(variables.$class.pluginPath), "\", "/", "all");
@@ -149,30 +150,9 @@ component output="false" extends="wheels.Global"{
 			if (Len(local.manifestWheelsVersion)) {
 				local.compatVersion = local.manifestWheelsVersion;
 			}
-			if (
-				!Len(local.compatVersion)
-				|| ListFind(local.compatVersion, local.wheelsVersion)
-				|| variables.$class.loadIncompatiblePlugins
-			) {
+			if ($shouldLoadPlugin(local.compatVersion, local.wheelsVersion, variables.$class.loadIncompatiblePlugins)) {
 				variables.$class.plugins[local.pluginKey] = local.plugin;
-				// Call onPluginLoad lifecycle hook if defined
-				if (StructKeyExists(local.plugin, "onPluginLoad") && IsCustomFunction(local.plugin.onPluginLoad)) {
-					// Build a context struct (not the application scope itself) so that
-					// registerMiddleware works on Adobe CF where application scope doesn't
-					// support function members.
-					local.loadContext = Duplicate(application);
-					$installPluginLoadAPI(local.pluginKey, local.loadContext);
-					local.plugin.onPluginLoad(local.loadContext);
-					// Sync all non-function keys back to application scope.
-					// The Duplicate creates a deep copy so unchanged structs are
-					// written back identically (harmless). Closures injected by
-					// $installPluginLoadAPI are skipped to keep application clean.
-					for (local.contextKey in local.loadContext) {
-						if (!IsCustomFunction(local.loadContext[local.contextKey])) {
-							application[local.contextKey] = local.loadContext[local.contextKey];
-						}
-					}
-				}
+				$invokeOnPluginLoad(local.pluginKey, local.plugin);
 				// Track plugins that implement ServiceProviderInterface
 				if ($isServiceProvider(local.plugin)) {
 					ArrayAppend(variables.$class.serviceProviders, local.pluginKey);
@@ -190,19 +170,8 @@ component output="false" extends="wheels.Global"{
 					});
 					WriteLog(type="warning", text="[Wheels] #local.warning#");
 				}
-				// If plugin author has specified compatibility version as 2.0, only check against that major version
-				// If they've specified 2.0.1, then be more specific.
-				// Manifest wheelsVersion (already in local.compatVersion) takes precedence over CFC this.version.
-				if (Len(local.compatVersion)) {
-					if (
-						(ListLen(local.compatVersion, ".") > 2 && !ListFind(local.compatVersion, local.wheelsVersion))
-						|| (
-							ListLen(local.compatVersion, ".") == 2
-							&& !ListFind(local.compatVersion, ListDeleteAt(local.wheelsVersion, 3, "."))
-						)
-					) {
-						variables.$class.incompatiblePlugins = ListAppend(variables.$class.incompatiblePlugins, local.pluginKey);
-					}
+				if ($isVersionMismatch(local.compatVersion, local.wheelsVersion)) {
+					variables.$class.incompatiblePlugins = ListAppend(variables.$class.incompatiblePlugins, local.pluginKey);
 				}
 			}
 		};
@@ -310,10 +279,9 @@ component output="false" extends="wheels.Global"{
 	public struct function $parsePluginManifest(required string manifestPath) {
 		local.result = {valid = false, manifest = {}, errors = []};
 
-		// Read and parse JSON
+		// Read and parse JSON (uses cache if already read by $readManifestField)
 		try {
-			local.raw = FileRead(arguments.manifestPath);
-			local.manifest = DeserializeJSON(local.raw);
+			local.manifest = $getCachedManifestJSON(arguments.manifestPath);
 		} catch (any e) {
 			ArrayAppend(local.result.errors, "Failed to parse plugin.json: " & e.message);
 			return local.result;
@@ -580,9 +548,22 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Returns the parsed JSON from a plugin.json manifest, reading from disk only once.
+	 * Subsequent calls for the same path return the cached result.
+	 *
+	 * @manifestPath Full filesystem path to the plugin.json file
+	 * @return The deserialized JSON struct (throws on invalid JSON)
+	 */
+	private struct function $getCachedManifestJSON(required string manifestPath) {
+		if (!StructKeyExists(variables.$class.manifestCache, arguments.manifestPath)) {
+			variables.$class.manifestCache[arguments.manifestPath] = DeserializeJSON(FileRead(arguments.manifestPath));
+		}
+		return variables.$class.manifestCache[arguments.manifestPath];
+	}
+
+	/**
 	 * Reads a single field from a plugin.json manifest without full validation.
-	 * Used for early-stage checks (e.g. wheelsVersion) before the full manifest
-	 * is parsed in $pluginMetaData().
+	 * Uses the manifest cache to avoid redundant disk reads.
 	 *
 	 * @folderPath Full filesystem path to the plugin directory
 	 * @fieldName  The JSON field to read
@@ -594,7 +575,7 @@ component output="false" extends="wheels.Global"{
 			return "";
 		}
 		try {
-			local.manifest = DeserializeJSON(FileRead(local.manifestPath));
+			local.manifest = $getCachedManifestJSON(local.manifestPath);
 			if (IsStruct(local.manifest) && StructKeyExists(local.manifest, arguments.fieldName) && IsSimpleValue(local.manifest[arguments.fieldName])) {
 				return Trim(local.manifest[arguments.fieldName]);
 			}
@@ -627,6 +608,76 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Determines whether a plugin should be loaded based on its declared
+	 * compatibility version, the current Wheels version, and the
+	 * loadIncompatiblePlugins setting.
+	 */
+	private boolean function $shouldLoadPlugin(
+		required string compatVersion,
+		required string wheelsVersion,
+		required boolean loadIncompatible
+	) {
+		return !Len(arguments.compatVersion)
+			|| ListFind(arguments.compatVersion, arguments.wheelsVersion)
+			|| arguments.loadIncompatible;
+	}
+
+	/**
+	 * Checks whether a loaded plugin's declared version is actually a mismatch
+	 * with the running Wheels version (for the incompatiblePlugins list).
+	 * Supports both 2-part (major.minor) and 3-part (major.minor.patch) matching.
+	 */
+	private boolean function $isVersionMismatch(required string compatVersion, required string wheelsVersion) {
+		if (!Len(arguments.compatVersion)) return false;
+		if (ListLen(arguments.compatVersion, ".") > 2 && !ListFind(arguments.compatVersion, arguments.wheelsVersion)) return true;
+		if (ListLen(arguments.compatVersion, ".") == 2 && !ListFind(arguments.compatVersion, ListDeleteAt(arguments.wheelsVersion, 3, "."))) return true;
+		return false;
+	}
+
+	/**
+	 * Invokes the onPluginLoad lifecycle hook if defined on the plugin.
+	 * Builds a context struct (not the application scope directly) to work
+	 * around Adobe CF's limitation on function members in the application scope.
+	 */
+	private void function $invokeOnPluginLoad(required string pluginKey, required any plugin) {
+		if (!StructKeyExists(arguments.plugin, "onPluginLoad") || !IsCustomFunction(arguments.plugin.onPluginLoad)) {
+			return;
+		}
+		local.loadContext = Duplicate(application);
+		$installPluginLoadAPI(arguments.pluginKey, local.loadContext);
+		arguments.plugin.onPluginLoad(local.loadContext);
+		// Sync non-function keys back to application scope. Closures injected
+		// by $installPluginLoadAPI are skipped to keep application clean.
+		for (local.contextKey in local.loadContext) {
+			if (!IsCustomFunction(local.loadContext[local.contextKey])) {
+				application[local.contextKey] = local.loadContext[local.contextKey];
+			}
+		}
+	}
+
+	/**
+	 * Resolves the mixin target for a plugin using a 3-source cascade:
+	 * 1. Default: "global" (inject into all component types)
+	 * 2. CFC mixin attribute overrides default
+	 * 3. plugin.json "mixins" field takes highest precedence
+	 */
+	private string function $resolveMixinTarget(required string pluginName, required struct cfcMeta) {
+		local.target = "global";
+		if (StructKeyExists(arguments.cfcMeta, "mixin")) {
+			local.target = arguments.cfcMeta.mixin;
+		}
+		if (
+			StructKeyExists(variables.$class.pluginMeta, arguments.pluginName)
+			&& !StructIsEmpty(variables.$class.pluginMeta[arguments.pluginName].manifest)
+			&& StructKeyExists(variables.$class.pluginMeta[arguments.pluginName].manifest, "mixins")
+			&& Len(Trim(variables.$class.pluginMeta[arguments.pluginName].manifest.mixins))
+		) {
+			local.target = Trim(variables.$class.pluginMeta[arguments.pluginName].manifest.mixins);
+		}
+		return local.target;
+	}
+
+	/**
 	 * MIXINS
 	 */
 
@@ -653,32 +704,13 @@ component output="false" extends="wheels.Global"{
 				continue;
 			}
 
-			// reference the plugin
 			local.plugin = variables.$class.plugins[local.iPlugin];
-			// grab meta data of the plugin
 			local.pluginMeta = GetMetadata(local.plugin);
 			if (
 				!StructKeyExists(local.pluginMeta, "environment")
 				|| ListFindNoCase(local.pluginMeta.environment, variables.$class.wheelsEnvironment)
 			) {
-				// by default and for backwards compatibility, we inject all methods
-				// into all objects
-				local.pluginMixins = "global";
-
-				// if the component has a default mixin value, assign that value
-				if (StructKeyExists(local.pluginMeta, "mixin")) {
-					local.pluginMixins = local.pluginMeta["mixin"];
-				}
-
-				// plugin.json mixins field takes precedence over CFC mixin attribute
-				if (
-					StructKeyExists(variables.$class.pluginMeta, local.iPlugin)
-					&& !StructIsEmpty(variables.$class.pluginMeta[local.iPlugin].manifest)
-					&& StructKeyExists(variables.$class.pluginMeta[local.iPlugin].manifest, "mixins")
-					&& Len(Trim(variables.$class.pluginMeta[local.iPlugin].manifest.mixins))
-				) {
-					local.pluginMixins = Trim(variables.$class.pluginMeta[local.iPlugin].manifest.mixins);
-				}
+				local.pluginMixins = $resolveMixinTarget(local.iPlugin, local.pluginMeta);
 
 				// loop through all plugin methods and enter injection info accordingly
 				// (based on the mixin value on the method or the default one set on the
