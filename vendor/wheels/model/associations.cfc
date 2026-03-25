@@ -223,7 +223,7 @@ component {
 	 * Internal function.
 	 * Registers a foreign key property with integer type for BoxLang compatibility.
 	 */
-	private void function $registerBoxLangForeignKey(required string propertyName) {
+	public void function $registerBoxLangForeignKey(required string propertyName) {
 		if (StructKeyExists(server, "boxlang") && !StructKeyExists(variables.wheels.class.properties, arguments.propertyName)) {
 			property(name = arguments.propertyName, type = "integer");
 		}

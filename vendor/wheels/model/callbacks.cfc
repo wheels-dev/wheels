@@ -340,7 +340,7 @@ component {
 	 * Internal function.
 	 * Executes an afterFind callback against a query or object.
 	 */
-	private any function $afterFindCallback(required string method, any collection = "") {
+	public any function $afterFindCallback(required string method, any collection = "") {
 		if (IsQuery(arguments.collection)) {
 			return $queryCallback(method = arguments.method, collection = arguments.collection);
 		}
@@ -359,7 +359,7 @@ component {
 	 * Internal function.
 	 * Converts Oracle TIMESTAMP/DATE objects to CFML DateTime values (BoxLang compatibility).
 	 */
-	private any function $coerceOracleTimestamp(required any value) {
+	public any function $coerceOracleTimestamp(required any value) {
 		if (!structKeyExists(server, "boxlang") || !IsObject(arguments.value) || IsStruct(arguments.value)) {
 			return arguments.value;
 		}
