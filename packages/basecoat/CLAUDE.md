@@ -1,14 +1,14 @@
-# wheels-basecoat Plugin
+# wheels-basecoat
 
 ## What This Is
 
-A Wheels framework plugin providing CFML view helpers that generate Basecoat UI component markup — shadcn/ui-quality design using plain HTML + Tailwind CSS classes. No React, no build step. Works with or without wheels-hotwire.
+A Wheels framework package providing CFML view helpers that generate Basecoat UI component markup — shadcn/ui-quality design using plain HTML + Tailwind CSS classes. No React, no build step. Works with or without wheels-hotwire.
 
 This package is part of the Wheels first-party package collection, hosted in the main Wheels repository under `packages/basecoat/`. Activate by copying to `vendor/basecoat/`.
 
-## Plugin Architecture
+## Package Architecture
 
-Standard Wheels plugin. The main CFC (`Basecoat.cfc`) contains `init()` and all public methods. Wheels injects every public method into controller and view scopes. Call them as `#functionName()#` in views.
+Standard Wheels package. The main CFC (`Basecoat.cfc`) contains `init()` and all public methods. Wheels injects every public method into controller and view scopes via PackageLoader. Call them as `#functionName()#` in views.
 
 ## File Structure
 
@@ -25,7 +25,7 @@ packages/basecoat/
 
 ### Single CFC Requirement
 
-All public helper functions must be methods in `Basecoat.cfc`. Do not create separate CFCs — Wheels won't inject them.
+All public helper functions must be methods in `Basecoat.cfc`. Wheels packages inject methods from **one CFC only** (the one matching the directory name).
 
 ## Coding Conventions
 

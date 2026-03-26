@@ -1,14 +1,14 @@
-# wheels-hotwire Plugin
+# wheels-hotwire
 
 ## What This Is
 
-A Wheels framework plugin providing Hotwire infrastructure: Turbo Drive, Turbo Frames, Turbo Streams, Stimulus, and Hotwire Native mobile support. This is the **interaction layer** — it has zero opinions about CSS or visual design.
+A Wheels framework package providing Hotwire infrastructure: Turbo Drive, Turbo Frames, Turbo Streams, Stimulus, and Hotwire Native mobile support. This is the **interaction layer** — it has zero opinions about CSS or visual design.
 
 This package is part of the Wheels first-party package collection, hosted in the main Wheels repository under `packages/hotwire/`. Activate by copying to `vendor/hotwire/`.
 
-## Plugin Architecture
+## Package Architecture
 
-Standard Wheels plugin. The main CFC (`Hotwire.cfc`) contains `init()` and all public methods, which Wheels injects into controller and view scopes. Any public function defined here is callable as `#functionName()#` in views and `functionName()` in controllers.
+Standard Wheels package. The main CFC (`Hotwire.cfc`) contains `init()` and all public methods, which Wheels injects into controller and view scopes via PackageLoader. Any public function defined here is callable as `#functionName()#` in views and `functionName()` in controllers.
 
 ## File Structure
 
@@ -25,7 +25,7 @@ packages/hotwire/
 
 ### Single CFC Requirement
 
-Wheels plugins inject methods from **one CFC only**. All public helper functions must be methods in `Hotwire.cfc`. Private utility methods are fine within the same CFC. Do not create separate CFCs.
+Wheels packages inject methods from **one CFC only** (the one matching the directory name). All public helper functions must be methods in `Hotwire.cfc`. Private utility methods are fine within the same CFC.
 
 ## Coding Conventions
 

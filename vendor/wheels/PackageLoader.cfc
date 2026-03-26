@@ -22,11 +22,13 @@ component output="false" {
 	public PackageLoader function init(
 		required string vendorPath,
 		string wheelsVersion = "",
-		string wheelsEnvironment = "production"
+		string wheelsEnvironment = "production",
+		string componentPrefix = "vendor"
 	) {
 		variables.vendorPath = arguments.vendorPath;
 		variables.wheelsVersion = arguments.wheelsVersion;
 		variables.wheelsEnvironment = arguments.wheelsEnvironment;
+		variables.componentPrefix = arguments.componentPrefix;
 		variables.packages = {};
 		variables.packageMeta = {};
 		variables.mixins = {};
@@ -181,7 +183,7 @@ component output="false" {
 		}
 
 		// Instantiate the package CFC
-		local.componentPath = "vendor.#arguments.dirName#.#local.cfcName#";
+		local.componentPath = "#variables.componentPrefix#.#arguments.dirName#.#local.cfcName#";
 		local.pkg = CreateObject("component", local.componentPath).init();
 		variables.packages[arguments.dirName] = local.pkg;
 
