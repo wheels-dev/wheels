@@ -1,5 +1,5 @@
 /**
- * SentryForWheels — CFWheels plugin for Sentry error tracking.
+ * wheels-sentry — CFWheels plugin for Sentry error tracking.
  *
  * Provides automatic SDK initialization, controller mixin methods for
  * capturing errors/messages with Wheels context, and breadcrumb support.
@@ -76,7 +76,7 @@ component mixin="controller" output="false" {
 			scopeSettings.includeSession = $sentryGetSetting("sentryIncludeSession", pii);
 			scopeSettings.includeCookies = $sentryGetSetting("sentryIncludeCookies", pii);
 
-			application.sentry = new plugins.SentryForWheels.SentryClient(
+			application.sentry = new plugins.sentry.SentryClient(
 				DSN: dsn,
 				environment: env,
 				release: rel,
@@ -85,13 +85,13 @@ component mixin="controller" output="false" {
 			);
 
 			writeLog(
-				text="SentryForWheels initialized (env=#env#, release=#rel#, pii=#pii#)",
+				text="wheels-sentry initialized (env=#env#, release=#rel#, pii=#pii#)",
 				type="information",
 				file="application"
 			);
 		} catch (any e) {
 			writeLog(
-				text="SentryForWheels initialization failed: #e.message#",
+				text="wheels-sentry initialization failed: #e.message#",
 				type="error",
 				file="application"
 			);

@@ -1,5 +1,5 @@
 <cfoutput>
-<h1>SentryForWheels</h1>
+<h1>wheels-sentry</h1>
 <p>Sentry error tracking for CFWheels with framework-aware context enrichment.</p>
 <h2>Status</h2>
 <table class="table">

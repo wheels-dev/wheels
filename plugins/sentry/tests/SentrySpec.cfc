@@ -1,5 +1,5 @@
 /**
- * SentryForWheels — TestBox BDD specs
+ * wheels-sentry — TestBox BDD specs
  *
  * Tests are structured to verify public behavior only. Private methods
  * (parseDSN, validateLevel) are exercised through the public API.
@@ -13,7 +13,7 @@ component extends="wheels.WheelsTest" output="false" {
 			it("accepts a modern DSN without throwing", () => {
 				var threw = false;
 				try {
-					var client = new plugins.SentryForWheels.SentryClient(
+					var client = new plugins.sentry.SentryClient(
 						DSN: "https://abc123@o123456.ingest.sentry.io/789",
 						environment: "test",
 						release: "1.0.0"
@@ -27,7 +27,7 @@ component extends="wheels.WheelsTest" output="false" {
 			it("accepts a legacy DSN (with secret key) without throwing", () => {
 				var threw = false;
 				try {
-					var client = new plugins.SentryForWheels.SentryClient(
+					var client = new plugins.sentry.SentryClient(
 						DSN: "https://abc123:secretkey@o123456.ingest.sentry.io/789",
 						environment: "test",
 						release: "1.0.0"
@@ -41,7 +41,7 @@ component extends="wheels.WheelsTest" output="false" {
 			it("throws for an invalid DSN", () => {
 				var threw = false;
 				try {
-					var client = new plugins.SentryForWheels.SentryClient(
+					var client = new plugins.sentry.SentryClient(
 						DSN: "not-a-valid-dsn",
 						environment: "test",
 						release: "1.0.0"
@@ -57,7 +57,7 @@ component extends="wheels.WheelsTest" output="false" {
 		describe("SentryClient — getTimeVars timestamp", () => {
 
 			it("returns a Z-suffixed ISO 8601 timestamp", () => {
-				var client = new plugins.SentryForWheels.SentryClient(
+				var client = new plugins.sentry.SentryClient(
 					DSN: "https://abc123@o123456.ingest.sentry.io/789",
 					environment: "test",
 					release: "1.0.0"
@@ -77,7 +77,7 @@ component extends="wheels.WheelsTest" output="false" {
 
 		});
 
-		describe("SentryForWheels mixin — sentrySetUser", () => {
+		describe("wheels-sentry mixin — sentrySetUser", () => {
 
 			it("stores user struct in request scope", () => {
 				// sentrySetUser is a simple assignment; test the behavior directly
@@ -113,7 +113,7 @@ component extends="wheels.WheelsTest" output="false" {
 				// Clear any pre-existing breadcrumbs from prior tests
 				structDelete(request, "sentryBreadcrumbs");
 
-				var client = new plugins.SentryForWheels.SentryClient(
+				var client = new plugins.sentry.SentryClient(
 					DSN: "https://abc123@o123456.ingest.sentry.io/789",
 					environment: "test",
 					release: "1.0.0"
@@ -135,7 +135,7 @@ component extends="wheels.WheelsTest" output="false" {
 			it("appends multiple breadcrumbs in order", () => {
 				structDelete(request, "sentryBreadcrumbs");
 
-				var client = new plugins.SentryForWheels.SentryClient(
+				var client = new plugins.sentry.SentryClient(
 					DSN: "https://abc123@o123456.ingest.sentry.io/789",
 					environment: "test",
 					release: "1.0.0"
@@ -154,7 +154,7 @@ component extends="wheels.WheelsTest" output="false" {
 			it("includes optional data struct in breadcrumb when provided", () => {
 				structDelete(request, "sentryBreadcrumbs");
 
-				var client = new plugins.SentryForWheels.SentryClient(
+				var client = new plugins.sentry.SentryClient(
 					DSN: "https://abc123@o123456.ingest.sentry.io/789",
 					environment: "test",
 					release: "1.0.0"
@@ -176,7 +176,7 @@ component extends="wheels.WheelsTest" output="false" {
 		describe("SentryClient — getEnvironment / getRelease accessors", () => {
 
 			it("returns the environment passed at init", () => {
-				var client = new plugins.SentryForWheels.SentryClient(
+				var client = new plugins.sentry.SentryClient(
 					DSN: "https://abc123@o123456.ingest.sentry.io/789",
 					environment: "staging",
 					release: "2.5.0"
@@ -185,7 +185,7 @@ component extends="wheels.WheelsTest" output="false" {
 			});
 
 			it("returns the release passed at init", () => {
-				var client = new plugins.SentryForWheels.SentryClient(
+				var client = new plugins.sentry.SentryClient(
 					DSN: "https://abc123@o123456.ingest.sentry.io/789",
 					environment: "production",
 					release: "3.1.4"
