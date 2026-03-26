@@ -4,7 +4,7 @@
 
 A Wheels framework plugin providing CFML view helpers that generate Basecoat UI component markup — shadcn/ui-quality design using plain HTML + Tailwind CSS classes. No React, no build step. Works with or without wheels-hotwire.
 
-This plugin is part of the Wheels first-party plugin collection, hosted as an exploded folder in the main Wheels repository under `plugins/basecoat/`.
+This package is part of the Wheels first-party package collection, hosted in the main Wheels repository under `packages/basecoat/`. Activate by copying to `vendor/basecoat/`.
 
 ## Plugin Architecture
 
@@ -13,10 +13,11 @@ Standard Wheels plugin. The main CFC (`Basecoat.cfc`) contains `init()` and all 
 ## File Structure
 
 ```
-plugins/basecoat/
+packages/basecoat/
 ├── CLAUDE.md              # This file (Claude Code reads first)
-├── Basecoat.cfc           # Main plugin CFC — ALL helpers here
-├── index.cfm              # Plugin UI page (Wheels debug panel)
+├── Basecoat.cfc           # Main package CFC — ALL helpers here
+├── package.json           # Package manifest
+├── index.cfm              # Package UI page (Wheels debug panel)
 ├── box.json               # CommandBox package metadata
 └── .ai/
     └── ARCHITECTURE.md    # Full architecture doc (long-form context)

@@ -3,6 +3,11 @@
 	"version": "1.0.0",
 	"author": "PAI Industries",
 	"description": "Sentry error tracking for CFWheels with framework-aware context enrichment",
-	"mixins": "controller",
-	"wheelsVersion": "3.0"
+	"wheelsVersion": ">=3.0",
+	"provides": {
+		"mixins": "controller",
+		"services": [],
+		"middleware": []
+	},
+	"dependencies": {}
 }

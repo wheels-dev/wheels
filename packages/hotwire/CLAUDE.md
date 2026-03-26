@@ -4,7 +4,7 @@
 
 A Wheels framework plugin providing Hotwire infrastructure: Turbo Drive, Turbo Frames, Turbo Streams, Stimulus, and Hotwire Native mobile support. This is the **interaction layer** — it has zero opinions about CSS or visual design.
 
-This plugin is part of the Wheels first-party plugin collection, hosted as an exploded folder in the main Wheels repository under `plugins/hotwire/`.
+This package is part of the Wheels first-party package collection, hosted in the main Wheels repository under `packages/hotwire/`. Activate by copying to `vendor/hotwire/`.
 
 ## Plugin Architecture
 
@@ -13,10 +13,11 @@ Standard Wheels plugin. The main CFC (`Hotwire.cfc`) contains `init()` and all p
 ## File Structure
 
 ```
-plugins/hotwire/
+packages/hotwire/
 ├── CLAUDE.md              # This file (Claude Code reads first)
-├── Hotwire.cfc            # Main plugin CFC — ALL helpers here
-├── index.cfm              # Plugin UI page (Wheels debug panel)
+├── Hotwire.cfc            # Main package CFC — ALL helpers here
+├── package.json           # Package manifest
+├── index.cfm              # Package UI page (Wheels debug panel)
 ├── box.json               # CommandBox package metadata
 └── .ai/
     └── ARCHITECTURE.md    # Full architecture doc (long-form context)

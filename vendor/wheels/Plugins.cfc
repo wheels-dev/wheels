@@ -38,6 +38,8 @@ component output="false" extends="wheels.Global"{
 		$processMixins();
 		/* dependencies */
 		$determineDependency();
+		/* deprecation warning: plugins/ directory is deprecated in favor of packages/ */
+		$checkPluginsDeprecation();
 		return this;
 	}
 
@@ -541,6 +543,20 @@ component output="false" extends="wheels.Global"{
 	 */
 	private boolean function $hasPluginManifest(required string pluginName) {
 		return FileExists($fullPathToPlugin(arguments.pluginName) & "/plugin.json");
+	}
+
+	/**
+	 * Logs a deprecation warning if the plugins/ directory contains any loaded plugins.
+	 * The plugins/ directory is deprecated in favor of the packages/ system.
+	 */
+	private void function $checkPluginsDeprecation() {
+		if (!StructIsEmpty(variables.$class.plugins)) {
+			local.pluginList = StructKeyList(variables.$class.plugins);
+			WriteLog(
+				type = "warning",
+				text = "[Wheels] The plugins/ directory is deprecated. Plugins found: #local.pluginList#. Move them to packages/ and activate by copying to vendor/. See: https://wheels.dev/docs/packages"
+			);
+		}
 	}
 
 	/**

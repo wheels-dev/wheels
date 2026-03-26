@@ -157,7 +157,12 @@ component extends="wheels.Global" {
 			$loadPlugins();
 		}
 
-		// Inject methods from plugins directly to Application.cfc.
+		// Reload packages on each request if cachePlugins is set to false.
+		if (!application.wheels.cachePlugins && StructKeyExists(application.wheels, "enablePackagesComponent") && application.wheels.enablePackagesComponent) {
+			$loadPackages();
+		}
+
+		// Inject methods from plugins and packages directly to Application.cfc.
 		if (!StructIsEmpty(application.wheels.mixins)) {
 			if (structKeyExists(server, "boxlang")) {
 				variables.this = this;
