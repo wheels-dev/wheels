@@ -250,6 +250,42 @@
 		</cfif>
 	</cffunction>
 
+	<!--- Serves Hotwire Native path configuration as JSON response --->
+	<cffunction name="hotwireNativePathConfiguration" access="public" returntype="void" output="true"
+		hint="Renders JSON path configuration for Hotwire Native apps">
+		<cfargument name="settings" type="struct" required="false" default="#StructNew()#"
+			hint="Settings object (tabs, etc.)">
+		<cfargument name="rules" type="array" required="false" default="#ArrayNew(1)#"
+			hint="Array of rule structs with patterns and properties">
+
+		<cfset var local = {}>
+		<cfset local.config = {}>
+
+		<cfif NOT StructIsEmpty(arguments.settings)>
+			<cfset local.config["settings"] = arguments.settings>
+		</cfif>
+
+		<cfif ArrayLen(arguments.rules) GT 0>
+			<cfset local.config["rules"] = arguments.rules>
+		<cfelse>
+			<!--- Default rules: all pages default context, /new and /edit open as modals --->
+			<cfset local.config["rules"] = [
+				{
+					"patterns": [".*"],
+					"properties": {"context": "default", "pull_to_refresh_enabled": true}
+				},
+				{
+					"patterns": ["/new$", "/edit$"],
+					"properties": {"context": "modal", "pull_to_refresh_enabled": false}
+				}
+			]>
+		</cfif>
+
+		<cfcontent type="application/json" reset="true">
+		<cfoutput>#SerializeJSON(local.config)#</cfoutput>
+		<cfabort>
+	</cffunction>
+
 	<!--- ============================================== --->
 	<!--- STIMULUS CONVENIENCE HELPERS                   --->
 	<!--- ============================================== --->
