@@ -28,7 +28,7 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator" {
 	 */
 	public string function addPrimaryKeyOptions(required string sql, struct options = {}) {
 		if (StructKeyExists(arguments.options, "autoIncrement") && arguments.options.autoIncrement) {
-			arguments.sql = REReplace(arguments.sql, "\bINT\b", "INT DEFAULT unique_rowid()");
+			arguments.sql = REReplace(arguments.sql, "\bINTEGER\b|\bINT\b", "INT DEFAULT unique_rowid()");
 		}
 		arguments.sql = arguments.sql & " PRIMARY KEY";
 		return arguments.sql;

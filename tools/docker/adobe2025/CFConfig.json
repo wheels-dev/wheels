@@ -48,7 +48,7 @@
 			"connectionTimeout": "20",
 			"database": "wheelstestdb",
 			"dbdriver": "PostgreSql",
-			"dsn": "jdbc:postgresql://{host}:{port}/{database}",
+			"dsn": "jdbc:postgresql://{host}:{port}/{database}?sslmode=disable",
 			"host": "cockroachdb",
 			"password": "",
 			"port": "26257",
