@@ -429,11 +429,7 @@ jobs:
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
 
-          # Use h2 for Lucee (fast, built-in), sqlite for others
-          case "${{ matrix.cfengine }}" in
-            lucee6|lucee7) PKG_DB="h2" ;;
-            *) PKG_DB="sqlite" ;;
-          esac
+          PKG_DB="sqlite"
 
           # Find packages with test directories
           if [ ! -d "packages" ]; then
