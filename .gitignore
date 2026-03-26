@@ -35,3 +35,4 @@ cli/tests/*
 test-output/
 .worktrees/
 .grove/
+.claude/settings.local.json
