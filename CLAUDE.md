@@ -10,7 +10,7 @@ app/migrator/migrations/    app/db/seeds.cfm    app/db/seeds/
 app/events/    app/global/    app/lib/
 app/mailers/    app/jobs/    app/plugins/    app/snippets/
 config/settings.cfm    config/routes.cfm    config/environment.cfm
-public/    tests/    vendor/    .env (never commit)
+packages/    plugins/    public/    tests/    vendor/    .env (never commit)
 ```
 
 ## Development Tools
@@ -330,6 +330,61 @@ new wheels.middleware.RateLimiter(keyFunction=function(req) {
 ```
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` (default) or `database`. Adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers. Returns `429 Too Many Requests` with `Retry-After` when limit exceeded.
+
+## Package System
+
+Optional first-party modules ship in `packages/` and are activated by copying to `vendor/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
+
+```
+packages/              # Source/staging (NOT auto-loaded)
+  sentry/              #   wheels-sentry — error tracking
+  hotwire/             #   wheels-hotwire — Turbo/Stimulus
+  basecoat/            #   wheels-basecoat — UI components
+vendor/                # Runtime: framework core + activated packages
+  wheels/              #   Framework core (excluded from package discovery)
+  sentry/              #   Activated package (copied from packages/)
+plugins/               # DEPRECATED: legacy plugins still work with warning
+```
+
+### package.json Manifest
+
+```json
+{
+    "name": "wheels-sentry",
+    "version": "1.0.0",
+    "author": "PAI Industries",
+    "description": "Sentry error tracking",
+    "wheelsVersion": ">=3.0",
+    "provides": {
+        "mixins": "controller",
+        "services": [],
+        "middleware": []
+    },
+    "dependencies": {}
+}
+```
+
+**`provides.mixins`**: Comma-delimited targets — `controller`, `view`, `model`, `global`, `none`. Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`).
+
+### Activating a Package
+
+```bash
+cp -r packages/sentry vendor/sentry    # activate
+rm -rf vendor/sentry                    # deactivate
+```
+
+Restart or reload the app after activation. Symlinks also work: `ln -s ../../packages/sentry vendor/sentry`.
+
+### Error Isolation
+
+Each package loads in its own try/catch. A broken package is logged and skipped — the app and other packages continue normally.
+
+### Testing Packages
+
+```bash
+# Run a specific package's tests (package must be in vendor/)
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.sentry.tests"
+```
 
 ## Routing Quick Reference
 

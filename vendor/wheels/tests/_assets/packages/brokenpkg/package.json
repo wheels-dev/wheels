@@ -1,0 +1,8 @@
+{
+	"name": "wheels-brokenpkg",
+	"version": "0.0.1",
+	"description": "Test fixture: package that throws on init",
+	"provides": {
+		"mixins": "controller"
+	}
+}

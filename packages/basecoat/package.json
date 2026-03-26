@@ -1,0 +1,13 @@
+{
+	"name": "wheels-basecoat",
+	"version": "0.1.0",
+	"author": "CFWheels Core Team",
+	"description": "Basecoat UI component helpers for Wheels. shadcn/ui-quality design using plain HTML + Tailwind CSS. No React required.",
+	"wheelsVersion": ">=3.0",
+	"provides": {
+		"mixins": "controller,view",
+		"services": [],
+		"middleware": []
+	},
+	"dependencies": {}
+}

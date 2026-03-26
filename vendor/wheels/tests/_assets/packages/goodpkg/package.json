@@ -1,0 +1,10 @@
+{
+	"name": "wheels-goodpkg",
+	"version": "1.0.0",
+	"description": "Test fixture: valid package with controller mixins",
+	"provides": {
+		"mixins": "controller",
+		"services": [],
+		"middleware": []
+	}
+}

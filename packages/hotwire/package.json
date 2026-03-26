@@ -1,0 +1,13 @@
+{
+	"name": "wheels-hotwire",
+	"version": "0.1.0",
+	"author": "CFWheels Core Team",
+	"description": "Hotwire infrastructure for Wheels: Turbo Drive, Turbo Frames, Turbo Streams, Stimulus helpers, and Hotwire Native mobile support",
+	"wheelsVersion": ">=3.0",
+	"provides": {
+		"mixins": "controller,view",
+		"services": [],
+		"middleware": []
+	},
+	"dependencies": {}
+}

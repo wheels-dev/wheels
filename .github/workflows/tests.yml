@@ -423,6 +423,88 @@ jobs:
             exit 1
           fi
 
+      - name: Run per-package tests
+        if: success()
+        run: |
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+
+          PKG_DB="sqlite"
+
+          # Find packages with test directories
+          if [ ! -d "packages" ]; then
+            echo "No packages/ directory found, skipping"
+            exit 0
+          fi
+
+          PKG_FAIL=0
+          for pkg_dir in packages/*/; do
+            pkg_name=$(basename "$pkg_dir")
+            test_dir="${pkg_dir}tests"
+
+            if [ ! -d "$test_dir" ]; then
+              echo "Package '${pkg_name}' has no tests/ directory, skipping"
+              continue
+            fi
+
+            echo ""
+            echo "=============================================="
+            echo "Testing package: ${pkg_name} (${{ matrix.cfengine }} + ${PKG_DB})"
+            echo "=============================================="
+
+            # Activate: copy package to vendor/
+            cp -r "${pkg_dir}" "vendor/${pkg_name}"
+
+            # Restart engine for clean app state with the package loaded
+            docker restart wheels-${{ matrix.cfengine }}-1
+            WAIT=0
+            while [ "$WAIT" -lt 30 ]; do
+              WAIT=$((WAIT + 1))
+              if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
+                break
+              fi
+              sleep 5
+            done
+            # Warm-up
+            curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/?reload=true" || true
+            sleep 2
+
+            # Run the package's tests
+            TEST_URL="http://localhost:${PORT}/wheels/core/tests?db=${PKG_DB}&format=json&directory=vendor.${pkg_name}.tests"
+            RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-pkg-${pkg_name}.txt"
+
+            HTTP_CODE=$(curl -sL -o "$RESULT_FILE" \
+              --max-time 300 \
+              --write-out "%{http_code}" \
+              "$TEST_URL" || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              PASS=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print(d.get('totalPass',0))" 2>/dev/null || echo "?")
+              echo "PASSED: package '${pkg_name}' (${PASS} specs)"
+            else
+              echo "::warning::Package '${pkg_name}' tests returned HTTP ${HTTP_CODE}"
+              PKG_FAIL=1
+            fi
+
+            # Deactivate: remove from vendor/
+            rm -rf "vendor/${pkg_name}"
+          done
+
+          # Restart engine to restore clean state (no packages)
+          docker restart wheels-${{ matrix.cfengine }}-1
+          WAIT=0
+          while [ "$WAIT" -lt 30 ]; do
+            WAIT=$((WAIT + 1))
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$PKG_FAIL" -ne 0 ]; then
+            echo "::warning::One or more package test suites had issues (non-blocking)"
+          fi
+
       - name: Generate per-engine summary
         if: always()
         run: |

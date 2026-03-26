@@ -16,6 +16,8 @@
 		application.$wheels.modelPath = "/app/models";
 		application.$wheels.pluginPath = "/plugins";
 		application.$wheels.pluginComponentPath = "/plugins";
+		application.$wheels.packagePath = "/vendor";
+		application.$wheels.enablePackagesComponent = true;
 		application.$wheels.stylesheetPath = "stylesheets";
 		application.$wheels.viewPath = "/app/views";
 		application.$wheels.controllerPath = "/app/controllers";

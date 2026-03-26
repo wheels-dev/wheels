@@ -238,7 +238,12 @@ component {
 			application.wo.$loadPlugins();
 		}
 
-		// Allow developers to inject plugins into the application variables scope.
+		// Discover and load packages from vendor/ (after plugins, before mixin injection).
+		if (application.$wheels.enablePackagesComponent) {
+			application.wo.$loadPackages();
+		}
+
+		// Allow developers to inject plugins and packages into the application variables scope.
 		if (!StructIsEmpty(application.$wheels.mixins)) {
 			if (structKeyExists(server, "boxlang")) {
 				variables.this = this;
@@ -247,7 +252,7 @@ component {
 		}
 
 		// Create the mapper that will handle creating routes.
-		// Needs to be before $loadRoutes and after $loadPlugins.
+		// Needs to be before $loadRoutes and after $loadPlugins/$loadPackages.
 		application.$wheels.mapper = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Mapper", method = "$init");
 
 		// Load developer routes and adds the default Wheels routes (unless the developer has specified not to).

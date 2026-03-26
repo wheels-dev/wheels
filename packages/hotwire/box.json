@@ -1,0 +1,13 @@
+{
+	"name": "wheels-hotwire",
+	"slug": "wheels-hotwire",
+	"version": "0.1.0",
+	"author": "CFWheels Core Team",
+	"homepage": "https://wheels.dev",
+	"repository": { "type": "git", "URL": "https://github.com/cfwheels/wheels.git" },
+	"bugs": "https://github.com/cfwheels/wheels/issues",
+	"keywords": ["cfwheels", "hotwire", "turbo", "stimulus", "turbo-frames", "turbo-streams", "hotwire-native", "mobile"],
+	"type": "cfwheels-plugins",
+	"license": [{ "type": "MIT", "URL": "https://opensource.org/licenses/MIT" }],
+	"description": "Hotwire infrastructure for Wheels: Turbo Drive, Turbo Frames, Turbo Streams, Stimulus helpers, and Hotwire Native mobile support."
+}

@@ -2820,6 +2820,50 @@ component output="false" {
 	}
 
 	/**
+	 * Discovers and loads packages from the vendor/ directory via PackageLoader.
+	 * Merges package mixins into the existing application mixins struct so they
+	 * participate in the standard $initializeMixins injection pipeline.
+	 */
+	public void function $loadPackages() {
+		local.appKey = $appKey();
+		local.vendorPath = ExpandPath(application[local.appKey].packagePath);
+
+		application[local.appKey].PackageLoaderObj = $createObjectFromRoot(
+			path = "wheels",
+			fileName = "PackageLoader",
+			method = "init",
+			vendorPath = local.vendorPath,
+			wheelsVersion = application[local.appKey].version,
+			wheelsEnvironment = application[local.appKey].environment
+		);
+
+		application[local.appKey].packages = application[local.appKey].PackageLoaderObj.getPackages();
+		application[local.appKey].packageMeta = application[local.appKey].PackageLoaderObj.getPackageMeta();
+		application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
+
+		// Merge package mixins into the existing mixins struct (plugins loaded first, packages overlay)
+		local.pkgMixins = application[local.appKey].PackageLoaderObj.getMixins();
+		for (local.target in local.pkgMixins) {
+			if (!StructKeyExists(application[local.appKey].mixins, local.target)) {
+				application[local.appKey].mixins[local.target] = {};
+			}
+			StructAppend(application[local.appKey].mixins[local.target], local.pkgMixins[local.target]);
+		}
+
+		// Merge package middleware into pluginMiddleware (shared pipeline)
+		local.pkgMiddleware = application[local.appKey].PackageLoaderObj.getPackageMiddleware();
+		for (local.mw in local.pkgMiddleware) {
+			ArrayAppend(application[local.appKey].pluginMiddleware, local.mw);
+		}
+
+		// Invoke ServiceProvider register/boot if DI container exists
+		if (isDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PackageLoaderObj.getServiceProviders())) {
+			application[local.appKey].PackageLoaderObj.$invokeServiceProviderRegister(application.wheelsdi);
+			application[local.appKey].PackageLoaderObj.$invokeServiceProviderBoot(application[local.appKey]);
+		}
+	}
+
+	/**
 	 * NB: url rewriting files need to be removed from here.
 	 */
 	public string function $buildReleaseZip(string version = application.wheels.version, string directory = ExpandPath("/")) {

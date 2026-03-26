@@ -1,0 +1,16 @@
+{
+	"name": "wheels-basecoat",
+	"slug": "wheels-basecoat",
+	"version": "0.1.0",
+	"author": "CFWheels Core Team",
+	"homepage": "https://wheels.dev",
+	"repository": { "type": "git", "URL": "https://github.com/cfwheels/wheels.git" },
+	"bugs": "https://github.com/cfwheels/wheels/issues",
+	"keywords": ["cfwheels", "basecoat", "ui", "components", "shadcn", "tailwind", "design-system"],
+	"type": "cfwheels-plugins",
+	"license": [{ "type": "MIT", "URL": "https://opensource.org/licenses/MIT" }],
+	"optionalDependencies": {
+		"wheels-hotwire": ">=0.1.0"
+	},
+	"description": "Basecoat UI component helpers for Wheels. shadcn/ui-quality design using plain HTML + Tailwind CSS. No React required."
+}
