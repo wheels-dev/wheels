@@ -296,10 +296,9 @@ component displayname="SentryClient" output="false" accessors="true" {
 
 		var sentryEvent = {
 			"level": arguments.level,
-			"culprit": exMessage,
 			"exception": {
 				"values": [{
-					"type": exType & " Error",
+					"type": exType,
 					"value": trim(exMessage & " " & exDetail),
 					"stacktrace": {
 						"frames": frames
