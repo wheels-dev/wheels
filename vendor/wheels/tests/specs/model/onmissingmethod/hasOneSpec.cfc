@@ -52,7 +52,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is valid with combi key", () => {
-				user = userModel.findByKey(key = 1)
+				user = userModel.findOne(order = "id")
 				hasCombiKey = user.hasCombiKey()
 
 				expect(hasCombiKey).toBeTrue()
@@ -87,7 +87,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is valid with combi key", () => {
-				user = userModel.findByKey(key = 1)
+				user = userModel.findOne(order = "id")
 				combiKey = user.combiKey()
 
 				expect(combiKey).toBeInstanceOf("combiKey")

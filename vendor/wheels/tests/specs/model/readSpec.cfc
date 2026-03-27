@@ -131,9 +131,10 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that findfirst", () => {
 
 			it("works", () => {
+				firstUser = g.model("user").findOne(order = "id")
 				result = g.model("user").findFirst();
 
-				expect(result.id).toBe(1)
+				expect(result.id).toBe(firstUser.id)
 
 				result = g.model("user").findFirst(property = "firstName");
 
@@ -143,7 +144,8 @@ component extends="wheels.WheelsTest" {
 
 				expect(result.firstName).toBe("Chris")
 
-				result = g.model("user").findFirst(property = "firstName", where = "id != 2");
+				chris = g.model("user").findOne(where = "firstname = 'Chris'")
+				result = g.model("user").findFirst(property = "firstName", where = "id != #chris.id#");
 
 				expect(result.firstName).toBe("Joe")
 			})
@@ -152,13 +154,14 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that findLastOne", () => {
 
 			it("works", () => {
+				lastUser = g.model("user").findOne(order = "id DESC")
 				result = g.model("user").findLastOne();
 
-				expect(result.id).toBe(5)
+				expect(result.id).toBe(lastUser.id)
 
 				result = g.model("user").findLastOne(properties = "id");
 
-				expect(result.id).toBe(5)
+				expect(result.id).toBe(lastUser.id)
 			})
 		})
 

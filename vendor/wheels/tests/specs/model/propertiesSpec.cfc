@@ -168,7 +168,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("should be able to update integer from null to 0", () => {
-				user = g.model("user").findByKey(1)
+				user = g.model("user").findOne(order = "id")
 
 				transaction {
 					user.birthDayYear = ""
@@ -246,7 +246,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("returns numeric value if PK is numeric", () => {
-				author = g.model("author").findByKey(1)
+				author = g.model("author").findOne(order = "id")
 				authorArr = []
 
 				// BoxLang compatibility: Ensure numeric ID remains numeric
@@ -263,7 +263,7 @@ component extends="wheels.WheelsTest" {
 
 				responseJSON = serializeJSON(authorArr)
 
-				expect(find('"id":1',responseJSON)).toBeTrue()
+				expect(find('"id":' & local.authorId, responseJSON)).toBeTrue()
 			})
 
 			xit("returns pk calculated property selecting alias", () => {

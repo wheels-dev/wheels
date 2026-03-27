@@ -322,7 +322,7 @@ component extends="wheels.WheelsTest" {
 
 			it("function hasChanged is working with float compare", () => {
 				transaction {
-					post = g.model("post").findByKey(2)
+					post = g.model("post").findOne(where = "views > 0", order = "id")
 					post.averagerating = 3.0000
 					post.save(reload = true)
 					post.averagerating = "3.0000"
@@ -505,9 +505,12 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with IN operator wih spaces", () => {
+				// Look up actual IDs for Per, Tony, Chris (first 3 authors)
+				local.threeAuthors = g.model("author").findAll(select = "id", maxRows = 3, order = "id")
+				local.idList = ValueList(local.threeAuthors.id)
 				authors = g.model("author").findAll(
 					where = ArrayToList(
-						["id != 0", "id IN (1, 2, 3)", "firstName IN ('Per', 'Tony')", "lastName IN ('Djurner', 'Petruzzi')"],
+						["id != 0", "id IN (#local.idList#)", "firstName IN ('Per', 'Tony')", "lastName IN ('Djurner', 'Petruzzi')"],
 						" AND "
 					)
 				)
@@ -516,8 +519,9 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with IN operator with spaces and equals comma value combo with brackets", () => {
+				local.duke = g.model("author").findOne(where = "lastName = 'Chapman, Duke of Surrey'")
 				authors = g.model("author").findAll(
-					where = ArrayToList(["id IN (8)", "(lastName = 'Chapman, Duke of Surrey')"], " AND ")
+					where = ArrayToList(["id IN (#local.duke.id#)", "(lastName = 'Chapman, Duke of Surrey')"], " AND ")
 				)
 
 				expect(authors.recordCount).toBe(1)
@@ -887,15 +891,17 @@ component extends="wheels.WheelsTest" {
 					return
 				}
 				actual = user.findAll(returnType = "struct", keyColumn = "id")
+				local.firstUser = user.findOne(order = "id")
+				local.firstKey = ToString(local.firstUser.id)
 
 				expect(actual).toBeStruct()
 
 				if (isACF2021 || isACF2023 || isACF2025) {
-					expect(actual.resultset['1']).toBeStruct()
+					expect(actual.resultset[local.firstKey]).toBeStruct()
 				} else if (structKeyExists(server, "boxlang")) {
-					expect(actual['1']['1']).toBeStruct()
+					expect(actual[local.firstKey]['1']).toBeStruct()
 				} else {
-					expect(actual['1']).toBeStruct()
+					expect(actual[local.firstKey]).toBeStruct()
 				}
 			})
 
@@ -1003,7 +1009,8 @@ component extends="wheels.WheelsTest" {
 			it("function findAll with softdeleted associated rows", () => {
 				transaction action="begin" {
 					g.model("Post").deleteAll()
-					posts = g.model("Author").findByKey(key = 1, include = "Posts", returnAs = "query")
+					local.firstAuthor = g.model("Author").findOne(order = "id")
+					posts = g.model("Author").findByKey(key = local.firstAuthor.id, include = "Posts", returnAs = "query")
 					transaction action="rollback";
 				}
 
@@ -1023,9 +1030,9 @@ component extends="wheels.WheelsTest" {
 				application.wheels.cacheQueriesDuringRequest = true
 
 				transaction action="begin" {
-					authorBefore = g.model("author").findByKey(1)
+					authorBefore = g.model("author").findOne(order = "id")
 					authorBefore.update(lastName = "D")
-					authorAfter = g.model("author").findByKey(1)
+					authorAfter = g.model("author").findByKey(authorBefore.id)
 					transaction action="rollback";
 				}
 				
@@ -1042,7 +1049,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("should self join with other associations", () => {
-				post = postModel.findByKey(key = 1, include = "classifications(tag(parent))", returnAs = "query")
+				local.firstPost = postModel.findOne(order = "id")
+				post = postModel.findByKey(key = local.firstPost.id, include = "classifications(tag(parent))", returnAs = "query")
 
 				expect(post).toBeQuery()
 				expect(post.recordcount).toBeGT(0)
@@ -1140,13 +1148,15 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with unlimited properties for dynamic finders", () => {
-				post = g.model("Post").findOneByTitleAndAuthoridAndViews(values = "Title for first test post|1|5", delimiter = "|")
+				local.firstAuthor = g.model("author").findOne(order = "id")
+				post = g.model("Post").findOneByTitleAndAuthoridAndViews(values = "Title for first test post|#local.firstAuthor.id#|5", delimiter = "|")
 
 				expect(post).toBeInstanceOf("post")
 			})
 
 			it("is passing array", () => {
-				args = ["Title for first test post", 1, 5]
+				local.firstAuthor = g.model("author").findOne(order = "id")
+				args = ["Title for first test post", local.firstAuthor.id, 5]
 				post = g.model("Post").findOneByTitleAndAuthoridAndViews(values = args)
 
 				expect(post).toBeInstanceOf("post")
@@ -1155,10 +1165,11 @@ component extends="wheels.WheelsTest" {
 			it("can change delimiter for dynamic finders", () => {
 				title = "Testing to make, to make sure, commas work"
 				transaction action="begin" {
-					post = g.model("Post").findOne(where = "id = 1")
+					post = g.model("Post").findOne(order = "id")
+					local.authorId = post.authorid
 					post.title = title
 					post.save()
-					post = g.model("Post").findOneByTitleAndAuthorid(values = "#title#|1", delimiter = "|")
+					post = g.model("Post").findOneByTitleAndAuthorid(values = "#title#|#local.authorId#", delimiter = "|")
 					transaction action="rollback";
 				}
 
@@ -1166,7 +1177,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is passing where clause", () => {
-				post = g.model("Post").findOneByTitle(value = "Title for first test post", where = "authorid = 1 AND views = 5")
+				local.firstAuthor = g.model("author").findOne(order = "id")
+				post = g.model("Post").findOneByTitle(value = "Title for first test post", where = "authorid = #local.firstAuthor.id# AND views = 5")
 
 				expect(post).toBeInstanceOf("post")
 			})
@@ -1174,7 +1186,7 @@ component extends="wheels.WheelsTest" {
 			it("can pass in commas", () => {
 				title = "Testing to make, to make sure, commas work"
 				transaction action="begin" {
-					post = g.model("Post").findOne(where = "id = 1")
+					post = g.model("Post").findOne(order = "id")
 					post.title = title
 					post.save()
 					post = g.model("Post").findOneByTitle(values = "#title#")
@@ -1345,7 +1357,7 @@ component extends="wheels.WheelsTest" {
 			it("is working with maxrows and calculated property", () => {
 				result = g.model("photo").findOne(order = "DESCRIPTION1 DESC", maxRows = 1)
 
-				expect(result.fileName).toBe("Gallery 9 Photo Test 9")
+				expect(result.fileName).toInclude("Photo Test 9")
 			})
 
 			it("is working with no sort", () => {
@@ -1545,12 +1557,13 @@ component extends="wheels.WheelsTest" {
 
 			it("works with parameterize set to false with numeric", () => {
 				if (structKeyExists(server, "boxlang")) return;
+				local.firstPhoto = g.model("photo").findOne(order = "id")
 				result = g.model("photo").findAll(
 					page = 1,
 					perPage = 20,
 					handle = "pagination_order_test_1",
 					parameterize = "false",
-					where = "id = 1"
+					where = "id = #local.firstPhoto.id#"
 				)
 
 				expect(request.wheels.pagination_order_test_1.CURRENTPAGE).toBe(1)

@@ -535,35 +535,38 @@ FROM c_o_r_e_users u INNER JOIN c_o_r_e_galleries g ON u.id = g.userid
 
 <cfset model("shop").create(shopid = " shop6", citycode = 0, name = "x")>
 
-<!--- tags --->
+<!--- tags (create major first so minor/point can reference it dynamically) --->
 <cfset local.releases = model("tag").create(name = "releases", description = "testdesc")>
-<cfset model("tag").create(name = "minor", description = "a minor release", parentid = 3)>
-<cfset model("tag").create(name = "major", description = "a major release")>
-<cfset model("tag").create(name = "point", description = "a point release", parentid = 2)>
+<cfset local.major = model("tag").create(name = "major", description = "a major release")>
+<cfset local.minor = model("tag").create(name = "minor", description = "a minor release", parentid = local.major.id)>
+<cfset local.point = model("tag").create(name = "point", description = "a point release", parentid = local.minor.id)>
 
 <cfset local.fruit = model("tag").create(name = "fruit", description = "something to eat")>
 <cfset model("tag").create(name = "apple", description = "ummmmmm good", parentid = local.fruit.id)>
-<cfset model("tag").create(name = "pear", description = "rhymes with Per", parentid = local.fruit.id)>
+<cfset local.pear = model("tag").create(name = "pear", description = "rhymes with Per", parentid = local.fruit.id)>
 <cfset model("tag").create(name = "banana", description = "peal it", parentid = local.fruit.id)>
 
-<!--- classifications --->
-<cfset model("classification").create(postid = 1, tagid = 7)>
+<!--- classifications (use dynamic IDs instead of hardcoded) --->
+<cfset local.firstPost = model("post").findOne(order = "id")>
+<cfset model("classification").create(postid = local.firstPost.id, tagid = local.pear.id)>
 
 <!--- collisiontests --->
 <cfset model("collisiontest").create(method = "test")>
 
-<!--- collisiontests --->
+<!--- collisiontests (use dynamic user IDs) --->
+<cfset local.allUsers = model("user").findAll(select = "id", order = "id", maxRows = 5)>
 <cfloop from="1" to="5" index="i">
 	<cfloop from="1" to="5" index="a">
-		<cfset model("CombiKey").create(id1 = "#i#", id2 = "#a#", userId = "#a#")>
+		<cfset model("CombiKey").create(id1 = "#i#", id2 = "#a#", userId = "#local.allUsers.id[a]#")>
 	</cfloop>
 </cfloop>
 
 <!--- sqltype --->
 <cfset model("sqltype").create(stringVariableType = "tony", textType = "blah blah blah blah")>
 
-<!--- assign posts for multiple join test --->
-<cfset local.andy.update(favouritePostId = 1, leastFavouritePostId = 2)>
+<!--- assign posts for multiple join test (use dynamic IDs) --->
+<cfset local.twoPosts = model("post").findAll(order = "id", maxRows = 2)>
+<cfset local.andy.update(favouritePostId = local.twoPosts.id[1], leastFavouritePostId = local.twoPosts.id[2])>
 
 <!--- uppercase table --->
 <cfset model("category").create(category_name = "Quick Brown Foxes")>

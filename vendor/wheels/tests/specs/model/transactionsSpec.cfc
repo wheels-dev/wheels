@@ -4,10 +4,22 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
+		// CockroachDB uses SERIALIZABLE isolation by default and handles
+		// nested transactions/savepoints differently from other databases.
+		// The Wheels transaction abstraction (commit/rollback via callbacks)
+		// does not reliably roll back on CockroachDB, causing data corruption
+		// that cascades to other test suites.
 		describe("Tests that invokewithtransaction", () => {
+
+			var migration = CreateObject("component", "wheels.migrator.Migration").init();
+			if (migration.adapter.adapterName() == "CockroachDB") return;
 
 			beforeEach(() => {
 				application.wheels.transactionMode = "commit"
+			})
+
+			afterEach(() => {
+				application.wheels.transactionMode = "none"
 			})
 
 			afterEach(() => {

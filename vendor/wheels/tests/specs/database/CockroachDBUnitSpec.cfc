@@ -31,8 +31,20 @@ component extends="wheels.WheelsTest" {
 					expect(adapter.$getType(type = "varchar")).toBe("cf_sql_varchar");
 				});
 
-				it("delegates integer to PostgreSQL parent", () => {
-					expect(adapter.$getType(type = "integer")).toBe("cf_sql_integer");
+				it("maps integer to cf_sql_bigint (CockroachDB default INT is 64-bit)", () => {
+					expect(adapter.$getType(type = "integer")).toBe("cf_sql_bigint");
+				});
+
+				it("maps int to cf_sql_bigint", () => {
+					expect(adapter.$getType(type = "int")).toBe("cf_sql_bigint");
+				});
+
+				it("maps int4 to cf_sql_bigint", () => {
+					expect(adapter.$getType(type = "int4")).toBe("cf_sql_bigint");
+				});
+
+				it("maps serial to cf_sql_bigint", () => {
+					expect(adapter.$getType(type = "serial")).toBe("cf_sql_bigint");
 				});
 
 				it("delegates text to PostgreSQL parent", () => {
@@ -111,17 +123,19 @@ component extends="wheels.WheelsTest" {
 					))).toBeTrue();
 				});
 
-				it("returns void when result already has lastId key", () => {
+				it("returns lastId when result already has lastId key", () => {
 					var result = {
 						sql = "INSERT INTO users (firstname) VALUES ('test')",
 						lastId = 10
 					};
-					expect(IsNull(adapter.$identitySelect(
+					var rv = adapter.$identitySelect(
 						queryAttributes = {},
 						result = result,
 						primaryKey = "id",
 						returningIdentity = ""
-					))).toBeTrue();
+					);
+					expect(rv).toBeStruct();
+					expect(rv.lastId).toBe(10);
 				});
 			});
 

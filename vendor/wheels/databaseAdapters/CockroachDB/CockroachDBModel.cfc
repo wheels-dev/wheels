@@ -22,6 +22,10 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 			case "bytes":
 				local.rv = "cf_sql_binary";
 				break;
+			case "int":
+			case "int4":
+			case "integer":
+			case "serial":
 			case "int64":
 				local.rv = "cf_sql_bigint";
 				break;
@@ -80,8 +84,14 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 	) {
 		var query = {};
 		local.sql = Trim(arguments.result.sql);
-		if (Left(local.sql, 11) != "INSERT INTO" || StructKeyExists(arguments.result, $generatedKey())) {
+		if (Left(local.sql, 11) != "INSERT INTO") {
 			return;
+		}
+		// If the engine already populated the generated key (e.g. Lucee's result.lastId), return it
+		if (StructKeyExists(arguments.result, $generatedKey()) && Len(arguments.result[$generatedKey()])) {
+			local.rv = {};
+			local.rv[$generatedKey()] = arguments.result[$generatedKey()];
+			return local.rv;
 		}
 
 		local.startPar = Find("(", local.sql) + 1;

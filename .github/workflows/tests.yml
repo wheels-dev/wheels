@@ -382,13 +382,26 @@ jobs:
             fi
 
             # Databases whose failures are logged but don't block CI.
-            # CockroachDB populate.cfm fails to create tables (tracked for fix).
-            SOFT_FAIL_DBS="cockroachdb"
+            SOFT_FAIL_DBS=""
 
             # Track per-database result
+            # CockroachDB has 5 known failures (migration behavior, transaction rollback,
+            # paginated include edge case) that require adapter-level fixes.
+            # Allow up to 5 failures for CockroachDB; all other databases must pass clean.
+            COCKROACHDB_KNOWN_FAILURES=5
             if [ "$HTTP_CODE" = "200" ]; then
               echo "PASSED: ${{ matrix.cfengine }} + ${db}"
               DB_STATUS="pass"
+            elif [ "$db" = "cockroachdb" ] && [ -f "$RESULT_FILE" ]; then
+              FAIL_COUNT=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print(d.get('totalFail',0)+d.get('totalError',0))" 2>/dev/null || echo "999")
+              if [ "$FAIL_COUNT" -le "$COCKROACHDB_KNOWN_FAILURES" ]; then
+                echo "PASSED (with $FAIL_COUNT known failures): ${{ matrix.cfengine }} + ${db}"
+                DB_STATUS="pass"
+              else
+                echo "FAILED: ${{ matrix.cfengine }} + ${db} (${FAIL_COUNT} failures, max ${COCKROACHDB_KNOWN_FAILURES})"
+                DB_STATUS="fail"
+                OVERALL_STATUS=1
+              fi
             else
               echo "FAILED: ${{ matrix.cfengine }} + ${db} (HTTP ${HTTP_CODE})"
               DB_STATUS="fail"
@@ -513,7 +526,7 @@ jobs:
           echo "| Database | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          SOFT_FAIL_DBS="cockroachdb"
+          SOFT_FAIL_DBS=""
           IFS=',' read -ra DBS <<< "${{ steps.db-list.outputs.databases }}"
           for db in "${DBS[@]}"; do
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
@@ -534,6 +547,8 @@ jobs:
 
               if [ "$FAIL_COUNT" = "0" ]; then
                 echo "| ${db} | :white_check_mark: Pass |" >> $GITHUB_STEP_SUMMARY
+              elif [ "$db" = "cockroachdb" ] && [ "$FAIL_COUNT" -le 5 ] 2>/dev/null; then
+                echo "| ${db} | :white_check_mark: Pass (${FAIL_COUNT} known) |" >> $GITHUB_STEP_SUMMARY
               elif [ "$FAIL_COUNT" = "-1" ] && [ "$IS_SOFT_FAIL" = true ]; then
                 echo "| ${db} | :warning: Error (soft-fail) |" >> $GITHUB_STEP_SUMMARY
               elif [ "$FAIL_COUNT" = "-1" ]; then
