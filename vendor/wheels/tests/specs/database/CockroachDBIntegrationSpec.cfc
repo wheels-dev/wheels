@@ -70,7 +70,7 @@ component extends="wheels.WheelsTest" {
 
 				it("stores and retrieves true as a CFML boolean", () => {
 					transaction action="begin" {
-						var record = g.model("sqlType").create(booleanType = true);
+						var record = g.model("sqlType").create(booleanType = true, stringVariableType = "test", textType = "test");
 						var found = g.model("sqlType").findByKey(record.key());
 						expect(found.booleanType).toBeBoolean();
 						expect(found.booleanType).toBeTrue();
@@ -80,7 +80,7 @@ component extends="wheels.WheelsTest" {
 
 				it("stores and retrieves false as a CFML boolean", () => {
 					transaction action="begin" {
-						var record = g.model("sqlType").create(booleanType = false);
+						var record = g.model("sqlType").create(booleanType = false, stringVariableType = "test", textType = "test");
 						var found = g.model("sqlType").findByKey(record.key());
 						expect(found.booleanType).toBeBoolean();
 						expect(found.booleanType).toBeFalse();

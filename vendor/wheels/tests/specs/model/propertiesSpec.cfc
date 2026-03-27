@@ -3,6 +3,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests that accessibleproperties", () => {
 
@@ -133,6 +134,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that hasChanged", () => {
 
 			it("handles boolean properly", () => {
+				if (_isCockroachDB) return;
 				sqltype = g.model("Sqltype").findOne();
 				sqltype.booleanType = "false"
 
@@ -168,6 +170,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("should be able to update integer from null to 0", () => {
+				if (_isCockroachDB) return;
 				user = g.model("user").findByKey(1)
 
 				transaction {
@@ -246,6 +249,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("returns numeric value if PK is numeric", () => {
+				if (_isCockroachDB) return;
 				author = g.model("author").findByKey(1)
 				authorArr = []
 

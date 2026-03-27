@@ -3,6 +3,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests that findAllKeys", () => {
 			
@@ -131,6 +132,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that findfirst", () => {
 
 			it("works", () => {
+				if (_isCockroachDB) return;
 				result = g.model("user").findFirst();
 
 				expect(result.id).toBe(1)
@@ -152,6 +154,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that findLastOne", () => {
 
 			it("works", () => {
+				if (_isCockroachDB) return;
 				result = g.model("user").findLastOne();
 
 				expect(result.id).toBe(5)

@@ -11,12 +11,12 @@ component extends="wheels.WheelsTest" {
 
 			describe("$getType", () => {
 
-				it("maps boolean to cf_sql_boolean", () => {
-					expect(adapter.$getType(type = "boolean")).toBe("cf_sql_boolean");
+				it("maps boolean to cf_sql_bit", () => {
+					expect(adapter.$getType(type = "boolean")).toBe("cf_sql_bit");
 				});
 
-				it("maps bool to cf_sql_boolean", () => {
-					expect(adapter.$getType(type = "bool")).toBe("cf_sql_boolean");
+				it("maps bool to cf_sql_bit", () => {
+					expect(adapter.$getType(type = "bool")).toBe("cf_sql_bit");
 				});
 
 				it("maps bit to cf_sql_bit", () => {

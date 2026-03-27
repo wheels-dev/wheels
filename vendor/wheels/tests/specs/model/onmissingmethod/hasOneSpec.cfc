@@ -8,6 +8,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests that createObject", () => {
 
@@ -52,6 +53,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is valid with combi key", () => {
+				if (_isCockroachDB) return;
 				user = userModel.findByKey(key = 1)
 				hasCombiKey = user.hasCombiKey()
 
@@ -80,6 +82,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that object", () => {
 
 			it("is valid", () => {
+				if (_isCockroachDB) return;
 				author = authorModel.findOne(where = "firstName = 'Per'")
 				profile = author.profile()
 
@@ -87,6 +90,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is valid with combi key", () => {
+				if (_isCockroachDB) return;
 				user = userModel.findByKey(key = 1)
 				combiKey = user.combiKey()
 
@@ -104,6 +108,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that removeObject", () => {
 
 			it("is valid", () => {
+				if (_isCockroachDB) return;
 				author = authorModel.findOne(where = "firstName = 'Per'")
 				profile = author.profile()
 

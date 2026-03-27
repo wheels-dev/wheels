@@ -386,8 +386,7 @@ jobs:
             fi
 
             # Databases whose failures are logged but don't block CI.
-            # CockroachDB populate.cfm fails to create tables (tracked for fix).
-            SOFT_FAIL_DBS="cockroachdb"
+            SOFT_FAIL_DBS=""
 
             # Track per-database result
             if [ "$HTTP_CODE" = "200" ]; then
@@ -517,7 +516,7 @@ jobs:
           echo "| Database | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          SOFT_FAIL_DBS="cockroachdb"
+          SOFT_FAIL_DBS=""
           IFS=',' read -ra DBS <<< "${{ steps.db-list.outputs.databases }}"
           for db in "${DBS[@]}"; do
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"

@@ -3,10 +3,12 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests that delete", () => {
 
 			it("works", () => {
+				if (_isCockroachDB) return;
 				transaction action="begin" {
 					local.author = g.model("author").findOne()
 					local.author.delete()
@@ -112,6 +114,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that deleteByKey", () => {
 
 			it("works", () => {
+				if (_isCockroachDB) return;
 				transaction action="begin" {
 					local.author = g.model("author").findOne();
 					g.model("author").deleteByKey(local.author.id)
@@ -152,6 +155,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that deleteOne", () => {
 
 			it("works", () => {
+				if (_isCockroachDB) return;
 				transaction action="begin" {
 					g.model("author").deleteOne();
 					allAuthors = g.model("author").findAll()

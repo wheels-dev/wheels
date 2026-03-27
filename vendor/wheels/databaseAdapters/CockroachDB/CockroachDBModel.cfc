@@ -10,7 +10,7 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 		switch (arguments.type) {
 			case "bool":
 			case "boolean":
-				local.rv = "cf_sql_boolean";
+				local.rv = "cf_sql_bit";
 				break;
 			case "bit":
 			case "varbit":
