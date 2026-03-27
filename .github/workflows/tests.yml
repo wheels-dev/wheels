@@ -339,19 +339,23 @@ jobs:
           except:
               sys.exit(0)
 
+          def safe_str(val, default=''):
+              \"\"\"Coerce None/null JSON values to string for XML serialization.\"\"\"
+              return str(val) if val is not None else default
+
           def process_suite(parent_el, suite):
               \"\"\"Recursively process suites (TestBox suites can be nested).\"\"\"
               for sp in suite.get('specStats', []):
                   tc = SubElement(parent_el, 'testcase',
-                      name=sp.get('name', ''),
-                      classname=f\"{prefix} :: {suite.get('name', '')}\",
+                      name=safe_str(sp.get('name')),
+                      classname=f\"{prefix} :: {safe_str(suite.get('name'))}\",
                       time=str(sp.get('totalDuration', 0) / 1000))
                   if sp.get('status') == 'Failed':
-                      f = SubElement(tc, 'failure', message=sp.get('failMessage', ''))
-                      f.text = sp.get('failDetail', '')
+                      f = SubElement(tc, 'failure', message=safe_str(sp.get('failMessage')))
+                      f.text = safe_str(sp.get('failDetail'))
                   elif sp.get('status') == 'Error':
-                      e = SubElement(tc, 'error', message=sp.get('failMessage', ''))
-                      e.text = sp.get('failDetail', '')
+                      e = SubElement(tc, 'error', message=safe_str(sp.get('failMessage')))
+                      e.text = safe_str(sp.get('failDetail'))
                   elif sp.get('status') == 'Skipped':
                       SubElement(tc, 'skipped')
               # Recurse into child suites
@@ -378,7 +382,7 @@ jobs:
           with open(os.environ['JUNIT_FILE'], 'wb') as f:
               f.write(b'<?xml version=\"1.0\" encoding=\"UTF-8\"?>')
               f.write(tostring(root))
-          " || echo "JUnit conversion failed for ${db} (non-fatal)"
+          " || { echo "JUnit conversion failed for ${db} (non-fatal)"; rm -f "$JUNIT_FILE"; }
             fi
 
             # Databases whose failures are logged but don't block CI.
