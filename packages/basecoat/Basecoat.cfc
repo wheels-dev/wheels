@@ -1,345 +1,270 @@
-<cfcomponent output="false" mixin="controller,view">
+/**
+ * wheels-basecoat Plugin
+ * Basecoat UI component helpers for Wheels.
+ * Generates shadcn/ui-quality HTML using Basecoat CSS classes.
+ * Works with or without wheels-hotwire.
+ */
+component mixin="controller,view" output="false" {
 
-	<!---
-	==============================================
-	wheels-basecoat Plugin
-	Basecoat UI component helpers for Wheels.
-	Generates shadcn/ui-quality HTML using Basecoat CSS classes.
-	Works with or without wheels-hotwire.
-	==============================================
-	--->
+	function init() {
+		this.version = "3.0";
+		return this;
+	}
 
-	<cffunction name="init" access="public" output="false" returntype="any">
-		<cfset this.version = "3.0">
-		<cfreturn this>
-	</cffunction>
+	// ==============================================
+	// INCLUDES
+	// ==============================================
 
-	<!--- ============================================== --->
-	<!--- INCLUDES                                       --->
-	<!--- ============================================== --->
+	/**
+	 * Outputs Basecoat CSS and Alpine.js (for interactive components) tags for the layout <head>.
+	 */
+	public string function basecoatIncludes(
+		boolean alpine = true,
+		string alpineVersion = "3",
+		string basecoatCSSPath = "/plugins/basecoat/assets/basecoat/basecoat.min.css",
+		boolean turboAware = true
+	) {
+		var local = {};
+		savecontent variable="local.html" {
+			writeOutput(
+				(arguments.turboAware ? '<meta name="turbo-cache-control" content="no-preview">' & chr(10) : '')
+				& '<link rel="stylesheet" href="#arguments.basecoatCSSPath#">' & chr(10)
+				& (arguments.alpine ? '<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@#arguments.alpineVersion#/dist/cdn.min.js"></script>' & chr(10) : '')
+			);
+		}
+		return trim(local.html);
+	}
 
-	<cffunction name="basecoatIncludes" access="public" output="false" returntype="string"
-		hint="Outputs Basecoat CSS and Alpine.js (for interactive components) tags for the layout <head>.">
-		<cfargument name="alpine" type="boolean" required="false" default="true"
-			hint="Include Alpine.js for interactive components (dropdowns, tabs, etc.)">
-		<cfargument name="alpineVersion" type="string" required="false" default="3">
-		<cfargument name="basecoatCSSPath" type="string" required="false" default="/plugins/basecoat/assets/basecoat/basecoat.min.css"
-			hint="Path to Basecoat CSS file. Override if using CDN or custom build.">
-		<cfargument name="turboAware" type="boolean" required="false" default="true"
-			hint="Include turbo-cache-control meta tag (harmless without Turbo, helpful with it)">
+	// ==============================================
+	// BUTTONS
+	// ==============================================
 
-		<cfset var local = {}>
-		<cfsavecontent variable="local.html">
-			<cfoutput>
-<cfif arguments.turboAware><meta name="turbo-cache-control" content="no-preview">
-</cfif><link rel="stylesheet" href="#arguments.basecoatCSSPath#">
-<cfif arguments.alpine><script defer src="https://cdn.jsdelivr.net/npm/alpinejs@#arguments.alpineVersion#/dist/cdn.min.js"></script>
-</cfif>
-			</cfoutput>
-		</cfsavecontent>
+	/**
+	 * Basecoat button. Variants: primary, secondary, destructive, outline, ghost, link. Sizes: sm, md, lg.
+	 */
+	public string function uiButton(
+		string text = "",
+		string variant = "primary",
+		string size = "md",
+		string icon = "",
+		string href = "",
+		string type = "button",
+		boolean disabled = false,
+		boolean loading = false,
+		boolean close = false,
+		string class = "",
+		string id = "",
+		string ariaLabel = "",
+		string turboConfirm = "",
+		string turboMethod = ""
+	) {
+		var local = {};
 
-		<cfreturn Trim(local.html)>
-	</cffunction>
+		// Build Basecoat compound class: btn[-size][-icon][-variant]
+		local.isIconOnly = len(arguments.icon) && !len(arguments.text);
+		local.parts = [];
+		if (arguments.size != "md") arrayAppend(local.parts, arguments.size);
+		if (local.isIconOnly) arrayAppend(local.parts, "icon");
+		if (arguments.variant != "primary") arrayAppend(local.parts, arguments.variant);
 
-	<!--- ============================================== --->
-	<!--- BUTTONS                                        --->
-	<!--- ============================================== --->
+		local.cls = arrayLen(local.parts) ? "btn-" & arrayToList(local.parts, "-") : "btn";
+		if (len(arguments.class)) local.cls &= " " & arguments.class;
 
-	<cffunction name="uiButton" access="public" output="false" returntype="string"
-		hint="Basecoat button. Variants: primary, secondary, destructive, outline, ghost, link. Sizes: sm, md, lg.">
-		<cfargument name="text" type="string" required="false" default="">
-		<cfargument name="variant" type="string" required="false" default="primary"
-			hint="primary, secondary, destructive, outline, ghost, link">
-		<cfargument name="size" type="string" required="false" default="md"
-			hint="sm, md (default), lg">
-		<cfargument name="icon" type="string" required="false" default=""
-			hint="Lucide icon name. If text is empty, renders icon-only button.">
-		<cfargument name="href" type="string" required="false" default=""
-			hint="Renders as <a> instead of <button>">
-		<cfargument name="type" type="string" required="false" default="button"
-			hint="button, submit, reset">
-		<cfargument name="disabled" type="boolean" required="false" default="false">
-		<cfargument name="loading" type="boolean" required="false" default="false">
-		<cfargument name="close" type="boolean" required="false" default="false"
-			hint="Adds onclick to close nearest <dialog>">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfargument name="id" type="string" required="false" default="">
-		<cfargument name="ariaLabel" type="string" required="false" default="">
-		<cfargument name="turboConfirm" type="string" required="false" default=""
-			hint="data-turbo-confirm (works when wheels-hotwire is installed)">
-		<cfargument name="turboMethod" type="string" required="false" default=""
-			hint="data-turbo-method (works when wheels-hotwire is installed)">
+		// Inner content: icon + text
+		local.inner = "";
+		if (arguments.loading) {
+			local.inner = $uiLucideIcon("loader", 24, 2, "animate-spin");
+		} else if (len(arguments.icon)) {
+			local.inner = $uiLucideIcon(arguments.icon, 24);
+		}
+		if (len(arguments.text)) {
+			if (len(local.inner)) local.inner &= " ";
+			local.inner &= arguments.text;
+		}
 
-		<cfset var local = {}>
+		// Attributes
+		local.attrs = 'class="#local.cls#"';
+		if (len(arguments.id)) local.attrs &= ' id="#arguments.id#"';
+		if (arguments.disabled || arguments.loading) local.attrs &= " disabled";
+		if (len(arguments.ariaLabel)) local.attrs &= ' aria-label="#arguments.ariaLabel#"';
+		if (arguments.close) local.attrs &= " onclick=""this.closest('dialog').close()""";
+		if (len(arguments.turboConfirm)) local.attrs &= ' data-turbo-confirm="#arguments.turboConfirm#"';
+		if (len(arguments.turboMethod)) local.attrs &= ' data-turbo-method="#arguments.turboMethod#"';
 
-		<!--- Build Basecoat compound class: btn[-size][-icon][-variant] --->
-		<cfset local.isIconOnly = Len(arguments.icon) AND NOT Len(arguments.text)>
-		<cfset local.parts = []>
-		<cfif arguments.size NEQ "md">
-			<cfset ArrayAppend(local.parts, arguments.size)>
-		</cfif>
-		<cfif local.isIconOnly>
-			<cfset ArrayAppend(local.parts, "icon")>
-		</cfif>
-		<cfif arguments.variant NEQ "primary">
-			<cfset ArrayAppend(local.parts, arguments.variant)>
-		</cfif>
+		if (len(arguments.href))
+			return '<a href="#arguments.href#" #local.attrs#>#local.inner#</a>';
+		return '<button type="#arguments.type#" #local.attrs#>#local.inner#</button>';
+	}
 
-		<cfif ArrayLen(local.parts)>
-			<cfset local.cls = "btn-" & ArrayToList(local.parts, "-")>
-		<cfelse>
-			<cfset local.cls = "btn">
-		</cfif>
-		<cfif Len(arguments.class)>
-			<cfset local.cls = local.cls & " " & arguments.class>
-		</cfif>
+	// ==============================================
+	// BADGES
+	// ==============================================
 
-		<!--- Inner content: icon + text --->
-		<cfset local.inner = "">
-		<cfif arguments.loading>
-			<cfset local.inner = $uiLucideIcon("loader", 24, 2, "animate-spin")>
-		<cfelseif Len(arguments.icon)>
-			<cfset local.inner = $uiLucideIcon(arguments.icon, 24)>
-		</cfif>
-		<cfif Len(arguments.text)>
-			<cfif Len(local.inner)><cfset local.inner = local.inner & " "></cfif>
-			<cfset local.inner = local.inner & arguments.text>
-		</cfif>
+	/** Basecoat badge. Variants: default, secondary, destructive, outline. */
+	public string function uiBadge(required string text, string variant = "default", string class = "") {
+		var cls = (arguments.variant == "default") ? "badge" : "badge-#arguments.variant#";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<span class="#cls#">#arguments.text#</span>';
+	}
 
-		<!--- Attributes --->
-		<cfset local.attrs = 'class="#local.cls#"'>
-		<cfif Len(arguments.id)><cfset local.attrs = local.attrs & ' id="#arguments.id#"'></cfif>
-		<cfif arguments.disabled OR arguments.loading><cfset local.attrs = local.attrs & " disabled"></cfif>
-		<cfif Len(arguments.ariaLabel)><cfset local.attrs = local.attrs & ' aria-label="#arguments.ariaLabel#"'></cfif>
-		<cfif arguments.close><cfset local.attrs = local.attrs & " onclick=""this.closest('dialog').close()"""></cfif>
-		<cfif Len(arguments.turboConfirm)><cfset local.attrs = local.attrs & ' data-turbo-confirm="#arguments.turboConfirm#"'></cfif>
-		<cfif Len(arguments.turboMethod)><cfset local.attrs = local.attrs & ' data-turbo-method="#arguments.turboMethod#"'></cfif>
+	// ==============================================
+	// ICONS
+	// ==============================================
 
-		<cfif Len(arguments.href)>
-			<cfreturn '<a href="#arguments.href#" #local.attrs#>#local.inner#</a>'>
-		<cfelse>
-			<cfreturn '<button type="#arguments.type#" #local.attrs#>#local.inner#</button>'>
-		</cfif>
-	</cffunction>
+	/** Renders a Lucide SVG icon by name. */
+	public string function uiIcon(required string name, numeric size = 24, numeric strokeWidth = 2, string class = "") {
+		return $uiLucideIcon(arguments.name, arguments.size, arguments.strokeWidth, arguments.class);
+	}
 
-	<!--- ============================================== --->
-	<!--- BADGES                                         --->
-	<!--- ============================================== --->
+	// ==============================================
+	// SIMPLE COMPONENTS
+	// ==============================================
 
-	<cffunction name="uiBadge" access="public" output="false" returntype="string"
-		hint="Basecoat badge. Variants: default, secondary, destructive, outline.">
-		<cfargument name="text" type="string" required="true">
-		<cfargument name="variant" type="string" required="false" default="default">
-		<cfargument name="class" type="string" required="false" default="">
+	/** Basecoat loading spinner. */
+	public string function uiSpinner(string class = "") {
+		var cls = "spinner";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="#cls#"></div>';
+	}
 
-		<cfset var local = {}>
-		<cfset local.cls = (arguments.variant EQ "default") ? "badge" : "badge-#arguments.variant#">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<span class="#local.cls#">#arguments.text#</span>'>
-	</cffunction>
+	/** Basecoat skeleton loading placeholder. Specify lines for multiple, or use height/width for custom. */
+	public string function uiSkeleton(numeric lines = 1, string height = "h-4", string width = "w-full", string class = "") {
+		var cls = "skeleton #arguments.height# #arguments.width#";
+		if (len(arguments.class)) cls &= " " & arguments.class;
 
-	<!--- ============================================== --->
-	<!--- ICONS                                          --->
-	<!--- ============================================== --->
+		if (arguments.lines == 1)
+			return '<div class="#cls#"></div>';
 
-	<cffunction name="uiIcon" access="public" output="false" returntype="string"
-		hint="Renders a Lucide SVG icon by name.">
-		<cfargument name="name" type="string" required="true" hint="Lucide icon name, e.g. 'trash', 'plus', 'check'">
-		<cfargument name="size" type="numeric" required="false" default="24">
-		<cfargument name="strokeWidth" type="numeric" required="false" default="2">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfreturn $uiLucideIcon(arguments.name, arguments.size, arguments.strokeWidth, arguments.class)>
-	</cffunction>
+		var html = "";
+		for (var i = 1; i <= arguments.lines; i++) {
+			html &= '<div class="#cls#"></div>';
+			if (i < arguments.lines) html &= chr(10);
+		}
+		return html;
+	}
 
-	<!--- ============================================== --->
-	<!--- SIMPLE COMPONENTS                              --->
-	<!--- ============================================== --->
+	/** Basecoat progress bar. */
+	public string function uiProgress(required numeric value, string class = "") {
+		var cls = "progress";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="#cls#"><div class="progress-indicator" style="width: #arguments.value#%"></div></div>';
+	}
 
-	<cffunction name="uiSpinner" access="public" output="false" returntype="string"
-		hint="Basecoat loading spinner.">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "spinner">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="#local.cls#"></div>'>
-	</cffunction>
+	/** Basecoat horizontal separator. */
+	public string function uiSeparator(string class = "") {
+		var cls = "separator";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<hr class="#cls#" />';
+	}
 
-	<cffunction name="uiSkeleton" access="public" output="false" returntype="string"
-		hint="Basecoat skeleton loading placeholder. Specify lines for multiple, or use height/width for custom.">
-		<cfargument name="lines" type="numeric" required="false" default="1">
-		<cfargument name="height" type="string" required="false" default="h-4">
-		<cfargument name="width" type="string" required="false" default="w-full">
-		<cfargument name="class" type="string" required="false" default="">
+	/** Opens a Basecoat tooltip wrapper. Place trigger element inside, close with uiTooltipEnd(). */
+	public string function uiTooltip(required string tip, string class = "") {
+		var cls = "tooltip";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<span class="#cls#" data-tip="#arguments.tip#">';
+	}
 
-		<cfset var local = {}>
-		<cfset local.cls = "skeleton #arguments.height# #arguments.width#">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
+	public string function uiTooltipEnd() {
+		return '</span>';
+	}
 
-		<cfif arguments.lines EQ 1>
-			<cfreturn '<div class="#local.cls#"></div>'>
-		</cfif>
+	// ==============================================
+	// ALERTS
+	// ==============================================
 
-		<cfset local.html = "">
-		<cfloop from="1" to="#arguments.lines#" index="local.i">
-			<cfset local.html = local.html & '<div class="#local.cls#"></div>'>
-			<cfif local.i LT arguments.lines><cfset local.html = local.html & Chr(10)></cfif>
-		</cfloop>
-		<cfreturn local.html>
-	</cffunction>
+	/**
+	 * Basecoat alert. Self-closing (returns complete element). Variants: default, destructive.
+	 */
+	public string function uiAlert(
+		string title = "",
+		string description = "",
+		string variant = "default",
+		string icon = "",
+		string class = ""
+	) {
+		var local = {};
+		local.cls = "alert";
+		if (arguments.variant == "destructive") local.cls &= " alert-destructive";
+		if (len(arguments.class)) local.cls &= " " & arguments.class;
 
-	<cffunction name="uiProgress" access="public" output="false" returntype="string"
-		hint="Basecoat progress bar.">
-		<cfargument name="value" type="numeric" required="true" hint="0-100">
-		<cfargument name="class" type="string" required="false" default="">
+		// Default icons by variant
+		local.iconName = len(arguments.icon) ? arguments.icon : (arguments.variant == "destructive" ? "alert-triangle" : "info");
 
-		<cfset var local = {}>
-		<cfset local.cls = "progress">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="#local.cls#"><div class="progress-indicator" style="width: #arguments.value#%"></div></div>'>
-	</cffunction>
+		savecontent variable="local.html" {
+			writeOutput(
+				'<div class="#local.cls#" role="alert">' & chr(10)
+				& $uiLucideIcon(local.iconName, 16) & chr(10)
+				& '<div>' & chr(10)
+				& (len(arguments.title) ? '<h5>#arguments.title#</h5>' & chr(10) : '')
+				& (len(arguments.description) ? '<div>#arguments.description#</div>' & chr(10) : '')
+				& '</div>' & chr(10)
+				& '</div>'
+			);
+		}
+		return trim(local.html);
+	}
 
-	<cffunction name="uiSeparator" access="public" output="false" returntype="string"
-		hint="Basecoat horizontal separator.">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "separator">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<hr class="#local.cls#" />'>
-	</cffunction>
+	// ==============================================
+	// CARDS
+	// ==============================================
 
-	<cffunction name="uiTooltip" access="public" output="false" returntype="string"
-		hint="Opens a Basecoat tooltip wrapper. Place trigger element inside, close with uiTooltipEnd().">
-		<cfargument name="tip" type="string" required="true" hint="Tooltip text">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "tooltip">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<span class="#local.cls#" data-tip="#arguments.tip#">'>
-	</cffunction>
+	/** Opens a Basecoat card. Close with uiCardEnd(). */
+	public string function uiCard(string class = "") {
+		var cls = "card";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="#cls#">';
+	}
 
-	<cffunction name="uiTooltipEnd" access="public" output="false" returntype="string">
-		<cfreturn '</span>'>
-	</cffunction>
+	/** Card header with optional title and description. Self-closing. */
+	public string function uiCardHeader(string title = "", string description = "", string class = "") {
+		var local = {};
+		local.cls = "card-header";
+		if (len(arguments.class)) local.cls &= " " & arguments.class;
 
-	<!--- ============================================== --->
-	<!--- ALERTS                                         --->
-	<!--- ============================================== --->
+		savecontent variable="local.html" {
+			writeOutput(
+				'<div class="#local.cls#">' & chr(10)
+				& (len(arguments.title) ? '<h3>#arguments.title#</h3>' & chr(10) : '')
+				& (len(arguments.description) ? '<p>#arguments.description#</p>' & chr(10) : '')
+				& '</div>'
+			);
+		}
+		return trim(local.html);
+	}
 
-	<cffunction name="uiAlert" access="public" output="false" returntype="string"
-		hint="Basecoat alert. Self-closing (returns complete element). Variants: default, destructive.">
-		<cfargument name="title" type="string" required="false" default="">
-		<cfargument name="description" type="string" required="false" default="">
-		<cfargument name="variant" type="string" required="false" default="default"
-			hint="default, destructive">
-		<cfargument name="icon" type="string" required="false" default=""
-			hint="Lucide icon name. Defaults: info for default, alert-triangle for destructive.">
-		<cfargument name="class" type="string" required="false" default="">
+	/** Opens card content section. Close with uiCardContentEnd(). */
+	public string function uiCardContent(string class = "") {
+		var cls = "card-content";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="#cls#">';
+	}
 
-		<cfset var local = {}>
-		<cfset local.cls = "alert">
-		<cfif arguments.variant EQ "destructive">
-			<cfset local.cls = local.cls & " alert-destructive">
-		</cfif>
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
+	public string function uiCardContentEnd() {
+		return '</div>';
+	}
 
-		<!--- Default icons by variant --->
-		<cfset local.iconName = arguments.icon>
-		<cfif NOT Len(local.iconName)>
-			<cfset local.iconName = (arguments.variant EQ "destructive") ? "alert-triangle" : "info">
-		</cfif>
+	/** Opens card footer section. Close with uiCardFooterEnd(). */
+	public string function uiCardFooter(string class = "") {
+		var cls = "card-footer";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="#cls#">';
+	}
 
-		<cfsavecontent variable="local.html">
-			<cfoutput>
-<div class="#local.cls#" role="alert">
-#$uiLucideIcon(local.iconName, 16)#
-<div>
-<cfif Len(arguments.title)><h5>#arguments.title#</h5>
-</cfif><cfif Len(arguments.description)><div>#arguments.description#</div>
-</cfif></div>
-</div>
-			</cfoutput>
-		</cfsavecontent>
+	public string function uiCardFooterEnd() {
+		return '</div>';
+	}
 
-		<cfreturn Trim(local.html)>
-	</cffunction>
+	public string function uiCardEnd() {
+		return '</div>';
+	}
 
-	<!--- ============================================== --->
-	<!--- CARDS                                          --->
-	<!--- ============================================== --->
+	// ==============================================
+	// PRIVATE: LUCIDE ICON SVG HELPER
+	// ==============================================
 
-	<cffunction name="uiCard" access="public" output="false" returntype="string"
-		hint="Opens a Basecoat card. Close with uiCardEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "card">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="#local.cls#">'>
-	</cffunction>
-
-	<cffunction name="uiCardHeader" access="public" output="false" returntype="string"
-		hint="Card header with optional title and description. Self-closing.">
-		<cfargument name="title" type="string" required="false" default="">
-		<cfargument name="description" type="string" required="false" default="">
-		<cfargument name="class" type="string" required="false" default="">
-
-		<cfset var local = {}>
-		<cfset local.cls = "card-header">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-
-		<cfsavecontent variable="local.html">
-			<cfoutput>
-<div class="#local.cls#">
-<cfif Len(arguments.title)><h3>#arguments.title#</h3>
-</cfif><cfif Len(arguments.description)><p>#arguments.description#</p>
-</cfif></div>
-			</cfoutput>
-		</cfsavecontent>
-		<cfreturn Trim(local.html)>
-	</cffunction>
-
-	<cffunction name="uiCardContent" access="public" output="false" returntype="string"
-		hint="Opens card content section. Close with uiCardContentEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "card-content">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="#local.cls#">'>
-	</cffunction>
-
-	<cffunction name="uiCardContentEnd" access="public" output="false" returntype="string">
-		<cfreturn '</div>'>
-	</cffunction>
-
-	<cffunction name="uiCardFooter" access="public" output="false" returntype="string"
-		hint="Opens card footer section. Close with uiCardFooterEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "card-footer">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="#local.cls#">'>
-	</cffunction>
-
-	<cffunction name="uiCardFooterEnd" access="public" output="false" returntype="string">
-		<cfreturn '</div>'>
-	</cffunction>
-
-	<cffunction name="uiCardEnd" access="public" output="false" returntype="string">
-		<cfreturn '</div>'>
-	</cffunction>
-
-	<!--- ============================================== --->
-	<!--- PRIVATE: LUCIDE ICON SVG HELPER                --->
-	<!--- ============================================== --->
-
-	<cffunction name="$uiLucideIcon" access="private" output="false" returntype="string"
-		hint="Returns SVG markup for a Lucide icon. Extend the icon map as needed.">
-		<cfargument name="name" type="string" required="true">
-		<cfargument name="size" type="numeric" required="false" default="24">
-		<cfargument name="strokeWidth" type="numeric" required="false" default="2">
-		<cfargument name="class" type="string" required="false" default="">
-
-		<cfset var local = {}>
-		<cfset local.icons = {
+	/** Returns SVG markup for a Lucide icon. Extend the icon map as needed. */
+	private string function $uiLucideIcon(required string name, numeric size = 24, numeric strokeWidth = 2, string class = "") {
+		var icons = {
 			"plus": '<line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/>',
 			"trash": '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
 			"pencil": '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
@@ -355,410 +280,445 @@
 			"send": '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
 			"ellipsis": '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
 			"external-link": '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
-		}>
+		};
 
-		<cfset local.paths = StructKeyExists(local.icons, arguments.name) ? local.icons[arguments.name] : '<circle cx="12" cy="12" r="10"/>'>
-		<cfset local.classAttr = Len(arguments.class) ? ' class="#arguments.class#"' : "">
-		<cfreturn '<svg xmlns="http://www.w3.org/2000/svg" width="#arguments.size#" height="#arguments.size#" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="#arguments.strokeWidth#" stroke-linecap="round" stroke-linejoin="round"#local.classAttr#>#local.paths#</svg>'>
-	</cffunction>
+		var paths = structKeyExists(icons, arguments.name) ? icons[arguments.name] : '<circle cx="12" cy="12" r="10"/>';
+		var classAttr = len(arguments.class) ? ' class="#arguments.class#"' : "";
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="#arguments.size#" height="#arguments.size#" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="#arguments.strokeWidth#" stroke-linecap="round" stroke-linejoin="round"#classAttr#>#paths#</svg>';
+	}
 
-	<!--- ============================================== --->
-	<!--- PRIVATE: ID GENERATION                         --->
-	<!--- ============================================== --->
+	// ==============================================
+	// PRIVATE: ID GENERATION
+	// ==============================================
 
-	<cffunction name="$uiBuildId" access="private" output="false" returntype="string"
-		hint="Generates a short unique ID if none provided.">
-		<cfargument name="providedId" type="string" required="false" default="">
-		<cfargument name="prefix" type="string" required="false" default="ui">
-		<cfif Len(arguments.providedId)>
-			<cfreturn arguments.providedId>
-		</cfif>
-		<cfreturn arguments.prefix & "-" & Replace(Left(CreateUUID(), 8), "-", "", "all")>
-	</cffunction>
+	/** Generates a short unique ID if none provided. */
+	private string function $uiBuildId(string providedId = "", string prefix = "ui") {
+		if (len(arguments.providedId))
+			return arguments.providedId;
+		return arguments.prefix & "-" & replace(left(createUUID(), 8), "-", "", "all");
+	}
 
-	<!--- ============================================== --->
-	<!--- DIALOGS                                        --->
-	<!--- ============================================== --->
+	// ==============================================
+	// DIALOGS
+	// ==============================================
 
-	<cffunction name="uiDialog" access="public" output="false" returntype="string"
-		hint="Opens a Basecoat dialog (native <dialog> element). Close with uiDialogEnd(). Optionally renders a trigger button.">
-		<cfargument name="title" type="string" required="true" hint="Dialog heading text">
-		<cfargument name="description" type="string" required="false" default="" hint="Optional subtitle/description text">
-		<cfargument name="triggerText" type="string" required="false" default="" hint="If provided, renders a button that opens this dialog">
-		<cfargument name="triggerClass" type="string" required="false" default="btn-outline" hint="CSS class for the trigger button">
-		<cfargument name="id" type="string" required="false" default="" hint="Dialog ID. Auto-generated if empty.">
-		<cfargument name="maxWidth" type="string" required="false" default="sm:max-w-[425px]" hint="Tailwind max-width class">
-		<cfargument name="class" type="string" required="false" default="">
+	/**
+	 * Opens a Basecoat dialog (native <dialog> element). Close with uiDialogEnd().
+	 * Optionally renders a trigger button.
+	 */
+	public string function uiDialog(
+		required string title,
+		string description = "",
+		string triggerText = "",
+		string triggerClass = "btn-outline",
+		string id = "",
+		string maxWidth = "sm:max-w-[425px]",
+		string class = ""
+	) {
+		var local = {};
+		local.id = $uiBuildId(arguments.id, "dlg");
+		local.cls = "dialog w-full #arguments.maxWidth# max-h-[612px]";
+		if (len(arguments.class)) local.cls &= " " & arguments.class;
 
-		<cfset var local = {}>
-		<cfset local.id = $uiBuildId(arguments.id, "dlg")>
-		<cfset local.cls = "dialog w-full #arguments.maxWidth# max-h-[612px]">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
+		savecontent variable="local.html" {
+			writeOutput(
+				(len(arguments.triggerText) ? '<button type="button" onclick="document.getElementById(''#local.id#'').showModal()" class="#arguments.triggerClass#">#arguments.triggerText#</button>' & chr(10) : '')
+				& '<dialog id="#local.id#" class="#local.cls#" aria-labelledby="#local.id#-title"'
+				& (len(arguments.description) ? ' aria-describedby="#local.id#-desc"' : '')
+				& ' onclick="if (event.target === this) this.close()">' & chr(10)
+				& '<div>' & chr(10)
+				& '<header>' & chr(10)
+				& '<h2 id="#local.id#-title">#arguments.title#</h2>' & chr(10)
+				& (len(arguments.description) ? '<p id="#local.id#-desc">#arguments.description#</p>' & chr(10) : '')
+				& '</header>' & chr(10)
+				& '<section>'
+			);
+		}
+		return trim(local.html);
+	}
 
-		<cfsavecontent variable="local.html">
-			<cfoutput>
-<cfif Len(arguments.triggerText)><button type="button" onclick="document.getElementById('#local.id#').showModal()" class="#arguments.triggerClass#">#arguments.triggerText#</button>
-</cfif><dialog id="#local.id#" class="#local.cls#" aria-labelledby="#local.id#-title"<cfif Len(arguments.description)> aria-describedby="#local.id#-desc"</cfif> onclick="if (event.target === this) this.close()">
-<div>
-<header>
-<h2 id="#local.id#-title">#arguments.title#</h2>
-<cfif Len(arguments.description)><p id="#local.id#-desc">#arguments.description#</p>
-</cfif></header>
-<section>
-			</cfoutput>
-		</cfsavecontent>
+	/** Closes the dialog content section and opens the footer section. */
+	public string function uiDialogFooter() {
+		return '</section><footer>';
+	}
 
-		<cfreturn Trim(local.html)>
-	</cffunction>
+	/** Closes the dialog footer, adds the close (X) button, and closes the dialog element. */
+	public string function uiDialogEnd() {
+		var xIcon = $uiLucideIcon("x", 24, 2);
+		return '</footer><button type="button" aria-label="Close dialog" onclick="this.closest(''dialog'').close()">#xIcon#</button></div></dialog>';
+	}
 
-	<cffunction name="uiDialogFooter" access="public" output="false" returntype="string"
-		hint="Closes the dialog content section and opens the footer section.">
-		<cfreturn '</section><footer>'>
-	</cffunction>
+	// ==============================================
+	// FORM FIELDS
+	// ==============================================
 
-	<cffunction name="uiDialogEnd" access="public" output="false" returntype="string"
-		hint="Closes the dialog footer, adds the close (X) button, and closes the dialog element.">
-		<cfset var local = {}>
-		<cfset local.xIcon = $uiLucideIcon("x", 24, 2)>
-		<cfreturn '</footer><button type="button" aria-label="Close dialog" onclick="this.closest(''dialog'').close()">#local.xIcon#</button></div></dialog>'>
-	</cffunction>
+	/**
+	 * Basecoat form field. Handles text, email, password, number, tel, url, textarea, select, checkbox, switch.
+	 */
+	public string function uiField(
+		required string label,
+		required string name,
+		string type = "text",
+		string value = "",
+		string id = "",
+		string placeholder = "",
+		string description = "",
+		string errorMessage = "",
+		boolean required = false,
+		boolean disabled = false,
+		boolean checked = false,
+		string options = "",
+		numeric rows = 4,
+		string class = ""
+	) {
+		var local = {};
+		local.id = $uiBuildId(arguments.id, "fld");
+		local.hasError = len(arguments.errorMessage);
+		local.isToggle = (arguments.type == "checkbox" || arguments.type == "switch");
 
-	<!--- ============================================== --->
-	<!--- FORM FIELDS                                    --->
-	<!--- ============================================== --->
+		// Build input attrs common to all types
+		local.commonAttrs = 'id="#local.id#" name="#arguments.name#"';
+		if (arguments.required) local.commonAttrs &= " required";
+		if (arguments.disabled) local.commonAttrs &= " disabled";
 
-	<cffunction name="uiField" access="public" output="false" returntype="string"
-		hint="Basecoat form field. Handles text, email, password, number, tel, url, textarea, select, checkbox, switch.">
-		<cfargument name="label" type="string" required="true" hint="Label text">
-		<cfargument name="name" type="string" required="true" hint="Input name attribute">
-		<cfargument name="type" type="string" required="false" default="text" hint="text, email, password, number, tel, url, textarea, select, checkbox, switch">
-		<cfargument name="value" type="string" required="false" default="">
-		<cfargument name="id" type="string" required="false" default="" hint="Auto-generated if empty">
-		<cfargument name="placeholder" type="string" required="false" default="">
-		<cfargument name="description" type="string" required="false" default="">
-		<cfargument name="errorMessage" type="string" required="false" default="">
-		<cfargument name="required" type="boolean" required="false" default="false">
-		<cfargument name="disabled" type="boolean" required="false" default="false">
-		<cfargument name="checked" type="boolean" required="false" default="false" hint="For checkbox and switch types">
-		<cfargument name="options" type="string" required="false" default="" hint="Comma-delimited value:label pairs for select, e.g. 'a:Option A,b:Option B'">
-		<cfargument name="rows" type="numeric" required="false" default="4" hint="Rows for textarea">
-		<cfargument name="class" type="string" required="false" default="">
+		savecontent variable="local.html" {
+			// Wrapper
+			if (local.isToggle) {
+				writeOutput('<div class="flex items-center gap-2">' & chr(10));
+			} else {
+				writeOutput('<div class="grid gap-2">' & chr(10));
+			}
 
-		<cfset var local = {}>
-		<cfset local.id = $uiBuildId(arguments.id, "fld")>
-		<cfset local.hasError = Len(arguments.errorMessage)>
-		<cfset local.isToggle = (arguments.type EQ "checkbox" OR arguments.type EQ "switch")>
+			// Label before input (non-toggle types)
+			if (!local.isToggle)
+				writeOutput('<label for="#local.id#">#arguments.label#</label>' & chr(10));
 
-		<!--- Build input attrs common to all types --->
-		<cfset local.commonAttrs = 'id="#local.id#" name="#arguments.name#"'>
-		<cfif arguments.required><cfset local.commonAttrs = local.commonAttrs & " required"></cfif>
-		<cfif arguments.disabled><cfset local.commonAttrs = local.commonAttrs & " disabled"></cfif>
+			// Input element by type
+			if (arguments.type == "textarea") {
+				writeOutput('<textarea #local.commonAttrs# class="textarea#local.hasError ? " border-destructive" : ""#"');
+				if (len(arguments.placeholder)) writeOutput(' placeholder="#arguments.placeholder#"');
+				writeOutput(' rows="#arguments.rows#"');
+				if (local.hasError) writeOutput(' aria-invalid="true" aria-describedby="#local.id#-error"');
+				writeOutput('>#arguments.value#</textarea>' & chr(10));
+			} else if (arguments.type == "select") {
+				writeOutput('<select #local.commonAttrs# class="select#local.hasError ? " border-destructive" : ""#"');
+				if (local.hasError) writeOutput(' aria-invalid="true" aria-describedby="#local.id#-error"');
+				writeOutput('>' & chr(10));
+				if (len(arguments.options)) {
+					for (var opt in listToArray(arguments.options)) {
+						var optParts = listToArray(opt, ":");
+						var optVal = optParts[1];
+						var optLabel = (arrayLen(optParts) > 1) ? optParts[2] : optParts[1];
+						writeOutput('<option value="#optVal#"#arguments.value == optVal ? " selected" : ""#>#optLabel#</option>' & chr(10));
+					}
+				}
+				writeOutput('</select>' & chr(10));
+			} else if (arguments.type == "checkbox") {
+				writeOutput('<input type="checkbox" #local.commonAttrs# class="checkbox#len(arguments.class) ? " " & arguments.class : ""#"');
+				if (arguments.checked) writeOutput(' checked');
+				if (local.hasError) writeOutput(' aria-invalid="true" aria-describedby="#local.id#-error"');
+				writeOutput(' />' & chr(10));
+			} else if (arguments.type == "switch") {
+				writeOutput('<input type="checkbox" #local.commonAttrs# class="switch#len(arguments.class) ? " " & arguments.class : ""#" role="switch"');
+				if (arguments.checked) writeOutput(' checked');
+				if (local.hasError) writeOutput(' aria-invalid="true" aria-describedby="#local.id#-error"');
+				writeOutput(' />' & chr(10));
+			} else {
+				writeOutput('<input type="#arguments.type#" #local.commonAttrs# class="input#local.hasError ? " border-destructive" : ""#"');
+				if (len(arguments.value)) writeOutput(' value="#arguments.value#"');
+				if (len(arguments.placeholder)) writeOutput(' placeholder="#arguments.placeholder#"');
+				if (local.hasError) writeOutput(' aria-invalid="true" aria-describedby="#local.id#-error"');
+				if (len(arguments.class)) writeOutput(' #arguments.class#');
+				writeOutput(' />' & chr(10));
+			}
 
-		<cfsavecontent variable="local.html">
-			<cfoutput>
-<cfif local.isToggle><div class="flex items-center gap-2">
-<cfelse><div class="grid gap-2">
-</cfif><cfif NOT local.isToggle><label for="#local.id#">#arguments.label#</label>
-</cfif><cfif arguments.type EQ "textarea"><textarea #local.commonAttrs# class="textarea<cfif local.hasError> border-destructive</cfif>"<cfif Len(arguments.placeholder)> placeholder="#arguments.placeholder#"</cfif> rows="#arguments.rows#"<cfif local.hasError> aria-invalid="true" aria-describedby="#local.id#-error"</cfif>>#arguments.value#</textarea>
-<cfelseif arguments.type EQ "select"><select #local.commonAttrs# class="select<cfif local.hasError> border-destructive</cfif>"<cfif local.hasError> aria-invalid="true" aria-describedby="#local.id#-error"</cfif>>
-<cfif Len(arguments.options)><cfloop list="#arguments.options#" index="local.opt"><cfset local.optParts = ListToArray(local.opt, ":")><cfset local.optVal = local.optParts[1]><cfset local.optLabel = (ArrayLen(local.optParts) GT 1) ? local.optParts[2] : local.optParts[1]><option value="#local.optVal#"<cfif arguments.value EQ local.optVal> selected</cfif>>#local.optLabel#</option>
-</cfloop></cfif></select>
-<cfelseif arguments.type EQ "checkbox"><input type="checkbox" #local.commonAttrs# class="checkbox<cfif Len(arguments.class)> #arguments.class#</cfif>"<cfif arguments.checked> checked</cfif><cfif local.hasError> aria-invalid="true" aria-describedby="#local.id#-error"</cfif> />
-<cfelseif arguments.type EQ "switch"><input type="checkbox" #local.commonAttrs# class="switch<cfif Len(arguments.class)> #arguments.class#</cfif>" role="switch"<cfif arguments.checked> checked</cfif><cfif local.hasError> aria-invalid="true" aria-describedby="#local.id#-error"</cfif> />
-<cfelse><input type="#arguments.type#" #local.commonAttrs# class="input<cfif local.hasError> border-destructive</cfif>"<cfif Len(arguments.value)> value="#arguments.value#"</cfif><cfif Len(arguments.placeholder)> placeholder="#arguments.placeholder#"</cfif><cfif local.hasError> aria-invalid="true" aria-describedby="#local.id#-error"</cfif><cfif Len(arguments.class)> </cfif><cfif Len(arguments.class)>#arguments.class#</cfif> />
-</cfif><cfif local.isToggle><label for="#local.id#">#arguments.label#</label>
-</cfif><cfif Len(arguments.description) AND NOT local.hasError><p class="text-sm text-muted-foreground">#arguments.description#</p>
-</cfif><cfif local.hasError><p id="#local.id#-error" class="text-sm text-destructive">#arguments.errorMessage#</p>
-</cfif></div>
-			</cfoutput>
-		</cfsavecontent>
+			// Label after input (toggle types)
+			if (local.isToggle)
+				writeOutput('<label for="#local.id#">#arguments.label#</label>' & chr(10));
 
-		<cfreturn Trim(local.html)>
-	</cffunction>
+			// Description (only when no error)
+			if (len(arguments.description) && !local.hasError)
+				writeOutput('<p class="text-sm text-muted-foreground">#arguments.description#</p>' & chr(10));
 
-	<!--- ============================================== --->
-	<!--- TABLES                                         --->
-	<!--- ============================================== --->
+			// Error message
+			if (local.hasError)
+				writeOutput('<p id="#local.id#-error" class="text-sm text-destructive">#arguments.errorMessage#</p>' & chr(10));
 
-	<cffunction name="uiTable" access="public" output="false" returntype="string"
-		hint="Opens a Basecoat table (table-container + table). Close with uiTableEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "table">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="table-container"><table class="#local.cls#">'>
-	</cffunction>
+			writeOutput('</div>');
+		}
+		return trim(local.html);
+	}
 
-	<cffunction name="uiTableHeader" access="public" output="false" returntype="string"
-		hint="Opens the table thead and a tr. Close with uiTableHeaderEnd().">
-		<cfreturn '<thead><tr>'>
-	</cffunction>
+	// ==============================================
+	// TABLES
+	// ==============================================
 
-	<cffunction name="uiTableHeaderEnd" access="public" output="false" returntype="string">
-		<cfreturn '</tr></thead>'>
-	</cffunction>
+	/** Opens a Basecoat table (table-container + table). Close with uiTableEnd(). */
+	public string function uiTable(string class = "") {
+		var cls = "table";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="table-container"><table class="#cls#">';
+	}
 
-	<cffunction name="uiTableBody" access="public" output="false" returntype="string"
-		hint="Opens the table tbody. Close with uiTableBodyEnd().">
-		<cfreturn '<tbody>'>
-	</cffunction>
+	/** Opens the table thead and a tr. Close with uiTableHeaderEnd(). */
+	public string function uiTableHeader() {
+		return '<thead><tr>';
+	}
 
-	<cffunction name="uiTableBodyEnd" access="public" output="false" returntype="string">
-		<cfreturn '</tbody>'>
-	</cffunction>
+	public string function uiTableHeaderEnd() {
+		return '</tr></thead>';
+	}
 
-	<cffunction name="uiTableRow" access="public" output="false" returntype="string"
-		hint="Opens a table tr. Close with uiTableRowEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfif Len(arguments.class)>
-			<cfreturn '<tr class="#arguments.class#">'>
-		</cfif>
-		<cfreturn '<tr>'>
-	</cffunction>
+	/** Opens the table tbody. Close with uiTableBodyEnd(). */
+	public string function uiTableBody() {
+		return '<tbody>';
+	}
 
-	<cffunction name="uiTableRowEnd" access="public" output="false" returntype="string">
-		<cfreturn '</tr>'>
-	</cffunction>
+	public string function uiTableBodyEnd() {
+		return '</tbody>';
+	}
 
-	<cffunction name="uiTableHead" access="public" output="false" returntype="string"
-		hint="Renders a th cell.">
-		<cfargument name="text" type="string" required="false" default="">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfif Len(arguments.class)>
-			<cfreturn '<th class="#arguments.class#">#arguments.text#</th>'>
-		</cfif>
-		<cfreturn '<th>#arguments.text#</th>'>
-	</cffunction>
+	/** Opens a table tr. Close with uiTableRowEnd(). */
+	public string function uiTableRow(string class = "") {
+		if (len(arguments.class))
+			return '<tr class="#arguments.class#">';
+		return '<tr>';
+	}
 
-	<cffunction name="uiTableCell" access="public" output="false" returntype="string"
-		hint="Renders a td cell.">
-		<cfargument name="text" type="string" required="false" default="">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfif Len(arguments.class)>
-			<cfreturn '<td class="#arguments.class#">#arguments.text#</td>'>
-		</cfif>
-		<cfreturn '<td>#arguments.text#</td>'>
-	</cffunction>
+	public string function uiTableRowEnd() {
+		return '</tr>';
+	}
 
-	<cffunction name="uiTableEnd" access="public" output="false" returntype="string">
-		<cfreturn '</table></div>'>
-	</cffunction>
+	/** Renders a th cell. */
+	public string function uiTableHead(string text = "", string class = "") {
+		if (len(arguments.class))
+			return '<th class="#arguments.class#">#arguments.text#</th>';
+		return '<th>#arguments.text#</th>';
+	}
 
-	<!--- ============================================== --->
-	<!--- TABS                                           --->
-	<!--- ============================================== --->
+	/** Renders a td cell. */
+	public string function uiTableCell(string text = "", string class = "") {
+		if (len(arguments.class))
+			return '<td class="#arguments.class#">#arguments.text#</td>';
+		return '<td>#arguments.text#</td>';
+	}
 
-	<cffunction name="uiTabs" access="public" output="false" returntype="string"
-		hint="Opens a Basecoat tabs container. Close with uiTabsEnd().">
-		<cfargument name="defaultTab" type="string" required="false" default="" hint="data-default value (ID of initial tab)">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "tabs">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfset local.dataDefault = Len(arguments.defaultTab) ? ' data-default="#arguments.defaultTab#"' : "">
-		<cfreturn '<div class="#local.cls#"#local.dataDefault#>'>
-	</cffunction>
+	public string function uiTableEnd() {
+		return '</table></div>';
+	}
 
-	<cffunction name="uiTabList" access="public" output="false" returntype="string"
-		hint="Opens the tabs-list container. Close with uiTabListEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "tabs-list">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="#local.cls#">'>
-	</cffunction>
+	// ==============================================
+	// TABS
+	// ==============================================
 
-	<cffunction name="uiTabListEnd" access="public" output="false" returntype="string">
-		<cfreturn '</div>'>
-	</cffunction>
+	/** Opens a Basecoat tabs container. Close with uiTabsEnd(). */
+	public string function uiTabs(string defaultTab = "", string class = "") {
+		var cls = "tabs";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		var dataDefault = len(arguments.defaultTab) ? ' data-default="#arguments.defaultTab#"' : "";
+		return '<div class="#cls#"#dataDefault#>';
+	}
 
-	<cffunction name="uiTabTrigger" access="public" output="false" returntype="string"
-		hint="Renders a tab trigger button.">
-		<cfargument name="value" type="string" required="true" hint="Matches the data-value of the corresponding uiTabContent">
-		<cfargument name="text" type="string" required="true" hint="Button label">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "tabs-trigger">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<button class="#local.cls#" data-value="#arguments.value#">#arguments.text#</button>'>
-	</cffunction>
+	/** Opens the tabs-list container. Close with uiTabListEnd(). */
+	public string function uiTabList(string class = "") {
+		var cls = "tabs-list";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="#cls#">';
+	}
 
-	<cffunction name="uiTabContent" access="public" output="false" returntype="string"
-		hint="Opens a tab content panel. Close with uiTabContentEnd().">
-		<cfargument name="value" type="string" required="true" hint="Matches the data-value of the trigger button">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "tabs-content">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<div class="#local.cls#" data-value="#arguments.value#">'>
-	</cffunction>
+	public string function uiTabListEnd() {
+		return '</div>';
+	}
 
-	<cffunction name="uiTabContentEnd" access="public" output="false" returntype="string">
-		<cfreturn '</div>'>
-	</cffunction>
+	/** Renders a tab trigger button. */
+	public string function uiTabTrigger(required string value, required string text, string class = "") {
+		var cls = "tabs-trigger";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<button class="#cls#" data-value="#arguments.value#">#arguments.text#</button>';
+	}
 
-	<cffunction name="uiTabsEnd" access="public" output="false" returntype="string">
-		<cfreturn '</div>'>
-	</cffunction>
+	/** Opens a tab content panel. Close with uiTabContentEnd(). */
+	public string function uiTabContent(required string value, string class = "") {
+		var cls = "tabs-content";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<div class="#cls#" data-value="#arguments.value#">';
+	}
 
-	<!--- ============================================== --->
-	<!--- DROPDOWNS                                      --->
-	<!--- ============================================== --->
+	public string function uiTabContentEnd() {
+		return '</div>';
+	}
 
-	<cffunction name="uiDropdown" access="public" output="false" returntype="string"
-		hint="Opens a CSS-only dropdown (details/summary). Close with uiDropdownEnd().">
-		<cfargument name="text" type="string" required="true" hint="Trigger label text">
-		<cfargument name="triggerClass" type="string" required="false" default="btn-outline" hint="CSS class for the summary element">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "dropdown">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<details class="#local.cls#"><summary class="#arguments.triggerClass#">#arguments.text#</summary><ul>'>
-	</cffunction>
+	public string function uiTabsEnd() {
+		return '</div>';
+	}
 
-	<cffunction name="uiDropdownItem" access="public" output="false" returntype="string"
-		hint="Renders a dropdown menu item.">
-		<cfargument name="text" type="string" required="true">
-		<cfargument name="href" type="string" required="false" default="#">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = Len(arguments.class) ? ' class="#arguments.class#"' : "">
-		<cfreturn '<li><a href="#arguments.href#"#local.cls#>#arguments.text#</a></li>'>
-	</cffunction>
+	// ==============================================
+	// DROPDOWNS
+	// ==============================================
 
-	<cffunction name="uiDropdownSeparator" access="public" output="false" returntype="string"
-		hint="Renders a separator line inside a dropdown.">
-		<cfreturn '<li><hr class="separator" /></li>'>
-	</cffunction>
+	/** Opens a CSS-only dropdown (details/summary). Close with uiDropdownEnd(). */
+	public string function uiDropdown(required string text, string triggerClass = "btn-outline", string class = "") {
+		var cls = "dropdown";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<details class="#cls#"><summary class="#arguments.triggerClass#">#arguments.text#</summary><ul>';
+	}
 
-	<cffunction name="uiDropdownEnd" access="public" output="false" returntype="string">
-		<cfreturn '</ul></details>'>
-	</cffunction>
+	/** Renders a dropdown menu item. */
+	public string function uiDropdownItem(required string text, string href = "##", string class = "") {
+		var clsAttr = len(arguments.class) ? ' class="#arguments.class#"' : "";
+		return '<li><a href="#arguments.href#"#clsAttr#>#arguments.text#</a></li>';
+	}
 
-	<!--- ============================================== --->
-	<!--- PAGINATION                                     --->
-	<!--- ============================================== --->
+	/** Renders a separator line inside a dropdown. */
+	public string function uiDropdownSeparator() {
+		return '<li><hr class="separator" /></li>';
+	}
 
-	<cffunction name="uiPagination" access="public" output="false" returntype="string"
-		hint="Renders a pagination nav with prev/next, page window, and ellipsis.">
-		<cfargument name="currentPage" type="numeric" required="true">
-		<cfargument name="totalPages" type="numeric" required="true">
-		<cfargument name="baseUrl" type="string" required="true" hint="URL without page param, e.g. /posts">
-		<cfargument name="pageParam" type="string" required="false" default="page">
-		<cfargument name="windowSize" type="numeric" required="false" default="2" hint="Pages shown on each side of current page">
-		<cfargument name="class" type="string" required="false" default="">
+	public string function uiDropdownEnd() {
+		return '</ul></details>';
+	}
 
-		<cfset var local = {}>
-		<cfset local.cls = "pagination">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
+	// ==============================================
+	// PAGINATION
+	// ==============================================
 
-		<!--- URL builder helper --->
-		<cfset local.sep = (Find("?", arguments.baseUrl) GT 0) ? "&" : "?">
+	/**
+	 * Renders a pagination nav with prev/next, page window, and ellipsis.
+	 */
+	public string function uiPagination(
+		required numeric currentPage,
+		required numeric totalPages,
+		required string baseUrl,
+		string pageParam = "page",
+		numeric windowSize = 2,
+		string class = ""
+	) {
+		var local = {};
+		local.cls = "pagination";
+		if (len(arguments.class)) local.cls &= " " & arguments.class;
 
-		<cfset local.prevIcon = $uiLucideIcon("chevron-left", 16, 2)>
-		<cfset local.nextIcon = $uiLucideIcon("chevron-right", 16, 2)>
+		// URL builder helper
+		local.sep = (find("?", arguments.baseUrl) > 0) ? "&" : "?";
+		local.prevIcon = $uiLucideIcon("chevron-left", 16, 2);
+		local.nextIcon = $uiLucideIcon("chevron-right", 16, 2);
 
-		<cfsavecontent variable="local.html">
-			<cfoutput>
-<nav class="#local.cls#" aria-label="Pagination">
-<cfif arguments.currentPage LTE 1><span class="pagination-item opacity-50" aria-disabled="true">#local.prevIcon#</span>
-<cfelse><a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#arguments.currentPage - 1#" class="pagination-item" aria-label="Previous page">#local.prevIcon#</a>
-</cfif><cfset local.windowStart = Max(1, arguments.currentPage - arguments.windowSize)><cfset local.windowEnd = Min(arguments.totalPages, arguments.currentPage + arguments.windowSize)><cfif local.windowStart GT 1><a href="#arguments.baseUrl##local.sep##arguments.pageParam#=1" class="pagination-item">1</a><cfif local.windowStart GT 2><span class="pagination-item" aria-hidden="true">&hellip;</span>
-</cfif></cfif><cfloop from="#local.windowStart#" to="#local.windowEnd#" index="local.p"><cfif local.p EQ arguments.currentPage><span class="pagination-item pagination-item-active" aria-current="page">#local.p#</span>
-<cfelse><a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#local.p#" class="pagination-item">#local.p#</a>
-</cfif></cfloop><cfif local.windowEnd LT arguments.totalPages><cfif local.windowEnd LT arguments.totalPages - 1><span class="pagination-item" aria-hidden="true">&hellip;</span>
-</cfif><a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#arguments.totalPages#" class="pagination-item">#arguments.totalPages#</a>
-</cfif><cfif arguments.currentPage GTE arguments.totalPages><span class="pagination-item opacity-50" aria-disabled="true">#local.nextIcon#</span>
-<cfelse><a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#arguments.currentPage + 1#" class="pagination-item" aria-label="Next page">#local.nextIcon#</a>
-</cfif></nav>
-			</cfoutput>
-		</cfsavecontent>
+		savecontent variable="local.html" {
+			writeOutput('<nav class="#local.cls#" aria-label="Pagination">' & chr(10));
 
-		<cfreturn Trim(local.html)>
-	</cffunction>
+			// Previous
+			if (arguments.currentPage <= 1) {
+				writeOutput('<span class="pagination-item opacity-50" aria-disabled="true">#local.prevIcon#</span>' & chr(10));
+			} else {
+				writeOutput('<a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#arguments.currentPage - 1#" class="pagination-item" aria-label="Previous page">#local.prevIcon#</a>' & chr(10));
+			}
 
-	<!--- ============================================== --->
-	<!--- BREADCRUMB                                     --->
-	<!--- ============================================== --->
+			// Page window
+			local.windowStart = max(1, arguments.currentPage - arguments.windowSize);
+			local.windowEnd = min(arguments.totalPages, arguments.currentPage + arguments.windowSize);
 
-	<cffunction name="uiBreadcrumb" access="public" output="false" returntype="string"
-		hint="Opens a Basecoat breadcrumb nav. Close with uiBreadcrumbEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "breadcrumb">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<nav aria-label="Breadcrumb" class="#local.cls#"><ol>'>
-	</cffunction>
+			// First page + ellipsis
+			if (local.windowStart > 1) {
+				writeOutput('<a href="#arguments.baseUrl##local.sep##arguments.pageParam#=1" class="pagination-item">1</a>');
+				if (local.windowStart > 2)
+					writeOutput('<span class="pagination-item" aria-hidden="true">&hellip;</span>' & chr(10));
+			}
 
-	<cffunction name="uiBreadcrumbItem" access="public" output="false" returntype="string"
-		hint="Renders a breadcrumb item. Omit href for the current (last) page.">
-		<cfargument name="text" type="string" required="true">
-		<cfargument name="href" type="string" required="false" default="" hint="If empty, renders as current-page span">
-		<cfif Len(arguments.href)>
-			<cfreturn '<li><a href="#arguments.href#">#arguments.text#</a></li>'>
-		</cfif>
-		<cfreturn '<li><span aria-current="page">#arguments.text#</span></li>'>
-	</cffunction>
+			// Page numbers
+			for (var p = local.windowStart; p <= local.windowEnd; p++) {
+				if (p == arguments.currentPage) {
+					writeOutput('<span class="pagination-item pagination-item-active" aria-current="page">#p#</span>' & chr(10));
+				} else {
+					writeOutput('<a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#p#" class="pagination-item">#p#</a>' & chr(10));
+				}
+			}
 
-	<cffunction name="uiBreadcrumbSeparator" access="public" output="false" returntype="string"
-		hint="Renders a breadcrumb separator (chevron-right icon).">
-		<cfset var local = {}>
-		<cfset local.icon = $uiLucideIcon("chevron-right", 14, 2)>
-		<cfreturn '<li aria-hidden="true">#local.icon#</li>'>
-	</cffunction>
+			// Last page + ellipsis
+			if (local.windowEnd < arguments.totalPages) {
+				if (local.windowEnd < arguments.totalPages - 1)
+					writeOutput('<span class="pagination-item" aria-hidden="true">&hellip;</span>' & chr(10));
+				writeOutput('<a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#arguments.totalPages#" class="pagination-item">#arguments.totalPages#</a>' & chr(10));
+			}
 
-	<cffunction name="uiBreadcrumbEnd" access="public" output="false" returntype="string">
-		<cfreturn '</ol></nav>'>
-	</cffunction>
+			// Next
+			if (arguments.currentPage >= arguments.totalPages) {
+				writeOutput('<span class="pagination-item opacity-50" aria-disabled="true">#local.nextIcon#</span>' & chr(10));
+			} else {
+				writeOutput('<a href="#arguments.baseUrl##local.sep##arguments.pageParam#=#arguments.currentPage + 1#" class="pagination-item" aria-label="Next page">#local.nextIcon#</a>' & chr(10));
+			}
 
-	<!--- ============================================== --->
-	<!--- SIDEBAR                                        --->
-	<!--- ============================================== --->
+			writeOutput('</nav>');
+		}
+		return trim(local.html);
+	}
 
-	<cffunction name="uiSidebar" access="public" output="false" returntype="string"
-		hint="Opens a Basecoat sidebar (aside + nav). Close with uiSidebarEnd().">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "sidebar">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfreturn '<aside class="#local.cls#"><nav>'>
-	</cffunction>
+	// ==============================================
+	// BREADCRUMB
+	// ==============================================
 
-	<cffunction name="uiSidebarSection" access="public" output="false" returntype="string"
-		hint="Opens a sidebar section with optional heading. Close with uiSidebarSectionEnd().">
-		<cfargument name="title" type="string" required="false" default="" hint="Optional section heading">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "sidebar-section">
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfset local.heading = Len(arguments.title) ? '<h4>#arguments.title#</h4>' : "">
-		<cfreturn '<div class="#local.cls#">#local.heading#<ul>'>
-	</cffunction>
+	/** Opens a Basecoat breadcrumb nav. Close with uiBreadcrumbEnd(). */
+	public string function uiBreadcrumb(string class = "") {
+		var cls = "breadcrumb";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<nav aria-label="Breadcrumb" class="#cls#"><ol>';
+	}
 
-	<cffunction name="uiSidebarSectionEnd" access="public" output="false" returntype="string">
-		<cfreturn '</ul></div>'>
-	</cffunction>
+	/** Renders a breadcrumb item. Omit href for the current (last) page. */
+	public string function uiBreadcrumbItem(required string text, string href = "") {
+		if (len(arguments.href))
+			return '<li><a href="#arguments.href#">#arguments.text#</a></li>';
+		return '<li><span aria-current="page">#arguments.text#</span></li>';
+	}
 
-	<cffunction name="uiSidebarItem" access="public" output="false" returntype="string"
-		hint="Renders a sidebar navigation item.">
-		<cfargument name="text" type="string" required="true">
-		<cfargument name="href" type="string" required="false" default="#">
-		<cfargument name="icon" type="string" required="false" default="" hint="Lucide icon name">
-		<cfargument name="active" type="boolean" required="false" default="false">
-		<cfargument name="class" type="string" required="false" default="">
-		<cfset var local = {}>
-		<cfset local.cls = "sidebar-item">
-		<cfif arguments.active><cfset local.cls = local.cls & " sidebar-item-active"></cfif>
-		<cfif Len(arguments.class)><cfset local.cls = local.cls & " " & arguments.class></cfif>
-		<cfset local.iconHtml = Len(arguments.icon) ? $uiLucideIcon(arguments.icon, 16, 2) & " " : "">
-		<cfreturn '<li><a href="#arguments.href#" class="#local.cls#">#local.iconHtml##arguments.text#</a></li>'>
-	</cffunction>
+	/** Renders a breadcrumb separator (chevron-right icon). */
+	public string function uiBreadcrumbSeparator() {
+		var icon = $uiLucideIcon("chevron-right", 14, 2);
+		return '<li aria-hidden="true">#icon#</li>';
+	}
 
-	<cffunction name="uiSidebarEnd" access="public" output="false" returntype="string">
-		<cfreturn '</nav></aside>'>
-	</cffunction>
+	public string function uiBreadcrumbEnd() {
+		return '</ol></nav>';
+	}
 
-</cfcomponent>
+	// ==============================================
+	// SIDEBAR
+	// ==============================================
+
+	/** Opens a Basecoat sidebar (aside + nav). Close with uiSidebarEnd(). */
+	public string function uiSidebar(string class = "") {
+		var cls = "sidebar";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		return '<aside class="#cls#"><nav>';
+	}
+
+	/** Opens a sidebar section with optional heading. Close with uiSidebarSectionEnd(). */
+	public string function uiSidebarSection(string title = "", string class = "") {
+		var cls = "sidebar-section";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		var heading = len(arguments.title) ? '<h4>#arguments.title#</h4>' : "";
+		return '<div class="#cls#">#heading#<ul>';
+	}
+
+	public string function uiSidebarSectionEnd() {
+		return '</ul></div>';
+	}
+
+	/** Renders a sidebar navigation item. */
+	public string function uiSidebarItem(
+		required string text,
+		string href = "##",
+		string icon = "",
+		boolean active = false,
+		string class = ""
+	) {
+		var cls = "sidebar-item";
+		if (arguments.active) cls &= " sidebar-item-active";
+		if (len(arguments.class)) cls &= " " & arguments.class;
+		var iconHtml = len(arguments.icon) ? $uiLucideIcon(arguments.icon, 16, 2) & " " : "";
+		return '<li><a href="#arguments.href#" class="#cls#">#iconHtml##arguments.text#</a></li>';
+	}
+
+	public string function uiSidebarEnd() {
+		return '</nav></aside>';
+	}
+
+}

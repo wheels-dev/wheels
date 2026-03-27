@@ -1,11 +1,11 @@
-<cfcomponent extends="wheels.WheelsTest">
+component extends="wheels.WheelsTest" {
 
-	<cffunction name="beforeAll">
-		<cfset variables.bc = CreateObject("component", "plugins.basecoat.Basecoat").init()>
-	</cffunction>
+	function beforeAll() {
+		variables.bc = createObject("component", "plugins.basecoat.Basecoat").init();
+	}
 
-	<cffunction name="run">
-		<cfset describe("Basecoat Phase 1+2 — Simple Components", () => {
+	function run() {
+		describe("Basecoat Phase 1+2 — Simple Components", () => {
 
 			describe("uiButton", () => {
 
@@ -164,7 +164,7 @@
 				it("renders multiple skeleton lines", () => {
 					var html = variables.bc.uiSkeleton(lines=3);
 					expect(html).toMatch('<div class="skeleton h-4 w-full"></div>');
-					expect(ListLen(html, Chr(10))).toBe(3);
+					expect(listLen(html, chr(10))).toBe(3);
 				});
 
 			});
@@ -192,7 +192,7 @@
 
 			});
 
-		})>
-	</cffunction>
+		});
+	}
 
-</cfcomponent>
+}

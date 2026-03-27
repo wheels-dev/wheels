@@ -1,28 +1,28 @@
-<cfcomponent extends="wheels.WheelsTest">
+component extends="wheels.WheelsTest" {
 
-	<cffunction name="beforeAll">
-		<cfset variables.bc = CreateObject("component", "plugins.basecoat.Basecoat").init()>
-	</cffunction>
+	function beforeAll() {
+		variables.bc = createObject("component", "plugins.basecoat.Basecoat").init();
+	}
 
-	<cffunction name="run">
-		<cfset describe("Basecoat Phase 2-5 — Complex Components", () => {
+	function run() {
+		describe("Basecoat Phase 2-5 — Complex Components", () => {
 
 			describe("uiDialog", () => {
 
 				it("includes aria-labelledby matching generated ID", () => {
 					var html = variables.bc.uiDialog(title="My Dialog");
 					// Extract the dialog ID from the html — id="dlg-XXXXXXXX"
-					var idMatch = ReMatch('id="(dlg-[^"]+)"', html);
-					expect(ArrayLen(idMatch)).toBeGTE(1);
-					var dlgId = ReReplace(idMatch[1], 'id="([^"]+)"', "\1");
+					var idMatch = reMatch('id="(dlg-[^"]+)"', html);
+					expect(arrayLen(idMatch)).toBeGTE(1);
+					var dlgId = reReplace(idMatch[1], 'id="([^"]+)"', "\1");
 					expect(html).toMatch('aria-labelledby="#dlgId#-title"');
 					expect(html).toMatch('id="#dlgId#-title"');
 				});
 
 				it("includes aria-describedby when description provided", () => {
 					var html = variables.bc.uiDialog(title="T", description="Some desc");
-					var idMatch = ReMatch('id="(dlg-[^"]+)"', html);
-					var dlgId = ReReplace(idMatch[1], 'id="([^"]+)"', "\1");
+					var idMatch = reMatch('id="(dlg-[^"]+)"', html);
+					var dlgId = reReplace(idMatch[1], 'id="([^"]+)"', "\1");
 					expect(html).toMatch('aria-describedby="#dlgId#-desc"');
 					expect(html).toMatch('id="#dlgId#-desc"');
 				});
@@ -95,7 +95,7 @@
 					var html = variables.bc.uiField(label="Active", name="user[active]", type="checkbox");
 					expect(html).toMatch('class="flex items-center gap-2"');
 					// input must come before label in the string
-					expect(Find('<input', html)).toBeLT(Find('<label', html));
+					expect(find('<input', html)).toBeLT(find('<label', html));
 					expect(html).toMatch('class="checkbox"');
 				});
 
@@ -104,7 +104,7 @@
 					expect(html).toMatch('class="flex items-center gap-2"');
 					expect(html).toMatch('role="switch"');
 					expect(html).toMatch('class="switch"');
-					expect(Find('<input', html)).toBeLT(Find('<label', html));
+					expect(find('<input', html)).toBeLT(find('<label', html));
 				});
 
 				it("error state adds border-destructive and aria-invalid", () => {
@@ -117,8 +117,8 @@
 
 				it("error paragraph uses id matching aria-describedby", () => {
 					var html = variables.bc.uiField(label="Email", name="user[email]", errorMessage="Required");
-					var idMatch = ReMatch('id="(fld-[^"]+)"', html);
-					var fldId = ReReplace(idMatch[1], 'id="([^"]+)"', "\1");
+					var idMatch = reMatch('id="(fld-[^"]+)"', html);
+					var fldId = reReplace(idMatch[1], 'id="([^"]+)"', "\1");
 					expect(html).toMatch('aria-describedby="#fldId#-error"');
 					expect(html).toMatch('id="#fldId#-error"');
 				});
@@ -132,8 +132,8 @@
 				it("auto-generates unique IDs when id not supplied", () => {
 					var html1 = variables.bc.uiField(label="A", name="a");
 					var html2 = variables.bc.uiField(label="B", name="b");
-					var id1 = ReReplace(html1, '.*id="(fld-[^"]+)".*', "\1");
-					var id2 = ReReplace(html2, '.*id="(fld-[^"]+)".*', "\1");
+					var id1 = reReplace(html1, '.*id="(fld-[^"]+)".*', "\1");
+					var id2 = reReplace(html2, '.*id="(fld-[^"]+)".*', "\1");
 					expect(id1).notToBe(id2);
 				});
 
@@ -346,7 +346,7 @@
 
 			});
 
-		})>
-	</cffunction>
+		});
+	}
 
-</cfcomponent>
+}

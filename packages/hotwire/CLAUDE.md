@@ -29,13 +29,13 @@ Wheels packages inject methods from **one CFC only** (the one matching the direc
 
 ## Coding Conventions
 
-- `<cffunction>` tag syntax for all public methods
-- `<cfargument>` with `required`, `type`, and `default` attributes on every parameter
-- `<cfset var local = {}>` or `<cfset var ...>` for all local variables
+- CFScript syntax (`component { }`, `function name() { }`)
+- Typed function parameters with defaults: `string name = "default"`
+- `var local = {};` for local variable scopes
 - Function names: camelCase
 - View helpers return strings (used via `#helper()#` in templates)
-- Controller helpers may use `<cfset>` to call Wheels functions like `redirectTo()`
-- Build multi-line HTML via `<cfsavecontent variable="local.html">` blocks
+- Controller helpers call Wheels functions like `redirectTo()`
+- Build multi-line HTML via `savecontent variable="local.html" { writeOutput(...); }`
 - Double quotes for HTML attributes
 
 ### Naming Patterns

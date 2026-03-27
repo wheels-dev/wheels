@@ -29,14 +29,14 @@ All public helper functions must be methods in `Basecoat.cfc`. Wheels packages i
 
 ## Coding Conventions
 
-- `<cffunction>` tag syntax for all public methods
-- `<cfargument>` with `required`, `type`, and `default` on every parameter
-- `<cfset var local = {}>` for local variables
+- CFScript syntax (`component { }`, `function name() { }`)
+- Typed function parameters with defaults: `string name = "default"`
+- `var local = {};` for local variable scopes
 - Function names: camelCase with `ui` prefix for components, `basecoat` prefix for infrastructure
 - View helpers return strings
-- Multi-line HTML via `<cfsavecontent variable="local.html">` blocks
+- Build multi-line HTML via `savecontent variable="local.html" { writeOutput(...); }`
 - Double quotes for HTML attributes
-- Generate unique IDs via `Replace(Left(CreateUUID(), 8), "-", "", "all")` when caller omits ID
+- Generate unique IDs via `replace(left(createUUID(), 8), "-", "", "all")` when caller omits ID
 
 ### Naming Patterns
 
