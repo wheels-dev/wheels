@@ -52,6 +52,17 @@ if (application.wheels.enableMigratorComponent) {
 		}
 	);
 }
+if (StructKeyExists(application.wheels, "enablePackagesComponent") && application.wheels.enablePackagesComponent) {
+	ArrayAppend(
+		request.navigation,
+		{
+			route = "wheelsPackageList",
+			title = "Packages",
+			isFluid = false,
+			text = '<svg xmlns="http://www.w3.org/2000/svg" height="14" width="14" viewBox="0 0 512 512"><path d="M234.5 5.7c13.9-5.3 29.7-5.3 43.6 0l192 73.7C493.6 89.5 512 112.3 512 138.4V373.6c0 26.1-18.4 48.9-42 59l-192 73.7c-13.9 5.3-29.7 5.3-43.6 0l-192-73.7C18.4 422.5 0 399.7 0 373.6V138.4c0-26.1 18.4-48.9 42-59l192-73.7zM256 66L82 133l174 67 174-67L256 66zM32 373.6c0 8.7 6.1 16.3 14 19.7l192 73.7V274L46 200v173.6zM274 467l192-73.7c7.9-3 14-11 14-19.7V200L274 274V467z"/></svg>&nbsp Packages'
+		}
+	);
+}
 if (application.wheels.enablePluginsComponent) {
 	ArrayAppend(
 		request.navigation,

@@ -20,7 +20,7 @@ paths = [
 	'assetPaths'
 ];
 
-components = ['enablePluginsComponent', 'enableMigratorComponent', 'enablePublicComponent'];
+components = ['enablePackagesComponent', 'enablePluginsComponent', 'enableMigratorComponent', 'enablePublicComponent'];
 environment = [
 	'hostName',
 	'environment',
