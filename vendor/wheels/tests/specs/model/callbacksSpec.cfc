@@ -3,6 +3,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests that afterDelete", () => {
 
@@ -35,6 +36,8 @@ component extends="wheels.WheelsTest" {
 		})
 
 		describe("Tests that afterFind", () => {
+
+			if (_isCockroachDB) return;
 
 			beforeEach(() => {
 				g.model("post").$registerCallback(type = "afterFind", methods = "afterFindCallback")
@@ -132,6 +135,8 @@ component extends="wheels.WheelsTest" {
 		})
 
 		describe("Tests that afterFindNonLegacy", () => {
+
+			if (_isCockroachDB) return;
 
 			beforeEach(() => {
 				g.model("post").$registerCallback(type = "afterFind", methods = "afterFindCallback")

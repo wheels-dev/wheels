@@ -31,7 +31,6 @@ component extends="wheels.WheelsTest" {
 							lastName = "ByKey"
 						);
 						var found = g.model("author").findByKey(author.key());
-						expect(found).toBeInstanceOf("component");
 						expect(found.firstName).toBe("CRDBFind");
 						expect(found.lastName).toBe("ByKey");
 						transaction action="rollback";

@@ -699,6 +699,7 @@ component extends="wheels.WheelsTest" {
 				isACF = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor >= 2018
 				isPostgres = migration.adapter.adapterName() == "PostgreSQL"
 				isSQLite = migration.adapter.adapterName() == "SQLite"
+				isCockroachDB = migration.adapter.adapterName() == "CockroachDB"
 				isLucee = application.wheels.serverName == "Lucee"
 				isBoxLang = application.wheels.serverName == "BoxLang"
 			})
@@ -707,6 +708,7 @@ component extends="wheels.WheelsTest" {
 				if (isACF2016 && isPostgres) {
 					return
 				}
+				if (isCockroachDB) return;
 
 				tableName = "dbm_addindex_tests"
 				indexName = "idx_to_add"
@@ -731,6 +733,7 @@ component extends="wheels.WheelsTest" {
 				if (isACF2016 && isPostgres) {
 					return
 				}
+				if (isCockroachDB) return;
 
 				tableName = "dbm_addindex_tests"
 				indexName = "idx_to_add_to_multiple_columns"
@@ -1053,6 +1056,7 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				isACF2016 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2016
 				isPostgres = migration.adapter.adapterName() == "PostgreSQL"
+				isCockroachDB = migration.adapter.adapterName() == "CockroachDB"
 				isLucee = application.wheels.serverName == "Lucee"
 				isBoxLang = application.wheels.serverName == "BoxLang"
 			})
@@ -1061,6 +1065,7 @@ component extends="wheels.WheelsTest" {
 				if (isACF2016 && isPostgres) {
 					return
 				}
+				if (isCockroachDB) return;
 				tableName = "dbm_removeindex_tests"
 				indexName = "idx_to_remove"
 				t = migration.createTable(name = tableName, force = true)

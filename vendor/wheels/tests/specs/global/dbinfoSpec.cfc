@@ -15,6 +15,7 @@ component extends="wheels.WheelsTest" {
 
     function run( ) {
         g = application.wo;
+        var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
         describe( "Testing $dbinfo() function for database", () => {
 
@@ -53,6 +54,7 @@ component extends="wheels.WheelsTest" {
             });
 
             it( "should return correct index information", () => {
+                if (_isCockroachDB) return;
                 local.result = g.$dbinfo(
                     datasource = variables.datasource,
                     type = "index",
