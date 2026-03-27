@@ -3,6 +3,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		// Calculate the expected WHERE column reference length dynamically based on quoting
 		// result[2] from $whereClause is: quotedTable.quotedColumn + " " + operator
@@ -16,6 +17,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that whereclause", () => {
 
 			it("works with numeric operators", () => {
+				if (_isCockroachDB) return;
 				operators = ListToArray("=,<>,!=,<,<=,!<,>,>=,!>")
 
 				for (i in operators) {

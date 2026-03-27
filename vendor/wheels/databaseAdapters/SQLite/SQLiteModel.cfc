@@ -82,7 +82,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
     public any function $identitySelect(
         required struct queryAttributes,
         required struct result,
-        required string primaryKey
+        required string primaryKey,
+        any returningIdentity = ""
     ) {
         var query = {};
         var local = {};

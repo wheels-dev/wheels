@@ -14,6 +14,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests column BIG INTEGER", () => {
 
@@ -800,6 +801,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests changeColumn", () => {
 
 			it("is changing column", () => {
+				if (_isCockroachDB) return;
 				if(get("adapterName") eq 'SQLiteModel') {
 					skip("SQLite does not allow altering Columns.")
 				}

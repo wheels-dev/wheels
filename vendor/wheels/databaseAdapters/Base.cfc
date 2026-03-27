@@ -105,10 +105,13 @@ component output=false extends="wheels.Global"{
 		}
 
 		// Manual identity retrieval for Lucee / ACF
+		// Pass the query result (if any) as returningIdentity — needed by adapters
+		// that use RETURNING clauses (e.g. CockroachDB) to retrieve generated keys.
 		wheels.id = $identitySelect(
-			primaryKey      = args.primaryKey,
-			queryAttributes = args.queryAttributes,
-			result          = wheels.result
+			primaryKey         = args.primaryKey,
+			queryAttributes    = args.queryAttributes,
+			result             = wheels.result,
+			returningIdentity  = structKeyExists(local, args.debugName) ? local[args.debugName] : ""
 		);
 
 		if (structKeyExists(wheels,"id") && isStruct(wheels.id) && !structIsEmpty(wheels.id)) {
@@ -168,7 +171,8 @@ component output=false extends="wheels.Global"{
 	public any function $identitySelect(
 		required struct queryAttributes,
 		required struct result,
-		required string primaryKey
+		required string primaryKey,
+		any returningIdentity = ""
 	) {
 		local.query = {};
 		local.sql = Trim(arguments.result.sql);

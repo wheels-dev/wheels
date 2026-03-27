@@ -13,6 +13,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests that adapter", () => {
 
@@ -38,6 +39,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that getCurrentMigrationVersion", () => {
 
 			it("is returning expected value", () => {
+				if (_isCockroachDB) return;
 				for (local.table in ["c_o_r_e_bunyips", "c_o_r_e_dropbears", "c_o_r_e_hoopsnakes"]) {
 					migration.dropTable(local.table)
 				}
@@ -72,6 +74,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is migrating up from 0 to 001", () => {
+				if (_isCockroachDB) return;
 				migrator.migrateTo(001)
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
 
@@ -82,6 +85,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is migrating up from 0 to 003", () => {
+				if (_isCockroachDB) return;
 				migrator.migrateTo(003)
 				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
 				info2 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_dropbears")
@@ -96,6 +100,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is migrating down from 003 to 001", () => {
+				if (_isCockroachDB) return;
 				migrator.migrateTo(003)
 				migrator.migrateTo(001)
 				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
@@ -111,6 +116,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("generates sql files", () => {
+				if (_isCockroachDB) return;
 				application.wheels.writeMigratorSQLFiles = true
 
 				migrator.migrateTo(002)

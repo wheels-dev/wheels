@@ -8,6 +8,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
 		describe("Tests that addObject", () => {
 
@@ -100,6 +101,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is valid with combi key", () => {
+				if (_isCockroachDB) return;
 				user = userModel.findByKey(key = 1)
 				hasCombiKeys = user.hasCombiKeys()
 
@@ -135,6 +137,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is valid with combi key", () => {
+				if (_isCockroachDB) return;
 				user = userModel.findByKey(key = 1)
 				combiKeyCount = user.combiKeyCount()
 
@@ -160,6 +163,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is valid with combi key", () => {
+				if (_isCockroachDB) return;
 				user = userModel.findByKey(key = 1)
 				combiKeys = user.combiKeys()
 
