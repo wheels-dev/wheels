@@ -36,3 +36,4 @@ test-output/
 .worktrees/
 .grove/
 .claude/settings.local.json
+.DS_Store
