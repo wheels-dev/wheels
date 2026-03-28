@@ -43,7 +43,50 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: npx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
-  tests:
-    uses: ./.github/workflows/tests.yml
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  quick-test:
+    name: "Quick Test (Lucee 7 + SQLite)"
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Start CF engine
+        run: docker compose build --no-cache lucee7 && docker compose up -d lucee7
+
+      - name: Wait for CF engine to be ready
+        run: |
+          echo "Waiting for lucee7 on port 60007..."
+          MAX_WAIT=60
+          WAIT_COUNT=0
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:60007/" | grep -q "200\|404\|302"; then
+              echo "CF engine is ready!"
+              break
+            fi
+            sleep 5
+          done
+          curl -s -o /dev/null --max-time 60 "http://localhost:60007/" || true
+          sleep 2
+
+      - name: Run SQLite tests
+        run: |
+          RESULT_FILE="/tmp/quick-test-result.txt"
+          HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
+            --max-time 900 \
+            --write-out "%{http_code}" \
+            "http://localhost:60007/wheels/core/tests?db=sqlite&format=json" || echo "000")
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            PASS=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print(d.get('totalPass',0))" 2>/dev/null || echo "?")
+            FAIL=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print(d.get('totalFail',0) + d.get('totalError',0))" 2>/dev/null || echo "?")
+            echo "Tests: ${PASS} passed, ${FAIL} failed"
+            if [ "$FAIL" != "0" ]; then
+              echo "::error::${FAIL} test failures"
+              exit 1
+            fi
+          else
+            echo "::error::Tests returned HTTP ${HTTP_CODE}"
+            exit 1
+          fi
