@@ -310,9 +310,38 @@
 				</cfif>
 			</dl>
 		</div>
+		<cfif StructKeyExists(application.wheels, "enablePackagesComponent") AND application.wheels.enablePackagesComponent>
+			<div class="wdb-section">
+				<div class="wdb-section-title">Packages</div>
+				<cfif StructKeyExists(application.wheels, "packageMeta") AND StructCount(application.wheels.packageMeta) GT 0>
+					<table class="wdb-table">
+						<thead><tr><th>Package</th><th>Version</th><th>Description</th></tr></thead>
+						<tbody>
+						<cfloop collection="#application.wheels.packageMeta#" item="local.pkgName">
+							<cfset local.pkgInfo = application.wheels.packageMeta[local.pkgName]>
+							<tr>
+								<td><code>#local.pkgInfo.name#</code></td>
+								<td>#local.pkgInfo.version#</td>
+								<td style="color:##a6adc8;">#local.pkgInfo.description#</td>
+							</tr>
+						</cfloop>
+						</tbody>
+					</table>
+				<cfelse>
+					<p style="color:##6c7086;">No packages installed.</p>
+				</cfif>
+				<cfif StructKeyExists(application.wheels, "failedPackages") AND ArrayLen(application.wheels.failedPackages) GT 0>
+					<div style="color:##f38ba8;font-size:12px;margin-top:8px;">
+						<cfloop array="#application.wheels.failedPackages#" index="local.fp">
+							<p>Failed to load <strong>#local.fp.name#</strong>: #local.fp.error#</p>
+						</cfloop>
+					</div>
+				</cfif>
+			</div>
+		</cfif>
 		<cfif $get("enablePluginsComponent")>
 			<div class="wdb-section">
-				<div class="wdb-section-title">Plugins</div>
+				<div class="wdb-section-title">Plugins (Legacy)</div>
 				<cfif StructCount($get("plugins")) IS NOT 0>
 					<table class="wdb-table">
 						<thead><tr><th>Plugin</th><th>Version</th></tr></thead>
@@ -401,6 +430,12 @@
 			<a href="#urlFor(route = 'wheelsMigrator')#" class="wdb-link-card" target="_blank">
 				<svg viewBox="0 0 448 512"><path d="M448 80v48c0 44.2-100.3 80-224 80S0 172.2 0 128V80C0 35.8 100.3 0 224 0s224 35.8 224 80z"/></svg>
 				Migrator
+			</a>
+			</cfif>
+			<cfif StructKeyExists(application.wheels, "enablePackagesComponent") AND application.wheels.enablePackagesComponent>
+			<a href="#urlFor(route = 'wheelsPackageList')#" class="wdb-link-card" target="_blank">
+				<svg viewBox="0 0 512 512"><path d="M234.5 5.7c13.9-5.3 29.7-5.3 43.6 0l192 73.7C493.6 89.5 512 112.3 512 138.4V373.6c0 26.1-18.4 48.9-42 59l-192 73.7c-13.9 5.3-29.7 5.3-43.6 0l-192-73.7C18.4 422.5 0 399.7 0 373.6V138.4c0-26.1 18.4-48.9 42-59l192-73.7zM256 66L82 133l174 67 174-67L256 66zM32 373.6c0 8.7 6.1 16.3 14 19.7l192 73.7V274L46 200v173.6zM274 467l192-73.7c7.9-3 14-11 14-19.7V200L274 274V467z"/></svg>
+				Packages
 			</a>
 			</cfif>
 			<cfif $get("enablePluginsComponent")>

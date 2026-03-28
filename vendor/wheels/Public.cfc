@@ -114,6 +114,14 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/views/cli.cfm";
 		return "";
 	}
+	function packagelist() {
+		include "/wheels/public/views/packagelist.cfm";
+		return "";
+	}
+	function packageentry() {
+		include "/wheels/public/views/packageentry.cfm";
+		return "";
+	}
 	function plugins() {
 		include "/wheels/public/views/plugins.cfm";
 		return "";
