@@ -2343,9 +2343,17 @@ component output="false" {
 	 * Call CFML's canonicalize() function but set to blank string if the result is null (happens on Lucee 5).
 	 */
 	public string function $canonicalize(required string input) {
-		local.rv = Canonicalize(arguments.input, false, false);
-		if (IsNull(local.rv)) {
-			local.rv = "";
+		try {
+			local.rv = Canonicalize(arguments.input, false, false);
+			if (IsNull(local.rv)) {
+				local.rv = "";
+			}
+		} catch (any e) {
+			// Lucee's Canonicalize() delegates to Java's URLDecoder, which throws
+			// IllegalArgumentException for inputs containing malformed percent-encoded
+			// sequences (e.g. %% or a lone % not followed by two hex digits).
+			// Fall back to the raw input; it will still be HTML-encoded by the caller.
+			local.rv = arguments.input;
 		}
 		return local.rv;
 	}
