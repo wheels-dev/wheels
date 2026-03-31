@@ -8,7 +8,7 @@
  * wheels jobs monitor --queue=mailers
  * {code}
  */
-component extends="../../base" {
+component extends="../base" {
 
 	/**
 	 * @interval Refresh interval in seconds (default: 3)

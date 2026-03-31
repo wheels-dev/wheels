@@ -247,7 +247,7 @@ component extends="../base" {
 		if (len(content) && right(content, 1) != chr(10)) {
 			content &= chr(10);
 		}
-		content &= chr(10) & "# Vite build output" & chr(10);
+		content = content & chr(10) & "## Vite build output" & chr(10);
 		content &= arguments.entry & chr(10);
 		fileWrite(gitignorePath, content);
 		detailOutput.update(".gitignore", true);

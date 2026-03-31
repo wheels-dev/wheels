@@ -553,8 +553,8 @@ component singleton {
 				},
 				// Structure key exists
 				{
-					pattern = 'assert\s*\(\s*"structKeyExists\s*\(\s*([^,]+),\s*["\']([^"\']+)["\']\s*\)"\s*\)',
-					replace = 'expect($1).toHaveKey("$2")'
+					pattern = "assert\s*\(\s*""structKeyExists\s*\(\s*([^,]+),\s*[']([^']+)[']\s*\)""\s*\)",
+					replace = "expect($1).toHaveKey(""$2"")"
 				},
 				// Length checks
 				{

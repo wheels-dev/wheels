@@ -7,7 +7,7 @@
  * wheels jobs retry --limit=10
  * {code}
  */
-component extends="../../base" {
+component extends="../base" {
 
 	/**
 	 * @queue Filter by queue name (default: all queues)

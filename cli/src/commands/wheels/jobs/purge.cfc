@@ -8,7 +8,7 @@
  * wheels jobs purge --completed --failed --force
  * {code}
  */
-component extends="../../base" {
+component extends="../base" {
 
 	/**
 	 * @completed Purge completed jobs (default: true)

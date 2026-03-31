@@ -7,7 +7,7 @@
  * wheels jobs status --format=json
  * {code}
  */
-component extends="../../base" {
+component extends="../base" {
 
 	/**
 	 * @queue  Filter by queue name (default: all queues)

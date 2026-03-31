@@ -179,9 +179,9 @@ component {
 
 		// Boolean — Yes/No badges
 		if (field.dataType == "boolean" || field.inputType == "checkbox") {
-			return "<cfif |ObjectNamePlural|." & field.name
+			return chr(60) & 'cfif |ObjectNamePlural|.' & field.name
 				& '><span class="badge bg-success">Yes</span>'
-				& '<cfelse><span class="badge bg-secondary">No</span></cfif>';
+				& chr(60) & 'cfelse><span class="badge bg-secondary">No</span>' & chr(60) & '/cfif>';
 		}
 
 		// Email — mailto link

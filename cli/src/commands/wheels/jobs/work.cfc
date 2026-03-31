@@ -11,7 +11,7 @@
  * wheels jobs work --max-jobs=100
  * {code}
  */
-component extends="../../base" {
+component extends="../base" {
 
 	/**
 	 * @queue      Comma-delimited queue names to process (default: all queues)
