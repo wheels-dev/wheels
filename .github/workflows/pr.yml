@@ -18,6 +18,8 @@ jobs:
   label:
     name: Auto-Label PR
     runs-on: ubuntu-latest
+    # Fork PRs get a read-only GITHUB_TOKEN so labeling will fail — don't block CI
+    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
