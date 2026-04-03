@@ -1982,43 +1982,14 @@ component output="false" {
 	 * Get the status code (e.g. 200, 404 etc) of the response we're about to send.
 	 */
 	public string function $statusCode() {
-		if (StructKeyExists(server, "lucee")) {
-			local.response = GetPageContext().getResponse();
-		} else {
-			local.response = GetPageContext().getFusionContext().getResponse();
-		}
-		return local.response.getStatus();
+		return application.wheels.engineAdapter.getStatusCode();
 	}
 
 	/**
 	 * Gets the value of the content type header (blank string if it doesn't exist) of the response we're about to send.
 	 */
 	public string function $contentType() {
-		local.rv = "";
-		local.pageContext = getPageContext();
-		if (structKeyExists(server, "boxlang")) {
-			local.response = local.pageContext;
-		} else if (structKeyExists(server, "lucee")) {
-			local.response = local.pageContext.getResponse();
-		} else {
-			local.response = local.pageContext.getFusionContext().getResponse();
-		}
-
-		if (structKeyExists(server, "boxlang")) {
-			local.request = local.response.getRequest();
-			local.header = local.request.getHeader("Content-Type");
-			if(!isNull(local.header)) {
-				local.rv = local.header;
-			}
-		} else {
-			if (local.response.containsHeader("Content-Type")) {
-				local.header = local.response.getHeader("Content-Type");
-				if (!isNull(local.header)) {
-					local.rv = local.header;
-				}
-			}
-		}
-		return local.rv;
+		return application.wheels.engineAdapter.getContentType();
 	}
 
 	/**
@@ -2134,14 +2105,14 @@ component output="false" {
 	 * Returns the request timeout value in seconds
 	 */
 	public numeric function $getRequestTimeout() {
-		// Check for BoxLang first using unique BoxLang identifier
-		if (StructKeyExists(server, "boxlang")) {
-			return 10000;
-		} else if (StructKeyExists(server, "lucee") && StructKeyExists(server.lucee, "version")) {
-			return (GetPageContext().getRequestTimeout() / 1000);
-		} else {
-			return CreateObject("java", "coldfusion.runtime.RequestMonitor").GetRequestTimeout();
-		}
+		return application.wheels.engineAdapter.getRequestTimeout();
+	}
+
+	/**
+	 * Returns the engine adapter instance for centralized cross-engine behavior.
+	 */
+	public any function $engineAdapter() {
+		return application.wheels.engineAdapter;
 	}
 
 	// ======================================================================

@@ -65,14 +65,8 @@ component {
 	 * Note: This bypasses layouts and after-filters. Use for true streaming endpoints only.
 	 */
 	public any function initSSEStream() {
-		// Get the underlying response object
-		if (StructKeyExists(server, "boxlang")) {
-			local.response = GetPageContext();
-		} else if (StructKeyExists(server, "lucee")) {
-			local.response = GetPageContext().getResponse();
-		} else {
-			local.response = GetPageContext().getFusionContext().getResponse();
-		}
+		// Get the underlying response object via engine adapter
+		local.response = application.wheels.engineAdapter.getResponse();
 
 		// Set SSE headers
 		local.response.setContentType("text/event-stream");

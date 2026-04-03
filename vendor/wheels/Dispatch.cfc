@@ -100,21 +100,8 @@ component output="false" extends="wheels.Global"{
 				// Object form field.
 				local.name = SpanExcluding(local.key, "[");
 
-				// BoxLang compatibility: Check if we're running on BoxLang and handle differently
-				if (StructKeyExists(server, "boxlang")) {
-					// BoxLang specific parsing to handle the bracket parsing differences
-					local.keyWithoutName = ReplaceNoCase(local.key, local.name & "[", "", "one");
-					local.keyWithoutEndBracket = Left(local.keyWithoutName, Len(local.keyWithoutName) - 1);
-					local.nested = [];
-					local.segments = ListToArray(local.keyWithoutEndBracket, "][", false);
-					for (local.segment in local.segments) {
-						local.cleanSegment = Replace(Replace(local.segment, "[", "", "all"), "]", "", "all");
-						ArrayAppend(local.nested, local.cleanSegment);
-					}
-				} else {
-					// Standard behavior for Lucee/Adobe CF
-					local.nested = ListToArray(ReplaceList(local.key, local.name & "[,]", ""), "[", true);
-				}
+				// Use engine adapter for cross-engine bracket-parsing differences
+				local.nested = application.wheels.engineAdapter.parseFormKey(local.key, local.name);
 				if (!StructKeyExists(local.rv, local.name)) {
 					local.rv[local.name] = {};
 				}
@@ -640,29 +627,8 @@ component output="false" extends="wheels.Global"{
 		// Filter out illegal characters from the controller and action arguments.
 		local.rv.action = ReReplace(local.rv.action, "[^0-9A-Za-z-_\.]", "", "all");
 
-		// Convert controller to upperCamelCase.
-		// BoxLang compatibility: Handle consecutive dots differently
-		if (StructKeyExists(server, "boxlang")) {
-			// For BoxLang, manually handle the leading dots issue
-			local.dotPrefix = "";
-			local.cleanName = local.rv.controller;
-
-			while (Left(local.cleanName, 1) == ".") {
-				local.dotPrefix &= ".";
-				local.cleanName = Right(local.cleanName, Len(local.cleanName) - 1);
-			}
-
-			local.cleanName = ReReplace(local.cleanName, "(^|-)([a-z])", "\u\2", "all");
-			local.rv.controller = local.dotPrefix & local.cleanName;
-		} else {
-			// Standard behavior for Lucee/Adobe CF
-			local.cName = ListLast(local.rv.controller, ".");
-			local.cName = ReReplace(local.cName, "(^|-)([a-z])", "\u\2", "all");
-			local.cLen = ListLen(local.rv.controller, ".");
-			if (local.cLen) {
-				local.rv.controller = ListSetAt(local.rv.controller, local.cLen, local.cName, ".");
-			}
-		}
+		// Convert controller to upperCamelCase via engine adapter
+		local.rv.controller = application.wheels.engineAdapter.controllerNameToUpperCamelCase(local.rv.controller);
 
 		// Action to normal camelCase.
 		local.rv.action = ReReplace(local.rv.action, "-([a-z])", "\u\1", "all");
