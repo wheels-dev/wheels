@@ -7,7 +7,7 @@ component extends="wheels.WheelsTest" {
 			describe("DatabaseModelAdapterInterface", () => {
 
 				it("H2 model adapter exposes all required methods", () => {
-					var adapter = CreateObject("component", "wheels.databaseAdapters.H2Model");
+					var adapter = CreateObject("component", "wheels.databaseAdapters.H2.H2Model");
 					var methods = [
 						"$init", "$executeQuery", "$performQuery", "$identitySelect",
 						"$generatedKey", "$getColumns", "$getColumnInfo",
@@ -32,7 +32,7 @@ component extends="wheels.WheelsTest" {
 			describe("DatabaseMigratorAdapterInterface", () => {
 
 				it("H2 migrator adapter exposes all required methods", () => {
-					var adapter = CreateObject("component", "wheels.databaseAdapters.H2Migrator");
+					var adapter = CreateObject("component", "wheels.databaseAdapters.H2.H2Migrator");
 					var methods = [
 						"typeToSQL", "addPrimaryKeyOptions", "primaryKeyConstraint",
 						"addColumnOptions", "optionsIncludeDefault", "quote",

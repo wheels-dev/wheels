@@ -67,7 +67,7 @@ component extends="wheels.WheelsTest" {
 				it("save has correct parameter names", () => {
 					var expected = [
 						"parameterize", "reload", "validate", "transaction",
-						"callbacks", "allowExplicitTimestamps"
+						"callbacks"
 					];
 					assertParamsPresent(userModel, "save", expected);
 				});

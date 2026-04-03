@@ -36,8 +36,11 @@ component extends="wheels.WheelsTest" {
 
 			describe("DI Binding Resolution", () => {
 
-				it("interface bindings are registered in default configuration", () => {
-					var di = application.wheelsdi;
+				it("interface bindings are registered in wheels.Bindings", () => {
+					// Create a fresh Injector with the default Bindings to verify
+					// all interface bindings are present (avoids relying on
+					// application.wheelsdi which may be reset during test lifecycle).
+					var di = new wheels.Injector(binderPath="wheels.Bindings");
 					var bindings = [
 						"ModelFinderInterface",
 						"ModelPersistenceInterface",

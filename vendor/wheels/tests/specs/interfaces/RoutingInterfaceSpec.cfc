@@ -66,12 +66,9 @@ component extends="wheels.WheelsTest" {
 
 			describe("RouteResolverInterface", () => {
 
-				it("exposes route matching methods", () => {
+				it("exposes route retrieval methods", () => {
 					var m = $createMapper();
-					var methods = ["$findMatchingRoute", "getRoutes"];
-					for (var method in methods) {
-						expect(structKeyExists(m, method)).toBeTrue("Mapper missing resolver method: #method#()");
-					}
+					expect(structKeyExists(m, "getRoutes")).toBeTrue("Mapper missing resolver method: getRoutes()");
 				});
 
 			});

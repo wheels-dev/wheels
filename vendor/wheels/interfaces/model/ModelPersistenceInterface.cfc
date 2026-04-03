@@ -48,7 +48,6 @@ interface {
 	 * @validate Run validations.
 	 * @transaction Transaction mode.
 	 * @callbacks Run callbacks.
-	 * @allowExplicitTimestamps Allow manual timestamps.
 	 * @return True if the save succeeded (validations passed).
 	 */
 	public boolean function save(
@@ -56,8 +55,7 @@ interface {
 		boolean reload,
 		boolean validate,
 		string transaction,
-		boolean callbacks,
-		boolean allowExplicitTimestamps
+		boolean callbacks
 	);
 
 	/**

@@ -46,7 +46,7 @@ component {
 			.bind("EventHandlerInterface").to("wheels.events.EventMethods");
 
 		// Database adapters (no default — adapter is selected per datasource at runtime)
-		// Bind per-project: bind("DatabaseModelAdapterInterface").to("wheels.databaseAdapters.H2Model")
+		// Bind per-project: bind("DatabaseModelAdapterInterface").to("wheels.databaseAdapters.H2.H2Model")
 
 		// DI subsystem
 		arguments.injector

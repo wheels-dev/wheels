@@ -21,21 +21,21 @@ interface {
 	 * @eventName Name of the lifecycle event where the error occurred.
 	 * @return The error response content (HTML or other format).
 	 */
-	public string function $runOnError(required any exception, required string eventName);
+	public string function $runOnError(required exception, required eventName);
 
 	/**
 	 * Run at the start of each request (maps to onRequestStart).
 	 *
 	 * @targetPage The requested template path.
 	 */
-	public void function $runOnRequestStart(required string targetPage);
+	public void function $runOnRequestStart(required targetPage);
 
 	/**
 	 * Run at the end of each request (maps to onRequestEnd).
 	 *
 	 * @targetpage The requested template path.
 	 */
-	public void function $runOnRequestEnd(required string targetpage);
+	public void function $runOnRequestEnd(required targetpage);
 
 	/**
 	 * Run when a new session starts (maps to onSessionStart).
@@ -48,14 +48,14 @@ interface {
 	 * @sessionScope The ending session's scope.
 	 * @applicationScope The application scope.
 	 */
-	public void function $runOnSessionEnd(required any sessionScope, required any applicationScope);
+	public void function $runOnSessionEnd(required sessionScope, required applicationScope);
 
 	/**
 	 * Run when a requested template is not found (maps to onMissingTemplate).
 	 *
 	 * @targetpage The missing template path.
 	 */
-	public void function $runOnMissingTemplate(required string targetpage);
+	public void function $runOnMissingTemplate(required targetpage);
 
 	/**
 	 * Return the current request format (e.g., "html", "json", "xml").
