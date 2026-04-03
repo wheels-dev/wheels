@@ -11,7 +11,7 @@
  *
  * Self-registers at application.wheelsdi for framework-wide access.
  */
-component {
+component implements="wheels.interfaces.di.InjectorInterface" {
 
 	/**
 	 * Constructor. Accepts a dotted-path to a Bindings CFC that has a configure(injector) method.

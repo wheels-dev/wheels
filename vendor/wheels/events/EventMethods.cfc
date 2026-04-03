@@ -1,4 +1,4 @@
-component extends="wheels.Global" {
+component extends="wheels.Global" implements="wheels.interfaces.events.EventHandlerInterface" {
 	public string function $runOnError(required exception, required eventName) {
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "initialized")) {
 			$restoreTestRunnerApplicationScope();
