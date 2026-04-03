@@ -254,9 +254,7 @@ component {
 
 		// Allow developers to inject plugins and packages into the application variables scope.
 		if (!StructIsEmpty(application.$wheels.mixins)) {
-			if (structKeyExists(server, "boxlang")) {
-				variables.this = this;
-			}
+			application.$wheels.engineAdapter.prepareDIComplete(variables, this);
 			new wheels.Plugins().$initializeMixins(variables);
 		}
 

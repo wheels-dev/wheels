@@ -212,9 +212,7 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 	}
 
 	function onDIcomplete(){
-		if (structKeyExists(server, "boxlang")) {
-			variables.this = this;
-		}
+		$engineAdapter().prepareDIComplete(variables, this);
 		new wheels.Plugins().$initializeMixins(variables);
 	}
 }

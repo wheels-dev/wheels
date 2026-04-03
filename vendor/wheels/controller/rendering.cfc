@@ -510,13 +510,12 @@ component {
 			local.fileName = Replace("_" & local.fileName, "__", "_", "one");
 		}
 
-		// BoxLang compatibility: Extract folder name more reliably
-		if (structKeyExists(server, "boxlang")) {
-			// For BoxLang, extract folder path manually to handle version differences
+		// Engine compatibility: Extract folder name reliably
+		if ($engineAdapter().isBoxLang()) {
+			// Extract folder path manually to handle engine version differences
 			local.tempName = arguments.$name;
 			if (Find("/", local.tempName)) {
 				local.folderName = Left(local.tempName, Len(local.tempName) - Len(ListLast(local.tempName, "/")));
-				// Remove trailing slash if present, but only if there's more than just "/"
 				if (Right(local.folderName, 1) == "/" AND Len(local.folderName) > 1) {
 					local.folderName = Left(local.folderName, Len(local.folderName) - 1);
 				}

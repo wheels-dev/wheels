@@ -548,13 +548,8 @@ component {
 
 		local.value = this[arguments.validation.args.property];
 
-		// Oracle TIMESTAMP/DATE objects in BoxLang — always invoke
-		if (
-			StructKeyExists(server, "boxlang")
-			&& IsObject(local.value)
-			&& !IsStruct(local.value)
-			&& ListContains("oracle.sql.TIMESTAMP,oracle.sql.DATE", GetMetadata(local.value).getName())
-		) {
+		// Oracle TIMESTAMP/DATE objects — always invoke validation
+		if ($engineAdapter().isOracleJdbcObject(local.value)) {
 			return true;
 		}
 
@@ -701,11 +696,7 @@ component {
 		local.value = this[arguments.property];
 		local.isValidNumber = IsNumeric(local.value);
 
-		// BoxLang compatibility — reject numbers with commas
-		// (BoxLang's IsNumeric is locale-aware and accepts "1,000.00")
-		if (StructKeyExists(server, "boxlang") && local.isValidNumber && Find(",", local.value)) {
-			local.isValidNumber = false;
-		}
+		local.isValidNumber = $engineAdapter().isNumericStrict(local.value);
 
 		local.failed = !local.isValidNumber
 			|| (arguments.onlyInteger && Round(local.value) != local.value)

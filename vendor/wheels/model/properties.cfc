@@ -582,19 +582,10 @@ component {
 	}
 
 	/**
-	 * Resolves an object value, converting Oracle BLOB objects to binary in BoxLang.
+	 * Resolves an object value, converting Oracle JDBC objects via the engine adapter.
 	 */
 	public any function $resolveObjectValue(required any value) {
-		if (StructKeyExists(server, "boxlang") && !IsStruct(arguments.value)) {
-			try {
-				if (GetMetadata(arguments.value).getName() == "oracle.sql.BLOB") {
-					return arguments.value.getBytes();
-				}
-			} catch (any e) {
-				// If getMetadata fails, return as-is
-			}
-		}
-		return arguments.value;
+		return $engineAdapter().coerceOracleObject(arguments.value);
 	}
 
 	/**

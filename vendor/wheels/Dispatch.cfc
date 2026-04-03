@@ -279,12 +279,7 @@ component output="false" extends="wheels.Global"{
 						message="The action parameter is missing or null. Controller: #local.params.controller#");
 				}
 
-				if (structKeyExists(server, "boxlang")) {
-					local.method = application.wheels.public[local.params.action];
-					local.method();
-				} else {
-					invoke(object=application.wheels.public, methodname=local.params.action);
-				}
+				$engineAdapter().invokeMethod(application.wheels.public, local.params.action);
 				// The wheels controller methods handle their own output and abort
 				// So we need to ensure we don't continue processing
 				return "";
@@ -671,9 +666,7 @@ component output="false" extends="wheels.Global"{
 	}
 
 	function onDIComplete(){
-		if (structKeyExists(server, "boxlang")) {
-			variables.this = this;
-		}
+		$engineAdapter().prepareDIComplete(variables, this);
 		new wheels.Plugins().$initializeMixins(variables);
 	}
 }
