@@ -36,11 +36,12 @@ interface {
 	public numeric function flashCount();
 
 	/**
-	 * Delete a specific flash key.
+	 * Delete a specific flash key and return its value.
 	 *
 	 * @key The flash key to delete.
+	 * @return The value that was stored under the key.
 	 */
-	public void function flashDelete(string key);
+	public any function flashDelete(required string key);
 
 	/**
 	 * Return true if the flash is empty.

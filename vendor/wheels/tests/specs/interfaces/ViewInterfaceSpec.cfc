@@ -44,6 +44,18 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it("paginationLinks has correct parameter names", () => {
+					var expected = [
+						"windowSize", "alwaysShowAnchors", "anchorDivider",
+						"linkToCurrentPage", "prepend", "append", "prependToPage",
+						"addActiveClassToPrependedParent", "prependOnFirst",
+						"prependOnAnchor", "appendToPage", "appendOnLast",
+						"appendOnAnchor", "classForCurrent", "handle", "name",
+						"showSinglePage", "pageNumberAsParam", "encode"
+					];
+					assertParamsPresent(ctrl, "paginationLinks", expected);
+				});
+
 				it("linkTo has correct parameter names", () => {
 					var expected = [
 						"text", "route", "controller", "action", "key",

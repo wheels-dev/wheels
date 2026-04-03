@@ -103,7 +103,7 @@ interface {
 		boolean reload,
 		any parameterize,
 		boolean instantiate,
-		string useIndex,
+		struct useIndex,
 		boolean validate,
 		string transaction,
 		boolean callbacks,
@@ -151,7 +151,7 @@ interface {
 		struct properties,
 		boolean reload,
 		boolean validate,
-		string useIndex,
+		struct useIndex,
 		string transaction,
 		boolean callbacks,
 		boolean includeSoftDeletes
@@ -214,7 +214,7 @@ interface {
 		boolean reload,
 		any parameterize,
 		boolean instantiate,
-		string useIndex,
+		struct useIndex,
 		string transaction,
 		boolean callbacks,
 		boolean includeSoftDeletes,
@@ -261,7 +261,7 @@ interface {
 		string transaction,
 		boolean callbacks,
 		boolean includeSoftDeletes,
-		string useIndex,
+		struct useIndex,
 		boolean softDelete
 	);
 

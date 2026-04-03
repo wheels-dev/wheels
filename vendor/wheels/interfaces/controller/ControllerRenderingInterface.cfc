@@ -57,14 +57,14 @@ interface {
 	 * @text The text content.
 	 * @status HTTP status code.
 	 */
-	public void function renderText(string text, numeric status);
+	public void function renderText(string text, any status);
 
 	/**
 	 * Render an empty response body.
 	 *
 	 * @status HTTP status code (default: 200).
 	 */
-	public void function renderNothing(numeric status);
+	public void function renderNothing(string status);
 
 	/**
 	 * Render data using a format-appropriate template (JSON, XML, etc.).

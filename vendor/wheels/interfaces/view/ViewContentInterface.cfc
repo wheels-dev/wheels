@@ -12,10 +12,10 @@ interface {
 	/**
 	 * Store content for a named section to be yielded in the layout.
 	 *
-	 * @position Named content section (default: "body").
-	 * @overwrite Whether to replace existing content for this section.
+	 * @position Content position: "first", "last", or a numeric index.
+	 * @overwrite Whether to replace existing content: "true", "false", or "all".
 	 */
-	public void function contentFor(string position, boolean overwrite);
+	public void function contentFor(any position, any overwrite);
 
 	/**
 	 * Return the main layout content (the rendered view body).

@@ -48,7 +48,7 @@ interface {
 		numeric maxRows,
 		numeric page,
 		numeric perPage,
-		boolean count,
+		numeric count,
 		string handle,
 		any cache,
 		boolean reload,
@@ -57,7 +57,7 @@ interface {
 		boolean returnIncluded,
 		boolean callbacks,
 		boolean includeSoftDeletes,
-		string useIndex,
+		struct useIndex,
 		string dataSource
 	);
 
@@ -88,7 +88,7 @@ interface {
 		any parameterize,
 		string returnAs,
 		boolean includeSoftDeletes,
-		string useIndex,
+		struct useIndex,
 		string dataSource
 	);
 
@@ -196,17 +196,20 @@ interface {
 
 	/**
 	 * Return the count of records matching the criteria.
+	 * When `group` is specified, returns a query of grouped counts instead of a numeric.
 	 *
 	 * @where SQL WHERE clause.
 	 * @include Associations to join.
 	 * @parameterize Use cfqueryparam.
 	 * @includeSoftDeletes Include soft-deleted records.
+	 * @group SQL GROUP BY clause. When set, returns a query instead of numeric.
 	 */
-	public numeric function count(
+	public any function count(
 		string where,
 		string include,
 		any parameterize,
-		boolean includeSoftDeletes
+		boolean includeSoftDeletes,
+		string group
 	);
 
 	/**

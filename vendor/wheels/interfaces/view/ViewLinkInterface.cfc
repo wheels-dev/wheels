@@ -96,13 +96,18 @@ interface {
 	 * @prepend HTML before the pagination.
 	 * @append HTML after the pagination.
 	 * @prependToPage HTML before each page link.
+	 * @addActiveClassToPrependedParent Add active class to prepended parent element.
+	 * @prependOnFirst Whether to prepend on the first page link.
+	 * @prependOnAnchor Whether to prepend on anchor links.
 	 * @appendToPage HTML after each page link.
+	 * @appendOnLast Whether to append on the last page link.
+	 * @appendOnAnchor Whether to append on anchor links.
 	 * @classForCurrent CSS class for the current page link.
 	 * @handle Named pagination handle.
 	 * @name Route parameter name for the page number.
 	 * @showSinglePage Whether to show links when there's only one page.
 	 * @pageNumberAsParam Whether page number goes in URL params vs. route.
-	 * @encode Encode attribute values.
+	 * @encode Encode attribute values (accepts boolean, string, or struct).
 	 */
 	public string function paginationLinks(
 		numeric windowSize,
@@ -112,13 +117,18 @@ interface {
 		string prepend,
 		string append,
 		string prependToPage,
+		boolean addActiveClassToPrependedParent,
+		boolean prependOnFirst,
+		boolean prependOnAnchor,
 		string appendToPage,
+		boolean appendOnLast,
+		boolean appendOnAnchor,
 		string classForCurrent,
 		string handle,
 		string name,
 		boolean showSinglePage,
 		boolean pageNumberAsParam,
-		boolean encode
+		any encode
 	);
 
 	/**

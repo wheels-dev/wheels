@@ -49,6 +49,13 @@ component extends="wheels.WheelsTest" {
 					assertParamsPresent(userModel, "findByKey", expected);
 				});
 
+				it("count has correct parameter names", () => {
+					var expected = [
+						"where", "include", "parameterize", "includeSoftDeletes", "group"
+					];
+					assertParamsPresent(userModel, "count", expected);
+				});
+
 			});
 
 			describe("ModelPersistenceInterface", () => {
@@ -134,7 +141,7 @@ component extends="wheels.WheelsTest" {
 					var methods = [
 						"tableName", "setPrimaryKey", "table", "properties",
 						"setProperties", "isNew", "isPersisted", "key",
-						"columnNames", "primaryKeys"
+						"columnNames", "primaryKeys", "primaryKey"
 					];
 					for (var m in methods) {
 						expect(structKeyExists(userModel, m)).toBeTrue("Model missing: #m#()");

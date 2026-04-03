@@ -14,13 +14,12 @@
 interface {
 
 	/**
-	 * Set or get the database table name for this model.
-	 * When called with `name`, sets the table name. Returns the current table name.
+	 * Return the database table name for this model (getter only).
+	 * Use `table()` to set the table name.
 	 *
-	 * @name The database table name to use.
 	 * @return The table name.
 	 */
-	public string function tableName(string name);
+	public string function tableName();
 
 	/**
 	 * Set the primary key column(s) for this model.
@@ -30,11 +29,11 @@ interface {
 	public void function setPrimaryKey(string property);
 
 	/**
-	 * Map this model to a specific database table (alias for `tableName`).
+	 * Map this model to a specific database table. Pass `false` to disable table mapping.
 	 *
-	 * @name The database table name.
+	 * @name The database table name, or `false` to disable table mapping.
 	 */
-	public void function table(string name);
+	public void function table(required any name);
 
 	/**
 	 * Return a struct of all property name/value pairs on the current instance.
@@ -73,7 +72,17 @@ interface {
 
 	/**
 	 * Return a comma-delimited list of primary key column names.
+	 * When `position` is specified, returns just that key (1-based index).
+	 *
+	 * @position 1-based index of a specific primary key column to return.
 	 */
-	public string function primaryKeys();
+	public string function primaryKeys(numeric position);
+
+	/**
+	 * Return primary key column name(s). Alias for `primaryKeys()`.
+	 *
+	 * @position 1-based index of a specific primary key column to return.
+	 */
+	public string function primaryKey(numeric position);
 
 }
