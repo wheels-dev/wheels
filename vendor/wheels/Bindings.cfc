@@ -18,8 +18,9 @@ component {
 		// Model subsystem
 		arguments.injector
 			.bind("ModelFinderInterface").to("wheels.model.read")
-			.bind("ModelPersistenceInterface").to("wheels.model.crud")
+			.bind("ModelPersistenceInterface").to("wheels.model.create")
 			.bind("ModelValidationInterface").to("wheels.model.validations")
+			.bind("ModelErrorInterface").to("wheels.model.errors")
 			.bind("ModelCallbackInterface").to("wheels.model.callbacks")
 			.bind("ModelAssociationInterface").to("wheels.model.associations")
 			.bind("ModelPropertyInterface").to("wheels.model.properties");
@@ -34,7 +35,7 @@ component {
 		arguments.injector
 			.bind("ViewFormInterface").to("wheels.view.formsplain")
 			.bind("ViewLinkInterface").to("wheels.view.links")
-			.bind("ViewContentInterface").to("wheels.view.content");
+			.bind("ViewContentInterface").to("wheels.view.miscellaneous");
 
 		// Routing subsystem
 		arguments.injector

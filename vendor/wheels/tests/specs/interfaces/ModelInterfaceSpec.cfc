@@ -14,7 +14,8 @@ component extends="wheels.WheelsTest" {
 				it("exposes all required finder methods", () => {
 					var methods = [
 						"findAll", "findOne", "findByKey", "findFirst", "findLastOne",
-						"findAllKeys", "findEach", "findInBatches", "count", "exists", "reload"
+						"findAllKeys", "findEach", "findInBatches", "count", "exists", "reload",
+						"average", "maximum", "minimum", "sum"
 					];
 					for (var m in methods) {
 						expect(structKeyExists(userModel, m)).toBeTrue("Model missing: #m#()");
@@ -54,6 +55,38 @@ component extends="wheels.WheelsTest" {
 						"where", "include", "parameterize", "includeSoftDeletes", "group"
 					];
 					assertParamsPresent(userModel, "count", expected);
+				});
+
+				it("average has correct parameter names", () => {
+					var expected = [
+						"property", "where", "include", "distinct", "parameterize",
+						"ifNull", "includeSoftDeletes", "group"
+					];
+					assertParamsPresent(userModel, "average", expected);
+				});
+
+				it("maximum has correct parameter names", () => {
+					var expected = [
+						"property", "where", "include", "parameterize",
+						"ifNull", "includeSoftDeletes", "group"
+					];
+					assertParamsPresent(userModel, "maximum", expected);
+				});
+
+				it("minimum has correct parameter names", () => {
+					var expected = [
+						"property", "where", "include", "parameterize",
+						"ifNull", "includeSoftDeletes", "group"
+					];
+					assertParamsPresent(userModel, "minimum", expected);
+				});
+
+				it("sum has correct parameter names", () => {
+					var expected = [
+						"property", "where", "include", "distinct", "parameterize",
+						"ifNull", "includeSoftDeletes", "group"
+					];
+					assertParamsPresent(userModel, "sum", expected);
 				});
 
 			});
@@ -141,11 +174,58 @@ component extends="wheels.WheelsTest" {
 					var methods = [
 						"tableName", "setPrimaryKey", "table", "properties",
 						"setProperties", "isNew", "isPersisted", "key",
-						"columnNames", "primaryKeys", "primaryKey"
+						"columnNames", "primaryKeys", "primaryKey",
+						"scope", "enum"
 					];
 					for (var m in methods) {
 						expect(structKeyExists(userModel, m)).toBeTrue("Model missing: #m#()");
 					}
+				});
+
+				it("scope has correct parameter names", () => {
+					var expected = [
+						"name", "where", "order", "select", "include", "maxRows", "handler"
+					];
+					assertParamsPresent(userModel, "scope", expected);
+				});
+
+				it("enum has correct parameter names", () => {
+					var expected = ["property", "values"];
+					assertParamsPresent(userModel, "enum", expected);
+				});
+
+			});
+
+			describe("ModelErrorInterface", () => {
+
+				it("exposes all required error methods", () => {
+					var methods = [
+						"addError", "addErrorToBase", "allErrors", "clearErrors",
+						"errorCount", "errorsOn", "errorsOnBase", "hasErrors"
+					];
+					for (var m in methods) {
+						expect(structKeyExists(userModel, m)).toBeTrue("Model missing: #m#()");
+					}
+				});
+
+				it("addError has correct parameter names", () => {
+					var expected = ["property", "message", "name"];
+					assertParamsPresent(userModel, "addError", expected);
+				});
+
+				it("allErrors has correct parameter names", () => {
+					var expected = ["includeAssociations", "seenErrors"];
+					assertParamsPresent(userModel, "allErrors", expected);
+				});
+
+				it("errorCount has correct parameter names", () => {
+					var expected = ["property", "name"];
+					assertParamsPresent(userModel, "errorCount", expected);
+				});
+
+				it("errorsOn has correct parameter names", () => {
+					var expected = ["property", "name"];
+					assertParamsPresent(userModel, "errorsOn", expected);
 				});
 
 			});

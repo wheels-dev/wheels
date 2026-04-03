@@ -234,4 +234,92 @@ interface {
 	 */
 	public void function reload();
 
+	/**
+	 * Return the average value of a numeric property across matching records.
+	 *
+	 * @property The numeric property to average.
+	 * @where SQL WHERE clause.
+	 * @include Associations to join.
+	 * @distinct Whether to average only distinct values.
+	 * @parameterize Use cfqueryparam.
+	 * @ifNull Value to return if result is NULL.
+	 * @includeSoftDeletes Include soft-deleted records.
+	 * @group SQL GROUP BY clause. When set, returns a query instead of a single value.
+	 */
+	public any function average(
+		required string property,
+		string where,
+		string include,
+		boolean distinct,
+		any parameterize,
+		any ifNull,
+		boolean includeSoftDeletes,
+		string group
+	);
+
+	/**
+	 * Return the maximum value of a property across matching records.
+	 *
+	 * @property The property to find the maximum of.
+	 * @where SQL WHERE clause.
+	 * @include Associations to join.
+	 * @parameterize Use cfqueryparam.
+	 * @ifNull Value to return if result is NULL.
+	 * @includeSoftDeletes Include soft-deleted records.
+	 * @group SQL GROUP BY clause. When set, returns a query instead of a single value.
+	 */
+	public any function maximum(
+		required string property,
+		string where,
+		string include,
+		any parameterize,
+		any ifNull,
+		boolean includeSoftDeletes,
+		string group
+	);
+
+	/**
+	 * Return the minimum value of a property across matching records.
+	 *
+	 * @property The property to find the minimum of.
+	 * @where SQL WHERE clause.
+	 * @include Associations to join.
+	 * @parameterize Use cfqueryparam.
+	 * @ifNull Value to return if result is NULL.
+	 * @includeSoftDeletes Include soft-deleted records.
+	 * @group SQL GROUP BY clause. When set, returns a query instead of a single value.
+	 */
+	public any function minimum(
+		required string property,
+		string where,
+		string include,
+		any parameterize,
+		any ifNull,
+		boolean includeSoftDeletes,
+		string group
+	);
+
+	/**
+	 * Return the sum of a numeric property across matching records.
+	 *
+	 * @property The numeric property to sum.
+	 * @where SQL WHERE clause.
+	 * @include Associations to join.
+	 * @distinct Whether to sum only distinct values.
+	 * @parameterize Use cfqueryparam.
+	 * @ifNull Value to return if result is NULL.
+	 * @includeSoftDeletes Include soft-deleted records.
+	 * @group SQL GROUP BY clause. When set, returns a query instead of a single value.
+	 */
+	public any function sum(
+		required string property,
+		string where,
+		string include,
+		boolean distinct,
+		any parameterize,
+		any ifNull,
+		boolean includeSoftDeletes,
+		string group
+	);
+
 }

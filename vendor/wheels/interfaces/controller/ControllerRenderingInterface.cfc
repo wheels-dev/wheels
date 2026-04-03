@@ -94,9 +94,11 @@ interface {
 	/**
 	 * Redirect the client to another URL or route.
 	 *
+	 * @back If true, redirect to the HTTP referrer (ignores other routing params).
 	 * @controller Target controller.
 	 * @action Target action.
 	 * @route Named route.
+	 * @method HTTP method override for the redirect target.
 	 * @key Primary key value for the route.
 	 * @params Additional URL parameters as a struct or string.
 	 * @anchor URL fragment anchor.
@@ -106,13 +108,16 @@ interface {
 	 * @port Override port.
 	 * @statusCode HTTP redirect status code (301, 302, etc.).
 	 * @addToken Whether to add session token (CF-specific).
+	 * @url Explicit external URL to redirect to (bypasses route generation).
 	 * @delay Whether to delay the redirect until after the action completes.
 	 * @encode Whether to encode the URL.
 	 */
 	public void function redirectTo(
+		boolean back,
 		string controller,
 		string action,
 		string route,
+		string method,
 		any key,
 		any params,
 		string anchor,
@@ -122,6 +127,7 @@ interface {
 		numeric port,
 		numeric statusCode,
 		boolean addToken,
+		string url,
 		boolean delay,
 		boolean encode
 	);

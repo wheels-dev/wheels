@@ -45,6 +45,7 @@ component extends="wheels.WheelsTest" {
 						"ModelFinderInterface",
 						"ModelPersistenceInterface",
 						"ModelValidationInterface",
+						"ModelErrorInterface",
 						"ModelCallbackInterface",
 						"ModelAssociationInterface",
 						"ModelPropertyInterface",
@@ -63,6 +64,38 @@ component extends="wheels.WheelsTest" {
 						expect(di.containsInstance(name)).toBeTrue(
 							"Missing DI binding: #name#"
 						);
+					}
+				});
+
+				it("all interface bindings resolve to real components", () => {
+					// This test catches broken bindings (e.g., pointing to non-existent CFCs)
+					// by actually instantiating each bound component, not just checking the mapping.
+					var di = new wheels.Injector(binderPath="wheels.Bindings");
+					var bindings = [
+						"ModelFinderInterface",
+						"ModelPersistenceInterface",
+						"ModelValidationInterface",
+						"ModelErrorInterface",
+						"ModelCallbackInterface",
+						"ModelAssociationInterface",
+						"ModelPropertyInterface",
+						"ControllerFilterInterface",
+						"ControllerRenderingInterface",
+						"ControllerFlashInterface",
+						"ViewFormInterface",
+						"ViewLinkInterface",
+						"ViewContentInterface",
+						"RouteMapperInterface",
+						"RouteResolverInterface",
+						"EventHandlerInterface",
+						"InjectorInterface"
+					];
+					for (var name in bindings) {
+						if (di.containsInstance(name)) {
+							expect(function() {
+								di.getInstance(name);
+							}).notToThrow("getInstance('#name#') should resolve without error");
+						}
 					}
 				});
 

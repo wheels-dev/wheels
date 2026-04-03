@@ -85,4 +85,35 @@ interface {
 	 */
 	public string function primaryKey(numeric position);
 
+	/**
+	 * Define a named query scope for composable query building.
+	 * Call in `config()` to register reusable query fragments that chain with finders.
+	 *
+	 * @name The scope name (becomes a callable method on the model).
+	 * @where SQL WHERE clause fragment.
+	 * @order SQL ORDER BY clause fragment.
+	 * @select Comma-delimited column list.
+	 * @include Associations to join.
+	 * @maxRows Maximum rows to return.
+	 * @handler Name of a function that returns a scope definition struct (for dynamic scopes).
+	 */
+	public void function scope(
+		required string name,
+		string where,
+		string order,
+		string select,
+		string include,
+		numeric maxRows,
+		string handler
+	);
+
+	/**
+	 * Define an enum on a property, providing named values with auto-generated
+	 * boolean checker methods (e.g., `isDraft()`) and query scopes per value.
+	 *
+	 * @property The property to attach the enum to.
+	 * @values Comma-delimited string of value names, or a struct mapping names to stored values.
+	 */
+	public void function enum(required string property, required any values);
+
 }

@@ -37,6 +37,15 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it("redirectTo has all 17 parameter names including back, method, and url", () => {
+					var expected = [
+						"back", "controller", "action", "route", "method", "key",
+						"params", "anchor", "onlyPath", "host", "protocol", "port",
+						"statusCode", "addToken", "url", "delay", "encode"
+					];
+					assertParamsPresent(ctrl, "redirectTo", expected);
+				});
+
 			});
 
 			describe("ControllerFlashInterface", () => {
