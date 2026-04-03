@@ -16,7 +16,6 @@
 component mixin="controller" output="false" {
 
 	function init() {
-		this.version = "1.0.0";
 		$initLegacyAdapter();
 		return this;
 	}
@@ -24,6 +23,7 @@ component mixin="controller" output="false" {
 	/**
 	 * Initialize the deprecation logger instance.
 	 * Reads mode from Wheels settings if available, falls back to "log".
+	 * Reads version from package.json.
 	 */
 	public void function $initLegacyAdapter() {
 		var mode = "log";
@@ -33,13 +33,31 @@ component mixin="controller" output="false" {
 			/* setting not configured — use default */
 		}
 		variables.$legacyAdapterLogger = new DeprecationLogger(mode = mode);
+
+		/* read version from package.json */
+		variables.$legacyAdapterVersionString = "0.0.0";
+		try {
+			var packageDir = GetDirectoryFromPath(GetCurrentTemplatePath());
+			var packageJsonPath = packageDir & "package.json";
+			if (FileExists(packageJsonPath)) {
+				var manifest = DeserializeJSON(FileRead(packageJsonPath));
+				if (StructKeyExists(manifest, "version")) {
+					variables.$legacyAdapterVersionString = manifest.version;
+				}
+			}
+		} catch (any e) {
+			/* fallback to default if package.json is unreadable */
+		}
 	}
 
 	/**
-	 * Returns the adapter version string.
+	 * Returns the adapter version string (sourced from package.json).
 	 */
 	public string function $legacyAdapterVersion() {
-		return "1.0.0";
+		if (!StructKeyExists(variables, "$legacyAdapterVersionString")) {
+			$initLegacyAdapter();
+		}
+		return variables.$legacyAdapterVersionString;
 	}
 
 	/**
@@ -105,27 +123,6 @@ component mixin="controller" output="false" {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  View Helper Shims                                                 */
-	/* ------------------------------------------------------------------ */
-
-	/**
-	 * DEPRECATED: Use paginationNav() or the composable pagination helpers instead.
-	 *
-	 * This shim preserves the old paginationLinks() default markup behavior
-	 * for applications that depend on the legacy HTML structure.
-	 * The core paginationLinks() still exists in 4.0, so this is a no-op
-	 * shim that just logs the deprecation.
-	 */
-	public string function $legacyPaginationLinks() {
-		$getLegacyLogger().logDeprecation(
-			oldMethod = "paginationLinks()",
-			newMethod = "paginationNav()",
-			message = "paginationLinks() still works but paginationNav() provides better composability. See: https://wheels.dev/docs/pagination"
-		);
-		return paginationLinks(argumentCollection = arguments);
-	}
-
-	/* ------------------------------------------------------------------ */
 	/*  Configuration Shims                                               */
 	/* ------------------------------------------------------------------ */
 
@@ -157,12 +154,16 @@ component mixin="controller" output="false" {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  Plugin Compatibility Helpers                                      */
+	/*  Plugin Diagnostics                                                */
 	/* ------------------------------------------------------------------ */
 
 	/**
 	 * Checks whether legacy plugins are loaded and returns info about them.
 	 * Useful during migration to identify plugins that need conversion to packages.
+	 *
+	 * This is a diagnostic function — it reports what legacy plugins exist but
+	 * does not perform automatic wrapping or bridging. The actual migration
+	 * from plugin to package is a manual process guided by the scanner report.
 	 */
 	public struct function $legacyPluginInfo() {
 		var info = {plugins: [], hasLegacyPlugins: false};

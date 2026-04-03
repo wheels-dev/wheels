@@ -64,23 +64,28 @@ rm -rf vendor/legacyadapter
 |---|---|---|
 | `renderPage()` | `renderView()` | Renamed in Wheels 3.0 |
 | `renderPageToString()` | `renderView(returnAs="string")` | Removed in Wheels 3.0 |
-| `paginationLinks()` | `paginationNav()` | Old method still works; nav is composable |
+
+## Plugin Diagnostics
+
+The adapter includes `$legacyPluginInfo()` — a diagnostic function that identifies legacy plugins still active in the `plugins/` directory. It reports plugin names and versions to help you inventory what needs conversion to the modern package system. The actual migration from plugin to package is a manual process.
 
 ## Migration Scanner Patterns
 
 The scanner detects these patterns and provides guidance:
 
-| Pattern | Severity | Description |
-|---------|----------|-------------|
-| `renderPage()` | Critical | Must be replaced |
-| `renderPageToString()` | Critical | Must be replaced |
-| `this.version =` | Warning | Plugin version — move to package.json |
-| `this.dependency =` | Warning | Plugin deps — move to package.json |
-| `extends="wheels.Test"` | Warning | Use `wheels.WheelsTest` for TestBox |
-| `application.wheels.*` access | Info | Consider DI container |
-| `extends="Model"` (short) | Info | Future-proof to full path |
-| `extends="Controller"` (short) | Info | Future-proof to full path |
-| Raw WHERE strings | Info | Consider query builder |
+| Pattern | Severity | Scope | Description |
+|---------|----------|-------|-------------|
+| `renderPage()` | Critical | All files | Must be replaced |
+| `renderPageToString()` | Critical | All files | Must be replaced |
+| `this.version =` | Warning | `plugins/` only | Plugin version — move to package.json |
+| `this.dependency =` | Warning | `plugins/` only | Plugin deps — move to package.json |
+| `extends="wheels.Test"` | Warning | All files | Use `wheels.WheelsTest` for TestBox |
+| `application.wheels.*` access | Info | All files | Consider DI container |
+| `extends="Model"` (short) | Info | All files | Future-proof to full path |
+| `extends="Controller"` (short) | Info | All files | Future-proof to full path |
+| Raw WHERE strings | Info | All files | Consider query builder |
+
+Note: `this.version` and `this.dependency` are only flagged in files within the `plugins/` directory to avoid false positives on model CFCs, services, or other components that legitimately use version properties.
 
 ## Deactivating
 

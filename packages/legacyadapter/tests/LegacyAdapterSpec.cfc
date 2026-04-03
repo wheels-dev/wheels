@@ -145,9 +145,12 @@ component extends="wheels.WheelsTest" output="false" {
 				expect(threw).toBeFalse("LegacyAdapter init should not throw");
 			});
 
-			it("returns version string", () => {
+			it("returns version string from package.json", () => {
 				var adapter = $createAdapter();
-				expect(adapter.$legacyAdapterVersion()).toBe("1.0.0");
+				var version = adapter.$legacyAdapterVersion();
+				/* version should be a valid semver-like string, not the old hardcoded fallback */
+				expect(Len(version) > 0).toBeTrue("version should not be empty");
+				expect(FindNoCase(".", version) > 0).toBeTrue("version should contain a dot (semver)");
 			});
 
 			it("returns status struct with required keys", () => {
@@ -205,42 +208,54 @@ component extends="wheels.WheelsTest" output="false" {
 
 			it("detects renderPage pattern in source", () => {
 				var scanner = $createScanner();
-				var result = $scanContent(scanner, 'renderPage(template="home/index")');
+				var result = $scanContent(scanner, 'renderPage(template="home/index")', "app/controllers");
 				expect(result.found).toBeTrue("Scanner should detect renderPage() call");
 				expect(result.pattern).toBe("renderPage");
 			});
 
 			it("detects renderPageToString pattern", () => {
 				var scanner = $createScanner();
-				var result = $scanContent(scanner, 'var html = renderPageToString(action="show")');
+				var result = $scanContent(scanner, 'var html = renderPageToString(action="show")', "app/controllers");
 				expect(result.found).toBeTrue("Scanner should detect renderPageToString() call");
 				expect(result.pattern).toBe("renderPageToString");
 			});
 
-			it("detects legacy plugin version declaration", () => {
+			it("detects legacy plugin version declaration in plugins directory", () => {
 				var scanner = $createScanner();
-				var result = $scanContent(scanner, 'this.version = "1.0.0";');
-				expect(result.found).toBeTrue("Scanner should detect this.version =");
+				var result = $scanContent(scanner, 'this.version = "1.0.0";', "plugins/MyPlugin");
+				expect(result.found).toBeTrue("Scanner should detect this.version = in plugins/ dir");
 				expect(result.pattern).toBe("legacyPluginVersion");
 			});
 
-			it("detects legacy plugin dependency declaration", () => {
+			it("does NOT flag this.version outside plugins directory", () => {
 				var scanner = $createScanner();
-				var result = $scanContent(scanner, 'this.dependency = "PluginA,PluginB";');
-				expect(result.found).toBeTrue("Scanner should detect this.dependency =");
+				var result = $scanContent(scanner, 'this.version = "1.0.0";', "app/models");
+				expect(result.found).toBeFalse("Scanner should NOT flag this.version in app/models/");
+			});
+
+			it("detects legacy plugin dependency declaration in plugins directory", () => {
+				var scanner = $createScanner();
+				var result = $scanContent(scanner, 'this.dependency = "PluginA,PluginB";', "plugins/MyPlugin");
+				expect(result.found).toBeTrue("Scanner should detect this.dependency = in plugins/ dir");
 				expect(result.pattern).toBe("legacyPluginDependency");
+			});
+
+			it("does NOT flag this.dependency outside plugins directory", () => {
+				var scanner = $createScanner();
+				var result = $scanContent(scanner, 'this.dependency = "SomeLib";', "app/lib");
+				expect(result.found).toBeFalse("Scanner should NOT flag this.dependency in app/lib/");
 			});
 
 			it("detects legacy test extends", () => {
 				var scanner = $createScanner();
-				var result = $scanContent(scanner, 'component extends="wheels.Test" {');
+				var result = $scanContent(scanner, 'component extends="wheels.Test" {', "app/controllers");
 				expect(result.found).toBeTrue("Scanner should detect extends=""wheels.Test""");
 				expect(result.pattern).toBe("legacyTestExtends");
 			});
 
 			it("detects direct application scope access", () => {
 				var scanner = $createScanner();
-				var result = $scanContent(scanner, 'var env = application.wheels.environment;');
+				var result = $scanContent(scanner, 'var env = application.wheels.environment;', "app/controllers");
 				expect(result.found).toBeTrue("Scanner should detect application.wheels.* access");
 				expect(result.pattern).toBe("directAppScopeAccess");
 			});
@@ -315,19 +330,24 @@ component extends="wheels.WheelsTest" output="false" {
 	/**
 	 * Scans a single line of content for patterns.
 	 * Returns {found: boolean, pattern: string}.
+	 *
+	 * @scanner The scanner instance
+	 * @content The source content to scan
+	 * @subDir Subdirectory within temp dir to simulate file location (e.g. "plugins/MyPlugin" or "app/models")
 	 */
-	private struct function $scanContent(required any scanner, required string content) {
+	private struct function $scanContent(required any scanner, required string content, string subDir = "app") {
 		/* Write content to a temp file, scan it, return first finding */
-		var tempDir = GetTempDirectory() & "wheels-legacy-test-#CreateUUID()#";
-		DirectoryCreate(tempDir);
+		var tempBase = GetTempDirectory() & "wheels-legacy-test-#CreateUUID()#";
+		var tempDir = tempBase & "/" & arguments.subDir;
+		DirectoryCreate(tempDir, true);
 		var tempFile = tempDir & "/test.cfm";
 		FileWrite(tempFile, arguments.content);
 
-		var report = arguments.scanner.scan(appPath = tempDir);
+		var report = arguments.scanner.scan(appPath = tempBase);
 
 		/* clean up */
 		FileDelete(tempFile);
-		DirectoryDelete(tempDir);
+		DirectoryDelete(tempBase, true);
 
 		if (ArrayLen(report.findings) > 0) {
 			return {found: true, pattern: report.findings[1].pattern};

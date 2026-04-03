@@ -61,9 +61,9 @@
 <h2>Migration Guide</h2>
 <p>The legacy adapter supports a three-stage migration path:</p>
 <ol>
-	<li><strong>Stage 1 (Install &amp; Go):</strong> Copy <code>packages/legacy-adapter</code> to <code>vendor/legacy-adapter</code>. All 3.x code works unchanged. Deprecation warnings appear in logs.</li>
+	<li><strong>Stage 1 (Install &amp; Go):</strong> Copy <code>packages/legacyadapter</code> to <code>vendor/legacyadapter</code>. All 3.x code works unchanged. Deprecation warnings appear in logs.</li>
 	<li><strong>Stage 2 (Migrate):</strong> Run the migration scanner to find legacy patterns. Update code incrementally. Set <code>legacyAdapterMode</code> to <code>"warn"</code> for more visibility.</li>
-	<li><strong>Stage 3 (Remove):</strong> Set mode to <code>"error"</code> to catch any remaining legacy calls. Once clean, remove <code>vendor/legacy-adapter</code>.</li>
+	<li><strong>Stage 3 (Remove):</strong> Set mode to <code>"error"</code> to catch any remaining legacy calls. Once clean, remove <code>vendor/legacyadapter</code>.</li>
 </ol>
 
 <h3>Configuration</h3>

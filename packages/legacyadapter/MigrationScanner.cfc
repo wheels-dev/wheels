@@ -72,6 +72,12 @@ component output="false" {
 			return;
 		}
 
+		/* skip test/fixture directories entirely */
+		if ($isTestPath(arguments.filePath)) {
+			return;
+		}
+
+		var normalizedPath = ReplaceNoCase(arguments.filePath, "\", "/", "all");
 		var lines = ListToArray(content, Chr(10), true);
 		var lineCount = ArrayLen(lines);
 
@@ -79,9 +85,11 @@ component output="false" {
 			var line = lines[i];
 			for (var pattern in variables.patterns) {
 				if (REFindNoCase(pattern.regex, line)) {
-					/* skip test/fixture directories */
-					if ($isTestPath(arguments.filePath)) {
-						continue;
+					/* apply path filter if pattern requires one */
+					if (StructKeyExists(pattern, "pathFilter") && Len(pattern.pathFilter)) {
+						if (FindNoCase(pattern.pathFilter, normalizedPath) == 0) {
+							continue;
+						}
 					}
 					ArrayAppend(arguments.report.findings, {
 						file: arguments.filePath,
@@ -111,6 +119,11 @@ component output="false" {
 
 	/**
 	 * Builds the list of patterns to scan for.
+	 *
+	 * Each pattern is a struct with keys: name, regex, severity, guidance.
+	 * Patterns may also include a `pathFilter` key — if present, the pattern
+	 * only matches files whose path contains that substring. This prevents
+	 * false positives (e.g., `this.version` in non-plugin CFCs).
 	 */
 	public array function $buildPatternList() {
 		var p = [];
@@ -131,12 +144,13 @@ component output="false" {
 			guidance: "Replace renderPageToString() with renderView(returnAs=""string"")."
 		});
 
-		/* ---- Plugin patterns ---- */
+		/* ---- Plugin patterns (restricted to plugins/ directory) ---- */
 
 		ArrayAppend(p, {
 			name: "legacyPluginVersion",
 			regex: "this\.version\s*=",
 			severity: "warning",
+			pathFilter: "/plugins/",
 			guidance: "Legacy plugin version declaration. Move to package.json manifest with 'version' field. See: https://wheels.dev/docs/packages"
 		});
 
@@ -144,6 +158,7 @@ component output="false" {
 			name: "legacyPluginDependency",
 			regex: "this\.dependency\s*=",
 			severity: "warning",
+			pathFilter: "/plugins/",
 			guidance: "Legacy plugin dependency declaration. Move to package.json 'dependencies' field."
 		});
 
