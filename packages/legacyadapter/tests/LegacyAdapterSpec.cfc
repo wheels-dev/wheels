@@ -339,7 +339,7 @@ component extends="wheels.WheelsTest" output="false" {
 		/* Write content to a temp file, scan it, return first finding */
 		var tempBase = GetTempDirectory() & "wheels-legacy-test-#CreateUUID()#";
 		var tempDir = tempBase & "/" & arguments.subDir;
-		DirectoryCreate(tempDir, true);
+		CreateObject("java", "java.io.File").init(tempDir).mkdirs();
 		var tempFile = tempDir & "/test.cfm";
 		FileWrite(tempFile, arguments.content);
 
