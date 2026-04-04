@@ -9,6 +9,9 @@
  * PackageLoader runs alongside (not replacing) the existing Plugins.cfc system.
  * Loaded package mixins are merged into the application mixins struct
  * so they participate in the standard initializeMixins injection pipeline.
+ *
+ * Supports dependency declarations (requires, replaces, suggests), topological
+ * load ordering via ModuleGraph.cfc, and lazy loading for service-only packages.
  */
 component output="false" {
 
@@ -35,6 +38,9 @@ component output="false" {
 		variables.serviceProviders = [];
 		variables.packageMiddleware = [];
 		variables.failedPackages = [];
+		variables.excludedPackages = {};
+		variables.loadOrder = [];
+		variables.lazyPackages = {};
 
 		// The same mixin targets as Plugins.cfc
 		variables.mixableComponents = "application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test";
@@ -78,18 +84,121 @@ component output="false" {
 		return variables.failedPackages;
 	}
 
+	public struct function getExcludedPackages() {
+		return variables.excludedPackages;
+	}
+
+	public array function getLoadOrder() {
+		return variables.loadOrder;
+	}
+
+	/**
+	 * Returns a package instance, triggering lazy instantiation if needed.
+	 *
+	 * @dirName  Package directory name
+	 * @return   Package CFC instance
+	 */
+	public any function getPackage(required string dirName) {
+		if (StructKeyExists(variables.packages, arguments.dirName)) {
+			return variables.packages[arguments.dirName];
+		}
+		// Check if it's a lazy package that hasn't been instantiated
+		if (StructKeyExists(variables.lazyPackages, arguments.dirName)) {
+			$instantiateLazyPackage(arguments.dirName);
+			return variables.packages[arguments.dirName];
+		}
+		Throw(
+			type = "Wheels.PackageNotFound",
+			message = "Package '#arguments.dirName#' is not loaded"
+		);
+	}
+
+	/**
+	 * Checks whether a package is loaded (including lazy packages).
+	 */
+	public boolean function isPackageLoaded(required string dirName) {
+		return StructKeyExists(variables.packages, arguments.dirName)
+			|| StructKeyExists(variables.lazyPackages, arguments.dirName);
+	}
+
 	// ---------------------------------------------------------------------------
 	// Discovery & Loading
 	// ---------------------------------------------------------------------------
 
 	/**
 	 * Scans vendor/ for directories containing package.json (excluding vendor/wheels/).
-	 * Each package loads in its own try/catch for error isolation.
+	 * Builds a dependency graph and loads packages in topological order.
 	 */
 	private void function $discover() {
 		if (!DirectoryExists(variables.vendorPath)) {
 			return;
 		}
+
+		// Phase 1: Discover all manifests (fast — file reads only, no CFC compilation)
+		local.manifests = $discoverManifests();
+
+		if (StructIsEmpty(local.manifests)) {
+			return;
+		}
+
+		// Phase 2: Resolve dependency graph
+		local.graph = new wheels.ModuleGraph();
+		local.resolution = local.graph.resolve(local.manifests);
+
+		variables.loadOrder = local.resolution.loadOrder;
+		variables.excludedPackages = local.resolution.excluded;
+
+		// Record graph-level errors as failed packages
+		for (local.err in local.resolution.errors) {
+			ArrayAppend(variables.failedPackages, {
+				name = local.err.package,
+				error = local.err.message,
+				detail = ""
+			});
+			WriteLog(
+				text = "[Wheels] Package '#local.err.package#' failed: #local.err.message#",
+				type = "error",
+				file = "application"
+			);
+		}
+
+		// Log excluded (replaced) packages
+		for (local.dirName in local.resolution.excluded) {
+			WriteLog(
+				text = "[Wheels] Package '#local.dirName#' excluded: #local.resolution.excluded[local.dirName]#",
+				type = "information",
+				file = "application"
+			);
+		}
+
+		// Phase 3: Load packages in resolved order
+		for (local.dirName in local.resolution.loadOrder) {
+			local.pkgDir = variables.vendorPath & "/" & local.dirName;
+			local.manifestPath = local.pkgDir & "/package.json";
+
+			try {
+				$loadPackage(local.dirName, local.pkgDir, local.manifestPath);
+			} catch (any e) {
+				ArrayAppend(variables.failedPackages, {
+					name = local.dirName,
+					error = e.message,
+					detail = StructKeyExists(e, "detail") ? e.detail : ""
+				});
+				WriteLog(
+					text = "[Wheels] Package '#local.dirName#' failed to load: #e.message#",
+					type = "error",
+					file = "application"
+				);
+			}
+		}
+	}
+
+	/**
+	 * Scans vendor/ and parses all package.json manifests without instantiating CFCs.
+	 * Returns a struct keyed by directory name with parsed manifest structs.
+	 */
+	private struct function $discoverManifests() {
+		local.manifests = {};
 
 		local.dirs = DirectoryList(variables.vendorPath, false, "name");
 
@@ -112,9 +221,9 @@ component output="false" {
 				continue;
 			}
 
-			// Load this package with error isolation
+			// Parse manifest with error isolation
 			try {
-				$loadPackage(local.dirName, local.pkgDir, local.manifestPath);
+				local.manifests[local.dirName] = $parseManifest(local.manifestPath);
 			} catch (any e) {
 				ArrayAppend(variables.failedPackages, {
 					name = local.dirName,
@@ -122,16 +231,19 @@ component output="false" {
 					detail = StructKeyExists(e, "detail") ? e.detail : ""
 				});
 				WriteLog(
-					text = "[Wheels] Package '#local.dirName#' failed to load: #e.message#",
+					text = "[Wheels] Package '#local.dirName#' manifest error: #e.message#",
 					type = "error",
 					file = "application"
 				);
 			}
 		}
+
+		return local.manifests;
 	}
 
 	/**
 	 * Loads a single package: validates manifest, instantiates CFC, collects mixins/services/middleware.
+	 * Supports lazy loading for packages that declare "lazy": true and have no mixins/middleware.
 	 */
 	private void function $loadPackage(
 		required string dirName,
@@ -167,6 +279,44 @@ component output="false" {
 			local.mixinTargets = Trim(local.manifest.mixins);
 		}
 
+		// Check for middleware
+		local.hasMiddleware = StructKeyExists(local.provides, "middleware")
+			&& IsArray(local.provides.middleware)
+			&& ArrayLen(local.provides.middleware) > 0;
+
+		// Determine if this package should be lazily loaded
+		local.isLazy = StructKeyExists(local.manifest, "lazy") && local.manifest.lazy == true;
+		local.canBeLazy = local.isLazy && local.mixinTargets == "none" && !local.hasMiddleware;
+
+		if (local.canBeLazy) {
+			// Store lazy package info — CFC will be instantiated on first access
+			variables.lazyPackages[arguments.dirName] = {
+				dirName = arguments.dirName,
+				pkgDir = arguments.pkgDir,
+				mixinTargets = local.mixinTargets,
+				manifest = local.manifest
+			};
+			WriteLog(
+				text = "[Wheels] Package '#arguments.dirName#' v#variables.packageMeta[arguments.dirName].version# registered (lazy)",
+				type = "information",
+				file = "application"
+			);
+			return;
+		}
+
+		// Eager loading: instantiate CFC now
+		$instantiatePackage(arguments.dirName, arguments.pkgDir, local.mixinTargets, local.provides);
+	}
+
+	/**
+	 * Instantiates a package CFC and collects its mixins/services/middleware.
+	 */
+	private void function $instantiatePackage(
+		required string dirName,
+		required string pkgDir,
+		required string mixinTargets,
+		required struct provides
+	) {
 		// Find the main CFC: convention is directory name matches CFC name
 		local.cfcName = arguments.dirName;
 		local.cfcPath = arguments.pkgDir & "/" & local.cfcName & ".cfc";
@@ -193,8 +343,8 @@ component output="false" {
 		}
 
 		// Collect middleware from manifest
-		if (StructKeyExists(local.provides, "middleware") && IsArray(local.provides.middleware)) {
-			for (local.mw in local.provides.middleware) {
+		if (StructKeyExists(arguments.provides, "middleware") && IsArray(arguments.provides.middleware)) {
+			for (local.mw in arguments.provides.middleware) {
 				local.options = StructKeyExists(local.mw, "options") ? local.mw.options : {};
 				ArrayAppend(variables.packageMiddleware, {
 					middleware = local.mw.component,
@@ -205,13 +355,45 @@ component output="false" {
 		}
 
 		// Collect mixins if targets declared
-		if (local.mixinTargets != "none") {
-			$collectMixins(arguments.dirName, local.pkg, local.mixinTargets);
+		if (arguments.mixinTargets != "none") {
+			$collectMixins(arguments.dirName, local.pkg, arguments.mixinTargets);
 		}
 
 		// Log success
 		WriteLog(
-			text = "[Wheels] Package '#arguments.dirName#' v#variables.packageMeta[arguments.dirName].version# loaded (#local.mixinTargets# mixins)",
+			text = "[Wheels] Package '#arguments.dirName#' v#variables.packageMeta[arguments.dirName].version# loaded (#arguments.mixinTargets# mixins)",
+			type = "information",
+			file = "application"
+		);
+	}
+
+	/**
+	 * Instantiates a lazy package on first access.
+	 */
+	private void function $instantiateLazyPackage(required string dirName) {
+		if (!StructKeyExists(variables.lazyPackages, arguments.dirName)) {
+			return;
+		}
+
+		local.info = variables.lazyPackages[arguments.dirName];
+
+		local.provides = {};
+		if (StructKeyExists(local.info.manifest, "provides")) {
+			local.provides = local.info.manifest.provides;
+		}
+
+		$instantiatePackage(
+			dirName = arguments.dirName,
+			pkgDir = local.info.pkgDir,
+			mixinTargets = local.info.mixinTargets,
+			provides = local.provides
+		);
+
+		// Remove from lazy registry
+		StructDelete(variables.lazyPackages, arguments.dirName);
+
+		WriteLog(
+			text = "[Wheels] Lazy package '#arguments.dirName#' instantiated on demand",
 			type = "information",
 			file = "application"
 		);
@@ -299,6 +481,7 @@ component output="false" {
 
 	/**
 	 * Invokes register(container) on all packages that implement ServiceProviderInterface.
+	 * Also triggers instantiation of lazy ServiceProvider packages.
 	 */
 	public void function $invokeServiceProviderRegister(required any container) {
 		for (local.pkgKey in variables.serviceProviders) {
