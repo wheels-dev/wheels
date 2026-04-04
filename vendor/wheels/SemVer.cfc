@@ -1,7 +1,8 @@
 /**
- * Lightweight semver parsing and comparison utility for plugin dependency resolution.
+ * Lightweight semver parsing and comparison utility for package dependency resolution.
  * Supports standard operators: =, >, >=, <, <=, ^ (compatible), ~ (patch-level).
  * Space-separated constraints are ANDed together (e.g., ">=1.0.0 <2.0.0").
+ * Wildcard "*" matches any version.
  */
 component output="false" {
 
@@ -64,16 +65,16 @@ component output="false" {
 
 	/**
 	 * Evaluates whether a version satisfies a single constraint expression.
-	 * Supports: =, >, >=, <, <=, ^ (compatible-with), ~ (approximately).
+	 * Supports: =, >, >=, <, <=, ^ (compatible-with), ~ (approximately), * (any).
 	 * A bare version string (no operator) is treated as exact match (=).
 	 *
 	 * @version The version to check (string or parsed struct)
-	 * @constraint A single constraint expression (e.g., ">=1.0.0", "^2.3.0", "~1.2.0")
+	 * @constraint A single constraint expression (e.g., ">=1.0.0", "^2.3.0", "~1.2.0", "*")
 	 * @return True if the version satisfies the constraint
 	 */
 	public boolean function satisfies(required any version, required string constraint) {
 		local.c = Trim(arguments.constraint);
-		if (!Len(local.c)) {
+		if (!Len(local.c) || local.c == "*") {
 			return true;
 		}
 		local.ver = IsStruct(arguments.version) ? arguments.version : this.parse(arguments.version);
@@ -116,14 +117,19 @@ component output="false" {
 	/**
 	 * Evaluates whether a version satisfies ALL constraints in a space-separated string.
 	 * Each constraint is ANDed: ">=1.0.0 <2.0.0" means version must satisfy both.
+	 * Wildcard "*" always returns true.
 	 *
 	 * @version The version to check (string or parsed struct)
 	 * @constraints Space-separated constraint expressions
 	 * @return True if all constraints are satisfied
 	 */
 	public boolean function satisfiesAll(required any version, required string constraints) {
+		local.c = Trim(arguments.constraints);
+		if (!Len(local.c) || local.c == "*") {
+			return true;
+		}
 		local.ver = IsStruct(arguments.version) ? arguments.version : this.parse(arguments.version);
-		local.parts = ListToArray(Trim(arguments.constraints), " ");
+		local.parts = ListToArray(local.c, " ");
 		for (local.part in local.parts) {
 			if (!this.satisfies(local.ver, local.part)) {
 				return false;
@@ -155,13 +161,13 @@ component output="false" {
 		}
 		// Upper bound depends on left-most non-zero digit
 		if (local.target.major != 0) {
-			// ^1.2.3 → <2.0.0
+			// ^1.2.3 -> <2.0.0
 			return arguments.ver.major == local.target.major;
 		} else if (local.target.minor != 0) {
-			// ^0.2.3 → <0.3.0
+			// ^0.2.3 -> <0.3.0
 			return arguments.ver.major == 0 && arguments.ver.minor == local.target.minor;
 		} else {
-			// ^0.0.3 → <0.0.4
+			// ^0.0.3 -> <0.0.4
 			return arguments.ver.major == 0 && arguments.ver.minor == 0 && arguments.ver.patch == local.target.patch;
 		}
 	}
