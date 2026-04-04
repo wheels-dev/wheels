@@ -11,8 +11,6 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # Module sync should not block CI — PAT may expire independently
-    continue-on-error: true
     steps:
       - name: Checkout wheels repo
         uses: actions/checkout@v4
@@ -31,6 +29,7 @@ jobs:
           # Module core: mirror cli/lucli/ → dist root (delete stale files)
           rsync -av --del \
             --exclude='PLAN.md' \
+            --exclude='README.md' \
             wheels/cli/lucli/ dist/
 
           # Bundle codegen templates for standalone installation
@@ -73,3 +72,13 @@ jobs:
           else
             echo "Tag $TAG already exists, skipping"
           fi
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -sf -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "{\"text\": \":warning: LuCLI module sync failed for wheels@${GITHUB_SHA:0:7}. Check: $RUN_URL\"}"
