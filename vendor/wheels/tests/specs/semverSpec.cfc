@@ -115,6 +115,12 @@ component extends="wheels.WheelsTest" {
 			it("returns true for empty constraint", function() {
 				expect(semver.satisfies("1.0.0", "")).toBeTrue()
 			})
+
+			it("returns true for wildcard * constraint", function() {
+				expect(semver.satisfies("1.0.0", "*")).toBeTrue()
+				expect(semver.satisfies("0.0.1", "*")).toBeTrue()
+				expect(semver.satisfies("99.99.99", "*")).toBeTrue()
+			})
 		})
 
 		describe("SemVer caret (^) constraints", function() {
@@ -179,6 +185,10 @@ component extends="wheels.WheelsTest" {
 
 			it("returns true for empty constraint string", function() {
 				expect(semver.satisfiesAll("1.0.0", "")).toBeTrue()
+			})
+
+			it("returns true for wildcard * in satisfiesAll", function() {
+				expect(semver.satisfiesAll("5.0.0", "*")).toBeTrue()
 			})
 		})
 

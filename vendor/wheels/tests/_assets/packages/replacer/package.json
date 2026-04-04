@@ -1,0 +1,11 @@
+{
+	"name": "wheels-replacer",
+	"version": "2.0.0",
+	"description": "Test fixture: replaces goodpkg",
+	"replaces": {
+		"wheels-goodpkg": "*"
+	},
+	"provides": {
+		"mixins": "controller"
+	}
+}

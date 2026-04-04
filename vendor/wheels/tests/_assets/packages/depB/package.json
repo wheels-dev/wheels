@@ -1,0 +1,8 @@
+{
+	"name": "wheels-depB",
+	"version": "2.0.0",
+	"description": "Test fixture: no dependencies, loads first",
+	"provides": {
+		"mixins": "controller"
+	}
+}

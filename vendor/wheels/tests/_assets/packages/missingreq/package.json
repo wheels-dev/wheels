@@ -1,0 +1,11 @@
+{
+	"name": "wheels-missingreq",
+	"version": "1.0.0",
+	"description": "Test fixture: requires a package that does not exist",
+	"requires": {
+		"wheels-nonexistent": ">=1.0.0"
+	},
+	"provides": {
+		"mixins": "none"
+	}
+}
