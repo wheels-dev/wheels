@@ -126,6 +126,25 @@ Interactive CFML console with Wheels app context (`model()`, `service()`, etc.).
 
 ## Phase 3: Package Manager Swap
 
+### Distribution Architecture
+
+**LuCLI requires `module.json` and `Module.cfc` at the repository root** after cloning (validated in `ModuleCommand.java` lines 821-825). There is no `--subdir` parameter. Since the Wheels module lives at `cli/lucli/` in the monorepo, **subdirectory install from the monorepo is not possible**.
+
+**Solution**: Distribution repo `wheels-dev/wheels-cli-lucli` — a dedicated public repo auto-synced from the monorepo via GitHub Actions (`sync-lucli-module.yml`).
+
+### Install Commands
+
+```bash
+# Named install (requires LuCLI registry entry — see Phase 3D)
+lucli modules install wheels
+
+# Explicit URL install
+lucli modules install wheels --url https://github.com/wheels-dev/wheels-cli-lucli
+
+# Specific version
+lucli modules install wheels --url https://github.com/wheels-dev/wheels-cli-lucli#v3.1.0
+```
+
 ### 3A: Homebrew Formula Update
 
 **Repo**: `wheels-dev/homebrew-wheels`
@@ -135,9 +154,9 @@ Current formula creates a bash wrapper that calls `box wheels "$@"`. Change to:
 ```ruby
 depends_on "lucli"  # was: depends_on "commandbox"
 
-# post_install: install wheels module
+# post_install: install wheels module from distribution repo
 system bin/"lucli", "modules", "install", "wheels",
-       "--url", "https://github.com/wheels-dev/wheels/archive/refs/heads/develop.tar.gz"
+       "--url", "https://github.com/wheels-dev/wheels-cli-lucli"
 ```
 
 The `wheels` command stays identical for users.
@@ -148,17 +167,25 @@ The `wheels` command stays identical for users.
 
 Same approach — swap `box wheels` wrapper for `lucli wheels` wrapper.
 
-### 3C: Module Distribution
+### 3C: Module Sync Workflow
 
-The Wheels LuCLI module (`cli/lucli/`) needs to be installable via:
+Auto-syncs `cli/lucli/` → `wheels-dev/wheels-cli-lucli` on every push to `develop` that touches module or template files. Includes Slack notification on failure (no more `continue-on-error: true`).
 
-```bash
-lucli modules install wheels --url https://github.com/wheels-dev/wheels
+See `.github/workflows/sync-lucli-module.yml`.
+
+### 3D: LuCLI Registry Entry
+
+For `lucli modules install wheels` (no `--url`) to work, the module must be in LuCLI's bundled registry.
+
+**PR to `bpamiri/LuCLI`**: Add entry to `src/main/resources/repository/local.json`:
+
+```json
+{
+  "name": "wheels",
+  "description": "Code generation, migrations, testing, and server management for CFWheels",
+  "url": "https://github.com/wheels-dev/wheels-cli-lucli.git"
+}
 ```
-
-LuCLI's module installer extracts from Git archives. Verify it can install from a subdirectory (`cli/lucli/`) of the monorepo, or provide a separate distribution archive.
-
-**Fallback**: Dedicated `wheels-dev/wheels-cli-lucli` repo with just the module files, auto-published from the monorepo via GitHub Actions.
 
 ---
 
@@ -176,6 +203,7 @@ LuCLI's module installer extracts from Git archives. Verify it can install from 
 - [ ] Test `wheels new` project scaffolding
 - [ ] Test Homebrew formula installation flow
 - [ ] Test MCP tool integration with Claude Code
+- [ ] Run integration test: `cli/lucli/tests/test-module-install.sh`
 
 ### 4C: Release
 - [ ] Tag Wheels 3.1.0
@@ -206,6 +234,8 @@ cli/src/templates/
 
 The LuCLI `services/Templates.cfc` reads these and substitutes `{{variableName}}` placeholders. No duplication needed.
 
+When installed as a standalone module (via `lucli modules install`), templates are bundled at `templates/codegen/` in the distribution repo. The sync workflow copies `cli/src/templates/` → `dist/templates/codegen/`.
+
 ### Module Installation Path
 
 When installed as a LuCLI module, the Wheels module lives at:
@@ -219,14 +249,14 @@ When installed as a LuCLI module, the Wheels module lives at:
     CodeGen.cfc
     Templates.cfc
     ...
+  templates/
+    app/              — Project scaffold templates
+    codegen/          — Code generation templates (bundled from cli/src/templates/)
 ```
 
-The module needs to know where Wheels templates are. Options:
-1. Bundle templates into the module distribution
-2. Read templates from the project's `vendor/wheels/cli/src/templates/` at runtime
-3. Download templates on first use
-
-Option 2 is simplest — the project already has Wheels vendored.
+Template resolution order:
+1. Project's `vendor/wheels/cli/src/templates/` (if in a Wheels project)
+2. Module's bundled `templates/codegen/` (standalone fallback)
 
 ### Shared Service Interface
 
