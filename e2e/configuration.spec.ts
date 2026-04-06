@@ -72,7 +72,7 @@ test.describe('Wheels Framework - Core Files Structure', () => {
     await page.goto(`${BASE_URL}/wheels/info`);
 
     await expect(page.locator('html')).toBeVisible();
-    await expect(page.locator('head')).toBeVisible();
+    await expect(page.locator('head')).toHaveCount(1);
     await expect(page.locator('body')).toBeVisible();
   });
 

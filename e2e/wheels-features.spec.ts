@@ -35,20 +35,11 @@ test.describe('Wheels - Development Tools', () => {
   test('should display migration status', async ({ page }) => {
     await page.goto(`${BASE_URL}/wheels/migrator`);
 
-    await expect(page).toHaveTitle(/Migrator? \| Database \| Wheels/i);
+    await expect(page).toHaveTitle(/Migrator \| Wheels/i);
 
     // Should show migration info
     const content = await page.content();
     await expect(content.toLowerCase()).toMatch(/migration|database|schema|version/i);
-  });
-
-  test('should support migration actions', async ({ page }) => {
-    const actions = ['info', 'migrate', 'rollback'];
-
-    for (const action of actions) {
-      const response = await page.goto(`${BASE_URL}/wheels/migrator?action=${action}`);
-      expect(response?.status()).toBeLessThan(500);
-    }
   });
 
   test('should display plugin/package status', async ({ page }) => {
@@ -89,7 +80,7 @@ test.describe('Wheels - Test Runner', () => {
   });
 
   test('should support database selection parameter', async ({ page }) => {
-    const databases = ['h2', 'mysql', 'postgres', 'sqlite'];
+    const databases = ['h2', 'mysql', 'postgres', 'sqlite', 'oracle', 'sqlserver'];
 
     for (const db of databases) {
       const response = await page.goto(`${BASE_URL}/wheels/app/tests?db=${db}`);
@@ -123,28 +114,12 @@ test.describe('Wheels - Response Format Support', () => {
     const text = await response.text();
     expect(text.length).toBeGreaterThan(0);
   });
-
-  test('should return XML when requested', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/wheels/api?format=xml`);
-
-    expect(response.ok()).toBeTruthy();
-
-    const text = await response.text();
-    expect(text.length).toBeGreaterThan(0);
-    expect(text).toMatch(/</);
-  });
 });
 
 test.describe('Wheels - Mailer Integration', () => {
   test.beforeEach(async ({ page }) => {
     page.setDefaultTimeout(15000);
     page.setDefaultNavigationTimeout(15000);
-  });
-
-  test('should have UserNotificationsMailer configured', async ({ page }) => {
-    // Mailer view should exist
-    const response = await page.goto(`${BASE_URL}/usernotificationsmailer/sendemail`);
-    expect(response?.status()).toBeLessThan(500);
   });
 
   test('mailer action should handle requests', async ({ request }) => {

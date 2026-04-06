@@ -38,7 +38,7 @@ test.describe('Wheels Framework - System Pages', () => {
   test('should load database migrator page', async ({ page }) => {
     await page.goto(`${BASE_URL}/wheels/migrator`);
 
-    await expect(page).toHaveTitle(/Migrator? \| Database \| Wheels/i);
+    await expect(page).toHaveTitle(/Migrator \| Wheels/i);
 
     const content = await page.content();
     await expect(content.toLowerCase()).toMatch(/migration|database|migrator/i);
@@ -96,7 +96,7 @@ test.describe('Wheels Framework - Layout and Views', () => {
     await page.goto(`${BASE_URL}/wheels/info`);
 
     await expect(page.locator('html')).toBeVisible();
-    await expect(page.locator('head')).toBeVisible();
+    await expect(page.locator('head')).toHaveCount(1);
     await expect(page.locator('body')).toBeVisible();
   });
 

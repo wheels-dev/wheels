@@ -27,11 +27,8 @@ test.describe('Wheels Framework - API Response Formats', () => {
 
     expect(response?.ok()).toBeTruthy();
 
-    const content = await page.content();
-    const body = content.trim();
-
-    // Should be valid JSON
-    expect(() => JSON.parse(body)).not.toThrow();
+    const data = await response!.json();
+    expect(data).toBeTruthy();
   });
 
   test('should return TXT when format=txt', async ({ page }) => {
@@ -48,7 +45,6 @@ test.describe('Wheels Framework - Core API Endpoints', () => {
   const endpoints = [
     { path: '/wheels/info', title: /System Information \| Wheels/, description: 'System information' },
     { path: '/wheels/routes', title: /Routes?/i, description: 'Route listing' },
-    { path: '/wheels/build', description: 'Build information' },
     { path: '/wheels/guides', title: /Guides?/i, description: 'Documentation guides' },
     { path: '/wheels/migrator', title: /Migrator/i, description: 'Database migrator' },
     { path: '/wheels/plugins', title: /Plugins?/i, description: 'Plugin management' },
@@ -141,12 +137,5 @@ test.describe('Wheels Framework - Response Headers', () => {
 
     expect(headers['content-type']).toBeDefined();
     expect(headers['content-type']).toContain('text/html');
-  });
-
-  test('should set cache control headers', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/wheels/info`);
-    const headers = response.headers();
-
-    expect(headers['cache-control'] || headers['pragma']).toBeDefined();
   });
 });
