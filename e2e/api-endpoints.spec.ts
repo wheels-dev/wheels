@@ -5,8 +5,6 @@ import { test, expect } from '@playwright/test';
  * Tests various response formats and API functionality
  */
 
-const BASE_URL = 'http://127.0.0.1:8082';
-
 test.describe('Wheels Framework - API Response Formats', () => {
   test.beforeEach(async ({ page }) => {
     page.setDefaultTimeout(15000);
@@ -14,7 +12,7 @@ test.describe('Wheels Framework - API Response Formats', () => {
   });
 
   test('should return HTML by default', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/wheels/info`);
+    const response = await page.goto(`/wheels/info`);
 
     expect(response?.ok()).toBeTruthy();
 
@@ -23,7 +21,7 @@ test.describe('Wheels Framework - API Response Formats', () => {
   });
 
   test('should return JSON when format=json', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/wheels/api?format=json`);
+    const response = await page.goto(`/wheels/api?format=json`);
 
     expect(response?.ok()).toBeTruthy();
 
@@ -32,7 +30,7 @@ test.describe('Wheels Framework - API Response Formats', () => {
   });
 
   test('should return TXT when format=txt', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/wheels/info?format=txt`);
+    const response = await page.goto(`/wheels/info?format=txt`);
 
     expect(response?.ok()).toBeTruthy();
 
@@ -59,7 +57,7 @@ test.describe('Wheels Framework - Core API Endpoints', () => {
 
   for (const endpoint of endpoints) {
     test(`GET ${endpoint.path} - ${endpoint.description}`, async ({ page }) => {
-      const response = await page.goto(`${BASE_URL}${endpoint.path}`);
+      const response = await page.goto(`${endpoint.path}`);
 
       expect(response?.status()).toBe(200);
 
@@ -75,7 +73,7 @@ test.describe('Wheels Framework - Query Parameters', () => {
     const formats = ['json', 'txt', 'xml'];
 
     for (const format of formats) {
-      const response = await page.goto(`${BASE_URL}/wheels/info?format=${format}`);
+      const response = await page.goto(`/wheels/info?format=${format}`);
       expect(response?.status()).toBeLessThan(500);
     }
   });
@@ -88,7 +86,7 @@ test.describe('Wheels Framework - Query Parameters', () => {
     ];
 
     for (const dir of directories) {
-      const response = await page.goto(`${BASE_URL}/wheels/app/tests?directory=${dir}`);
+      const response = await page.goto(`/wheels/app/tests?directory=${dir}`);
       expect(response?.status()).toBeLessThan(500);
     }
   });
@@ -96,43 +94,43 @@ test.describe('Wheels Framework - Query Parameters', () => {
 
 test.describe('Wheels Framework - HTTP Methods', () => {
   test('should respond to GET requests', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/wheels/info`);
+    const response = await request.get(`/wheels/info`);
     expect(response.ok()).toBeTruthy();
     expect(response.status()).toBe(200);
   });
 
   test('should handle POST to wildcard routes', async ({ request }) => {
-    const response = await request.post(`${BASE_URL}/test/action`);
+    const response = await request.post(`/test/action`);
     expect(response.status()).toBeLessThan(500);
   });
 
   test('should handle PUT requests', async ({ request }) => {
-    const response = await request.put(`${BASE_URL}/test/action`);
+    const response = await request.put(`/test/action`);
     expect(response.status()).toBeLessThan(500);
   });
 
   test('should handle DELETE requests', async ({ request }) => {
-    const response = await request.delete(`${BASE_URL}/test/action`);
+    const response = await request.delete(`/test/action`);
     expect(response.status()).toBeLessThan(500);
   });
 });
 
 test.describe('Wheels Framework - Error Handling', () => {
   test('should handle missing controllers gracefully', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/nonexistentController/action`);
+    const response = await page.goto(`/nonexistentController/action`);
     expect(response?.status()).toBeGreaterThanOrEqual(200);
     expect(response?.status()).toBeLessThan(500);
   });
 
   test('should handle deeply nested URLs', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/a/b/c/d/e/f`);
+    const response = await page.goto(`/a/b/c/d/e/f`);
     expect(response?.status()).toBeLessThan(500);
   });
 });
 
 test.describe('Wheels Framework - Response Headers', () => {
   test('should set Content-Type header', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/wheels/info`);
+    const response = await request.get(`/wheels/info`);
     const headers = response.headers();
 
     expect(headers['content-type']).toBeDefined();

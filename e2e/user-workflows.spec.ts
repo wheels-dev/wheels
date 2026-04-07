@@ -5,8 +5,6 @@ import { test, expect } from '@playwright/test';
  * Tests real user scenarios and critical application paths
  */
 
-const BASE_URL = 'http://127.0.0.1:8082';
-
 test.describe('User Authentication Workflows', () => {
   test.beforeEach(async ({ page }) => {
     page.setDefaultTimeout(15000);
@@ -18,7 +16,7 @@ test.describe('User Authentication Workflows', () => {
     const loginRoutes = ['/login', '/auth/login', '/sessions/new'];
 
     for (const route of loginRoutes) {
-      const response = await page.goto(`${BASE_URL}${route}`);
+      const response = await page.goto(`${route}`);
       // Should not throw 500 error - either shows login or 404
       expect(response?.status()).toBeLessThan(500);
     }
@@ -26,7 +24,7 @@ test.describe('User Authentication Workflows', () => {
 
   test('should handle session creation', async ({ page }) => {
     // POST to login should be handled
-    const response = await page.request.post(`${BASE_URL}/sessions/create`, {
+    const response = await page.request.post(`/sessions/create`, {
       form: { email: 'test@example.com', password: 'test' }
     });
     // Should not crash - either redirect or show error
@@ -45,19 +43,19 @@ test.describe('Resource CRUD Workflows', () => {
     const resources = ['users', 'products', 'posts', 'articles'];
 
     for (const resource of resources) {
-      const response = await page.goto(`${BASE_URL}/${resource}`);
+      const response = await page.goto(`/${resource}`);
       // Should not crash - either list or 404
       expect(response?.status()).toBeLessThan(500);
     }
   });
 
   test('should handle new resource form pages', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/users/new`);
+    const response = await page.goto(`/users/new`);
     expect(response?.status()).toBeLessThan(500);
   });
 
   test('should handle resource creation via POST', async ({ page }) => {
-    const response = await page.request.post(`${BASE_URL}/users/create`, {
+    const response = await page.request.post(`/users/create`, {
       form: {
         firstName: 'Test',
         lastName: 'User',
@@ -68,12 +66,12 @@ test.describe('Resource CRUD Workflows', () => {
   });
 
   test('should handle resource edit pages', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/users/1/edit`);
+    const response = await page.goto(`/users/1/edit`);
     expect(response?.status()).toBeLessThan(500);
   });
 
   test('should handle resource deletion', async ({ page }) => {
-    const response = await page.request.delete(`${BASE_URL}/users/1`);
+    const response = await page.request.delete(`/users/1`);
     expect(response.status()).toBeLessThan(500);
   });
 });
@@ -85,7 +83,7 @@ test.describe('Form Validation Workflows', () => {
   });
 
   test('should display validation errors for invalid submissions', async ({ page }) => {
-    await page.goto(`${BASE_URL}/users/new`);
+    await page.goto(`/users/new`);
 
     // Submit empty form
     await page.click('button[type="submit"], input[type="submit"]');
@@ -96,7 +94,7 @@ test.describe('Form Validation Workflows', () => {
   });
 
   test('should accept valid form submissions', async ({ page }) => {
-    await page.goto(`${BASE_URL}/users/new`);
+    await page.goto(`/users/new`);
 
     // Fill valid data
     await page.fill('input[name="firstName"]', 'Valid');
@@ -110,7 +108,7 @@ test.describe('Form Validation Workflows', () => {
 
 test.describe('Search and Filter Workflows', () => {
   test('should handle search queries', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/users?search=test`);
+    const response = await page.goto(`/users?search=test`);
     expect(response?.status()).toBeLessThan(500);
   });
 
@@ -118,7 +116,7 @@ test.describe('Search and Filter Workflows', () => {
     const pages = [1, 2, 5, 10];
 
     for (const pageNum of pages) {
-      const response = await page.goto(`${BASE_URL}/users?page=${pageNum}`);
+      const response = await page.goto(`/users?page=${pageNum}`);
       expect(response?.status()).toBeLessThan(500);
     }
   });
@@ -127,7 +125,7 @@ test.describe('Search and Filter Workflows', () => {
     const sorts = ['name', 'createdAt', 'email', 'id'];
 
     for (const sort of sorts) {
-      const response = await page.goto(`${BASE_URL}/users?sort=${sort}`);
+      const response = await page.goto(`/users?sort=${sort}`);
       expect(response?.status()).toBeLessThan(500);
     }
   });
@@ -135,7 +133,7 @@ test.describe('Search and Filter Workflows', () => {
 
 test.describe('API and JSON Response Workflows', () => {
   test('should return valid JSON for API requests', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/wheels/api?format=json`);
+    const response = await request.get(`/wheels/api?format=json`);
 
     expect(response.ok()).toBeTruthy();
 
@@ -144,7 +142,7 @@ test.describe('API and JSON Response Workflows', () => {
   });
 
   test('should handle API POST requests with JSON body', async ({ request }) => {
-    const response = await request.post(`${BASE_URL}/wheels/api`, {
+    const response = await request.post(`/wheels/api`, {
       data: { action: 'test', data: { key: 'value' } }
     });
 
@@ -154,7 +152,7 @@ test.describe('API and JSON Response Workflows', () => {
 
 test.describe('Error Page Workflows', () => {
   test('should display custom 404 page for missing resources', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/nonexistent/resource/path`);
+    const response = await page.goto(`/nonexistent/resource/path`);
 
     // Should show error page, not crash
     expect(response?.status()).toBeGreaterThanOrEqual(400);
@@ -166,7 +164,7 @@ test.describe('Error Page Workflows', () => {
   });
 
   test('should handle invalid parameters gracefully', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/users/invalid-id`);
+    const response = await page.goto(`/users/invalid-id`);
     expect(response?.status()).toBeLessThan(500);
   });
 });
@@ -174,14 +172,14 @@ test.describe('Error Page Workflows', () => {
 test.describe('Session and Cookie Workflows', () => {
   test('should maintain session across page navigations', async ({ page, context }) => {
     // Visit first page
-    await page.goto(`${BASE_URL}/wheels/info`);
+    await page.goto(`/wheels/info`);
     const cookies = await context.cookies();
 
     // Should have session cookie
     expect(cookies.length).toBeGreaterThanOrEqual(0);
 
     // Navigate to another page
-    await page.goto(`${BASE_URL}/wheels/routes`);
+    await page.goto(`/wheels/routes`);
 
     // Session should persist
     const cookiesAfter = await context.cookies();
@@ -189,7 +187,7 @@ test.describe('Session and Cookie Workflows', () => {
   });
 
   test('should handle cookie consent if present', async ({ page }) => {
-    await page.goto(`${BASE_URL}/`);
+    await page.goto(`/`);
 
     // Check for cookie consent banners
     const consentBanner = page.locator('[class*="cookie"], [id*="cookie"], [class*="consent"]');
@@ -210,7 +208,7 @@ test.describe('Mobile Responsiveness Workflows', () => {
     });
     const page = await context.newPage();
 
-    await page.goto(`${BASE_URL}/wheels/info`);
+    await page.goto(`/wheels/info`);
 
     // Page should load without horizontal scroll
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
@@ -226,7 +224,7 @@ test.describe('Mobile Responsiveness Workflows', () => {
     });
     const page = await context.newPage();
 
-    await page.goto(`${BASE_URL}/wheels/info`);
+    await page.goto(`/wheels/info`);
 
     const content = await page.content();
     await expect(content).toBeTruthy();
