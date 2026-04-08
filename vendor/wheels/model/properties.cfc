@@ -816,6 +816,15 @@ component {
 		required string property,
 		required any values
 	) {
+		// Validate property name: alphanumeric and underscore only (prevents SQL injection via property name)
+		if (!ReFind("^[a-zA-Z_][a-zA-Z0-9_]*$", arguments.property)) {
+			Throw(
+				type = "Wheels.InvalidPropertyName",
+				message = "The property name `#arguments.property#` is invalid.",
+				extendedInfo = "Property names must contain only letters, numbers, and underscores, and must start with a letter or underscore."
+			);
+		}
+
 		if (!StructKeyExists(variables.wheels.class, "enums")) {
 			variables.wheels.class.enums = {};
 		}
@@ -850,8 +859,10 @@ component {
 		}
 		for (local.name in ListToArray(local.enumDef.names)) {
 			local.storedValue = local.enumDef.values[local.name];
+			// Escape single quotes to prevent SQL injection in generated WHERE clauses
+			local.escapedValue = Replace(local.storedValue, "'", "''", "all");
 			local.scopeDef = {};
-			local.scopeDef.where = "#arguments.property# = '#local.storedValue#'";
+			local.scopeDef.where = "#arguments.property# = '#local.escapedValue#'";
 			variables.wheels.class.scopes[local.name] = local.scopeDef;
 		}
 	}
