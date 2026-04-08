@@ -407,7 +407,7 @@ component output="false" {
 		if (!Len(arguments.property) || !ReFind("^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$", arguments.property)) {
 			Throw(
 				type = "Wheels.InvalidPropertyName",
-				message = "The property name `#HTMLEditFormat(arguments.property)#` contains invalid characters.",
+				message = "The property name `#EncodeForHTML(arguments.property)#` contains invalid characters.",
 				extendedInfo = "Property names may only contain letters, numbers, and underscores, with an optional table prefix using dot notation (e.g., `users.id`)."
 			);
 		}
@@ -422,7 +422,7 @@ component output="false" {
 		if (!ReFind("^(?i)(ASC|DESC)$", arguments.direction)) {
 			Throw(
 				type = "Wheels.InvalidSortDirection",
-				message = "The sort direction `#HTMLEditFormat(arguments.direction)#` is invalid.",
+				message = "The sort direction `#EncodeForHTML(arguments.direction)#` is invalid.",
 				extendedInfo = "Sort direction must be either ASC or DESC."
 			);
 		}
@@ -437,7 +437,7 @@ component output="false" {
 		if (!ReFind("^(=|!=|<>|<|>|<=|>=|LIKE|NOT LIKE|IS|IS NOT)$", UCase(Trim(arguments.operator)))) {
 			Throw(
 				type = "Wheels.InvalidOperator",
-				message = "The operator `#HTMLEditFormat(arguments.operator)#` is not allowed.",
+				message = "The operator `#EncodeForHTML(arguments.operator)#` is not allowed.",
 				extendedInfo = "Allowed operators: =, !=, <>, <, >, <=, >=, LIKE, NOT LIKE, IS, IS NOT."
 			);
 		}

@@ -10,7 +10,7 @@ component extends="wheels.WheelsTest" {
 			it("defaults allowOrigins to empty string", function() {
 				local.cors = new wheels.middleware.Cors();
 				// With no origins configured and no Origin header, request passes through.
-				local.reqCtx = {};
+				local.reqCtx = {cgi = {}};
 				local.result = local.cors.handle(
 					request = local.reqCtx,
 					next = function(required struct request) {
