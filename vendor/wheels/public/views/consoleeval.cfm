@@ -48,7 +48,7 @@ if (!len(trim(local.expression))) {
 if (
 	structKeyExists(application.wheels, "reloadPassword")
 	&& len(application.wheels.reloadPassword)
-	&& local.password != application.wheels.reloadPassword
+	&& Compare(Hash(local.password, "SHA-256"), Hash(application.wheels.reloadPassword, "SHA-256")) != 0
 ) {
 	writeOutput(serializeJSON({
 		success: false,
