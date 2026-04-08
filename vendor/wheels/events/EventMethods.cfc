@@ -44,7 +44,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 				// Detect request format for format-specific error handling
 				local.format = $getRequestFormat();
 				
-				if (structKeyExists(server, "boxlang")) {
+				if ($engineAdapter().isBoxLang()) {
 					if (StructKeyExists(arguments.exception, "type") && Left(arguments.exception.type, 6) == "Wheels") {
 						local.wheelsError = arguments.exception;
 					} else if (
@@ -164,9 +164,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 
 		// Inject methods from plugins and packages directly to Application.cfc.
 		if (!StructIsEmpty(application.wheels.mixins)) {
-			if (structKeyExists(server, "boxlang")) {
-				variables.this = this;
-			}
+			$engineAdapter().prepareDIComplete(variables, this);
 			local.Mixins.$initializeMixins(variables);
 		}
 

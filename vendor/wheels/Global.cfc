@@ -31,16 +31,13 @@ component output="false" {
 
 	public struct function $image(){
     	local.rv = {};
-		if (structKeyExists(server, "boxlang")) {
-			if (arguments.action == "info") {
-				var img = ImageRead(arguments.source);
-				local.rv = ImageInfo(img);
-			} else {
-				throw(
-					type = "Wheels.Image.UnsupportedAction",
-					message = "The `$image()` function in BoxLang currently supports only the 'info' action."
-				);
-			}
+		if (arguments.action == "info") {
+			local.rv = $engineAdapter().imageInfo(arguments.source);
+		} else if ($engineAdapter().isBoxLang()) {
+			throw(
+				type = "Wheels.Image.UnsupportedAction",
+				message = "The `$image()` function in BoxLang currently supports only the 'info' action."
+			);
 		} else {
 			// Adobe or Lucee: use cfimage
 			arguments.structName = "rv";
@@ -207,9 +204,9 @@ component output="false" {
 			StructDelete(arguments, "password");
 		}
 
-		// BoxLang + SQL Server specific fix for index queries
+		// BoxLang specific fix for index queries (MSSQL/Oracle)
 		if (
-			StructKeyExists(server, "boxlang") &&
+			$engineAdapter().isBoxLang() &&
 			StructKeyExists(arguments, "type") && arguments.type == "index" &&
 			StructKeyExists(arguments, "table")
 		) {
@@ -371,14 +368,7 @@ component output="false" {
 	}
 
 	public any function $zip(){
-		if (structKeyExists(server, "boxlang")) {
-			if (!left(arguments.file, 1) == "/") {
-				arguments.file = "/" & arguments.file;
-			}
-			if (!left(arguments.destination, 1) == "/") {
-				arguments.destination = "/" & arguments.destination;
-			}
-		}
+		$engineAdapter().prepareZipArgs(arguments);
  		cfzip(attributeCollection="#arguments#");
 	}
 
@@ -592,18 +582,7 @@ component output="false" {
 			// this might fail if a query contains binary data so in those rare cases we fall back on using cfwddx (which is a little bit slower which is why we don't use it all the time)
 			try {
 				local.rv = SerializeJSON(local.values);
-				// BoxLang compatibility: For consistent hashing, normalize array representations
-				if (structKeyExists(server, "boxlang")) {
-					// Convert to a more predictable format by removing structural chars and sorting
-					local.normalized = REReplace(local.rv, '[\[\]{}"]', "", "all");
-					local.parts = listToArray(local.normalized, ",");
-					arraySort(local.parts, "textnocase");
-					local.rv = arrayToList(local.parts, ",");
-				} else {
-					// remove the characters that indicate array or struct so that we can sort it as a list below
-					local.rv = ReplaceList(local.rv, "{,},[,],/", ",,,,");
-					local.rv = ListSort(local.rv, "text");
-				}
+				local.rv = $engineAdapter().normalizeForHash(local.rv);
 			} catch (any e) {
 				local.rv = $wddx(input = local.values);
 			}
@@ -1982,43 +1961,14 @@ component output="false" {
 	 * Get the status code (e.g. 200, 404 etc) of the response we're about to send.
 	 */
 	public string function $statusCode() {
-		if (StructKeyExists(server, "lucee")) {
-			local.response = GetPageContext().getResponse();
-		} else {
-			local.response = GetPageContext().getFusionContext().getResponse();
-		}
-		return local.response.getStatus();
+		return application.wheels.engineAdapter.getStatusCode();
 	}
 
 	/**
 	 * Gets the value of the content type header (blank string if it doesn't exist) of the response we're about to send.
 	 */
 	public string function $contentType() {
-		local.rv = "";
-		local.pageContext = getPageContext();
-		if (structKeyExists(server, "boxlang")) {
-			local.response = local.pageContext;
-		} else if (structKeyExists(server, "lucee")) {
-			local.response = local.pageContext.getResponse();
-		} else {
-			local.response = local.pageContext.getFusionContext().getResponse();
-		}
-
-		if (structKeyExists(server, "boxlang")) {
-			local.request = local.response.getRequest();
-			local.header = local.request.getHeader("Content-Type");
-			if(!isNull(local.header)) {
-				local.rv = local.header;
-			}
-		} else {
-			if (local.response.containsHeader("Content-Type")) {
-				local.header = local.response.getHeader("Content-Type");
-				if (!isNull(local.header)) {
-					local.rv = local.header;
-				}
-			}
-		}
-		return local.rv;
+		return application.wheels.engineAdapter.getContentType();
 	}
 
 	/**
@@ -2134,14 +2084,14 @@ component output="false" {
 	 * Returns the request timeout value in seconds
 	 */
 	public numeric function $getRequestTimeout() {
-		// Check for BoxLang first using unique BoxLang identifier
-		if (StructKeyExists(server, "boxlang")) {
-			return 10000;
-		} else if (StructKeyExists(server, "lucee") && StructKeyExists(server.lucee, "version")) {
-			return (GetPageContext().getRequestTimeout() / 1000);
-		} else {
-			return CreateObject("java", "coldfusion.runtime.RequestMonitor").GetRequestTimeout();
-		}
+		return application.wheels.engineAdapter.getRequestTimeout();
+	}
+
+	/**
+	 * Returns the engine adapter instance for centralized cross-engine behavior.
+	 */
+	public any function $engineAdapter() {
+		return application.wheels.engineAdapter;
 	}
 
 	// ======================================================================
@@ -2310,16 +2260,7 @@ component output="false" {
 			}
 		}
 		if (StructKeyExists(application.wheels.functions, arguments.name)) {
-			if (structKeyExists(server, "boxlang")) {
-				// Manual implementation for BoxLang
-				for (local.key in application.wheels.functions[arguments.name]) {
-					if (!StructKeyExists(arguments.args, local.key)) {
-						arguments.args[local.key] = application.wheels.functions[arguments.name][local.key];
-					}
-				}
-			} else {
-				StructAppend(arguments.args, application.wheels.functions[arguments.name], false);
-			}
+			$engineAdapter().structAppendDefaults(arguments.args, application.wheels.functions[arguments.name]);
 		}
 
 		// make sure that the arguments marked as required exist
@@ -2366,20 +2307,16 @@ component output="false" {
 		local.val = arguments.value;
 		local.detectedType = arguments.type;
 
-		// BoxLang sometimes returns oracle.sql.TIMESTAMP objects that aren't recognized as CFML date objects.
-		if (
-			(StructKeyExists(server, "boxlang") || StructKeyExists(server, "coldfusion")) &&
-			IsObject(local.val) &&
-			FindNoCase("oracle.sql.TIMESTAMP", GetMetadata(local.val).name)
-		) {
-			try {
-				// Safely convert it to a CFML date using its toString() method, which returns an ISO-like string
-				local.val = ParseDateTime(local.val.toString());
-				local.detectedType = "datetime";
-			} catch (any e) {
-				// Fallback: just get the string representation
-				local.val = local.val.toString();
-				local.detectedType = "string";
+		// Coerce Oracle JDBC objects (TIMESTAMP, DATE) to CFML datetime values.
+		if (IsObject(local.val)) {
+			local.coerced = $engineAdapter().coerceOracleObject(local.val);
+			if (!IsObject(local.coerced) || local.coerced.hashCode() != local.val.hashCode()) {
+				local.val = local.coerced;
+				if (IsDate(local.val)) {
+					local.detectedType = "datetime";
+				} else {
+					local.detectedType = "string";
+				}
 			}
 		}
 
@@ -2423,9 +2360,9 @@ component output="false" {
 			}
 		}
 
-		// BoxLang compatibility: Pre-process problematic date strings before type detection
-		if (StructKeyExists(server, "boxlang") && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
-			// Manually parse DD/MM/YYYY format to avoid BoxLang's MM/DD/YYYY interpretation
+		// Pre-process date strings with AM/PM that may be parsed differently per engine
+		if ($engineAdapter().isBoxLang() && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
+			// Manually parse DD/MM/YYYY format to avoid engine-specific interpretation
 			local.parts = ListToArray(arguments.value, " ");
 			local.datePart = local.parts[1];
 			local.timePart = local.parts[2];
@@ -2445,9 +2382,7 @@ component output="false" {
 			} else if (local.amPm == "AM" && local.hour == 12) {
 				local.hour = 0;
 			}
-			// convert to a real datetime object and continue (so switch will format it)
 			val = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
-			// ensure detectedType is datetime so switch will format
 			detectedType = "datetime";
 		}
 
@@ -2532,12 +2467,10 @@ component output="false" {
 								// likely MM/DD/YYYY
 								local.month = d1; local.day = d2;
 							} else {
-								// ambiguous -> prefer DD/MM/YYYY if server.boxlang exists, else MM/DD/YYYY
-								if (StructKeyExists(server, "boxlang")) {
-									local.day = d1; local.month = d2;
-								} else {
-									local.month = d1; local.day = d2;
-								}
+								// ambiguous -> use adapter to determine date format preference
+								local.ambiguousDate = $engineAdapter().parseAmbiguousSlashDate(d1, d2, y);
+								local.month = Month(local.ambiguousDate);
+								local.day = Day(local.ambiguousDate);
 							}
 							local.dt = CreateDate(y, local.month, local.day);
 							// if time exists in same string, try to parse it using ParseDateTime

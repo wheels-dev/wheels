@@ -321,9 +321,8 @@ component {
 				// optional arguments
 				for (local.argumentName in ["returnType","keyColumn"]) {
 					if (StructKeyExists(arguments, local.argumentName)) {
-						// BoxLang compatibility: Map keyColumn to columnKey
-						if (StructKeyExists(server, "boxlang") && local.argumentName == "keyColumn") {
-							local.finderArgs["columnKey"] = arguments[local.argumentName];
+						if (local.argumentName == "keyColumn") {
+							local.finderArgs[$engineAdapter().queryKeyColumnArgName()] = arguments[local.argumentName];
 						} else {
 							local.finderArgs[local.argumentName] = arguments[local.argumentName];
 						}
@@ -411,7 +410,7 @@ component {
 		arguments.include = $listClean(arguments.include);
 		if (Len(arguments.key)) {
 			$keyLengthCheck(arguments.key);
-		} else if (structKeyExists(server, "boxlang")) {
+		} else if ($engineAdapter().isBoxLang()) {
 			return false;
 		}
 

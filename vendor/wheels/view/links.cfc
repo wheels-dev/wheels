@@ -440,8 +440,7 @@ component {
 
 		// Create anchor elements with an href attribute for all URLs found in the text.
 		if (arguments.link != "emailAddresses") {
-			// For BoxLang compatibility
-			if (structKeyExists(server, "boxlang")) {
+			if ($engineAdapter().isBoxLang()) {
 				local.anchors = [];
 				local.tempText = arguments.text;
 				local.anchorMatches = ReMatchNoCase("<a\s[^>]*>.*?</a>", local.tempText);

@@ -642,9 +642,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	}
 	
 	function onDIcomplete(){
-		if (structKeyExists(server, "boxlang")) {
-			variables.this = this;
-		}
+		$engineAdapter().prepareDIComplete(variables, this);
 		new wheels.Plugins().$initializeMixins(variables);
 	}
 }

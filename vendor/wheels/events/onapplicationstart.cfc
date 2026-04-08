@@ -45,6 +45,15 @@ component {
 		}
 		application.$wheels.serverVersionMajor = ListFirst(application.$wheels.serverVersion, ".,");
 
+		// Instantiate the engine adapter for centralized cross-engine behavior.
+		if (application.$wheels.serverName == "BoxLang") {
+			application.$wheels.engineAdapter = new wheels.engineAdapters.BoxLang.BoxLangAdapter(application.$wheels.serverVersion);
+		} else if (application.$wheels.serverName == "Lucee") {
+			application.$wheels.engineAdapter = new wheels.engineAdapters.Lucee.LuceeAdapter(application.$wheels.serverVersion);
+		} else {
+			application.$wheels.engineAdapter = new wheels.engineAdapters.Adobe.AdobeAdapter(application.$wheels.serverVersion);
+		}
+
 		local.upgradeTo = application.wo.$checkMinimumVersion(
 			engine = application.$wheels.serverName,
 			version = application.$wheels.serverVersion
@@ -245,9 +254,7 @@ component {
 
 		// Allow developers to inject plugins and packages into the application variables scope.
 		if (!StructIsEmpty(application.$wheels.mixins)) {
-			if (structKeyExists(server, "boxlang")) {
-				variables.this = this;
-			}
+			application.$wheels.engineAdapter.prepareDIComplete(variables, this);
 			new wheels.Plugins().$initializeMixins(variables);
 		}
 

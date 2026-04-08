@@ -104,13 +104,11 @@ component {
 		arguments.returnAs = "query";
 		arguments.callbacks = false;
 		if (StructKeyExists(arguments, "key")) {
-			// BoxLang compatibility: Handle null key values
-			if (StructKeyExists(server, "boxlang") && (!StructKeyExists(arguments, "key") || arguments.key == "" || arguments.key == "null" || !Len(arguments.key))) {
+			if ($engineAdapter().isBoxLang() && (!StructKeyExists(arguments, "key") || arguments.key == "" || arguments.key == "null" || !Len(arguments.key))) {
 				local.rv = 0;
 			} else {
 				local.result = findByKey(argumentCollection = arguments);
-				// BoxLang compatibility: Handle case where findByKey returns boolean false for null keys  
-				if (StructKeyExists(server, "boxlang") && IsBoolean(local.result)) {
+				if (IsBoolean(local.result) && !local.result) {
 					local.rv = 0;
 				} else {
 					local.rv = local.result.recordCount;
@@ -118,8 +116,7 @@ component {
 			}
 		} else {
 			local.result = findOne(argumentCollection = arguments);
-			// BoxLang compatibility: Handle case where findOne returns boolean false
-			if (StructKeyExists(server, "boxlang") && IsBoolean(local.result)) {
+			if (IsBoolean(local.result) && !local.result) {
 				local.rv = 0;
 			} else {
 				local.rv = local.result.recordCount;
@@ -286,17 +283,16 @@ component {
 		local.rv.scale = variables.wheels.class.properties[arguments.property].scale;
 		local.rv.null = (!Len(this[arguments.property]) && variables.wheels.class.properties[arguments.property].nullable);
 
-		// BoxLang/JDK compatibility: Convert date strings to proper date for datetime types
-		if (structKeyExists(server, "boxlang") && (Len(local.rv.value) && !local.rv.null && 
+		// Convert date strings to proper date for datetime types (engine-specific parsing)
+		if ($engineAdapter().isBoxLang() && (Len(local.rv.value) && !local.rv.null && 
 		    (local.rv.type == "CF_SQL_DATE" || local.rv.type == "CF_SQL_TIME" || local.rv.type == "CF_SQL_TIMESTAMP") &&
 		    IsSimpleValue(local.rv.value) && !IsDate(local.rv.value))) {
 
-			// Handle DD/MM/YYYY and DD-MM-YYYY formats common in European locales
 			if (REFind("^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$", local.rv.value)) {
 				local.parts = ListToArray(local.rv.value, "/-");
 				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
 					try {
-						local.rv.value = CreateDate(local.parts[3], local.parts[2], local.parts[1]);
+						local.rv.value = $engineAdapter().parseAmbiguousSlashDate(local.parts[1], local.parts[2], local.parts[3]);
 					} catch (any e) {
 						local.rv.value = CreateDate(local.parts[3], local.parts[1], local.parts[2]);
 					}

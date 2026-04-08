@@ -311,13 +311,11 @@ component {
 						if (!QueryKeyExists(arguments.collection, local.key)) {
 							QueryAddColumn(arguments.collection, local.key, []);
 						}
-						if (structKeyExists(server, "boxlang")) {
-							if (local.result[local.key] == "") {
-								continue;
-							}
+						if ($engineAdapter().isBoxLang() && local.result[local.key] == "") {
+							continue;
 						}
 
-						arguments.collection[local.key][local.rowNumber] = $coerceOracleTimestamp(local.result[local.key]);
+						arguments.collection[local.key][local.rowNumber] = $engineAdapter().coerceOracleObject(local.result[local.key]);
 					}
 				} else if (IsBoolean(local.result) && !local.result) {
 					// Break the loop and return false if the callback returned false.
@@ -357,31 +355,9 @@ component {
 
 	/**
 	 * Internal function.
-	 * Converts Oracle TIMESTAMP/DATE objects to CFML DateTime values (BoxLang compatibility).
+	 * Converts Oracle TIMESTAMP/DATE objects to CFML DateTime values via the engine adapter.
 	 */
 	public any function $coerceOracleTimestamp(required any value) {
-		if (!structKeyExists(server, "boxlang") || !IsObject(arguments.value) || IsStruct(arguments.value)) {
-			return arguments.value;
-		}
-		try {
-			local.className = GetMetadata(arguments.value).getName();
-		} catch (any e) {
-			return arguments.value;
-		}
-		if (local.className != "oracle.sql.TIMESTAMP" && local.className != "oracle.sql.DATE") {
-			return arguments.value;
-		}
-		local.timestampString = arguments.value.toString();
-		local.dateParts = ListToArray(local.timestampString, " ");
-		local.dateComponents = ListToArray(local.dateParts[1], "-");
-		local.timeComponents = ListToArray(local.dateParts[2], ":");
-		return CreateDateTime(
-			Val(local.dateComponents[1]),
-			Val(local.dateComponents[2]),
-			Val(local.dateComponents[3]),
-			Val(local.timeComponents[1]),
-			Val(local.timeComponents[2]),
-			Val(ListFirst(local.timeComponents[3], "."))
-		);
+		return $engineAdapter().coerceOracleObject(arguments.value);
 	}
 }

@@ -899,21 +899,17 @@ component {
 					local.start = local.temp.pos[4] + local.temp.len[4];
 					local.extractedValue = Mid(arguments.where, local.temp.pos[4], local.temp.len[4]);
 
-					// BoxLang compatibility: Handle comma-separated values in IN clauses differently
-					if (StructKeyExists(server, "boxlang")) {
+					// Handle comma-separated values in IN clauses
+					if ($engineAdapter().isBoxLang()) {
 						local.processedValue = local.extractedValue;
-						// Remove outer parentheses if present (e.g., "(1,2,3)" -> "1,2,3")
 						if (Left(local.processedValue, 1) == "(" && Right(local.processedValue, 1) == ")") {
 							local.processedValue = Mid(local.processedValue, 2, Len(local.processedValue) - 2);
 						}
-						
-						// BoxLang: Only apply quote cleanup if the value contains quotes
 						if (Find("'", local.processedValue) > 0 || Find(Chr(34), local.processedValue) > 0) {
 							local.cleanedValue = local.processedValue;							
 							local.cleanedValue = ReReplace(local.cleanedValue, "'([^']*)'", "\1", "ALL");
 							local.doubleQuote = Chr(34);
 							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#([^#local.doubleQuote#]*)#local.doubleQuote#", "\1", "ALL");
-							
 							ArrayAppend(local.originalValues, local.cleanedValue);
 						} else {
 							ArrayAppend(local.originalValues, local.processedValue);
