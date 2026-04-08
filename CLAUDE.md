@@ -127,7 +127,7 @@ t.timestamps();  // creates both createdAt and updatedAt
 ```
 
 ### 8. Database-Agnostic Dates in Migrations
-Use `NOW()` — it works across MySQL, PostgreSQL, SQL Server, H2.
+Use `NOW()` — it works across MySQL, PostgreSQL, SQL Server, H2, SQLite.
 ```cfm
 // WRONG — database-specific
 execute("INSERT INTO users (name, createdAt) VALUES ('Admin', CURRENT_TIMESTAMP)");
@@ -498,12 +498,12 @@ application scope, closure scoping). Always test at least **two engines**:
 ```bash
 cd /path/to/wheels/rig    # must be in the repo root with compose.yml
 
-# Start both engines (H2 is built-in, no external DB needed)
+# Start both engines (SQLite is built-in on all engines, no external DB needed)
 docker compose up -d lucee6 adobe2025
 
 # Wait ~60s for startup, then run both:
-curl -s -o /tmp/lucee6-results.json "http://localhost:60006/wheels/core/tests?db=h2&format=json"
-curl -s -o /tmp/adobe2025-results.json "http://localhost:62025/wheels/core/tests?db=h2&format=json"
+curl -s -o /tmp/lucee6-results.json "http://localhost:60006/wheels/core/tests?db=sqlite&format=json"
+curl -s -o /tmp/adobe2025-results.json "http://localhost:62025/wheels/core/tests?db=sqlite&format=json"
 
 # Check results (HTTP 200=pass, 417=failures)
 for f in /tmp/lucee6-results.json /tmp/adobe2025-results.json; do
@@ -541,7 +541,7 @@ curl -sf "http://localhost:60006/wheels/core/tests?db=mysql&format=json" > /tmp/
 
 ### Run a specific test directory
 ```bash
-curl "http://localhost:60006/wheels/core/tests?db=h2&format=json&directory=tests.specs.controller"
+curl "http://localhost:60006/wheels/core/tests?db=sqlite&format=json&directory=tests.specs.controller"
 ```
 
 ### Known cross-engine gotchas
@@ -675,7 +675,7 @@ Client-side: `const es = new EventSource('/controller/notifications');`
 ## Reference Docs
 
 Deeper documentation lives in `.ai/` — Claude will search it automatically when needed:
-- `.ai/wheels/cross-engine-compatibility.md` — **Start here** for Lucee/Adobe/H2 gotchas
+- `.ai/wheels/cross-engine-compatibility.md` — **Start here** for Lucee/Adobe cross-engine gotchas
 - `.ai/cfml/` — CFML language reference (syntax, data types, components)
 - `.ai/wheels/models/` — ORM details, associations, validations, scopes, enums
 - `.ai/wheels/controllers/` — filters, rendering, security
