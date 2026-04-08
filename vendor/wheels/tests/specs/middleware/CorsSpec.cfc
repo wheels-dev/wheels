@@ -20,31 +20,17 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toBe("passthrough");
 			});
 
-			it("returns empty response when allowOrigins is empty and request has Origin header", function() {
+			it("proceeds without CORS headers when allowOrigins is empty and request has Origin header", function() {
 				local.cors = new wheels.middleware.Cors();
 				local.reqCtx = {cgi = {http_origin = "https://evil.com"}};
 				local.result = local.cors.handle(
 					request = local.reqCtx,
 					next = function(required struct request) {
-						return "should-not-reach";
+						return "proceeded";
 					}
 				);
-				// Should block the request, returning empty string (403).
-				expect(local.result).toBe("");
-			});
-
-			it("does not call next when allowOrigins is empty and Origin is present", function() {
-				local.cors = new wheels.middleware.Cors();
-				local.reqCtx = {cgi = {http_origin = "https://attacker.com"}};
-				var tracker = {nextCalled = false};
-				local.cors.handle(
-					request = local.reqCtx,
-					next = function(required struct request) {
-						tracker.nextCalled = true;
-						return "reached";
-					}
-				);
-				expect(tracker.nextCalled).toBeFalse();
+				// Middleware passes through without CORS headers; the browser enforces the block.
+				expect(local.result).toBe("proceeded");
 			});
 
 			it("allows requests when origin matches explicit allowOrigins", function() {
