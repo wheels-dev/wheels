@@ -290,10 +290,11 @@ component extends="wheels.WheelsTest" {
 
 		describe("Engine Adapter - Date Parsing", function() {
 
-			it("parses an unambiguous date correctly (day > 12)", function() {
-				// 25/03/2024 — day=25, month=3
-				var result = application.wheels.engineAdapter.parseAmbiguousSlashDate(25, 3, 2024);
+			it("parses an ambiguous date where both values are valid months", function() {
+				// Both d1 and d2 must be <= 12 (caller handles unambiguous cases)
+				var result = application.wheels.engineAdapter.parseAmbiguousSlashDate(3, 5, 2024);
 				expect(IsDate(result)).toBeTrue();
+				expect(Year(result)).toBe(2024);
 			});
 
 			it("returns a date object", function() {

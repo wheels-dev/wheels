@@ -316,6 +316,7 @@ component output="false" {
 	 */
 	public date function parseAmbiguousSlashDate(required numeric d1, required numeric d2, required numeric year) {
 		// Default: MM/DD/YYYY (US format, Lucee/Adobe convention)
+		// Only called when both d1 and d2 are <= 12 (truly ambiguous)
 		return CreateDate(arguments.year, arguments.d1, arguments.d2);
 	}
 
