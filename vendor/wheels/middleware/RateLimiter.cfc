@@ -17,7 +17,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @storage Backend: "memory" or "database".
 	 * @keyFunction Closure that receives the request struct and returns a string key. Defaults to client IP.
 	 * @headerPrefix Prefix for rate limit response headers.
-	 * @trustProxy Whether to use X-Forwarded-For for client IP resolution.
+	 * @trustProxy Whether to use X-Forwarded-For for client IP resolution. Defaults to false for security — when true, any client can spoof their IP via X-Forwarded-For to bypass rate limiting. Only enable when behind a trusted reverse proxy (nginx, HAProxy, etc.) that strips or overwrites the X-Forwarded-For header from clients.
 	 */
 	public RateLimiter function init(
 		numeric maxRequests = 60,
@@ -26,7 +26,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		string storage = "memory",
 		any keyFunction = "",
 		string headerPrefix = "X-RateLimit",
-		boolean trustProxy = true
+		boolean trustProxy = false
 	) {
 		if (!ListFindNoCase("fixedWindow,slidingWindow,tokenBucket", arguments.strategy)) {
 			throw(
