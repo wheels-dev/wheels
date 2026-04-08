@@ -25,4 +25,27 @@ component extends="wheels.engineAdapters.Base" output="false" {
 		return CreateObject("java", "coldfusion.runtime.RequestMonitor").GetRequestTimeout();
 	}
 
+	/**
+	 * Adobe CF needs Oracle TIMESTAMP/DATE coercion for consistent date
+	 * comparisons in hasChanged() and $convertToString().
+	 */
+	public any function coerceOracleObject(required any value) {
+		if (!IsObject(arguments.value) || IsStruct(arguments.value)) {
+			return arguments.value;
+		}
+		try {
+			local.className = GetMetadata(arguments.value).getName();
+		} catch (any e) {
+			return arguments.value;
+		}
+		if (local.className == "oracle.sql.TIMESTAMP" || local.className == "oracle.sql.DATE") {
+			try {
+				return ParseDateTime(arguments.value.toString());
+			} catch (any e) {
+				return arguments.value.toString();
+			}
+		}
+		return arguments.value;
+	}
+
 }
