@@ -563,13 +563,9 @@ component extends="wheels.WheelsTest" {
 					post.update()
 					post.reload()
 					newUpdatedAt = post.properties().updatedAt
-					if(isInstanceOf(orgUpdatedAt,"java.time.LocalDateTime") and isInstanceOf(newUpdatedAt,"java.time.LocalDateTime")){
-						orgUpdatedAt = createDateTime(orgUpdatedAt.getYear(),orgUpdatedAt.getMonthValue(),orgUpdatedAt.getDayOfMonth(),orgUpdatedAt.getHour(),orgUpdatedAt.getMinute(),orgUpdatedAt.getSecond());
-						newUpdatedAt = createDateTime(newUpdatedAt.getYear(),newUpdatedAt.getMonthValue(),newUpdatedAt.getDayOfMonth(),newUpdatedAt.getHour(),newUpdatedAt.getMinute(),newUpdatedAt.getSecond());
-					} else if (isInstanceOf(orgUpdatedAt, "oracle.sql.TIMESTAMP") and isInstanceOf(newUpdatedAt, "oracle.sql.TIMESTAMP")){
-						orgUpdatedAt = orgUpdatedAt.timestampValue();
-						newUpdatedAt = newUpdatedAt.timestampValue();
-					}
+					// Normalize both values to comparable strings
+					orgUpdatedAt = $normalizeTimestamp(orgUpdatedAt);
+					newUpdatedAt = $normalizeTimestamp(newUpdatedAt);
 					expect(orgUpdatedAt).toBe(newUpdatedAt)
 
 					transaction action="rollback";
@@ -583,14 +579,10 @@ component extends="wheels.WheelsTest" {
 					post.update(body = "here is some updated text")
 					post.reload()
 					newCreatedAt = post.properties().createdAt
-					if(isInstanceOf(orgUpdatedAt,"java.time.LocalDateTime") and isInstanceOf(newUpdatedAt,"java.time.LocalDateTime")){
-						orgUpdatedAt = createDateTime(orgUpdatedAt.getYear(),orgUpdatedAt.getMonthValue(),orgUpdatedAt.getDayOfMonth(),orgUpdatedAt.getHour(),orgUpdatedAt.getMinute(),orgUpdatedAt.getSecond());
-						newUpdatedAt = createDateTime(newUpdatedAt.getYear(),newUpdatedAt.getMonthValue(),newUpdatedAt.getDayOfMonth(),newUpdatedAt.getHour(),newUpdatedAt.getMinute(),newUpdatedAt.getSecond());
-					} else if (isInstanceOf(orgUpdatedAt, "oracle.sql.TIMESTAMP") and isInstanceOf(newUpdatedAt, "oracle.sql.TIMESTAMP")){
-						orgUpdatedAt = orgUpdatedAt.timestampValue();
-						newUpdatedAt = newUpdatedAt.timestampValue();
-					}
-					expect(orgUpdatedAt).toBe(newUpdatedAt)
+					// Normalize both values to comparable strings
+					orgCreatedAt = $normalizeTimestamp(orgCreatedAt);
+					newCreatedAt = $normalizeTimestamp(newCreatedAt);
+					expect(orgCreatedAt).toBe(newCreatedAt)
 					
 					transaction action="rollback";
 				}
@@ -712,5 +704,32 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.PropertyIsIncorrectType")
 			})
 		})
+	}
+
+	/**
+	 * Normalizes a timestamp value (which may be oracle.sql.TIMESTAMP,
+	 * java.time.LocalDateTime, or a CFML date) to a consistent string
+	 * for comparison in tests.
+	 */
+	private string function $normalizeTimestamp(required any value) {
+		if (IsObject(arguments.value) && !IsStruct(arguments.value)) {
+			try {
+				local.className = GetMetadata(arguments.value).getName();
+				if (local.className == "oracle.sql.TIMESTAMP" || local.className == "oracle.sql.DATE") {
+					return DateTimeFormat(ParseDateTime(arguments.value.toString()), "yyyy-mm-dd HH:nn:ss");
+				}
+				if (local.className contains "LocalDateTime") {
+					return DateTimeFormat(
+						CreateDateTime(arguments.value.getYear(), arguments.value.getMonthValue(), arguments.value.getDayOfMonth(),
+							arguments.value.getHour(), arguments.value.getMinute(), arguments.value.getSecond()),
+						"yyyy-mm-dd HH:nn:ss"
+					);
+				}
+			} catch (any e) {}
+		}
+		if (IsDate(arguments.value)) {
+			return DateTimeFormat(arguments.value, "yyyy-mm-dd HH:nn:ss");
+		}
+		return ToString(arguments.value);
 	}
 }
