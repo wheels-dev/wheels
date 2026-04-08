@@ -235,7 +235,7 @@ component output="false" {
 	 * @methodName The name of the method to invoke
 	 */
 	public void function invokeMethod(required any object, required string methodName) {
-		invoke(object=arguments.object, method=arguments.methodName);
+		invoke(arguments.object, arguments.methodName);
 	}
 
 	// --- Image Handling ---
@@ -316,6 +316,7 @@ component output="false" {
 	 */
 	public date function parseAmbiguousSlashDate(required numeric d1, required numeric d2, required numeric year) {
 		// Default: MM/DD/YYYY (US format, Lucee/Adobe convention)
+		// Only called when both d1 and d2 are <= 12 (truly ambiguous)
 		return CreateDate(arguments.year, arguments.d1, arguments.d2);
 	}
 

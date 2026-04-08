@@ -1961,14 +1961,43 @@ component output="false" {
 	 * Get the status code (e.g. 200, 404 etc) of the response we're about to send.
 	 */
 	public string function $statusCode() {
-		return application.wheels.engineAdapter.getStatusCode();
+		if ($hasEngineAdapter()) {
+			return application.wheels.engineAdapter.getStatusCode();
+		}
+		// Fallback when adapter not yet initialized (e.g. error during startup)
+		if (StructKeyExists(server, "lucee") || StructKeyExists(server, "boxlang")) {
+			return GetPageContext().getResponse().getStatus();
+		}
+		return GetPageContext().getFusionContext().getResponse().getStatus();
 	}
 
 	/**
 	 * Gets the value of the content type header (blank string if it doesn't exist) of the response we're about to send.
 	 */
 	public string function $contentType() {
-		return application.wheels.engineAdapter.getContentType();
+		if ($hasEngineAdapter()) {
+			return application.wheels.engineAdapter.getContentType();
+		}
+		// Fallback when adapter not yet initialized
+		local.rv = "";
+		if (StructKeyExists(server, "lucee")) {
+			local.response = GetPageContext().getResponse();
+		} else if (StructKeyExists(server, "boxlang")) {
+			local.response = GetPageContext();
+		} else {
+			local.response = GetPageContext().getFusionContext().getResponse();
+		}
+		try {
+			if (StructKeyExists(server, "boxlang")) {
+				local.header = local.response.getRequest().getHeader("Content-Type");
+			} else {
+				local.header = local.response.containsHeader("Content-Type") ? local.response.getHeader("Content-Type") : javacast("null", "");
+			}
+			if (!IsNull(local.header)) {
+				local.rv = local.header;
+			}
+		} catch (any e) {}
+		return local.rv;
 	}
 
 	/**
@@ -2081,17 +2110,44 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the request timeout value in seconds
+	 * Returns the request timeout value in seconds.
+	 * Must be safe to call during onError before application.wheels is initialized.
 	 */
 	public numeric function $getRequestTimeout() {
-		return application.wheels.engineAdapter.getRequestTimeout();
+		if ($hasEngineAdapter()) {
+			return application.wheels.engineAdapter.getRequestTimeout();
+		}
+		// Fallback when adapter not yet initialized (e.g. error during startup)
+		if (StructKeyExists(server, "boxlang")) {
+			return 10000;
+		} else if (StructKeyExists(server, "lucee")) {
+			return (GetPageContext().getRequestTimeout() / 1000);
+		} else {
+			return CreateObject("java", "coldfusion.runtime.RequestMonitor").GetRequestTimeout();
+		}
 	}
 
 	/**
 	 * Returns the engine adapter instance for centralized cross-engine behavior.
+	 * Checks both application.wheels (post-init) and application.$wheels (during init).
 	 */
 	public any function $engineAdapter() {
-		return application.wheels.engineAdapter;
+		if (StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(application.wheels, "engineAdapter")) {
+			return application.wheels.engineAdapter;
+		}
+		if (StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(application.$wheels, "engineAdapter")) {
+			return application.$wheels.engineAdapter;
+		}
+		throw(type="Wheels.EngineAdapterNotInitialized", message="Engine adapter has not been initialized yet.");
+	}
+
+	/**
+	 * Returns true if the engine adapter is available in application scope.
+	 * Used by functions that may be called before onApplicationStart completes.
+	 */
+	public boolean function $hasEngineAdapter() {
+		return (StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(application.wheels, "engineAdapter"))
+			|| (StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(application.$wheels, "engineAdapter"));
 	}
 
 	// ======================================================================
