@@ -127,7 +127,7 @@ component {
 			&& StructKeyExists(application.$wheels, "reloadPassword")
 			&& (
 				!Len(application.$wheels.reloadPassword)
-				|| (StructKeyExists(URL, "password") && URL.password == application.$wheels.reloadPassword)
+				|| (StructKeyExists(URL, "password") && Compare(Hash(URL.password, "SHA-256"), Hash(application.$wheels.reloadPassword, "SHA-256")) == 0)
 			)
 		) {
 			application.$wheels.environment = URL.reload;
