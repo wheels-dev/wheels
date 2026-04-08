@@ -4,6 +4,6 @@
     "devDependencies": {
         "commandbox-cfformat": "*",
         "commandbox-dotenv": "*",
-        "commandbox-cfconfig": "*"
+        "commandbox-cfconfig": "~2.1.0"
     }
 }
