@@ -235,7 +235,7 @@ component output="false" {
 	 * @methodName The name of the method to invoke
 	 */
 	public void function invokeMethod(required any object, required string methodName) {
-		invoke(object=arguments.object, method=arguments.methodName);
+		invoke(arguments.object, arguments.methodName);
 	}
 
 	// --- Image Handling ---
