@@ -24,9 +24,7 @@
 			"host": "mysql",
 			"password": "wheelstestdb",
 			"port": "3306",
-			"username": "wheelstestdb",
-			"SID": "",
-			"serviceName": ""
+			"username": "wheelstestdb"
 		},
 		"wheelstestdb_postgres": {
 			"blob": "false",
@@ -41,9 +39,7 @@
 			"password": "wheelstestdb",
 			"port": "5432",
 			"username": "wheelstestdb",
-			"validate": "false",
-			"SID": "",
-			"serviceName": ""
+			"validate": "false"
 		},
 		"wheelstestdb_cockroachdb": {
 			"blob": "false",
@@ -58,9 +54,7 @@
 			"password": "",
 			"port": "26257",
 			"username": "wheelstestdb",
-			"validate": "false",
-			"SID": "",
-			"serviceName": ""
+			"validate": "false"
 		},
 		"wheelstestdb_sqlserver": {
 			"blob": "false",
@@ -75,9 +69,7 @@
 			"password": "x!bsT8t60yo0cTVTPq",
 			"port": "1433",
 			"username": "sa",
-			"validate": "false",
-			"SID": "",
-			"serviceName": ""
+			"validate": "false"
 		},
 		"msdb_sqlserver": {
 			"blob": "false",
@@ -92,9 +84,7 @@
 			"password": "x!bsT8t60yo0cTVTPq",
 			"port": "1433",
 			"username": "sa",
-			"validate": "false",
-			"SID": "",
-			"serviceName": ""
+			"validate": "false"
 		},
 		"wheelstestdb_h2": {
 			"class": "org.h2.Driver",
@@ -104,9 +94,7 @@
 			"dsn": "jdbc:h2:{path}{database};MODE={mode}",
 			"allow": "511",
 			"clob": true,
-			"blob": true,
-			"SID": "",
-			"serviceName": ""
+			"blob": true
 		},
 		"wheelstestdb_h2_tenant_b": {
 			"class": "org.h2.Driver",
@@ -116,9 +104,7 @@
 			"dsn": "jdbc:h2:{path}{database};MODE={mode}",
 			"allow": "511",
 			"clob": true,
-			"blob": true,
-			"SID": "",
-			"serviceName": ""
+			"blob": true
 		},
 		"wheelstestdb_h2_sqlserver": {
 			"class": "org.h2.Driver",
@@ -128,9 +114,7 @@
 			"dsn": "jdbc:h2:{path}{database};MODE={mode}",
 			"allow": "511",
 			"clob": true,
-			"blob": true,
-			"SID": "",
-			"serviceName": ""
+			"blob": true
 		},
 		"wheelstestdb_sqlite": {
 			"blob": "false",
@@ -141,9 +125,7 @@
 			"dsn": "jdbc:sqlite:/app/wheelstestdb.db",
 			"host": "",
 			"password": "",
-			"username": "",
-			"SID": "",
-			"serviceName": ""
+			"username": ""
 		},
 		"wheelstestdb_sqlite_tenant_b": {
 			"blob": "false",
@@ -154,9 +136,22 @@
 			"dsn": "jdbc:sqlite:/app/wheelstestdb_tenant_b.db",
 			"host": "",
 			"password": "",
-			"username": "",
-			"SID": "",
-			"serviceName": ""
+			"username": ""
+		},
+		"wheelstestdb_oracle": {
+			"blob": "false",
+			"class": "oracle.jdbc.OracleDriver",
+			"clob": "false",
+			"connectionLimit": "-1",
+			"connectionTimeout": "20",
+			"database": "wheelstestdb",
+			"dbdriver": "Other",
+			"dsn": "jdbc:oracle:thin:@//{host}:{port}/{database}",
+			"host": "oracle",
+			"password": "wheelstestdb",
+			"port": "1521",
+			"username": "wheelstestdb",
+			"validate": "false"
 		}
 	}
 }

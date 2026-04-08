@@ -3,7 +3,6 @@
     "version": "1.0.0",
     "devDependencies": {
         "commandbox-cfformat": "*",
-        "commandbox-dotenv": "*",
-        "commandbox-cfconfig": "~2.1.0"
+        "commandbox-dotenv": "*"
     }
 }
