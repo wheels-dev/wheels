@@ -13,6 +13,8 @@
  */
 component extends="../base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @queue      Comma-delimited queue names to process (default: all queues)
 	 * @interval   Seconds between poll cycles (default: 5)
@@ -34,21 +36,20 @@ component extends="../base" {
 			return;
 		}
 
-		print.line();
-		print.boldCyanLine("Wheels Job Worker");
-		print.line("Press Ctrl+C to stop");
-		print.line();
+		detailOutput.header("Wheels Job Worker");
+		detailOutput.output("Press Ctrl+C to stop");
+		detailOutput.line();
 
 		if (Len(arguments.queue)) {
-			print.greenLine("Queues: #arguments.queue#");
+			detailOutput.metric("Queues", arguments.queue);
 		} else {
-			print.greenLine("Queues: all");
+			detailOutput.metric("Queues", "all");
 		}
-		print.greenLine("Poll interval: #arguments.interval#s");
+		detailOutput.metric("Poll interval", "#arguments.interval#s");
 		if (arguments.maxJobs > 0) {
-			print.greenLine("Max jobs: #arguments.maxJobs#");
+			detailOutput.metric("Max jobs", arguments.maxJobs);
 		}
-		print.line();
+		detailOutput.line();
 
 		local.processed = 0;
 		local.failed = 0;
@@ -75,14 +76,14 @@ component extends="../base" {
 					} else if (StructKeyExists(local.jr, "success") && local.jr.success) {
 						local.processed++;
 						if (!arguments.quiet) {
-							print.greenLine("[#TimeFormat(Now(), "HH:mm:ss")#] Completed: #local.jr.jobClass# (#local.jr.jobId#)");
+							detailOutput.output("[#TimeFormat(Now(), "HH:mm:ss")#] Completed: #local.jr.jobClass# (#local.jr.jobId#)");
 						}
 
 						// Check max jobs limit
 						if (arguments.maxJobs > 0 && local.processed >= arguments.maxJobs) {
-							print.line();
-							print.boldGreenLine("Reached max jobs limit (#arguments.maxJobs#). Shutting down.");
-							print.line("Processed: #local.processed# | Failed: #local.failed#");
+							detailOutput.line();
+							detailOutput.success("Reached max jobs limit (#arguments.maxJobs#). Shutting down.");
+							detailOutput.output("Processed: #local.processed# | Failed: #local.failed#");
 							return;
 						}
 
@@ -91,19 +92,19 @@ component extends="../base" {
 					} else {
 						local.failed++;
 						local.errorMsg = StructKeyExists(local.jr, "error") ? local.jr.error : "Unknown error";
-						print.redLine("[#TimeFormat(Now(), "HH:mm:ss")#] Failed: #local.jr.jobClass# - #local.errorMsg#");
+						detailOutput.error("[#TimeFormat(Now(), "HH:mm:ss")#] Failed: #local.jr.jobClass# - #local.errorMsg#");
 
 						// Check max jobs limit (failures count too)
 						if (arguments.maxJobs > 0 && (local.processed + local.failed) >= arguments.maxJobs) {
-							print.line();
-							print.boldGreenLine("Reached max jobs limit (#arguments.maxJobs#). Shutting down.");
-							print.line("Processed: #local.processed# | Failed: #local.failed#");
+							detailOutput.line();
+							detailOutput.success("Reached max jobs limit (#arguments.maxJobs#). Shutting down.");
+							detailOutput.output("Processed: #local.processed# | Failed: #local.failed#");
 							return;
 						}
 					}
 				}
 			} catch (any e) {
-				print.redLine("[#TimeFormat(Now(), "HH:mm:ss")#] Worker error: #e.message#");
+				detailOutput.error("[#TimeFormat(Now(), "HH:mm:ss")#] Worker error: #e.message#");
 			}
 
 			sleep(arguments.interval * 1000);

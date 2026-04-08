@@ -10,6 +10,8 @@
  */
 component extends="../base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @interval Refresh interval in seconds (default: 3)
 	 * @queue    Filter by queue name (default: all queues)
@@ -25,10 +27,9 @@ component extends="../base" {
 			return;
 		}
 
-		print.line();
-		print.boldMagentaLine("Wheels Job Monitor");
-		print.line("Press Ctrl+C to stop");
-		print.line();
+		detailOutput.header("Wheels Job Monitor");
+		detailOutput.output("Press Ctrl+C to stop");
+		detailOutput.line();
 
 		while (true) {
 			// Build URL parameters
@@ -42,77 +43,54 @@ component extends="../base" {
 
 				if (StructKeyExists(local.result, "success") && local.result.success) {
 					// Clear previous output with separator
-					print.line(RepeatString("=", 60));
-					print.boldCyanLine("Job Queue Dashboard - #TimeFormat(Now(), "HH:mm:ss")#");
-					print.line(RepeatString("-", 60));
+					detailOutput.divider("=", 60);
+					detailOutput.getPrint().boldCyanLine("Job Queue Dashboard - #TimeFormat(Now(), "HH:mm:ss")#");
+					detailOutput.divider("-", 60);
 
 					// Queue statistics
 					if (StructKeyExists(local.result, "stats") && StructKeyExists(local.result.stats, "totals")) {
 						local.t = local.result.stats.totals;
-						print.line();
-						print.boldLine("Queue Summary:");
-						print.yellowLine("  Pending:    #local.t.pending#");
-						print.cyanLine("  Processing: #local.t.processing#");
-						print.greenLine("  Completed:  #local.t.completed#");
-						if (local.t.failed > 0) {
-							print.redLine("  Failed:     #local.t.failed#");
-						} else {
-							print.line("  Failed:     #local.t.failed#");
-						}
-						print.line("  Total:      #local.t.total#");
+						detailOutput.subHeader("Queue Summary");
+						detailOutput.metric("Pending", local.t.pending);
+						detailOutput.metric("Processing", local.t.processing);
+						detailOutput.metric("Completed", local.t.completed);
+						detailOutput.metric("Failed", local.t.failed);
+						detailOutput.metric("Total", local.t.total);
 					}
 
 					// Throughput
 					if (StructKeyExists(local.result, "monitor")) {
 						local.m = local.result.monitor;
 
-						print.line();
-						print.boldLine("Throughput (last 60 min):");
-						print.greenLine("  Completed: #local.m.throughput.completed#");
-						if (local.m.throughput.failed > 0) {
-							print.redLine("  Failed:    #local.m.throughput.failed#");
-						} else {
-							print.line("  Failed:    #local.m.throughput.failed#");
-						}
-						if (local.m.errorRate > 0) {
-							print.redLine("  Error rate: #local.m.errorRate#%");
-						} else {
-							print.greenLine("  Error rate: 0%");
-						}
+						detailOutput.subHeader("Throughput (last 60 min)");
+						detailOutput.metric("Completed", local.m.throughput.completed);
+						detailOutput.metric("Failed", local.m.throughput.failed);
+						detailOutput.metric("Error rate", "#local.m.errorRate#%");
 
 						if (Len(local.m.oldestPending)) {
-							print.line();
-							print.line("Oldest pending job: #DateTimeFormat(local.m.oldestPending, 'yyyy-mm-dd HH:mm:ss')#");
+							detailOutput.line();
+							detailOutput.output("Oldest pending job: #DateTimeFormat(local.m.oldestPending, 'yyyy-mm-dd HH:mm:ss')#");
 						}
 
 						// Recent jobs
 						if (ArrayLen(local.m.recentJobs)) {
-							print.line();
-							print.boldLine("Recent Jobs:");
+							detailOutput.subHeader("Recent Jobs");
 							local.count = Min(ArrayLen(local.m.recentJobs), 5);
 							for (local.i = 1; local.i <= local.count; local.i++) {
 								local.job = local.m.recentJobs[local.i];
-								local.statusColor = "line";
-								if (local.job.status == "completed") local.statusColor = "greenLine";
-								else if (local.job.status == "failed") local.statusColor = "redLine";
-								else if (local.job.status == "processing") local.statusColor = "cyanLine";
-								else if (local.job.status == "pending") local.statusColor = "yellowLine";
-
-								print["#local.statusColor#"](
-									"  [#local.job.status#] #local.job.jobClass# (#local.job.queue#) - #DateTimeFormat(local.job.updatedAt, 'HH:mm:ss')#"
-								);
+								detailOutput.output("  [#local.job.status#] #local.job.jobClass# (#local.job.queue#) - #DateTimeFormat(local.job.updatedAt, 'HH:mm:ss')#");
 							}
 						}
 					}
 
 					// Timeout recoveries
 					if (StructKeyExists(local.result, "timeoutsRecovered") && local.result.timeoutsRecovered > 0) {
-						print.line();
-						print.yellowLine("Recovered #local.result.timeoutsRecovered# timed-out job(s)");
+						detailOutput.line();
+						detailOutput.statusWarning("Recovered #local.result.timeoutsRecovered# timed-out job(s)");
 					}
 				}
 			} catch (any e) {
-				print.redLine("[#TimeFormat(Now(), "HH:mm:ss")#] Monitor error: #e.message#");
+				detailOutput.error("[#TimeFormat(Now(), "HH:mm:ss")#] Monitor error: #e.message#");
 			}
 
 			sleep(arguments.interval * 1000);

@@ -10,6 +10,8 @@
  */
 component extends="../base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @completed Purge completed jobs (default: true)
 	 * @failed    Purge failed jobs (default: false)
@@ -31,9 +33,7 @@ component extends="../base" {
 			return;
 		}
 
-		print.line();
-		print.boldBlueLine("Purge Jobs");
-		print.line();
+		detailOutput.header("Purge Jobs");
 
 		local.totalPurged = 0;
 
@@ -48,9 +48,9 @@ component extends="../base" {
 			if (StructKeyExists(local.result, "success") && local.result.success && StructKeyExists(local.result, "purged")) {
 				local.totalPurged += local.result.purged;
 				if (local.result.purged > 0) {
-					print.greenLine("Purged #local.result.purged# completed job(s) older than #arguments.olderThan# day(s).");
+					detailOutput.success("Purged #local.result.purged# completed job(s) older than #arguments.olderThan# day(s).");
 				} else {
-					print.line("No completed jobs to purge.");
+					detailOutput.output("No completed jobs to purge.");
 				}
 			}
 		}
@@ -66,19 +66,16 @@ component extends="../base" {
 			if (StructKeyExists(local.result, "success") && local.result.success && StructKeyExists(local.result, "purged")) {
 				local.totalPurged += local.result.purged;
 				if (local.result.purged > 0) {
-					print.greenLine("Purged #local.result.purged# failed job(s) older than #arguments.olderThan# day(s).");
+					detailOutput.success("Purged #local.result.purged# failed job(s) older than #arguments.olderThan# day(s).");
 				} else {
-					print.line("No failed jobs to purge.");
+					detailOutput.output("No failed jobs to purge.");
 				}
 			}
 		}
 
 		if (local.totalPurged > 0) {
-			print.line();
-			print.boldGreenLine("Total purged: #local.totalPurged# job(s)");
+			detailOutput.success("Total purged: #local.totalPurged# job(s)");
 		}
-
-		print.line();
 	}
 
 }
