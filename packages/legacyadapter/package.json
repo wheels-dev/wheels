@@ -1,0 +1,13 @@
+{
+	"name": "wheels-legacy-adapter",
+	"version": "1.0.0",
+	"author": "Wheels Team",
+	"description": "Backward compatibility adapter for migrating Wheels 3.x applications to 4.0. Provides deprecation logging, API shims, and a migration scanner.",
+	"wheelsVersion": ">=3.0",
+	"provides": {
+		"mixins": "controller",
+		"services": [],
+		"middleware": []
+	},
+	"dependencies": {}
+}
