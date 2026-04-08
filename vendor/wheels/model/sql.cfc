@@ -236,8 +236,6 @@ component {
 		if (Len(arguments.order)) {
 			if (arguments.order == "random") {
 				local.rv = variables.wheels.class.adapter.$randomOrder();
-			} else if (Find("(", arguments.order)) {
-				local.rv = arguments.order;
 			} else {
 				// Setup an array containing class info for current class and all the ones that should be included.
 				local.classes = [];
@@ -254,8 +252,25 @@ component {
 					if (!Find(" ASC", local.iItem) && !Find(" DESC", local.iItem)) {
 						local.iItem &= " ASC";
 					}
-					if (Find(".", local.iItem)) {
-						local.rv = ListAppend(local.rv, local.iItem);
+					if (Find("(", local.iItem)) {
+						// Reject raw SQL expressions — calculated properties should be referenced by name
+						local.property = Trim(SpanExcluding(local.iItem, " "));
+						Throw(
+							type = "Wheels.InvalidOrderClause",
+							message = "Raw SQL expressions are not allowed in the ORDER BY clause. Use a calculated property name instead.",
+							extendedInfo = "The order item `#local.property#` contains parentheses which are not permitted. Define a calculated property using the `property()` method in your model's `config()` and reference it by name in the `order` argument."
+						);
+					} else if (Find(".", local.iItem)) {
+						// Prevent SQL injection via dot-notation — only allow table.column identifiers
+						if (REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?$", local.iItem)) {
+							local.rv = ListAppend(local.rv, local.iItem);
+						} else {
+							Throw(
+								type = "Wheels.InvalidOrderClause",
+								message = "Invalid dot-notation in ORDER BY clause: `#local.iItem#`.",
+								extendedInfo = "Dot-notation order items must follow the `tablename.columnname` pattern using only alphanumeric characters and underscores."
+							);
+						}
 					} else {
 						local.property = ListLast(SpanExcluding(local.iItem, " "), ".");
 						local.jEnd = ArrayLen(local.classes);
