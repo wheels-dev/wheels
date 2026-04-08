@@ -10,14 +10,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	/**
 	 * Creates the CORS middleware with configurable options.
 	 *
-	 * @allowOrigins Comma-delimited list of allowed origins. Use "*" for any origin.
+	 * @allowOrigins Comma-delimited list of allowed origins, or "*" for any origin. Defaults to "" (no origins allowed). You must explicitly configure allowed origins for CORS to function.
 	 * @allowMethods Comma-delimited list of allowed HTTP methods.
 	 * @allowHeaders Comma-delimited list of allowed request headers.
 	 * @allowCredentials Whether to allow credentials (cookies, auth headers).
 	 * @maxAge Preflight cache duration in seconds.
 	 */
 	public Cors function init(
-		string allowOrigins = "*",
+		string allowOrigins = "",
 		string allowMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		string allowHeaders = "Content-Type,Authorization,X-Requested-With",
 		boolean allowCredentials = false,

@@ -7,10 +7,10 @@
 		application.$wheels.csrfCookieName = "_wheels_authenticity";
 		application.$wheels.csrfCookieDomain = "";
 		application.$wheels.csrfCookieEncodeValue = "";
-		application.$wheels.csrfCookieHttpOnly = "";
+		application.$wheels.csrfCookieHttpOnly = true;
 		application.$wheels.csrfCookiePath = "/";
 		application.$wheels.csrfCookiePreserveCase = "";
-		application.$wheels.csrfCookieSecure = "";
+		application.$wheels.csrfCookieSecure = true;
 
 		// CORS (Cross-Origin Resource Sharing) settings.
 		application.$wheels.allowCorsRequests = false;
