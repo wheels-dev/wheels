@@ -83,6 +83,7 @@ component output="false" {
 	 * @property The property name to check for NULL.
 	 */
 	public any function whereNull(required string property) {
+		$validatePropertyName(arguments.property);
 		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# IS NULL"});
 		return this;
 	}
@@ -93,6 +94,7 @@ component output="false" {
 	 * @property The property name to check for NOT NULL.
 	 */
 	public any function whereNotNull(required string property) {
+		$validatePropertyName(arguments.property);
 		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# IS NOT NULL"});
 		return this;
 	}
@@ -105,6 +107,7 @@ component output="false" {
 	 * @high The upper bound value.
 	 */
 	public any function whereBetween(required string property, required any low, required any high) {
+		$validatePropertyName(arguments.property);
 		local.lowQuoted = $quoteValue(arguments.property, arguments.low);
 		local.highQuoted = $quoteValue(arguments.property, arguments.high);
 		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# BETWEEN #local.lowQuoted# AND #local.highQuoted#"});
@@ -118,6 +121,7 @@ component output="false" {
 	 * @values A list or array of values to match against.
 	 */
 	public any function whereIn(required string property, required any values) {
+		$validatePropertyName(arguments.property);
 		local.valueList = $quoteValueList(arguments.property, arguments.values);
 		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# IN (#local.valueList#)"});
 		return this;
@@ -130,6 +134,7 @@ component output="false" {
 	 * @values A list or array of values to exclude.
 	 */
 	public any function whereNotIn(required string property, required any values) {
+		$validatePropertyName(arguments.property);
 		local.valueList = $quoteValueList(arguments.property, arguments.values);
 		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# NOT IN (#local.valueList#)"});
 		return this;
@@ -142,6 +147,8 @@ component output="false" {
 	 * @direction The sort direction: "ASC" or "DESC". Defaults to "ASC".
 	 */
 	public any function orderBy(required string property, string direction = "ASC") {
+		$validatePropertyName(arguments.property);
+		$validateDirection(arguments.direction);
 		ArrayAppend(variables.orderClauses, "#arguments.property# #arguments.direction#");
 		return this;
 	}
@@ -390,9 +397,58 @@ component output="false" {
 	// ----- Private Helpers -----
 
 	/**
+	 * Validate that a property name is safe to interpolate into SQL.
+	 * Allows alphanumeric identifiers with underscores, and optional table.column dot notation.
+	 * Throws Wheels.InvalidPropertyName if the name contains unsafe characters.
+	 *
+	 * @property The property name to validate.
+	 */
+	private void function $validatePropertyName(required string property) {
+		if (!Len(arguments.property) || !ReFind("^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$", arguments.property)) {
+			Throw(
+				type = "Wheels.InvalidPropertyName",
+				message = "The property name `#HTMLEditFormat(arguments.property)#` contains invalid characters.",
+				extendedInfo = "Property names may only contain letters, numbers, and underscores, with an optional table prefix using dot notation (e.g., `users.id`)."
+			);
+		}
+	}
+
+	/**
+	 * Validate that an ORDER BY direction is safe.
+	 *
+	 * @direction The sort direction to validate.
+	 */
+	private void function $validateDirection(required string direction) {
+		if (!ReFind("^(?i)(ASC|DESC)$", arguments.direction)) {
+			Throw(
+				type = "Wheels.InvalidSortDirection",
+				message = "The sort direction `#HTMLEditFormat(arguments.direction)#` is invalid.",
+				extendedInfo = "Sort direction must be either ASC or DESC."
+			);
+		}
+	}
+
+	/**
+	 * Validate that a comparison operator is safe to interpolate into SQL.
+	 *
+	 * @operator The operator to validate.
+	 */
+	private void function $validateOperator(required string operator) {
+		if (!ReFind("^(=|!=|<>|<|>|<=|>=|LIKE|NOT LIKE|IS|IS NOT)$", UCase(Trim(arguments.operator)))) {
+			Throw(
+				type = "Wheels.InvalidOperator",
+				message = "The operator `#HTMLEditFormat(arguments.operator)#` is not allowed.",
+				extendedInfo = "Allowed operators: =, !=, <>, <, >, <=, >=, LIKE, NOT LIKE, IS, IS NOT."
+			);
+		}
+	}
+
+	/**
 	 * Build a single condition clause with proper value quoting.
 	 */
 	private string function $buildCondition(required string property, required string operator, required any value) {
+		$validatePropertyName(arguments.property);
+		$validateOperator(arguments.operator);
 		local.quotedValue = $quoteValue(arguments.property, arguments.value);
 		return "#arguments.property# #arguments.operator# #local.quotedValue#";
 	}
