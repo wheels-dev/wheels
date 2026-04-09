@@ -21,6 +21,9 @@
 		application.$wheels.accessControlAllowCredentials = false;
 		application.$wheels.accessControlAllowHeaders = "Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With";
 
+		// Redirect security settings.
+		application.$wheels.allowExternalRedirects = false;
+
 		// IP based restriction settings
 		application.$wheels.debugAccessIPs = [];
 		application.$wheels.allowIPBasedDebugAccess = false;
