@@ -313,6 +313,16 @@ component {
 					local.start &= arguments.anchorDivider;
 				}
 			}
+			// Sanitize prependToPage once before the loop (input doesn't change per iteration).
+			// First decode HTML numeric entities so that encoded payloads like &#111;nmouseover
+			// are normalised before the regex strips event handlers and javascript: URIs.
+			if (Len(arguments.prependToPage)) {
+				local.decodedPrepend = $decodeHtmlEntities(arguments.prependToPage);
+				local.sanitizedPrepend = reReplaceNoCase(local.decodedPrepend, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+				local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+				local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, 'javascript\s*:', '', 'all');
+			}
+
 			local.middle = "";
 			for (local.i = 1; local.i <= local.totalPages; local.i++) {
 				if (
@@ -347,10 +357,6 @@ component {
 							We need the paginationLinks() function to set the active class to the parent of the current page item.
 							The changes made here set the active class to the immediate parent of the current page element in case nested elements are passed in.
 						 */
-						// Strip event handlers (on*=) and javascript: URIs to prevent XSS
-						local.sanitizedPrepend = reReplaceNoCase(arguments.prependToPage, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
-						local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
-						local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, 'javascript\s*:', '', 'all');
 
 						if(local.currentPage == local.i  && arguments.addActiveClassToPrependedParent && findNoCase('class', local.sanitizedPrepend)) {
 							// Inject "active " into the class attribute value via regex
@@ -528,6 +534,36 @@ component {
 			local.match = ReFindNoCase(arguments.regex, arguments.text, local.startPosition, true);
 		}
 		return arguments.text;
+	}
+
+	/**
+	 * Decodes HTML numeric entities (decimal &#NNN; and hex &#xHH;) to their character equivalents.
+	 * Used to normalise input before regex-based XSS sanitisation so that entity-encoded
+	 * payloads like &#111;nmouseover cannot bypass the pattern checks.
+	 */
+	public string function $decodeHtmlEntities(required string input) {
+		local.result = arguments.input;
+		// Decode hex entities: &#xHH;
+		local.pos = 1;
+		while (true) {
+			local.match = reFindNoCase('&##x([0-9a-f]+);', local.result, local.pos, true);
+			if (local.match.pos[1] == 0) break;
+			local.hex = Mid(local.result, local.match.pos[2], local.match.len[2]);
+			local.char = Chr(InputBaseN(local.hex, 16));
+			local.result = Left(local.result, local.match.pos[1] - 1) & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
+			local.pos = local.match.pos[1] + Len(local.char);
+		}
+		// Decode decimal entities: &#NNN;
+		local.pos = 1;
+		while (true) {
+			local.match = reFind('&##(\d+);', local.result, local.pos, true);
+			if (local.match.pos[1] == 0) break;
+			local.dec = Mid(local.result, local.match.pos[2], local.match.len[2]);
+			local.char = Chr(Int(local.dec));
+			local.result = Left(local.result, local.match.pos[1] - 1) & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
+			local.pos = local.match.pos[1] + Len(local.char);
+		}
+		return local.result;
 	}
 
 	public string function $paramsToQueryString(required any params) {
