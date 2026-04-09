@@ -1,6 +1,6 @@
 /**
- * Tests for RateLimiter middleware, specifically covering the trustProxy setting
- * and its effect on client IP resolution for rate limiting.
+ * Tests for RateLimiter middleware covering trustProxy, proxyStrategy,
+ * and maxStoreSize parameters.
  */
 component extends="wheels.WheelsTest" {
 
@@ -164,6 +164,185 @@ component extends="wheels.WheelsTest" {
 				// Both should pass because they have different remoteAddr keys.
 				expect(result1).toBe("ok");
 				expect(result2).toBe("ok");
+			});
+
+		});
+
+		describe("RateLimiter proxyStrategy", function() {
+
+			it("defaults to first IP in X-Forwarded-For chain", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1,
+					windowSeconds = 60,
+					trustProxy = true,
+					proxyStrategy = "first"
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// "1.1.1.1, 10.0.0.1" — first strategy picks 1.1.1.1
+				var req1 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "1.1.1.1, 10.0.0.1"
+					}
+				};
+				var req2 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "1.1.1.1, 10.0.0.2"
+					}
+				};
+
+				var result1 = limiter.handle(request = req1, next = nextFn);
+				var result2 = limiter.handle(request = req2, next = nextFn);
+
+				// Both keyed to "1.1.1.1" so second is blocked.
+				expect(result1).toBe("ok");
+				expect(result2).toInclude("Rate limit exceeded");
+			});
+
+			it("uses last IP in X-Forwarded-For chain when proxyStrategy is last", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1,
+					windowSeconds = 60,
+					trustProxy = true,
+					proxyStrategy = "last"
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// "1.1.1.1, 10.0.0.1" — last strategy picks 10.0.0.1
+				var req1 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "1.1.1.1, 10.0.0.1"
+					}
+				};
+				// "2.2.2.2, 10.0.0.1" — last strategy still picks 10.0.0.1
+				var req2 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "2.2.2.2, 10.0.0.1"
+					}
+				};
+
+				var result1 = limiter.handle(request = req1, next = nextFn);
+				var result2 = limiter.handle(request = req2, next = nextFn);
+
+				// Both keyed to "10.0.0.1" so second is blocked.
+				expect(result1).toBe("ok");
+				expect(result2).toInclude("Rate limit exceeded");
+			});
+
+			it("last strategy prevents spoofed first-IP bypass", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 2,
+					windowSeconds = 60,
+					trustProxy = true,
+					proxyStrategy = "last"
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// Attacker rotates the first (spoofed) IP but proxy always appends real IP.
+				var req1 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "fake-1.1.1.1, 192.168.1.100"
+					}
+				};
+				var req2 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "fake-2.2.2.2, 192.168.1.100"
+					}
+				};
+				var req3 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "fake-3.3.3.3, 192.168.1.100"
+					}
+				};
+
+				var result1 = limiter.handle(request = req1, next = nextFn);
+				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result3 = limiter.handle(request = req3, next = nextFn);
+
+				// All keyed to "192.168.1.100" — third request blocked.
+				expect(result1).toBe("ok");
+				expect(result2).toBe("ok");
+				expect(result3).toInclude("Rate limit exceeded");
+			});
+
+			it("throws on invalid proxyStrategy", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(proxyStrategy = "middle");
+				}).toThrow("Wheels.RateLimiter.InvalidProxyStrategy");
+			});
+
+		});
+
+		describe("RateLimiter maxStoreSize", function() {
+
+			it("defaults maxStoreSize to 100000", function() {
+				var limiter = new wheels.middleware.RateLimiter();
+				// Should construct without error.
+				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("accepts custom maxStoreSize", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxStoreSize = 500);
+				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("evicts entries when store exceeds maxStoreSize", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1000,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					maxStoreSize = 5
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// Send requests from 10 unique IPs to exceed the store size of 5.
+				for (var i = 1; i <= 10; i++) {
+					var req = {remoteAddr: "client-evict-#i#"};
+					limiter.handle(request = req, next = nextFn);
+				}
+
+				// The limiter should still function correctly (not error out).
+				var finalReq = {remoteAddr: "client-evict-final"};
+				var result = limiter.handle(request = finalReq, next = nextFn);
+				expect(result).toBe("ok");
+			});
+
+			it("still rate limits correctly after eviction", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 2,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					maxStoreSize = 5
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// Fill store with unique clients.
+				for (var i = 1; i <= 4; i++) {
+					var req = {remoteAddr: "filler-#i#"};
+					limiter.handle(request = req, next = nextFn);
+				}
+
+				// Now test that rate limiting still works for a specific client.
+				var testReq = {remoteAddr: "test-client-rl"};
+				var r1 = limiter.handle(request = testReq, next = nextFn);
+				var r2 = limiter.handle(request = testReq, next = nextFn);
+				var r3 = limiter.handle(request = testReq, next = nextFn);
+
+				expect(r1).toBe("ok");
+				expect(r2).toBe("ok");
+				expect(r3).toInclude("Rate limit exceeded");
 			});
 
 		});
