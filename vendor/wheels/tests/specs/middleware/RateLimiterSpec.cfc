@@ -323,13 +323,13 @@ component extends="wheels.WheelsTest" {
 					maxRequests = 2,
 					windowSeconds = 60,
 					strategy = "fixedWindow",
-					maxStoreSize = 5
+					maxStoreSize = 10
 				);
 
 				var nextFn = function(req) { return "ok"; };
 
-				// Fill store with unique clients.
-				for (var i = 1; i <= 4; i++) {
+				// Fill store with unique clients to trigger eviction.
+				for (var i = 1; i <= 9; i++) {
 					var req = {remoteAddr: "filler-#i#"};
 					limiter.handle(request = req, next = nextFn);
 				}

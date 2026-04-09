@@ -85,4 +85,10 @@ component extends="wheels.WheelsTest" {
 
 	}
 
+	public void function $clearRoutes() {
+		application.wheels.routes = [];
+		application.wheels.staticRoutes = {};
+		application.wheels.namedRoutePositions = {};
+	}
+
 }
