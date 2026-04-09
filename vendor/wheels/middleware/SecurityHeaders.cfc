@@ -1,6 +1,7 @@
 /**
  * Adds common security headers to every response.
- * Covers OWASP recommended headers for clickjacking, XSS, MIME sniffing, and referrer leakage.
+ * Covers OWASP recommended headers for clickjacking, XSS, MIME sniffing, referrer leakage,
+ * content security policy, transport security, and browser feature permissions.
  *
  * [section: Middleware]
  * [category: Built-in]
@@ -14,12 +15,18 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @contentTypeOptions X-Content-Type-Options value.
 	 * @xssProtection X-XSS-Protection value.
 	 * @referrerPolicy Referrer-Policy value.
+	 * @contentSecurityPolicy Content-Security-Policy value. Empty by default (opt-in) because a restrictive policy can break apps with inline scripts/styles.
+	 * @strictTransportSecurity Strict-Transport-Security value. Empty by default (opt-in) because it requires HTTPS to be configured.
+	 * @permissionsPolicy Permissions-Policy value. Empty by default (opt-in) because it is app-specific.
 	 */
 	public SecurityHeaders function init(
 		string frameOptions = "SAMEORIGIN",
 		string contentTypeOptions = "nosniff",
 		string xssProtection = "1; mode=block",
-		string referrerPolicy = "strict-origin-when-cross-origin"
+		string referrerPolicy = "strict-origin-when-cross-origin",
+		string contentSecurityPolicy = "",
+		string strictTransportSecurity = "",
+		string permissionsPolicy = ""
 	) {
 		variables.headers = {};
 		if (Len(arguments.frameOptions)) {
@@ -34,7 +41,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		if (Len(arguments.referrerPolicy)) {
 			variables.headers["Referrer-Policy"] = arguments.referrerPolicy;
 		}
+		if (Len(arguments.contentSecurityPolicy)) {
+			variables.headers["Content-Security-Policy"] = arguments.contentSecurityPolicy;
+		}
+		if (Len(arguments.strictTransportSecurity)) {
+			variables.headers["Strict-Transport-Security"] = arguments.strictTransportSecurity;
+		}
+		if (Len(arguments.permissionsPolicy)) {
+			variables.headers["Permissions-Policy"] = arguments.permissionsPolicy;
+		}
 		return this;
+	}
+
+	public struct function $headers() {
+		return variables.headers;
 	}
 
 	public string function handle(required struct request, required any next) {
