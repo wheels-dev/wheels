@@ -215,10 +215,15 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		var assetsDir = expandPath("/wheels/docs/src/.gitbook/assets/");
 		var assetPath = assetsDir & file;
 
-		// Java canonical path for cross-engine compat (getCanonicalPath is Lucee-only)
-		var canonicalAssets = createObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
-		var canonicalPath = createObject("java", "java.io.File").init(assetPath).getCanonicalPath();
-		if (!fileExists(assetPath) || left(canonicalPath, len(canonicalAssets)) != canonicalAssets) {
+		try {
+			var canonicalAssets = createObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
+			var canonicalPath = createObject("java", "java.io.File").init(assetPath).getCanonicalPath();
+		} catch (any e) {
+			cfheader(statusCode=404);
+			writeOutput("Image not found");
+			return;
+		}
+		if (!fileExists(assetPath) || CompareNoCase(left(canonicalPath, len(canonicalAssets)), canonicalAssets) != 0) {
 			cfheader(statusCode=404);
 			writeOutput("Image not found");
 			return;
