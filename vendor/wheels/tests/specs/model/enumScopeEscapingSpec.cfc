@@ -42,34 +42,44 @@ component extends="wheels.WheelsTest" {
 				expect(scopes.high.where).toBe("priority = '2'")
 			})
 
-			it("escapes single quotes in enum stored values", () => {
+			it("rejects enum values containing single quotes", () => {
 				var m = g.model("post")
-				m.enum(property="status", values={it_s_fine: "it's fine", normal: "normal"})
-				var scopes = m.scopeInfo()
 
-				expect(scopes).toHaveKey("it_s_fine")
-				expect(scopes.it_s_fine.where).toBe("status = 'it''s fine'")
-
-				expect(scopes).toHaveKey("normal")
-				expect(scopes.normal.where).toBe("status = 'normal'")
+				expect(function() {
+					m.enum(property="status", values={it_s_fine: "it's fine", normal: "normal"})
+				}).toThrow("Wheels.InvalidEnumValue")
 			})
 
-			it("escapes multiple single quotes in enum stored values", () => {
+			it("rejects enum values containing SQL injection patterns", () => {
 				var m = g.model("post")
-				m.enum(property="status", values={tricky: "it''s a ''test''"})
-				var scopes = m.scopeInfo()
 
-				expect(scopes).toHaveKey("tricky")
-				expect(scopes.tricky.where).toBe("status = 'it''''s a ''''test'''''")
+				expect(function() {
+					m.enum(property="status", values={dangerous: "'; DROP TABLE users; --"})
+				}).toThrow("Wheels.InvalidEnumValue")
 			})
 
-			it("handles enum values containing SQL keywords safely", () => {
+			it("allows enum values with hyphens spaces and dots", () => {
 				var m = g.model("post")
-				m.enum(property="status", values={dangerous: "'; DROP TABLE users; --"})
+				m.enum(property="status", values={my_val: "some-value", other: "v1.0", spaced: "hello world"})
 				var scopes = m.scopeInfo()
 
-				expect(scopes).toHaveKey("dangerous")
-				expect(scopes.dangerous.where).toBe("status = '''; DROP TABLE users; --'")
+				expect(scopes).toHaveKey("my_val")
+				expect(scopes.my_val.where).toBe("status = 'some-value'")
+
+				expect(scopes).toHaveKey("other")
+				expect(scopes.other.where).toBe("status = 'v1.0'")
+
+				expect(scopes).toHaveKey("spaced")
+				expect(scopes.spaced.where).toBe("status = 'hello world'")
+			})
+
+			it("allows numeric enum stored values", () => {
+				var m = g.model("post")
+				m.enum(property="priority", values={low: 0, medium: 1, high: 2})
+				var scopes = m.scopeInfo()
+
+				expect(scopes).toHaveKey("low")
+				expect(scopes.low.where).toBe("priority = '0'")
 			})
 
 			it("rejects property names with invalid characters", () => {

@@ -736,6 +736,11 @@ component {
 		for (local.key in arguments.args) {
 			local.val = arguments.args[local.key];
 			if (IsSimpleValue(local.val)) {
+				// Strip SQL comment/statement markers before escaping
+				local.val = Replace(local.val, "--", "", "all");
+				local.val = Replace(local.val, "/*", "", "all");
+				local.val = Replace(local.val, "*/", "", "all");
+				local.val = Replace(local.val, ";", "", "all");
 				local.sanitized[local.key] = $escapeSqlValue(local.val);
 			} else {
 				local.sanitized[local.key] = local.val;
@@ -886,7 +891,16 @@ component {
 		}
 		for (local.name in ListToArray(local.enumDef.names)) {
 			local.storedValue = local.enumDef.values[local.name];
-			local.escapedValue = $escapeSqlValue(local.storedValue);
+			// Validate enum stored values: only allow alphanumeric, underscore, hyphen, space, and dot.
+			// Enum values are developer-defined in model config(), so this is a strict allowlist.
+			if (IsSimpleValue(local.storedValue) && ReFind("[^a-zA-Z0-9_\- .]", ToString(local.storedValue))) {
+				Throw(
+					type = "Wheels.InvalidEnumValue",
+					message = "The enum value `#local.storedValue#` for property `#arguments.property#` contains invalid characters.",
+					extendedInfo = "Enum values must contain only alphanumeric characters, underscores, hyphens, spaces, and dots. Received: `#local.storedValue#`"
+				);
+			}
+			local.escapedValue = $escapeSqlValue(ToString(local.storedValue));
 			local.scopeDef = {};
 			local.scopeDef.where = "#arguments.property# = '#local.escapedValue#'";
 			variables.wheels.class.scopes[local.name] = local.scopeDef;

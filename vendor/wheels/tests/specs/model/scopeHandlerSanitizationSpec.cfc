@@ -18,11 +18,12 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("Djurner'' OR ''1''=''1");
 			});
 
-			it("escapes DROP TABLE injection in arguments", () => {
+			it("strips semicolons and comment markers from injection attempts", () => {
 				var m = application.wo.model("author");
 				var result = m.$sanitizeScopeHandlerArgs({"1": "'; DROP TABLE users; --"});
 
-				expect(result["1"]).toBe("''; DROP TABLE users; --");
+				// semicolons stripped, -- stripped, then quotes escaped
+				expect(result["1"]).toBe("'' DROP TABLE users ");
 			});
 
 			it("leaves clean string arguments unchanged", () => {
@@ -93,11 +94,12 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("test\\path");
 			});
 
-			it("escapes backslash-quote bypass attempts", () => {
+			it("escapes backslash-quote bypass attempts and strips comments", () => {
 				var m = application.wo.model("author");
 				var result = m.$sanitizeScopeHandlerArgs({"1": "test\' OR 1=1 --"});
 
-				expect(result["1"]).toBe("test\\'' OR 1=1 --");
+				// -- stripped, then backslash escaped, then quote escaped
+				expect(result["1"]).toBe("test\\'' OR 1=1 ");
 			});
 
 			it("strips null bytes from string arguments", () => {
@@ -114,6 +116,34 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("O\\''Brien");
 			});
 
+			it("strips SQL line comment sequences", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "admin-- comment"});
+
+				expect(result["1"]).toBe("admin comment");
+			});
+
+			it("strips SQL block comment markers", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "admin/* injected */value"});
+
+				expect(result["1"]).toBe("admin injected value");
+			});
+
+			it("strips semicolons to prevent stacked queries", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "value; DROP TABLE users"});
+
+				expect(result["1"]).toBe("value DROP TABLE users");
+			});
+
+			it("handles all dangerous patterns combined", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": Chr(0) & "val'; DROP TABLE x;/* comment */--end"});
+
+				// null bytes stripped, -- stripped, /* */ stripped, ; stripped, \ escaped, ' escaped
+				expect(result["1"]).toBe("val'' DROP TABLE x comment end");
+			});
 
 		});
 
