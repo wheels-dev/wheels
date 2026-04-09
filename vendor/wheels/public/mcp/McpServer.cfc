@@ -996,14 +996,14 @@ Provide migration code following Wheels conventions."
 			return generateTestFile(arguments.args);
 		}
 
-		local.command = "wheels g " & arguments.args.type & " " & arguments.args.name;
+		local.command = "wheels g " & $sanitizeCommandArg(arguments.args.type) & " " & $sanitizeCommandArg(arguments.args.name);
 
 		if (structKeyExists(arguments.args, "attributes") && len(arguments.args.attributes)) {
-			local.command &= " " & arguments.args.attributes;
+			local.command &= " " & $sanitizeCommandArg(arguments.args.attributes);
 		}
 
 		if (structKeyExists(arguments.args, "actions") && len(arguments.args.actions) && arguments.args.type == "controller") {
-			local.command &= " " & arguments.args.actions;
+			local.command &= " " & $sanitizeCommandArg(arguments.args.actions);
 		}
 
 		return executeCommand(local.command);
@@ -1174,7 +1174,7 @@ Provide migration code following Wheels conventions."
 		local.command = "wheels test run";
 
 		if (structKeyExists(arguments.args, "target") && len(arguments.args.target)) {
-			local.command &= " " & arguments.args.target;
+			local.command &= " " & $sanitizeCommandArg(arguments.args.target);
 		}
 
 		if (structKeyExists(arguments.args, "verbose") && arguments.args.verbose) {
@@ -1189,8 +1189,13 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'action'";
 		}
 
-		local.command = "wheels server " & arguments.args.action;
+		local.command = "wheels server " & $sanitizeCommandArg(arguments.args.action);
 		return executeCommand(local.command);
+	}
+
+	// Whitelist-sanitize to prevent shell injection via cfexecute arguments
+	public string function $sanitizeCommandArg(required string arg) {
+		return ReReplace(arguments.arg, '[^a-zA-Z0-9 _\-\.,=/]', '', 'all');
 	}
 
 	private string function executeCommand(required string command) {
