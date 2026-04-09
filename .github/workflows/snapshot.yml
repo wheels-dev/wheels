@@ -50,8 +50,21 @@ jobs:
       - name: Configure and start Lucee server
         run: |
           cp tools/ci/lucee.ci.json lucee.json
-          lucli server start --disable-open-browser --port=60007 &
-          sleep 5
+          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+          echo "Waiting for LuCLI to start Lucee..."
+          for i in $(seq 1 90); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee server is up after ${i} seconds"
+              break
+            fi
+            if ! kill -0 $(cat /tmp/lucli-server.pid) 2>/dev/null; then
+              echo "::error::LuCLI server process died"
+              cat /tmp/lucli-server.log
+              exit 1
+            fi
+            sleep 2
+          done
 
       - name: Run tests
         run: |
@@ -77,9 +90,17 @@ jobs:
           path: /tmp/junit-results/
           if-no-files-found: warn
 
+      - name: Debug server logs
+        if: failure()
+        run: cat /tmp/lucli-server.log 2>/dev/null || true
+
       - name: Stop server
         if: always()
-        run: lucli server stop 2>/dev/null || true
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
+          lucli server stop 2>/dev/null || true
 
   #############################################
   # Build Snapshot Release (gates on fast-test)

@@ -1,6 +1,5 @@
 {
   "name": "wheels-ci",
-  "version": "7.0.2.101",
   "port": 60007,
   "shutdownPort": 60008,
   "webroot": "./public",
