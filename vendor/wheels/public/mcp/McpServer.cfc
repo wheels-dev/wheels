@@ -1426,7 +1426,7 @@ Provide migration code following Wheels conventions."
 
 			if (structKeyExists(arguments.args, "model") && len(arguments.args.model)) {
 				if (arguments.args.model != "all") {
-					local.command &= " models/" & arguments.args.model;
+					local.command &= " models/" & $sanitizeCommandArg(arguments.args.model);
 				}
 			}
 
