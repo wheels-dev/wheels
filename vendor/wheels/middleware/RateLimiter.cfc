@@ -17,7 +17,19 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @storage Backend: "memory" or "database".
 	 * @keyFunction Closure that receives the request struct and returns a string key. Defaults to client IP.
 	 * @headerPrefix Prefix for rate limit response headers.
-	 * @trustProxy Whether to use X-Forwarded-For for client IP resolution. Defaults to false for security — when true, any client can spoof their IP via X-Forwarded-For to bypass rate limiting. Only enable when behind a trusted reverse proxy (nginx, HAProxy, etc.) that strips or overwrites the X-Forwarded-For header from clients.
+	 * @trustProxy Whether to use X-Forwarded-For for client IP resolution. Defaults to false for security.
+	 *   WARNING: Only enable this when your application sits behind a trusted reverse proxy (e.g. nginx,
+	 *   HAProxy, AWS ALB) that strips or overwrites the X-Forwarded-For header from downstream clients.
+	 *   Without a proxy that sanitizes this header, any client can spoof arbitrary IPs to bypass rate
+	 *   limiting entirely. Your proxy MUST be configured to either: (a) drop incoming X-Forwarded-For and
+	 *   set it to the real client IP, or (b) append the client IP so the rightmost entry is trustworthy.
+	 *   If your proxy appends, set proxyStrategy="last" to use the rightmost (proxy-added) IP.
+	 * @proxyStrategy Which IP to extract from X-Forwarded-For: "first" (leftmost, client-supplied — default
+	 *   for backwards compatibility) or "last" (rightmost, added by the nearest trusted proxy — recommended
+	 *   when the proxy appends rather than overwrites the header).
+	 * @maxStoreSize Maximum number of entries allowed in the in-memory store. When exceeded during cleanup,
+	 *   the oldest entries are evicted. Prevents unbounded memory growth from attackers rotating client keys.
+	 *   Only applies when storage="memory". Default: 100000.
 	 */
 	public RateLimiter function init(
 		numeric maxRequests = 60,
@@ -26,7 +38,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		string storage = "memory",
 		any keyFunction = "",
 		string headerPrefix = "X-RateLimit",
-		boolean trustProxy = false
+		boolean trustProxy = false,
+		string proxyStrategy = "first",
+		numeric maxStoreSize = 100000
 	) {
 		if (!ListFindNoCase("fixedWindow,slidingWindow,tokenBucket", arguments.strategy)) {
 			throw(
@@ -42,6 +56,13 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
+		if (!ListFindNoCase("first,last", arguments.proxyStrategy)) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidProxyStrategy",
+				message = "Invalid proxy strategy: #arguments.proxyStrategy#. Must be first or last."
+			);
+		}
+
 		variables.maxRequests = arguments.maxRequests;
 		variables.windowSeconds = arguments.windowSeconds;
 		variables.strategy = arguments.strategy;
@@ -49,6 +70,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.keyFunction = arguments.keyFunction;
 		variables.headerPrefix = arguments.headerPrefix;
 		variables.trustProxy = arguments.trustProxy;
+		variables.proxyStrategy = arguments.proxyStrategy;
+		variables.maxStoreSize = arguments.maxStoreSize;
 
 		// In-memory store using ConcurrentHashMap for thread safety.
 		if (variables.storage == "memory") {
@@ -74,6 +97,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Periodic cleanup for memory storage.
 		if (variables.storage == "memory") {
 			$maybeCleanup(local.now);
+			// Emergency eviction if store is at capacity and this is a new key.
+			if (variables.store.size() >= variables.maxStoreSize && !variables.store.containsKey(local.clientKey)) {
+				$evictOldest(local.now);
+			}
 		}
 
 		// Check rate limit based on strategy.
@@ -143,6 +170,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					local.forwarded = cgi.http_x_forwarded_for;
 				}
 				if (Len(Trim(local.forwarded))) {
+					if (variables.proxyStrategy == "last") {
+						return Trim(ListLast(local.forwarded));
+					}
 					return Trim(ListFirst(local.forwarded));
 				}
 			} catch (any e) {
@@ -374,9 +404,69 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				for (local.key in local.keysToRemove) {
 					variables.store.remove(local.key);
 				}
+
+				// If store still exceeds maxStoreSize after expiry cleanup, evict oldest entries.
+				if (variables.store.size() > variables.maxStoreSize) {
+					$evictOldest(arguments.now);
+				}
 			}
 		} catch (any e) {
 			// Lock timeout or error — skip cleanup this time.
+		}
+	}
+
+	/**
+	 * Evict entries from the in-memory store when it exceeds maxStoreSize.
+	 * Scores each entry by age and removes the oldest 10% to create headroom.
+	 * Entries whose age cannot be determined score 0 (youngest) and are evicted last.
+	 */
+	private void function $evictOldest(required numeric now) {
+		try {
+			local.keys = variables.store.keySet().toArray();
+			local.storeSize = ArrayLen(local.keys);
+			local.targetSize = Int(variables.maxStoreSize * 0.9);
+			local.toEvict = local.storeSize - local.targetSize;
+
+			if (local.toEvict <= 0) {
+				return;
+			}
+
+			// Build an array of {key, age} for sorting.
+			local.entries = [];
+			local.currentWindowId = Int(arguments.now / variables.windowSeconds);
+			for (local.key in local.keys) {
+				local.age = 0;
+				if (variables.store.containsKey(local.key)) {
+					local.value = variables.store.get(local.key);
+
+					if (variables.strategy == "fixedWindow" && Find(":", local.key)) {
+						local.windowId = Val(ListLast(local.key, ":"));
+						local.age = local.currentWindowId - local.windowId;
+					} else if (variables.strategy == "slidingWindow" && IsArray(local.value) && ArrayLen(local.value) > 0) {
+						local.age = arguments.now - local.value[1];
+					} else if (variables.strategy == "tokenBucket" && IsStruct(local.value) && StructKeyExists(local.value, "lastRefill")) {
+						local.age = arguments.now - local.value.lastRefill;
+					}
+				}
+				ArrayAppend(local.entries, {key: local.key, age: local.age});
+			}
+
+			// Sort by age descending (oldest first).
+			ArraySort(local.entries, function(a, b) {
+				return (b.age < a.age) ? -1 : ((b.age > a.age) ? 1 : 0);
+			});
+
+			// Evict the oldest entries.
+			local.evicted = 0;
+			for (local.entry in local.entries) {
+				if (local.evicted >= local.toEvict) {
+					break;
+				}
+				variables.store.remove(local.entry.key);
+				local.evicted++;
+			}
+		} catch (any e) {
+			// Best-effort eviction — don't let errors propagate.
 		}
 	}
 
