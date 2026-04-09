@@ -14,7 +14,7 @@
 
 		// CORS (Cross-Origin Resource Sharing) settings.
 		application.$wheels.allowCorsRequests = false;
-		application.$wheels.accessControlAllowOrigin = "*";
+		application.$wheels.accessControlAllowOrigin = "";
 		application.$wheels.accessControlAllowMethods = "GET, POST, PATCH, PUT, DELETE, OPTIONS";
 		application.$wheels.accessControlAllowMethodsByRoute = false;
 		application.$wheels.accessControlAllowCredentials = false;

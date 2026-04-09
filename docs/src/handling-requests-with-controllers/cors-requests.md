@@ -8,15 +8,20 @@ Wheels can often act as the "backend" in a modern web application, serving data 
 
 When we separate our systems in such a manner, we need to consider CORS (Cross Origin Resource Sharing) and how to properly serve requests which modern browsers will allow.
 
-### The "Quick and Dirty" approach
+### Getting Started
 
-If you just need to satisfy your CORS requirement quickly, you can do so with a simple configuration switch in your `/config/settings.cfm` file: `set(allowCorsRequests=true);`.
+To enable CORS, add `set(allowCorsRequests=true);` to your `/config/settings.cfm` file. You must also configure your allowed origins explicitly — by default, no origins are permitted:
 
-By default, this will enable the following CORS headers:
+```javascript
+set(allowCorsRequests=true);
+set(accessControlAllowOrigin="https://app.domain.com");
+```
+
+This will enable the following CORS headers for matching requests:
 
 ```
 Access-Control-Allow-Origin 
-*
+https://app.domain.com
 
 Access-Control-Allow-Methods 
 GET, POST, PATCH, PUT, DELETE, OPTIONS
@@ -25,7 +30,9 @@ Access-Control-Allow-Headers
 Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With
 ```
 
-This will satisfy most requirements to get going quickly, but is more of a blanket "catch all" configuration which doesn't really restrict anything, or provide much information to the API consumer about your available resources.
+{% hint style="warning" %}
+Setting `accessControlAllowOrigin` to `"*"` (wildcard) allows any website to make cross-origin requests to your application. Only use this in development or when you explicitly intend to provide a public API.
+{% endhint %}
 
 ### Custom CORS Headers
 
@@ -35,7 +42,7 @@ We can be more specific. We still need to specify `set(allowCorsRequests=true);`
 
 The Access Control Allow Origin header tells the browser whether the domain they are connecting from can access the requested resource.
 
-By default, this header is set to a wildcard allowing connection from any domain. But it might be your VueJS app lives at `app.domain.com` and we only want to allow access from that domain to our API.
+By default, this header is not set (empty string), meaning no cross-origin requests are allowed. You must explicitly configure your allowed origins. For example, if your VueJS app lives at `app.domain.com`:
 
 ```javascript
 // Wildcard

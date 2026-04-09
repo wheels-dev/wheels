@@ -3319,7 +3319,7 @@ component output="false" {
 	 * Set CORS Headers: only triggered if application.wheels.allowCorsRequests = true
 	 */
 	public void function $setCORSHeaders(
-		string allowOrigin = "*",
+		string allowOrigin = "",
 		string allowCredentials = false,
 		string allowHeaders = "Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With",
 		string allowMethods = "GET, POST, PATCH, PUT, DELETE, OPTIONS",
@@ -3328,6 +3328,11 @@ component output="false" {
 		string scriptName = request.cgi.script_name
 	) {
 		local.incomingOrigin = StructKeyExists(request.wheels.httprequestdata.headers, "origin") ? request.wheels.httprequestdata.headers.origin : false;
+
+		// No origins configured — skip all CORS headers (deny all by default)
+		if (!Len(arguments.allowOrigin)) {
+			return;
+		}
 
 		// Either a wildcard, or if a specific domain is set, we need to ensure the incoming request matches it
 		if (arguments.allowOrigin == "*") {
