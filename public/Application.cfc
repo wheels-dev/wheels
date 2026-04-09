@@ -22,17 +22,11 @@ component output="false" {
 	this.mappings["/config"] = expandPath("../config");
 	this.mappings["/plugins"] = expandPath("../plugins");
 
-	// CI datasource injection: when WHEELS_CI=true, define SQLite datasources
-	// directly so tests can run without Lucee Admin configuration.
-	if (server.system.environment.WHEELS_CI ?: "" == "true") {
-		this.datasources["wheelstestdb_sqlite"] = {
-			class: "org.sqlite.JDBC",
-			connectionString: "jdbc:sqlite:#expandPath('../')#wheelstestdb.db"
-		};
-		this.datasources["wheelstestdb_sqlite_tenant_b"] = {
-			class: "org.sqlite.JDBC",
-			connectionString: "jdbc:sqlite:#expandPath('../')#wheelstestdb_tenant_b.db"
-		};
+	// Load app-level configuration (datasources, custom settings, etc.)
+	// This is the recommended place for developers to define this.datasources,
+	// this.sessionManagement overrides, and other Application.cfc-level config.
+	if (FileExists(expandPath("../config/app.cfm"))) {
+		include "../config/app.cfm";
 	}
 
 	// We turn on "sessionManagement" by default since the Flash uses it.

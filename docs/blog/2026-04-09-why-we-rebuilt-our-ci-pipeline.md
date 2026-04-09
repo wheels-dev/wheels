@@ -1,10 +1,10 @@
 # Why We Rebuilt Our CI Pipeline From 40 Minutes to 82 Seconds
 
-*April 9, 2026 — Peter Amiri, CFWheels Core Team*
+*April 9, 2026 — Peter Amiri, Wheels Core Team*
 
 ---
 
-For years, the CFWheels CI pipeline ran every commit through a gauntlet: five CFML engines, seven databases, Docker Compose orchestrating it all. It was thorough. It was comprehensive. And it was killing our velocity.
+For years, the Wheels CI pipeline ran every commit through a gauntlet: five CFML engines, seven databases, Docker Compose orchestrating it all. It was thorough. It was comprehensive. And it was killing our velocity.
 
 Today we shipped a fundamentally different approach. Our primary CI now runs in **82 seconds**. No Docker. No CommandBox. Just LuCLI, Lucee 7, and SQLite — the same tools a developer uses on their laptop.
 
@@ -45,7 +45,7 @@ These aren't exotic edge cases. They're the daily reality of cross-engine CFML d
 
 ## The Strategic Decision: Pick a Primary Platform
 
-We made a deliberate choice: **Lucee 7 and SQLite are the primary supported platform for CFWheels going forward.**
+We made a deliberate choice: **Lucee 7 and SQLite are the primary supported platform for Wheels going forward.**
 
 This doesn't mean we're dropping support for other engines or databases. It means we're changing the relationship between primary and secondary platforms:
 
@@ -56,7 +56,7 @@ This mirrors how most successful open-source projects operate. Rails doesn't blo
 
 ### Why Lucee 7
 
-Lucee is where CFWheels development happens. It's the engine the core team runs locally. It's the engine most Wheels applications deploy on. And with LuCLI — our new Lucee-native CLI — it's the engine we're investing in for the AI-native development experience (MCP tools, code generation, interactive REPL).
+Lucee is where Wheels development happens. It's the engine the core team runs locally. It's the engine most Wheels applications deploy on. And with LuCLI — our new Lucee-native CLI — it's the engine we're investing in for the AI-native development experience (MCP tools, code generation, interactive REPL).
 
 Lucee 7 specifically because it's the current mainline release with active development and the best performance characteristics.
 
@@ -103,7 +103,7 @@ This gives us:
 
 ## What LuCLI Means for CI
 
-LuCLI is more than a CommandBox replacement — it's a statement about where CFWheels is headed. By using LuCLI in CI, the pipeline validates the same tool developers use locally:
+LuCLI is more than a CommandBox replacement — it's a statement about where Wheels is headed. By using LuCLI in CI, the pipeline validates the same tool developers use locally:
 
 - `lucli server start` starts the same Lucee instance in CI and on your laptop
 - `lucli server stop` cleanly shuts it down
@@ -115,9 +115,10 @@ When CI and local development use the same tools, "works on my machine" and "wor
 
 One interesting challenge: Lucee needs datasource configurations at the engine level, not just the application level. In the Docker-based pipeline, this was handled by CFConfig.json — a well-established way to configure Lucee datasources before the server starts.
 
-LuCLI doesn't yet support CFConfig-style datasource injection. Rather than adding a complex workaround, we used CFML's native `this.datasources` feature in `Application.cfc`, gated by an environment variable:
+LuCLI doesn't yet support CFConfig-style datasource injection. Rather than adding a complex workaround, we used CFML's native `this.datasources` feature in `config/app.cfm` — the Wheels convention for Application-level configuration — gated by an environment variable:
 
 ```cfm
+// config/app.cfm
 if (server.system.environment.WHEELS_CI ?: "" == "true") {
     this.datasources["wheelstestdb_sqlite"] = {
         class: "org.sqlite.JDBC",
@@ -126,7 +127,9 @@ if (server.system.environment.WHEELS_CI ?: "" == "true") {
 }
 ```
 
-This is clean, portable, and doesn't require engine-specific admin APIs. It's also a pattern that any Wheels application can adopt for testing — define your test datasources in code, not in engine configuration.
+`config/app.cfm` is included by `Application.cfc` and is the recommended place for developers to define `this.datasources`, session settings, and other Application-level configuration. It keeps `Application.cfc` clean as a framework file that rarely needs editing.
+
+This pattern is clean, portable, and doesn't require engine-specific admin APIs. Any Wheels application can adopt it for testing — define your test datasources in code, not in engine configuration.
 
 ## Lessons Learned
 
@@ -148,7 +151,7 @@ We didn't delete the compatibility matrix. We decoupled it from the critical pat
 
 ## What's Next
 
-This CI change is part of a larger strategic shift toward Lucee 7 as the reference platform for CFWheels:
+This CI change is part of a larger strategic shift toward Lucee 7 as the reference platform for Wheels:
 
 - **LuCLI as the recommended CLI**: Replacing CommandBox for Wheels-specific workflows (generation, testing, migration, MCP)
 - **Engine adapters**: The adapter pattern from the W-004 PR centralizes cross-engine behavior, making it easier to maintain secondary engine support without polluting the main codebase
