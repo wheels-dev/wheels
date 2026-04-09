@@ -8,11 +8,11 @@ component extends="wheels.WheelsTest" {
 		describe("CORS security defaults", () => {
 
 			it("defaults accessControlAllowOrigin to empty string not wildcard", () => {
-				expect(application.$wheels.accessControlAllowOrigin).toBe("");
+				expect(application.wheels.accessControlAllowOrigin).toBe("");
 			});
 
 			it("defaults allowCorsRequests to false", () => {
-				expect(application.$wheels.allowCorsRequests).toBeFalse();
+				expect(application.wheels.allowCorsRequests).toBeFalse();
 			});
 
 		});

@@ -347,12 +347,12 @@ component {
 							We need the paginationLinks() function to set the active class to the parent of the current page item.
 							The changes made here set the active class to the immediate parent of the current page element in case nested elements are passed in.
 						 */
-						if(local.currentPage == local.i  && arguments.addActiveClassToPrependedParent && findNoCase('class', arguments.prependToPage)) {
-							// Strip event handlers (on*=) and javascript: URIs to prevent XSS
-							local.sanitizedPrepend = reReplaceNoCase(arguments.prependToPage, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
-							local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
-							local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, 'javascript\s*:', '', 'all');
+						// Strip event handlers (on*=) and javascript: URIs to prevent XSS
+						local.sanitizedPrepend = reReplaceNoCase(arguments.prependToPage, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+						local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+						local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, 'javascript\s*:', '', 'all');
 
+						if(local.currentPage == local.i  && arguments.addActiveClassToPrependedParent && findNoCase('class', local.sanitizedPrepend)) {
 							// Inject "active " into the class attribute value via regex
 							if (reFindNoCase('class\s*=\s*[''"]', local.sanitizedPrepend)) {
 								local.activePrependToPage = reReplaceNoCase(
@@ -371,7 +371,7 @@ component {
 							}
 							local.middle &= local.activePrependToPage;
 						} else {
-							local.middle &= arguments.prependToPage;
+							local.middle &= local.sanitizedPrepend;
 						}
 					}
 					if (local.currentPage != local.i || arguments.linkToCurrentPage) {
