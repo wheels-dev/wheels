@@ -18,6 +18,26 @@ component output="false" displayName="MCP Server" {
 		return this;
 	}
 
+	/** Rejects shell metacharacters (; | & $ ` ( ) { } < > newlines) */
+	private boolean function $isSafeArgument(required string value) {
+		return reFind("[;\|&\$`\(\)\{\}<>\n\r]", arguments.value) == 0;
+	}
+
+	/** Allowlist: letters + digits, must start with a letter */
+	private boolean function $isValidType(required string value) {
+		return reFind("^[a-zA-Z][a-zA-Z0-9]*$", arguments.value) > 0;
+	}
+
+	/** Allowlist: letters, digits, underscores, dots; must start with letter or underscore */
+	private boolean function $isValidName(required string value) {
+		return reFind("^[a-zA-Z_][a-zA-Z0-9_\.]*$", arguments.value) > 0;
+	}
+
+	/** Allowlist: letters, digits, underscores, dots, hyphens, slashes */
+	private boolean function $isValidTarget(required string value) {
+		return reFind("^[a-zA-Z0-9_\.\-\/]*$", arguments.value) > 0;
+	}
+
 	public any function handleRequest(required any request, required string sessionId) {
 		// Handle batch requests (array of requests)
 		if (isArray(arguments.request)) {
@@ -991,6 +1011,22 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameters 'type' and 'name'";
 		}
 
+		if (!$isValidType(arguments.args.type)) {
+			return "Error: Invalid 'type' parameter. Must be alphanumeric (e.g., model, controller, scaffold).";
+		}
+
+		if (!$isValidName(arguments.args.name)) {
+			return "Error: Invalid 'name' parameter. Must be alphanumeric with optional underscores and dots.";
+		}
+
+		if (structKeyExists(arguments.args, "attributes") && len(arguments.args.attributes) && !$isSafeArgument(arguments.args.attributes)) {
+			return "Error: Invalid 'attributes' parameter. Contains disallowed characters.";
+		}
+
+		if (structKeyExists(arguments.args, "actions") && len(arguments.args.actions) && !$isSafeArgument(arguments.args.actions)) {
+			return "Error: Invalid 'actions' parameter. Contains disallowed characters.";
+		}
+
 		// Handle test generation to ensure proper directory structure
 		if (arguments.args.type == "test") {
 			return generateTestFile(arguments.args);
@@ -1143,6 +1179,10 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'action'";
 		}
 
+		if (!$isValidType(arguments.args.action)) {
+			return "Error: Invalid 'action' parameter. Must be alphanumeric (e.g., info, latest, up, down, reset).";
+		}
+
 		try {
 			local.currentPort = cgi.server_port;
 			if (local.currentPort == 0 || !len(local.currentPort)) {
@@ -1174,6 +1214,9 @@ Provide migration code following Wheels conventions."
 		local.command = "wheels test run";
 
 		if (structKeyExists(arguments.args, "target") && len(arguments.args.target)) {
+			if (!$isValidTarget(arguments.args.target)) {
+				return "Error: Invalid 'target' parameter. Must be alphanumeric with optional dots, hyphens, underscores, or slashes.";
+			}
 			local.command &= " " & arguments.args.target;
 		}
 
@@ -1189,11 +1232,23 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'action'";
 		}
 
+		if (!$isValidType(arguments.args.action)) {
+			return "Error: Invalid 'action' parameter. Must be alphanumeric (e.g., start, stop, status).";
+		}
+
 		local.command = "wheels server " & arguments.args.action;
 		return executeCommand(local.command);
 	}
 
 	private string function executeCommand(required string command) {
+		// Defense-in-depth: final gate before cfexecute
+		if (reFind("[;\|&\$`\(\)\{\}<>]", arguments.command)) {
+			return "Error: Command contains disallowed shell metacharacters.";
+		}
+		if (!reFind("^wheels\s", arguments.command)) {
+			return "Error: Only 'wheels' commands are allowed.";
+		}
+
 		try {
 			// Get the application root directory using Application.cfc mappings
 			// The /app mapping points to the application's app directory (e.g., /project/app/)
@@ -1360,6 +1415,10 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'target'";
 		}
 
+		if (!$isValidTarget(arguments.args.target)) {
+			return "Error: Invalid 'target' parameter. Must be alphanumeric (e.g., models, controllers, routes, all).";
+		}
+
 		try {
 			local.currentPort = cgi.server_port;
 			if (local.currentPort == 0 || !len(local.currentPort)) {
@@ -1421,6 +1480,9 @@ Provide migration code following Wheels conventions."
 
 			if (structKeyExists(arguments.args, "model") && len(arguments.args.model)) {
 				if (arguments.args.model != "all") {
+					if (!$isValidName(arguments.args.model)) {
+						return "Error: Invalid 'model' parameter. Must be alphanumeric with optional underscores and dots.";
+					}
 					local.command &= " models/" & arguments.args.model;
 				}
 			}
@@ -1661,6 +1723,10 @@ Provide migration code following Wheels conventions."
 	private string function executeWheelsDevelop(required struct args) {
 		if (!structKeyExists(arguments.args, "task")) {
 			return "Error: Missing required parameter 'task'";
+		}
+
+		if (!$isSafeArgument(arguments.args.task)) {
+			return "Error: Invalid 'task' parameter. Contains disallowed characters.";
 		}
 
 		local.task = arguments.args.task;
