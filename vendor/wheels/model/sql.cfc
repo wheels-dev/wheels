@@ -676,19 +676,20 @@ component {
 			useIndex = arguments.useIndex,
 			sql = local.tempSql
 		);
-		if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
-			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "FROM #arguments.include#");
-			}
-		}
-		else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
-			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
-			}
-		}
-		else if(arguments.include != "" && ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
-			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #arguments.include#");
+		if(arguments.include != "" && structKeyExists(arguments, "sql") && left(arguments.sql[1], 6) == 'UPDATE'){
+			// Resolve include via $expandedAssociations to get safe table names (prevents SQL injection)
+			local.expandedAssociations = $expandedAssociations(include=arguments.include);
+			if(ArrayLen(local.expandedAssociations)){
+				local.resolvedTableName = variables.wheels.class.adapter.$quoteIdentifier(local.expandedAssociations[1].tableName);
+				if(ListFind('PostgreSQL,CockroachDB', local.migration.adapter.adapterName())){
+					ArrayAppend(arguments.sql, "FROM #local.resolvedTableName#");
+				}
+				else if(ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
+					ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
+				}
+				else if(ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName())){
+					ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #local.resolvedTableName#");
+				}
 			}
 		}
 		local.iEnd = ArrayLen(local.whereClause);
