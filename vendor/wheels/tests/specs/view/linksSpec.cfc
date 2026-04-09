@@ -172,6 +172,35 @@ component extends="wheels.WheelsTest" {
 				expect(result).notToInclude("alert(document.cookie)")
 				expect(result).toInclude("class='active page-item'")
 			})
+
+			it("encodes anchorDivider to prevent XSS", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					windowSize       = 0,
+					alwaysShowAnchors = true,
+					anchorDivider    = '<script>alert(1)</script>',
+					encode           = true
+				)
+
+				expect(result).notToInclude("<script>")
+				expect(result).notToInclude("</script>")
+				expect(result).notToInclude("alert(1)")
+			})
+
+			it("strips event handler XSS from appendToPage", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prependToPage                   = "<li>",
+					appendToPage                    = '<span onmouseover="alert(1)">x</span></li>',
+					addActiveClassToPrependedParent = false,
+					linkToCurrentPage               = true,
+					encode                          = "attributes"
+				)
+
+				expect(result).notToInclude("onmouseover")
+				expect(result).notToInclude("alert(1)")
+				expect(result).toInclude("<span")
+			})
 		})
 	}
 
