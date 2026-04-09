@@ -101,11 +101,11 @@ component {
 				}
 			}
 		} else if (Len(arguments.url)) {
-			if (!$isSafeRedirectUrl(url = arguments.url, serverName = request.cgi.server_name)) {
+			if (!$get("allowExternalRedirects") && !$isSafeRedirectUrl(url = arguments.url, serverName = request.cgi.server_name)) {
 				Throw(
 					type = "Wheels.UnsafeRedirect",
 					message = "The URL passed to `redirectTo()` is not safe for redirection.",
-					extendedInfo = "Only relative URLs and URLs matching the current domain are allowed. URL: #arguments.url#"
+					extendedInfo = "Only relative URLs and URLs matching the current domain are allowed. Set allowExternalRedirects=true to permit external redirects. URL: #EncodeForHTML(arguments.url)#"
 				);
 			}
 			local.url = arguments.url;

@@ -226,6 +226,18 @@ component extends="wheels.WheelsTest" {
 
 				expect(r.url).toBe("//" & request.cgi.server_name & "/page")
 			})
+
+			it("allows external redirect when allowExternalRedirects is true", () => {
+				application.wheels.allowExternalRedirects = true;
+				try {
+					_controller.redirectTo(url = "http://external.com/page")
+					r = _controller.getRedirect()
+
+					expect(r.url).toBe("http://external.com/page")
+				} finally {
+					application.wheels.allowExternalRedirects = false;
+				}
+			})
 		})
 	}
 }
