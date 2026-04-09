@@ -116,7 +116,9 @@ component {
 	 * @comment Optional comment text.
 	 */
 	public void function sendSSEComment(required any writer, string comment = "ping") {
-		arguments.writer.write(": #arguments.comment##Chr(10)##Chr(10)#");
+		// Strip CR/LF to prevent field injection via comments
+		local.safeComment = ReReplace(arguments.comment, '[\r\n]', '', 'all');
+		arguments.writer.write(": #local.safeComment##Chr(10)##Chr(10)#");
 		arguments.writer.flush();
 	}
 
@@ -167,14 +169,14 @@ component {
 	) {
 		local.lines = [];
 
-		// Event ID
+		// Event ID (strip CR/LF to prevent field injection)
 		if (Len(arguments.id)) {
-			ArrayAppend(local.lines, "id: #arguments.id#");
+			ArrayAppend(local.lines, "id: #ReReplace(arguments.id, '[\r\n]', '', 'all')#");
 		}
 
-		// Event type
+		// Event type (strip CR/LF to prevent field injection)
 		if (Len(arguments.event)) {
-			ArrayAppend(local.lines, "event: #arguments.event#");
+			ArrayAppend(local.lines, "event: #ReReplace(arguments.event, '[\r\n]', '', 'all')#");
 		}
 
 		// Retry interval
@@ -183,8 +185,11 @@ component {
 		}
 
 		// Data lines (each line of data gets its own "data:" prefix per SSE spec)
+		// Normalize line endings: CRLF -> LF, then lone CR -> LF, before splitting
 		if (Len(arguments.data)) {
-			local.dataLines = ListToArray(arguments.data, Chr(10));
+			local.normalizedData = Replace(arguments.data, Chr(13) & Chr(10), Chr(10), "all");
+			local.normalizedData = Replace(local.normalizedData, Chr(13), Chr(10), "all");
+			local.dataLines = ListToArray(local.normalizedData, Chr(10));
 			for (local.line in local.dataLines) {
 				ArrayAppend(local.lines, "data: #local.line#");
 			}
