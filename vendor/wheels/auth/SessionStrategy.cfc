@@ -97,6 +97,13 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 	 * @principal Struct representing the authenticated identity (user id, roles, etc.).
 	 */
 	public void function login(required struct principal) {
+		// Regenerate session ID to prevent session fixation attacks
+		try {
+			sessionRotate();
+		} catch (any e) {
+			writeLog(text="sessionRotate() unavailable: #e.message#", type="warning", file="wheels_auth");
+		}
+
 		$setSessionPrincipal(arguments.principal);
 
 		if (IsCustomFunction(variables.onLogin) || IsClosure(variables.onLogin)) {
