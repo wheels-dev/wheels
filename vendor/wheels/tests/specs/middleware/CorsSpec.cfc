@@ -82,6 +82,56 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toBe("same-origin");
 			});
 
+			describe("wildcard + credentials validation", function() {
+
+				it("throws when allowOrigins is wildcard and allowCredentials is true", function() {
+					expect(function() {
+						new wheels.middleware.Cors(allowOrigins = "*", allowCredentials = true);
+					}).toThrow("Wheels.Cors.InvalidConfiguration");
+				});
+
+				it("includes a descriptive error message for the invalid combination", function() {
+					var caught = {};
+					try {
+						new wheels.middleware.Cors(allowOrigins = "*", allowCredentials = true);
+					} catch (any e) {
+						caught = e;
+					}
+					expect(caught).toHaveKey("message");
+					expect(caught.message).toInclude("allowOrigins");
+					expect(caught.message).toInclude("allowCredentials");
+					expect(caught.message).toInclude("CORS specification");
+				});
+
+				it("allows wildcard origin with allowCredentials false", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "*", allowCredentials = false);
+					local.reqCtx = {cgi = {http_origin = "https://any.com"}};
+					local.result = local.cors.handle(
+						request = local.reqCtx,
+						next = function(required struct request) {
+							return "ok";
+						}
+					);
+					expect(local.result).toBe("ok");
+				});
+
+				it("allows specific origins with allowCredentials true", function() {
+					local.cors = new wheels.middleware.Cors(
+						allowOrigins = "https://myapp.com",
+						allowCredentials = true
+					);
+					local.reqCtx = {cgi = {http_origin = "https://myapp.com"}};
+					local.result = local.cors.handle(
+						request = local.reqCtx,
+						next = function(required struct request) {
+							return "creds-ok";
+						}
+					);
+					expect(local.result).toBe("creds-ok");
+				});
+
+			});
+
 		});
 
 	}
