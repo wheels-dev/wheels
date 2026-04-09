@@ -38,30 +38,58 @@ jobs:
           chmod +x /usr/local/bin/lucli
           lucli --version
 
-      - name: Install SQLite JDBC and create test database
+      - name: Create test databases
         run: |
-          mkdir -p lib
-          curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
-            -o lib/sqlite-jdbc.jar
           sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
           sqlite3 wheelstestdb.db "SELECT 1;"
           sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
 
-      - name: Configure and start Lucee server
+      - name: Download SQLite JDBC driver
+        run: |
+          curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
+            -o /tmp/sqlite-jdbc.jar
+
+      - name: Start Lucee server
         run: |
           cp tools/ci/lucee.ci.json lucee.json
           nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
           echo $! > /tmp/lucli-server.pid
-          echo "Waiting for LuCLI to start Lucee..."
-          for i in $(seq 1 90); do
+          echo "Waiting for Lucee to start..."
+          for i in $(seq 1 120); do
             if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
-              echo "Lucee server is up after ${i} seconds"
+              echo "Lucee is up (attempt ${i})"
               break
             fi
             if ! kill -0 $(cat /tmp/lucli-server.pid) 2>/dev/null; then
               echo "::error::LuCLI server process died"
               cat /tmp/lucli-server.log
               exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Install SQLite JDBC into Lucee
+        run: |
+          LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
+          if [ -z "$LUCEE_LIB" ]; then
+            LUCEE_LIB=$(find ~/.lucli/express -maxdepth 2 -name "lib" -type d 2>/dev/null | head -1)
+          fi
+          if [ -n "$LUCEE_LIB" ]; then
+            cp /tmp/sqlite-jdbc.jar "$LUCEE_LIB/"
+            echo "SQLite JDBC installed to: $LUCEE_LIB"
+          else
+            echo "::error::Could not find Lucee lib directory"
+            exit 1
+          fi
+          kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          sleep 3
+          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+          echo "Waiting for Lucee to restart..."
+          for i in $(seq 1 60); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee restarted with SQLite JDBC"
+              break
             fi
             sleep 2
           done

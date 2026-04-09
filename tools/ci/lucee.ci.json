@@ -1,5 +1,8 @@
 {
   "name": "wheels-ci",
+  "lucee": {
+    "version": "7.0.1.100"
+  },
   "port": 60007,
   "shutdownPort": 60008,
   "webroot": "./public",

@@ -30,6 +30,18 @@ if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
   exit 1
 fi
 
+# --- Configure SQLite datasources ---
+echo "Configuring SQLite datasources..."
+# Copy setup script into webroot temporarily
+cp tools/ci/setup-datasources.cfm public/_ci_setup_ds.cfm
+DS_RESULT=$(curl -s --max-time 30 "${BASE_URL}/_ci_setup_ds.cfm" 2>/dev/null || echo "")
+rm -f public/_ci_setup_ds.cfm
+if echo "$DS_RESULT" | grep -q '"success":true'; then
+  echo "Datasources configured successfully"
+else
+  echo "::warning::Datasource setup may have failed: ${DS_RESULT}"
+fi
+
 # --- Warm up Wheels application ---
 echo "Warming up Wheels application..."
 curl -s -o /dev/null --max-time 120 "${BASE_URL}/?reload=true&password=wheels_test_password" || true
