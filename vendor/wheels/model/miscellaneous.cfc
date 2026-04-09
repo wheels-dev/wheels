@@ -303,26 +303,11 @@ component {
 		if(local.rv.datatype eq 'geography'){
 			local.sqlQuery = "select type from geography_columns where f_table_name = ? and f_geography_column = ?";
 			local.result = queryExecute(local.sqlQuery, [tableName(), arguments.property], {datasource: variables.wheels.class.datasource});
-			if(local.result.type eq 'point'){
-				local.rv.value = 'POINT(#this[arguments.property]#)';
-			}
-			else if(local.result.type eq 'linestring'){
-				local.rv.value = 'LINESTRING(#this[arguments.property]#)';
-			}
-			else if(local.result.type eq 'polygon'){
-				local.rv.value = 'POLYGON(#this[arguments.property]#)';
-			}
-			else if(local.result.type eq 'multipoint'){
-				local.rv.value = 'MULTIPOINT(#this[arguments.property]#)';
-			}
-			else if(local.result.type eq 'multilinestring'){
-				local.rv.value = 'MULTILINESTRING(#this[arguments.property]#)';
-			}
-			else if(local.result.type eq 'multipolygon'){
-				local.rv.value = 'MULTIPOLYGON(#this[arguments.property]#)';
-			}
-			else if(local.result.type eq 'geometrycollection'){
-				local.rv.value = 'GEOMETRYCOLLECTION(#this[arguments.property]#)';
+			local.validWktTypes = "point,linestring,polygon,multipoint,multilinestring,multipolygon,geometrycollection";
+			local.geoType = LCase(local.result.type);
+			if(ListFind(local.validWktTypes, local.geoType)){
+				local.sanitizedValue = $sanitizeWktValue(this[arguments.property]);
+				local.rv.value = UCase(local.geoType) & '(#local.sanitizedValue#)';
 			}
 			local.rv.column = arguments.property;
 			local.rv.table = tableName();
@@ -354,6 +339,15 @@ component {
 	 */
 	public void function sharedModel() {
 		variables.wheels.class.sharedModel = true;
+	}
+
+	/**
+	 * Internal function. Sanitizes a WKT coordinate value by stripping
+	 * everything except digits, dots, commas, spaces, minus signs, and
+	 * parentheses — the only characters valid in WKT geometry literals.
+	 */
+	public string function $sanitizeWktValue(required string value) {
+		return ReReplace(arguments.value, '[^0-9\.\,\s\-\(\)]', '', 'all');
 	}
 
 	/**
