@@ -43,6 +43,14 @@ component {
 		local.rv = "";
 		if (StructKeyExists(arguments.useIndex, arguments.modelName)) {
 			local.indexName = arguments.useIndex[arguments.modelName];
+			// Validate index name to prevent SQL injection — only alphanumeric and underscores allowed
+			if (!IsSimpleValue(local.indexName) || !ReFind("^[a-zA-Z0-9_]+$", local.indexName)) {
+				Throw(
+					type = "Wheels.InvalidIndexName",
+					message = "Invalid index name.",
+					extendedInfo = "The index name contains invalid characters. Only letters, numbers, and underscores are allowed."
+				);
+			}
 			if (arguments.adapterName == "MySQLModel") {
 				local.rv = "USE INDEX(#local.indexName#)";
 			} else if (arguments.adapterName == "MicrosoftSQLServerModel") {
@@ -712,6 +720,10 @@ component {
 			}
 			ArrayPrepend(local.classes, variables.wheels.class);
 			// Issue#1273: Added this section to allow included tables to be referenced in the query
+			// SECURITY NOTE: The JOIN strings used below are safe from injection because they are
+			// constructed internally by $expandedAssociations() using $quoteIdentifier() for all
+			// table and column names (see the join-building loop in $expandedAssociations). The
+			// include parameter is validated against registered associations before reaching here.
 			local.joinclause = "";
 			local.migration = CreateObject("component", "wheels.migrator.Migration").init();
 			if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
