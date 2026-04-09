@@ -12,10 +12,22 @@ cfheader(statuscode="200");
 cfcontent(type="application/json");
 
 // ── Security: localhost only ────────────────────
+local.localhostAddresses = "127.0.0.1,::1,0:0:0:0:0:0:0:1";
 local.remoteAddr = cgi.REMOTE_ADDR;
-if (!listFind("127.0.0.1,::1,0:0:0:0:0:0:0:1", local.remoteAddr)) {
+if (!listFind(local.localhostAddresses, local.remoteAddr)) {
 	writeOutput(serializeJSON({success: false, error: "Console access restricted to localhost"}));
 	abort;
+}
+
+// ── Security: X-Forwarded-For proxy bypass prevention ──
+if (len(trim(cgi.HTTP_X_FORWARDED_FOR))) {
+	local.forwardedIps = listToArray(cgi.HTTP_X_FORWARDED_FOR);
+	for (local.ip in local.forwardedIps) {
+		if (!listFind(local.localhostAddresses, trim(local.ip))) {
+			writeOutput(serializeJSON({success: false, error: "Console access restricted to localhost"}));
+			abort;
+		}
+	}
 }
 
 // ── Security: development mode only ─────────────
@@ -44,12 +56,42 @@ if (!len(trim(local.expression))) {
 	abort;
 }
 
-// ── Security: reload password ───────────────────
+// ── Security: reload password (fail closed) ────
 if (
-	structKeyExists(application.wheels, "reloadPassword")
-	&& len(application.wheels.reloadPassword)
-	&& Compare(Hash(local.password, "SHA-256"), Hash(application.wheels.reloadPassword, "SHA-256")) != 0
+	!structKeyExists(application.wheels, "reloadPassword")
+	|| !len(trim(application.wheels.reloadPassword))
 ) {
+	writeOutput(serializeJSON({
+		success: false,
+		error: "Console requires a reload password. Set RELOAD_PASSWORD in .env"
+	}));
+	abort;
+}
+
+// Rate limit: lock out IP after 5 failed attempts within 5 minutes
+if (!structKeyExists(application, "$consoleRateLimit")) {
+	application.$consoleRateLimit = {};
+}
+local.rateLimitKey = cgi.REMOTE_ADDR;
+if (structKeyExists(application.$consoleRateLimit, local.rateLimitKey)) {
+	local.rl = application.$consoleRateLimit[local.rateLimitKey];
+	if (local.rl.count >= 5 && dateDiff("n", local.rl.firstAttempt, now()) < 5) {
+		writeOutput(serializeJSON({success: false, error: "Too many failed attempts. Try again later."}));
+		abort;
+	}
+	if (dateDiff("n", local.rl.firstAttempt, now()) >= 5) {
+		structDelete(application.$consoleRateLimit, local.rateLimitKey);
+	}
+}
+
+// Constant-time comparison to prevent timing attacks
+local.inputBytes = Hash(local.password, "SHA-256").getBytes("UTF-8");
+local.expectedBytes = Hash(application.wheels.reloadPassword, "SHA-256").getBytes("UTF-8");
+if (!CreateObject("java", "java.security.MessageDigest").isEqual(local.inputBytes, local.expectedBytes)) {
+	if (!structKeyExists(application.$consoleRateLimit, local.rateLimitKey)) {
+		application.$consoleRateLimit[local.rateLimitKey] = {count: 0, firstAttempt: now()};
+	}
+	application.$consoleRateLimit[local.rateLimitKey].count++;
 	writeOutput(serializeJSON({
 		success: false,
 		error: "Invalid reload password. Set RELOAD_PASSWORD in .env or pass --password to wheels console"
