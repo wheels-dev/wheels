@@ -478,7 +478,7 @@ component output=false extends="wheels.Global"{
 			arguments.type = $getValidationType(arguments.sqlType);
 		}
 		if (!ListFindNoCase("integer,float,boolean", arguments.type) || !Len(arguments.str)) {
-			local.rv = "'#arguments.str#'";
+			local.rv = "'#Replace(arguments.str, "'", "''", "all")#'";
 		} else {
 			local.rv = arguments.str;
 		}
