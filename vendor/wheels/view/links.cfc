@@ -348,17 +348,27 @@ component {
 							The changes made here set the active class to the immediate parent of the current page element in case nested elements are passed in.
 						 */
 						if(local.currentPage == local.i  && arguments.addActiveClassToPrependedParent && findNoCase('class', arguments.prependToPage)) {
-							local.prependToPageElementArr = listToArray(arguments.prependToPage, '<');
-							local.lastElementArrIndex = arrayLen(local.prependToPageElementArr);
-							local.lastElement = local.prependToPageElementArr[local.lastElementArrIndex];
-							local.classStringIndex = findNoCase('class=', local.lastElement) + 6;
-							local.startString = mid(local.lastElement, 1, local.classStringIndex);
-							local.midString = mid(local.lastElement, local.classStringIndex+1, len(local.lastElement)-local.classStringIndex+1);
-							local.activeMidString = 'active ' & local.midString;
-							local.modifiedLastElement = local.startString & local.activeMidString;
-							local.prependToPageElementArr[local.lastElementArrIndex] = local.modifiedLastElement;
-							local.activePrependToPage = arrayToList(local.prependToPageElementArr, '<');
-							local.activePrependToPage = '<' & local.activePrependToPage;
+							// Strip event handlers (on*=) and javascript: URIs to prevent XSS
+							local.sanitizedPrepend = reReplaceNoCase(arguments.prependToPage, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+							local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+							local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, 'javascript\s*:', '', 'all');
+
+							// Inject "active " into the class attribute value via regex
+							if (reFindNoCase('class\s*=\s*[''"]', local.sanitizedPrepend)) {
+								local.activePrependToPage = reReplaceNoCase(
+									local.sanitizedPrepend,
+									'(class\s*=\s*[''"])',
+									'\1active ',
+									'one'
+								);
+							} else {
+								local.activePrependToPage = reReplaceNoCase(
+									local.sanitizedPrepend,
+									'(class\s*=\s*)',
+									'\1active ',
+									'one'
+								);
+							}
 							local.middle &= local.activePrependToPage;
 						} else {
 							local.middle &= arguments.prependToPage;
