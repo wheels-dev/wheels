@@ -130,5 +130,71 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toInclude("data: ");
 			});
 		});
+
+		describe("SSE Newline Injection Prevention", function() {
+
+			beforeEach(function() {
+				params = {controller = "dummy", action = "dummy"};
+				_controller = g.controller("dummy", params);
+			});
+
+			it("strips newlines from id field to prevent field injection", function() {
+				local.result = _controller.$formatSSEEvent(data = "test", id = "123" & Chr(10) & "event: malicious");
+				expect(local.result).toInclude("id: 123event: malicious");
+				// No line should start with "event:" — the injected text is harmlessly concatenated in the id value
+				local.lines = ListToArray(local.result, Chr(10));
+				for (local.line in local.lines) {
+					if (Left(Trim(local.line), 6) == "event:") {
+						fail("Injected event: field found on its own line");
+					}
+				}
+			});
+
+			it("strips carriage returns from id field", function() {
+				local.result = _controller.$formatSSEEvent(data = "test", id = "123" & Chr(13) & "event: malicious");
+				// CR stripped, so the id line contains the injected text harmlessly concatenated
+				expect(local.result).toInclude("id: 123event: malicious");
+				// No CR characters should remain in output
+				expect(local.result).notToInclude(Chr(13));
+			});
+
+			it("strips newlines from event field to prevent field injection", function() {
+				local.result = _controller.$formatSSEEvent(data = "test", event = "update" & Chr(10) & "id: spoofed");
+				expect(local.result).toInclude("event: updateid: spoofed");
+				// The injected id: should not be on its own line
+				local.lines = ListToArray(local.result, Chr(10));
+				for (local.line in local.lines) {
+					if (Left(local.line, 3) == "id:") {
+						fail("Injected id: field found on its own line");
+					}
+				}
+			});
+
+			it("strips carriage returns from event field", function() {
+				local.result = _controller.$formatSSEEvent(data = "test", event = "update" & Chr(13) & "data: injected");
+				expect(local.result).notToInclude(Chr(13));
+			});
+
+			it("normalizes CRLF in data to separate data lines", function() {
+				local.input = "line1" & Chr(13) & Chr(10) & "line2";
+				local.result = _controller.$formatSSEEvent(data = local.input);
+				expect(local.result).toInclude("data: line1");
+				expect(local.result).toInclude("data: line2");
+			});
+
+			it("normalizes lone CR in data to separate data lines", function() {
+				local.input = "line1" & Chr(13) & "line2";
+				local.result = _controller.$formatSSEEvent(data = local.input);
+				expect(local.result).toInclude("data: line1");
+				expect(local.result).toInclude("data: line2");
+			});
+
+			it("prevents CR-based field injection in data", function() {
+				local.input = "safe data" & Chr(13) & "event: malicious";
+				local.result = _controller.$formatSSEEvent(data = local.input);
+				// CR should be normalized to LF, so "event: malicious" becomes a data: line
+				expect(local.result).toInclude("data: event: malicious");
+			});
+		});
 	}
 }
