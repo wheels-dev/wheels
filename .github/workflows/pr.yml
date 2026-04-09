@@ -112,10 +112,21 @@ jobs:
             exit 1
           fi
 
-          # Restart server to pick up the new JDBC driver
+          # Stop server fully and restart to pick up the new JDBC driver
           kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
-          sleep 3
-          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          lucli server stop 2>/dev/null || true
+          # Wait for port to be freed
+          for i in $(seq 1 15); do
+            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:60007/" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          # Also kill any lingering java processes on the port
+          fuser -k 60007/tcp 2>/dev/null || true
+          sleep 2
+
+          nohup lucli server run --port=60007 --force > /tmp/lucli-server.log 2>&1 &
           echo $! > /tmp/lucli-server.pid
 
           echo "Waiting for Lucee to restart..."
