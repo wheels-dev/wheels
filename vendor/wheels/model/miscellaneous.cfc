@@ -301,8 +301,8 @@ component {
 		}
 		
 		if(local.rv.datatype eq 'geography'){
-			local.sqlQuery = "select type from geography_columns where f_table_name = '#tableName()#' and f_geography_column = '#arguments.property#'";
-			local.result = queryExecute(local.sqlQuery,[],{datasource: "#variables.wheels.class.datasource#"});
+			local.sqlQuery = "select type from geography_columns where f_table_name = ? and f_geography_column = ?";
+			local.result = queryExecute(local.sqlQuery, [tableName(), arguments.property], {datasource: variables.wheels.class.datasource});
 			if(local.result.type eq 'point'){
 				local.rv.value = 'POINT(#this[arguments.property]#)';
 			}
