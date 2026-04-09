@@ -5,7 +5,7 @@ component extends="wheels.WheelsTest" {
 		describe("$quoteValue()", () => {
 
 			beforeEach(() => {
-				adapter = CreateObject("component", "wheels.databaseAdapters.H2.H2Model");
+				adapter = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
 			});
 
 			it("wraps string values in single quotes", () => {
