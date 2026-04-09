@@ -101,7 +101,7 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 		try {
 			sessionRotate();
 		} catch (any e) {
-			// Engine doesn't support sessionRotate — continue without rotation
+			writeLog(text="sessionRotate() unavailable: #e.message#", type="warning", file="wheels_auth");
 		}
 
 		$setSessionPrincipal(arguments.principal);
