@@ -141,33 +141,36 @@ component extends="../base" {
 				local.h2Jar = findH2Jar();
 				if (Len(local.h2Jar)) {
 					print.line("Using H2 JAR: " & GetFileFromPath(local.h2Jar));
-					
-					// For Lucee's H2 bundle, we can also try running the JAR directly
+
+					// Build command as array to avoid shell injection
 					if (FindNoCase("org.lucee.h2", local.h2Jar)) {
-						local.cmd = "java -jar """ & local.h2Jar & """";
+						local.cmdArray = ["java", "-jar", local.h2Jar];
 					} else {
-						local.cmd = "java -cp """ & local.h2Jar & """ org.h2.tools.Console";
+						local.cmdArray = ["java", "-cp", local.h2Jar, "org.h2.tools.Console"];
 					}
-					
-					local.cmd &= " -web -browser";
-					
+
+					ArrayAppend(local.cmdArray, "-web");
+					ArrayAppend(local.cmdArray, "-browser");
+
 					if (StructKeyExists(arguments.dsInfo, "url")) {
-						local.cmd &= " -url " & arguments.dsInfo.url;
+						ArrayAppend(local.cmdArray, "-url");
+						ArrayAppend(local.cmdArray, arguments.dsInfo.url);
 					} else if (StructKeyExists(arguments.dsInfo, "database")) {
-						local.cmd &= " -url jdbc:h2:" & arguments.dsInfo.database;
+						ArrayAppend(local.cmdArray, "-url");
+						ArrayAppend(local.cmdArray, "jdbc:h2:" & arguments.dsInfo.database);
 					}
-					
+
 					if (StructKeyExists(arguments.dsInfo, "username") && Len(arguments.dsInfo.username)) {
-						local.cmd &= " -user " & arguments.dsInfo.username;
+						ArrayAppend(local.cmdArray, "-user");
+						ArrayAppend(local.cmdArray, arguments.dsInfo.username);
 					}
-					
+
 					print.line("Launching H2 Console via command line...");
-					print.line("Command: " & local.cmd);
 					print.line();
 					print.yellowLine("The H2 Console will open in your browser.");
 					print.yellowLine("Press Ctrl+C to stop the console when done.");
-					
-					runInteractiveCommand(local.cmd);
+
+					$runInteractiveCommand(local.cmdArray);
 				} else {
 					error("H2 JAR not found. Make sure H2 database is installed.");
 					print.line("H2 is typically included with Lucee as org.lucee.h2-*.jar");
@@ -219,24 +222,29 @@ component extends="../base" {
 				local.h2Jar = findH2Jar();
 				if (Len(local.h2Jar)) {
 					print.line("Using H2 JAR: " & GetFileFromPath(local.h2Jar));
-					
-					local.cmd = "java -cp """ & local.h2Jar & """ org.h2.tools.Shell";
+
+					// Build command as array to avoid shell injection
+					local.cmdArray = ["java", "-cp", local.h2Jar, "org.h2.tools.Shell"];
 					if (Len(local.url)) {
-						local.cmd &= " -url " & local.url;
+						ArrayAppend(local.cmdArray, "-url");
+						ArrayAppend(local.cmdArray, local.url);
 					}
 					if (StructKeyExists(arguments.dsInfo, "username") && Len(arguments.dsInfo.username)) {
-						local.cmd &= " -user " & arguments.dsInfo.username;
+						ArrayAppend(local.cmdArray, "-user");
+						ArrayAppend(local.cmdArray, arguments.dsInfo.username);
 					}
 					if (StructKeyExists(arguments.dsInfo, "password") && Len(arguments.dsInfo.password)) {
-						local.cmd &= " -password " & arguments.dsInfo.password;
+						ArrayAppend(local.cmdArray, "-password");
+						ArrayAppend(local.cmdArray, arguments.dsInfo.password);
 					}
 					if (Len(arguments.command)) {
-						local.cmd &= " -sql """ & arguments.command & """";
+						ArrayAppend(local.cmdArray, "-sql");
+						ArrayAppend(local.cmdArray, arguments.command);
 					}
-					
+
 					print.line("Launching H2 Shell...");
 					print.line();
-					runInteractiveCommand(local.cmd);
+					$runInteractiveCommand(local.cmdArray);
 				} else {
 					error("H2 JAR not found. Make sure H2 database is installed.");
 					print.line("You can also try the web console with: wheels db shell web=true");
@@ -251,25 +259,28 @@ component extends="../base" {
 		local.database = arguments.dsInfo.database ?: "";
 		local.username = arguments.dsInfo.username ?: "";
 		local.password = arguments.dsInfo.password ?: "";
-		
-		// Build mysql command
-		local.cmd = "mysql";
-		local.cmd &= " -h " & local.host;
-		local.cmd &= " -P " & local.port;
+
+		// Build mysql command as array to avoid shell injection
+		local.cmdArray = ["mysql", "-h", local.host, "-P", local.port];
 		if (Len(local.username)) {
-			local.cmd &= " -u " & local.username;
-		}
-		if (Len(local.password)) {
-			local.cmd &= " -p" & local.password;
+			ArrayAppend(local.cmdArray, "-u");
+			ArrayAppend(local.cmdArray, local.username);
 		}
 		if (Len(local.database)) {
-			local.cmd &= " " & local.database;
+			ArrayAppend(local.cmdArray, local.database);
 		}
-		
+
+		// Pass password via MYSQL_PWD environment variable instead of command line
+		local.envVars = {};
+		if (Len(local.password)) {
+			local.envVars["MYSQL_PWD"] = local.password;
+		}
+
 		if (Len(arguments.command)) {
-			local.cmd &= " -e """ & arguments.command & """";
+			ArrayAppend(local.cmdArray, "-e");
+			ArrayAppend(local.cmdArray, arguments.command);
 			print.line("Executing command: " & arguments.command);
-			runCommand(local.cmd);
+			$runCommand(local.cmdArray, local.envVars);
 		} else {
 			print.greenLine("Connecting to MySQL database...");
 			print.line("Host: " & local.host & ":" & local.port);
@@ -277,8 +288,8 @@ component extends="../base" {
 			print.line();
 			print.line("Type 'help' for MySQL commands, 'exit' to quit");
 			print.line();
-			
-			runInteractiveCommand(local.cmd);
+
+			$runInteractiveCommand(local.cmdArray, local.envVars);
 		}
 	}
 
@@ -287,26 +298,25 @@ component extends="../base" {
 		local.port = arguments.dsInfo.port ?: "5432";
 		local.database = arguments.dsInfo.database ?: "postgres";
 		local.username = arguments.dsInfo.username ?: "";
-		
-		// Build psql command
-		local.cmd = "psql";
-		local.cmd &= " -h " & local.host;
-		local.cmd &= " -p " & local.port;
-		local.cmd &= " -d " & local.database;
+
+		// Build psql command as array to avoid shell injection
+		local.cmdArray = ["psql", "-h", local.host, "-p", local.port, "-d", local.database];
 		if (Len(local.username)) {
-			local.cmd &= " -U " & local.username;
+			ArrayAppend(local.cmdArray, "-U");
+			ArrayAppend(local.cmdArray, local.username);
 		}
-		
-		// Set PGPASSWORD environment variable if provided
+
+		// Pass password via PGPASSWORD environment variable (never on command line)
 		local.envVars = {};
 		if (StructKeyExists(arguments.dsInfo, "password") && Len(arguments.dsInfo.password)) {
 			local.envVars["PGPASSWORD"] = arguments.dsInfo.password;
 		}
-		
+
 		if (Len(arguments.command)) {
-			local.cmd &= " -c """ & arguments.command & """";
+			ArrayAppend(local.cmdArray, "-c");
+			ArrayAppend(local.cmdArray, arguments.command);
 			print.line("Executing command: " & arguments.command);
-			runCommand(local.cmd, local.envVars);
+			$runCommand(local.cmdArray, local.envVars);
 		} else {
 			print.greenLine("Connecting to PostgreSQL database...");
 			print.line("Host: " & local.host & ":" & local.port);
@@ -314,8 +324,8 @@ component extends="../base" {
 			print.line();
 			print.line("Type \h for help, \q to quit");
 			print.line();
-			
-			runInteractiveCommand(local.cmd, local.envVars);
+
+			$runInteractiveCommand(local.cmdArray, local.envVars);
 		}
 	}
 
@@ -325,29 +335,33 @@ component extends="../base" {
 		local.database = arguments.dsInfo.database ?: "master";
 		local.username = arguments.dsInfo.username ?: "";
 		local.password = arguments.dsInfo.password ?: "";
-		
-		// Build sqlcmd command
-		local.cmd = "sqlcmd";
-		local.cmd &= " -S " & local.host;
+
+		local.server = local.host;
 		if (local.port != "1433") {
-			local.cmd &= "," & local.port;
+			local.server &= "," & local.port;
 		}
-		local.cmd &= " -d " & local.database;
-		
+
+		// Build sqlcmd command as array to avoid shell injection
+		local.cmdArray = ["sqlcmd", "-S", local.server, "-d", local.database];
+		local.envVars = {};
+
 		if (Len(local.username)) {
-			local.cmd &= " -U " & local.username;
+			ArrayAppend(local.cmdArray, "-U");
+			ArrayAppend(local.cmdArray, local.username);
+			// Pass password via SQLCMDPASSWORD environment variable instead of command line
 			if (Len(local.password)) {
-				local.cmd &= " -P " & local.password;
+				local.envVars["SQLCMDPASSWORD"] = local.password;
 			}
 		} else {
 			// Use Windows authentication
-			local.cmd &= " -E";
+			ArrayAppend(local.cmdArray, "-E");
 		}
-		
+
 		if (Len(arguments.command)) {
-			local.cmd &= " -Q """ & arguments.command & """";
+			ArrayAppend(local.cmdArray, "-Q");
+			ArrayAppend(local.cmdArray, arguments.command);
 			print.line("Executing command: " & arguments.command);
-			runCommand(local.cmd);
+			$runCommand(local.cmdArray, local.envVars);
 		} else {
 			print.greenLine("Connecting to SQL Server database...");
 			print.line("Host: " & local.host & ":" & local.port);
@@ -355,8 +369,8 @@ component extends="../base" {
 			print.line();
 			print.line("Type :help for commands, :quit to exit");
 			print.line();
-			
-			runInteractiveCommand(local.cmd);
+
+			$runInteractiveCommand(local.cmdArray, local.envVars);
 		}
 	}
 
@@ -462,81 +476,111 @@ component extends="../base" {
 		return "Unknown";
 	}
 
-	private void function runInteractiveCommand(required string command, struct envVars = {}) {
-		try {
-			// Use ProcessBuilder for better control
-			local.pb = CreateObject("java", "java.lang.ProcessBuilder");
-			
-			// Parse command into array
-			local.commandArray = ListToArray(arguments.command, " ");
-			local.pb.init(local.commandArray);
-			
-			// Set environment variables
-			if (!StructIsEmpty(arguments.envVars)) {
-				local.env = local.pb.environment();
-				for (local.key in arguments.envVars) {
-					local.env.put(local.key, arguments.envVars[local.key]);
-				}
+	/**
+	 * Create a ProcessBuilder from a command array with optional environment variables.
+	 * Centralizes array-to-ArrayList conversion and env var injection.
+	 */
+	private any function $createProcessBuilder(required any commandArgs, struct envVars = {}) {
+		if (IsArray(arguments.commandArgs)) {
+			local.commandArray = arguments.commandArgs;
+		} else {
+			local.commandArray = ListToArray(arguments.commandArgs, " ");
+		}
+
+		local.javaList = CreateObject("java", "java.util.ArrayList");
+		for (local.item in local.commandArray) {
+			local.javaList.add(JavaCast("string", local.item));
+		}
+
+		local.pb = CreateObject("java", "java.lang.ProcessBuilder").init(local.javaList);
+
+		if (!StructIsEmpty(arguments.envVars)) {
+			local.env = local.pb.environment();
+			for (local.key in arguments.envVars) {
+				local.env.put(local.key, arguments.envVars[local.key]);
 			}
-			
-			// Inherit IO to allow interactive mode
+		}
+
+		return local.pb;
+	}
+
+	/**
+	 * Run a command interactively with inherited IO.
+	 * Accepts a pre-built array of command arguments to avoid shell injection.
+	 */
+	private void function $runInteractiveCommand(required any commandArgs, struct envVars = {}) {
+		try {
+			local.pb = $createProcessBuilder(arguments.commandArgs, arguments.envVars);
 			local.pb.inheritIO();
-			
-			// Start process
+
 			local.process = local.pb.start();
-			
-			// Wait for process to complete
 			local.exitCode = local.process.waitFor();
-			
+
 			if (local.exitCode != 0) {
 				print.line();
 				print.yellowLine("Database shell exited with code: " & local.exitCode);
 			}
-			
+
 		} catch (any e) {
-			// Fallback to cfexecute for simpler cases
+			// Fallback to cfexecute
 			try {
+				if (IsArray(arguments.commandArgs)) {
+					local.exe = arguments.commandArgs[1];
+					local.argStr = "";
+					if (ArrayLen(arguments.commandArgs) > 1) {
+						local.parts = [];
+						for (local.i = 2; local.i <= ArrayLen(arguments.commandArgs); local.i++) {
+							local.val = arguments.commandArgs[local.i];
+							if (Find(" ", local.val)) {
+								ArrayAppend(local.parts, '"' & local.val & '"');
+							} else {
+								ArrayAppend(local.parts, local.val);
+							}
+						}
+						local.argStr = ArrayToList(local.parts, " ");
+					}
+				} else {
+					local.exe = ListFirst(arguments.commandArgs, " ");
+					local.argStr = ListRest(arguments.commandArgs, " ");
+				}
 				cfexecute(
-					name=ListFirst(arguments.command, " "),
-					arguments=ListRest(arguments.command, " "),
+					name=local.exe,
+					arguments=local.argStr,
 					timeout=0
 				);
 			} catch (any e2) {
 				error("Failed to launch database shell. Make sure the database client is installed.");
-				print.line("Command attempted: " & arguments.command);
 			}
 		}
 	}
 
-	private void function runCommand(required string command, struct envVars = {}) {
-		// Similar to runInteractiveCommand but doesn't inherit IO
+	/**
+	 * Run a command and capture its output.
+	 * Accepts a pre-built array of command arguments to avoid shell injection.
+	 */
+	private void function $runCommand(required any commandArgs, struct envVars = {}) {
 		try {
-			local.pb = CreateObject("java", "java.lang.ProcessBuilder");
-			local.commandArray = ListToArray(arguments.command, " ");
-			local.pb.init(local.commandArray);
-			
-			if (!StructIsEmpty(arguments.envVars)) {
-				local.env = local.pb.environment();
-				for (local.key in arguments.envVars) {
-					local.env.put(local.key, arguments.envVars[local.key]);
-				}
-			}
-			
+			local.pb = $createProcessBuilder(arguments.commandArgs, arguments.envVars);
+			local.pb.redirectErrorStream(true);
+
 			local.process = local.pb.start();
-			local.exitCode = local.process.waitFor();
-			
-			// Read output
-			local.inputStream = local.process.getInputStream();
+
 			local.reader = CreateObject("java", "java.io.BufferedReader").init(
-				CreateObject("java", "java.io.InputStreamReader").init(local.inputStream)
+				CreateObject("java", "java.io.InputStreamReader").init(local.process.getInputStream())
 			);
-			
+
 			local.line = local.reader.readLine();
 			while (!IsNull(local.line)) {
 				print.line(local.line);
 				local.line = local.reader.readLine();
 			}
-			
+
+			local.exitCode = local.process.waitFor();
+
+			if (local.exitCode != 0) {
+				print.yellowLine("Command exited with code: " & local.exitCode);
+			}
+
 		} catch (any e) {
 			error("Command execution failed: " & e.message);
 		}
