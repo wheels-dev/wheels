@@ -30,7 +30,7 @@ component extends="wheels.WheelsTest" {
 				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
 				// &#111; = 'o', so this decodes to <li onmouseover="alert(1)">
 				var result = _controller.paginationLinks(
-					prependToPage = '<li &#111;nmouseover="alert(1)">'
+					prependToPage = '<li &##111;nmouseover="alert(1)">'
 				);
 				expect(result).notToInclude("onmouseover");
 				expect(result).notToInclude("alert");
@@ -40,7 +40,7 @@ component extends="wheels.WheelsTest" {
 				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
 				// &#x6F; = 'o', so this decodes to <li onmouseover="alert(1)">
 				var result = _controller.paginationLinks(
-					prependToPage = '<li &#x6F;nmouseover="alert(1)">'
+					prependToPage = '<li &##x6F;nmouseover="alert(1)">'
 				);
 				expect(result).notToInclude("onmouseover");
 				expect(result).notToInclude("alert");
@@ -50,7 +50,7 @@ component extends="wheels.WheelsTest" {
 				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
 				// &#106; = 'j', so this decodes to javascript:alert(1)
 				var result = _controller.paginationLinks(
-					prependToPage = '<li><a href="&#106;avascript:alert(1)">'
+					prependToPage = '<li><a href="&##106;avascript:alert(1)">'
 				);
 				expect(result).notToInclude("javascript");
 				expect(result).notToInclude("alert");
@@ -76,7 +76,7 @@ component extends="wheels.WheelsTest" {
 
 			it("decodes mixed decimal and hex entities in $decodeHtmlEntities", () => {
 				// &#111; = 'o' (decimal), &#x6E; = 'n' (hex)
-				var input = "&#111;&#x6E;mouseover";
+				var input = "&##111;&##x6E;mouseover";
 				var result = _controller.$decodeHtmlEntities(input);
 				expect(result).toBe("onmouseover");
 			});
