@@ -15,7 +15,8 @@ component {
 		) {
 			local.scopeDef = variables.wheels.class.scopes[arguments.missingMethodName];
 			if (StructKeyExists(local.scopeDef, "handler") && Len(local.scopeDef.handler)) {
-				local.spec = $invoke(method = local.scopeDef.handler, invokeArgs = arguments.missingMethodArguments);
+				local.sanitizedArgs = $sanitizeScopeHandlerArgs(arguments.missingMethodArguments);
+				local.spec = $invoke(method = local.scopeDef.handler, invokeArgs = local.sanitizedArgs);
 			} else {
 				local.spec = Duplicate(local.scopeDef);
 			}
