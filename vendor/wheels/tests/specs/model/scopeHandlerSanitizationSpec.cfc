@@ -127,7 +127,7 @@ component extends="wheels.WheelsTest" {
 				var m = application.wo.model("author");
 				var result = m.$sanitizeScopeHandlerArgs({"1": "admin/* injected */value"});
 
-				expect(result["1"]).toBe("admin injectedvalue");
+				expect(result["1"]).toBe("admin injected value");
 			});
 
 			it("strips semicolons to prevent stacked queries", () => {
