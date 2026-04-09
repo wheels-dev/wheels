@@ -1053,6 +1053,12 @@ Provide migration code following Wheels conventions."
 		try {
 			// Determine test type and target directory
 			local.testName = arguments.args.name;
+
+			// Validate test name: only letters, digits, underscores; must start with a letter
+			if (!ReFind("^[a-zA-Z][a-zA-Z0-9_]*$", local.testName)) {
+				return "Error: Invalid test name. Use only letters, numbers, and underscores, starting with a letter.";
+			}
+
 			local.testType = "model"; // default
 			local.targetDir = "";
 
@@ -1098,6 +1104,13 @@ Provide migration code following Wheels conventions."
 			// Generate test file content
 			local.testFileName = local.testName & "Test.cfc";
 			local.testFilePath = local.fullTargetDir & local.testFileName;
+
+			// Defense-in-depth: verify resolved path stays within the target directory
+			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.testFilePath).getCanonicalPath();
+			local.canonicalBase = CreateObject("java", "java.io.File").init(local.fullTargetDir).getCanonicalPath();
+			if (!local.canonicalTarget.startsWith(local.canonicalBase)) {
+				return "Error: Invalid test file path - path traversal detected.";
+			}
 
 			// Create test file with proper TestBox structure
 			local.testContent = createTestFileContent(local.testName, local.testType);
@@ -1232,8 +1245,10 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'action'";
 		}
 
-		if (!$isValidType(arguments.args.action)) {
-			return "Error: Invalid 'action' parameter. Must be alphanumeric (e.g., start, stop, status).";
+		// Whitelist allowed server actions to prevent command injection
+		local.allowedActions = "start,stop,restart,status,log,env,info,list";
+		if (!ListFindNoCase(local.allowedActions, arguments.args.action)) {
+			return "Error: Invalid action '#EncodeForHTML(arguments.args.action)#'. Allowed: #local.allowedActions#";
 		}
 
 		local.command = "wheels server " & arguments.args.action;
