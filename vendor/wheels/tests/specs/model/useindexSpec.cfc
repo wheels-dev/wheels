@@ -121,5 +121,105 @@ component extends="wheels.WheelsTest" {
                 expect(posts.recordcount).toBe(4)
             })
 		});
+
+		describe("$indexHint SQL injection prevention", () => {
+
+			it("accepts valid index names with letters numbers and underscores", () => {
+				result = g.model("post").$indexHint(
+					useIndex = {"post": "idx_users_email"},
+					modelName = "post",
+					adapterName = "MySQLModel"
+				);
+				expect(result).toBe("USE INDEX(idx_users_email)");
+			});
+
+			it("accepts valid index name for MSSQL adapter", () => {
+				result = g.model("post").$indexHint(
+					useIndex = {"post": "IX_Posts_AuthorId"},
+					modelName = "post",
+					adapterName = "MicrosoftSQLServerModel"
+				);
+				expect(result).toBe("WITH (INDEX(IX_Posts_AuthorId))");
+			});
+
+			it("returns empty string for unsupported adapter", () => {
+				result = g.model("post").$indexHint(
+					useIndex = {"post": "idx_test"},
+					modelName = "post",
+					adapterName = "PostgreSQLModel"
+				);
+				expect(result).toBe("");
+			});
+
+			it("returns empty string when model not in useIndex struct", () => {
+				result = g.model("post").$indexHint(
+					useIndex = {"other": "idx_test"},
+					modelName = "post",
+					adapterName = "MySQLModel"
+				);
+				expect(result).toBe("");
+			});
+
+			it("rejects index name containing SQL injection attempt", () => {
+				expect(function() {
+					g.model("post").$indexHint(
+						useIndex = {"post": "); DROP TABLE users;--"},
+						modelName = "post",
+						adapterName = "MySQLModel"
+					);
+				}).toThrow("Wheels.InvalidIndexName");
+			});
+
+			it("rejects index name with spaces", () => {
+				expect(function() {
+					g.model("post").$indexHint(
+						useIndex = {"post": "idx name"},
+						modelName = "post",
+						adapterName = "MySQLModel"
+					);
+				}).toThrow("Wheels.InvalidIndexName");
+			});
+
+			it("rejects index name with parentheses", () => {
+				expect(function() {
+					g.model("post").$indexHint(
+						useIndex = {"post": "idx(test)"},
+						modelName = "post",
+						adapterName = "MySQLModel"
+					);
+				}).toThrow("Wheels.InvalidIndexName");
+			});
+
+			it("rejects index name with single quotes", () => {
+				expect(function() {
+					g.model("post").$indexHint(
+						useIndex = {"post": "idx'test"},
+						modelName = "post",
+						adapterName = "MySQLModel"
+					);
+				}).toThrow("Wheels.InvalidIndexName");
+			});
+
+			it("rejects empty string as index name", () => {
+				expect(function() {
+					g.model("post").$indexHint(
+						useIndex = {"post": ""},
+						modelName = "post",
+						adapterName = "MySQLModel"
+					);
+				}).toThrow("Wheels.InvalidIndexName");
+			});
+
+			it("rejects non-simple value as index name", () => {
+				expect(function() {
+					g.model("post").$indexHint(
+						useIndex = {"post": ["array_value"]},
+						modelName = "post",
+						adapterName = "MySQLModel"
+					);
+				}).toThrow("Wheels.InvalidIndexName");
+			});
+
+		});
 	}
 }
