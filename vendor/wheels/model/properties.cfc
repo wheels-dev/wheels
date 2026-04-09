@@ -709,10 +709,12 @@ component {
 	}
 
 	/**
-	 * Sanitizes arguments before they are passed to a scope handler function.
-	 * Escapes single quotes in all string argument values so that handlers using
-	 * string interpolation (e.g. `"lastname = '#arguments.name#'"`) produce safe SQL.
-	 * This matches the escaping pattern used for enum-generated scopes in `enum()`.
+	 * Sanitizes arguments passed to dynamic scope handler functions so that
+	 * string interpolation in WHERE clauses is safe against SQL injection.
+	 *
+	 * WARNING: For best security, scope handlers should use parameterized queries
+	 * rather than string interpolation. This sanitization is a safety net, not a
+	 * replacement for proper parameterization.
 	 *
 	 * @args The struct of arguments to sanitize (typically missingMethodArguments).
 	 */
@@ -720,8 +722,14 @@ component {
 		local.sanitized = {};
 		for (local.key in arguments.args) {
 			local.val = arguments.args[local.key];
-			if (IsSimpleValue(local.val) && Find("'", local.val)) {
-				local.sanitized[local.key] = Replace(local.val, "'", "''", "all");
+			if (IsSimpleValue(local.val)) {
+				// Strip null bytes (can terminate strings in some DB drivers)
+				local.val = Replace(local.val, Chr(0), "", "all");
+				// Escape backslashes (must be before single-quote escaping)
+				local.val = Replace(local.val, "\", "\\", "all");
+				// Escape single quotes (SQL standard doubling)
+				local.val = Replace(local.val, "'", "''", "all");
+				local.sanitized[local.key] = local.val;
 			} else {
 				local.sanitized[local.key] = local.val;
 			}

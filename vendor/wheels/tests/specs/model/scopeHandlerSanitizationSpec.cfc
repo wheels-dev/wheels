@@ -86,6 +86,35 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("");
 			});
 
+			it("escapes backslashes in string arguments", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "test\path"});
+
+				expect(result["1"]).toBe("test\\path");
+			});
+
+			it("escapes backslash-quote bypass attempts", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "test\' OR 1=1 --"});
+
+				expect(result["1"]).toBe("test\\'' OR 1=1 --");
+			});
+
+			it("strips null bytes from string arguments", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "test" & Chr(0) & "injection"});
+
+				expect(result["1"]).toBe("testinjection");
+			});
+
+			it("handles combined backslash quote and null byte attacks", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": Chr(0) & "O\'Brien"});
+
+				expect(result["1"]).toBe("O\\''Brien");
+			});
+
+
 		});
 
 	}
