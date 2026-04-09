@@ -46,6 +46,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       LUCLI_VERSION: "0.3.3"
+      WHEELS_CI: "true"
     steps:
       - uses: actions/checkout@v5
 

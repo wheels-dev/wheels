@@ -22,6 +22,8 @@ jobs:
   fast-test:
     name: "Lucee 7 + SQLite (LuCLI)"
     runs-on: ubuntu-latest
+    env:
+      WHEELS_CI: "true"
     steps:
       - uses: actions/checkout@v5
 

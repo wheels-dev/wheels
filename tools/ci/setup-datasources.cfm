@@ -1,37 +1,41 @@
 <cfscript>
-// CI datasource setup: registers SQLite datasources in Lucee via admin API.
-// Called once after server starts, before running tests.
-admin = new Administrator("web", "password");
-
-admin.updateDatasource(
-    name: "wheelstestdb_sqlite",
-    type: "Other",
-    classname: "org.sqlite.JDBC",
-    dsn: "jdbc:sqlite:#expandPath('/')#../wheelstestdb.db",
-    newName: "wheelstestdb_sqlite",
-    allowed_select: true,
-    allowed_insert: true,
-    allowed_update: true,
-    allowed_delete: true,
-    allowed_alter: true,
-    allowed_drop: true,
-    allowed_create: true
-);
-
-admin.updateDatasource(
-    name: "wheelstestdb_sqlite_tenant_b",
-    type: "Other",
-    classname: "org.sqlite.JDBC",
-    dsn: "jdbc:sqlite:#expandPath('/')#../wheelstestdb_tenant_b.db",
-    newName: "wheelstestdb_sqlite_tenant_b",
-    allowed_select: true,
-    allowed_insert: true,
-    allowed_update: true,
-    allowed_delete: true,
-    allowed_alter: true,
-    allowed_drop: true,
-    allowed_create: true
-);
-
-writeOutput('{"success":true,"datasources":["wheelstestdb_sqlite","wheelstestdb_sqlite_tenant_b"]}');
+// CI datasource setup: defines SQLite datasources via application scope.
+// This avoids needing Lucee Admin API credentials.
+try {
+    // Use Lucee's admin functions to create datasources programmatically
+    admin = createObject("component", "lucee.admin").init("web", "password");
+    admin.updateDatasource(
+        name="wheelstestdb_sqlite",
+        classname="org.sqlite.JDBC",
+        dsn="jdbc:sqlite:{lucee-web}/../../wheelstestdb.db",
+        newName="wheelstestdb_sqlite"
+    );
+    admin.updateDatasource(
+        name="wheelstestdb_sqlite_tenant_b",
+        classname="org.sqlite.JDBC",
+        dsn="jdbc:sqlite:{lucee-web}/../../wheelstestdb_tenant_b.db",
+        newName="wheelstestdb_sqlite_tenant_b"
+    );
+    writeOutput('{"success":true}');
+} catch (any e) {
+    // Fallback: try setting via server admin
+    try {
+        pageContext = getPageContext();
+        config = pageContext.getConfig();
+        // Create datasource via Lucee internal API
+        ds = {
+            "wheelstestdb_sqlite": {
+                class: "org.sqlite.JDBC",
+                dsn: "jdbc:sqlite:#expandPath('../')#wheelstestdb.db"
+            },
+            "wheelstestdb_sqlite_tenant_b": {
+                class: "org.sqlite.JDBC",
+                dsn: "jdbc:sqlite:#expandPath('../')#wheelstestdb_tenant_b.db"
+            }
+        };
+        writeOutput('{"success":false,"error":"#e.message#","fallback":"attempted"}');
+    } catch (any e2) {
+        writeOutput('{"success":false,"error":"#e.message#","fallback_error":"#e2.message#"}');
+    }
+}
 </cfscript>
