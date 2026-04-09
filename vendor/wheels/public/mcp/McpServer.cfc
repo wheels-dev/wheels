@@ -1586,15 +1586,41 @@ Provide migration code following Wheels conventions."
 
 	// Helper functions for .ai documentation
 
+	/**
+	 * Validates a path segment is safe (no traversal or null bytes) and returns
+	 * the cleaned absolute path constrained within the application root.
+	 * Returns empty string if validation fails.
+	 */
+	private string function $validateDocumentationPath(required string relativePath) {
+		// Reject path traversal sequences and null bytes early
+		if (Find("..", arguments.relativePath) || Find(Chr(0), arguments.relativePath)) {
+			return "";
+		}
+
+		local.basePath = expandPath("/");
+		local.fullPath = local.basePath & arguments.relativePath;
+
+		// Clean up path separators
+		local.fullPath = replace(local.fullPath, "\\", "/", "all");
+		local.fullPath = replace(local.fullPath, "//", "/", "all");
+
+		// Canonical path containment check to prevent traversal
+		local.canonicalBase = CreateObject("java", "java.io.File").init(local.basePath).getCanonicalPath();
+		local.canonicalTarget = CreateObject("java", "java.io.File").init(local.fullPath).getCanonicalPath();
+
+		if (!local.canonicalTarget.startsWith(local.canonicalBase)) {
+			return "";
+		}
+
+		return local.fullPath;
+	}
+
 	private string function readAIDocumentation(required string filename) {
 		try {
-			// Ensure path is relative to application root
-			local.basePath = expandPath("/");
-			local.filePath = local.basePath & ".ai/" & arguments.filename;
-
-			// Clean up path separators
-			local.filePath = replace(local.filePath, "\\", "/", "all");
-			local.filePath = replace(local.filePath, "//", "/", "all");
+			local.filePath = $validateDocumentationPath(".ai/" & arguments.filename);
+			if (!len(local.filePath)) {
+				return "Error: Invalid filename";
+			}
 
 			if (fileExists(local.filePath)) {
 				return fileRead(local.filePath);
@@ -1608,13 +1634,10 @@ Provide migration code following Wheels conventions."
 
 	private string function aggregateAIDocumentation(required string folderPath) {
 		try {
-			// Ensure path is relative to application root
-			local.basePath = expandPath("/");
-			local.fullPath = local.basePath & arguments.folderPath;
-
-			// Clean up path separators
-			local.fullPath = replace(local.fullPath, "\\", "/", "all");
-			local.fullPath = replace(local.fullPath, "//", "/", "all");
+			local.fullPath = $validateDocumentationPath(arguments.folderPath);
+			if (!len(local.fullPath)) {
+				return "Error: Invalid folder path";
+			}
 
 			local.aggregatedContent = "";
 
