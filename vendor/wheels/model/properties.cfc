@@ -709,6 +709,19 @@ component {
 	}
 
 	/**
+	 * Escapes a string value for safe inclusion in a SQL literal.
+	 * Strips null bytes, doubles backslashes (MySQL escape sequences), and doubles single quotes.
+	 *
+	 * @value The string value to escape.
+	 */
+	public string function $escapeSqlValue(required string value) {
+		local.rv = Replace(arguments.value, Chr(0), "", "all");
+		local.rv = Replace(local.rv, "\", "\\", "all");
+		local.rv = Replace(local.rv, "'", "''", "all");
+		return local.rv;
+	}
+
+	/**
 	 * Sanitizes arguments passed to dynamic scope handler functions so that
 	 * string interpolation in WHERE clauses is safe against SQL injection.
 	 *
@@ -723,13 +736,7 @@ component {
 		for (local.key in arguments.args) {
 			local.val = arguments.args[local.key];
 			if (IsSimpleValue(local.val)) {
-				// Strip null bytes (can terminate strings in some DB drivers)
-				local.val = Replace(local.val, Chr(0), "", "all");
-				// Escape backslashes (must be before single-quote escaping)
-				local.val = Replace(local.val, "\", "\\", "all");
-				// Escape single quotes (SQL standard doubling)
-				local.val = Replace(local.val, "'", "''", "all");
-				local.sanitized[local.key] = local.val;
+				local.sanitized[local.key] = $escapeSqlValue(local.val);
 			} else {
 				local.sanitized[local.key] = local.val;
 			}
@@ -879,8 +886,7 @@ component {
 		}
 		for (local.name in ListToArray(local.enumDef.names)) {
 			local.storedValue = local.enumDef.values[local.name];
-			// Escape single quotes to prevent SQL injection in generated WHERE clauses
-			local.escapedValue = Replace(local.storedValue, "'", "''", "all");
+			local.escapedValue = $escapeSqlValue(local.storedValue);
 			local.scopeDef = {};
 			local.scopeDef.where = "#arguments.property# = '#local.escapedValue#'";
 			variables.wheels.class.scopes[local.name] = local.scopeDef;
