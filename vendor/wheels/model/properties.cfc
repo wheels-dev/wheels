@@ -709,6 +709,27 @@ component {
 	}
 
 	/**
+	 * Sanitizes arguments before they are passed to a scope handler function.
+	 * Escapes single quotes in all string argument values so that handlers using
+	 * string interpolation (e.g. `"lastname = '#arguments.name#'"`) produce safe SQL.
+	 * This matches the escaping pattern used for enum-generated scopes in `enum()`.
+	 *
+	 * @args The struct of arguments to sanitize (typically missingMethodArguments).
+	 */
+	public struct function $sanitizeScopeHandlerArgs(required struct args) {
+		local.sanitized = {};
+		for (local.key in arguments.args) {
+			local.val = arguments.args[local.key];
+			if (IsSimpleValue(local.val) && Find("'", local.val)) {
+				local.sanitized[local.key] = Replace(local.val, "'", "''", "all");
+			} else {
+				local.sanitized[local.key] = local.val;
+			}
+		}
+		return local.sanitized;
+	}
+
+	/**
 	 * Returns a struct containing all callback definitions for this model, keyed by callback type
 	 * (e.g., `beforeSave`, `afterCreate`). Each callback type contains an array of callback method names.
 	 *
