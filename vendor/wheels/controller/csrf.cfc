@@ -232,6 +232,9 @@ component {
 			preserveCase = application.wheels.csrfCookiePreserveCase,
 			secure = application.wheels.csrfCookieSecure
 		};
+		if (Len(application.wheels.csrfCookieSameSite)) {
+			local.cookieStruct.sameSite = application.wheels.csrfCookieSameSite;
+		}
 		if (Len(application.wheels.csrfCookieDomain)) {
 			local.cookieStruct.domain = application.wheels.csrfCookieDomain;
 		}

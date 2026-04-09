@@ -11,6 +11,7 @@
 		application.$wheels.csrfCookiePath = "/";
 		application.$wheels.csrfCookiePreserveCase = "";
 		application.$wheels.csrfCookieSecure = true;
+		application.$wheels.csrfCookieSameSite = "Lax";
 
 		// CORS (Cross-Origin Resource Sharing) settings.
 		application.$wheels.allowCorsRequests = false;
