@@ -11,10 +11,23 @@
 cfheader(statuscode="200");
 cfcontent(type="application/json");
 
+// ── Security: POST only (defense-in-depth) ─────
+if (cgi.REQUEST_METHOD != "POST") {
+	cfheader(statuscode="405");
+	writeOutput(serializeJSON({success: false, error: "Method not allowed. Use POST."}));
+	abort;
+}
+
 // ── Security: localhost only ────────────────────
-local.localhostAddresses = "127.0.0.1,::1,0:0:0:0:0:0:0:1";
 local.remoteAddr = cgi.REMOTE_ADDR;
-if (!listFind(local.localhostAddresses, local.remoteAddr)) {
+local.isLocalhost = false;
+try {
+	local.remoteInet = createObject("java", "java.net.InetAddress").getByName(local.remoteAddr);
+	local.isLocalhost = local.remoteInet.isLoopbackAddress();
+} catch (any e) {
+	local.isLocalhost = false;
+}
+if (!local.isLocalhost) {
 	writeOutput(serializeJSON({success: false, error: "Console access restricted to localhost"}));
 	abort;
 }
@@ -23,7 +36,13 @@ if (!listFind(local.localhostAddresses, local.remoteAddr)) {
 if (len(trim(cgi.HTTP_X_FORWARDED_FOR))) {
 	local.forwardedIps = listToArray(cgi.HTTP_X_FORWARDED_FOR);
 	for (local.ip in local.forwardedIps) {
-		if (!listFind(local.localhostAddresses, trim(local.ip))) {
+		try {
+			local.fwdInet = createObject("java", "java.net.InetAddress").getByName(trim(local.ip));
+			if (!local.fwdInet.isLoopbackAddress()) {
+				writeOutput(serializeJSON({success: false, error: "Console access restricted to localhost"}));
+				abort;
+			}
+		} catch (any e) {
 			writeOutput(serializeJSON({success: false, error: "Console access restricted to localhost"}));
 			abort;
 		}
@@ -37,6 +56,13 @@ if (
 	&& application.wheels.environment != "development"
 ) {
 	writeOutput(serializeJSON({success: false, error: "Console only available in development mode. Current: " & application.wheels.environment}));
+	abort;
+}
+
+// ── Security: Content-Type must be JSON ─────────
+local.contentType = cgi.CONTENT_TYPE ?: "";
+if (!FindNoCase("application/json", local.contentType)) {
+	writeOutput(serializeJSON({success: false, error: "Content-Type must be application/json"}));
 	abort;
 }
 
