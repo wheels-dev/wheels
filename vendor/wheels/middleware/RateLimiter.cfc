@@ -30,6 +30,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @maxStoreSize Maximum number of entries allowed in the in-memory store. When exceeded during cleanup,
 	 *   the oldest entries are evicted. Prevents unbounded memory growth from attackers rotating client keys.
 	 *   Only applies when storage="memory". Default: 100000.
+	 * @maxTimestampsPerKey Maximum number of timestamps stored per client key in the sliding window strategy.
+	 *   Prevents a single attacker from exhausting heap memory by making rapid requests. After pruning expired
+	 *   entries, arrays exceeding this limit are truncated to keep only the most recent timestamps.
+	 *   Default: maxRequests * 3. Only applies to the "slidingWindow" strategy with storage="memory".
 	 */
 	public RateLimiter function init(
 		numeric maxRequests = 60,
@@ -40,7 +44,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		string headerPrefix = "X-RateLimit",
 		boolean trustProxy = false,
 		string proxyStrategy = "first",
-		numeric maxStoreSize = 100000
+		numeric maxStoreSize = 100000,
+		numeric maxTimestampsPerKey = 0
 	) {
 		if (!ListFindNoCase("fixedWindow,slidingWindow,tokenBucket", arguments.strategy)) {
 			throw(
@@ -72,6 +77,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.trustProxy = arguments.trustProxy;
 		variables.proxyStrategy = arguments.proxyStrategy;
 		variables.maxStoreSize = arguments.maxStoreSize;
+		variables.maxTimestampsPerKey = arguments.maxTimestampsPerKey > 0 ? arguments.maxTimestampsPerKey : arguments.maxRequests * 3;
 
 		// In-memory store using ConcurrentHashMap for thread safety.
 		if (variables.storage == "memory") {
@@ -267,6 +273,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					}
 				}
 
+				// Cap per-key array size to prevent memory exhaustion from rapid requests.
+				if (ArrayLen(local.pruned) > variables.maxTimestampsPerKey) {
+					local.pruned = local.pruned.slice(ArrayLen(local.pruned) - variables.maxTimestampsPerKey + 1);
+				}
+
 				if (ArrayLen(local.pruned) >= variables.maxRequests) {
 					local.allowed = false;
 					local.remaining = 0;
@@ -417,23 +428,62 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 	/**
 	 * Evict entries from the in-memory store when it exceeds maxStoreSize.
-	 * Scores each entry by age and removes the oldest 10% to create headroom.
+	 * First removes fully expired entries, then evicts the oldest 25% to create headroom.
 	 * Entries whose age cannot be determined score 0 (youngest) and are evicted last.
 	 */
 	private void function $evictOldest(required numeric now) {
 		try {
 			local.keys = variables.store.keySet().toArray();
 			local.storeSize = ArrayLen(local.keys);
-			local.targetSize = Int(variables.maxStoreSize * 0.9);
+			local.targetSize = Int(variables.maxStoreSize * 0.75);
 			local.toEvict = local.storeSize - local.targetSize;
 
 			if (local.toEvict <= 0) {
 				return;
 			}
 
-			// Build an array of {key, age} for sorting.
-			local.entries = [];
+			// First pass: remove fully expired entries (cheap, no sorting needed).
 			local.currentWindowId = Int(arguments.now / variables.windowSeconds);
+			local.windowStart = arguments.now - variables.windowSeconds;
+			local.expiredCount = 0;
+			for (local.key in local.keys) {
+				if (local.expiredCount >= local.toEvict) {
+					break;
+				}
+				if (variables.store.containsKey(local.key)) {
+					local.value = variables.store.get(local.key);
+					local.isExpired = false;
+
+					if (variables.strategy == "fixedWindow" && Find(":", local.key)) {
+						local.windowId = Val(ListLast(local.key, ":"));
+						local.isExpired = local.windowId < local.currentWindowId;
+					} else if (variables.strategy == "slidingWindow" && IsArray(local.value)) {
+						if (ArrayLen(local.value) == 0) {
+							local.isExpired = true;
+						} else {
+							// Expired if newest timestamp is outside the window.
+							local.isExpired = local.value[ArrayLen(local.value)] <= local.windowStart;
+						}
+					} else if (variables.strategy == "tokenBucket" && IsStruct(local.value) && StructKeyExists(local.value, "tokens")) {
+						local.isExpired = local.value.tokens >= variables.maxRequests && (arguments.now - local.value.lastRefill) > variables.windowSeconds;
+					}
+
+					if (local.isExpired) {
+						variables.store.remove(local.key);
+						local.expiredCount++;
+					}
+				}
+			}
+
+			// If expired-entry removal was sufficient, skip the expensive sort.
+			if (local.expiredCount >= local.toEvict) {
+				return;
+			}
+
+			// Second pass: sort remaining entries by age and evict oldest.
+			local.remainingToEvict = local.toEvict - local.expiredCount;
+			local.keys = variables.store.keySet().toArray();
+			local.entries = [];
 			for (local.key in local.keys) {
 				local.age = 0;
 				if (variables.store.containsKey(local.key)) {
@@ -459,7 +509,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			// Evict the oldest entries.
 			local.evicted = 0;
 			for (local.entry in local.entries) {
-				if (local.evicted >= local.toEvict) {
+				if (local.evicted >= local.remainingToEvict) {
 					break;
 				}
 				variables.store.remove(local.entry.key);

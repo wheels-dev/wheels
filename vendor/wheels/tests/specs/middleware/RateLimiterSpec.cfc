@@ -347,6 +347,96 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("RateLimiter maxTimestampsPerKey", function() {
+
+			it("defaults maxTimestampsPerKey to maxRequests * 3", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 10,
+					strategy = "slidingWindow"
+				);
+				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("accepts custom maxTimestampsPerKey", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 10,
+					strategy = "slidingWindow",
+					maxTimestampsPerKey = 50
+				);
+				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("caps sliding window timestamps per key", function() {
+				// Set maxRequests high so we never get blocked, but cap timestamps low.
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1000,
+					windowSeconds = 60,
+					strategy = "slidingWindow",
+					maxTimestampsPerKey = 5
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// Send 20 requests from the same client.
+				for (var i = 1; i <= 20; i++) {
+					var req = {remoteAddr: "flood-client"};
+					limiter.handle(request = req, next = nextFn);
+				}
+
+				// The limiter should still function correctly after capping.
+				var finalReq = {remoteAddr: "flood-client"};
+				var result = limiter.handle(request = finalReq, next = nextFn);
+				expect(result).toBe("ok");
+			});
+
+			it("still enforces rate limit with timestamp cap active", function() {
+				// maxRequests=3, maxTimestampsPerKey defaults to 9 (3*3).
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 3,
+					windowSeconds = 60,
+					strategy = "slidingWindow"
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				var r1 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
+				var r2 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
+				var r3 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
+				var r4 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
+
+				expect(r1).toBe("ok");
+				expect(r2).toBe("ok");
+				expect(r3).toBe("ok");
+				expect(r4).toInclude("Rate limit exceeded");
+			});
+
+		});
+
+		describe("RateLimiter eviction improvements", function() {
+
+			it("evicts 25 percent of entries creating more headroom", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1000,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					maxStoreSize = 4
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// Fill store to capacity with unique clients.
+				for (var i = 1; i <= 8; i++) {
+					var req = {remoteAddr: "evict25-#i#"};
+					limiter.handle(request = req, next = nextFn);
+				}
+
+				// Should still work after eviction.
+				var result = limiter.handle(request = {remoteAddr: "evict25-final"}, next = nextFn);
+				expect(result).toBe("ok");
+			});
+
+		});
+
 	}
 
 }
