@@ -550,7 +550,9 @@ component {
 			if (local.match.pos[1] == 0) break;
 			local.hex = Mid(local.result, local.match.pos[2], local.match.len[2]);
 			local.char = Chr(InputBaseN(local.hex, 16));
-			local.result = Left(local.result, local.match.pos[1] - 1) & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
+			// Lucee 7 doesn't allow Left(str, 0); guard against match at position 1
+			local.prefix = local.match.pos[1] > 1 ? Left(local.result, local.match.pos[1] - 1) : "";
+			local.result = local.prefix & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
 			local.pos = local.match.pos[1] + Len(local.char);
 		}
 		// Decode decimal entities: &#NNN;
@@ -560,7 +562,8 @@ component {
 			if (local.match.pos[1] == 0) break;
 			local.dec = Mid(local.result, local.match.pos[2], local.match.len[2]);
 			local.char = Chr(Int(local.dec));
-			local.result = Left(local.result, local.match.pos[1] - 1) & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
+			local.prefix = local.match.pos[1] > 1 ? Left(local.result, local.match.pos[1] - 1) : "";
+			local.result = local.prefix & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
 			local.pos = local.match.pos[1] + Len(local.char);
 		}
 		return local.result;

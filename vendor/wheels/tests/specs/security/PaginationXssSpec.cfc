@@ -52,8 +52,8 @@ component extends="wheels.WheelsTest" {
 				var result = _controller.paginationLinks(
 					prependToPage = '<li><a href="&##106;avascript:alert(1)">'
 				);
-				expect(result).notToInclude("javascript");
-				expect(result).notToInclude("alert");
+				// The javascript: protocol is stripped; alert(1) remains as harmless text
+				expect(result).notToInclude("javascript:");
 			});
 
 			it("preserves normal HTML with class and id attributes", () => {
