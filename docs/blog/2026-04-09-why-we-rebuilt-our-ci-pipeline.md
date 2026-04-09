@@ -111,11 +111,15 @@ LuCLI is more than a CommandBox replacement — it's a statement about where Whe
 
 When CI and local development use the same tools, "works on my machine" and "works in CI" converge. There's one mental model, one set of troubleshooting steps, one path from code change to verification.
 
-## The Datasource Pattern
+## The Datasource Pattern: Engine-Level to App-Level
 
-One interesting challenge: Lucee needs datasource configurations at the engine level, not just the application level. In the Docker-based pipeline, this was handled by CFConfig.json — a well-established way to configure Lucee datasources before the server starts.
+The move from CommandBox to LuCLI surfaced an important architectural shift in how datasources are configured.
 
-LuCLI doesn't yet support CFConfig-style datasource injection. Rather than adding a complex workaround, we used CFML's native `this.datasources` feature in `config/app.cfm` — the Wheels convention for Application-level configuration — gated by an environment variable:
+In the CommandBox/Docker world, datasources lived at the **engine level**. CommandBox supports CFConfig — a JSON file that injects datasource definitions directly into Lucee's server configuration before the application starts. Our Docker Compose files used `CFConfig.json` to define all seven database connections (MySQL, PostgreSQL, SQL Server, H2, CockroachDB, Oracle, SQLite) at the engine layer. The application never needed to know how those connections were established — it just referenced them by name.
+
+LuCLI doesn't support CFConfig. Rather than building a compatibility shim, we took this as an opportunity to move datasource definitions where they arguably belong: **at the application level**. CFML has supported `this.datasources` in `Application.cfc` for years, but the ecosystem's reliance on engine-level admin panels and CFConfig meant most developers never used it.
+
+In Wheels, `config/app.cfm` is the recommended place for Application-level configuration — it's included by `Application.cfc` and keeps the framework file clean:
 
 ```cfm
 // config/app.cfm
@@ -127,9 +131,9 @@ if (server.system.environment.WHEELS_CI ?: "" == "true") {
 }
 ```
 
-`config/app.cfm` is included by `Application.cfc` and is the recommended place for developers to define `this.datasources`, session settings, and other Application-level configuration. It keeps `Application.cfc` clean as a framework file that rarely needs editing.
+This is a better pattern for several reasons. App-level datasources are version-controlled with your code. They're portable across engines without engine-specific admin tools. They're visible in code review. And they work identically whether you're running LuCLI locally, deploying to a server, or running in CI — no separate configuration layer to keep in sync.
 
-This pattern is clean, portable, and doesn't require engine-specific admin APIs. Any Wheels application can adopt it for testing — define your test datasources in code, not in engine configuration.
+The `WHEELS_CI` environment variable gates the test datasources so they only activate in CI. Production applications define their real datasources in the same file, ungated, or read connection strings from environment variables.
 
 ## Lessons Learned
 
