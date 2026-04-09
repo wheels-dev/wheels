@@ -285,9 +285,20 @@ component {
 			if (Len(arguments.appendToPage)) {
 				arguments.appendToPage = EncodeForHTML($canonicalize(arguments.appendToPage));
 			}
+			if (Len(arguments.anchorDivider)) {
+				arguments.anchorDivider = EncodeForHTML($canonicalize(arguments.anchorDivider));
+			}
 		}
 
 		if (arguments.showSinglePage || local.totalPages > 1) {
+			// Strip event handlers from appendToPage (parallel to prependToPage sanitization in the loop)
+			if (Len(arguments.appendToPage)) {
+				local.sanitizedAppend = reReplaceNoCase(arguments.appendToPage, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+				local.sanitizedAppend = reReplaceNoCase(local.sanitizedAppend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+				local.sanitizedAppend = reReplaceNoCase(local.sanitizedAppend, 'javascript\s*:', '', 'all');
+			} else {
+				local.sanitizedAppend = arguments.appendToPage;
+			}
 			if (Len(arguments.prepend)) {
 				local.start &= arguments.prepend;
 			}
@@ -307,8 +318,8 @@ component {
 						local.start &= arguments.prependToPage;
 					}
 					local.start &= linkTo(argumentCollection = local.linkToArguments);
-					if (Len(arguments.appendToPage) && arguments.appendOnAnchor) {
-						local.start &= arguments.appendToPage;
+					if (Len(local.sanitizedAppend) && arguments.appendOnAnchor) {
+						local.start &= local.sanitizedAppend;
 					}
 					local.start &= arguments.anchorDivider;
 				}
@@ -394,8 +405,8 @@ component {
 							local.middle &= NumberFormat(local.i);
 						}
 					}
-					if (Len(arguments.appendToPage)) {
-						local.middle &= arguments.appendToPage;
+					if (Len(local.sanitizedAppend)) {
+						local.middle &= local.sanitizedAppend;
 					}
 				}
 			}
@@ -415,8 +426,8 @@ component {
 						local.end &= arguments.prependToPage;
 					}
 					local.end &= linkTo(argumentCollection = local.linkToArguments);
-					if (Len(arguments.appendToPage) && arguments.appendOnAnchor) {
-						local.end &= arguments.appendToPage;
+					if (Len(local.sanitizedAppend) && arguments.appendOnAnchor) {
+						local.end &= local.sanitizedAppend;
 					}
 				}
 			}
@@ -432,8 +443,8 @@ component {
 					Len(local.middle) - Len(arguments.prependToPage)
 				);
 			}
-			if (Len(arguments.appendToPage) && !arguments.appendOnLast) {
-				local.middle = Mid(local.middle, 1, Len(local.middle) - Len(arguments.appendToPage));
+			if (Len(local.sanitizedAppend) && !arguments.appendOnLast) {
+				local.middle = Mid(local.middle, 1, Len(local.middle) - Len(local.sanitizedAppend));
 			}
 		}
 		return local.start & local.middle & local.end;
