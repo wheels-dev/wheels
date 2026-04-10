@@ -497,6 +497,15 @@ component {
 		string $baseTemplatePath = $get("viewPath"),
 		boolean $prependWithUnderscore = true
 	) {
+		// Reject path traversal attempts in partial/template names
+		if (Find("..", arguments.$name) || Find(Chr(92), arguments.$name)) {
+			Throw(
+				type="Wheels.InvalidPartialPath",
+				message="The partial name `#EncodeForHTML(arguments.$name)#` contains invalid path characters.",
+				extendedInfo="Partial names must not contain '..' or backslashes."
+			);
+		}
+
 		local.rv = arguments.$baseTemplatePath;
 
 		// Handle dot notation in the controller name.

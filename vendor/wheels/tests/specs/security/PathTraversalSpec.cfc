@@ -2,6 +2,8 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		g = application.wo;
+
 		describe("guideImage path traversal prevention", () => {
 
 			it("strips directory components from file parameter", () => {
@@ -49,6 +51,51 @@ component extends="wheels.WheelsTest" {
 				var canonicalNormal = createObject("java", "java.io.File").init(normalPath).getCanonicalPath();
 
 				expect(CompareNoCase(left(canonicalNormal, len(canonicalAssets)), canonicalAssets)).toBe(0);
+			});
+
+		});
+
+		describe("Partial path traversal prevention", () => {
+
+			beforeEach(() => {
+				params = {controller="dummy", action="dummy"};
+				_controller = g.controller("dummy", params);
+			});
+
+			it("rejects partial names with dot-dot sequences", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="../../etc/passwd", $type="partial");
+				}).toThrow("Wheels.InvalidPartialPath");
+			});
+
+			it("rejects partial names with backslashes", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name=".." & Chr(92) & "secret", $type="partial");
+				}).toThrow("Wheels.InvalidPartialPath");
+			});
+
+			it("rejects page template names with dot-dot sequences", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="../../config/settings", $type="page");
+				}).toThrow("Wheels.InvalidPartialPath");
+			});
+
+			it("allows normal partial names without path traversal", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="sidebar", $type="partial");
+				}).notToThrow();
+			});
+
+			it("allows partial names with forward slash subfolder paths", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="users/card", $type="partial");
+				}).notToThrow();
+			});
+
+			it("allows partial names with leading slash", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="/shared/header", $type="partial");
+				}).notToThrow();
 			});
 
 		});
