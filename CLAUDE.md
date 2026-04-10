@@ -486,6 +486,9 @@ component extends="wheels.WheelsTest" {
 - **Force reload**: append `&reload=true` after adding new model CFCs
 - **Closure gotcha**: CFML closures can't access outer `local` vars — use shared structs (`var result = {count: 0}`)
 - **Scope gotcha in test infra**: Wheels internal functions (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
+- **`#` escape gotcha**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiters. In string literals, escape as `&##111;`. Comments (`//`) are fine since they aren't evaluated. Unescaped `#` in strings causes "Invalid Syntax Closing [#] not found" compilation errors that crash the **entire** test suite (not just that file).
+- **`$clearRoutes()` in test specs**: Test CFCs that manipulate routes must define their own `$clearRoutes()` method — it is NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc`.
+- **`Left(str, 0)` crashes Lucee 7**: Use a ternary guard: `local.match.pos[1] > 1 ? Left(str, local.match.pos[1] - 1) : ""`
 - Run with MCP `wheels_test()` or CLI `wheels test run`
 
 ## Running Tests Locally (Docker)
@@ -684,6 +687,20 @@ Deeper documentation lives in `.ai/` — Claude will search it automatically whe
 - `.ai/wheels/cli/` — generators (including admin generator)
 - `.ai/wheels/testing/` — unit testing with TestBox, test infrastructure, common gotchas
 - `.ai/wheels/configuration/` — routing, environments, settings, DI container
+
+## Commit Message Conventions
+
+This repo uses commitlint. Commit messages must follow: `type(scope): lowercase subject`
+
+**Valid scopes:** `model`, `controller`, `view`, `router`, `middleware`, `migration`, `cli`, `test`, `config`, `di`, `job`, `mailer`, `plugin`, `sse`, `seed`, `docs`
+
+**Invalid scope:** `security` — use the layer it touches (e.g., `model` for SQL injection fix, `view` for XSS fix, `config` for consoleeval hardening, `cli` for MCP server fixes).
+
+**Subject must be lowercase.** No sentence-case, start-case, or pascal-case. Write `fix(model): validate index names` not `fix(model): Validate index names`.
+
+## Branding
+
+The project name is **Wheels** (not "CFWheels"). The rebrand happened at v3.0. Always use "Wheels" in new code, comments, commit messages, PR descriptions, and documentation.
 
 ## MCP Server
 
