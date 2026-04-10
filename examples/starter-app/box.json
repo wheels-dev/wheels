@@ -6,12 +6,11 @@
     "location":"forgeboxStorage",
     "slug":"wheels-starter-app",
     "createPackageDirectory":false,
-    "type":"cfwheels-templates",
+    "type":"wheels-templates",
     "keywords":[
         "mvc",
         "rails",
         "wheels",
-        "cfwheels",
         "core"
     ],
     "repository":{
@@ -30,11 +29,11 @@
     ],
     "dependencies": {
         "wheels-core": "^3.1.0",
-        "cfwheels-authenticateThis":"^1"
+        "wheels-authenticateThis":"^1"
     },
     "installPaths": {
         "wheels-core": "vendor/wheels/",
-        "cfwheels-authenticateThis":"plugins/authenticateThis/"
+        "wheels-authenticateThis":"plugins/authenticateThis/"
     },
     "private":false,
     "license":[
