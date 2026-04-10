@@ -150,6 +150,32 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  seed — Database seeding
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Run database seeds (convention-based or generated)
+	 */
+	public string function seed() {
+		var args = __arguments ?: [];
+		var environment = "";
+		var mode = "auto";
+
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (reFindNoCase("^--environment=", arg)) {
+				environment = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--mode=", arg)) {
+				mode = valueAfterEquals(arg);
+			} else if (arg == "--generate") {
+				mode = "generate";
+			}
+		}
+
+		return runSeed(mode, environment);
+	}
+
+	// ─────────────────────────────────────────────────
 	//  test — Run test suite
 	// ─────────────────────────────────────────────────
 
@@ -331,9 +357,9 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Default datasource and reload password to app name if not specified
+		// Default datasource to app name, generate random reload password
 		if (!len(options.datasource)) options.datasource = lCase(appName);
-		if (!len(options.reloadPassword)) options.reloadPassword = lCase(appName);
+		if (!len(options.reloadPassword)) options.reloadPassword = generateRandomPassword();
 
 		return scaffoldNewApp(appName, options);
 	}
@@ -633,6 +659,23 @@ component extends="modules.BaseModule" {
 					System.out.print(chr(27) & "[2J" & chr(27) & "[H");
 					System.out.flush();
 					continue;
+
+				case "/models":
+					consoleExec(evalUrl, "structKeyArray(application.wheels.models).sort('textnocase')", password);
+					continue;
+
+				case "/routes":
+					consoleExec(evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", password);
+					continue;
+
+				case "/version":
+					consoleExec(evalUrl, "application.wheels.version", password);
+					continue;
+
+				case "/ds":
+				case "/datasource":
+					consoleExec(evalUrl, "application.wheels.dataSourceName", password);
+					continue;
 			}
 
 			// Evaluate expression
@@ -829,11 +872,15 @@ component extends="modules.BaseModule" {
 	private void function printConsoleHelp() {
 		out("");
 		out("Wheels Console Commands:", "bold");
-		out("  /help, /h     Show this help");
-		out("  /env          Show environment info");
-		out("  /reload       Reload the application");
-		out("  /clear        Clear the screen");
-		out("  /exit, /quit  Exit the console");
+		out("  /help, /h       Show this help");
+		out("  /env            Show environment info");
+		out("  /models         List all registered models");
+		out("  /routes         List all routes");
+		out("  /version        Show Wheels version");
+		out("  /ds             Show current datasource");
+		out("  /reload         Reload the application");
+		out("  /clear          Clear the screen");
+		out("  /exit, /quit    Exit the console");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');
@@ -842,8 +889,8 @@ component extends="modules.BaseModule" {
 		out('  model("User").count()                        Count records');
 		out('  model("Post").findAll(where="status=''draft''")  Filtered query');
 		out('  get("environment")                           Framework setting');
-		out('  application.wheels.version                   Wheels version');
 		out('  service("emailService")                      Resolve a service');
+		out('  application.wheels.version                   Wheels version');
 		out("");
 	}
 
@@ -2041,35 +2088,84 @@ component extends="modules.BaseModule" {
 		var serverPort = detectServerPort();
 		if (!serverPort) {
 			out("No running Wheels server detected.", "red");
-			out("Migrations require a running server. Start with: wheels start");
+			out("Migrations require a running server. Start with: wheels server start");
 			return "";
 		}
 
 		out("Running migration: #action#...", "cyan");
 
 		try {
-			var migrateUrl = "http://localhost:#serverPort#/wheels/app/tests?type=app&reload=true";
-
+			var command = "";
 			switch (action) {
-				case "latest":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=migrateToLatest&reload=true&password=";
-					break;
-				case "up":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=migrateUp&reload=true&password=";
-					break;
-				case "down":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=migrateDown&reload=true&password=";
-					break;
-				case "info":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=info&reload=true&password=";
-					break;
+				case "latest": command = "migrateTo"; break;
+				case "up":     command = "migrateUp"; break;
+				case "down":   command = "migrateDown"; break;
+				case "info":   command = "info"; break;
+			}
+
+			var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
+			if (action == "latest") {
+				// migrateTo needs a version — omitting it runs to latest
+				migrateUrl &= "&version=";
 			}
 
 			var httpResult = makeHttpRequest(migrateUrl);
-			out("Migration #action# completed.", "green");
-			verbose(httpResult);
+
+			try {
+				var result = deserializeJSON(httpResult);
+				if (structKeyExists(result, "message") && len(result.message)) {
+					out(result.message, "green");
+				} else {
+					out("Migration #action# completed.", "green");
+				}
+			} catch (any jsonErr) {
+				out("Migration #action# completed.", "green");
+				verbose(httpResult);
+			}
 		} catch (any e) {
 			out("Migration failed: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	// ── Seed Execution ──────────────────────────────
+
+	private string function runSeed(string mode = "auto", string environment = "") {
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running Wheels server detected.", "red");
+			out("Seeding requires a running server. Start with: wheels server start");
+			return "";
+		}
+
+		out("Running database seeds...", "cyan");
+
+		try {
+			var seedUrl = "http://localhost:#serverPort#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
+			if (len(environment)) {
+				seedUrl &= "&environment=#environment#";
+			}
+
+			var httpResult = makeHttpRequest(seedUrl);
+
+			try {
+				var result = deserializeJSON(httpResult);
+				if (structKeyExists(result, "success") && result.success) {
+					if (structKeyExists(result, "totalCreated")) {
+						out("Seeded: #result.totalCreated# created, #result.totalSkipped# skipped", "green");
+					} else {
+						out("Seeding completed.", "green");
+					}
+				} else {
+					out("Seeding failed: #result.message ?: 'unknown error'#", "red");
+				}
+			} catch (any jsonErr) {
+				out("Seeding completed.", "green");
+				verbose(httpResult);
+			}
+		} catch (any e) {
+			out("Seeding failed: #e.message#", "red");
 		}
 
 		return "";
@@ -2257,7 +2353,7 @@ component extends="modules.BaseModule" {
 		var opts = {
 			port: structKeyExists(options, "port") ? options.port : 8080,
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
-			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : lCase(appName),
+			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
@@ -2317,17 +2413,18 @@ component extends="modules.BaseModule" {
 		out("Application created!", "green");
 		out("");
 		out("Configuration:", "bold");
-		out("  Port:       #opts.port#");
-		out("  Datasource: #opts.datasource#");
+		out("  Port:            #opts.port#");
+		out("  Datasource:      #opts.datasource#");
+		out("  Reload password: #opts.reloadPassword#");
 		if (opts.setupH2) {
-			out("  Database:   H2 embedded (db/h2/)", "green");
+			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
-			out("  Database:   SQLite (db/development.sqlite)", "green");
+			out("  Database:        SQLite (db/development.sqlite)", "green");
 		}
 		out("");
 		out("Next steps:", "bold");
 		out("  cd #appName#");
-		out("  wheels start");
+		out("  wheels server start");
 		return "";
 	}
 
@@ -2390,10 +2487,14 @@ component extends="modules.BaseModule" {
 		var nl = chr(10);
 		var tab = chr(9);
 
-		// Create db directory for SQLite data files
+		// Create db directory and empty SQLite files
 		var dbDir = targetDir & "/db";
 		ensureDirectory(dbDir);
+		fileWrite(dbDir & "/development.sqlite", "");
+		fileWrite(dbDir & "/test.sqlite", "");
 		printCreated(appName & "/db/");
+		printCreated(appName & "/db/development.sqlite");
+		printCreated(appName & "/db/test.sqlite");
 
 		// Build SQLite datasource configuration for config/app.cfm
 		var sqliteConfig = "";
@@ -2405,7 +2506,7 @@ component extends="modules.BaseModule" {
 		sqliteConfig &= tab & "};";
 
 		// Also add a test database datasource
-		sqliteConfig &= nl & tab & 'this.datasources["wheelstestdb"] = {' & nl;
+		sqliteConfig &= nl & tab & 'this.datasources["#datasourceName#_test"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
 		sqliteConfig &= tab & tab & 'bundleName: "org.xerial.sqlite-jdbc",' & nl;
 		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")' & nl;
@@ -2813,6 +2914,18 @@ component extends="modules.BaseModule" {
 		var pos = find("=", arg);
 		if (pos == 0) return "";
 		return mid(arg, pos + 1, len(arg));
+	}
+
+	/**
+	 * Generate a random alphanumeric password for reload protection.
+	 */
+	private string function generateRandomPassword(numeric length = 16) {
+		var chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+		var result = "";
+		for (var i = 1; i <= arguments.length; i++) {
+			result &= mid(chars, randRange(1, len(chars)), 1);
+		}
+		return result;
 	}
 
 }
