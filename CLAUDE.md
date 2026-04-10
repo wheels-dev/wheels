@@ -491,9 +491,54 @@ component extends="wheels.WheelsTest" {
 - **`Left(str, 0)` crashes Lucee 7**: Use a ternary guard: `local.match.pos[1] > 1 ? Left(str, local.match.pos[1] - 1) : ""`
 - Run with MCP `wheels_test()` or CLI `wheels test run`
 
-## Running Tests Locally (Docker)
+## Running Tests Locally (LuCLI — Recommended)
 
 **IMPORTANT: Always run the test suite before pushing.** Do not rely on CI alone.
+
+### Fastest method: one command
+```bash
+bash tools/test-local.sh              # run all core tests
+bash tools/test-local.sh model        # run model tests only
+bash tools/test-local.sh security     # run security tests only
+```
+
+The script handles everything: creates SQLite DBs, starts a LuCLI server if needed, runs tests, reports results, cleans up. No Docker required.
+
+### Prerequisites (one-time setup)
+```bash
+# Install LuCLI (0.3.3+ recommended)
+brew install lucli    # or download from GitHub releases
+# Java 21 required
+brew install openjdk@21
+```
+
+### Manual method (if you need a persistent server)
+```bash
+cd /path/to/wheels
+sqlite3 wheelstestdb.db "SELECT 1;"
+sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+lucli server run --port=8080
+
+# In another terminal:
+curl -s "http://localhost:8080/?reload=true&password=wheels"
+curl -sf "http://localhost:8080/wheels/core/tests?db=sqlite&format=json" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(f'{d[\"totalPass\"]} pass, {d[\"totalFail\"]} fail, {d[\"totalError\"]} error')"
+```
+
+### Run specific test directories
+```bash
+bash tools/test-local.sh model        # vendor/wheels/tests/specs/model/
+bash tools/test-local.sh controller   # vendor/wheels/tests/specs/controller/
+bash tools/test-local.sh view         # vendor/wheels/tests/specs/view/
+bash tools/test-local.sh security     # vendor/wheels/tests/specs/security/
+bash tools/test-local.sh middleware   # vendor/wheels/tests/specs/middleware/
+bash tools/test-local.sh dispatch     # vendor/wheels/tests/specs/dispatch/
+bash tools/test-local.sh migrator     # vendor/wheels/tests/specs/migrator/
+```
+
+## Running Tests Locally (Docker — Legacy)
+
+Docker is still supported for cross-engine testing (Adobe CF, multiple Lucee versions, multiple databases). For day-to-day development, use the LuCLI method above.
 
 ### Minimum: test both Lucee AND Adobe before pushing
 Lucee and Adobe CF have different runtime behaviors (struct member functions,
