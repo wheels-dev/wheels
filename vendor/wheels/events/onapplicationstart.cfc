@@ -140,6 +140,15 @@ component {
 			)
 		) {
 			application.$wheels.environment = URL.reload;
+			try {
+				writeLog(
+					file="wheels_security",
+					type="warning",
+					text="Environment switched to '" & URL.reload & "' via URL from " & cgi.REMOTE_ADDR
+				);
+			} catch (any e) {
+				// Fail silently if logging fails
+			}
 		} else {
 			application.wo.$include(template = "/config/environment.cfm");
 		}
@@ -211,9 +220,21 @@ component {
 		application.$wheels.initialized = true;
 
 		// Load general developer settings first, then override with environment specific ones.
+		// Track the initial default so we can detect if the developer explicitly overrides it.
+		local.envSwitchDefault = application.$wheels.allowEnvironmentSwitchViaUrl;
 		application.wo.$include(template = "/config/settings.cfm");
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
 			application.wo.$include(template = "/config/#application.$wheels.environment#/settings.cfm");
+		}
+
+		// In production-like environments, disable URL-based environment switching by default.
+		// Developers can override by explicitly calling set(allowEnvironmentSwitchViaUrl=true) in settings.cfm.
+		if (
+			ListFindNoCase("production,testing,maintenance", application.$wheels.environment)
+			&& application.$wheels.allowEnvironmentSwitchViaUrl == local.envSwitchDefault
+			&& local.envSwitchDefault
+		) {
+			application.$wheels.allowEnvironmentSwitchViaUrl = false;
 		}
 
 		// Load DI service registrations.
