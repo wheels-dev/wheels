@@ -1,6 +1,6 @@
 {
   "name": "wheels",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "description": "Wheels CLI - Code generation, migrations, testing, and server management for Wheels",
   "author": "Wheels Team",
   "license": "Apache-2.0",
