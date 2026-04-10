@@ -18,9 +18,9 @@ component output="false" displayName="MCP Server" {
 		return this;
 	}
 
-	/** Rejects shell metacharacters (; | & $ ` ( ) { } < > newlines) */
+	/** Rejects shell metacharacters (; | & $ ` ( ) { } < > ' " \ ~ newlines) */
 	private boolean function $isSafeArgument(required string value) {
-		return reFind("[;\|&\$`\(\)\{\}<>\n\r]", arguments.value) == 0;
+		return reFind("[;\|&\$`\(\)\{\}<>\n\r'""\~\\]", arguments.value) == 0;
 	}
 
 	/** Allowlist: letters + digits, must start with a letter */
@@ -1257,7 +1257,7 @@ Provide migration code following Wheels conventions."
 
 	private string function executeCommand(required string command) {
 		// Defense-in-depth: final gate before cfexecute
-		if (reFind("[;\|&\$`\(\)\{\}<>]", arguments.command)) {
+		if (reFind("[;\|&\$`\(\)\{\}<>'""\~\\]", arguments.command)) {
 			return "Error: Command contains disallowed shell metacharacters.";
 		}
 		if (!reFind("^wheels\s", arguments.command)) {
@@ -1313,7 +1313,7 @@ Provide migration code following Wheels conventions."
 			try {
 				cfexecute(
 					name = "box",
-					arguments = arguments.command,
+					arguments = "wheels " & mid(arguments.command, 7),
 					timeout = "30",
 					variable = "local.result",
 					errorVariable = "local.error",
