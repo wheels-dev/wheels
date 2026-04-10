@@ -1,7 +1,7 @@
 # Wheels CLI + LuCLI Integration Design
 
-**Date:** 2026-04-09
-**Status:** Draft
+**Date:** 2026-04-09 (updated 2026-04-10)
+**Status:** Phase 1 complete, Phase 2 in validation
 **Author:** Peter Amiri + Claude
 
 ## Problem
@@ -126,10 +126,11 @@ When the binary name is `wheels`, LuCLI loads the Wheels command profile:
 3. db/test.db exists?
    -> No: create it (empty SQLite database)
 
-4. SQLite JDBC in Lucee runtime?
-   -> No: copy from bundled location or auto-download
+4. lucli deps install
+   -> Resolves lucee.json dependencies (sqlite-jdbc via Maven, etc.)
 
 5. Start Lucee Express, print URL
+   -> #project:path# placeholders in CFConfig resolved at startup
 ```
 
 ## `wheels test` Internals
@@ -188,7 +189,7 @@ wheels test [filter] [--db=sqlite] [--ci] [--format=text|json|junit]
 | `McpCommand` | `wheels mcp` | MCP server over stdio. Cleaner Claude Code integration. |
 | Module system | Wheels command profile | Command definitions, server hooks, scaffold templates. |
 | Secrets management | `.env` / `wheels secrets` | `#secret:NAME#` resolution in lucee.json. |
-| `{project}` placeholder (needs PR) | Datasource paths | `jdbc:sqlite:{project}/db/development.db` resolves correctly. |
+| `#project:path#` placeholder | Datasource paths | `jdbc:sqlite:#project:path#/db/development.db` resolves correctly. Follows `#env:VAR#` / `#secret:NAME#` convention. |
 
 ### CLI/Server Same Context
 
@@ -207,76 +208,84 @@ For testing, this opens a future path to run tests in-process (no HTTP overhead,
 
 ### 1. LuCLI (`cybersonic/LuCLI` -- PRs from Wheels team)
 
-| Change | Size | Description |
-|--------|------|-------------|
-| Binary name detection | Medium | `argv[0]` check. If `wheels`, load Wheels profile instead of default LuCLI commands. |
-| `{project}` placeholder in CFConfig | Small | In `writeCfConfigIfPresent()`, replace `{project}` with `projectDir.toString()` in all string values before writing `.CFConfig.json`. |
-| Profile system | Medium | When binary name matches a registered profile, load that profile's module, set cache dir (`~/.wheels/`), apply branding. Profile discovery: LuCLI checks `~/.lucli/profiles/<binary-name>/` and the built-in profile registry. A profile defines: command module path, cache directory override, branding strings (banner, prompt), and default `lucee.json` template. |
-| SQLite JDBC bundling | Small | Ship SQLite JDBC in the express runtime's `lib/ext/`, or auto-download on first datasource use. |
+| Change | PR | Status | Description |
+|--------|-----|--------|-------------|
+| Binary name detection | #39 | **Merged** | `argv[0]` check via `-Dlucli.binary.name`. If `wheels`, prepends module name to args. |
+| Fix integration tests | #40 | **Merged** | Fixed pre-existing test failures to unblock further PRs. |
+| Wheels module in registry | #46 | **Merged** | Added wheels module to LuCLI's bundled module registry. |
+| `#project:path#` placeholder | #48 | **Open** | Replaces `#project:path#` in CFConfig text values with absolute project dir. Follows `#env:VAR#` / `#secret:NAME#` convention. |
+| Profile system (branding) | #49 | **Merged** | `CliProfile` interface with `DefaultProfile` and `WheelsProfile`. Controls home dir (`~/.wheels/`), banner, REPL prompt, backups dir. Binary name normalized (strips paths/extensions). |
+| ~~JDBC driver auto-install~~ | #50 | **Closed** | Replaced by declaring SQLite JDBC as a `type: "java"` dependency in `lucee.json`. LuCLI's existing `lucli deps install` handles Maven downloads. |
 
 ### 2. Wheels Framework (`wheels-dev/wheels`)
 
-| Change | Size | Description |
-|--------|------|-------------|
-| `lucee.json` update | Small | Ship with SQLite datasources using `{project}/db/` paths. Environment-aware. |
-| `cli/lucli/` module rewrite | Large | The Wheels command profile: command definitions, scaffold templates, test runner, first-run logic. |
-| Scaffold templates | Medium | Project skeleton for `wheels new`. Pre-wired SQLite, .env, directory structure. |
-| Test runner component | Medium | CFML or Java component that parses test results, formats output, manages server lifecycle. |
-| CLAUDE.md update | Small | Document `wheels test` as primary local testing method. |
+| Change | Status | Description |
+|--------|--------|-------------|
+| `lucee.json` update | **Done** | SQLite datasources with `#project:path#` paths, sqlite-jdbc as `type: "java"` dependency. |
+| `cli/lucli/Module.cfc` | **Done** | ~2,900 lines. All 14 commands implemented (new, generate, test, migrate, seed, reload, console, routes, info, analyze, validate, mcp, start, stop). |
+| `cli/lucli/services/` | **Done** | CodeGen, Templates, Scaffold, Helpers, Analysis, MigrationRunner, TestRunner, MCP services. |
+| Scaffold templates | **Done** | Full project skeleton in `cli/lucli/templates/app/`. |
+| CI pipeline update | **Not started** | Need to add `wheels test --ci` as option alongside Docker. |
+| End-to-end validation | **Not started** | Need to verify `wheels server start` works against this repo. |
 
 ### 3. Homebrew/Chocolatey (`wheels-dev/homebrew-wheels`, `wheels-dev/chocolatey-wheels`)
 
-| Change | Size | Description |
-|--------|------|-------------|
-| Formula rewrite | Small | Install LuCLI binary renamed to `wheels`. Remove CommandBox dependency. |
-| Bundle framework template | Small | Include Wheels framework files for `wheels new`. |
-| Bundle SQLite JDBC | Small | Include or declare as dependency. |
+| Change | Status | Description |
+|--------|--------|-------------|
+| Formula rewrite | **Not started** | Install LuCLI binary as `wheels`. Remove CommandBox dependency. |
+| Bundle framework template | **Not started** | Include Wheels framework files for `wheels new`. |
+| ~~Bundle SQLite JDBC~~ | **N/A** | Handled by `lucee.json` dependency declaration — `lucli deps install` pulls from Maven. |
 
 ## Phasing
 
-### Phase 1: Foundation (LuCLI PRs)
+### Phase 1: Foundation (LuCLI PRs) — COMPLETE
 
 **Goal:** The `wheels` binary works, SQLite datasources resolve.
 
-- Binary name detection + profile loading
-- `{project}` placeholder resolution in CFConfig writer
-- SQLite JDBC bundling or auto-download
+- [x] Binary name detection + profile loading (PRs #39, #49 merged)
+- [x] `#project:path#` placeholder resolution in CFConfig writer (PR #48 open, awaiting merge)
+- [x] SQLite JDBC via `lucee.json` dependency declaration (PR #50 closed — existing `lucli deps install` handles it)
+- [x] Wheels module registered in LuCLI's bundled registry (PR #46 merged)
 
 **Validates:** Can a Wheels project start with `wheels server start` and have SQLite working?
+**Status:** All LuCLI PRs accepted. Awaiting PR #48 merge for placeholder support. Need end-to-end validation.
 
-### Phase 2: Core CLI (Wheels repo)
+### Phase 2: Core CLI (Wheels repo) — IN PROGRESS
 
 **Goal:** Framework contributors can `wheels test` locally.
 
-- `wheels server start/stop` (thin wrappers with first-run auto-setup)
-- `wheels test` (HTTP-based, auto-manages temporary server)
-- `lucee.json` with SQLite out-of-box
-- CI pipeline updated to use `wheels test --ci`
+- [x] `wheels server start/stop` (thin wrappers with first-run auto-setup)
+- [x] `wheels test` (HTTP-based, auto-manages temporary server)
+- [x] `lucee.json` with SQLite out-of-box
+- [x] `cli/lucli/Module.cfc` — all 14 commands implemented
+- [x] `cli/lucli/services/` — CodeGen, Templates, Scaffold, Helpers, Analysis, MigrationRunner, TestRunner, MCP
+- [ ] CI pipeline updated to use `wheels test --ci`
+- [ ] End-to-end validation: `wheels server start` against framework repo
 
 **Validates:** Does `git clone wheels && wheels test` pass 2600+ tests with zero setup?
 
 **Migration note:** Existing framework contributors who have `wheelstestdb.db` files and Docker-based workflows continue to work. The `wheelstestdb_sqlite` datasource name is preserved for backward compatibility. The `db/development.db` / `db/test.db` convention is for new projects created by `wheels new`. Core framework tests continue to use `wheelstestdb_sqlite` as the datasource name.
 
-### Phase 3: Scaffold & Distribution
+### Phase 3: Scaffold & Distribution — NOT STARTED
 
 **Goal:** New developers get the full Rails-like experience.
 
-- `wheels new myapp` (project scaffolding)
-- Homebrew/Chocolatey formula rewrite
-- `wheels generate/dbmigrate/db:seed/console` (delegate to running app)
-- Documentation and getting-started guide
+- [x] `wheels new myapp` (project scaffolding — implemented in Module.cfc)
+- [x] `wheels generate/dbmigrate/db:seed/console` (implemented, HTTP-based)
+- [ ] Homebrew/Chocolatey formula rewrite
+- [ ] Documentation and getting-started guide
 
 **Validates:** Can a new developer go from `brew install wheels` to running app in under 2 minutes?
 
-### Phase 4: In-Process Everything
+### Phase 4: In-Process Everything — SERVICES WRITTEN, NOT WIRED
 
 **Goal:** Eliminate HTTP round-trips. All commands run in the same JVM context as the app.
 
-- Migrate test runner from HTTP to in-process via `LuceeScriptEngine`
-- Migrate `generate`, `dbmigrate`, `db:seed` from HTTP to in-process
-- `wheels console` with live app context (model/service/DI access)
-- `wheels server monitor` (JMX dashboard)
-- MCP server via LuCLI stdio transport
+- [ ] Wire MigrationRunner.cfc for in-process execution (code exists, not connected)
+- [ ] Wire TestRunner.cfc for in-process execution (code exists, not connected)
+- [ ] `wheels console` with live app context (model/service/DI access)
+- [ ] `wheels server monitor` (JMX dashboard)
+- [ ] MCP server via LuCLI stdio transport
 
 This is the architectural endgame: the CLI and the server share a single Lucee runtime. Commands like `wheels dbmigrate latest` don't need a running server — they load the app context, execute the migration, and exit. Like how `rails db:migrate` works without `rails server` running.
 

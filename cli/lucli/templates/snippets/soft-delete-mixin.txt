@@ -1,0 +1,35 @@
+<!---
+	Soft Delete Pattern
+	Requires: deletedAt (datetime, nullable) column on the table.
+	Migration: t.datetime(columnNames="deletedAt", null=true, default="NULL");
+
+	Usage in your model config():
+		beforeDelete("softDelete");
+		scope(name="active", where="deletedAt IS NULL");
+		scope(name="trashed", where="deletedAt IS NOT NULL");
+--->
+
+<cfscript>
+/**
+ * Soft delete: set deletedAt instead of removing the row.
+ * Return false to prevent the actual DELETE.
+ */
+private boolean function softDelete() {
+	this.updateProperty(property="deletedAt", value=Now());
+	return false;
+}
+
+/**
+ * Restore a soft-deleted record.
+ */
+public boolean function restore() {
+	return this.updateProperty(property="deletedAt", value="");
+}
+
+/**
+ * Check if the record has been soft-deleted.
+ */
+public boolean function isTrashed() {
+	return len(this.deletedAt) && isDate(this.deletedAt);
+}
+</cfscript>

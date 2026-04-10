@@ -1,0 +1,33 @@
+<!--- app/snippets/pagination-view.cfm --->
+<!--- Example paginated list view --->
+<cfparam name="records" default="">
+
+<h1>Items</h1>
+
+#paginationNav(showInfo=true)#
+
+<table class="table table-striped">
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Name</th>
+			<th>Created</th>
+			<th>Actions</th>
+		</tr>
+	</thead>
+	<tbody>
+		<cfoutput query="records">
+		<tr>
+			<td>#records.id#</td>
+			<td>#encodeForHTML(records.name)#</td>
+			<td>#dateFormat(records.createdAt, "mmm d, yyyy")#</td>
+			<td>
+				#linkTo(text="View", route="item", key=records.id)#
+				#linkTo(text="Edit", route="editItem", key=records.id)#
+			</td>
+		</tr>
+		</cfoutput>
+	</tbody>
+</table>
+
+#paginationNav()#

@@ -1497,8 +1497,7 @@ component extends="modules.BaseModule" {
 	 * Each entry has: name, description, hint, generate(projectRoot, force) -> array of relative paths
 	 */
 	private struct function getSnippetRegistry() {
-		var nl = chr(10);
-		var tab = chr(9);
+		var snippetDir = getDirectoryFromPath(getCurrentTemplatePath()) & "templates/snippets/";
 
 		return {
 			"auth": {
@@ -1508,82 +1507,15 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					// Session controller
-					var sessionCtrl = 'component extends="Controller" {' & nl
-						& nl
-						& tab & 'function config() {' & nl
-						& tab & tab & 'verifies(only="create", params="username,password");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Login form' & nl
-						& tab & ' */' & nl
-						& tab & 'function new() {' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Process login' & nl
-						& tab & ' */' & nl
-						& tab & 'function create() {' & nl
-						& tab & tab & 'var user = model("User").findOne(where="username=''##params.username##''");' & nl
-						& tab & tab & 'if (IsObject(user) && user.authenticate(params.password)) {' & nl
-						& tab & tab & tab & 'session.currentUserId = user.key();' & nl
-						& tab & tab & tab & 'flashInsert(success="Logged in successfully.");' & nl
-						& tab & tab & tab & 'redirectTo(route="root");' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'flashInsert(error="Invalid username or password.");' & nl
-						& tab & tab & tab & 'renderView(action="new");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Logout' & nl
-						& tab & ' */' & nl
-						& tab & 'function delete() {' & nl
-						& tab & tab & 'structDelete(session, "currentUserId");' & nl
-						& tab & tab & 'flashInsert(success="You have been logged out.");' & nl
-						& tab & tab & 'redirectTo(route="root");' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var sessionCtrl = fileRead(snippetDir & "auth-sessions-controller.txt");
 					var p = writeSnippetFile(projectRoot, "app/controllers/Sessions.cfc", sessionCtrl, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Login view
-					var loginView = '<cfparam name="params.username" default="">' & nl
-						& nl
-						& '<h1>Log In</h1>' & nl
-						& nl
-						& '##flashMessages()##' & nl
-						& nl
-						& '##startFormTag(route="sessions", method="post")##' & nl
-						& tab & '<div class="mb-3">' & nl
-						& tab & tab & '##textField(name="username", label="Username", class="form-control")##' & nl
-						& tab & '</div>' & nl
-						& tab & '<div class="mb-3">' & nl
-						& tab & tab & '##passwordField(name="password", label="Password", class="form-control")##' & nl
-						& tab & '</div>' & nl
-						& tab & '##submitTag(value="Log In", class="btn btn-primary")##' & nl
-						& '##endFormTag()##';
+					var loginView = fileRead(snippetDir & "auth-login-view.txt");
 					p = writeSnippetFile(projectRoot, "app/views/sessions/new.cfm", loginView, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Auth filter helper (for Controller.cfc)
-					var authFilter = '<!--- Include in your base Controller.cfc config(): filters(through="authenticate") --->' & nl
-						& nl
-						& '<cfscript>' & nl
-						& 'private function authenticate() {' & nl
-						& tab & 'if (!structKeyExists(session, "currentUserId")) {' & nl
-						& tab & tab & 'flashInsert(error="Please log in to continue.");' & nl
-						& tab & tab & 'redirectTo(controller="sessions", action="new");' & nl
-						& tab & '}' & nl
-						& tab & 'currentUser = model("User").findByKey(session.currentUserId);' & nl
-						& tab & 'if (!IsObject(currentUser)) {' & nl
-						& tab & tab & 'structDelete(session, "currentUserId");' & nl
-						& tab & tab & 'redirectTo(controller="sessions", action="new");' & nl
-						& tab & '}' & nl
-						& '}' & nl
-						& '</cfscript>';
+					var authFilter = fileRead(snippetDir & "auth-filter.txt");
 					p = writeSnippetFile(projectRoot, "app/snippets/auth-filter.cfm", authFilter, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1597,60 +1529,11 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					// Soft delete model mixin
-					var content = '<!---' & nl
-						& tab & 'Soft Delete Pattern' & nl
-						& tab & 'Requires: deletedAt (datetime, nullable) column on the table.' & nl
-						& tab & 'Migration: t.datetime(columnNames="deletedAt", null=true, default="NULL");' & nl
-						& nl
-						& tab & 'Usage in your model config():' & nl
-						& tab & tab & 'beforeDelete("softDelete");' & nl
-						& tab & tab & 'scope(name="active", where="deletedAt IS NULL");' & nl
-						& tab & tab & 'scope(name="trashed", where="deletedAt IS NOT NULL");' & nl
-						& '--->' & nl
-						& nl
-						& '<cfscript>' & nl
-						& '/**' & nl
-						& ' * Soft delete: set deletedAt instead of removing the row.' & nl
-						& ' * Return false to prevent the actual DELETE.' & nl
-						& ' */' & nl
-						& 'private boolean function softDelete() {' & nl
-						& tab & 'this.updateProperty(property="deletedAt", value=Now());' & nl
-						& tab & 'return false;' & nl
-						& '}' & nl
-						& nl
-						& '/**' & nl
-						& ' * Restore a soft-deleted record.' & nl
-						& ' */' & nl
-						& 'public boolean function restore() {' & nl
-						& tab & 'return this.updateProperty(property="deletedAt", value="");' & nl
-						& '}' & nl
-						& nl
-						& '/**' & nl
-						& ' * Check if the record has been soft-deleted.' & nl
-						& ' */' & nl
-						& 'public boolean function isTrashed() {' & nl
-						& tab & 'return len(this.deletedAt) && isDate(this.deletedAt);' & nl
-						& '}' & nl
-						& '</cfscript>';
+					var content = fileRead(snippetDir & "soft-delete-mixin.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/soft-delete.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Migration
-					var migration = 'component extends="wheels.migrator.Migration" {' & nl
-						& nl
-						& tab & 'function up() {' & nl
-						& tab & tab & '// Add to your table: change "tablename" below' & nl
-						& tab & tab & 'addColumn(table="tablename", columnType="datetime", columnName="deletedAt", null=true, default="NULL");' & nl
-						& tab & tab & 'addIndex(table="tablename", columnNames="deletedAt");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function down() {' & nl
-						& tab & tab & 'removeIndex(table="tablename", columnNames="deletedAt");' & nl
-						& tab & tab & 'removeColumn(table="tablename", columnName="deletedAt");' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var migration = fileRead(snippetDir & "soft-delete-migration.txt");
 					p = writeSnippetFile(projectRoot, "app/snippets/soft-delete-migration.cfc", migration, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1664,54 +1547,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = 'component extends="Controller" {' & nl
-						& nl
-						& tab & 'function config() {' & nl
-						& tab & tab & 'provides("json");' & nl
-						& tab & tab & 'verifies(params="key", paramsTypes="integer", only="show,update,delete");' & nl
-						& tab & tab & 'filters(through="findRecord", only="show,update,delete");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function index() {' & nl
-						& tab & tab & 'var page = val(params.page) > 0 ? val(params.page) : 1;' & nl
-						& tab & tab & 'records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");' & nl
-						& tab & tab & 'renderWith(data=records, layout=false);' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function show() {' & nl
-						& tab & tab & 'renderWith(data=record, layout=false);' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function create() {' & nl
-						& tab & tab & 'record = model("Item").new(params.item);' & nl
-						& tab & tab & 'if (record.save()) {' & nl
-						& tab & tab & tab & 'renderWith(data=record, layout=false, status=201);' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'renderWith(data={errors: record.allErrors()}, layout=false, status=422);' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function update() {' & nl
-						& tab & tab & 'if (record.update(properties=params.item)) {' & nl
-						& tab & tab & tab & 'renderWith(data=record, layout=false);' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'renderWith(data={errors: record.allErrors()}, layout=false, status=422);' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function delete() {' & nl
-						& tab & tab & 'record.delete();' & nl
-						& tab & tab & 'renderWith(data={message: "Record deleted."}, layout=false);' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'private function findRecord() {' & nl
-						& tab & tab & 'record = model("Item").findByKey(params.key);' & nl
-						& tab & tab & 'if (!IsObject(record)) {' & nl
-						& tab & tab & tab & 'renderWith(data={error: "Record not found."}, layout=false, status=404);' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var content = fileRead(snippetDir & "api-controller.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/api-controller.cfc", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1725,64 +1561,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = 'component extends="Controller" {' & nl
-						& nl
-						& tab & 'function config() {' & nl
-						& tab & tab & 'verifies(params="key", paramsTypes="integer", only="show,edit,update,delete");' & nl
-						& tab & tab & 'filters(through="findRecord", only="show,edit,update,delete");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function index() {' & nl
-						& tab & tab & 'var page = val(params.page) > 0 ? val(params.page) : 1;' & nl
-						& tab & tab & 'records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function show() {' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function new() {' & nl
-						& tab & tab & 'record = model("Item").new();' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function create() {' & nl
-						& tab & tab & 'record = model("Item").new(params.item);' & nl
-						& tab & tab & 'if (record.save()) {' & nl
-						& tab & tab & tab & 'flashInsert(success="Item was created successfully.");' & nl
-						& tab & tab & tab & 'redirectTo(action="index");' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'flashInsert(error="There was a problem creating the item.");' & nl
-						& tab & tab & tab & 'renderView(action="new");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function edit() {' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function update() {' & nl
-						& tab & tab & 'if (record.update(properties=params.item)) {' & nl
-						& tab & tab & tab & 'flashInsert(success="Item was updated successfully.");' & nl
-						& tab & tab & tab & 'redirectTo(action="index");' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'flashInsert(error="There was a problem updating the item.");' & nl
-						& tab & tab & tab & 'renderView(action="edit");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function delete() {' & nl
-						& tab & tab & 'record.delete();' & nl
-						& tab & tab & 'flashInsert(success="Item was deleted successfully.");' & nl
-						& tab & tab & 'redirectTo(action="index");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'private function findRecord() {' & nl
-						& tab & tab & 'record = model("Item").findByKey(params.key);' & nl
-						& tab & tab & 'if (!IsObject(record)) {' & nl
-						& tab & tab & tab & 'flashInsert(error="Item not found.");' & nl
-						& tab & tab & tab & 'redirectTo(action="index");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var content = fileRead(snippetDir & "crud-controller.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/crud-controller.cfc", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1796,36 +1575,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = '<!--- app/views/shared/_flash.cfm --->' & nl
-						& '<cfparam name="flash" default="##flashMessages(includeEmptyContainer=false)##">' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "success")>' & nl
-						& tab & '<div class="alert alert-success alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("success")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "error")>' & nl
-						& tab & '<div class="alert alert-danger alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("error")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "warning")>' & nl
-						& tab & '<div class="alert alert-warning alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("warning")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "info")>' & nl
-						& tab & '<div class="alert alert-info alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("info")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>';
+					var content = fileRead(snippetDir & "flash-messages.txt");
 					var p = writeSnippetFile(projectRoot, "app/views/shared/_flash.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1839,39 +1589,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = '<!--- app/snippets/pagination-view.cfm --->' & nl
-						& '<!--- Example paginated list view --->' & nl
-						& '<cfparam name="records" default="">' & nl
-						& nl
-						& '<h1>Items</h1>' & nl
-						& nl
-						& '##paginationNav(showInfo=true)##' & nl
-						& nl
-						& '<table class="table table-striped">' & nl
-						& tab & '<thead>' & nl
-						& tab & tab & '<tr>' & nl
-						& tab & tab & tab & '<th>ID</th>' & nl
-						& tab & tab & tab & '<th>Name</th>' & nl
-						& tab & tab & tab & '<th>Created</th>' & nl
-						& tab & tab & tab & '<th>Actions</th>' & nl
-						& tab & tab & '</tr>' & nl
-						& tab & '</thead>' & nl
-						& tab & '<tbody>' & nl
-						& tab & tab & '<cfoutput query="records">' & nl
-						& tab & tab & '<tr>' & nl
-						& tab & tab & tab & '<td>##records.id##</td>' & nl
-						& tab & tab & tab & '<td>##encodeForHTML(records.name)##</td>' & nl
-						& tab & tab & tab & '<td>##dateFormat(records.createdAt, "mmm d, yyyy")##</td>' & nl
-						& tab & tab & tab & '<td>' & nl
-						& tab & tab & tab & tab & '##linkTo(text="View", route="item", key=records.id)##' & nl
-						& tab & tab & tab & tab & '##linkTo(text="Edit", route="editItem", key=records.id)##' & nl
-						& tab & tab & tab & '</td>' & nl
-						& tab & tab & '</tr>' & nl
-						& tab & tab & '</cfoutput>' & nl
-						& tab & '</tbody>' & nl
-						& '</table>' & nl
-						& nl
-						& '##paginationNav()##';
+					var content = fileRead(snippetDir & "pagination-view.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/pagination-view.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1885,51 +1603,11 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					// Main seeds file
-					var content = '<!--- app/db/seeds.cfm --->' & nl
-						& '<!--- Shared seeds: run in all environments --->' & nl
-						& '<cfscript>' & nl
-						& nl
-						& '// Roles' & nl
-						& 'seedOnce(modelName="Role", uniqueProperties="name", properties={' & nl
-						& tab & 'name: "admin", description: "Administrator with full access"' & nl
-						& '});' & nl
-						& 'seedOnce(modelName="Role", uniqueProperties="name", properties={' & nl
-						& tab & 'name: "member", description: "Regular member"' & nl
-						& '});' & nl
-						& nl
-						& '// Settings' & nl
-						& 'seedOnce(modelName="Setting", uniqueProperties="key", properties={' & nl
-						& tab & 'key: "site.name", value: "My Wheels App"' & nl
-						& '});' & nl
-						& 'seedOnce(modelName="Setting", uniqueProperties="key", properties={' & nl
-						& tab & 'key: "site.perPage", value: "25"' & nl
-						& '});' & nl
-						& nl
-						& '</cfscript>';
+					var content = fileRead(snippetDir & "seeds.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/seeds.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Development seeds
-					var devContent = '<!--- app/db/seeds/development.cfm --->' & nl
-						& '<!--- Development-only seeds: test data --->' & nl
-						& '<cfscript>' & nl
-						& nl
-						& '// Dev admin user' & nl
-						& 'seedOnce(modelName="User", uniqueProperties="email", properties={' & nl
-						& tab & 'firstName: "Dev", lastName: "Admin",' & nl
-						& tab & 'email: "admin@example.com", roleId: 1' & nl
-						& '});' & nl
-						& nl
-						& '// Sample records for development' & nl
-						& 'for (var i = 1; i <= 10; i++) {' & nl
-						& tab & 'seedOnce(modelName="User", uniqueProperties="email", properties={' & nl
-						& tab & tab & 'firstName: "Test", lastName: "User ##i##",' & nl
-						& tab & tab & 'email: "user##i##@example.com", roleId: 2' & nl
-						& tab & '});' & nl
-						& '}' & nl
-						& nl
-						& '</cfscript>';
+					var devContent = fileRead(snippetDir & "seeds-development.txt");
 					p = writeSnippetFile(projectRoot, "app/snippets/seeds-development.cfm", devContent, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1943,38 +1621,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = 'component extends="wheels.Mailer" {' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Send welcome email to a new user.' & nl
-						& tab & ' */' & nl
-						& tab & 'public void function sendWelcome(required any user) {' & nl
-						& tab & tab & 'mail(' & nl
-						& tab & tab & tab & 'to=arguments.user.email,' & nl
-						& tab & tab & tab & 'from="noreply@example.com",' & nl
-						& tab & tab & tab & 'subject="Welcome to the app!",' & nl
-						& tab & tab & tab & 'template="/app/views/mailers/user/welcome",' & nl
-						& tab & tab & tab & 'layout="/app/views/mailers/layout",' & nl
-						& tab & tab & tab & 'user=arguments.user' & nl
-						& tab & tab & ');' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Send password reset instructions.' & nl
-						& tab & ' */' & nl
-						& tab & 'public void function sendPasswordReset(required any user, required string token) {' & nl
-						& tab & tab & 'mail(' & nl
-						& tab & tab & tab & 'to=arguments.user.email,' & nl
-						& tab & tab & tab & 'from="noreply@example.com",' & nl
-						& tab & tab & tab & 'subject="Password Reset",' & nl
-						& tab & tab & tab & 'template="/app/views/mailers/user/password_reset",' & nl
-						& tab & tab & tab & 'layout="/app/views/mailers/layout",' & nl
-						& tab & tab & tab & 'user=arguments.user,' & nl
-						& tab & tab & tab & 'token=arguments.token' & nl
-						& tab & tab & ');' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var content = fileRead(snippetDir & "user-mailer.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/user-mailer.cfc", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -2198,7 +1845,6 @@ component extends="modules.BaseModule" {
 			if (len(filter)) {
 				testUrl &= "&directory=#filter#";
 			}
-			testUrl &= "&reload=true";
 
 			var httpResult = makeHttpRequest(testUrl);
 
@@ -2794,14 +2440,16 @@ component extends="modules.BaseModule" {
 	/**
 	 * Make an HTTP GET request and return the response body
 	 */
-	private string function makeHttpRequest(required string url) {
-		var URL = createObject("java", "java.net.URL").init(url);
-		var conn = URL.openConnection();
+	private string function makeHttpRequest(required string requestUrl) {
+		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
+		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("GET");
 		conn.setConnectTimeout(5000);
-		conn.setReadTimeout(10000);
+		conn.setReadTimeout(120000);
 
-		var scanner = createObject("java", "java.util.Scanner").init(conn.getInputStream(), "UTF-8");
+		var responseCode = conn.getResponseCode();
+		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {
 			response &= scanner.nextLine() & chr(10);
@@ -2813,9 +2461,9 @@ component extends="modules.BaseModule" {
 	/**
 	 * Make an HTTP POST request with a JSON body and return the response
 	 */
-	private string function makeHttpPost(required string url, required string body) {
-		var URL = createObject("java", "java.net.URL").init(url);
-		var conn = URL.openConnection();
+	private string function makeHttpPost(required string requestUrl, required string body) {
+		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
+		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("POST");
 		conn.setConnectTimeout(5000);
 		conn.setReadTimeout(30000);

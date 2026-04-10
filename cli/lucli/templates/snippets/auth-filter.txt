@@ -1,0 +1,15 @@
+<!--- Include in your base Controller.cfc config(): filters(through="authenticate") --->
+
+<cfscript>
+private function authenticate() {
+	if (!structKeyExists(session, "currentUserId")) {
+		flashInsert(error="Please log in to continue.");
+		redirectTo(controller="sessions", action="new");
+	}
+	currentUser = model("User").findByKey(session.currentUserId);
+	if (!IsObject(currentUser)) {
+		structDelete(session, "currentUserId");
+		redirectTo(controller="sessions", action="new");
+	}
+}
+</cfscript>
