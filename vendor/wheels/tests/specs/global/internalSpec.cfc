@@ -186,50 +186,50 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that $fullDomainString", () => {
 
 			it("is returing protocol and port", () => {
-				r = g.$fullDomainString("http://www.cfwheels.com")
-				r2 = g.$fullDomainString("https://www.cfwheels.com")
-				r3 = g.$fullDomainString("http://www.cfwheels.com:8080")
-				r4 = g.$fullDomainString("https://www.cfwheels.com:8443")
-				r5 = g.$fullDomainString("www.cfwheels.com")
-				r6 = g.$fullDomainString("www.cfwheels.com:80")
-				r7 = g.$fullDomainString("www.cfwheels.com:8888")
-				r8 = g.$fullDomainString("www.cfwheels.com:443")
+				r = g.$fullDomainString("http://www.wheels.dev")
+				r2 = g.$fullDomainString("https://www.wheels.dev")
+				r3 = g.$fullDomainString("http://www.wheels.dev:8080")
+				r4 = g.$fullDomainString("https://www.wheels.dev:8443")
+				r5 = g.$fullDomainString("www.wheels.dev")
+				r6 = g.$fullDomainString("www.wheels.dev:80")
+				r7 = g.$fullDomainString("www.wheels.dev:8888")
+				r8 = g.$fullDomainString("www.wheels.dev:443")
 
-				expect(r).toBe("http://www.cfwheels.com:80")
-				expect(r2).toBe("https://www.cfwheels.com:443")
-				expect(r3).toBe("http://www.cfwheels.com:8080")
-				expect(r4).toBe("https://www.cfwheels.com:8443")
-				expect(r5).toBe("http://www.cfwheels.com:80")
-				expect(r6).toBe("http://www.cfwheels.com:80")
-				expect(r7).toBe("http://www.cfwheels.com:8888")
-				expect(r8).toBe("https://www.cfwheels.com:443")
+				expect(r).toBe("http://www.wheels.dev:80")
+				expect(r2).toBe("https://www.wheels.dev:443")
+				expect(r3).toBe("http://www.wheels.dev:8080")
+				expect(r4).toBe("https://www.wheels.dev:8443")
+				expect(r5).toBe("http://www.wheels.dev:80")
+				expect(r6).toBe("http://www.wheels.dev:80")
+				expect(r7).toBe("http://www.wheels.dev:8888")
+				expect(r8).toBe("https://www.wheels.dev:443")
 			})
 		})
 
 		describe("Tests that $fullCgiDomainString", () => {
 
 			it("gets full domain string from cgi https", () => {
-				r = g.$fullCgiDomainString({server_name = "www.cfwheels.com", server_port = 443, server_port_secure = 1})
+				r = g.$fullCgiDomainString({server_name = "www.wheels.dev", server_port = 443, server_port_secure = 1})
 
-				expect(r).toBe("https://www.cfwheels.com:443")
+				expect(r).toBe("https://www.wheels.dev:443")
 			})
 			
 			it("gets full domain string from cgi https non standard", () => {
-				r = g.$fullCgiDomainString({server_name = "www.cfwheels.com", server_port = 8443, server_port_secure = 1})
+				r = g.$fullCgiDomainString({server_name = "www.wheels.dev", server_port = 8443, server_port_secure = 1})
 
-				expect(r).toBe("https://www.cfwheels.com:8443")
+				expect(r).toBe("https://www.wheels.dev:8443")
 			})
 
 			it("gets full domain string from cgi http", () => {
-				r = g.$fullCgiDomainString({server_name = "www.cfwheels.com", server_port = 80, server_port_secure = 0})
+				r = g.$fullCgiDomainString({server_name = "www.wheels.dev", server_port = 80, server_port_secure = 0})
 
-				expect(r).toBe("http://www.cfwheels.com:80")
+				expect(r).toBe("http://www.wheels.dev:80")
 			})
 
 			it("gets full domain string from cgi http non standard", () => {
-				r = g.$fullCgiDomainString({server_name = "www.cfwheels.com", server_port = 8080, server_port_secure = 0})
+				r = g.$fullCgiDomainString({server_name = "www.wheels.dev", server_port = 8080, server_port_secure = 0})
 
-				expect(r).toBe("http://www.cfwheels.com:8080")
+				expect(r).toBe("http://www.wheels.dev:8080")
 			})
 		})
 
@@ -260,7 +260,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("tests same output", () => {
-				binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/cfwheels-logo.png'));
+				binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/wheels-logo.png'));
 				if( application.wheels.adapterName eq 'SQLiteModel' ){
 					binaryData = toBase64(binaryData)
 				}

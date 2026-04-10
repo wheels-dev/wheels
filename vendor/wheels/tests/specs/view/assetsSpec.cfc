@@ -115,7 +115,7 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				_controller = g.controller(name = "dummy")
 				args = {}
-				args.source = "/wheels/tests/_assets/files/cfwheels-logo.png"
+				args.source = "/wheels/tests/_assets/files/wheels-logo.png"
 				args.alt = "wheelstestlogo"
 				args.class = "wheelstestlogoclass"
 				args.id = "wheelstestlogoid"
@@ -132,7 +132,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "alt")
 				StructDelete(args, "class")
 				StructDelete(args, "id")
-				r = '<img alt="Cfwheels logo" height="121" src="#imagePath#/#args.source#" width="93">'
+				r = '<img alt="Wheels logo" height="121" src="#imagePath#/#args.source#" width="93">'
 				e = _controller.imageTag(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -152,7 +152,7 @@ component extends="wheels.WheelsTest" {
 				application.wheels.cacheImages = true
 				StructDelete(args, "alt")
 				StructDelete(args, "class")
-				r = '<img alt="Cfwheels logo" height="121" src="#imagePath#/#args.source#" id="#args.id#" width="93">'
+				r = '<img alt="Wheels logo" height="121" src="#imagePath#/#args.source#" id="#args.id#" width="93">'
 				e = _controller.imageTag(argumentCollection = args)
 
 				expect(e).toBe(r)
@@ -171,8 +171,8 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "alt")
 				StructDelete(args, "class")
 				StructDelete(args, "id")
-				args.source = "http://www.cfwheels.org/images/cfwheels-logo.png"
-				r = '<img alt="Cfwheels logo" src="#args.source#">'
+				args.source = "http://www.wheels.dev/images/wheels-logo.png"
+				r = '<img alt="Wheels logo" src="#args.source#">'
 				e = _controller.imageTag(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -184,7 +184,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "id")
 				args.height = 25
 				args.width = 25
-				r = '<img alt="Cfwheels logo" height="25" src="#imagePath#/#args.source#" width="25">'
+				r = '<img alt="Wheels logo" height="25" src="#imagePath#/#args.source#" width="25">'
 				e = _controller.imageTag(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -195,7 +195,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "class")
 				StructDelete(args, "id")
 				args.height = 25
-				r = '<img alt="Cfwheels logo" height="25" src="#imagePath#/#args.source#" width="93">'
+				r = '<img alt="Wheels logo" height="25" src="#imagePath#/#args.source#" width="93">'
 				e = _controller.imageTag(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -206,7 +206,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "class")
 				StructDelete(args, "id")
 				args.width = 25
-				r = '<img alt="Cfwheels logo" height="121" src="#imagePath#/#args.source#" width="25">'
+				r = '<img alt="Wheels logo" height="121" src="#imagePath#/#args.source#" width="25">'
 				e = _controller.imageTag(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -218,7 +218,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "id")
 				args.height = false
 				args.width = false
-				r = '<img alt="Cfwheels logo" src="#imagePath#/#args.source#">'
+				r = '<img alt="Wheels logo" src="#imagePath#/#args.source#">'
 				e = _controller.imageTag(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -233,7 +233,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("throws exception on unsupported image", () => {
-				path = "/wheels/tests/_assets/files/cfwheels-logo.txt"
+				path = "/wheels/tests/_assets/files/wheels-logo.txt"
 
 				expect(function() {
 					_controller.imageTag(source=path)

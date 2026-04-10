@@ -232,7 +232,7 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(() => {
 				user = g.model("UserBlank").new();
-				user.username = "gavin@cfwheels.org"
+				user.username = "gavin@wheels.dev"
 				user.password = "disismypassword"
 				user.firstName = "Gavin"
 				user.lastName = "Gavinsson"

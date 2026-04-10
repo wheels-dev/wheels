@@ -13,7 +13,7 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that binarydata", () => {
 
 			beforeEach(() => {
-				binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/cfwheels-logo.png'))
+				binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/wheels-logo.png'))
 				if( application.wheels.adapterName eq 'SQLiteModel' ){
 					binaryData = toBase64(binaryData)
 				}
@@ -292,7 +292,7 @@ component extends="wheels.WheelsTest" {
 
 					expect(photo.hasChanged('fileData')).toBeFalse()
 
-					binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/cfwheels-logo.png'))
+					binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/wheels-logo.png'))
 					if( application.wheels.adapterName eq 'SQLiteModel' ){
 						binaryData = toBase64(binaryData)
 					}
@@ -309,7 +309,7 @@ component extends="wheels.WheelsTest" {
 
 					expect(photo.hasChanged('fileData')).toBeFalse()
 
-					binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/cfwheels-logo.txt'))
+					binaryData = FileReadBinary(ExpandPath('/wheels/tests/_assets/files/wheels-logo.txt'))
 					if( application.wheels.adapterName eq 'SQLiteModel' ){
 						binaryData = toBase64(binaryData)
 					}

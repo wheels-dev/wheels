@@ -16,33 +16,33 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("links URLs", () => {
-				str = 'blah blah <a href="http://cfwheels.org/download">http://cfwheels.org/download</a> Download CFWheels from http://cfwheels.org/download blah blah'
+				str = 'blah blah <a href="http://wheels.dev/download">http://wheels.dev/download</a> Download Wheels from http://wheels.dev/download blah blah'
 				r = _controller.autoLink(str, "URLs")
-				e = 'blah blah <a href="http://cfwheels.org/download">http://cfwheels.org/download</a> Download CFWheels from <a href="http://cfwheels.org/download">http://cfwheels.org/download</a> blah blah'
+				e = 'blah blah <a href="http://wheels.dev/download">http://wheels.dev/download</a> Download Wheels from <a href="http://wheels.dev/download">http://wheels.dev/download</a> blah blah'
 
 				expect(e).toBe(r)
 			})
 
 			it("links email", () => {
-				str = 'blah blah <a href="mailto:tpetruzzi@gmail.com">tpetruzzi@gmail.com</a> Download CFWheels from tpetruzzi@gmail.com blah blah'
+				str = 'blah blah <a href="mailto:tpetruzzi@gmail.com">tpetruzzi@gmail.com</a> Download Wheels from tpetruzzi@gmail.com blah blah'
 				r = _controller.autoLink(str, "emailAddresses")
-				e = 'blah blah <a href="mailto:tpetruzzi@gmail.com">tpetruzzi@gmail.com</a> Download CFWheels from <a href="mailto:tpetruzzi@gmail.com">tpetruzzi@gmail.com</a> blah blah'
+				e = 'blah blah <a href="mailto:tpetruzzi@gmail.com">tpetruzzi@gmail.com</a> Download Wheels from <a href="mailto:tpetruzzi@gmail.com">tpetruzzi@gmail.com</a> blah blah'
 
 				expect(e).toBe(r)
 			})
 
 			it("does not include punctuation", () => {
-				str = 'The best http://cfwheels.org, Framework around. Download CFWheels from http://cfwheels.org/download.?!'
+				str = 'The best http://wheels.dev, Framework around. Download Wheels from http://wheels.dev/download.?!'
 				r = _controller.autoLink(str, "URLs")
-				e = 'The best <a href="http://cfwheels.org">http://cfwheels.org</a>, Framework around. Download CFWheels from <a href="http://cfwheels.org/download">http://cfwheels.org/download</a>.?!'
+				e = 'The best <a href="http://wheels.dev">http://wheels.dev</a>, Framework around. Download Wheels from <a href="http://wheels.dev/download">http://wheels.dev/download</a>.?!'
 
 				expect(e).toBe(r)
 			})
 
 			it("overloaded arguments becomes link attributes", () => {
-				str = 'Download CFWheels from http://cfwheels.org/download'
+				str = 'Download Wheels from http://wheels.dev/download'
 				r = _controller.autoLink(text = str, link = "URLs", target = "_blank", class = "wheels-href")
-				e = 'Download CFWheels from <a class="wheels-href" href="http://cfwheels.org/download" target="_blank">http://cfwheels.org/download</a>'
+				e = 'Download Wheels from <a class="wheels-href" href="http://wheels.dev/download" target="_blank">http://wheels.dev/download</a>'
 				
 				expect(e).toBe(r)
 			})
@@ -56,17 +56,17 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("issue 656 relative paths escaped", () => {
-				str = 'Download CFWheels from <a href="/">http://x.com/x</a> blah blah'
+				str = 'Download Wheels from <a href="/">http://x.com/x</a> blah blah'
 				r = _controller.autoLink(str)
-				e = 'Download CFWheels from <a href="/">http://x.com/x</a> blah blah'
+				e = 'Download Wheels from <a href="/">http://x.com/x</a> blah blah'
 				
 				expect(e).toBe(r)
 			})
 
 			it("issue 656 relative paths link", () => {
-				str = 'Download CFWheels from /cfwheels.org/download blah blah'
+				str = 'Download Wheels from /wheels.dev/download blah blah'
 				r = _controller.autoLink(str)
-				e = 'Download CFWheels from <a href="/cfwheels.org/download">/cfwheels.org/download</a> blah blah'
+				e = 'Download Wheels from <a href="/wheels.dev/download">/wheels.dev/download</a> blah blah'
 
 				expect(e).toBe(r)
 			})
@@ -93,15 +93,15 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				_controller = g.controller(name = "dummy")
 				args = {}
-				args.text = "CFWheels: testing the excerpt view helper to see if it works or not."
-				args.phrase = "CFWheels: testing the excerpt"
+				args.text = "Wheels: testing the excerpt view helper to see if it works or not."
+				args.phrase = "Wheels: testing the excerpt"
 				args.radius = "0"
 				args.excerptString = "[more]"
 			})
 
 			it("works with phrase at the beginning", () => {
 				e = _controller.excerpt(argumentcollection = args)
-				r = "CFWheels: testing the excerpt[more]"
+				r = "Wheels: testing the excerpt[more]"
 
 				expect(e).toBe(r)
 			})
@@ -127,7 +127,7 @@ component extends="wheels.WheelsTest" {
 				args.phrase = "excerpt view helper"
 				args.radius = "25"
 				e = _controller.excerpt(argumentcollection = args)
-				r = "CFWheels: testing the excerpt view helper to see if it works or no[more]"
+				r = "Wheels: testing the excerpt view helper to see if it works or no[more]"
 
 				expect(e).toBe(r)
 			})
@@ -156,14 +156,14 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				_controller = g.controller(name = "dummy")
 				args = {}
-				args.text = "CFWheels test to do see if highlight function works or not."
+				args.text = "Wheels test to do see if highlight function works or not."
 				args.phrases = "highlight function"
-				args.class = "cfwheels-highlight"
+				args.class = "wheels-highlight"
 			})
 
 			it("works with phrase found", () => {
 				e = _controller.highlight(argumentcollection = args)
-				r = 'CFWheels test to do see if <span class="cfwheels-highlight">highlight function</span> works or not.'
+				r = 'Wheels test to do see if <span class="wheels-highlight">highlight function</span> works or not.'
 
 				expect(e).toBe(r)
 			})
@@ -172,7 +172,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "phrases")
 				args.phrase = "xxxxxxxxx"
 				e = _controller.highlight(argumentcollection = args)
-				r = 'CFWheels test to do see if highlight function works or not.'
+				r = 'Wheels test to do see if highlight function works or not.'
 				
 				expect(e).toBe(r)
 			})
@@ -181,7 +181,7 @@ component extends="wheels.WheelsTest" {
 				StructDelete(args, "class")
 				args.phrases = "highlight function"
 				e = _controller.highlight(argumentcollection = args)
-				r = 'CFWheels test to do see if <span class="highlight">highlight function</span> works or not.'
+				r = 'Wheels test to do see if <span class="highlight">highlight function</span> works or not.'
 
 				expect(e).toBe(r)
 			})
@@ -189,7 +189,7 @@ component extends="wheels.WheelsTest" {
 			it("works with phrase not found no class defined", () => {
 				args.phrases = "xxxxxxxxx"
 				e = _controller.highlight(argumentcollection = args)
-				r = 'CFWheels test to do see if highlight function works or not.'
+				r = 'Wheels test to do see if highlight function works or not.'
 				
 				expect(e).toBe(r)
 			})
@@ -198,7 +198,7 @@ component extends="wheels.WheelsTest" {
 				args.delimiter = "|"
 				args.phrases = "test to|function|or not"
 				e = _controller.highlight(argumentcollection = args)
-				r = 'CFWheels <span class="cfwheels-highlight">test to</span> do see if highlight <span class="cfwheels-highlight">function</span> works <span class="cfwheels-highlight">or not</span>.'
+				r = 'Wheels <span class="wheels-highlight">test to</span> do see if highlight <span class="wheels-highlight">function</span> works <span class="wheels-highlight">or not</span>.'
 
 				expect(e).toBe(r)
 			})
@@ -206,7 +206,7 @@ component extends="wheels.WheelsTest" {
 			it("works with mark tag", () => {
 				args.tag = "mark"
 				e = _controller.highlight(argumentcollection = args)
-				r = 'CFWheels test to do see if <mark class="cfwheels-highlight">highlight function</mark> works or not.'
+				r = 'Wheels test to do see if <mark class="wheels-highlight">highlight function</mark> works or not.'
 
 				expect(e).toBe(r)
 			})
@@ -324,10 +324,10 @@ augue validus cui lucidus.</p>"
 			it("should word truncate the phrase", () => {
 				local.controller = g.controller(name = "dummy")
 				local.args = {}
-				local.args.text = "CFWheels is a framework for ColdFusion"
+				local.args.text = "Wheels is a framework for ColdFusion"
 				local.args.length = "4"
 				result = local.controller.wordTruncate(argumentcollection = local.args)
-				expected = "CFWheels is a framework..."
+				expected = "Wheels is a framework..."
 
 				expect(result).toBe(expected)
 			})

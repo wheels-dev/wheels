@@ -99,55 +99,55 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("only supplies file", () => {
-				args.file = "/wheels/tests/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/tests/_assets/files/wheels-logo.png"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("cfwheels-logo.png")
+				expect(r.file.right(17)).toBe("wheels-logo.png")
 				expect(r.mime).toBe("image/png")
-				expect(r.name.right(17)).toBe("cfwheels-logo.png")
+				expect(r.name.right(17)).toBe("wheels-logo.png")
 			})
 
 			it("gets test info", () => {
-				args.file = "/wheels/tests/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/tests/_assets/files/wheels-logo.png"
 				args.name = "A Weird FileName.png"
 				_controller.sendFile(argumentCollection = args)
 				r = _controller.getFiles()
 
-				expect(r[1].file.right(17)).toBe("cfwheels-logo.png")
+				expect(r[1].file.right(17)).toBe("wheels-logo.png")
 				expect(r[1].mime).toBe("image/png")
 				expect(r[1].name).toBe("A Weird FileName.png")
 			})
 
 			it("supplies file and name", () => {
-				args.file = "/wheels/tests/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/tests/_assets/files/wheels-logo.png"
 				args.name = "A Weird FileName.png"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("cfwheels-logo.png")
+				expect(r.file.right(17)).toBe("wheels-logo.png")
 				expect(r.mime).toBe("image/png")
 				expect(r.name).toBe("A Weird FileName.png")
 			})
 
 			it("changes disposition", () => {
-				args.file = "/wheels/tests/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/tests/_assets/files/wheels-logo.png"
 				args.disposition = "attachment"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("cfwheels-logo.png")
+				expect(r.file.right(17)).toBe("wheels-logo.png")
 				expect(r.disposition).toBe("attachment")
 				expect(r.mime).toBe("image/png")
-				expect(r.name.right(17)).toBe("cfwheels-logo.png")
+				expect(r.name.right(17)).toBe("wheels-logo.png")
 			})
 
 			it("overloads mimetype", () => {
-				args.file = "/wheels/tests/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/tests/_assets/files/wheels-logo.png"
 				args.type = "wheels/custom"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("cfwheels-logo.png")
+				expect(r.file.right(17)).toBe("wheels-logo.png")
 				expect(r.disposition).toBe("attachment")
 				expect(r.mime).toBe("wheels/custom")
-				expect(r.name.right(17)).toBe("cfwheels-logo.png")
+				expect(r.name.right(17)).toBe("wheels-logo.png")
 			})
 
 			it("checks single file exists", () => {
@@ -160,7 +160,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("checks no extension file does not exist", () => {
-				args.file = "/wheels/tests/_assets/files/cfwheels-logo"
+				args.file = "/wheels/tests/_assets/files/wheels-logo"
 
 				expect(function() {
 					_controller.sendFile(argumentCollection = args)
@@ -172,7 +172,7 @@ component extends="wheels.WheelsTest" {
 				skip("Temporarily skipping to debug path issues in CI");
 				
 				// Get absolute path to test assets directory
-				local.testFile = "/wheels/tests/_assets/files/cfwheels-logo.png";
+				local.testFile = "/wheels/tests/_assets/files/wheels-logo.png";
 				// Extract directory and filename parts
 				local.dir = GetDirectoryFromPath(local.testFile);
 				local.filename = GetFileFromPath(local.testFile);
@@ -182,9 +182,9 @@ component extends="wheels.WheelsTest" {
 				args.file = local.filename
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("cfwheels-logo.png")
+				expect(r.file.right(17)).toBe("wheels-logo.png")
 				expect(r.mime).toBe("image/png")
-				expect(r.name.right(17)).toBe("cfwheels-logo.png")
+				expect(r.name.right(17)).toBe("wheels-logo.png")
 			})
 		})
 
@@ -296,20 +296,20 @@ component extends="wheels.WheelsTest" {
 
 			it("sends mail with attachment", () => {
 				args.template = "plainEmailTemplate"
-				args.file = "cfwheels-logo.png"
+				args.file = "wheels-logo.png"
 				result = _controller.sendEmail(argumentCollection = args)
 
 				expect(result.mailparams[1].file).toInclude("_assets")
-				expect(result.mailparams[1].file).toInclude("cfwheels-logo.png")
+				expect(result.mailparams[1].file).toInclude("wheels-logo.png")
 			})
 
 			it("sends mail with external attachment", () => {
 				args.template = "plainEmailTemplate"
-				args.file = "cfwheels-logo.png,http://www.example.com/test.txt,c:\inetpub\wwwroot\cfwheels\something.pdf"
+				args.file = "wheels-logo.png,http://www.example.com/test.txt,c:\inetpub\wwwroot\cfwheels\something.pdf"
 				result = _controller.sendEmail(argumentCollection = args)
 
 				expect(result.mailparams[1].file).toInclude("_assets")
-				expect(result.mailparams[1].file).toInclude("cfwheels-logo.png")
+				expect(result.mailparams[1].file).toInclude("wheels-logo.png")
 				expect(result.mailparams[2].file).toInclude("http://www.example.com/test.txt")
 				expect(result.mailparams[3].file).toInclude("c:\inetpub\wwwroot\cfwheels\something.pdf")
 			})

@@ -24,39 +24,39 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("removes all links when encode=false", () => {
-				htmlText = 'Here is a <a href="http://cfwheels.org">CFWheels</a> link with <strong>bold</strong> text'
+				htmlText = 'Here is a <a href="http://wheels.dev">Wheels</a> link with <strong>bold</strong> text'
 				actual = _controller.stripLinks(html = htmlText, encode = false)
-				expected = 'Here is a CFWheels link with <strong>bold</strong> text'
+				expected = 'Here is a Wheels link with <strong>bold</strong> text'
 				
 				expect(actual).toBe(expected)
 			})
 			
 			it("removes all links and encodes remaining HTML when encode=true", () => {
-				htmlText = 'Here is a <a href="http://cfwheels.org">CFWheels</a> link with <strong>bold</strong> text'
+				htmlText = 'Here is a <a href="http://wheels.dev">Wheels</a> link with <strong>bold</strong> text'
 				actual = _controller.stripLinks(html = htmlText, encode = true)
-				expected = 'Here is a CFWheels link with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text'
+				expected = 'Here is a Wheels link with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text'
 				
 				expect(actual).toBe(expected)
 			})
 			
 			it("handles nested tags correctly when encode=false", () => {
-				htmlText = 'Check out <a href="http://cfwheels.org"><strong>CFWheels</strong> framework</a> for CFML'
+				htmlText = 'Check out <a href="http://wheels.dev"><strong>Wheels</strong> framework</a> for CFML'
 				actual = _controller.stripLinks(html = htmlText, encode = false)
-				expected = 'Check out <strong>CFWheels</strong> framework for CFML'
+				expected = 'Check out <strong>Wheels</strong> framework for CFML'
 				
 				expect(actual).toBe(expected)
 			})
 			
 			it("handles nested tags correctly when encode=true", () => {
-				htmlText = 'Check out <a href="http://cfwheels.org"><strong>CFWheels</strong> framework</a> for CFML'
+				htmlText = 'Check out <a href="http://wheels.dev"><strong>Wheels</strong> framework</a> for CFML'
 				actual = _controller.stripLinks(html = htmlText, encode = true)
-				expected = 'Check out &lt;strong&gt;CFWheels&lt;&##x2f;strong&gt; framework for CFML'
+				expected = 'Check out &lt;strong&gt;Wheels&lt;&##x2f;strong&gt; framework for CFML'
 				
 				expect(actual).toBe(expected)
 			})
 			
 			it("handles malformed HTML correctly", () => {
-				htmlText = 'This is <a href="http://cfwheels.org"></a> link without closing tag and <strong>nested tags'
+				htmlText = 'This is <a href="http://wheels.dev"></a> link without closing tag and <strong>nested tags'
 				actual = _controller.stripLinks(html = htmlText, encode = false)
 				
 				// Should strip the link but preserve other tags
@@ -66,9 +66,9 @@ component extends="wheels.WheelsTest" {
 			})
 			
 			it("handles links with attributes correctly", () => {
-				htmlText = 'Here is <a href="http://cfwheels.org" class="external" id="wheels-link" target="_blank">CFWheels</a> link'
+				htmlText = 'Here is <a href="http://wheels.dev" class="external" id="wheels-link" target="_blank">Wheels</a> link'
 				actual = _controller.stripLinks(html = htmlText, encode = false)
-				expected = 'Here is CFWheels link'
+				expected = 'Here is Wheels link'
 				
 				expect(actual).toBe(expected)
 			})
