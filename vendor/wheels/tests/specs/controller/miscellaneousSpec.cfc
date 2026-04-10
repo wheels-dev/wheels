@@ -102,9 +102,9 @@ component extends="wheels.WheelsTest" {
 				args.file = "/wheels/tests/_assets/files/wheels-logo.png"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("wheels-logo.png")
+				expect(r.file.right(15)).toBe("wheels-logo.png")
 				expect(r.mime).toBe("image/png")
-				expect(r.name.right(17)).toBe("wheels-logo.png")
+				expect(r.name.right(15)).toBe("wheels-logo.png")
 			})
 
 			it("gets test info", () => {
@@ -113,7 +113,7 @@ component extends="wheels.WheelsTest" {
 				_controller.sendFile(argumentCollection = args)
 				r = _controller.getFiles()
 
-				expect(r[1].file.right(17)).toBe("wheels-logo.png")
+				expect(r[1].file.right(15)).toBe("wheels-logo.png")
 				expect(r[1].mime).toBe("image/png")
 				expect(r[1].name).toBe("A Weird FileName.png")
 			})
@@ -123,7 +123,7 @@ component extends="wheels.WheelsTest" {
 				args.name = "A Weird FileName.png"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("wheels-logo.png")
+				expect(r.file.right(15)).toBe("wheels-logo.png")
 				expect(r.mime).toBe("image/png")
 				expect(r.name).toBe("A Weird FileName.png")
 			})
@@ -133,10 +133,10 @@ component extends="wheels.WheelsTest" {
 				args.disposition = "attachment"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("wheels-logo.png")
+				expect(r.file.right(15)).toBe("wheels-logo.png")
 				expect(r.disposition).toBe("attachment")
 				expect(r.mime).toBe("image/png")
-				expect(r.name.right(17)).toBe("wheels-logo.png")
+				expect(r.name.right(15)).toBe("wheels-logo.png")
 			})
 
 			it("overloads mimetype", () => {
@@ -144,10 +144,10 @@ component extends="wheels.WheelsTest" {
 				args.type = "wheels/custom"
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("wheels-logo.png")
+				expect(r.file.right(15)).toBe("wheels-logo.png")
 				expect(r.disposition).toBe("attachment")
 				expect(r.mime).toBe("wheels/custom")
-				expect(r.name.right(17)).toBe("wheels-logo.png")
+				expect(r.name.right(15)).toBe("wheels-logo.png")
 			})
 
 			it("checks single file exists", () => {
@@ -182,9 +182,9 @@ component extends="wheels.WheelsTest" {
 				args.file = local.filename
 				r = _controller.sendFile(argumentCollection = args)
 
-				expect(r.file.right(17)).toBe("wheels-logo.png")
+				expect(r.file.right(15)).toBe("wheels-logo.png")
 				expect(r.mime).toBe("image/png")
-				expect(r.name.right(17)).toBe("wheels-logo.png")
+				expect(r.name.right(15)).toBe("wheels-logo.png")
 			})
 		})
 
