@@ -18,9 +18,9 @@ component output="false" displayName="MCP Server" {
 		return this;
 	}
 
-	/** Rejects shell metacharacters (; | & $ ` ( ) { } < > newlines) */
+	/** Rejects shell metacharacters (; | & $ ` ( ) { } < > ' " \ ~ ! * ? [ ] ^ % newlines) */
 	private boolean function $isSafeArgument(required string value) {
-		return reFind("[;\|&\$`\(\)\{\}<>\n\r]", arguments.value) == 0;
+		return reFind("[;\|&\$`\(\)\{\}<>\n\r'""\~\\!\*\?\[\]\^%]", arguments.value) == 0;
 	}
 
 	/** Allowlist: letters + digits, must start with a letter */
@@ -1257,12 +1257,15 @@ Provide migration code following Wheels conventions."
 
 	private string function executeCommand(required string command) {
 		// Defense-in-depth: final gate before cfexecute
-		if (reFind("[;\|&\$`\(\)\{\}<>]", arguments.command)) {
+		if (reFind("[;\|&\$`\(\)\{\}<>\n\r'""\~\\!\*\?\[\]\^%]", arguments.command)) {
 			return "Error: Command contains disallowed shell metacharacters.";
 		}
 		if (!reFind("^wheels\s", arguments.command)) {
 			return "Error: Only 'wheels' commands are allowed.";
 		}
+
+		// Strip "wheels " prefix once — used by both primary and fallback paths
+		local.strippedArgs = mid(arguments.command, 7);
 
 		try {
 			// Get the application root directory using Application.cfc mappings
@@ -1294,7 +1297,7 @@ Provide migration code following Wheels conventions."
 			// Execute the command
 			cfexecute(
 				name = "wheels",
-				arguments = mid(arguments.command, 7), // Remove "wheels " prefix
+				arguments = local.strippedArgs,
 				timeout = "30",
 				variable = "local.result",
 				errorVariable = "local.error",
@@ -1313,7 +1316,7 @@ Provide migration code following Wheels conventions."
 			try {
 				cfexecute(
 					name = "box",
-					arguments = arguments.command,
+					arguments = "wheels " & local.strippedArgs,
 					timeout = "30",
 					variable = "local.result",
 					errorVariable = "local.error",
