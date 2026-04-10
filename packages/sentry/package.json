@@ -2,7 +2,7 @@
 	"name": "wheels-sentry",
 	"version": "1.0.0",
 	"author": "PAI Industries",
-	"description": "Sentry error tracking for CFWheels with framework-aware context enrichment",
+	"description": "Sentry error tracking for Wheels with framework-aware context enrichment",
 	"wheelsVersion": ">=3.0",
 	"provides": {
 		"mixins": "controller",

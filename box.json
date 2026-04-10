@@ -28,7 +28,6 @@
         "mvc",
         "rails",
         "wheels",
-        "cfwheels",
         "core"
     ],
     "ignore":[
