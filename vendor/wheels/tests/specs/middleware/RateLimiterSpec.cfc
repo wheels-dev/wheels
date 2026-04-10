@@ -170,7 +170,7 @@ component extends="wheels.WheelsTest" {
 
 		describe("RateLimiter proxyStrategy", function() {
 
-			it("defaults to first IP in X-Forwarded-For chain", function() {
+			it("uses first IP in X-Forwarded-For chain when proxyStrategy is first", function() {
 				var limiter = new wheels.middleware.RateLimiter(
 					maxRequests = 1,
 					windowSeconds = 60,
@@ -273,6 +273,24 @@ component extends="wheels.WheelsTest" {
 				expect(result1).toBe("ok");
 				expect(result2).toBe("ok");
 				expect(result3).toInclude("Rate limit exceeded");
+			});
+
+			it("defaults to last proxy strategy when trustProxy is enabled", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					trustProxy = true,
+					maxRequests = 5,
+					windowSeconds = 60
+				);
+
+				// The rightmost IP should be used (proxy-appended)
+				var req = {
+					cgi: {
+						remote_addr: "10.0.0.1",
+						http_x_forwarded_for: "1.2.3.4, 5.6.7.8"
+					}
+				};
+				var clientKey = limiter.$getClientKey(req);
+				expect(clientKey).toBe("5.6.7.8");
 			});
 
 			it("throws on invalid proxyStrategy", function() {
