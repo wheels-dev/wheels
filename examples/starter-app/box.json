@@ -28,7 +28,7 @@
         ".env.example"
     ],
     "dependencies": {
-        "wheels-core": "^3.1.0",
+        "wheels-core": "^4.0.0",
         "wheels-authenticateThis":"^1"
     },
     "installPaths": {
