@@ -21,14 +21,13 @@ WEB-INF
 # Vendor dependencies (install with: wheels install)
 /vendor/
 
-# Database files
-/db/
+# Database files (SQLite databases are created by the server)
+/db/*.sqlite
+/db/*.db
 
 # Server state
 settings.json
 settings.xml
-*.db
-*.sqlite
 .wheels/
 
 # Environment files (contain secrets)

@@ -16,7 +16,7 @@
 
 	/*
 		URL rewriting mode: "On", "Partial", or "Off".
-		"On" requires web server rewrite rules (or urlrewrite.xml for Tuckey/CommandBox).
+		"On" requires web server rewrite rules (or urlrewrite.xml for LuCLI/Tuckey).
 		"Partial" requires cgi.path_info support.
 	*/
 	set(URLRewriting="On");
