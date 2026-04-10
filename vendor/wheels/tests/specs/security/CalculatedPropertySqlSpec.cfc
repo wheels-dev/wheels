@@ -23,6 +23,20 @@ component extends="wheels.WheelsTest" {
 					}).toThrow("Wheels.InvalidCalculatedProperty")
 				})
 
+				it("rejects SQL with bare trailing semicolons", () => {
+					expect(function() {
+						var m = g.model("post")
+						m.$validateCalculatedPropertySql(sql="COUNT(*);", propertyName="test")
+					}).toThrow("Wheels.InvalidCalculatedProperty")
+				})
+
+				it("rejects SQL with EXECUTE keyword", () => {
+					expect(function() {
+						var m = g.model("post")
+						m.$validateCalculatedPropertySql(sql="EXECUTE('SELECT 1')", propertyName="test")
+					}).toThrow("Wheels.InvalidCalculatedProperty")
+				})
+
 				it("rejects SQL with UNION SELECT", () => {
 					expect(function() {
 						var m = g.model("post")

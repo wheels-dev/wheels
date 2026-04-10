@@ -918,12 +918,12 @@ component {
 	 * [category: Miscellaneous Functions]
 	 */
 	public string function $validateCalculatedPropertySql(required string sql, required string propertyName) {
-		local.dangerous = ";\s|UNION\s|INTO\s+(?:OUT|DUMP)|EXEC\s|xp_|LOAD_FILE|BENCHMARK|SLEEP\s*\(";
+		local.dangerous = ";|\bUNION\b|INTO\s+(?:OUT|DUMP)|\bEXEC(UTE)?\b|xp_|LOAD_FILE|BENCHMARK|SLEEP\s*\(";
 		if (ReFindNoCase(local.dangerous, arguments.sql)) {
 			Throw(
 				type = "Wheels.InvalidCalculatedProperty",
 				message = "The calculated property `#arguments.propertyName#` contains potentially dangerous SQL patterns.",
-				extendedInfo = "Calculated property SQL must not contain semicolons followed by whitespace, UNION, EXEC, or other dangerous SQL constructs. Expression: #arguments.sql#"
+				extendedInfo = "Calculated property SQL must not contain semicolons, UNION, EXEC/EXECUTE, or other dangerous SQL constructs. Expression: #arguments.sql#"
 			);
 		}
 		return arguments.sql;
