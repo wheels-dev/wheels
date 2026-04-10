@@ -497,12 +497,14 @@ component {
 		string $baseTemplatePath = $get("viewPath"),
 		boolean $prependWithUnderscore = true
 	) {
-		// Reject path traversal attempts in partial/template names
-		if (Find("..", arguments.$name) || Find(Chr(92), arguments.$name)) {
+		// Strip null bytes and URL-decode before traversal checks to prevent encoded bypasses
+		arguments.$name = Replace(arguments.$name, Chr(0), "", "all");
+		local.decoded = URLDecode(arguments.$name);
+		if (Find("..", local.decoded) || Find(Chr(92), local.decoded)) {
 			Throw(
 				type="Wheels.InvalidPartialPath",
 				message="The partial name `#EncodeForHTML(arguments.$name)#` contains invalid path characters.",
-				extendedInfo="Partial names must not contain '..' or backslashes."
+				extendedInfo="Partial names must not contain '..' or backslashes (including URL-encoded variants)."
 			);
 		}
 
