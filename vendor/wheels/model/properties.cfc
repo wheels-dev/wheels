@@ -712,6 +712,10 @@ component {
 	 * Escapes a string value for safe inclusion in a SQL literal.
 	 * Strips null bytes, doubles backslashes (MySQL escape sequences), and doubles single quotes.
 	 *
+	 * DEPRECATED: Prefer parameterized queries (cfqueryparam / whereParams) over string escaping.
+	 * This function is retained for backwards compatibility with existing scope handlers
+	 * that use string interpolation in WHERE clauses.
+	 *
 	 * @value The string value to escape.
 	 */
 	public string function $escapeSqlValue(required string value) {
@@ -736,11 +740,17 @@ component {
 		for (local.key in arguments.args) {
 			local.val = arguments.args[local.key];
 			if (IsSimpleValue(local.val)) {
+				// Strip null bytes
+				local.val = Replace(local.val, Chr(0), "", "all");
 				// Strip SQL comment/statement markers before escaping
 				local.val = Replace(local.val, "--", "", "all");
 				local.val = Replace(local.val, "/*", "", "all");
 				local.val = Replace(local.val, "*/", "", "all");
 				local.val = Replace(local.val, ";", "", "all");
+				// Strip dangerous SQL keywords that could be used for injection.
+				// Word-boundary matching prevents false positives in normal values.
+				local.val = REReplaceNoCase(local.val, "\b(UNION|EXEC|EXECUTE|BENCHMARK|SLEEP)\b", "", "all");
+				local.val = REReplaceNoCase(local.val, "\bxp_\w*", "", "all");
 				local.sanitized[local.key] = $escapeSqlValue(local.val);
 			} else {
 				local.sanitized[local.key] = local.val;
@@ -900,9 +910,15 @@ component {
 					extendedInfo = "Enum values must contain only alphanumeric characters, underscores, hyphens, spaces, and dots. Received: `#local.storedValue#`"
 				);
 			}
-			local.escapedValue = $escapeSqlValue(ToString(local.storedValue));
 			local.scopeDef = {};
-			local.scopeDef.where = "#arguments.property# = '#local.escapedValue#'";
+			// Store value in whereParams for parameterized execution rather than
+			// interpolating into the WHERE string. ScopeChain.$mergeSpecs() resolves
+			// these into quoted values that $whereClause() re-parameterizes via cfqueryparam.
+			local.scopeDef.where = "#arguments.property# = ?";
+			local.scopeDef.whereParams = [{
+				value: ToString(local.storedValue),
+				type: "CF_SQL_VARCHAR"
+			}];
 			variables.wheels.class.scopes[local.name] = local.scopeDef;
 		}
 	}
