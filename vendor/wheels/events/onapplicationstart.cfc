@@ -128,20 +128,70 @@ component {
 			application.$wheels.allowEnvironmentSwitchViaUrl = false;
 		}
 
+		// Rate limit reload attempts: 5 failed password attempts within 5 minutes locks the IP
+		if (!StructKeyExists(application, "$reloadRateLimit")) {
+			application.$reloadRateLimit = {};
+		}
+		local.reloadRateLimitKey = cgi.REMOTE_ADDR;
+		local.reloadRateLimited = false;
+		if (StructKeyExists(application.$reloadRateLimit, local.reloadRateLimitKey)) {
+			local.rl = application.$reloadRateLimit[local.reloadRateLimitKey];
+			if (local.rl.count >= 5 && DateDiff("n", local.rl.firstAttempt, Now()) < 5) {
+				local.reloadRateLimited = true;
+			}
+			if (DateDiff("n", local.rl.firstAttempt, Now()) >= 5) {
+				StructDelete(application.$reloadRateLimit, local.reloadRateLimitKey);
+			}
+		}
+
 		// Set environment either from the url or the developer's environment.cfm file.
+		local.reloadPasswordMatched = false;
 		if (
-			StructKeyExists(URL, "reload")
+			!local.reloadRateLimited
+			&& StructKeyExists(URL, "reload")
 			&& !IsBoolean(URL.reload)
 			&& Len(url.reload)
 			&& StructKeyExists(application.$wheels, "reloadPassword")
 			&& (
 				!Len(application.$wheels.reloadPassword)
-				|| (StructKeyExists(URL, "password") && Compare(Hash(URL.password, "SHA-256"), Hash(application.$wheels.reloadPassword, "SHA-256")) == 0)
+				|| (
+					StructKeyExists(URL, "password")
+					&& CreateObject("java", "java.security.MessageDigest").isEqual(
+						Hash(URL.password, "SHA-256").getBytes("UTF-8"),
+						Hash(application.$wheels.reloadPassword, "SHA-256").getBytes("UTF-8")
+					)
+				)
 			)
 		) {
+			local.reloadPasswordMatched = true;
 			application.$wheels.environment = URL.reload;
 		} else {
 			application.wo.$include(template = "/config/environment.cfm");
+		}
+
+		// Track failed reload password attempts
+		if (
+			StructKeyExists(URL, "reload")
+			&& StructKeyExists(URL, "password")
+			&& !local.reloadRateLimited
+			&& !local.reloadPasswordMatched
+		) {
+			if (!StructKeyExists(application.$reloadRateLimit, local.reloadRateLimitKey)) {
+				application.$reloadRateLimit[local.reloadRateLimitKey] = {count: 0, firstAttempt: Now()};
+			}
+			application.$reloadRateLimit[local.reloadRateLimitKey].count++;
+			try {
+				writeLog(file="wheels_security", type="warning", text="Reload password rejected from #cgi.REMOTE_ADDR#");
+			} catch (any e) {
+			}
+		}
+
+		// Log successful reload
+		if (local.reloadPasswordMatched) {
+			try {
+				writeLog(file="wheels_security", type="information", text="Reload accepted from #cgi.REMOTE_ADDR# (environment: #URL.reload#)");
+			} catch (any e) {
+			}
 		}
 
 		// If we're not allowed to switch, override and replace with the old environment
