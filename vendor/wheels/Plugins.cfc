@@ -139,6 +139,13 @@ component output="false" extends="wheels.Global"{
 		local.wheelsVersion = $normalizeWheelsVersion();
 		for (local.pluginKey in local.pluginKeys) {
 			local.pluginValue = local.plugins[local.pluginKey];
+			try {
+				WriteLog(
+					text = "[Wheels] Loading plugin '##local.pluginKey##' from ##local.pluginValue.folderPath##",
+					type = "information",
+					file = "wheels_security"
+				);
+			} catch (any e) {}
 			local.plugin = CreateObject("component", $componentPathToPlugin(local.pluginKey, local.pluginValue.name)).init();
 			// Determine the compatibility version list. If a plugin.json exists and
 			// declares wheelsVersion, use that instead of the CFC's this.version

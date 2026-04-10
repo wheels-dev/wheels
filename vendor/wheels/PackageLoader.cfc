@@ -304,6 +304,43 @@ component output="false" {
 			return;
 		}
 
+		try {
+			WriteLog(
+				text = "[Wheels] Loading package '##arguments.dirName##' from ##arguments.pkgDir##",
+				type = "information",
+				file = "wheels_security"
+			);
+		} catch (any e) {}
+
+		if (StructKeyExists(local.manifest, "checksums") && IsStruct(local.manifest.checksums)) {
+			local.checksumFailed = false;
+			for (local.cfcFile in local.manifest.checksums) {
+				local.expectedHash = local.manifest.checksums[local.cfcFile];
+				local.cfcFilePath = arguments.pkgDir & "/" & local.cfcFile;
+				if (FileExists(local.cfcFilePath)) {
+					local.actualHash = Hash(FileRead(local.cfcFilePath), "SHA-256");
+					if (CompareNoCase(local.actualHash, local.expectedHash) != 0) {
+						try {
+							WriteLog(
+								text = "[Wheels] SECURITY WARNING: Checksum mismatch for ##local.cfcFile## in package '##arguments.dirName##'. Expected: ##local.expectedHash##, Got: ##local.actualHash##",
+								type = "warning",
+								file = "wheels_security"
+							);
+						} catch (any e) {}
+						local.checksumFailed = true;
+					}
+				}
+			}
+			if (local.checksumFailed) {
+				ArrayAppend(variables.failedPackages, {
+					name = arguments.dirName,
+					error = "Checksum verification failed",
+					detail = "One or more CFC files did not match declared checksums in package.json"
+				});
+				return;
+			}
+		}
+
 		// Eager loading: instantiate CFC now
 		$instantiatePackage(arguments.dirName, arguments.pkgDir, local.mixinTargets, local.provides);
 	}
