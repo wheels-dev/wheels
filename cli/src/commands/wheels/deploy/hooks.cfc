@@ -194,7 +194,7 @@ component extends="./base" {
         
         // Make executable
         if (arguments.template == "bash") {
-            $execBash("chmod +x #hookFile#");
+            $execBash("chmod +x " & $shellEscape(hookFile));
         }
         
         print.greenLine("✓ Created hook: #arguments.hookName#");
