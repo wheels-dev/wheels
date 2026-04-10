@@ -415,6 +415,98 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("RateLimiter failOpen parameter", function() {
+
+			it("defaults failOpen to false (fail-closed)", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60);
+				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("accepts failOpen=true", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, failOpen = true);
+				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("accepts failOpen=false", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, failOpen = false);
+				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("blocks requests by default when fail-closed with fixed window", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 2,
+					windowSeconds = 60,
+					strategy = "fixedWindow"
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				var r1 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
+				var r2 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
+				var r3 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
+
+				expect(r1).toBe("ok");
+				expect(r2).toBe("ok");
+				expect(r3).toInclude("Rate limit exceeded");
+			});
+
+			it("blocks requests by default when fail-closed with sliding window", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 2,
+					windowSeconds = 60,
+					strategy = "slidingWindow"
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				var r1 = limiter.handle(request = {remoteAddr: "failclose-sw-1"}, next = nextFn);
+				var r2 = limiter.handle(request = {remoteAddr: "failclose-sw-1"}, next = nextFn);
+				var r3 = limiter.handle(request = {remoteAddr: "failclose-sw-1"}, next = nextFn);
+
+				expect(r1).toBe("ok");
+				expect(r2).toBe("ok");
+				expect(r3).toInclude("Rate limit exceeded");
+			});
+
+			it("blocks requests by default when fail-closed with token bucket", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 2,
+					windowSeconds = 60,
+					strategy = "tokenBucket"
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				var r1 = limiter.handle(request = {remoteAddr: "failclose-tb-1"}, next = nextFn);
+				var r2 = limiter.handle(request = {remoteAddr: "failclose-tb-1"}, next = nextFn);
+				var r3 = limiter.handle(request = {remoteAddr: "failclose-tb-1"}, next = nextFn);
+
+				expect(r1).toBe("ok");
+				expect(r2).toBe("ok");
+				expect(r3).toInclude("Rate limit exceeded");
+			});
+
+			it("still enforces rate limits when failOpen is true", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 2,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					failOpen = true
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				var r1 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
+				var r2 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
+				var r3 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
+
+				expect(r1).toBe("ok");
+				expect(r2).toBe("ok");
+				expect(r3).toInclude("Rate limit exceeded");
+			});
+
+		});
+
 	}
 
 }
