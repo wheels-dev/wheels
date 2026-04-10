@@ -45,9 +45,9 @@ component aliases="wheels g app" extends="../base" {
     variables.templateMap = {
       'WheelsBaseTemplate'        : 'wheels-base-template@^3.1.0',
       'BleedingEdge'              : 'wheels-base-template@BE',
-      'WheelsTemplateHTMX'        : 'cfwheels-template-htmx-alpine-simple',
+      'WheelsTemplateHTMX'        : 'wheels-template-htmx-alpine-simple',
       'WheelsStarterApp'          : 'wheels-starter-app',
-      'WheelsTodoMVCHTMX'         : 'cfwheels-todomvc-htmx'
+      'WheelsTodoMVCHTMX'         : 'wheels-todomvc-htmx'
     };
 
     return this;
@@ -211,14 +211,14 @@ component aliases="wheels g app" extends="../base" {
       )
       .run();
 
-    // Remove the cfwheels-base from the dependencies
+    // Remove the wheels-base from the dependencies
     command( 'tokenReplace' )
-      .params( path = 'box.json', token = '"cfwheels-base":"^2.2",', replacement = '' )
+      .params( path = 'box.json', token = '"wheels-base":"^2.2",', replacement = '' )
       .run();
 
-    // Remove the cfwheels-base from the install paths
+    // Remove the wheels-base from the install paths
     command( 'tokenReplace' )
-      .params( path = 'box.json', token = '"cfwheels-base":"base/",', replacement = '' )
+      .params( path = 'box.json', token = '"wheels-base":"base/",', replacement = '' )
       .run();
 
     // Add the H2 Lucee extension to the dependencies
@@ -248,10 +248,10 @@ component aliases="wheels g app" extends="../base" {
 
       // New Flashwrapper Plugin needed - install it via Forgebox
       if (!arguments.skipInstall) {
-        command( 'install cfwheels-flashmessages-bootstrap' ).run();
+        command( 'install wheels-flashmessages-bootstrap' ).run();
       } else {
         details.getPrint().yellowLine( "Skipping Bootstrap plugin installation (--skipInstall flag)" );
-        arrayAppend(nextSteps, "Install Bootstrap plugin: install cfwheels-flashmessages-bootstrap");
+        arrayAppend(nextSteps, "Install Bootstrap plugin: install wheels-flashmessages-bootstrap");
       }
 
       }
@@ -287,7 +287,7 @@ component aliases="wheels g app" extends="../base" {
   }
 
   /**
-   * Returns an array of cfwheels templates available
+   * Returns an array of wheels templates available
    */
   function templateComplete( ) {
     return variables.templateMap.keyList().listToArray();

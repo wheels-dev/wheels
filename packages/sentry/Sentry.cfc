@@ -1,5 +1,5 @@
 /**
- * wheels-sentry — CFWheels plugin for Sentry error tracking.
+ * wheels-sentry — Wheels package for Sentry error tracking.
  *
  * Provides automatic SDK initialization, controller mixin methods for
  * capturing errors/messages with Wheels context, and breadcrumb support.

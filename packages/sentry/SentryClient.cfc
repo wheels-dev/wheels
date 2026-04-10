@@ -1,5 +1,5 @@
 /**
- * Sentry SDK for ColdFusion / CFWheels
+ * Sentry SDK for ColdFusion / Wheels
  *
  * Based on sentry-cfml by GiancarloGomez (https://github.com/GiancarloGomez/sentry-cfml)
  * Enhanced with Wheels-aware context enrichment, breadcrumbs, and modern envelope API.
@@ -99,7 +99,7 @@ component displayname="SentryClient" output="false" accessors="true" {
 			tags["cfml.engine"] = "unknown";
 		}
 
-		tags["cfml.framework"] = "cfwheels";
+		tags["cfml.framework"] = "wheels";
 		var appKey = structKeyExists(application, "wheels") ? "wheels" : "$wheels";
 		if (structKeyExists(application, appKey) && structKeyExists(application[appKey], "version"))
 			tags["cfml.framework.version"] = application[appKey].version;

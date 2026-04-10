@@ -2,7 +2,7 @@
  * Update a specific Wheels plugin to the latest version
  * Examples:
  * wheels plugin update bcrypt
- * wheels plugin update cfwheels-bcrypt --version=2.0.0
+ * wheels plugin update wheels-bcrypt --version=2.0.0
  */
 component aliases="wheels plugin update" extends="../base" {
 

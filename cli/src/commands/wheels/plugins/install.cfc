@@ -1,9 +1,9 @@
 /**
  * Install Wheels CLI plugins
  * Examples:
- * wheels plugins install cfwheels-flashmessages-bootstrap
- * wheels plugins install cfwheels-bcrypt --dev
- * wheels plugins install cfwheels-bcrypt
+ * wheels plugins install wheels-flashmessages-bootstrap
+ * wheels plugins install wheels-bcrypt --dev
+ * wheels plugins install wheels-bcrypt
  */
 component aliases="wheels plugin install" extends="../base" {
 
@@ -74,7 +74,7 @@ component aliases="wheels plugin install" extends="../base" {
             detailOutput.output("- Verify the plugin name is correct", true);
             detailOutput.output("- Check if the plugin exists on ForgeBox:", true);
             detailOutput.output("  wheels plugin list --available", true);
-            detailOutput.output("- Ensure the plugin type is 'cfwheels-plugins'", true);
+            detailOutput.output("- Ensure the plugin type is 'wheels-plugins'", true);
             detailOutput.output("- Try clearing package cache: box clean", true);
 
             setExitCode(1);

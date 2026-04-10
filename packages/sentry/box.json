@@ -5,8 +5,8 @@
 	"author": "PAI Industries",
 	"type": "wheels-plugins",
 	"homepage": "https://github.com/paiindustries/sentry-for-wheels",
-	"shortDescription": "Sentry error tracking for CFWheels with framework-aware context enrichment",
-	"keywords": "sentry,error-tracking,monitoring,cfwheels",
+	"shortDescription": "Sentry error tracking for Wheels with framework-aware context enrichment",
+	"keywords": "sentry,error-tracking,monitoring,wheels",
 	"directory": "/plugins/",
 	"createPackageDirectory": true,
 	"packageDirectory": "sentry"

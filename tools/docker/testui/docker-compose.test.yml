@@ -4,7 +4,7 @@ services:
   testui-new:
     build:
       context: .
-    image: cfwheels-testui-new:test
+    image: wheels-testui-new:test
     ports:
       - "3002:80"
     # Add extra_hosts to allow container to access host services

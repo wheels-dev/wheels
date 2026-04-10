@@ -2,7 +2,7 @@
  * Wheels CLI Module for LuCLI
  *
  * Provides code generation, migrations, testing, and server management
- * for CFWheels applications. Each public function is a subcommand:
+ * for Wheels applications. Each public function is a subcommand:
  *
  *   wheels new myapp
  *   wheels create app myapp --port=3000
@@ -11,7 +11,7 @@
  *   wheels test --filter=models
  *   wheels start
  *
- * hint: CFWheels framework CLI - create, generate, migrate, test, and manage your app
+ * hint: Wheels framework CLI - create, generate, migrate, test, and manage your app
  */
 component extends="modules.BaseModule" {
 
@@ -2439,7 +2439,7 @@ component extends="modules.BaseModule" {
 		if (!len(wheelsSource)) {
 			out("  Warning: Could not locate Wheels framework source.", "yellow");
 			out("  You will need to install the framework manually into vendor/wheels/");
-			out("  See: https://guides.cfwheels.org/docs/installing-cfwheels");
+			out("  See: https://guides.wheels.dev/docs/getting-started");
 			return;
 		}
 

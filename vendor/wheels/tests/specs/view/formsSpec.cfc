@@ -75,8 +75,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with image", () => {
-				r = _controller.buttonTag(image = "http://www.cfwheels.com/logo.jpg")
-				e = '<button type="submit" value="save"><img alt="Logo" src="http://www.cfwheels.com/logo.jpg" type="image"></button>'
+				r = _controller.buttonTag(image = "http://www.wheels.dev/logo.jpg")
+				e = '<button type="submit" value="save"><img alt="Logo" src="http://www.wheels.dev/logo.jpg" type="image"></button>'
 
 				expect(e).toBe(r)
 			})

@@ -311,7 +311,7 @@ component extends="base" {
 				
 				// Check for wheels dependency
 				if (StructKeyExists(local.boxJson, "dependencies")) {
-					if (StructKeyExists(local.boxJson.dependencies, "wheels-core") || StructKeyExists(local.boxJson.dependencies, "cfwheels")) {
+					if (StructKeyExists(local.boxJson.dependencies, "wheels-core") || StructKeyExists(local.boxJson.dependencies, "wheels")) {
 						ArrayAppend(arguments.passed, "Wheels dependency declared");
 					} else {
 						ArrayAppend(arguments.warnings, "Wheels not listed in dependencies");

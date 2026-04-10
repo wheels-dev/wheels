@@ -3267,7 +3267,7 @@ component output="false" {
 
 	/**
 	 * Get full domain string from cgi scope: includes protocol and port
-	 * e.g https://www.cfwheels.com:443
+	 * e.g https://www.wheels.dev:443
 	 *
 	 * @cgi Fake CGI Scope for Testing; will default to normal cgi scope
 	 **/
@@ -3286,8 +3286,8 @@ component output="false" {
 
 	/**
 	 * Get full domain string from a passed in string: includes protocol and port
-	 * e.g https://www.cfwheels.com -> https://www.cfwheels.com:443
-	 * e.g www.cfwheels.com -> http://www.cfwheels.com:80
+	 * e.g https://www.wheels.dev -> https://www.wheels.dev:443
+	 * e.g www.wheels.dev -> http://www.wheels.dev:80
 	 *
 	 * @domain The string to look at
 	 **/
