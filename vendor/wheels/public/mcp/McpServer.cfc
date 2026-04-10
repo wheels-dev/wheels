@@ -1265,16 +1265,38 @@ Provide migration code following Wheels conventions."
 	}
 
 	private string function executeCommand(required string command) {
-		// Defense-in-depth: final gate before cfexecute
-		if (reFind("[;\|&\$`\(\)\{\}<>\n\r'""\~\\!\*\?\[\]\^%]", arguments.command)) {
-			return "Error: Command contains disallowed shell metacharacters.";
+		// Structural allowlist: only permit known wheels subcommands with safe arguments
+		var allowedSubcommands = "g,generate,test,server,dbmigrate,db:seed,jobs,reload,info,new,init,deps";
+
+		if (!len(trim(arguments.command))) {
+			return "Error: Empty command.";
 		}
+
 		if (!reFind("^wheels\s", arguments.command)) {
 			return "Error: Only 'wheels' commands are allowed.";
 		}
 
 		// Strip "wheels " prefix once — used by both primary and fallback paths
-		local.strippedArgs = mid(arguments.command, 7);
+		local.strippedArgs = trim(mid(arguments.command, 7));
+
+		if (!len(local.strippedArgs)) {
+			return "Error: Missing subcommand. Allowed: #allowedSubcommands#";
+		}
+
+		// Parse into parts and validate subcommand against allowlist
+		local.parts = ListToArray(local.strippedArgs, " ");
+		local.subcommand = local.parts[1];
+
+		if (!ListFindNoCase(allowedSubcommands, local.subcommand)) {
+			return "Error: Unknown subcommand '#EncodeForHTML(local.subcommand)#'. Allowed: #allowedSubcommands#";
+		}
+
+		// Validate each subsequent argument for shell metacharacters
+		for (var i = 2; i <= ArrayLen(local.parts); i++) {
+			if (!$isSafeArgument(local.parts[i])) {
+				return "Error: Argument contains disallowed characters.";
+			}
+		}
 
 		try {
 			// Get the application root directory using Application.cfc mappings
