@@ -34,6 +34,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 *   Prevents a single attacker from exhausting heap memory by making rapid requests. After pruning expired
 	 *   entries, arrays exceeding this limit are truncated to keep only the most recent timestamps.
 	 *   Default: maxRequests * 3. Only applies to the "slidingWindow" strategy with storage="memory".
+	 * @failOpen When true, requests are allowed through if the rate limiter lock times out.
+	 *   Default false (fail-closed, secure by default). Set to true if availability
+	 *   is more important than strict rate enforcement.
 	 */
 	public RateLimiter function init(
 		numeric maxRequests = 60,
@@ -45,7 +48,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		boolean trustProxy = false,
 		string proxyStrategy = "first",
 		numeric maxStoreSize = 100000,
-		numeric maxTimestampsPerKey = 0
+		numeric maxTimestampsPerKey = 0,
+		boolean failOpen = false
 	) {
 		if (!ListFindNoCase("fixedWindow,slidingWindow,tokenBucket", arguments.strategy)) {
 			throw(
@@ -78,6 +82,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.proxyStrategy = arguments.proxyStrategy;
 		variables.maxStoreSize = arguments.maxStoreSize;
 		variables.maxTimestampsPerKey = arguments.maxTimestampsPerKey > 0 ? arguments.maxTimestampsPerKey : arguments.maxRequests * 3;
+		variables.failOpen = arguments.failOpen;
 
 		// In-memory store using ConcurrentHashMap for thread safety.
 		if (variables.storage == "memory") {
@@ -197,6 +202,23 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		return "unknown";
 	}
 
+	/**
+	 * Handle a rate limiter error (lock timeout or DB failure) according to the failOpen setting.
+	 * Returns a struct with `allowed` and `remaining` reflecting the decision.
+	 */
+	private struct function $handleError(required string context, required string clientKey) {
+		local.mode = variables.failOpen ? "fail-open" : "fail-closed";
+		writeLog(
+			text = "Rate limiter #arguments.context# (#local.mode#) for key: #arguments.clientKey#",
+			type = "warning",
+			file = "wheels_ratelimiter"
+		);
+		return {
+			allowed: variables.failOpen,
+			remaining: 0
+		};
+	}
+
 	// ---------------------------------------------------------------------------
 	// Fixed Window Strategy
 	// ---------------------------------------------------------------------------
@@ -233,7 +255,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				}
 			}
 		} catch (any e) {
-			// Fail open on lock timeout.
+			local.err = $handleError("lock timeout", local.storeKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: local.resetAt};
@@ -293,7 +317,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				variables.store.put(arguments.clientKey, local.pruned);
 			}
 		} catch (any e) {
-			// Fail open on lock timeout.
+			local.err = $handleError("lock timeout", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: local.resetAt};
@@ -345,7 +371,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				variables.store.put(arguments.clientKey, local.bucket);
 			}
 		} catch (any e) {
-			// Fail open on lock timeout.
+			local.err = $handleError("lock timeout", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: local.resetAt};
@@ -559,7 +587,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					local.remaining = variables.maxRequests - local.qCount.counter;
 				}
 			} catch (any e2) {
-				// Fail open.
+				local.err = $handleError("DB error", arguments.clientKey);
+				local.allowed = local.err.allowed;
+				local.remaining = local.err.remaining;
 			}
 		}
 
@@ -601,7 +631,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				local.remaining = variables.maxRequests - local.qCount.cnt - 1;
 			}
 		} catch (any e) {
-			// Fail open.
+			local.err = $handleError("DB error", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: arguments.resetAt};
@@ -656,7 +688,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				);
 			}
 		} catch (any e) {
-			// Fail open.
+			local.err = $handleError("DB error", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: arguments.resetAt};
