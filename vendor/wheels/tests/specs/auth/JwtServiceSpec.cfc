@@ -302,6 +302,44 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("algorithm validation", function() {
+
+				it("accepts tokens with HS256 algorithm", function() {
+					var token = jwt.encode(claims = {sub = 1});
+					var claims = jwt.decode(token);
+					expect(claims.sub).toBe(1);
+				});
+
+				it("rejects tokens with alg none", function() {
+					// Craft a token with alg: none header
+					var headerB64 = _base64UrlEncode('{"alg":"none","typ":"JWT"}');
+					var payloadB64 = _base64UrlEncode('{"sub":1,"iat":999999999,"exp":999999999}');
+					var fakeToken = headerB64 & "." & payloadB64 & ".fakesig";
+					expect(function() {
+						jwt.decode(fakeToken);
+					}).toThrow("Wheels.Auth.JWT.InvalidAlgorithm");
+				});
+
+				it("rejects tokens with alg RS256", function() {
+					var headerB64 = _base64UrlEncode('{"alg":"RS256","typ":"JWT"}');
+					var payloadB64 = _base64UrlEncode('{"sub":1,"iat":999999999,"exp":999999999}');
+					var fakeToken = headerB64 & "." & payloadB64 & ".fakesig";
+					expect(function() {
+						jwt.decode(fakeToken);
+					}).toThrow("Wheels.Auth.JWT.InvalidAlgorithm");
+				});
+
+				it("rejects tokens with missing alg claim", function() {
+					var headerB64 = _base64UrlEncode('{"typ":"JWT"}');
+					var payloadB64 = _base64UrlEncode('{"sub":1,"iat":999999999,"exp":999999999}');
+					var fakeToken = headerB64 & "." & payloadB64 & ".fakesig";
+					expect(function() {
+						jwt.decode(fakeToken);
+					}).toThrow("Wheels.Auth.JWT.InvalidAlgorithm");
+				});
+
+			});
+
 			describe("interoperability", function() {
 
 				it("produces tokens with lowercase JSON claim keys", function() {
@@ -327,6 +365,17 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	/**
+	 * Helper to base64url-encode a string for crafting test tokens.
+	 */
+	private string function _base64UrlEncode(required string value) {
+		var b64 = ToBase64(arguments.value);
+		b64 = Replace(b64, "+", "-", "all");
+		b64 = Replace(b64, "/", "_", "all");
+		b64 = REReplace(b64, "=+$", "");
+		return b64;
 	}
 
 }

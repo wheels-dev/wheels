@@ -151,12 +151,23 @@ component {
 	 */
 	public string function $ensureCsrfCookieEncryptionKey() {
 		if (!Len(application.wheels.csrfCookieEncryptionSecretKey)) {
+			// In production, require explicit configuration
+			if (application.wheels.environment == "production") {
+				Throw(
+					type = "Wheels.Security.MissingCsrfKey",
+					message = "csrfCookieEncryptionSecretKey must be configured in production.",
+					extendedInfo = "Set csrfCookieEncryptionSecretKey in your .env file or config/settings.cfm. Auto-generation is not allowed in production because the key is lost on application restart, invalidating all CSRF tokens."
+				);
+			}
+			// In non-production, auto-generate with warning
 			application.wheels.csrfCookieEncryptionSecretKey = GenerateSecretKey("AES");
-			writeLog(
-				text = "Wheels: csrfCookieEncryptionSecretKey was empty — auto-generated a temporary AES key. Set a persistent key via set(csrfCookieEncryptionSecretKey=""your-key"") in config/settings.cfm to prevent token invalidation on app restart.",
-				type = "warning",
-				file = "wheels_security"
-			);
+			try {
+				writeLog(
+					text = "Wheels WARNING: csrfCookieEncryptionSecretKey was empty — auto-generated a temporary AES key. Set this in config/settings.cfm for persistence across restarts.",
+					type = "warning",
+					file = "wheels_security"
+				);
+			} catch (any e) {}
 		}
 		return application.wheels.csrfCookieEncryptionSecretKey;
 	}
