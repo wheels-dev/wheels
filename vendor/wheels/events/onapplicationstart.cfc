@@ -152,15 +152,11 @@ component {
 			&& !IsBoolean(URL.reload)
 			&& Len(url.reload)
 			&& StructKeyExists(application.$wheels, "reloadPassword")
-			&& (
-				!Len(application.$wheels.reloadPassword)
-				|| (
-					StructKeyExists(URL, "password")
-					&& CreateObject("java", "java.security.MessageDigest").isEqual(
-						Hash(URL.password, "SHA-256").getBytes("UTF-8"),
-						Hash(application.$wheels.reloadPassword, "SHA-256").getBytes("UTF-8")
-					)
-				)
+			&& Len(application.$wheels.reloadPassword)
+			&& StructKeyExists(URL, "password")
+			&& CreateObject("java", "java.security.MessageDigest").isEqual(
+				Hash(URL.password, "SHA-256").getBytes("UTF-8"),
+				Hash(application.$wheels.reloadPassword, "SHA-256").getBytes("UTF-8")
 			)
 		) {
 			local.reloadPasswordMatched = true;
@@ -285,6 +281,13 @@ component {
 			&& local.envSwitchDefault
 		) {
 			application.$wheels.allowEnvironmentSwitchViaUrl = false;
+		}
+
+		// Warn if reloadPassword is empty — URL-based reload and environment switching are disabled.
+		if (!Len(application.$wheels.reloadPassword)) {
+			try {
+				writeLog(file="wheels_security", type="warning", text="Wheels: reloadPassword is empty — URL-based environment switching and application reload are disabled until a password is set in config/settings.cfm");
+			} catch (any e) {}
 		}
 
 		// Load DI service registrations.
