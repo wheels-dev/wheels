@@ -145,6 +145,40 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("val'' DROP TABLE x comment end");
 			});
 
+			it("strips UNION keyword from injection attempts", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "foo UNION SELECT password FROM users"});
+
+				expect(result["1"]).notToInclude("UNION");
+			});
+
+			it("strips EXEC and EXECUTE keywords", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "EXEC xp_cmdshell"});
+
+				expect(result["1"]).notToInclude("EXEC");
+				expect(result["1"]).notToInclude("xp_");
+			});
+
+			it("strips BENCHMARK and SLEEP keywords", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "BENCHMARK(10000000,SHA1('test'))"});
+
+				expect(result["1"]).notToInclude("BENCHMARK");
+
+				var result2 = m.$sanitizeScopeHandlerArgs({"1": "SLEEP(5)"});
+
+				expect(result2["1"]).notToInclude("SLEEP");
+			});
+
+			it("does not strip partial keyword matches in normal values", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "executor"});
+
+				// "executor" should remain because EXEC is not a whole-word match
+				expect(result["1"]).toBe("executor");
+			});
+
 		});
 
 	}
