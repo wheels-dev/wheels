@@ -162,6 +162,9 @@ component extends="modules.BaseModule" {
 		var reporter = "simple";
 		var format = "json";
 		var verboseOutput = false;
+		var ciMode = false;
+		var coreTests = false;
+		var db = "sqlite";
 
 		// Parse named arguments from --key=value or --key value
 		for (var i = 1; i <= arrayLen(args); i++) {
@@ -174,15 +177,30 @@ component extends="modules.BaseModule" {
 				reporter = args[++i];
 			} else if (reFindNoCase("^--reporter=", arg)) {
 				reporter = valueAfterEquals(arg);
+			} else if (arg == "--db" && i < arrayLen(args)) {
+				db = args[++i];
+			} else if (reFindNoCase("^--db=", arg)) {
+				db = valueAfterEquals(arg);
 			} else if (arg == "--verbose" || arg == "-v") {
 				verboseOutput = true;
+			} else if (arg == "--ci") {
+				ciMode = true;
+			} else if (arg == "--core") {
+				coreTests = true;
 			} else if (!arg.startsWith("--")) {
 				// Positional arg is the filter directory
 				filter = arg;
 			}
 		}
 
-		return runTests(filter, reporter, format, verboseOutput);
+		// Auto-detect: if vendor/wheels/tests/ exists, default to core tests
+		if (!coreTests && len(variables.projectRoot)) {
+			if (directoryExists(variables.projectRoot & "/vendor/wheels/tests")) {
+				coreTests = true;
+			}
+		}
+
+		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2063,19 +2081,24 @@ component extends="modules.BaseModule" {
 		string filter = "",
 		string reporter = "simple",
 		string format = "json",
-		boolean verboseOutput = false
+		boolean verboseOutput = false,
+		boolean coreTests = false,
+		string db = "sqlite",
+		boolean ciMode = false
 	) {
 		var serverPort = detectServerPort();
 		if (!serverPort) {
 			out("No running Wheels server detected.", "red");
-			out("Tests require a running server. Start with: wheels start");
+			out("Start with: wheels start", "yellow");
+			out("Or use: bash tools/test-local.sh (auto-manages server)", "yellow");
 			return "";
 		}
 
-		out("Running tests...", "cyan");
+		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
+		out("Running #(coreTests ? 'core' : 'app')# tests (#db#)...", "cyan");
 
 		try {
-			var testUrl = "http://localhost:#serverPort#/wheels/app/tests?format=#format#";
+			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
 			if (len(filter)) {
 				testUrl &= "&directory=#filter#";
 			}
