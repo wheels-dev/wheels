@@ -29,7 +29,7 @@ component extends="wheels.WheelsTest" {
 					expect(local.mw.$headers()).notToHaveKey("Content-Security-Policy");
 				});
 
-				it("does not set HSTS by default", function() {
+				it("does not set HSTS by default when environment is not production", function() {
 					local.mw = new wheels.middleware.SecurityHeaders();
 					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
 				});
@@ -86,9 +86,46 @@ component extends="wheels.WheelsTest" {
 					expect(local.mw.$headers()["Strict-Transport-Security"]).toBe(local.value);
 				});
 
-				it("does not set HSTS header when empty string", function() {
+				it("does not set HSTS header when empty string and not production", function() {
 					local.mw = new wheels.middleware.SecurityHeaders(
 						strictTransportSecurity = ""
+					);
+					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
+				});
+
+				it("auto-defaults HSTS in production environment", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						environment = "production"
+					);
+					expect(local.mw.$headers()).toHaveKey("Strict-Transport-Security");
+					expect(local.mw.$headers()["Strict-Transport-Security"]).toBe("max-age=31536000; includeSubDomains");
+				});
+
+				it("does not auto-default HSTS in development environment", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						environment = "development"
+					);
+					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
+				});
+
+				it("does not auto-default HSTS in testing environment", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						environment = "testing"
+					);
+					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
+				});
+
+				it("uses explicit HSTS value even in production", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						strictTransportSecurity = "max-age=86400",
+						environment = "production"
+					);
+					expect(local.mw.$headers()["Strict-Transport-Security"]).toBe("max-age=86400");
+				});
+
+				it("does not set HSTS when environment is empty and no explicit value", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						environment = ""
 					);
 					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
 				});
