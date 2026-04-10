@@ -179,6 +179,46 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("executor");
 			});
 
+			it("strips WAITFOR and DELAY keywords from time-based injection", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "WAITFOR DELAY ''00:00:05''"});
+
+				expect(result["1"]).notToInclude("WAITFOR");
+				expect(result["1"]).notToInclude("DELAY");
+			});
+
+			it("strips INTO OUTFILE from file-write injection", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "test'' INTO OUTFILE ''/tmp/dump"});
+
+				expect(result["1"]).notToInclude("INTO OUTFILE");
+			});
+
+			it("strips LOAD_FILE function from file-read injection", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "LOAD_FILE(''/etc/passwd'')"});
+
+				expect(result["1"]).notToInclude("LOAD_FILE");
+			});
+
+			it("strips CHAR function from encoding bypass injection", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "CHAR(0x41)"});
+
+				expect(result["1"]).notToInclude("CHAR(");
+			});
+
+			it("does not strip DELAY or WAITFOR as partial word matches", () => {
+				var m = application.wo.model("author");
+				var result = m.$sanitizeScopeHandlerArgs({"1": "delayed"});
+
+				expect(result["1"]).toBe("delayed");
+
+				var result2 = m.$sanitizeScopeHandlerArgs({"1": "waitforward"});
+
+				expect(result2["1"]).toBe("waitforward");
+			});
+
 		});
 
 	}
