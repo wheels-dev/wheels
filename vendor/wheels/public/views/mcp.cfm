@@ -167,7 +167,7 @@ try {
 				"error": {
 					"code": -32700,
 					"message": "Parse error",
-					"data": e.message
+					"data": "Request body is not valid JSON"
 				}
 			};
 			local.errorResponse["id"] = javaCast("null", "");
@@ -197,13 +197,24 @@ try {
 	}));
 
 } catch (any e) {
-	// Handle unexpected errors
+	try {
+		writeLog(
+			file="wheels_mcp",
+			type="error",
+			text="MCP error: " & e.message & " | Detail: " & (structKeyExists(e, "detail") ? e.detail : "")
+		);
+	} catch (any logErr) {
+		// Fail silently if logging fails
+	}
 	cfheader(statusCode="500");
 	cfheader(name="Content-Type", value="application/json");
 	writeOutput(serializeJSON({
-		"error": "Internal server error",
-		"message": e.message,
-		"detail": structKeyExists(e, "detail") ? e.detail : ""
+		"jsonrpc": "2.0",
+		"error": {
+			"code": -32603,
+			"message": "Internal error"
+		},
+		"id": javaCast("null", "")
 	}));
 }
 </cfscript>
