@@ -99,7 +99,10 @@ component output="false" {
 		local.signingInput = local.parts[1] & "." & local.parts[2];
 		local.expectedSig = $sign(local.signingInput);
 
-		if (local.expectedSig != local.parts[3]) {
+		if (!CreateObject("java", "java.security.MessageDigest").isEqual(
+			local.expectedSig.getBytes("UTF-8"),
+			local.parts[3].getBytes("UTF-8")
+		)) {
 			throw(
 				type = "Wheels.Auth.JWT.InvalidSignature",
 				message = "JWT signature verification failed"
