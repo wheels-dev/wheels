@@ -82,7 +82,7 @@ component {
 
 		// Set up containers for routes, caches, settings etc.
 		// TODO remove the static version number
-		application.$wheels.version = "4.0.0-SNAPSHOT";
+		application.$wheels.version = "4.0.0";
 		try {
 			application.$wheels.hostName = CreateObject("java", "java.net.InetAddress").getLocalHost().getHostName();
 		} catch (any e) {

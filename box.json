@@ -1,6 +1,6 @@
 {
     "name":"Wheels.fw",
-    "version":"4.0.0-SNAPSHOT",
+    "version":"4.0.0",
     "author":"Wheels Core Team and Community",
     "shortDescription":"Wheels MVC Framework Core Directory",
     "location":"ForgeboxStorage",

@@ -2,7 +2,7 @@ component {
     this.title = "Wheels CLI";
     this.author = "Wheels.dev Team";
     this.description = "Modern CLI for Wheels Framework";
-    this.version = "4.0.0-SNAPSHOT";
+    this.version = "4.0.0";
     this.autoMapModels = false;
     this.cfmapping = "wheels-cli";
     this.modelNamespace = "wheels-cli";
