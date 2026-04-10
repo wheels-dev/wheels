@@ -21,13 +21,21 @@
   },
   "enableLucee": true,
   "enableREST": false,
+  "dependencies": {
+    "sqlite-jdbc": {
+      "type": "java",
+      "groupId": "org.xerial",
+      "artifactId": "sqlite-jdbc",
+      "version": "3.47.2.0"
+    }
+  },
   "configuration": {
     "datasources": {
       "wheelstestdb_sqlite": {
         "class": "org.sqlite.JDBC",
         "database": "wheelstestdb",
         "dbdriver": "Other",
-        "dsn": "jdbc:sqlite:{project}/wheelstestdb.db",
+        "dsn": "jdbc:sqlite:#project:path#/wheelstestdb.db",
         "host": "",
         "password": "",
         "username": ""
@@ -36,7 +44,7 @@
         "class": "org.sqlite.JDBC",
         "database": "wheelstestdb_tenant_b",
         "dbdriver": "Other",
-        "dsn": "jdbc:sqlite:{project}/wheelstestdb_tenant_b.db",
+        "dsn": "jdbc:sqlite:#project:path#/wheelstestdb_tenant_b.db",
         "host": "",
         "password": "",
         "username": ""
