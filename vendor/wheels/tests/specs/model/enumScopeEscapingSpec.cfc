@@ -2,10 +2,20 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		g = application.wo
+
 		describe("Tests that enum scope WHERE clauses", () => {
 
+			beforeEach(() => {
+				g.$clearModelInitializationCache()
+			})
+
+			afterEach(() => {
+				g.$clearModelInitializationCache()
+			})
+
 			it("generates parameterized WHERE for simple string values", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 				m.enum(property="status", values="draft,published,archived")
 				var scopes = m.scopeInfo()
 
@@ -25,7 +35,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("generates parameterized WHERE for struct-mapped values", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 				m.enum(property="priority", values={low: 0, medium: 1, high: 2})
 				var scopes = m.scopeInfo()
 
@@ -39,7 +49,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("rejects enum values containing single quotes", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 
 				expect(function() {
 					m.enum(property="status", values={it_s_fine: "it's fine", normal: "normal"})
@@ -47,7 +57,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("rejects enum values containing SQL injection patterns", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 
 				expect(function() {
 					m.enum(property="status", values={dangerous: "'; DROP TABLE users; --"})
@@ -55,7 +65,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("allows enum values with hyphens spaces and dots", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 				m.enum(property="status", values={my_val: "some-value", other: "v1.0", spaced: "hello world"})
 				var scopes = m.scopeInfo()
 
@@ -73,7 +83,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("allows numeric enum stored values", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 				m.enum(property="priority", values={low: 0, medium: 1, high: 2})
 				var scopes = m.scopeInfo()
 
@@ -84,7 +94,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("rejects property names with invalid characters", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 
 				expect(function() {
 					m.enum(property="status; DROP TABLE", values="draft")
@@ -92,7 +102,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("rejects property names starting with a number", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 
 				expect(function() {
 					m.enum(property="1status", values="draft")
@@ -100,7 +110,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("allows property names with underscores", () => {
-				var m = application.wo.model("author")
+				var m = g.model("author")
 				m.enum(property="_my_status", values="draft,published")
 				var scopes = m.scopeInfo()
 
