@@ -94,10 +94,10 @@ wheels test --ci --format=junit       # CI mode with JUnit output
 | `wheels server monitor` | Live performance dashboard | Maps to `lucli server monitor` (JMX) |
 | `wheels test` | Run test suite | New command — auto-manages server |
 | `wheels test [filter]` | Run filtered tests | Directory or file path filter |
-| `wheels generate model User` | Generate model | HTTP call to running Wheels app |
-| `wheels generate scaffold Post` | Full CRUD scaffold | HTTP call to running Wheels app |
-| `wheels dbmigrate latest` | Run migrations | HTTP call to running Wheels app |
-| `wheels db:seed` | Seed database | HTTP call to running Wheels app |
+| `wheels generate model User` | Generate model | HTTP call (Phase 2-3), in-process (Phase 4) |
+| `wheels generate scaffold Post` | Full CRUD scaffold | HTTP call (Phase 2-3), in-process (Phase 4) |
+| `wheels dbmigrate latest` | Run migrations | HTTP call (Phase 2-3), in-process (Phase 4) |
+| `wheels db:seed` | Seed database | HTTP call (Phase 2-3), in-process (Phase 4) |
 | `wheels console` | Interactive REPL | LuCLI `repl` with Wheels app context |
 | `wheels cfml '<expr>'` | Evaluate CFML expression | LuCLI `cfml` command |
 | `wheels version` | Show versions | Enhanced `lucli --version` |
@@ -109,8 +109,10 @@ When the binary name is `wheels`, LuCLI loads the Wheels command profile:
 - `wheels server *` -> LuCLI's native server commands with Wheels defaults (port 8080, SQLite auto-setup)
 - `wheels test *` -> Test runner (built into Wheels profile)
 - `wheels new *` -> Scaffold logic (built into Wheels profile)
-- `wheels generate|dbmigrate|db:seed|console` -> HTTP calls to running Wheels app
+- `wheels generate|dbmigrate|db:seed|console` -> HTTP calls to running app (Phase 2-3), in-process via LuceeScriptEngine (Phase 4)
 - `wheels cfml|mcp|daemon` -> LuCLI native commands in Wheels context
+
+**Architecture note:** HTTP calls to a running server are the pragmatic Phase 2-3 approach. The end-state (Phase 4) is all commands running in-process via LuCLI's `LuceeScriptEngine`, which shares the same JVM and Lucee context as the server. This eliminates the need for a running server for commands like migrations, generators, seeds, and testing — they execute directly against the application code and database.
 
 ## `wheels server start` First-Run Behavior
 
@@ -266,13 +268,16 @@ For testing, this opens a future path to run tests in-process (no HTTP overhead,
 
 **Validates:** Can a new developer go from `brew install wheels` to running app in under 2 minutes?
 
-### Phase 4: Advanced
+### Phase 4: In-Process Everything
 
-**Goal:** Power-user features leveraging LuCLI's full capability.
+**Goal:** Eliminate HTTP round-trips. All commands run in the same JVM context as the app.
 
-- In-process test runner via `LuceeScriptEngine` (no HTTP overhead)
-- `wheels console` with live app context
+- Migrate test runner from HTTP to in-process via `LuceeScriptEngine`
+- Migrate `generate`, `dbmigrate`, `db:seed` from HTTP to in-process
+- `wheels console` with live app context (model/service/DI access)
 - `wheels server monitor` (JMX dashboard)
 - MCP server via LuCLI stdio transport
 
-**Validates:** Is the development experience competitive with Rails/Laravel tooling?
+This is the architectural endgame: the CLI and the server share a single Lucee runtime. Commands like `wheels dbmigrate latest` don't need a running server — they load the app context, execute the migration, and exit. Like how `rails db:migrate` works without `rails server` running.
+
+**Validates:** Can all `wheels` commands work without a running server? Is the development experience competitive with Rails/Laravel tooling?
