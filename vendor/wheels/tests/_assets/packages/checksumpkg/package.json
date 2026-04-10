@@ -1,0 +1,10 @@
+{
+	"name": "wheels-checksumpkg",
+	"version": "1.0.0",
+	"description": "Test fixture: valid package without checksums (backward compat)",
+	"provides": {
+		"mixins": "controller",
+		"services": [],
+		"middleware": []
+	}
+}

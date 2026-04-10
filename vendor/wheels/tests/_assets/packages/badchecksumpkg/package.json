@@ -1,0 +1,13 @@
+{
+	"name": "wheels-badchecksumpkg",
+	"version": "1.0.0",
+	"description": "Test fixture: package with mismatched checksums",
+	"provides": {
+		"mixins": "controller",
+		"services": [],
+		"middleware": []
+	},
+	"checksums": {
+		"Badchecksumpkg.cfc": "0000000000000000000000000000000000000000000000000000000000000000"
+	}
+}
