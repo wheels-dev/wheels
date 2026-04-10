@@ -98,6 +98,24 @@ component extends="wheels.WheelsTest" {
 				}).notToThrow();
 			});
 
+			it("rejects URL-encoded dot-dot traversal attempts", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="%2e%2e/%2e%2e/etc/passwd", $type="partial");
+				}).toThrow("Wheels.InvalidPartialPath");
+			});
+
+			it("rejects null bytes in partial names", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="valid" & Chr(0) & "/../secret", $type="partial");
+				}).toThrow("Wheels.InvalidPartialPath");
+			});
+
+			it("rejects mixed URL-encoded backslash traversal", () => {
+				expect(function() {
+					_controller.$generateIncludeTemplatePath($name="%2e%2e%5csecret", $type="partial");
+				}).toThrow("Wheels.InvalidPartialPath");
+			});
+
 		});
 
 	}
