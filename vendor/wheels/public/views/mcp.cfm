@@ -39,14 +39,11 @@ if (!listFind("127.0.0.1,::1,0:0:0:0:0:0:0:1", local.remoteAddr)) {
 	abort;
 }
 
-// Set CORS headers for localhost-only requests
-cfheader(name="Access-Control-Allow-Origin", value="http://localhost");
-cfheader(name="Access-Control-Allow-Methods", value="GET, POST, OPTIONS");
-cfheader(name="Access-Control-Allow-Headers", value="Content-Type, Accept, Mcp-Session-Id");
-
-// Handle OPTIONS preflight requests
+// Handle OPTIONS requests — CORS is unnecessary since endpoint is localhost-only
 if (cgi.request_method == "OPTIONS") {
-	cfheader(statusCode="200");
+	cfheader(statusCode="405");
+	cfheader(name="Content-Type", value="application/json");
+	writeOutput(serializeJSON({"error": "OPTIONS method not supported"}));
 	abort;
 }
 
