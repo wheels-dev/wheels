@@ -170,7 +170,7 @@ component extends="wheels.WheelsTest" {
 
 		describe("RateLimiter proxyStrategy", function() {
 
-			it("defaults to first IP in X-Forwarded-For chain", function() {
+			it("uses first IP in X-Forwarded-For chain when proxyStrategy is first", function() {
 				var limiter = new wheels.middleware.RateLimiter(
 					maxRequests = 1,
 					windowSeconds = 60,
@@ -273,6 +273,38 @@ component extends="wheels.WheelsTest" {
 				expect(result1).toBe("ok");
 				expect(result2).toBe("ok");
 				expect(result3).toInclude("Rate limit exceeded");
+			});
+
+			it("defaults to last proxy strategy when trustProxy is enabled without explicit proxyStrategy", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					trustProxy = true,
+					maxRequests = 1,
+					windowSeconds = 60
+				);
+
+				var nextFn = function(req) { return "ok"; };
+
+				// Two requests with different first IPs but same last IP should share a bucket
+				// (proving the default strategy is "last", not "first")
+				var req1 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "1.1.1.1, 10.0.0.1"
+					}
+				};
+				var req2 = {
+					cgi: {
+						remote_addr: "10.0.0.50",
+						http_x_forwarded_for: "2.2.2.2, 10.0.0.1"
+					}
+				};
+
+				var result1 = limiter.handle(request = req1, next = nextFn);
+				expect(result1).toBe("ok");
+
+				// Second request from "different" first IP but SAME last IP should be blocked
+				var result2 = limiter.handle(request = req2, next = nextFn);
+				expect(result2).toInclude("Rate limit exceeded");
 			});
 
 			it("throws on invalid proxyStrategy", function() {

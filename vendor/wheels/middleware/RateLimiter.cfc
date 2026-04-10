@@ -23,10 +23,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 *   Without a proxy that sanitizes this header, any client can spoof arbitrary IPs to bypass rate
 	 *   limiting entirely. Your proxy MUST be configured to either: (a) drop incoming X-Forwarded-For and
 	 *   set it to the real client IP, or (b) append the client IP so the rightmost entry is trustworthy.
-	 *   If your proxy appends, set proxyStrategy="last" to use the rightmost (proxy-added) IP.
-	 * @proxyStrategy Which IP to extract from X-Forwarded-For: "first" (leftmost, client-supplied — default
-	 *   for backwards compatibility) or "last" (rightmost, added by the nearest trusted proxy — recommended
-	 *   when the proxy appends rather than overwrites the header).
+	 *   If your proxy appends, the default proxyStrategy="last" uses the rightmost (proxy-added) IP.
+	 * @proxyStrategy Which IP to extract from X-Forwarded-For: "last" (rightmost, added by the nearest
+	 *   trusted proxy — default, secure when the proxy appends the real client IP) or "first" (leftmost,
+	 *   client-supplied — available for backward compatibility but vulnerable to spoofing).
 	 * @maxStoreSize Maximum number of entries allowed in the in-memory store. When exceeded during cleanup,
 	 *   the oldest entries are evicted. Prevents unbounded memory growth from attackers rotating client keys.
 	 *   Only applies when storage="memory". Default: 100000.
@@ -49,7 +49,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		any keyFunction = "",
 		string headerPrefix = "X-RateLimit",
 		boolean trustProxy = false,
-		string proxyStrategy = "first",
+		string proxyStrategy = "last",
 		numeric maxStoreSize = 100000,
 		numeric maxTimestampsPerKey = 0,
 		numeric maxKeyLength = 128,
