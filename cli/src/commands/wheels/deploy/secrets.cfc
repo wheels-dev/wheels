@@ -112,7 +112,7 @@ component extends="./base" {
             $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'mkdir -p /opt/" & $shellEscape(serviceName) & "/.kamal'");
             
             // Write secrets file
-            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat > /opt/" & $shellEscape(serviceName) & "/.kamal/secrets << EOF" & chr(10) & secretsContent & "EOF" & chr(10) & "chmod 600 /opt/" & $shellEscape(serviceName) & "/.kamal/secrets'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat > /opt/" & $shellEscape(serviceName) & "/.kamal/secrets << EOF" & chr(10) & secretsContent & chr(10) & "EOF" & chr(10) & "chmod 600 /opt/" & $shellEscape(serviceName) & "/.kamal/secrets'");
             
             if (result.exitCode == 0) {
                 print.greenLine("✓ Secrets pushed to #server#");
