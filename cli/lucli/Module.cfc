@@ -659,6 +659,23 @@ component extends="modules.BaseModule" {
 					System.out.print(chr(27) & "[2J" & chr(27) & "[H");
 					System.out.flush();
 					continue;
+
+				case "/models":
+					consoleExec(evalUrl, "structKeyArray(application.wheels.models).sort('textnocase')", password);
+					continue;
+
+				case "/routes":
+					consoleExec(evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", password);
+					continue;
+
+				case "/version":
+					consoleExec(evalUrl, "application.wheels.version", password);
+					continue;
+
+				case "/ds":
+				case "/datasource":
+					consoleExec(evalUrl, "application.wheels.dataSourceName", password);
+					continue;
 			}
 
 			// Evaluate expression
@@ -855,11 +872,15 @@ component extends="modules.BaseModule" {
 	private void function printConsoleHelp() {
 		out("");
 		out("Wheels Console Commands:", "bold");
-		out("  /help, /h     Show this help");
-		out("  /env          Show environment info");
-		out("  /reload       Reload the application");
-		out("  /clear        Clear the screen");
-		out("  /exit, /quit  Exit the console");
+		out("  /help, /h       Show this help");
+		out("  /env            Show environment info");
+		out("  /models         List all registered models");
+		out("  /routes         List all routes");
+		out("  /version        Show Wheels version");
+		out("  /ds             Show current datasource");
+		out("  /reload         Reload the application");
+		out("  /clear          Clear the screen");
+		out("  /exit, /quit    Exit the console");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');
@@ -868,8 +889,8 @@ component extends="modules.BaseModule" {
 		out('  model("User").count()                        Count records');
 		out('  model("Post").findAll(where="status=''draft''")  Filtered query');
 		out('  get("environment")                           Framework setting');
-		out('  application.wheels.version                   Wheels version');
 		out('  service("emailService")                      Resolve a service');
+		out('  application.wheels.version                   Wheels version');
 		out("");
 	}
 
