@@ -6,7 +6,7 @@
     "location":"forgeboxStorage",
     "slug":"wheels-base-template",
     "createPackageDirectory":false,
-    "type":"wheels-templates",
+    "type":"cfwheels-templates",
     "keywords":[
 			"mvc",
 			"rails",

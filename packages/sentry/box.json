@@ -3,7 +3,7 @@
 	"slug": "wheels-sentry",
 	"version": "1.0.0",
 	"author": "PAI Industries",
-	"type": "wheels-plugins",
+	"type": "cfwheels-plugins",
 	"homepage": "https://github.com/paiindustries/sentry-for-wheels",
 	"shortDescription": "Sentry error tracking for Wheels with framework-aware context enrichment",
 	"keywords": "sentry,error-tracking,monitoring,wheels",

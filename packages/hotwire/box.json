@@ -7,7 +7,7 @@
 	"repository": { "type": "git", "URL": "https://github.com/wheels-dev/wheels.git" },
 	"bugs": "https://github.com/wheels-dev/wheels/issues",
 	"keywords": ["wheels", "hotwire", "turbo", "stimulus", "turbo-frames", "turbo-streams", "hotwire-native", "mobile"],
-	"type": "wheels-plugins",
+	"type": "cfwheels-plugins",
 	"license": [{ "type": "MIT", "URL": "https://opensource.org/licenses/MIT" }],
 	"description": "Hotwire infrastructure for Wheels: Turbo Drive, Turbo Frames, Turbo Streams, Stimulus helpers, and Hotwire Native mobile support."
 }

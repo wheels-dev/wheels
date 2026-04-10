@@ -6,7 +6,7 @@
     "location":"",
     "slug":"tweet",
     "createPackageDirectory":false,
-    "type":"wheels-templates",
+    "type":"cfwheels-templates",
     "keywords":[
         "mvc",
         "rails",

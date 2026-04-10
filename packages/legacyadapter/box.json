@@ -1,7 +1,7 @@
 {
 	"name": "wheels-legacy-adapter",
 	"version": "1.0.0",
-	"type": "wheels-plugins",
+	"type": "cfwheels-plugins",
 	"homepage": "https://wheels.dev",
 	"repository": {
 		"type": "git",
