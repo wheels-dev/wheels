@@ -1,25 +1,40 @@
 /**
- * Tests that CSRF cookie encryption key is auto-generated when empty.
+ * Tests that CSRF cookie encryption key is enforced in production
+ * and auto-generated with a warning in non-production environments.
  */
 component extends="wheels.WheelsTest" {
 
 	function run() {
 
-		describe("CSRF cookie encryption key auto-generation", function() {
+		describe("CSRF cookie encryption key", function() {
 
 			beforeEach(function() {
 				$originalKey = application.wheels.csrfCookieEncryptionSecretKey;
 				$originalStore = application.wheels.csrfStore;
+				$originalEnv = application.wheels.environment;
 			});
 
 			afterEach(function() {
 				application.wheels.csrfCookieEncryptionSecretKey = $originalKey;
 				application.wheels.csrfStore = $originalStore;
+				application.wheels.environment = $originalEnv;
 			});
 
-			it("auto-generates a key when csrfStore is cookie and key is empty", function() {
+			it("throws in production when key is empty", function() {
 				application.wheels.csrfCookieEncryptionSecretKey = "";
 				application.wheels.csrfStore = "cookie";
+				application.wheels.environment = "production";
+
+				var _controller = application.wo.controller("dummy");
+				expect(function() {
+					_controller.$ensureCsrfCookieEncryptionKey();
+				}).toThrow("Wheels.Security.MissingCsrfKey");
+			});
+
+			it("auto-generates a key in development when key is empty", function() {
+				application.wheels.csrfCookieEncryptionSecretKey = "";
+				application.wheels.csrfStore = "cookie";
+				application.wheels.environment = "development";
 
 				var _controller = application.wo.controller("dummy");
 				var result = _controller.$ensureCsrfCookieEncryptionKey();
@@ -28,14 +43,25 @@ component extends="wheels.WheelsTest" {
 				expect(Len(application.wheels.csrfCookieEncryptionSecretKey)).toBeGT(0);
 			});
 
-			it("generates a valid AES key that works for encryption", function() {
+			it("auto-generates a key in testing when key is empty", function() {
 				application.wheels.csrfCookieEncryptionSecretKey = "";
 				application.wheels.csrfStore = "cookie";
+				application.wheels.environment = "testing";
 
 				var _controller = application.wo.controller("dummy");
 				var result = _controller.$ensureCsrfCookieEncryptionKey();
 
-				// Key must be non-empty (length varies by engine: 128-bit=24 chars, 256-bit=44 chars).
+				expect(Len(result)).toBeGT(0);
+			});
+
+			it("generates a valid AES key that works for encryption", function() {
+				application.wheels.csrfCookieEncryptionSecretKey = "";
+				application.wheels.csrfStore = "cookie";
+				application.wheels.environment = "development";
+
+				var _controller = application.wo.controller("dummy");
+				var result = _controller.$ensureCsrfCookieEncryptionKey();
+
 				expect(Len(result)).toBeGT(0);
 
 				// Verify the key actually works for encryption/decryption.
@@ -45,10 +71,11 @@ component extends="wheels.WheelsTest" {
 				expect(decrypted).toBe(plaintext);
 			});
 
-			it("preserves an explicitly set key", function() {
+			it("preserves an explicitly set key regardless of environment", function() {
 				var explicitKey = GenerateSecretKey("AES");
 				application.wheels.csrfCookieEncryptionSecretKey = explicitKey;
 				application.wheels.csrfStore = "cookie";
+				application.wheels.environment = "production";
 
 				var _controller = application.wo.controller("dummy");
 				var result = _controller.$ensureCsrfCookieEncryptionKey();
@@ -60,6 +87,7 @@ component extends="wheels.WheelsTest" {
 			it("only generates the key once across multiple calls", function() {
 				application.wheels.csrfCookieEncryptionSecretKey = "";
 				application.wheels.csrfStore = "cookie";
+				application.wheels.environment = "development";
 
 				var _controller = application.wo.controller("dummy");
 				var firstResult = _controller.$ensureCsrfCookieEncryptionKey();
