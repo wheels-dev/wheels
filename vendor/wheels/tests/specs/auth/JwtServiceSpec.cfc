@@ -147,6 +147,19 @@ component extends="wheels.WheelsTest" {
 					expect(claims.sub).toBe(1);
 				});
 
+				it("rejects a token whose signature differs by a single character", function() {
+					var token = jwt.encode(claims = {sub = 99});
+					var parts = ListToArray(token, ".");
+					var sig = parts[3];
+					var lastChar = Right(sig, 1);
+					var flipped = lastChar == "A" ? "B" : "A";
+					parts[3] = Left(sig, Len(sig) - 1) & flipped;
+					var tampered = ArrayToList(parts, ".");
+					expect(function() {
+						jwt.decode(token = tampered);
+					}).toThrow("Wheels.Auth.JWT.InvalidSignature");
+				});
+
 				it("still validates signature when ignoreExpiry is true", function() {
 					var otherJwt = new wheels.auth.JwtService(secretKey = "wrong-key");
 					var now = Int(CreateObject("java", "java.lang.System").currentTimeMillis() / 1000);
