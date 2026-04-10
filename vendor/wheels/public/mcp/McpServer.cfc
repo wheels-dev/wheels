@@ -38,6 +38,20 @@ component output="false" displayName="MCP Server" {
 		return reFind("^[a-zA-Z0-9_\.\-\/]*$", arguments.value) > 0;
 	}
 
+	/** Returns a validated local port from cgi.server_port (never trusts client headers) */
+	private numeric function $getLocalPort() {
+		local.port = cgi.server_port;
+		if (isNumeric(local.port) && local.port > 0 && local.port <= 65535) {
+			return int(local.port);
+		}
+		return StructKeyExists(server, "lucee") ? 60000 : 8500;
+	}
+
+	/** Validates that a URL targets localhost only */
+	private boolean function $isLocalUrl(required string url) {
+		return reFindNoCase("^https?://localhost:\d+", arguments.url) > 0;
+	}
+
 	public any function handleRequest(required any request, required string sessionId) {
 		// Handle batch requests (array of requests)
 		if (isArray(arguments.request)) {
@@ -977,15 +991,13 @@ Provide migration code following Wheels conventions."
 
 	private string function fetchFromAIEndpoint(required string endpoint) {
 		// Use the existing AI endpoint infrastructure
-		// Try to use the same port as the current request
-		local.currentPort = cgi.server_port;
-		if (local.currentPort == 0 || !len(local.currentPort)) {
-			// Fallback to default ports
-			local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-		}
+		local.currentPort = $getLocalPort();
 		local.url = "http://localhost:" & local.currentPort & arguments.endpoint;
 
 		try {
+			if (!$isLocalUrl(local.url)) {
+				return "Error: Internal request URL validation failed.";
+			}
 			cfhttp(url=local.url, method="GET", timeout="10", result="local.httpResult");
 
 			if (local.httpResult.status_code == 200) {
@@ -1197,10 +1209,7 @@ Provide migration code following Wheels conventions."
 		}
 
 		try {
-			local.currentPort = cgi.server_port;
-			if (local.currentPort == 0 || !len(local.currentPort)) {
-				local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-			}
+			local.currentPort = $getLocalPort();
 			local.baseUrl = "http://localhost:" & local.currentPort & "/wheels/migrator";
 
 			switch (arguments.args.action) {
@@ -1338,19 +1347,7 @@ Provide migration code following Wheels conventions."
 	private string function executeWheelsReload(required struct args) {
 		// Use the proper Wheels reload endpoint via HTTP request
 		try {
-			// Get the current port from HTTP_HOST header (most reliable)
-			local.currentPort = cgi.server_port;
-
-			// Try HTTP_HOST if server_port is not available
-			if (!len(local.currentPort) || local.currentPort == 0) {
-				if (structKeyExists(cgi, "http_host") && find(":", cgi.http_host)) {
-					local.currentPort = listLast(cgi.http_host, ":");
-				} else if (structKeyExists(cgi, "http_host")) {
-					local.currentPort = "80"; // Default HTTP port
-				} else {
-					local.currentPort = "8080"; // Default dev port
-				}
-			}
+			local.currentPort = $getLocalPort();
 
 			// Use the MCP endpoint itself with ?reload=true parameter - much simpler!
 			local.reloadUrl = "http://localhost:" & local.currentPort & "/wheels/mcp?reload=true";
@@ -1365,6 +1362,9 @@ Provide migration code following Wheels conventions."
 
 			// Method 1: HTTP request to /wheels/mcp?reload=true (cleanest approach)
 			try {
+				if (!$isLocalUrl(local.reloadUrl)) {
+					return "Error: Internal request URL validation failed.";
+				}
 				cfhttp(url=local.reloadUrl, method="GET", timeout="10", result="local.httpResult");
 
 				if (structKeyExists(local.httpResult, "status_code") &&
@@ -1438,10 +1438,7 @@ Provide migration code following Wheels conventions."
 		}
 
 		try {
-			local.currentPort = cgi.server_port;
-			if (local.currentPort == 0 || !len(local.currentPort)) {
-				local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-			}
+			local.currentPort = $getLocalPort();
 			local.analysisUrl = "http://localhost:" & local.currentPort;
 
 			switch(arguments.args.target) {
@@ -1459,6 +1456,9 @@ Provide migration code following Wheels conventions."
 					return "Error: Invalid target '" & arguments.args.target & "'";
 			}
 
+			if (!$isLocalUrl(local.analysisUrl)) {
+				return "Error: Internal request URL validation failed.";
+			}
 			cfhttp(url=local.analysisUrl, method="GET", timeout="10", result="local.httpResult");
 
 			if (local.httpResult.status_code == 200) {
@@ -1514,6 +1514,9 @@ Provide migration code following Wheels conventions."
 	// Helper functions for migration operations
 
 	private string function getMigrationInfo(required string baseUrl) {
+		if (!$isLocalUrl(arguments.baseUrl)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -1560,6 +1563,9 @@ Provide migration code following Wheels conventions."
 	private string function executeMigrationCommand(required string baseUrl, required string command, required string version) {
 		local.url = arguments.baseUrl & "/" & arguments.command & "/" & arguments.version & "?confirm=1";
 
+		if (!$isLocalUrl(local.url)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=local.url, method="POST", timeout="30", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -1605,6 +1611,9 @@ Provide migration code following Wheels conventions."
 		}
 
 		// Get full migration data to find next pending migration
+		if (!$isLocalUrl(arguments.baseUrl)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -1630,6 +1639,9 @@ Provide migration code following Wheels conventions."
 
 	private string function executeMigrationDown(required string baseUrl) {
 		// Get current migration info to determine previous version
+		if (!$isLocalUrl(arguments.baseUrl)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -2263,22 +2275,9 @@ Provide migration code following Wheels conventions."
 
 	private string function performBrowserTesting(required struct plan) {
 		local.result = "";
-		local.currentPort = cgi.server_port;
 
 		try {
-			// Get current port (same logic as reload function)
-			if (local.currentPort == 0 || !len(local.currentPort)) {
-				if (structKeyExists(cgi, "http_host") && find(":", cgi.http_host)) {
-					local.hostParts = listToArray(cgi.http_host, ":");
-					if (arrayLen(local.hostParts) >= 2) {
-						local.currentPort = local.hostParts[2];
-					}
-				}
-				if (local.currentPort == 0 || !len(local.currentPort)) {
-					local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-				}
-			}
-
+			local.currentPort = $getLocalPort();
 			local.baseUrl = "http://localhost:" & local.currentPort;
 
 			local.result &= "• Testing homepage..." & chr(10);
