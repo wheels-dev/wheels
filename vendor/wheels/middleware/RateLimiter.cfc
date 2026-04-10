@@ -34,6 +34,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 *   Prevents a single attacker from exhausting heap memory by making rapid requests. After pruning expired
 	 *   entries, arrays exceeding this limit are truncated to keep only the most recent timestamps.
 	 *   Default: maxRequests * 3. Only applies to the "slidingWindow" strategy with storage="memory".
+	 * @maxKeyLength Maximum length of a client key before it is replaced with a SHA-256 hash.
+	 *   Prevents unbounded memory consumption from attackers supplying arbitrarily long keys
+	 *   (e.g., via long X-Forwarded-For chains or custom key functions). Default: 128.
 	 * @failOpen When true, requests are allowed through if the rate limiter lock times out.
 	 *   Default false (fail-closed, secure by default). Set to true if availability
 	 *   is more important than strict rate enforcement.
@@ -49,6 +52,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		string proxyStrategy = "first",
 		numeric maxStoreSize = 100000,
 		numeric maxTimestampsPerKey = 0,
+		numeric maxKeyLength = 128,
 		boolean failOpen = false
 	) {
 		if (!ListFindNoCase("fixedWindow,slidingWindow,tokenBucket", arguments.strategy)) {
@@ -82,6 +86,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.proxyStrategy = arguments.proxyStrategy;
 		variables.maxStoreSize = arguments.maxStoreSize;
 		variables.maxTimestampsPerKey = arguments.maxTimestampsPerKey > 0 ? arguments.maxTimestampsPerKey : arguments.maxRequests * 3;
+		variables.maxKeyLength = arguments.maxKeyLength;
 		variables.failOpen = arguments.failOpen;
 
 		// In-memory store using ConcurrentHashMap for thread safety.
@@ -89,7 +94,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			variables.store = CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init();
 		}
 
-		// Throttle cleanup to once per minute.
+		// Throttle cleanup interval in seconds.
+		variables.cleanupThrottleSeconds = 10;
 		variables.lastCleanup = 0;
 
 		// Track whether DB table has been verified.
@@ -154,12 +160,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 	/**
 	 * Resolve the client key from the request — uses keyFunction if provided, otherwise client IP.
+	 * Keys exceeding maxKeyLength are replaced with their SHA-256 hash to bound memory usage.
 	 */
 	private string function $resolveKey(required struct request) {
 		if (IsCustomFunction(variables.keyFunction) || IsClosure(variables.keyFunction)) {
-			return variables.keyFunction(arguments.request);
+			local.key = variables.keyFunction(arguments.request);
+		} else {
+			local.key = $getClientIp(arguments.request);
 		}
-		return $getClientIp(arguments.request);
+
+		if (Len(local.key) > variables.maxKeyLength) {
+			local.key = Hash(local.key, "SHA-256");
+		}
+
+		return local.key;
 	}
 
 	/**
@@ -384,17 +398,17 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * Periodically clean up stale entries from in-memory store (throttled to once per minute).
+	 * Periodically clean up stale entries from in-memory store (throttled to once per cleanupThrottleSeconds).
 	 */
 	private void function $maybeCleanup(required numeric now) {
-		if ((arguments.now - variables.lastCleanup) < 60) {
+		if ((arguments.now - variables.lastCleanup) < variables.cleanupThrottleSeconds) {
 			return;
 		}
 
 		try {
 			cflock(name = "wheels-ratelimit-cleanup", type = "exclusive", timeout = 1) {
 				// Double-check after acquiring lock.
-				if ((arguments.now - variables.lastCleanup) < 60) {
+				if ((arguments.now - variables.lastCleanup) < variables.cleanupThrottleSeconds) {
 					return;
 				}
 				variables.lastCleanup = arguments.now;
