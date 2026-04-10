@@ -360,6 +360,39 @@ component {
 
 			local.rv = ArrayToList(local.groupByItems);
 		} else if (Len(arguments.group)) {
+			// Validate each GROUP BY item before passing to $createSQLFieldList (mirrors ORDER BY validation)
+			local.groupArray = ListToArray(arguments.group);
+			for (local.g = 1; local.g <= ArrayLen(local.groupArray); local.g++) {
+				local.gItem = Trim(local.groupArray[local.g]);
+				if (Find("(", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "Raw SQL expressions with parentheses are not allowed in the GROUP BY clause. Use only column names or table.column notation."
+					);
+				}
+				if (Find(";", local.gItem) || Find("--", local.gItem) || Find("/*", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "The GROUP BY item '#EncodeForHTML(local.gItem)#' contains invalid characters."
+					);
+				}
+				if (Find(".", local.gItem) && !REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "The GROUP BY item '#EncodeForHTML(local.gItem)#' contains invalid characters. Only table.column notation is allowed."
+					);
+				}
+				if (Find(" AS ", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "Aliases (AS) are not allowed in the GROUP BY clause."
+					);
+				}
+			}
 			local.args.list = arguments.group;
 			local.rv = $createSQLFieldList(argumentCollection = local.args);
 		}
