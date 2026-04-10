@@ -71,19 +71,17 @@ component extends="./base" {
             print.yellowLine("Booting proxy on #server#...");
             
             // Create proxy directory
-            $execBash("ssh #sshUser#@#server# 'mkdir -p /opt/wheels-proxy'");
+            $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'mkdir -p /opt/wheels-proxy'");
             
             // Create proxy configuration
             var proxyConfig = generateProxyConfig(arguments.config, server);
             
             // Write configuration
-            $execBash("ssh #sshUser#@#server# 'cat > /opt/wheels-proxy/docker-compose.yml << EOF
-#proxyConfig#
-EOF'");
+            $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat > /opt/wheels-proxy/docker-compose.yml << EOF" & chr(10) & proxyConfig & chr(10) & "EOF'");
             
             // Start proxy
-            var result = $execBash("ssh #sshUser#@#server# 'cd /opt/wheels-proxy && docker compose up -d'");
-            
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/wheels-proxy && docker compose up -d'");
+
             if (result.exitCode == 0) {
                 print.greenLine("✓ Proxy booted on #server#");
                 
@@ -126,7 +124,7 @@ EOF'");
             print.line("-".repeatString(30));
             
             // Check if proxy container is running
-            var result = $execBash("ssh #sshUser#@#server# 'docker ps --filter name=wheels-proxy --format ""{{.Status}}""'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker ps --filter name=wheels-proxy --format ""{{.Status}}""'");
             
             if (result.exitCode == 0 && len(trim(result.output))) {
                 if (result.output contains "Up") {
@@ -134,7 +132,7 @@ EOF'");
                     print.line("  Status: #trim(result.output)#");
                     
                     // Check proxy health
-                    var healthResult = $execBash("ssh #sshUser#@#server# 'docker exec wheels-proxy wget -qO- http://localhost/health || echo FAILED'");
+                    var healthResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker exec wheels-proxy wget -qO- http://localhost/health || echo FAILED'");
                     
                     if (trim(healthResult.output) != "FAILED") {
                         print.greenLine("✓ Health Check Passed");
@@ -186,7 +184,7 @@ EOF'");
         for (var server in targetServers) {
             print.yellowLine("Rebooting proxy on #server#...");
             
-            var result = $execBash("ssh #sshUser#@#server# 'cd /opt/wheels-proxy && docker compose restart'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/wheels-proxy && docker compose restart'");
             
             if (result.exitCode == 0) {
                 print.greenLine("✓ Proxy rebooted on #server#");
@@ -228,7 +226,7 @@ EOF'");
         for (var server in targetServers) {
             print.yellowLine("Removing proxy from #server#...");
             
-            var result = $execBash("ssh #sshUser#@#server# 'cd /opt/wheels-proxy && docker compose down -v && rm -rf /opt/wheels-proxy'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/wheels-proxy && docker compose down -v && rm -rf /opt/wheels-proxy'");
             
             if (result.exitCode == 0) {
                 print.greenLine("✓ Proxy removed from #server#");
@@ -262,7 +260,7 @@ EOF'");
             print.line("-".repeatString(30));
             
             // Get proxy configuration
-            var configResult = $execBash("ssh #sshUser#@#server# 'cat /opt/wheels-proxy/docker-compose.yml 2>/dev/null'");
+            var configResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat /opt/wheels-proxy/docker-compose.yml 2>/dev/null'");
             
             if (configResult.exitCode == 0) {
                 print.line("Configuration:");
@@ -272,7 +270,7 @@ EOF'");
             }
             
             // Get container details
-            var detailsResult = $execBash("ssh #sshUser#@#server# 'docker inspect wheels-proxy --format ""Name: {{.Name}}\nCreated: {{.Created}}\nState: {{.State.Status}}\nRestarts: {{.RestartCount}}""'");
+            var detailsResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker inspect wheels-proxy --format ""Name: {{.Name}}\nCreated: {{.Created}}\nState: {{.State.Status}}\nRestarts: {{.RestartCount}}""'");
             
             if (detailsResult.exitCode == 0) {
                 print.line();
@@ -341,7 +339,7 @@ EOF'");
     
     private void function configureHealthCheck(required string server, required string user) {
         // Create wheels network if it doesn't exist
-        $execBash("ssh #arguments.user#@#arguments.server# 'docker network create wheels || true'");
+        $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'docker network create wheels || true'");
         
         // Create a simple health check response
         var healthConfig = "events {
@@ -357,9 +355,7 @@ http {
     }
 }";
         
-        $execBash("ssh #arguments.user#@#arguments.server# 'mkdir -p /opt/wheels-proxy/config && cat > /opt/wheels-proxy/config/nginx.conf << EOF
-#healthConfig#
-EOF'");
+        $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'mkdir -p /opt/wheels-proxy/config && cat > /opt/wheels-proxy/config/nginx.conf << EOF" & chr(10) & healthConfig & chr(10) & "EOF'");
     }
     
     private array function getTargetServers(required struct config, required string servers) {

@@ -54,7 +54,7 @@ component extends="./base" {
             
             // Get images from first server
             var server = targetServers[1];
-            var result = $execBash("ssh #sshUser#@#server# 'docker images #imagePattern# --format ""{{.Tag}}\t{{.CreatedAt}}""'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker images " & $shellEscape(imagePattern) & " --format ""{{.Tag}}\t{{.CreatedAt}}""'");
             
             if (result.exitCode == 0 && len(trim(result.output))) {
                 var lines = listToArray(result.output, chr(10));
@@ -121,12 +121,12 @@ component extends="./base" {
             
             // Check if image exists locally
             print.yellowLine("Checking for image...");
-            var checkResult = $execBash("ssh #sshUser#@#server# 'docker images -q #imageName#'");
+            var checkResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker images -q " & $shellEscape(imageName) & "'");
             
             if (!len(trim(checkResult.output))) {
                 // Need to pull the image
                 print.yellowLine("Image not found locally, pulling from registry...");
-                var pullResult = $execBash("ssh #sshUser#@#server# 'docker pull #imageName#'");
+                var pullResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker pull " & $shellEscape(imageName) & "'");
                 
                 if (pullResult.exitCode != 0) {
                     print.redLine("✗ Failed to pull image on #server#");
@@ -138,18 +138,16 @@ component extends="./base" {
             print.yellowLine("Updating configuration...");
             var composeContent = generateDockerCompose(deployConfig, imageName);
             
-            $execBash("ssh #sshUser#@#server# 'cat > /opt/#serviceName#/docker-compose.yml << EOF
-#composeContent#
-EOF'");
+            $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat > /opt/" & $shellEscape(serviceName) & "/docker-compose.yml << EOF" & chr(10) & composeContent & chr(10) & "EOF'");
             
             // Perform rolling restart
             print.yellowLine("Performing rollback...");
             
             // Stop current container
-            $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose down'");
+            $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose down'");
             
             // Start with rollback image
-            var startResult = $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose up -d'");
+            var startResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose up -d'");
             
             if (startResult.exitCode != 0) {
                 print.redLine("✗ Rollback failed on #server#");
@@ -262,10 +260,10 @@ networks:
     ) {
         var sshUser = config.ssh.user ?: "root";
         var startTime = getTickCount();
-        var checkUrl = "http://localhost:#config.healthcheck.port##config.healthcheck.path#";
-        
+        var checkUrl = "http://localhost:" & config.healthcheck.port & config.healthcheck.path;
+
         while ((getTickCount() - startTime) < (arguments.timeout * 1000)) {
-            var result = $execBash("ssh #sshUser#@#arguments.server# 'docker exec #config.service# curl -f -s -o /dev/null -w ""%{http_code}"" #checkUrl#'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(arguments.server) & " 'docker exec " & $shellEscape(config.service) & " curl -f -s -o /dev/null -w ""%{http_code}"" " & $shellEscape(checkUrl) & "'");
             
             if (result.exitCode == 0 && trim(result.output) == "200") {
                 return true;
