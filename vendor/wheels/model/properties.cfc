@@ -750,8 +750,11 @@ component {
 				local.val = Replace(local.val, ";", "", "all");
 				// Strip dangerous SQL keywords that could be used for injection.
 				// Word-boundary matching prevents false positives in normal values.
-				local.val = REReplaceNoCase(local.val, "\b(UNION|EXEC|EXECUTE|BENCHMARK|SLEEP)\b", "", "all");
+				local.val = REReplaceNoCase(local.val, "\b(UNION|EXEC|EXECUTE|BENCHMARK|SLEEP|WAITFOR|DELAY)\b", "", "all");
 				local.val = REReplaceNoCase(local.val, "\bxp_\w*", "", "all");
+				local.val = REReplaceNoCase(local.val, "\bINTO\s+OUTFILE\b", "", "all");
+				local.val = REReplaceNoCase(local.val, "\bLOAD_FILE\s*\(", "(", "all");
+				local.val = REReplaceNoCase(local.val, "\bCHAR\s*\(", "(", "all");
 				local.sanitized[local.key] = $escapeSqlValue(local.val);
 			} else {
 				local.sanitized[local.key] = local.val;
