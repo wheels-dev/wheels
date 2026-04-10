@@ -104,6 +104,7 @@ component {
 			variables.wheels.class.mapping[arguments.name].value = arguments.column;
 		}
 		if (Len(arguments.sql)) {
+			$validateCalculatedPropertySql(sql=arguments.sql, propertyName=arguments.name);
 			variables.wheels.class.mapping[arguments.name].type = "sql";
 			variables.wheels.class.mapping[arguments.name].value = arguments.sql;
 			variables.wheels.class.mapping[arguments.name].select = arguments.select;
@@ -905,5 +906,26 @@ component {
 			local.scopeDef.where = "#arguments.property# = '#local.escapedValue#'";
 			variables.wheels.class.scopes[local.name] = local.scopeDef;
 		}
+	}
+
+	/**
+	 * Validates that a calculated property SQL expression does not contain dangerous patterns.
+	 * Called at model config time when property(sql="...") is used. This is a defense-in-depth
+	 * measure: calculated property SQL is developer-defined, but this catches supply-chain attacks
+	 * or accidental interpolation of user input into SQL expressions.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Miscellaneous Functions]
+	 */
+	public string function $validateCalculatedPropertySql(required string sql, required string propertyName) {
+		local.dangerous = ";\s|UNION\s|INTO\s+(?:OUT|DUMP)|EXEC\s|xp_|LOAD_FILE|BENCHMARK|SLEEP\s*\(";
+		if (ReFindNoCase(local.dangerous, arguments.sql)) {
+			Throw(
+				type = "Wheels.InvalidCalculatedProperty",
+				message = "The calculated property `#arguments.propertyName#` contains potentially dangerous SQL patterns.",
+				extendedInfo = "Calculated property SQL must not contain semicolons followed by whitespace, UNION, EXEC, or other dangerous SQL constructs. Expression: #arguments.sql#"
+			);
+		}
+		return arguments.sql;
 	}
 }
