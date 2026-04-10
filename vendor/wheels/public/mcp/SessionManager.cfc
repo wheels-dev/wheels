@@ -9,7 +9,7 @@ component output="false" displayName="MCP Session Manager" {
 	}
 
 	public string function createSession() {
-		local.sessionId = "mcp-" & createUUID();
+		local.sessionId = "mcp-" & LCase(CreateObject("java", "java.util.UUID").randomUUID().toString());
 		variables.sessions[local.sessionId] = {
 			"id": local.sessionId,
 			"created": now(),
