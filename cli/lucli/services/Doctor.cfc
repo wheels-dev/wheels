@@ -203,7 +203,7 @@ component {
 		if (findNoCase("No migrations", combined)) {
 			arrayAppend(recs, "Run 'wheels generate migration' to create your first migration");
 		}
-		if (findNoCase("No test files", combined)) {
+		if (findNoCase("No test files", combined) || findNoCase("Missing recommended directory: tests", combined)) {
 			arrayAppend(recs, "Run 'wheels generate test' to add test coverage");
 		}
 		if (findNoCase("Missing required directory", combined)) {

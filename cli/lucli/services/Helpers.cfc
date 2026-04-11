@@ -40,7 +40,7 @@ component {
 		loc.rv = loc.text;
 
 		if (count != 1) {
-			if (reFindNoCase("[A-Z]", loc.text)) {
+			if (reFind("[A-Z]", loc.text)) {
 				loc.upperCasePos = reFind("[A-Z]", reverse(loc.text));
 				loc.prepend = mid(loc.text, 1, len(loc.text) - loc.upperCasePos);
 				loc.text = reverse(mid(reverse(loc.text), 1, loc.upperCasePos));

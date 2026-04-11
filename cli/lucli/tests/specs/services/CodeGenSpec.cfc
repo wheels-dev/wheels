@@ -60,14 +60,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("creates a controller CFC in app/controllers/", () => {
 					var result = codegen.generateController(
 						name = "Articles",
-						actions = "index,show"
+						actions = ["index", "show"]
 					);
 					expect(result.success).toBeTrue();
 					expect(fileExists(tempRoot & "/app/controllers/Articles.cfc")).toBeTrue();
 				});
 
 				it("controller extends Controller", () => {
-					codegen.generateController(name = "Reviews", actions = "", force = true);
+					codegen.generateController(name = "Reviews", actions = [], force = true);
 					var content = fileRead(tempRoot & "/app/controllers/Reviews.cfc");
 					expect(content).toInclude('extends="Controller"');
 				});
@@ -77,12 +77,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			describe("validateName()", () => {
 
 				it("rejects empty name", () => {
-					var result = codegen.validateName("");
+					var result = codegen.validateName("", "model");
 					expect(result.valid).toBeFalse();
 				});
 
 				it("accepts valid PascalCase name", () => {
-					var result = codegen.validateName("UserProfile");
+					var result = codegen.validateName("UserProfile", "model");
 					expect(result.valid).toBeTrue();
 				});
 

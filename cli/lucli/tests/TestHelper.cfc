@@ -26,6 +26,61 @@ component {
 			}
 		}
 
+		// Ensure all required and recommended directories exist in the temp project.
+		// directoryCopy skips empty source directories, so we create them explicitly.
+		var requiredDirs = [
+			"app",
+			"app/controllers",
+			"app/models",
+			"app/views",
+			"app/helpers",
+			"app/migrator",
+			"app/migrator/migrations",
+			"config",
+			"public",
+			"public/files",
+			"tests",
+			"tests/specs",
+			"tests/specs/models",
+			"tests/specs/controllers",
+			"tests/specs/views"
+		];
+		for (var reqDir in requiredDirs) {
+			var fullPath = tempBase & "/" & reqDir;
+			if (!directoryExists(fullPath)) {
+				directoryCreate(fullPath, true);
+			}
+		}
+
+		// Ensure config/routes.cfm exists with minimal valid content
+		var routesPath = tempBase & "/config/routes.cfm";
+		if (!fileExists(routesPath)) {
+			var nl = chr(10);
+			var t = chr(9);
+			var routesContent = "// routes" & nl & "mapper()" & nl & t & "// CLI-Appends-Here" & nl & t & ".wildcard()" & nl & ".end();";
+			fileWrite(routesPath, routesContent);
+		}
+
+		// Ensure config/settings.cfm exists with datasource config (satisfies Doctor health check)
+		var settingsPath = tempBase & "/config/settings.cfm";
+		if (!fileExists(settingsPath)) {
+			var nl = chr(10);
+			var settingsContent = "// settings" & nl & "set(dataSourceName=" & chr(34) & "wheels" & chr(34) & ");";
+			fileWrite(settingsPath, settingsContent);
+		}
+
+		// Create a placeholder migration so Doctor doesn't warn about missing migrations
+		var migrationPlaceholderPath = tempBase & "/app/migrator/migrations/00000000000000_placeholder.cfc";
+		if (!fileExists(migrationPlaceholderPath)) {
+			fileWrite(migrationPlaceholderPath, "component extends=" & chr(34) & "wheels.migrator.Migration" & chr(34) & " {}");
+		}
+
+		// Create a placeholder test spec so Doctor doesn't warn about missing tests
+		var testPlaceholderPath = tempBase & "/tests/specs/PlaceholderSpec.cfc";
+		if (!fileExists(testPlaceholderPath)) {
+			fileWrite(testPlaceholderPath, "component extends=" & chr(34) & "wheels.WheelsTest" & chr(34) & " {}");
+		}
+
 		// Copy key config files from root
 		var files = [".env", "lucee.json"];
 		for (var f in files) {

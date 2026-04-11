@@ -80,7 +80,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("warns when config routes.cfm has minimal content", () => {
 				var routesPath = tempRoot & "/config/routes.cfm";
 				var original = fileRead(routesPath);
-				fileWrite(routesPath, "<!--- --->"); // less than 10 chars of content
+				fileWrite(routesPath, "// "); // less than 10 chars of content
 
 				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();

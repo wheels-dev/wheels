@@ -36,8 +36,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_strs/_form.cfm");
-					expect(form).toInclude("textField");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_strs/_form.cfm");
+					expect(formContent).toInclude("textField");
 				});
 
 				it("maps text type to textArea", () => {
@@ -52,8 +52,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_txts/_form.cfm");
-					expect(form).toInclude("textArea");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_txts/_form.cfm");
+					expect(formContent).toInclude("textArea");
 				});
 
 				it("maps boolean type to checkBox", () => {
@@ -68,8 +68,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_bools/_form.cfm");
-					expect(form).toInclude("checkBox");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_bools/_form.cfm");
+					expect(formContent).toInclude("checkBox");
 				});
 
 				it("maps integer type to numberField", () => {
@@ -84,8 +84,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_ints/_form.cfm");
-					expect(form).toInclude("numberField");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_ints/_form.cfm");
+					expect(formContent).toInclude("numberField");
 				});
 
 				it("maps date type to dateField", () => {
@@ -100,8 +100,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_dts/_form.cfm");
-					expect(form).toInclude("dateField");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_dts/_form.cfm");
+					expect(formContent).toInclude("dateField");
 				});
 
 				it("maps datetime to dateTimeLocalField", () => {
@@ -116,8 +116,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_dtls/_form.cfm");
-					expect(form).toInclude("dateTimeLocalField");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_dtls/_form.cfm");
+					expect(formContent).toInclude("dateTimeLocalField");
 				});
 
 				it("maps email column name to emailField", () => {
@@ -132,8 +132,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_emails/_form.cfm");
-					expect(form).toInclude("emailField");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_emails/_form.cfm");
+					expect(formContent).toInclude("emailField");
 				});
 
 				it("maps phone column name to telField", () => {
@@ -148,8 +148,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_phones/_form.cfm");
-					expect(form).toInclude("telField");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_phones/_form.cfm");
+					expect(formContent).toInclude("telField");
 				});
 
 				it("maps website column name to urlField", () => {
@@ -164,8 +164,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						associations: []
 					};
 					var result = admin.generateAdmin(modelData = modelData, force = true, noRoutes = true);
-					var form = fileRead(tempRoot & "/app/views/admin/form_helper_urls/_form.cfm");
-					expect(form).toInclude("urlField");
+					var formContent = fileRead(tempRoot & "/app/views/admin/form_helper_urls/_form.cfm");
+					expect(formContent).toInclude("urlField");
 				});
 
 			});
