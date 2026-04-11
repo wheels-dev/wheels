@@ -1007,6 +1007,103 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	// ─────────────────────────────────────────────────
+	//  destroy — Remove generated components
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Remove generated components (resource, model, controller, view)
+	 */
+	public string function destroy() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args)) {
+			out("Usage: wheels destroy <name> [type]", "yellow");
+			out("");
+			out("Types:", "bold");
+			out("  resource    Remove model + controller + views + tests + route + migration (default)");
+			out("  model       Remove model + test + generate drop-table migration");
+			out("  controller  Remove controller + test");
+			out("  view        Remove view directory (or single file with controller/view syntax)");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels destroy User");
+			out("  wheels destroy Products controller");
+			out("  wheels destroy Product model");
+			out("  wheels destroy products/index view");
+			return "";
+		}
+
+		var name = trim(args[1]);
+		var type = arrayLen(args) > 1 ? lCase(trim(args[2])) : "resource";
+		var force = false;
+		for (var i = 1; i <= arrayLen(args); i++) {
+			if (args[i] == "--force") force = true;
+		}
+
+		if (!listFindNoCase("resource,model,controller,view", type)) {
+			out("Unknown type: #type#. Valid types: resource, model, controller, view", "red");
+			return "";
+		}
+
+		var svc = getService("destroy");
+
+		// Show preview and confirm
+		var preview = svc.previewDestroy(name, type);
+		if (!arrayLen(preview)) {
+			out("Nothing to destroy.", "yellow");
+			return "";
+		}
+
+		out("The following will be deleted:", "yellow");
+		for (var item in preview) {
+			out("  #item#");
+		}
+		out("");
+
+		if (!force) {
+			out("Proceed? [y/n] ", "yellow");
+			// In LuCLI module context, we can't do interactive prompts.
+			// The --force flag is required for non-interactive use.
+			// For interactive use, LuCLI provides prompt support via the module system.
+			var answer = prompt("Proceed? [y/n]: ");
+			if (lCase(left(trim(answer), 1)) != "y") {
+				out("Cancelled.", "red");
+				return "";
+			}
+		}
+
+		var result = {};
+		switch (type) {
+			case "resource":
+				result = svc.destroyResource(name);
+				break;
+			case "model":
+				result = svc.destroyModel(name);
+				break;
+			case "controller":
+				result = svc.destroyController(name);
+				break;
+			case "view":
+				result = svc.destroyView(name);
+				break;
+		}
+
+		// Output results
+		for (var deleted in result.deleted) {
+			out("  delete  #deleted#", "red");
+		}
+		for (var warning in result.warnings) {
+			out("  skip    #warning#", "yellow");
+		}
+		if (structKeyExists(result, "migrationPath") && len(result.migrationPath)) {
+			out("");
+			out("Migration generated: #result.migrationPath#", "cyan");
+			out("Run 'wheels migrate latest' to apply.", "cyan");
+		}
+		return "";
+	}
+
 	// ═════════════════════════════════════════════════
 	//  PRIVATE — Implementation details
 	// ═════════════════════════════════════════════════
@@ -2522,6 +2619,13 @@ component extends="modules.BaseModule" {
 					variables.services.analysis = new services.Analysis(
 						helpers = getService("helpers"),
 						projectRoot = variables.projectRoot
+					);
+					break;
+				case "destroy":
+					variables.services.destroy = new services.Destroy(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
 					);
 					break;
 				default:
