@@ -1,0 +1,70 @@
+component extends="Controller" {
+
+	function config() {
+		protectsFromForgery();
+{{beforeFilters}}
+	}
+
+{{foreignKeyLoaders}}
+	function index() {
+		{{plural}} = model("{{SingularCap}}").findAll(
+			page=params.page ?: 1,
+			perPage=25,
+			order="{{primaryKey}} DESC"
+		);
+	}
+
+	function show() {
+		{{singular}} = model("{{SingularCap}}").findByKey(params.key);
+		if (!IsObject({{singular}})) {
+			redirectTo(route="admin~{{plural}}");
+		}
+	}
+
+	function new() {
+		{{singular}} = model("{{SingularCap}}").new();
+	}
+
+	function edit() {
+		{{singular}} = model("{{SingularCap}}").findByKey(params.key);
+		if (!IsObject({{singular}})) {
+			redirectTo(route="admin~{{plural}}");
+		}
+	}
+
+	function create() {
+		{{singular}} = model("{{SingularCap}}").new(params.{{singular}});
+		if ({{singular}}.save()) {
+			flashInsert(success="{{SingularCap}} created.");
+			redirectTo(route="admin~{{singular}}", key={{singular}}.key());
+		} else {
+			flashInsert(error="Could not create {{SingularCap}}.");
+			renderView(action="new");
+		}
+	}
+
+	function update() {
+		{{singular}} = model("{{SingularCap}}").findByKey(params.key);
+		if (!IsObject({{singular}})) {
+			redirectTo(route="admin~{{plural}}");
+			return;
+		}
+		if ({{singular}}.update(params.{{singular}})) {
+			flashInsert(success="{{SingularCap}} updated.");
+			redirectTo(route="admin~{{singular}}", key={{singular}}.key());
+		} else {
+			flashInsert(error="Could not update {{SingularCap}}.");
+			renderView(action="edit");
+		}
+	}
+
+	function delete() {
+		{{singular}} = model("{{SingularCap}}").findByKey(params.key);
+		if (IsObject({{singular}})) {
+			{{singular}}.delete();
+			flashInsert(success="{{SingularCap}} deleted.");
+		}
+		redirectTo(route="admin~{{plural}}");
+	}
+
+}

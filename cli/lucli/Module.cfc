@@ -62,6 +62,7 @@ component extends="modules.BaseModule" {
 			out("  property      Generate an add-column migration for a model property");
 			out("  helper        Generate a helper file in app/helpers/");
 			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
+			out("  admin         Generate admin CRUD interface for an existing model");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate app myapp");
@@ -75,6 +76,7 @@ component extends="modules.BaseModule" {
 			out("  wheels generate property User email:string");
 			out("  wheels generate helper formatting");
 			out("  wheels generate snippets auth");
+			out("  wheels generate admin User");
 			return "";
 		}
 
@@ -118,6 +120,8 @@ component extends="modules.BaseModule" {
 				return generateHelper(remaining);
 			case "snippets":
 				return generateSnippets(remaining);
+			case "admin":
+				return generateAdmin(remaining);
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
@@ -1814,6 +1818,69 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Generate admin CRUD interface for an existing model
+	 */
+	private string function generateAdmin(array args = []) {
+		if (!arrayLen(arguments.args)) {
+			out("Usage: wheels generate admin <modelName> [--force] [--no-routes]", "yellow");
+			out("");
+			out("Generates an admin controller and views by introspecting an existing model.");
+			out("Requires a running server.");
+			return "";
+		}
+
+		var modelName = capitalize(arguments.args[1]);
+		var force = false;
+		var noRoutes = false;
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			if (arguments.args[i] == "--force") force = true;
+			if (arguments.args[i] == "--no-routes") noRoutes = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			out("Admin generation requires a running server for model introspection.");
+			return "";
+		}
+
+		// Introspect the model via the server
+		out("Introspecting model: #modelName#...", "cyan");
+		try {
+			var introspectUrl = "http://localhost:#serverPort#/wheels/cli?command=introspect&model=#modelName#&format=json";
+			var response = makeHttpRequest(introspectUrl);
+			var modelData = deserializeJSON(response);
+
+			if (!modelData.success) {
+				out("Error: #modelData.message#", "red");
+				return "";
+			}
+		} catch (any e) {
+			out("Error introspecting model: #e.message#", "red");
+			return "";
+		}
+
+		// Generate admin files
+		var svc = getService("admin");
+		var result = svc.generateAdmin(modelData=modelData, force=force, noRoutes=noRoutes);
+
+		if (result.success) {
+			for (var generated in result.generated) {
+				printCreated(generated);
+			}
+			out("");
+			out("Admin interface generated for #modelName#.", "green");
+			out("Visit /admin/#lCase(getService(""helpers"").pluralize(modelName))# after reloading.", "cyan");
+		} else {
+			for (var err in result.errors) {
+				out(err, "red");
+			}
+		}
+
+		return "";
+	}
+
+	/**
 	 * List all available snippet patterns
 	 */
 	private string function listSnippets() {
@@ -3197,6 +3264,14 @@ component extends="modules.BaseModule" {
 					variables.services.stats = new services.Stats(
 						helpers = getService("helpers"),
 						projectRoot = variables.projectRoot
+					);
+					break;
+				case "admin":
+					variables.services.admin = new services.Admin(
+						helpers = getService("helpers"),
+						templateService = getService("templates"),
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
 					);
 					break;
 				default:
