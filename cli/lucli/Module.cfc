@@ -1284,6 +1284,49 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	// ─────────────────────────────────────────────────
+	//  db — Database management
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Database management commands (reset, status, version)
+	 */
+	public string function db() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args)) {
+			out("Usage: wheels db <command>", "yellow");
+			out("");
+			out("Commands:", "bold");
+			out("  reset    Run pending migrations and reseed the database");
+			out("  status   Show migration status (applied vs pending)");
+			out("  version  Show current database schema version");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels db reset");
+			out("  wheels db reset --skip-seed");
+			out("  wheels db status");
+			out("  wheels db status --pending");
+			out("  wheels db version --detailed");
+			return "";
+		}
+
+		var subcommand = lCase(args[1]);
+
+		switch (subcommand) {
+			case "reset":
+				return dbReset(args);
+			case "status":
+				return dbStatus(args);
+			case "version":
+				return dbVersion(args);
+			default:
+				out("Unknown db command: #subcommand#", "red");
+				out("Valid commands: reset, status, version");
+				return "";
+		}
+	}
+
 	// ═════════════════════════════════════════════════
 	//  PRIVATE — Implementation details
 	// ═════════════════════════════════════════════════
@@ -2090,6 +2133,151 @@ component extends="modules.BaseModule" {
 			}
 		} catch (any e) {
 			out("Seeding failed: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	// ── DB Commands ─────────────────────────────────
+
+	/**
+	 * Reset database: run pending migrations and reseed
+	 */
+	private string function dbReset(array args = []) {
+		var force = false;
+		var skipSeed = false;
+		for (var arg in arguments.args) {
+			if (arg == "--force") force = true;
+			if (arg == "--skip-seed") skipSeed = true;
+		}
+
+		if (!force) {
+			out("This will run pending migrations and reseed the database.", "yellow");
+			out("Use --force to confirm: wheels db reset --force", "yellow");
+			return "";
+		}
+
+		// Step 1: Migrate
+		out("Running migrations...", "cyan");
+		var migrateResult = runMigration("latest");
+
+		// Step 2: Seed (unless skipped)
+		if (!skipSeed) {
+			out("Running seeds...", "cyan");
+			runSeed("auto", "");
+		}
+
+		out("");
+		out("Database reset complete.", "green");
+		return "";
+	}
+
+	/**
+	 * Show migration status
+	 */
+	private string function dbStatus(array args = []) {
+		var pendingOnly = false;
+		for (var arg in arguments.args) {
+			if (arg == "--pending") pendingOnly = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			return "";
+		}
+
+		try {
+			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+			var response = makeHttpRequest(statusUrl);
+			var data = deserializeJSON(response);
+
+			if (!data.success) {
+				out("Error: #data.message#", "red");
+				return "";
+			}
+
+			out("Migration Status", "bold");
+			out(repeatString("=", 70));
+
+			var fmt = "%-16s %-30s %-10s %s";
+			out(sprintf(fmt, "Version", "Description", "Status", "Applied"));
+			out(repeatString("-", 70));
+
+			for (var m in data.migrations) {
+				if (pendingOnly && m.status != "pending") continue;
+
+				var statusColor = m.status == "applied" ? "green" : "yellow";
+				var appliedAt = structKeyExists(m, "appliedAt") && len(m.appliedAt) ? m.appliedAt : "-";
+				out(sprintf(fmt, m.version, left(m.description, 30), m.status, appliedAt), statusColor);
+			}
+
+			out("");
+			out("Total: #data.summary.total# | Applied: #data.summary.applied# | Pending: #data.summary.pending#", "cyan");
+
+		} catch (any e) {
+			out("Error fetching migration status: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	/**
+	 * Show current database schema version
+	 */
+	private string function dbVersion(array args = []) {
+		var detailed = false;
+		for (var arg in arguments.args) {
+			if (arg == "--detailed") detailed = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			return "";
+		}
+
+		try {
+			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
+			var response = makeHttpRequest(versionUrl);
+			var data = deserializeJSON(response);
+
+			out("Database version: #data.version#", "bold");
+
+			if (detailed) {
+				// Also fetch status for extra detail
+				var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+				var statusResponse = makeHttpRequest(statusUrl);
+				var statusData = deserializeJSON(statusResponse);
+
+				if (statusData.success && arrayLen(statusData.migrations)) {
+					// Find last applied migration
+					var lastApplied = "";
+					for (var m in statusData.migrations) {
+						if (m.status == "applied") lastApplied = m;
+					}
+					if (isStruct(lastApplied)) {
+						var appliedAt = structKeyExists(lastApplied, "appliedAt") && len(lastApplied.appliedAt) ? lastApplied.appliedAt : "unknown";
+						out("Last migration:   #lastApplied.description# (applied #appliedAt#)");
+					}
+
+					out("Total migrations: #statusData.summary.total#");
+					out("Pending:          #statusData.summary.pending#");
+
+					// Show next pending
+					if (statusData.summary.pending > 0) {
+						for (var m in statusData.migrations) {
+							if (m.status == "pending") {
+								out("Next:             #m.version# -- #m.description#");
+								break;
+							}
+						}
+					}
+				}
+			}
+
+		} catch (any e) {
+			out("Error fetching database version: #e.message#", "red");
 		}
 
 		return "";
