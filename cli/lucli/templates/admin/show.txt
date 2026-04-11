@@ -1,0 +1,9 @@
+<cfparam name="{{singular}}" default="">
+<h1>{{SingularCap}} Detail</h1>
+<dl>
+{{showFields}}
+</dl>
+<p>
+	#linkTo(text="Edit", route="admin~edit_{{singular}}", key={{singular}}.key())#
+	#linkTo(text="Back to list", route="admin~{{plural}}")#
+</p>

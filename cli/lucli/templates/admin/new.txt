@@ -1,0 +1,4 @@
+<cfparam name="{{singular}}" default="">
+<h1>New {{SingularCap}}</h1>
+#includePartial(partial="form")#
+#linkTo(text="Back to list", route="admin~{{plural}}")#

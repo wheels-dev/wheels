@@ -62,6 +62,7 @@ component extends="modules.BaseModule" {
 			out("  property      Generate an add-column migration for a model property");
 			out("  helper        Generate a helper file in app/helpers/");
 			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
+			out("  admin         Generate admin CRUD interface for an existing model");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate app myapp");
@@ -75,6 +76,7 @@ component extends="modules.BaseModule" {
 			out("  wheels generate property User email:string");
 			out("  wheels generate helper formatting");
 			out("  wheels generate snippets auth");
+			out("  wheels generate admin User");
 			return "";
 		}
 
@@ -118,6 +120,8 @@ component extends="modules.BaseModule" {
 				return generateHelper(remaining);
 			case "snippets":
 				return generateSnippets(remaining);
+			case "admin":
+				return generateAdmin(remaining);
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
@@ -141,7 +145,12 @@ component extends="modules.BaseModule" {
 			case "up":
 			case "down":
 			case "info":
-				return runMigration(action);
+				try {
+					return runMigration(action);
+				} catch (MigrationError e) {
+					out("Migration failed: #e.message#", "red");
+					return "";
+				}
 			default:
 				out("Unknown migration action: #action#", "red");
 				out("Usage: wheels migrate [latest|up|down|info]");
@@ -1007,6 +1016,361 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	// ─────────────────────────────────────────────────
+	//  destroy — Remove generated components
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Remove generated components (resource, model, controller, view)
+	 */
+	public string function destroy() {
+		var args = __arguments ?: [];
+
+		var positional = [];
+		var force = false;
+		for (var a in args) {
+			if (a == "--force") { force = true; }
+			else { arrayAppend(positional, a); }
+		}
+		if (!arrayLen(positional)) {
+			out("Usage: wheels destroy <name> [type]", "yellow");
+			out("");
+			out("Types:", "bold");
+			out("  resource    Remove model + controller + views + tests + route + migration (default)");
+			out("  model       Remove model + test + generate drop-table migration");
+			out("  controller  Remove controller + test");
+			out("  view        Remove view directory (or single file with controller/view syntax)");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels destroy User");
+			out("  wheels destroy Products controller");
+			out("  wheels destroy Product model");
+			out("  wheels destroy products/index view");
+			return "";
+		}
+		var name = trim(positional[1]);
+		var type = arrayLen(positional) > 1 ? lCase(trim(positional[2])) : "resource";
+
+		if (!listFindNoCase("resource,model,controller,view", type)) {
+			out("Unknown type: #type#. Valid types: resource, model, controller, view", "red");
+			return "";
+		}
+
+		var svc = getService("destroy");
+
+		// Show preview and confirm
+		var preview = svc.previewDestroy(name, type);
+		if (!arrayLen(preview)) {
+			out("Nothing to destroy.", "yellow");
+			return "";
+		}
+
+		out("The following will be deleted:", "yellow");
+		for (var item in preview) {
+			out("  #item#");
+		}
+		out("");
+
+		if (!force) {
+			out("Use --force to confirm deletion.", "yellow");
+			return "";
+		}
+
+		var result = {};
+		switch (type) {
+			case "resource":
+				result = svc.destroyResource(name);
+				break;
+			case "model":
+				result = svc.destroyModel(name);
+				break;
+			case "controller":
+				result = svc.destroyController(name);
+				break;
+			case "view":
+				result = svc.destroyView(name);
+				break;
+		}
+
+		// Output results
+		for (var deleted in result.deleted) {
+			out("  delete  #deleted#", "red");
+		}
+		for (var warning in result.warnings) {
+			out("  skip    #warning#", "yellow");
+		}
+		if (structKeyExists(result, "migrationPath") && len(result.migrationPath)) {
+			out("");
+			out("Migration generated: #result.migrationPath#", "cyan");
+			out("Run 'wheels migrate latest' to apply.", "cyan");
+		}
+		return "";
+	}
+
+	/**
+	 * hint: Alias for destroy
+	 */
+	public string function d() {
+		return destroy();
+	}
+
+	// ─────────────────────────────────────────────────
+	//  doctor — Application health checks
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Run health checks on your Wheels application
+	 */
+	public string function doctor() {
+		var args = __arguments ?: [];
+		var verbose = false;
+		for (var arg in args) {
+			if (arg == "--verbose" || arg == "-v") verbose = true;
+		}
+
+		var svc = getService("doctor");
+		var results = svc.runChecks();
+
+		out("Wheels Health Check", "bold");
+		out(repeatString("=", 40));
+		out("");
+
+		// Issues
+		if (arrayLen(results.issues)) {
+			out("Issues (#arrayLen(results.issues)#):", "red");
+			for (var issue in results.issues) {
+				out("  x #issue#", "red");
+			}
+			out("");
+		}
+
+		// Warnings
+		if (arrayLen(results.warnings)) {
+			out("Warnings (#arrayLen(results.warnings)#):", "yellow");
+			for (var warning in results.warnings) {
+				out("  ! #warning#", "yellow");
+			}
+			out("");
+		}
+
+		// Passed (verbose only, or when no issues)
+		if (verbose || (results.status == "HEALTHY")) {
+			out("Passed (#arrayLen(results.passed)#):", "green");
+			for (var passed in results.passed) {
+				out("  + #passed#", "green");
+			}
+			out("");
+		}
+
+		// Status
+		switch (results.status) {
+			case "CRITICAL":
+				out("Status: CRITICAL", "red");
+				break;
+			case "WARNING":
+				out("Status: WARNING", "yellow");
+				break;
+			case "HEALTHY":
+				out("Status: HEALTHY", "green");
+				break;
+		}
+
+		// Recommendations
+		if (arrayLen(results.recommendations)) {
+			out("");
+			out("Recommendations:", "cyan");
+			for (var rec in results.recommendations) {
+				out("  * #rec#", "cyan");
+			}
+		}
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  stats — Code statistics
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Show code statistics for your Wheels application
+	 */
+	public string function stats() {
+		var args = __arguments ?: [];
+		var verbose = false;
+		for (var arg in args) {
+			if (arg == "--verbose" || arg == "-v") verbose = true;
+		}
+
+		var svc = getService("stats");
+		var data = svc.getStats();
+
+		out("Code Statistics", "bold");
+		out(repeatString("=", 70));
+
+		// Header
+		var fmt = "%-14s %6s %7s %10s %8s %7s";
+		out(sprintf(fmt, "Category", "Files", "LOC", "Comments", "Blanks", "Total"));
+		out(repeatString("-", 70));
+
+		// Rows
+		for (var cat in data.categories) {
+			out(sprintf(fmt,
+				cat.name,
+				cat.files,
+				cat.loc,
+				cat.comments,
+				cat.blanks,
+				cat.total
+			));
+		}
+
+		out(repeatString("-", 70));
+		out(sprintf(fmt,
+			"Total",
+			data.totals.files,
+			data.totals.loc,
+			data.totals.comments,
+			data.totals.blanks,
+			data.totals.total
+		));
+		out("");
+		out("Code-to-test ratio: 1:#data.codeToTestRatio#");
+		out("Average lines/file: #data.avgLinesPerFile#");
+
+		if (verbose && arrayLen(data.topFiles)) {
+			out("");
+			out("Top 10 Largest Files:", "bold");
+			for (var f in data.topFiles) {
+				out("  #f.lines# lines  #f.path#");
+			}
+		}
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  notes — Code annotations
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Extract TODO, FIXME, and other annotations from your codebase
+	 */
+	public string function notes() {
+		var args = __arguments ?: [];
+		var annotations = "TODO,FIXME,OPTIMIZE";
+		var custom = "";
+
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (reFindNoCase("^--annotations=", arg)) {
+				annotations = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--custom=", arg)) {
+				custom = valueAfterEquals(arg);
+			}
+		}
+
+		var svc = getService("stats");
+		var data = svc.getNotes(annotations, custom);
+
+		if (data.total == 0) {
+			out("No annotations found.", "green");
+			return "";
+		}
+
+		for (var aType in data.types) {
+			var items = data.annotations[aType];
+			if (!arrayLen(items)) continue;
+
+			out("#aType# (#arrayLen(items)#):", "yellow");
+			for (var item in items) {
+				var desc = len(item.text) ? " -- #item.text#" : "";
+				out("  #item.file#:#item.line##desc#");
+			}
+			out("");
+		}
+
+		// Summary line
+		var parts = [];
+		for (var aType in data.types) {
+			var count = arrayLen(data.annotations[aType]);
+			if (count) arrayAppend(parts, "#count# #aType#");
+		}
+		out("Summary: #data.total# annotations (#arrayToList(parts, ', ')#)", "cyan");
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  db — Database management
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Database management commands (reset, status, version)
+	 */
+	public string function db() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args)) {
+			out("Usage: wheels db <command>", "yellow");
+			out("");
+			out("Commands:", "bold");
+			out("  reset    Run pending migrations and reseed the database");
+			out("  status   Show migration status (applied vs pending)");
+			out("  version  Show current database schema version");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels db reset");
+			out("  wheels db reset --skip-seed");
+			out("  wheels db status");
+			out("  wheels db status --pending");
+			out("  wheels db version --detailed");
+			return "";
+		}
+
+		var subcommand = lCase(args[1]);
+
+		switch (subcommand) {
+			case "reset":
+				return dbReset(args);
+			case "status":
+				return dbStatus(args);
+			case "version":
+				return dbVersion(args);
+			default:
+				out("Unknown db command: #subcommand#", "red");
+				out("Valid commands: reset, status, version");
+				return "";
+		}
+	}
+
+	// ─────────────────────────────────────────────────
+	//  upgrade — Upgrade assistance
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Check for breaking changes before upgrading Wheels
+	 */
+	public string function upgrade() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args) || lCase(args[1]) != "check") {
+			out("Usage: wheels upgrade check [--to=<version>]", "yellow");
+			out("");
+			out("Scans your app for breaking changes between versions.");
+			out("Does not perform the upgrade — use 'brew upgrade wheels' for that.");
+			return "";
+		}
+
+		var targetVersion = "";
+		for (var i = 2; i <= arrayLen(args); i++) {
+			if (reFindNoCase("^--to=", args[i])) {
+				targetVersion = valueAfterEquals(args[i]);
+			}
+		}
+
+		return runUpgradeCheck(targetVersion);
+	}
+
 	// ═════════════════════════════════════════════════
 	//  PRIVATE — Implementation details
 	// ═════════════════════════════════════════════════
@@ -1466,6 +1830,69 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Generate admin CRUD interface for an existing model
+	 */
+	private string function generateAdmin(array args = []) {
+		if (!arrayLen(arguments.args)) {
+			out("Usage: wheels generate admin <modelName> [--force] [--no-routes]", "yellow");
+			out("");
+			out("Generates an admin controller and views by introspecting an existing model.");
+			out("Requires a running server.");
+			return "";
+		}
+
+		var modelName = capitalize(arguments.args[1]);
+		var force = false;
+		var noRoutes = false;
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			if (arguments.args[i] == "--force") force = true;
+			if (arguments.args[i] == "--no-routes") noRoutes = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			out("Admin generation requires a running server for model introspection.");
+			return "";
+		}
+
+		// Introspect the model via the server
+		out("Introspecting model: #modelName#...", "cyan");
+		try {
+			var introspectUrl = "http://localhost:#serverPort#/wheels/cli?command=introspect&model=#modelName#&format=json";
+			var response = makeHttpRequest(introspectUrl);
+			var modelData = deserializeJSON(response);
+
+			if (!modelData.success) {
+				out("Error: #modelData.message#", "red");
+				return "";
+			}
+		} catch (any e) {
+			out("Error introspecting model: #e.message#", "red");
+			return "";
+		}
+
+		// Generate admin files
+		var svc = getService("admin");
+		var result = svc.generateAdmin(modelData=modelData, force=force, noRoutes=noRoutes);
+
+		if (result.success) {
+			for (var generated in result.generated) {
+				printCreated(generated);
+			}
+			out("");
+			out("Admin interface generated for #modelName#.", "green");
+			out("Visit /admin/#lCase(getService(""helpers"").pluralize(modelName))# after reloading.", "cyan");
+		} else {
+			for (var err in result.errors) {
+				out(err, "red");
+			}
+		}
+
+		return "";
+	}
+
+	/**
 	 * List all available snippet patterns
 	 */
 	private string function listSnippets() {
@@ -1770,7 +2197,7 @@ component extends="modules.BaseModule" {
 				verbose(httpResult);
 			}
 		} catch (any e) {
-			out("Migration failed: #e.message#", "red");
+			throw(type="MigrationError", message=e.message, detail=e.detail ?: "");
 		}
 
 		return "";
@@ -1814,6 +2241,320 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			out("Seeding failed: #e.message#", "red");
 		}
+
+		return "";
+	}
+
+	// ── DB Commands ─────────────────────────────────
+
+	/**
+	 * Reset database: run pending migrations and reseed
+	 */
+	private string function dbReset(array args = []) {
+		var force = false;
+		var skipSeed = false;
+		for (var arg in arguments.args) {
+			if (arg == "--force") force = true;
+			if (arg == "--skip-seed") skipSeed = true;
+		}
+
+		if (!force) {
+			out("This will run pending migrations and reseed the database.", "yellow");
+			out("Use --force to confirm: wheels db reset --force", "yellow");
+			return "";
+		}
+
+		// Step 1: Migrate
+		try {
+			out("Running migrations...", "cyan");
+			runMigration("latest");
+		} catch (any e) {
+			out("Migration failed: #e.message#", "red");
+			return "";
+		}
+
+		// Step 2: Seed (unless skipped)
+		if (!skipSeed) {
+			out("Running seeds...", "cyan");
+			runSeed("auto", "");
+		}
+
+		out("");
+		out("Database reset complete.", "green");
+		return "";
+	}
+
+	/**
+	 * Show migration status
+	 */
+	private string function dbStatus(array args = []) {
+		var pendingOnly = false;
+		for (var arg in arguments.args) {
+			if (arg == "--pending") pendingOnly = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			return "";
+		}
+
+		try {
+			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+			var response = makeHttpRequest(statusUrl);
+			var data = deserializeJSON(response);
+
+			if (!data.success) {
+				out("Error: #data.message#", "red");
+				return "";
+			}
+
+			out("Migration Status", "bold");
+			out(repeatString("=", 70));
+
+			var fmt = "%-16s %-30s %-10s %s";
+			out(sprintf(fmt, "Version", "Description", "Status", "Applied"));
+			out(repeatString("-", 70));
+
+			for (var m in data.migrations) {
+				if (pendingOnly && m.status != "pending") continue;
+
+				var statusColor = m.status == "applied" ? "green" : "yellow";
+				var appliedAt = structKeyExists(m, "appliedAt") && len(m.appliedAt) ? m.appliedAt : "-";
+				out(sprintf(fmt, m.version, left(m.description, 30), m.status, appliedAt), statusColor);
+			}
+
+			out("");
+			out("Total: #data.summary.total# | Applied: #data.summary.applied# | Pending: #data.summary.pending#", "cyan");
+
+		} catch (any e) {
+			out("Error fetching migration status: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	/**
+	 * Show current database schema version
+	 */
+	private string function dbVersion(array args = []) {
+		var detailed = false;
+		for (var arg in arguments.args) {
+			if (arg == "--detailed") detailed = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			return "";
+		}
+
+		try {
+			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
+			var response = makeHttpRequest(versionUrl);
+			var data = deserializeJSON(response);
+
+			out("Database version: #data.version#", "bold");
+
+			if (detailed) {
+				// Also fetch status for extra detail
+				var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+				var statusResponse = makeHttpRequest(statusUrl);
+				var statusData = deserializeJSON(statusResponse);
+
+				if (statusData.success && arrayLen(statusData.migrations)) {
+					// Find last applied migration
+					var lastApplied = "";
+					for (var m in statusData.migrations) {
+						if (m.status == "applied") lastApplied = m;
+					}
+					if (isStruct(lastApplied)) {
+						var appliedAt = structKeyExists(lastApplied, "appliedAt") && len(lastApplied.appliedAt) ? lastApplied.appliedAt : "unknown";
+						out("Last migration:   #lastApplied.description# (applied #appliedAt#)");
+					}
+
+					out("Total migrations: #statusData.summary.total#");
+					out("Pending:          #statusData.summary.pending#");
+
+					// Show next pending
+					if (statusData.summary.pending > 0) {
+						for (var m in statusData.migrations) {
+							if (m.status == "pending") {
+								out("Next:             #m.version# -- #m.description#");
+								break;
+							}
+						}
+					}
+				}
+			}
+
+		} catch (any e) {
+			out("Error fetching database version: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	// ── Upgrade Check ────────────────────────────────
+
+	/**
+	 * Scan app for breaking changes between current and target version.
+	 */
+	private string function runUpgradeCheck(string targetVersion = "") {
+		// Detect current version
+		var boxJsonPath = variables.projectRoot & "/vendor/wheels/box.json";
+		var currentVersion = "unknown";
+		if (fileExists(boxJsonPath)) {
+			try {
+				var boxData = deserializeJSON(fileRead(boxJsonPath));
+				currentVersion = boxData.version ?: "unknown";
+			} catch (any e) {}
+		}
+
+		// Determine target version
+		var target = arguments.targetVersion;
+		if (!len(target)) {
+			try {
+				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
+				var response = makeHttpRequest(apiUrl);
+				var releaseData = deserializeJSON(response);
+				target = replace(releaseData.tag_name, "v", "");
+			} catch (any e) {
+				out("Could not fetch latest version. Use --to=<version> to specify.", "yellow");
+				return "";
+			}
+		}
+
+		out("Current version: #currentVersion#", "bold");
+		out("Target version:  #target#", "bold");
+		out("");
+
+		// Compare major versions
+		var currentMajor = val(listFirst(currentVersion, "."));
+		var targetMajor = val(listFirst(target, "."));
+
+		if (currentMajor == targetMajor) {
+			out("Same major version — no known breaking changes.", "green");
+			out("Upgrade with: brew upgrade wheels");
+			return "";
+		}
+
+		// Breaking changes database
+		var checks = [];
+
+		// 2.x -> 3.x
+		if (currentMajor <= 2 && targetMajor >= 3) {
+			arrayAppend(checks, {
+				description: "Legacy plugin directory",
+				pattern: "",
+				checkType: "directory",
+				path: "app/plugins",
+				fix: "Migrate to packages/ + vendor/ activation model"
+			});
+			arrayAppend(checks, {
+				description: "Old test base class (wheels.Test)",
+				pattern: 'extends\s*=\s*"wheels\.Test"',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Change to extends="wheels.WheelsTest"'
+			});
+		}
+
+		// 3.x -> 4.x
+		if (currentMajor <= 3 && targetMajor >= 4) {
+			arrayAppend(checks, {
+				description: "Legacy plugin directory (deprecated in 4.x)",
+				pattern: "",
+				checkType: "directory",
+				path: "plugins",
+				fix: "Migrate to packages/ + vendor/ system"
+			});
+			arrayAppend(checks, {
+				description: "Old test base class (wheels.Test)",
+				pattern: 'extends\s*=\s*"wheels\.Test"',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Change to extends="wheels.WheelsTest"'
+			});
+			arrayAppend(checks, {
+				description: "Direct WireBox references",
+				pattern: "application\.wirebox",
+				checkType: "grep",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				fix: "Use service() or inject() from the DI container instead"
+			});
+		}
+
+		// Run checks
+		var issues = [];
+		var passed = [];
+
+		for (var check in checks) {
+			if (check.checkType == "directory") {
+				var dirPath = variables.projectRoot & "/" & check.path;
+				if (directoryExists(dirPath)) {
+					var contents = directoryList(dirPath, false, "name");
+					if (arrayLen(contents)) {
+						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [check.path & "/"]});
+					} else {
+						arrayAppend(passed, check.description);
+					}
+				} else {
+					arrayAppend(passed, check.description);
+				}
+			} else if (check.checkType == "grep") {
+				var scanPath = variables.projectRoot & "/" & check.scanDir;
+				if (!directoryExists(scanPath)) {
+					arrayAppend(passed, check.description);
+					continue;
+				}
+				var matches = [];
+				for (var ext in listToArray(check.extensions)) {
+					var files = directoryList(scanPath, true, "path", "*." & ext);
+					for (var filePath in files) {
+						var content = fileRead(filePath);
+						var lines = listToArray(content, chr(10), true);
+						for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+							if (reFindNoCase(check.pattern, lines[lineNum])) {
+								var relPath = replace(filePath, variables.projectRoot & "/", "");
+								arrayAppend(matches, "#relPath#:#lineNum#");
+							}
+						}
+					}
+				}
+				if (arrayLen(matches)) {
+					arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
+				} else {
+					arrayAppend(passed, check.description);
+				}
+			}
+		}
+
+		// Output
+		if (arrayLen(issues)) {
+			out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
+			for (var issue in issues) {
+				out("  ! #issue.description#", "yellow");
+				for (var match in issue.matches) {
+					out("    #match#");
+				}
+				out("    -> #issue.fix#", "cyan");
+				out("");
+			}
+		}
+
+		if (arrayLen(passed)) {
+			out("All Clear (#arrayLen(passed)# checks):", "green");
+			for (var p in passed) {
+				out("  + #p#", "green");
+			}
+		}
+
+		out("");
+		out("Upgrade with: brew upgrade wheels");
 
 		return "";
 	}
@@ -2524,6 +3265,31 @@ component extends="modules.BaseModule" {
 						projectRoot = variables.projectRoot
 					);
 					break;
+				case "destroy":
+					variables.services.destroy = new services.Destroy(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
+					);
+					break;
+				case "doctor":
+					variables.services.doctor = new services.Doctor(
+						projectRoot = variables.projectRoot
+					);
+					break;
+				case "stats":
+					variables.services.stats = new services.Stats(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot
+					);
+					break;
+				case "admin":
+					variables.services.admin = new services.Admin(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
+					);
+					break;
 				default:
 					throw("Unknown service: #name#");
 			}
@@ -2562,6 +3328,31 @@ component extends="modules.BaseModule" {
 		var pos = find("=", arg);
 		if (pos == 0) return "";
 		return mid(arg, pos + 1, len(arg));
+	}
+
+	/**
+	 * Simple sprintf-like formatting for fixed-width columns.
+	 * Supports %-Ns (left-aligned string) and %Ns (right-aligned string).
+	 */
+	private string function sprintf(required string format) {
+		var result = arguments.format;
+		var argIndex = 2;
+		// Replace each %... placeholder with the corresponding argument
+		while (reFindNoCase("%-?\d+s", result) && argIndex <= structCount(arguments)) {
+			var match = reFindNoCase("(%-?)(\d+)s", result, 1, true);
+			if (match.pos[1] == 0) break;
+			var leftAlign = len(mid(result, match.pos[2], match.len[2])) > 1;
+			var width = val(mid(result, match.pos[3], match.len[3]));
+			var value = toString(arguments[argIndex]);
+			if (leftAlign) {
+				value = value & repeatString(" ", max(0, width - len(value)));
+			} else {
+				value = repeatString(" ", max(0, width - len(value))) & value;
+			}
+			result = left(result, match.pos[1] - 1) & value & mid(result, match.pos[1] + match.len[1], len(result));
+			argIndex++;
+		}
+		return result;
 	}
 
 	/**
