@@ -1171,6 +1171,119 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	// ─────────────────────────────────────────────────
+	//  stats — Code statistics
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Show code statistics for your Wheels application
+	 */
+	public string function stats() {
+		var args = __arguments ?: [];
+		var verbose = false;
+		for (var arg in args) {
+			if (arg == "--verbose" || arg == "-v") verbose = true;
+		}
+
+		var svc = getService("stats");
+		var data = svc.getStats();
+
+		out("Code Statistics", "bold");
+		out(repeatString("=", 70));
+
+		// Header
+		var fmt = "%-14s %6s %7s %10s %8s %7s";
+		out(sprintf(fmt, "Category", "Files", "LOC", "Comments", "Blanks", "Total"));
+		out(repeatString("-", 70));
+
+		// Rows
+		for (var cat in data.categories) {
+			out(sprintf(fmt,
+				cat.name,
+				cat.files,
+				cat.loc,
+				cat.comments,
+				cat.blanks,
+				cat.total
+			));
+		}
+
+		out(repeatString("-", 70));
+		out(sprintf(fmt,
+			"Total",
+			data.totals.files,
+			data.totals.loc,
+			data.totals.comments,
+			data.totals.blanks,
+			data.totals.total
+		));
+		out("");
+		out("Code-to-test ratio: 1:#data.codeToTestRatio#");
+		out("Average lines/file: #data.avgLinesPerFile#");
+
+		if (verbose && arrayLen(data.topFiles)) {
+			out("");
+			out("Top 10 Largest Files:", "bold");
+			for (var f in data.topFiles) {
+				out("  #f.lines# lines  #f.path#");
+			}
+		}
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  notes — Code annotations
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Extract TODO, FIXME, and other annotations from your codebase
+	 */
+	public string function notes() {
+		var args = __arguments ?: [];
+		var annotations = "TODO,FIXME,OPTIMIZE";
+		var custom = "";
+
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (reFindNoCase("^--annotations=", arg)) {
+				annotations = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--custom=", arg)) {
+				custom = valueAfterEquals(arg);
+			}
+		}
+
+		var svc = getService("stats");
+		var data = svc.getNotes(annotations, custom);
+
+		if (data.total == 0) {
+			out("No annotations found.", "green");
+			return "";
+		}
+
+		for (var aType in data.types) {
+			var items = data.annotations[aType];
+			if (!arrayLen(items)) continue;
+
+			out("#aType# (#arrayLen(items)#):", "yellow");
+			for (var item in items) {
+				var desc = len(item.text) ? " -- #item.text#" : "";
+				out("  #item.file#:#item.line##desc#");
+			}
+			out("");
+		}
+
+		// Summary line
+		var parts = [];
+		for (var aType in data.types) {
+			var count = arrayLen(data.annotations[aType]);
+			if (count) arrayAppend(parts, "#count# #aType#");
+		}
+		out("Summary: #data.total# annotations (#arrayToList(parts, ', ')#)", "cyan");
+
+		return "";
+	}
+
 	// ═════════════════════════════════════════════════
 	//  PRIVATE — Implementation details
 	// ═════════════════════════════════════════════════
@@ -2700,6 +2813,12 @@ component extends="modules.BaseModule" {
 						projectRoot = variables.projectRoot
 					);
 					break;
+				case "stats":
+					variables.services.stats = new services.Stats(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot
+					);
+					break;
 				default:
 					throw("Unknown service: #name#");
 			}
@@ -2738,6 +2857,31 @@ component extends="modules.BaseModule" {
 		var pos = find("=", arg);
 		if (pos == 0) return "";
 		return mid(arg, pos + 1, len(arg));
+	}
+
+	/**
+	 * Simple sprintf-like formatting for fixed-width columns.
+	 * Supports %-Ns (left-aligned string) and %Ns (right-aligned string).
+	 */
+	private string function sprintf(required string format) {
+		var result = arguments.format;
+		var argIndex = 2;
+		// Replace each %... placeholder with the corresponding argument
+		while (reFindNoCase("%-?\d+s", result) && argIndex <= structCount(arguments)) {
+			var match = reFindNoCase("(%-?)(\d+)s", result, 1, true);
+			if (match.pos[1] == 0) break;
+			var leftAlign = len(mid(result, match.pos[2], match.len[2])) > 1;
+			var width = val(mid(result, match.pos[3], match.len[3]));
+			var value = toString(arguments[argIndex]);
+			if (leftAlign) {
+				value = value & repeatString(" ", max(0, width - len(value)));
+			} else {
+				value = repeatString(" ", max(0, width - len(value))) & value;
+			}
+			result = left(result, match.pos[1] - 1) & value & mid(result, match.pos[1] + match.len[1], len(result));
+			argIndex++;
+		}
+		return result;
 	}
 
 	/**
