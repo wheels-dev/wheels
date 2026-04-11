@@ -21,6 +21,7 @@ component output="false" {
 	this.mappings["/tests"] = expandPath("../tests");
 	this.mappings["/config"] = expandPath("../config");
 	this.mappings["/plugins"] = expandPath("../plugins");
+	this.mappings["/cli"] = expandPath("../cli/");
 
 	// Load app-level configuration (datasources, custom settings, etc.)
 	// This is the recommended place for developers to define this.datasources,

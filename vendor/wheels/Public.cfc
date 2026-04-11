@@ -78,6 +78,11 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// Ensure we abort to prevent any further processing
 		abort;
 	}
+	public function clitests() {
+		include "/wheels/public/views/clitests.cfm";
+		abort;
+	}
+
 	function packages() {
 		include "/wheels/public/views/packages.cfm";
 		return "";
