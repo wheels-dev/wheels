@@ -314,3 +314,24 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+
+      #############################################
+      # Create Snapshot Pre-Release (develop only)
+      #############################################
+
+      - name: Create Snapshot Pre-Release
+        if: github.ref != 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.WHEELS_VERSION }}
+          name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
+          body: "Snapshot build from develop. Not for production use."
+          draft: false
+          prerelease: true
+          files: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
