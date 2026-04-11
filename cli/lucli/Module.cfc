@@ -1327,6 +1327,34 @@ component extends="modules.BaseModule" {
 		}
 	}
 
+	// ─────────────────────────────────────────────────
+	//  upgrade — Upgrade assistance
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Check for breaking changes before upgrading Wheels
+	 */
+	public string function upgrade() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args) || lCase(args[1]) != "check") {
+			out("Usage: wheels upgrade check [--to=<version>]", "yellow");
+			out("");
+			out("Scans your app for breaking changes between versions.");
+			out("Does not perform the upgrade — use 'brew upgrade wheels' for that.");
+			return "";
+		}
+
+		var targetVersion = "";
+		for (var i = 2; i <= arrayLen(args); i++) {
+			if (reFindNoCase("^--to=", args[i])) {
+				targetVersion = valueAfterEquals(args[i]);
+			}
+		}
+
+		return runUpgradeCheck(targetVersion);
+	}
+
 	// ═════════════════════════════════════════════════
 	//  PRIVATE — Implementation details
 	// ═════════════════════════════════════════════════
@@ -2279,6 +2307,170 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			out("Error fetching database version: #e.message#", "red");
 		}
+
+		return "";
+	}
+
+	// ── Upgrade Check ────────────────────────────────
+
+	/**
+	 * Scan app for breaking changes between current and target version.
+	 */
+	private string function runUpgradeCheck(string targetVersion = "") {
+		// Detect current version
+		var boxJsonPath = variables.projectRoot & "/vendor/wheels/box.json";
+		var currentVersion = "unknown";
+		if (fileExists(boxJsonPath)) {
+			try {
+				var boxData = deserializeJSON(fileRead(boxJsonPath));
+				currentVersion = boxData.version ?: "unknown";
+			} catch (any e) {}
+		}
+
+		// Determine target version
+		var target = arguments.targetVersion;
+		if (!len(target)) {
+			try {
+				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
+				var response = makeHttpRequest(apiUrl);
+				var releaseData = deserializeJSON(response);
+				target = replace(releaseData.tag_name, "v", "");
+			} catch (any e) {
+				out("Could not fetch latest version. Use --to=<version> to specify.", "yellow");
+				return "";
+			}
+		}
+
+		out("Current version: #currentVersion#", "bold");
+		out("Target version:  #target#", "bold");
+		out("");
+
+		// Compare major versions
+		var currentMajor = val(listFirst(currentVersion, "."));
+		var targetMajor = val(listFirst(target, "."));
+
+		if (currentMajor == targetMajor) {
+			out("Same major version — no known breaking changes.", "green");
+			out("Upgrade with: brew upgrade wheels");
+			return "";
+		}
+
+		// Breaking changes database
+		var checks = [];
+
+		// 2.x -> 3.x
+		if (currentMajor <= 2 && targetMajor >= 3) {
+			arrayAppend(checks, {
+				description: "Legacy plugin directory",
+				pattern: "",
+				checkType: "directory",
+				path: "app/plugins",
+				fix: "Migrate to packages/ + vendor/ activation model"
+			});
+			arrayAppend(checks, {
+				description: "Old test base class (wheels.Test)",
+				pattern: 'extends\s*=\s*"wheels\.Test"',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Change to extends="wheels.WheelsTest"'
+			});
+		}
+
+		// 3.x -> 4.x
+		if (currentMajor <= 3 && targetMajor >= 4) {
+			arrayAppend(checks, {
+				description: "Legacy plugin directory (deprecated in 4.x)",
+				pattern: "",
+				checkType: "directory",
+				path: "plugins",
+				fix: "Migrate to packages/ + vendor/ system"
+			});
+			arrayAppend(checks, {
+				description: "Old test base class (wheels.Test)",
+				pattern: 'extends\s*=\s*"wheels\.Test"',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Change to extends="wheels.WheelsTest"'
+			});
+			arrayAppend(checks, {
+				description: "Direct WireBox references",
+				pattern: "application\.wirebox",
+				checkType: "grep",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				fix: "Use service() or inject() from the DI container instead"
+			});
+		}
+
+		// Run checks
+		var issues = [];
+		var passed = [];
+
+		for (var check in checks) {
+			if (check.checkType == "directory") {
+				var dirPath = variables.projectRoot & "/" & check.path;
+				if (directoryExists(dirPath)) {
+					var contents = directoryList(dirPath, false, "name");
+					if (arrayLen(contents)) {
+						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [check.path & "/"]});
+					} else {
+						arrayAppend(passed, check.description);
+					}
+				} else {
+					arrayAppend(passed, check.description);
+				}
+			} else if (check.checkType == "grep") {
+				var scanPath = variables.projectRoot & "/" & check.scanDir;
+				if (!directoryExists(scanPath)) {
+					arrayAppend(passed, check.description);
+					continue;
+				}
+				var matches = [];
+				for (var ext in listToArray(check.extensions)) {
+					var files = directoryList(scanPath, true, "path", "*." & ext);
+					for (var filePath in files) {
+						var content = fileRead(filePath);
+						var lines = listToArray(content, chr(10), true);
+						for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+							if (reFindNoCase(check.pattern, lines[lineNum])) {
+								var relPath = replace(filePath, variables.projectRoot & "/", "");
+								arrayAppend(matches, "#relPath#:#lineNum#");
+							}
+						}
+					}
+				}
+				if (arrayLen(matches)) {
+					arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
+				} else {
+					arrayAppend(passed, check.description);
+				}
+			}
+		}
+
+		// Output
+		if (arrayLen(issues)) {
+			out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
+			for (var issue in issues) {
+				out("  ! #issue.description#", "yellow");
+				for (var match in issue.matches) {
+					out("    #match#");
+				}
+				out("    -> #issue.fix#", "cyan");
+				out("");
+			}
+		}
+
+		if (arrayLen(passed)) {
+			out("All Clear (#arrayLen(passed)# checks):", "green");
+			for (var p in passed) {
+				out("  + #p#", "green");
+			}
+		}
+
+		out("");
+		out("Upgrade with: brew upgrade wheels");
 
 		return "";
 	}
