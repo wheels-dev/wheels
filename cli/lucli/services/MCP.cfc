@@ -36,11 +36,11 @@ component {
 		return [
 			{
 				name: "wheels_generate",
-				description: "Generate Wheels components (model, controller, view, migration, scaffold, api-resource, route, test, property, helper, snippets)",
+				description: "Generate Wheels components (model, controller, view, migration, scaffold, api-resource, route, test, property, helper, snippets, admin)",
 				inputSchema: {
 					type: "object",
 					properties: {
-						type: { type: "string", enum: ["model","controller","view","migration","scaffold","api-resource","route","test","property","helper","snippets"] },
+						type: { type: "string", enum: ["model","controller","view","migration","scaffold","api-resource","route","test","property","helper","snippets","admin"] },
 						name: { type: "string", description: "Component name (PascalCase for models/controllers)" },
 						attributes: { type: "string", description: "Space-separated attributes (e.g., 'name email:string active:boolean')" }
 					},

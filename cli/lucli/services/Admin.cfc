@@ -8,12 +8,10 @@ component {
 
 	public function init(
 		required any helpers,
-		required any templateService,
 		required string projectRoot,
 		required string moduleRoot
 	) {
 		variables.helpers = arguments.helpers;
-		variables.templateService = arguments.templateService;
 		variables.projectRoot = arguments.projectRoot;
 		variables.moduleRoot = arguments.moduleRoot;
 		return this;

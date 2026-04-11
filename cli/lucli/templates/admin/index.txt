@@ -14,8 +14,8 @@
 		<tr>
 {{indexCells}}
 			<td>
-				#linkTo(text="Show", route="admin~{{singular}}", key={{plural}}.id)#
-				#linkTo(text="Edit", route="admin~edit_{{singular}}", key={{plural}}.id)#
+				#linkTo(text="Show", route="admin~{{singular}}", key={{plural}}.{{primaryKey}})#
+				#linkTo(text="Edit", route="admin~edit_{{singular}}", key={{plural}}.{{primaryKey}})#
 			</td>
 		</tr>
 		</cfloop>

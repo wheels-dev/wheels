@@ -2185,7 +2185,7 @@ component extends="modules.BaseModule" {
 				verbose(httpResult);
 			}
 		} catch (any e) {
-			out("Migration failed: #e.message#", "red");
+			rethrow;
 		}
 
 		return "";
@@ -2253,8 +2253,13 @@ component extends="modules.BaseModule" {
 		}
 
 		// Step 1: Migrate
-		out("Running migrations...", "cyan");
-		var migrateResult = runMigration("latest");
+		try {
+			out("Running migrations...", "cyan");
+			runMigration("latest");
+		} catch (any e) {
+			out("Migration failed: #e.message#", "red");
+			return "";
+		}
 
 		// Step 2: Seed (unless skipped)
 		if (!skipSeed) {
@@ -3269,7 +3274,6 @@ component extends="modules.BaseModule" {
 				case "admin":
 					variables.services.admin = new services.Admin(
 						helpers = getService("helpers"),
-						templateService = getService("templates"),
 						projectRoot = variables.projectRoot,
 						moduleRoot = variables.moduleRoot
 					);
