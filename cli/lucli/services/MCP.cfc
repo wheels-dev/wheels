@@ -17,7 +17,8 @@
  *
  * Tools auto-discovered from Module.cfc:
  *   wheels_generate, wheels_migrate, wheels_test, wheels_seed,
- *   wheels_reload, wheels_analyze, wheels_validate, wheels_routes, wheels_info
+ *   wheels_reload, wheels_analyze, wheels_validate, wheels_routes, wheels_info,
+ *   wheels_destroy, wheels_doctor, wheels_stats, wheels_notes, wheels_db, wheels_upgrade
  */
 component {
 
@@ -98,6 +99,73 @@ component {
 				name: "wheels_routes",
 				description: "List all configured routes with their patterns and targets",
 				inputSchema: { type: "object", properties: {} }
+			},
+			{
+				name: "wheels_destroy",
+				description: "Remove generated Wheels components (model, controller, view, resource) with cleanup",
+				inputSchema: {
+					type: "object",
+					properties: {
+						name: { type: "string", description: "Component name to destroy (e.g., User, Products)" },
+						type: { type: "string", description: "Type to destroy: resource (default), model, controller, view", enum: ["resource","model","controller","view"] }
+					},
+					required: ["name"]
+				}
+			},
+			{
+				name: "wheels_doctor",
+				description: "Run health checks on Wheels application (directories, files, config, permissions, database)",
+				inputSchema: {
+					type: "object",
+					properties: {
+						verbose: { type: "boolean", description: "Show all passed checks (default: false)" }
+					}
+				}
+			},
+			{
+				name: "wheels_stats",
+				description: "Show code statistics (files, LOC, comments, blanks) across project directories",
+				inputSchema: {
+					type: "object",
+					properties: {
+						verbose: { type: "boolean", description: "Show top 10 largest files (default: false)" }
+					}
+				}
+			},
+			{
+				name: "wheels_notes",
+				description: "Extract TODO, FIXME, OPTIMIZE and other annotations from codebase",
+				inputSchema: {
+					type: "object",
+					properties: {
+						annotations: { type: "string", description: "Comma-separated annotation types (default: TODO,FIXME,OPTIMIZE)" },
+						custom: { type: "string", description: "Additional custom annotation types to search" }
+					}
+				}
+			},
+			{
+				name: "wheels_db",
+				description: "Database management: reset (migrate + seed), status (migration status), version (schema version)",
+				inputSchema: {
+					type: "object",
+					properties: {
+						action: { type: "string", description: "Subcommand: reset, status, version", enum: ["reset","status","version"] },
+						skipSeed: { type: "boolean", description: "Skip seeding on reset (default: false)" },
+						pending: { type: "boolean", description: "Show only pending migrations for status" },
+						detailed: { type: "boolean", description: "Show detailed version info" }
+					},
+					required: ["action"]
+				}
+			},
+			{
+				name: "wheels_upgrade_check",
+				description: "Check for breaking changes before upgrading Wheels to a new version",
+				inputSchema: {
+					type: "object",
+					properties: {
+						to: { type: "string", description: "Target version (defaults to latest release)" }
+					}
+				}
 			}
 		];
 	}
