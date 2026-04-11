@@ -204,6 +204,11 @@ component {
 
 	// ── Route injection ──────────────────────────────────────
 
+	/**
+	 * Inject admin resource route into config/routes.cfm.
+	 * Limitation: detects first .end() after scope(path="admin") — if the admin
+	 * scope has nested scopes with their own .end(), insertion may land at wrong depth.
+	 */
 	private boolean function injectAdminRoute(required string plural) {
 		var routesPath = variables.projectRoot & "/config/routes.cfm";
 		if (!fileExists(routesPath)) return false;

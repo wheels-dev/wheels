@@ -145,7 +145,12 @@ component extends="modules.BaseModule" {
 			case "up":
 			case "down":
 			case "info":
-				return runMigration(action);
+				try {
+					return runMigration(action);
+				} catch (MigrationError e) {
+					out("Migration failed: #e.message#", "red");
+					return "";
+				}
 			default:
 				out("Unknown migration action: #action#", "red");
 				out("Usage: wheels migrate [latest|up|down|info]");
@@ -1100,6 +1105,13 @@ component extends="modules.BaseModule" {
 			out("Run 'wheels migrate latest' to apply.", "cyan");
 		}
 		return "";
+	}
+
+	/**
+	 * hint: Alias for destroy
+	 */
+	public string function d() {
+		return destroy();
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2185,7 +2197,7 @@ component extends="modules.BaseModule" {
 				verbose(httpResult);
 			}
 		} catch (any e) {
-			rethrow;
+			throw(type="MigrationError", message=e.message, detail=e.detail ?: "");
 		}
 
 		return "";
