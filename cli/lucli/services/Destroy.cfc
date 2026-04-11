@@ -173,7 +173,11 @@ component {
 			case "view":
 				if (find("/", arguments.name)) {
 					var parts = listToArray(arguments.name, "/");
-					arrayAppend(preview, "app/views/" & parts[1] & "/" & parts[2] & ".cfm");
+					if (arrayLen(parts) == 2 && len(parts[1]) && len(parts[2])) {
+						arrayAppend(preview, "app/views/" & parts[1] & "/" & parts[2] & ".cfm");
+					} else {
+						arrayAppend(preview, "Invalid view path: " & arguments.name);
+					}
 				} else {
 					arrayAppend(preview, "app/views/" & names.plural & "/");
 					arrayAppend(preview, "tests/specs/views/" & names.plural & "/");

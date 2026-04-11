@@ -1017,7 +1017,13 @@ component extends="modules.BaseModule" {
 	public string function destroy() {
 		var args = __arguments ?: [];
 
-		if (!arrayLen(args)) {
+		var positional = [];
+		var force = false;
+		for (var a in args) {
+			if (a == "--force") { force = true; }
+			else { arrayAppend(positional, a); }
+		}
+		if (!arrayLen(positional)) {
 			out("Usage: wheels destroy <name> [type]", "yellow");
 			out("");
 			out("Types:", "bold");
@@ -1033,13 +1039,8 @@ component extends="modules.BaseModule" {
 			out("  wheels destroy products/index view");
 			return "";
 		}
-
-		var name = trim(args[1]);
-		var type = arrayLen(args) > 1 ? lCase(trim(args[2])) : "resource";
-		var force = false;
-		for (var i = 1; i <= arrayLen(args); i++) {
-			if (args[i] == "--force") force = true;
-		}
+		var name = trim(positional[1]);
+		var type = arrayLen(positional) > 1 ? lCase(trim(positional[2])) : "resource";
 
 		if (!listFindNoCase("resource,model,controller,view", type)) {
 			out("Unknown type: #type#. Valid types: resource, model, controller, view", "red");
@@ -1062,15 +1063,8 @@ component extends="modules.BaseModule" {
 		out("");
 
 		if (!force) {
-			out("Proceed? [y/n] ", "yellow");
-			// In LuCLI module context, we can't do interactive prompts.
-			// The --force flag is required for non-interactive use.
-			// For interactive use, LuCLI provides prompt support via the module system.
-			var answer = prompt("Proceed? [y/n]: ");
-			if (lCase(left(trim(answer), 1)) != "y") {
-				out("Cancelled.", "red");
-				return "";
-			}
+			out("Use --force to confirm deletion.", "yellow");
+			return "";
 		}
 
 		var result = {};
