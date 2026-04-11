@@ -1098,6 +1098,79 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	// ─────────────────────────────────────────────────
+	//  doctor — Application health checks
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Run health checks on your Wheels application
+	 */
+	public string function doctor() {
+		var args = __arguments ?: [];
+		var verbose = false;
+		for (var arg in args) {
+			if (arg == "--verbose" || arg == "-v") verbose = true;
+		}
+
+		var svc = getService("doctor");
+		var results = svc.runChecks();
+
+		out("Wheels Health Check", "bold");
+		out(repeatString("=", 40));
+		out("");
+
+		// Issues
+		if (arrayLen(results.issues)) {
+			out("Issues (#arrayLen(results.issues)#):", "red");
+			for (var issue in results.issues) {
+				out("  x #issue#", "red");
+			}
+			out("");
+		}
+
+		// Warnings
+		if (arrayLen(results.warnings)) {
+			out("Warnings (#arrayLen(results.warnings)#):", "yellow");
+			for (var warning in results.warnings) {
+				out("  ! #warning#", "yellow");
+			}
+			out("");
+		}
+
+		// Passed (verbose only, or when no issues)
+		if (verbose || (results.status == "HEALTHY")) {
+			out("Passed (#arrayLen(results.passed)#):", "green");
+			for (var passed in results.passed) {
+				out("  + #passed#", "green");
+			}
+			out("");
+		}
+
+		// Status
+		switch (results.status) {
+			case "CRITICAL":
+				out("Status: CRITICAL", "red");
+				break;
+			case "WARNING":
+				out("Status: WARNING", "yellow");
+				break;
+			case "HEALTHY":
+				out("Status: HEALTHY", "green");
+				break;
+		}
+
+		// Recommendations
+		if (arrayLen(results.recommendations)) {
+			out("");
+			out("Recommendations:", "cyan");
+			for (var rec in results.recommendations) {
+				out("  * #rec#", "cyan");
+			}
+		}
+
+		return "";
+	}
+
 	// ═════════════════════════════════════════════════
 	//  PRIVATE — Implementation details
 	// ═════════════════════════════════════════════════
@@ -2620,6 +2693,11 @@ component extends="modules.BaseModule" {
 						helpers = getService("helpers"),
 						projectRoot = variables.projectRoot,
 						moduleRoot = variables.moduleRoot
+					);
+					break;
+				case "doctor":
+					variables.services.doctor = new services.Doctor(
+						projectRoot = variables.projectRoot
 					);
 					break;
 				default:
