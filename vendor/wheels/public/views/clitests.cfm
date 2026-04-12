@@ -1,6 +1,14 @@
 <cfsetting requestTimeOut="300">
 <cfscript>
 setting showDebugOutput="no";
+
+param name="request.wheels.params.format" default="json";
+
+// Set content type early so errors return JSON, not HTML
+if (request.wheels.params.format == "json") {
+	cfcontent(type = "application/json");
+}
+
 try {
 	testBox = new wheels.wheelstest.system.TestBox(
 		directory = "cli.lucli.tests.specs",
@@ -11,13 +19,10 @@ try {
 	arraySort(local.sortedArray, "textNoCase");
 	testBox.setBundles(local.sortedArray);
 
-	param name="request.wheels.params.format" default="json";
-
 	if (request.wheels.params.format == "json") {
 		result = testBox.run(
 			reporter = "wheels.wheelstest.system.reports.JSONReporter"
 		);
-		cfcontent(type = "application/json");
 		local.parsed = deserializeJSON(result);
 		if (local.parsed.totalFail > 0 || local.parsed.totalError > 0) {
 			cfheader(statuscode = 417);
@@ -33,7 +38,6 @@ try {
 	writeOutput(result);
 } catch (any e) {
 	cfheader(statuscode = 500);
-	cfcontent(type = "application/json");
-	writeOutput('{"success":false,"error":"' & replace(e.message, '"', '\"', 'all') & '"}');
+	writeOutput('{"success":false,"error":"' & replace(e.message, '"', '\"', 'all') & '","detail":"' & replace(e.detail ?: '', '"', '\"', 'all') & '"}');
 }
 </cfscript>

@@ -9,7 +9,7 @@ BASE_URL="http://localhost:${PORT}"
 TEST_URL="${BASE_URL}/wheels/core/tests?db=sqlite&format=json"
 RESULT_FILE="${RESULT_DIR:-/tmp}/test-results.json"
 JUNIT_FILE="${JUNIT_DIR:-/tmp}/junit-results.xml"
-CLI_TEST_URL="${BASE_URL}/cli/lucli/tests/runner.cfm?format=json"
+CLI_TEST_URL="${BASE_URL}/wheels/cli/tests?format=json"
 CLI_RESULT_FILE="${RESULT_DIR:-/tmp}/cli-test-results.json"
 CLI_JUNIT_FILE="${JUNIT_DIR:-/tmp}/cli-junit.xml"
 CORE_OK=true
@@ -133,6 +133,9 @@ fi
 
 # --- Run CLI module tests ---
 echo ""
+echo "Reloading app for CLI tests..."
+curl -s -o /dev/null --max-time 30 "${BASE_URL}/?reload=true&password=wheels-dev" || true
+sleep 2
 echo "Running CLI module tests..."
 CLI_HTTP_CODE=$(curl -s -o "$CLI_RESULT_FILE" \
   --max-time 300 \
