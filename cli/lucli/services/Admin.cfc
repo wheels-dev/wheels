@@ -27,7 +27,8 @@ component {
 	) {
 		var result = {success: true, generated: [], errors: []};
 		var singular = lCase(arguments.modelData.model);
-		var plural = variables.helpers.pluralize(singular);
+		// Prefer tableName from modelData for view/controller paths when provided
+		var plural = len(arguments.modelData.tableName ?: "") ? lCase(arguments.modelData.tableName) : variables.helpers.pluralize(singular);
 		var singularCap = variables.helpers.capitalize(singular);
 		var pluralCap = variables.helpers.capitalize(plural);
 
