@@ -4,7 +4,7 @@
 	local.message = "ERROR";
 	if (StructKeyExists(variables, "exception")) {
 		if (StructKeyExists(exception, "rootCause") && StructKeyExists(exception.rootCause, "message")) {
-			local.message = exception.rootCause.type & ": " & exception.rootCause.message;
+			local.message = ToString(exception.rootCause.type) & ": " & ToString(exception.rootCause.message);
 		} else if (StructKeyExists(exception, "message")) {
 			local.message = exception.message;
 		}

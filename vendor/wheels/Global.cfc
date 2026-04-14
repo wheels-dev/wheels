@@ -3441,6 +3441,9 @@ component output="false" {
 	 * Runs only in development mode at the end of application bootstrap.
 	 * Checks a subset of essential methods — full verification is done by test specs.
 	 * Logs warnings instead of throwing to avoid blocking app startup.
+	 * Note: the model check is a no-op at startup because models are lazy-loaded
+	 * (application.wheels.models is empty until the first model() call).
+	 * It activates when called later or from tests.
 	 */
 	public void function $verifyInterfaceContracts() {
 		local.issues = [];
