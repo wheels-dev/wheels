@@ -2,12 +2,12 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
-		g = application.wo
+		g = application.wo;
 
 		describe("h() view helper", () => {
 
 			beforeEach(() => {
-				_controller = g.controller(name = "dummy")
+				_controller = g.controller(name = "dummy");
 			});
 
 			it("encodes HTML special characters", () => {
@@ -42,7 +42,7 @@ component extends="wheels.WheelsTest" {
 		describe("hAttr() view helper", () => {
 
 			beforeEach(() => {
-				_controller = g.controller(name = "dummy")
+				_controller = g.controller(name = "dummy");
 			});
 
 			it("encodes for HTML attribute context", () => {

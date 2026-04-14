@@ -1,10 +1,10 @@
 <cfscript>
 	// Log the error to stderr so it appears in server logs / container output.
-	// The exception struct is passed into scope by the framework's $runOnError().
+	// The exception struct is passed into scope by $includeAndReturnOutput() in EventMethods.cfc.
 	local.message = "ERROR";
 	if (StructKeyExists(variables, "exception")) {
 		if (StructKeyExists(exception, "rootCause") && StructKeyExists(exception.rootCause, "message")) {
-			local.message = ToString(exception.rootCause.type) & ": " & ToString(exception.rootCause.message);
+			local.message = exception.rootCause.type & ": " & exception.rootCause.message;
 		} else if (StructKeyExists(exception, "message")) {
 			local.message = exception.message;
 		}

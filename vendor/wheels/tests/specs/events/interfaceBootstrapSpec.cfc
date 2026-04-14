@@ -2,7 +2,7 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
-		g = application.wo
+		g = application.wo;
 
 		describe("Dev-Mode Interface Contract Verification", () => {
 
@@ -25,6 +25,12 @@ component extends="wheels.WheelsTest" {
 				for (var m in requiredMethods) {
 					expect(StructKeyExists(ctrl, m)).toBeTrue("Controller missing required method: #m#");
 				}
+			});
+
+			it("controller instances have h() and hAttr() mixed in from view helpers", () => {
+				var ctrl = g.controller(name = "dummy");
+				expect(StructKeyExists(ctrl, "h")).toBeTrue("Controller missing mixin: h()");
+				expect(StructKeyExists(ctrl, "hAttr")).toBeTrue("Controller missing mixin: hAttr()");
 			});
 
 		});
