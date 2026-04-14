@@ -40,6 +40,8 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 					}
 				}
 			}
+			// Fire registered onError callbacks (packages like Sentry hook in here).
+			$fireOnErrorCallbacks(arguments.exception);
 			if (application.wheels.showErrorInformation) {
 				// Detect request format for format-specific error handling
 				local.format = $getRequestFormat();
