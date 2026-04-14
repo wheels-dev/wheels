@@ -87,7 +87,7 @@ The `wheels upgrade` command provides an interactive wizard for upgrading your W
 wheels upgrade --check
 
 # Output:
-# Current Wheels version: 2.5.0
+# Current Wheels version: 3.1.0
 # Upgrade available: 3.1.0
 # Run 'wheels upgrade' to start the upgrade process.
 ```

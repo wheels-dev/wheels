@@ -758,4 +758,3 @@ For full details, see [Server-Sent Events](./sse.md).
 - [API Controllers](./api.md)
 - [Controller Security](./security.md)
 - [Server-Sent Events](./sse.md)
-- [View Templates](../views/templates.md)

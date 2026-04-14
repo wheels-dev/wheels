@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE urlrewrite
+    PUBLIC "-//tuckey.org//DTD UrlRewrite 4.0//EN"
+    "http://www.tuckey.org/res/dtds/urlrewrite4.0.dtd">
+<!--
+This file is used by Tuckey UrlRewriteFilter for URL rewriting.
+Used by CommandBox and LuCLI for clean URLs.
+
+See https://wheels.dev for more information.
+If you do not use Tuckey, CommandBox, or LuCLI, this file can be safely deleted.
+-->
+<urlrewrite>
+  <rule enabled="true">
+    <name>Wheels pretty URLs</name>
+    <condition type="request-uri" operator="notequal">^/(cf_script|flex2gateway|jrunscripts|CFIDE/administrator|lucee/admin|cfformgateway|cffileservlet|lucee|files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots.txt|favicon.ico|sitemap.xml|index.cfm)</condition>
+    <from>^/(.*)$</from>
+    <to type="passthrough">/index.cfm/$1</to>
+  </rule>
+
+  <rule enabled="true">
+    <name>Convert dot to format parameter</name>
+    <from>^/(.*)\\.(\\w+)$</from>
+    <to>/$1?format=$2</to>
+  </rule>
+</urlrewrite>

@@ -64,3 +64,20 @@ Because the `photo` model is the main model being used in the following example,
 myPhotos = model("photo").findAll(include="photoGalleries");
 ```
 {% endcode %}
+
+### Automatic Datasource Switching with Multi-Tenancy
+
+If you're building a multi-tenant application where each tenant has its own database, Wheels can automatically switch the datasource on every request — no manual `dataSource()` calls needed.
+
+When the **TenantResolver** middleware is active, all model queries are automatically routed to the current tenant's datasource. Models that should always use the central (default) datasource — like a `Tenant` registry table — can opt out by calling `sharedModel()` in their `config()`:
+
+```javascript
+// app/models/Tenant.cfc — always uses the default datasource
+component extends="Model" {
+    function config() {
+        sharedModel();
+    }
+}
+```
+
+For the full setup guide, see [Multi-Tenancy](../working-with-wheels/multi-tenancy.md).

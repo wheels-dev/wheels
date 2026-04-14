@@ -751,8 +751,6 @@ wheels test run --db=oracle
 
 ## See Also
 
-- [wheels test run](../commands/testing/test-run.md) - Test execution command
-- [wheels test coverage](../commands/testing/test-coverage.md) - Coverage generation
-- [wheels generate test](../commands/generate/test.md) - Generate test files
+- [wheels test run](../commands/test/test-run.md) - Test execution command
+- [wheels test advanced](../commands/test/test-advanced.md) - Advanced test options
 - [TestBox Documentation](https://testbox.ortusbooks.com/) - Complete TestBox guide
-- [Docker Testing Guide](/tools/docker/testui/README.md) - Detailed Docker testing documentation

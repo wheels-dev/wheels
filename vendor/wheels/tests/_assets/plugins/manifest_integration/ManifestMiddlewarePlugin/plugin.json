@@ -1,0 +1,15 @@
+{
+	"name": "ManifestMiddlewarePlugin",
+	"version": "1.2.0",
+	"author": "Wheels Test Suite",
+	"description": "Plugin that declares middleware via manifest",
+	"middleware": [
+		{
+			"component": "ManifestTestMiddleware",
+			"options": {"priority": 5}
+		},
+		{
+			"component": "ManifestTestMiddleware2"
+		}
+	]
+}

@@ -166,17 +166,17 @@ component {
 			local.pattern = "/";
 		}
 
-	  // If arguments.to is not passed in, we check for the existence of app/views/home/index.cfm if found we set that as the root
-	  // else we set wheels##wheels as the root.
-	  if (!structKeyExists(arguments, "to")) {
-	    if (fileExists(application.AppDir & "views/home/index.cfm")) {
-	      arguments.to = "home##index";
-	      arguments.method = "get";
-	    } else {
-	      arguments.to = "wheels##wheels";
-	      arguments.method = "get";
-	    }
-	  }
+		// If arguments.to is not passed in, we check for the existence of app/views/home/index.cfm if found we set that as the root
+		// else we set wheels##wheels as the root.
+		if (!structKeyExists(arguments, "to")) {
+			if (fileExists(application.AppDir & "views/home/index.cfm")) {
+				arguments.to = "home##index";
+				arguments.method = "get";
+			} else {
+				arguments.to = "wheels##wheels";
+				arguments.method = "get";
+			}
+		}
 
 		return $match(name = "root", pattern = local.pattern, argumentCollection = arguments);
 
@@ -296,7 +296,7 @@ component {
 		// Use scoped package if found.
 		if (StructKeyExists(variables.scopeStack[1], "package")) {
 			if (StructKeyExists(arguments, "package")) {
-				arguments.package &= "." & variables.scopeStack[1].package;
+				arguments.package = variables.scopeStack[1].package & "." & arguments.package;
 			} else {
 				arguments.package = variables.scopeStack[1].package;
 			}
@@ -340,17 +340,11 @@ component {
 		}
 
 		// See if we have any globing in the pattern and if so add a constraint for each glob.
-		// BoxLang compatibility: Use different regex pattern to match globs
-		local.globRegex = StructKeyExists(server, "boxlang") ? "\*\[([^\]]+)\]" : "\*([^\/]+)";
+		local.globRegex = $engineAdapter().globRegex();
 		if (ReFindNoCase(local.globRegex, arguments.pattern)) {
 			local.globs = ReMatch(local.globRegex, arguments.pattern);
 			for (local.glob in local.globs) {
-				// For BoxLang: extract variable name from *[varname] pattern
-				if (StructKeyExists(server, "boxlang")) {
-					local.var = ReReplace(local.glob, "\*\[([^\]]+)\]", "\1");
-				} else {
-					local.var = ReplaceList(local.glob, "*,[,]", "");
-				}
+				local.var = $engineAdapter().extractGlobVariable(local.glob);
 				arguments.pattern = Replace(arguments.pattern, local.glob, "[#local.var#]");
 				arguments.constraints[local.var] = ".*";
 			}
@@ -359,6 +353,16 @@ component {
 		// Use constraints from stack.
 		if (StructKeyExists(variables.scopeStack[1], "constraints")) {
 			StructAppend(arguments.constraints, variables.scopeStack[1].constraints, false);
+		}
+
+		// Inherit middleware from scope stack.
+		if (!StructKeyExists(arguments, "middleware") && StructKeyExists(variables.scopeStack[1], "middleware")) {
+			arguments.middleware = variables.scopeStack[1].middleware;
+		}
+
+		// Inherit binding from scope stack.
+		if (!StructKeyExists(arguments, "binding") && StructKeyExists(variables.scopeStack[1], "binding")) {
+			arguments.binding = variables.scopeStack[1].binding;
 		}
 
 		// Add shallow path to pattern.

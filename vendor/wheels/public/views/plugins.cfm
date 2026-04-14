@@ -39,6 +39,24 @@ if (request.wheels.params.format == "json") {
 		}
 	}
 
+	// Add version mismatch plugins if any
+	if (isDefined("application.wheels.versionMismatchPlugins") && len(application.wheels.versionMismatchPlugins)) {
+		local.pluginsData.plugins.versionMismatches = [];
+		for (local.mm in listToArray(application.wheels.versionMismatchPlugins)) {
+			arrayAppend(local.pluginsData.plugins.versionMismatches, {
+				"plugin": listGetAt(local.mm, 1, "|"),
+				"dependency": listGetAt(local.mm, 2, "|"),
+				"required": listGetAt(local.mm, 3, "|"),
+				"loaded": listGetAt(local.mm, 4, "|")
+			});
+		}
+	}
+
+	// Add mixin collisions if any
+	if (isDefined("application.wheels.mixinCollisions") && arrayLen(application.wheels.mixinCollisions)) {
+		local.pluginsData.plugins.mixinCollisions = application.wheels.mixinCollisions;
+	}
+
 	local.pluginsData.plugins.count = structCount(loadedPlugins);
 
 	cfcontent(type="application/json", reset=true);
@@ -53,7 +71,7 @@ if (request.wheels.params.format == "json") {
 <div class="ui container">
 	#pageHeader("Plugins", "What you've got loaded..")#
 
-		<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins)>
+		<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins) OR (isDefined("application.wheels.versionMismatchPlugins") AND Len(application.wheels.versionMismatchPlugins)) OR (isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions))>
 			<div class="ui error message">
 				<div class="header">
 					Warnings:
@@ -63,6 +81,12 @@ if (request.wheels.params.format == "json") {
 						</cfif>
 						<cfif Len(application.wheels.dependantPlugins)>
 							<cfloop list="#application.wheels.dependantPlugins#" index="local.i"><cfset needs = ListLast(local.i, "|")>The #ListFirst(local.i, "|")# plugin needs the following plugin<cfif ListLen(needs) GT 1>s</cfif> to work properly: #needs#<br></cfloop>
+						</cfif>
+						<cfif isDefined("application.wheels.versionMismatchPlugins") AND Len(application.wheels.versionMismatchPlugins)>
+							<cfloop list="#application.wheels.versionMismatchPlugins#" index="local.mm">Plugin <strong>#ListGetAt(local.mm, 1, "|")#</strong> requires <strong>#ListGetAt(local.mm, 2, "|")#</strong> #ListGetAt(local.mm, 3, "|")# but version <strong>#ListGetAt(local.mm, 4, "|")#</strong> is loaded<br></cfloop>
+						</cfif>
+						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>
+							<cfloop array="#application.wheels.mixinCollisions#" index="local.c">Method <strong>#local.c.method#</strong> on <strong>#local.c.target#</strong>: provided by <strong>#local.c.existingPlugin#</strong>, overridden by <strong>#local.c.overridingPlugin#</strong><br></cfloop>
 						</cfif>
 			</div>
 		</cfif>
@@ -111,7 +135,7 @@ if (request.wheels.params.format == "json") {
 			<svg xmlns="http://www.w3.org/2000/svg" height="60" width="40" viewBox="0 0 384 512"><path fill="##6c7086" d="M96 0C78.3 0 64 14.3 64 32v96h64V32c0-17.7-14.3-32-32-32zM288 0c-17.7 0-32 14.3-32 32v96h64V32c0-17.7-14.3-32-32-32zM32 160c-17.7 0-32 14.3-32 32s14.3 32 32 32v32c0 77.4 55 142 128 156.8V480c0 17.7 14.3 32 32 32s32-14.3 32-32V412.8C297 398 352 333.4 352 256V224c17.7 0 32-14.3 32-32s-14.3-32-32-32H32z"/></svg>
 			<br>No plugins found!
 		</div>
-		<a href="https://forgebox.io/type/cfwheels-plugins" target="_blank" ref="noopener" class="ui primary button">Browse plugins on Forgebox.io</a>
+		<a href="https://forgebox.io/type/wheels-plugins" target="_blank" ref="noopener" class="ui primary button">Browse plugins on Forgebox.io</a>
 	</div>
 </cfif>
 

@@ -15,7 +15,8 @@ component {
 		) {
 			local.scopeDef = variables.wheels.class.scopes[arguments.missingMethodName];
 			if (StructKeyExists(local.scopeDef, "handler") && Len(local.scopeDef.handler)) {
-				local.spec = $invoke(method = local.scopeDef.handler, invokeArgs = arguments.missingMethodArguments);
+				local.sanitizedArgs = $sanitizeScopeHandlerArgs(arguments.missingMethodArguments);
+				local.spec = $invoke(method = local.scopeDef.handler, invokeArgs = local.sanitizedArgs);
 			} else {
 				local.spec = Duplicate(local.scopeDef);
 			}
@@ -116,12 +117,8 @@ component {
 			|| Left(arguments.missingMethodName, 9) == "findAllBy"
 		) {
 			// cfformat-ignore-start
-			if (StructKeyExists(server, "lucee")) {
-				// since Lucee passes in the method name in all upper case we have to do this here
-				local.finderProperties = ListToArray(LCase(ReplaceNoCase(ReplaceNoCase(ReplaceNoCase(arguments.missingMethodName, "And", "|", "all"), "findAllBy", "", "all"), "findOneBy", "", "all")), "|");
-			} else {
-				local.finderProperties = ListToArray(ReplaceNoCase(ReplaceNoCase(Replace(arguments.missingMethodName, "And", "|", "all"), "findAllBy", "", "all"), "findOneBy", "", "all"), "|");
-			}
+			local.finderPrefix = Left(arguments.missingMethodName, 9) == "findOneBy" ? "findOneBy" : "findAllBy";
+			local.finderProperties = $engineAdapter().dynamicFinderProperties(arguments.missingMethodName, local.finderPrefix);
 			// cfformat-ignore-end
 
 			// sometimes values will have commas in them, allow the developer to change the delimiter
@@ -172,19 +169,10 @@ component {
 			// construct where clause
 			local.addToWhere = ArrayToList(local.addToWhere, " AND ");
 			
-			// BoxLang compatibility: Use explicit if/else instead of IIf for string concatenation
-			if (StructKeyExists(server, "boxlang")) {
-				if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
-					arguments.missingMethodArguments.where = "(" & arguments.missingMethodArguments.where & ") AND (" & local.addToWhere & ")";
-				} else {
-					arguments.missingMethodArguments.where = local.addToWhere;
-				}
+			if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
+				arguments.missingMethodArguments.where = "(" & arguments.missingMethodArguments.where & ") AND (" & local.addToWhere & ")";
 			} else {
-				arguments.missingMethodArguments.where = IIf(
-					StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where),
-					"'(' & arguments.missingMethodArguments.where & ') AND (' & local.addToWhere & ')'",
-					"local.addToWhere"
-				);
+				arguments.missingMethodArguments.where = local.addToWhere;
 			}
 
 			// remove unneeded arguments
@@ -194,20 +182,10 @@ component {
 			StructDelete(arguments.missingMethodArguments, "values");
 
 			// call finder method
-			if (StructKeyExists(server, "boxlang")) {
-				// BoxLang-specific handling to avoid argumentCollection parsing issues
-				if (Left(arguments.missingMethodName, 9) == "findOneBy") {
-					local.rv = findOne(argumentCollection = arguments.missingMethodArguments);
-				} else {
-					local.rv = findAll(argumentCollection = arguments.missingMethodArguments);
-				}
+			if (Left(arguments.missingMethodName, 9) == "findOneBy") {
+				local.rv = findOne(argumentCollection = arguments.missingMethodArguments);
 			} else {
-				// Adobe ColdFusion and Lucee compatibility
-				local.rv = IIf(
-					Left(arguments.missingMethodName, 9) == "findOneBy",
-					"findOne(argumentCollection=arguments.missingMethodArguments)",
-					"findAll(argumentCollection=arguments.missingMethodArguments)"
-				);
+				local.rv = findAll(argumentCollection = arguments.missingMethodArguments);
 			}
 		} else if (Left(arguments.missingMethodName, 14) == "findOrCreateBy") {
 			local.rv = $findOrCreateBy(argumentCollection = arguments);

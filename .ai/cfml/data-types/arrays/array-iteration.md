@@ -163,5 +163,4 @@ expensiveProducts = products
 - [Array Creation](array-creation.md)
 - [Array Methods](array-methods.md)
 - [Closures](../../advanced/closures.md)
-- [Threading](../../advanced/threading.md)
 - [Control Flow](../../control-flow/loops.md)

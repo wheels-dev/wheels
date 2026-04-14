@@ -265,5 +265,3 @@ component {
 - [Component Basics](component-basics.md)
 - [Properties](properties.md)
 - [Variable Scopes](../data-types/variable-scopes.md)
-- [Inheritance](inheritance.md)
-- [Static Methods](static-methods.md)

@@ -264,7 +264,7 @@ for (issue in results.issues) {
 
 ## Related Documentation
 
-- [Request Handling Security](../../handling-requests-with-controllers/request-handling.md)
-- [Database Security](../../database-interaction-through-models/README.md)
-- [Configuration Security](../../working-with-wheels/configuration-and-defaults.md)
-- [Testing Security](../../working-with-wheels/testing-your-application.md)
+- [Request Handling](../../../handling-requests-with-controllers/request-handling.md)
+- [Verification](../../../handling-requests-with-controllers/verification.md)
+- [Configuration and Defaults](../../../working-with-wheels/configuration-and-defaults.md)
+- [Testing](../../../working-with-wheels/testing-your-application.md)

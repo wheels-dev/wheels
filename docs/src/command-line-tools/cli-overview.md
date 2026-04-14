@@ -25,7 +25,7 @@ Complete reference for all CLI commands organized by category:
 - [Configuration](commands/config/config-dump.md) - Manage application settings
 - [And more...](commands/README.md)
 
-### [Quick Start Guide](guides/quick-start.md)
+### [Quick Start Guide](quick-start.md)
 Get up and running with Wheels CLI in minutes. Learn how to:
 - Install Wheels CLI
 - Create your first application
@@ -35,21 +35,17 @@ Get up and running with Wheels CLI in minutes. Learn how to:
 ### Guides
 
 #### Development Guides
-- [Service Architecture](guides/service-architecture.md) - Understand the CLI's architecture
-- [Creating Custom Commands](guides/creating-commands.md) - Extend the CLI with your own commands
-- [Template System](guides/template-system.md) - Customize code generation templates
-- [Testing Guide](guides/testing.md) - Write and run tests effectively
+- [Service Architecture](cli-guides/service-architecture.md) - Understand the CLI's architecture
+- [Creating Custom Commands](cli-guides/creating-commands.md) - Extend the CLI with your own commands
+- [Template System](cli-guides/template-system.md) - Customize code generation templates
+- [Testing Guide](cli-guides/testing.md) - Write and run tests effectively
+
+#### Switching CLIs
+- [Migrating from CommandBox to LuCLI](cli-guides/migration-from-commandbox.md) - Command mapping, config changes, and side-by-side usage
 
 #### Best Practices
-- [Migration Guide](guides/migrations.md) - Database migration best practices
-- [Security Guide](guides/security.md) - Security scanning and hardening
-- [Performance Guide](guides/performance.md) - Optimization techniques
-
-### Reference
-- [Configuration Options](reference/configuration.md) - All available configuration settings
-- [Template Variables](reference/templates.md) - Variables available in templates
-- [Exit Codes](reference/exit-codes.md) - Understanding command exit codes
-- [Environment Variables](reference/environment-variables.md) - Environment configuration
+- [Migration Guide](cli-guides/migrations.md) - Database migration best practices
+- [Configuration](configuration.md) - All available configuration settings
 
 ## Key Features
 
@@ -122,12 +118,35 @@ wheels security scan
 
 ## Getting Started
 
-1. **Install CommandBox** (if not already installed):
+### Option A: LuCLI (Recommended)
+
+1. **Install LuCLI**:
    ```bash
-   # macOS/Linux
-   curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo apt-key add -
-   or
-	brew install commandbox
+   # macOS
+   brew install lucli
+
+   # Windows
+   choco install lucli
+   ```
+
+2. **Install Wheels module**:
+   ```bash
+   lucli modules install wheels
+   ```
+
+3. **Create Your First App**:
+   ```bash
+   wheels new myapp
+   cd myapp
+   wheels start
+   ```
+
+### Option B: CommandBox
+
+1. **Install CommandBox**:
+   ```bash
+   # macOS
+   brew install commandbox
 
    # Windows
    choco install commandbox
@@ -156,8 +175,8 @@ wheels security scan
 
 | Wheels CLI | Wheels | CommandBox | CFML Engine |
 |------------|----------|------------|-------------|
-| 3.0.x | 2.5+ | 5.0+ | Lucee 5.3+, Adobe 2018+ |
-| 2.0.x | 2.0-2.4 | 4.0+ | Lucee 5.2+, Adobe 2016+ |
+| 3.0.x | 3.0+ | 5.0+ | Lucee 5.3+, Adobe 2018+ |
+| 2.0.x | 2.0-2.5 | 4.0+ | Lucee 5.2+, Adobe 2016+ |
 
 ## Community & Support
 
@@ -168,7 +187,7 @@ wheels security scan
 
 ## Contributing
 
-We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for details on:
+We welcome contributions! See our [GitHub repository](https://github.com/wheels-dev/wheels) for details on:
 - Reporting issues
 - Suggesting features
 - Submitting pull requests
@@ -188,15 +207,15 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 ## Quick Links
 
 - [All Commands](commands/README.md) - Complete command reference
-- [Quick Start](guides/quick-start.md) - Get started in minutes
-- [Creating Commands](guides/creating-commands.md) - Extend the CLI
-- [Service Architecture](guides/service-architecture.md) - Technical deep dive
-- [Testing Guide](guides/testing.md) - Testing best practices
+- [Quick Start](quick-start.md) - Get started in minutes
+- [Creating Commands](cli-guides/creating-commands.md) - Extend the CLI
+- [Service Architecture](cli-guides/service-architecture.md) - Technical deep dive
+- [Testing Guide](cli-guides/testing.md) - Testing best practices
 
 ## License
 
-Wheels CLI is open source software licensed under the Apache License 2.0. See [LICENSE](../LICENSE) for details.
+Wheels CLI is open source software licensed under the Apache License 2.0.
 
 ---
 
-Ready to get started? Head to the [Quick Start Guide](guides/quick-start.md) or explore the [Command Reference](commands/README.md).
+Ready to get started? Head to the [Quick Start Guide](quick-start.md) or explore the [Command Reference](commands/README.md).

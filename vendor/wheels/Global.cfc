@@ -31,16 +31,13 @@ component output="false" {
 
 	public struct function $image(){
     	local.rv = {};
-		if (structKeyExists(server, "boxlang")) {
-			if (arguments.action == "info") {
-				var img = ImageRead(arguments.source);
-				local.rv = ImageInfo(img);
-			} else {
-				throw(
-					type = "Wheels.Image.UnsupportedAction",
-					message = "The `$image()` function in BoxLang currently supports only the 'info' action."
-				);
-			}
+		if (arguments.action == "info") {
+			local.rv = $engineAdapter().imageInfo(arguments.source);
+		} else if ($engineAdapter().isBoxLang()) {
+			throw(
+				type = "Wheels.Image.UnsupportedAction",
+				message = "The `$image()` function in BoxLang currently supports only the 'info' action."
+			);
 		} else {
 			// Adobe or Lucee: use cfimage
 			arguments.structName = "rv";
@@ -207,9 +204,9 @@ component output="false" {
 			StructDelete(arguments, "password");
 		}
 
-		// BoxLang + SQL Server specific fix for index queries
+		// BoxLang specific fix for index queries (MSSQL/Oracle)
 		if (
-			StructKeyExists(server, "boxlang") &&
+			$engineAdapter().isBoxLang() &&
 			StructKeyExists(arguments, "type") && arguments.type == "index" &&
 			StructKeyExists(arguments, "table")
 		) {
@@ -371,14 +368,7 @@ component output="false" {
 	}
 
 	public any function $zip(){
-		if (structKeyExists(server, "boxlang")) {
-			if (!left(arguments.file, 1) == "/") {
-				arguments.file = "/" & arguments.file;
-			}
-			if (!left(arguments.destination, 1) == "/") {
-				arguments.destination = "/" & arguments.destination;
-			}
-		}
+		$engineAdapter().prepareZipArgs(arguments);
  		cfzip(attributeCollection="#arguments#");
 	}
 
@@ -409,6 +399,29 @@ component output="false" {
 	}
 
 	/**
+	 * Returns the value of an environment variable. Checks application.env (loaded from .env files) first, then falls back to system environment variables (server.system.environment). Returns the default if the variable is not found in either location.
+	 *
+	 * [section: Configuration]
+	 * [category: Miscellaneous Functions]
+	 *
+	 * @name The environment variable name to look up.
+	 * @default Value to return if the variable is not found.
+	 */
+	public any function env(required string name, any default="") {
+		if (StructKeyExists(application, "env") && StructKeyExists(application.env, arguments.name)) {
+			return application.env[arguments.name];
+		}
+		if (
+			StructKeyExists(server, "system")
+			&& StructKeyExists(server.system, "environment")
+			&& StructKeyExists(server.system.environment, arguments.name)
+		) {
+			return server.system.environment[arguments.name];
+		}
+		return arguments.default;
+	}
+
+	/**
 	 * Use to configure a global setting or set a default for a function.
 	 *
 	 * [section: Configuration]
@@ -423,6 +436,18 @@ component output="false" {
 	 * Called from get().
 	 */
 	public any function $get(required string name, string functionName = "") {
+		// Multi-tenant config override: per-tenant settings take precedence
+		// over application-level settings (non-function settings only).
+		// Security-sensitive settings cannot be overridden per-tenant.
+		// Use IsDefined() for safe nested scope traversal during app startup.
+		if (
+			!Len(arguments.functionName)
+			&& IsDefined("request.wheels.tenant.config")
+			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
+			&& !ListFindNoCase("encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls", arguments.name)
+		) {
+			return request.wheels.tenant.config[arguments.name];
+		}
 		local.appKey = $appKey();
 		if (Len(arguments.functionName)) {
 			local.rv = application[local.appKey].functions[arguments.functionName][arguments.name];
@@ -455,6 +480,83 @@ component output="false" {
 	}
 
 	// ======================================================================
+	// MULTI-TENANCY FUNCTIONS
+	// ======================================================================
+
+	/**
+	 * Returns the current tenant struct, or an empty struct if no tenant is active.
+	 * The tenant struct contains: `id`, `dataSource`, `config`, and `$locked`.
+	 *
+	 * [section: Configuration]
+	 * [category: Multi-Tenancy]
+	 */
+	public struct function tenant() {
+		if (IsDefined("request.wheels.tenant")) {
+			return request.wheels.tenant;
+		}
+		return {};
+	}
+
+	/**
+	 * Returns the current tenant's datasource name, or the application default if no tenant is active.
+	 *
+	 * [section: Configuration]
+	 * [category: Multi-Tenancy]
+	 */
+	public string function $tenantDataSource() {
+		if (
+			IsDefined("request.wheels.tenant.dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
+			return request.wheels.tenant.dataSource;
+		}
+		return $get("dataSourceName");
+	}
+
+	/**
+	 * Switches the active tenant mid-request. Throws if the current tenant is locked
+	 * (set by TenantResolver middleware) unless `force` is true.
+	 *
+	 * [section: Configuration]
+	 * [category: Multi-Tenancy]
+	 *
+	 * @tenant Struct with at minimum a `dataSource` key. Optional: `id`, `config`.
+	 * @force If true, overrides the lock set by TenantResolver middleware.
+	 */
+	public void function switchTenant(required struct tenant, boolean force = false) {
+		if (!StructKeyExists(arguments.tenant, "dataSource") || !Len(arguments.tenant.dataSource)) {
+			Throw(
+				type = "Wheels.InvalidTenant",
+				message = "The tenant struct must contain a non-empty `dataSource` key."
+			);
+		}
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		// Check if current tenant is locked
+		if (
+			!arguments.force
+			&& IsDefined("request.wheels.tenant")
+			&& StructKeyExists(request.wheels.tenant, "$locked")
+			&& request.wheels.tenant["$locked"]
+		) {
+			Throw(
+				type = "Wheels.TenantLocked",
+				message = "Cannot switch tenants mid-request. The current tenant was set by middleware and is locked.",
+				extendedInfo = "Use `switchTenant(tenant={...}, force=true)` to override, or remove the lock in your middleware configuration."
+			);
+		}
+		// Set defaults
+		if (!StructKeyExists(arguments.tenant, "id")) {
+			arguments.tenant.id = "";
+		}
+		if (!StructKeyExists(arguments.tenant, "config")) {
+			arguments.tenant.config = {};
+		}
+		request.wheels.tenant = arguments.tenant;
+	}
+
+	// ======================================================================
 	// CACHE FUNCTIONS
 	// ======================================================================
 
@@ -480,18 +582,7 @@ component output="false" {
 			// this might fail if a query contains binary data so in those rare cases we fall back on using cfwddx (which is a little bit slower which is why we don't use it all the time)
 			try {
 				local.rv = SerializeJSON(local.values);
-				// BoxLang compatibility: For consistent hashing, normalize array representations
-				if (structKeyExists(server, "boxlang")) {
-					// Convert to a more predictable format by removing structural chars and sorting
-					local.normalized = REReplace(local.rv, '[\[\]{}"]', "", "all");
-					local.parts = listToArray(local.normalized, ",");
-					arraySort(local.parts, "textnocase");
-					local.rv = arrayToList(local.parts, ",");
-				} else {
-					// remove the characters that indicate array or struct so that we can sort it as a list below
-					local.rv = ReplaceList(local.rv, "{,},[,],/", ",,,,");
-					local.rv = ListSort(local.rv, "text");
-				}
+				local.rv = $engineAdapter().normalizeForHash(local.rv);
 			} catch (any e) {
 				local.rv = $wddx(input = local.values);
 			}
@@ -895,6 +986,120 @@ component output="false" {
 			executeArgs = arguments,
 			name = "modelLock#application.applicationName#"
 		);
+	}
+
+	/**
+	 * Resolve a DI-registered service by name.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Miscellaneous Functions]
+	 *
+	 * @name The registered service name to resolve.
+	 */
+	public any function service(required string name) {
+		if (!isDefined("application.wheelsdi")) {
+			throw(
+				type="Wheels.DI.NotInitialized",
+				message="The DI container has not been initialized. Ensure your application has started properly."
+			);
+		}
+		if (!application.wheelsdi.containsInstance(arguments.name)) {
+			throw(
+				type="Wheels.DI.ServiceNotFound",
+				message="No service registered with the name '#arguments.name#'. Check your config/services.cfm registrations."
+			);
+		}
+		return application.wheelsdi.getInstance(arguments.name);
+	}
+
+	/**
+	 * Return a reference to the DI container for direct configuration.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Miscellaneous Functions]
+	 */
+	public any function injector() {
+		if (!isDefined("application.wheelsdi")) {
+			throw(
+				type="Wheels.DI.NotInitialized",
+				message="The DI container has not been initialized. Ensure your application has started properly."
+			);
+		}
+		return application.wheelsdi;
+	}
+
+	// ======================================================================
+	// CHANNEL / PUB-SUB FUNCTIONS
+	// ======================================================================
+
+	/**
+	 * Publish an event to a channel.
+	 * Delegates to the in-memory Channel engine or the DatabaseAdapter
+	 * depending on the adapter argument (or the global channelAdapter setting).
+	 *
+	 * Can be called from controllers, models, jobs, or anywhere with access
+	 * to global helpers.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Channel Functions]
+	 *
+	 * @channel The channel name to publish to (e.g. "user.42").
+	 * @event The event type (e.g. "notification", "update").
+	 * @data The event data as a string (typically JSON).
+	 * @adapter Adapter to use: "memory" (default) or "database".
+	 */
+	public struct function publish(
+		required string channel,
+		required string event,
+		required string data,
+		string adapter = ""
+	) {
+		local.engine = $getChannelEngine(arguments.adapter);
+		return local.engine.publish(
+			channel = arguments.channel,
+			event = arguments.event,
+			data = arguments.data
+		);
+	}
+
+	/**
+	 * Internal: Get or create the channel engine singleton for the given adapter type.
+	 * Uses double-checked locking to ensure thread-safe lazy initialization.
+	 *
+	 * @adapter "memory" or "database". Defaults to application.wheels.channelAdapter or "memory".
+	 */
+	public any function $getChannelEngine(string adapter = "") {
+		// Resolve adapter type
+		if (!Len(arguments.adapter)) {
+			if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "channelAdapter")) {
+				local.adapterType = application.wheels.channelAdapter;
+			} else {
+				local.adapterType = "memory";
+			}
+		} else {
+			local.adapterType = arguments.adapter;
+		}
+
+		if (local.adapterType == "database") {
+			if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelDatabaseEngine")) {
+				lock name="wheelsChannelDatabaseEngine" timeout="10" {
+					if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelDatabaseEngine")) {
+						application.wheels.channelDatabaseEngine = CreateObject("component", "wheels.channel.DatabaseAdapter").init();
+					}
+				}
+			}
+			return application.wheels.channelDatabaseEngine;
+		}
+
+		// Default: memory adapter
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
+			lock name="wheelsChannelEngine" timeout="10" {
+				if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
+					application.wheels.channelEngine = CreateObject("component", "wheels.Channel").init();
+				}
+			}
+		}
+		return application.wheels.channelEngine;
 	}
 
 	// ======================================================================
@@ -1756,42 +1961,42 @@ component output="false" {
 	 * Get the status code (e.g. 200, 404 etc) of the response we're about to send.
 	 */
 	public string function $statusCode() {
-		if (StructKeyExists(server, "lucee")) {
-			local.response = GetPageContext().getResponse();
-		} else {
-			local.response = GetPageContext().getFusionContext().getResponse();
+		if ($hasEngineAdapter()) {
+			return application.wheels.engineAdapter.getStatusCode();
 		}
-		return local.response.getStatus();
+		// Fallback when adapter not yet initialized (e.g. error during startup)
+		if (StructKeyExists(server, "lucee") || StructKeyExists(server, "boxlang")) {
+			return GetPageContext().getResponse().getStatus();
+		}
+		return GetPageContext().getFusionContext().getResponse().getStatus();
 	}
 
 	/**
 	 * Gets the value of the content type header (blank string if it doesn't exist) of the response we're about to send.
 	 */
 	public string function $contentType() {
-		local.rv = "";
-		local.pageContext = getPageContext();
-		if (structKeyExists(server, "boxlang")) {
-			local.response = local.pageContext;
-		} else if (structKeyExists(server, "lucee")) {
-			local.response = local.pageContext.getResponse();
-		} else {
-			local.response = local.pageContext.getFusionContext().getResponse();
+		if ($hasEngineAdapter()) {
+			return application.wheels.engineAdapter.getContentType();
 		}
-
-		if (structKeyExists(server, "boxlang")) {
-			local.request = local.response.getRequest();
-			local.header = local.request.getHeader("Content-Type");
-			if(!isNull(local.header)) {
+		// Fallback when adapter not yet initialized
+		local.rv = "";
+		if (StructKeyExists(server, "lucee")) {
+			local.response = GetPageContext().getResponse();
+		} else if (StructKeyExists(server, "boxlang")) {
+			local.response = GetPageContext();
+		} else {
+			local.response = GetPageContext().getFusionContext().getResponse();
+		}
+		try {
+			if (StructKeyExists(server, "boxlang")) {
+				local.header = local.response.getRequest().getHeader("Content-Type");
+			} else {
+				local.header = local.response.containsHeader("Content-Type") ? local.response.getHeader("Content-Type") : javacast("null", "");
+			}
+			if (!IsNull(local.header)) {
 				local.rv = local.header;
 			}
-		} else {
-			if (local.response.containsHeader("Content-Type")) {
-				local.header = local.response.getHeader("Content-Type");
-				if (!isNull(local.header)) {
-					local.rv = local.header;
-				}
-			}
-		}
+		} catch (any e) {}
 		return local.rv;
 	}
 
@@ -1905,17 +2110,44 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the request timeout value in seconds
+	 * Returns the request timeout value in seconds.
+	 * Must be safe to call during onError before application.wheels is initialized.
 	 */
 	public numeric function $getRequestTimeout() {
-		// Check for BoxLang first using unique BoxLang identifier
+		if ($hasEngineAdapter()) {
+			return application.wheels.engineAdapter.getRequestTimeout();
+		}
+		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "boxlang")) {
 			return 10000;
-		} else if (StructKeyExists(server, "lucee") && StructKeyExists(server.lucee, "version")) {
+		} else if (StructKeyExists(server, "lucee")) {
 			return (GetPageContext().getRequestTimeout() / 1000);
 		} else {
 			return CreateObject("java", "coldfusion.runtime.RequestMonitor").GetRequestTimeout();
 		}
+	}
+
+	/**
+	 * Returns the engine adapter instance for centralized cross-engine behavior.
+	 * Checks both application.wheels (post-init) and application.$wheels (during init).
+	 */
+	public any function $engineAdapter() {
+		if (StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(application.wheels, "engineAdapter")) {
+			return application.wheels.engineAdapter;
+		}
+		if (StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(application.$wheels, "engineAdapter")) {
+			return application.$wheels.engineAdapter;
+		}
+		throw(type="Wheels.EngineAdapterNotInitialized", message="Engine adapter has not been initialized yet.");
+	}
+
+	/**
+	 * Returns true if the engine adapter is available in application scope.
+	 * Used by functions that may be called before onApplicationStart completes.
+	 */
+	public boolean function $hasEngineAdapter() {
+		return (StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(application.wheels, "engineAdapter"))
+			|| (StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(application.$wheels, "engineAdapter"));
 	}
 
 	// ======================================================================
@@ -2084,16 +2316,7 @@ component output="false" {
 			}
 		}
 		if (StructKeyExists(application.wheels.functions, arguments.name)) {
-			if (structKeyExists(server, "boxlang")) {
-				// Manual implementation for BoxLang
-				for (local.key in application.wheels.functions[arguments.name]) {
-					if (!StructKeyExists(arguments.args, local.key)) {
-						arguments.args[local.key] = application.wheels.functions[arguments.name][local.key];
-					}
-				}
-			} else {
-				StructAppend(arguments.args, application.wheels.functions[arguments.name], false);
-			}
+			$engineAdapter().structAppendDefaults(arguments.args, application.wheels.functions[arguments.name]);
 		}
 
 		// make sure that the arguments marked as required exist
@@ -2117,9 +2340,17 @@ component output="false" {
 	 * Call CFML's canonicalize() function but set to blank string if the result is null (happens on Lucee 5).
 	 */
 	public string function $canonicalize(required string input) {
-		local.rv = Canonicalize(arguments.input, false, false);
-		if (IsNull(local.rv)) {
-			local.rv = "";
+		try {
+			local.rv = Canonicalize(arguments.input, false, false);
+			if (IsNull(local.rv)) {
+				local.rv = "";
+			}
+		} catch (any e) {
+			// Lucee's Canonicalize() delegates to Java's URLDecoder, which throws
+			// IllegalArgumentException for inputs containing malformed percent-encoded
+			// sequences (e.g. %% or a lone % not followed by two hex digits).
+			// Fall back to the raw input; it will still be HTML-encoded by the caller.
+			local.rv = arguments.input;
 		}
 		return local.rv;
 	}
@@ -2132,20 +2363,16 @@ component output="false" {
 		local.val = arguments.value;
 		local.detectedType = arguments.type;
 
-		// BoxLang sometimes returns oracle.sql.TIMESTAMP objects that aren't recognized as CFML date objects.
-		if (
-			(StructKeyExists(server, "boxlang") || StructKeyExists(server, "coldfusion")) &&
-			IsObject(local.val) &&
-			FindNoCase("oracle.sql.TIMESTAMP", GetMetadata(local.val).name)
-		) {
-			try {
-				// Safely convert it to a CFML date using its toString() method, which returns an ISO-like string
-				local.val = ParseDateTime(local.val.toString());
-				local.detectedType = "datetime";
-			} catch (any e) {
-				// Fallback: just get the string representation
-				local.val = local.val.toString();
-				local.detectedType = "string";
+		// Coerce Oracle JDBC objects (TIMESTAMP, DATE) to CFML datetime values.
+		if (IsObject(local.val)) {
+			local.coerced = $engineAdapter().coerceOracleObject(local.val);
+			if (!IsObject(local.coerced) || local.coerced.hashCode() != local.val.hashCode()) {
+				local.val = local.coerced;
+				if (IsDate(local.val)) {
+					local.detectedType = "datetime";
+				} else {
+					local.detectedType = "string";
+				}
 			}
 		}
 
@@ -2189,9 +2416,9 @@ component output="false" {
 			}
 		}
 
-		// BoxLang compatibility: Pre-process problematic date strings before type detection
-		if (StructKeyExists(server, "boxlang") && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
-			// Manually parse DD/MM/YYYY format to avoid BoxLang's MM/DD/YYYY interpretation
+		// Pre-process date strings with AM/PM that may be parsed differently per engine
+		if ($engineAdapter().isBoxLang() && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
+			// Manually parse DD/MM/YYYY format to avoid engine-specific interpretation
 			local.parts = ListToArray(arguments.value, " ");
 			local.datePart = local.parts[1];
 			local.timePart = local.parts[2];
@@ -2211,9 +2438,7 @@ component output="false" {
 			} else if (local.amPm == "AM" && local.hour == 12) {
 				local.hour = 0;
 			}
-			// convert to a real datetime object and continue (so switch will format it)
 			val = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
-			// ensure detectedType is datetime so switch will format
 			detectedType = "datetime";
 		}
 
@@ -2298,12 +2523,10 @@ component output="false" {
 								// likely MM/DD/YYYY
 								local.month = d1; local.day = d2;
 							} else {
-								// ambiguous -> prefer DD/MM/YYYY if server.boxlang exists, else MM/DD/YYYY
-								if (StructKeyExists(server, "boxlang")) {
-									local.day = d1; local.month = d2;
-								} else {
-									local.month = d1; local.day = d2;
-								}
+								// ambiguous -> use adapter to determine date format preference
+								local.ambiguousDate = $engineAdapter().parseAmbiguousSlashDate(d1, d2, y);
+								local.month = Month(local.ambiguousDate);
+								local.day = Day(local.ambiguousDate);
 							}
 							local.dt = CreateDate(y, local.month, local.day);
 							// if time exists in same string, try to parse it using ParseDateTime
@@ -2579,7 +2802,62 @@ component output="false" {
 		application[local.appKey].pluginMeta = application[local.appKey].PluginObj.getPluginMeta();
 		application[local.appKey].incompatiblePlugins = application[local.appKey].PluginObj.getIncompatiblePlugins();
 		application[local.appKey].dependantPlugins = application[local.appKey].PluginObj.getDependantPlugins();
+		application[local.appKey].versionMismatchPlugins = application[local.appKey].PluginObj.getVersionMismatchPlugins();
+		application[local.appKey].mixinCollisions = application[local.appKey].PluginObj.getMixinCollisions();
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
+		application[local.appKey].pluginMiddleware = application[local.appKey].PluginObj.getPluginMiddleware();
+		// Invoke register(container) on ServiceProviderInterface plugins before activation
+		if (isDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PluginObj.getServiceProviders())) {
+			application[local.appKey].PluginObj.$invokeServiceProviderRegister(application.wheelsdi);
+			// Boot after all register() calls complete — plugins can now resolve services
+			application[local.appKey].PluginObj.$invokeServiceProviderBoot(application[local.appKey]);
+		}
+		// Invoke onPluginActivate lifecycle hook on all plugins now that everything is in the application scope
+		application[local.appKey].PluginObj.$invokeOnPluginActivate();
+	}
+
+	/**
+	 * Discovers and loads packages from the vendor/ directory via PackageLoader.
+	 * Merges package mixins into the existing application mixins struct so they
+	 * participate in the standard $initializeMixins injection pipeline.
+	 */
+	public void function $loadPackages() {
+		local.appKey = $appKey();
+		local.vendorPath = ExpandPath(application[local.appKey].packagePath);
+
+		application[local.appKey].PackageLoaderObj = $createObjectFromRoot(
+			path = "wheels",
+			fileName = "PackageLoader",
+			method = "init",
+			vendorPath = local.vendorPath,
+			wheelsVersion = application[local.appKey].version,
+			wheelsEnvironment = application[local.appKey].environment
+		);
+
+		application[local.appKey].packages = application[local.appKey].PackageLoaderObj.getPackages();
+		application[local.appKey].packageMeta = application[local.appKey].PackageLoaderObj.getPackageMeta();
+		application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
+
+		// Merge package mixins into the existing mixins struct (plugins loaded first, packages overlay)
+		local.pkgMixins = application[local.appKey].PackageLoaderObj.getMixins();
+		for (local.target in local.pkgMixins) {
+			if (!StructKeyExists(application[local.appKey].mixins, local.target)) {
+				application[local.appKey].mixins[local.target] = {};
+			}
+			StructAppend(application[local.appKey].mixins[local.target], local.pkgMixins[local.target]);
+		}
+
+		// Merge package middleware into pluginMiddleware (shared pipeline)
+		local.pkgMiddleware = application[local.appKey].PackageLoaderObj.getPackageMiddleware();
+		for (local.mw in local.pkgMiddleware) {
+			ArrayAppend(application[local.appKey].pluginMiddleware, local.mw);
+		}
+
+		// Invoke ServiceProvider register/boot if DI container exists
+		if (isDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PackageLoaderObj.getServiceProviders())) {
+			application[local.appKey].PackageLoaderObj.$invokeServiceProviderRegister(application.wheelsdi);
+			application[local.appKey].PackageLoaderObj.$invokeServiceProviderBoot(application[local.appKey]);
+		}
 	}
 
 	/**
@@ -2616,7 +2894,7 @@ component output="false" {
 		];
 
 		// directories & files to be removed
-		local.exclude = ["/wheels/tests", "/wheels/public/build.cfm", "/wheels/tests_testbox"];
+		local.exclude = ["/wheels/rocketunit_tests", "/wheels/public/build.cfm", "/wheels/tests"];
 
 		// filter out these bad boys
 		local.filter = "*.settings, *.classpath, *.project, *.DS_Store";
@@ -2989,7 +3267,7 @@ component output="false" {
 
 	/**
 	 * Get full domain string from cgi scope: includes protocol and port
-	 * e.g https://www.cfwheels.com:443
+	 * e.g https://www.wheels.dev:443
 	 *
 	 * @cgi Fake CGI Scope for Testing; will default to normal cgi scope
 	 **/
@@ -3008,8 +3286,8 @@ component output="false" {
 
 	/**
 	 * Get full domain string from a passed in string: includes protocol and port
-	 * e.g https://www.cfwheels.com -> https://www.cfwheels.com:443
-	 * e.g www.cfwheels.com -> http://www.cfwheels.com:80
+	 * e.g https://www.wheels.dev -> https://www.wheels.dev:443
+	 * e.g www.wheels.dev -> http://www.wheels.dev:80
 	 *
 	 * @domain The string to look at
 	 **/
@@ -3041,7 +3319,7 @@ component output="false" {
 	 * Set CORS Headers: only triggered if application.wheels.allowCorsRequests = true
 	 */
 	public void function $setCORSHeaders(
-		string allowOrigin = "*",
+		string allowOrigin = "",
 		string allowCredentials = false,
 		string allowHeaders = "Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With",
 		string allowMethods = "GET, POST, PATCH, PUT, DELETE, OPTIONS",
@@ -3050,6 +3328,11 @@ component output="false" {
 		string scriptName = request.cgi.script_name
 	) {
 		local.incomingOrigin = StructKeyExists(request.wheels.httprequestdata.headers, "origin") ? request.wheels.httprequestdata.headers.origin : false;
+
+		// No origins configured — skip all CORS headers (deny all by default)
+		if (!Len(arguments.allowOrigin)) {
+			return;
+		}
 
 		// Either a wildcard, or if a specific domain is set, we need to ensure the incoming request matches it
 		if (arguments.allowOrigin == "*") {

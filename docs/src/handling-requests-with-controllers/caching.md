@@ -94,7 +94,7 @@ The variables themselves are fairly self-explanatory. When `cacheDatabaseSchema`
 {% hint style="info" %}
 #### No more Design mode
 
-Note that "Design" mode has been removed in Wheels 2.x: please use development mode instead.
+Note that "Design" mode has been removed: please use development mode instead.
 {% endhint %}
 
 Please refer to the [Configuration and Defaults](https://wheels.dev/3.1.0/guides/working-with-wheels/configuration-and-defaults) chapter for a complete listing of all the variables you can set and their default values.

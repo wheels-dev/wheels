@@ -195,91 +195,169 @@ try {
 					data.message = "Error retrieving schema: " & e.message;
 				}
 				break;
-				
-			case "dbSeed":
-				// Seed database with test data
-				local.count = structKeyExists(request.wheels.params, "count") ? val(request.wheels.params.count) : 10;
-				local.models = structKeyExists(request.wheels.params, "models") ? request.wheels.params.models : "";
-				data.success = true;
-				data.seeded = [];
-				
+
+			case "introspect":
+				data.success = false;
+				if (!structKeyExists(request.wheels.params, "model") || !len(request.wheels.params.model)) {
+					data.message = "Missing required parameter: model";
+					break;
+				}
+
 				try {
-					// Get all model files if no specific models requested
-					local.modelList = [];
-					if (len(local.models)) {
-						local.modelList = listToArray(local.models);
-					} else {
-						// Find all model files in the app/models directory
-						local.modelPath = expandPath("/app/models");
-						if (directoryExists(local.modelPath)) {
-							local.modelFiles = directoryList(local.modelPath, false, "name", "*.cfc");
-							for (local.file in local.modelFiles) {
-								// Skip any files that start with underscore (partials/helpers)
-								if (left(local.file, 1) != "_") {
-									arrayAppend(local.modelList, listFirst(local.file, "."));
-								}
+					local.modelName = request.wheels.params.model;
+					local.modelInstance = model(local.modelName);
+					local.classData = local.modelInstance.$classData();
+
+					data.model = local.modelName;
+					data.tableName = local.classData.tableName ?: lCase(local.modelName) & "s";
+					data.primaryKey = local.classData.keys ?: "id";
+
+					data.columns = [];
+					if (structKeyExists(local.classData, "properties")) {
+						for (local.propName in local.classData.properties) {
+							local.prop = local.classData.properties[local.propName];
+							local.colInfo = {
+								name: local.propName,
+								type: local.prop.type ?: "string",
+								primaryKey: listFindNoCase(data.primaryKey, local.propName) > 0
+							};
+							if (structKeyExists(local.prop, "maxLength") && val(local.prop.maxLength) > 0) {
+								local.colInfo.maxLength = local.prop.maxLength;
 							}
+							if (right(local.propName, 2) == "Id" && len(local.propName) > 2) {
+								local.colInfo.foreignKey = true;
+								local.refName = left(local.propName, len(local.propName) - 2);
+								local.colInfo.referencedModel = uCase(left(local.refName, 1)) & mid(local.refName, 2, len(local.refName) - 1);
+							}
+							arrayAppend(data.columns, local.colInfo);
 						}
 					}
-					
-					// Seed each model
-					for (local.modelName in local.modelList) {
-						try {
-							// Create model instance
-							local.model = model(local.modelName);
-							local.seededCount = 0;
-							
-							// Get model properties
-							local.properties = [];
-							if (structKeyExists(local.model, "$classData") && structKeyExists(local.model.$classData(), "properties")) {
-								local.properties = local.model.$classData().properties;
-							}
-							
-							// Generate test data for each record
-							for (local.i = 1; local.i <= local.count; local.i++) {
-								local.record = {};
-								
-								// Generate data based on property names and types
-								for (local.prop in local.properties) {
-									if (local.prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", local.prop.name)) {
-										// Generate appropriate test data based on property name and type
-										local.record[local.prop.name] = generateTestData(local.prop.name, local.prop.type, local.i);
+
+					data.associations = [];
+					if (structKeyExists(local.classData, "associations")) {
+						for (local.assocName in local.classData.associations) {
+							local.assoc = local.classData.associations[local.assocName];
+							local.assocModelName = local.assoc.modelName ?: local.assocName;
+							local.assocModelName = uCase(left(local.assocModelName, 1)) & mid(local.assocModelName, 2, len(local.assocModelName) - 1);
+							arrayAppend(data.associations, {
+								type: local.assoc.type ?: "belongsTo",
+								name: local.assocName,
+								modelName: local.assocModelName
+							});
+						}
+					}
+
+					data.success = true;
+					data.message = "Model introspected successfully";
+				} catch (any e) {
+					data.message = "Error introspecting model: " & e.message;
+				}
+				break;
+
+			case "dbSeed":
+				local.mode = structKeyExists(request.wheels.params, "mode") ? request.wheels.params.mode : "auto";
+				local.environment = structKeyExists(request.wheels.params, "environment") ? request.wheels.params.environment : get("environment");
+				data.success = true;
+				data.mode = local.mode;
+
+				try {
+					// Determine seed mode: convention files vs generated test data
+					local.useConvention = false;
+					if (local.mode == "convention") {
+						local.useConvention = true;
+					} else if (local.mode == "generate") {
+						local.useConvention = false;
+					} else {
+						// Auto-detect: use convention if seed files exist
+						if (structKeyExists(application.wheels, "seeder") && application.wheels.seeder.hasSeedFiles()) {
+							local.useConvention = true;
+						}
+					}
+
+					if (local.useConvention) {
+						// Run convention-based seed files (app/db/seeds.cfm + environment)
+						data.mode = "convention";
+						local.seeder = application.wheels.seeder;
+						local.seedResult = local.seeder.runSeeds(environment = local.environment);
+						data.success = local.seedResult.success;
+						data.message = local.seedResult.message;
+						data.environment = local.environment;
+						data.totalCreated = local.seedResult.totalCreated;
+						data.totalSkipped = local.seedResult.totalSkipped;
+						data.results = local.seedResult.results;
+						if (structKeyExists(local.seedResult, "detail")) {
+							data.detail = local.seedResult.detail;
+						}
+					} else {
+						// Generate random test data (legacy behavior)
+						data.mode = "generate";
+						local.count = structKeyExists(request.wheels.params, "count") ? val(request.wheels.params.count) : 10;
+						local.models = structKeyExists(request.wheels.params, "models") ? request.wheels.params.models : "";
+						data.seeded = [];
+
+						// Get all model files if no specific models requested
+						local.modelList = [];
+						if (len(local.models)) {
+							local.modelList = listToArray(local.models);
+						} else {
+							local.modelPath = expandPath("/app/models");
+							if (directoryExists(local.modelPath)) {
+								local.modelFiles = directoryList(local.modelPath, false, "name", "*.cfc");
+								for (local.file in local.modelFiles) {
+									if (left(local.file, 1) != "_") {
+										arrayAppend(local.modelList, listFirst(local.file, "."));
 									}
 								}
-								
-								// Create the record
-								local.newRecord = local.model.new(local.record);
-								if (local.newRecord.save()) {
-									local.seededCount++;
-								}
 							}
-							
-							arrayAppend(data.seeded, {
-								model = local.modelName,
-								count = local.seededCount,
-								success = true
-							});
-							
-						} catch (any modelError) {
-							arrayAppend(data.seeded, {
-								model = local.modelName,
-								count = 0,
-								success = false,
-								error = modelError.message
-							});
 						}
-					}
-					
-					// Build success message
-					local.totalSeeded = 0;
-					for (local.result in data.seeded) {
-						if (local.result.success) {
-							local.totalSeeded += local.result.count;
+
+						// Seed each model with generated data
+						for (local.modelName in local.modelList) {
+							try {
+								local.model = model(local.modelName);
+								local.seededCount = 0;
+
+								local.properties = [];
+								if (structKeyExists(local.model, "$classData") && structKeyExists(local.model.$classData(), "properties")) {
+									local.properties = local.model.$classData().properties;
+								}
+
+								for (local.i = 1; local.i <= local.count; local.i++) {
+									local.record = {};
+									for (local.prop in local.properties) {
+										if (local.prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", local.prop.name)) {
+											local.record[local.prop.name] = generateTestData(local.prop.name, local.prop.type, local.i);
+										}
+									}
+									local.newRecord = local.model.new(local.record);
+									if (local.newRecord.save()) {
+										local.seededCount++;
+									}
+								}
+
+								arrayAppend(data.seeded, {
+									model = local.modelName,
+									count = local.seededCount,
+									success = true
+								});
+							} catch (any modelError) {
+								arrayAppend(data.seeded, {
+									model = local.modelName,
+									count = 0,
+									success = false,
+									error = modelError.message
+								});
+							}
 						}
+
+						local.totalSeeded = 0;
+						for (local.result in data.seeded) {
+							if (local.result.success) {
+								local.totalSeeded += local.result.count;
+							}
+						}
+						data.message = "Database seeding completed. Created #local.totalSeeded# records across #arrayLen(data.seeded)# models.";
 					}
-					
-					data.message = "Database seeding completed. Created #local.totalSeeded# records across #arrayLen(data.seeded)# models.";
-					
 				} catch (any e) {
 					data.success = false;
 					data.message = "Error during database seeding: " & e.message;
@@ -508,7 +586,7 @@ try {
 			case "dbShell":
 				// Database shell
 				data.success = false;
-				
+
 				// For H2, provide specific information about accessing the console
 				if (data.databaseType == "H2") {
 					data.message = "H2 Database Console Access:" & chr(10);
@@ -516,7 +594,7 @@ try {
 					data.message &= "The H2 web console may be available at the /h2-console path of your application." & chr(10);
 					data.message &= "URL: http://localhost:[your-port]/h2-console" & chr(10);
 					data.message &= "JDBC URL: " & application.wheels.dataSourceName & chr(10);
-					
+
 					// Try to get connection info
 					try {
 						local.dbinfo = new Query();
@@ -530,10 +608,10 @@ try {
 					} catch (any e) {
 						// Ignore errors getting extra info
 					}
-					
+
 					data.message &= chr(10) & "Option 2: Command Line" & chr(10);
 					data.message &= "java -cp [path-to-h2.jar] org.h2.tools.Shell" & chr(10);
-					
+
 					// If command parameter provided, execute it
 					if (structKeyExists(request.wheels.params, "command")) {
 						try {
@@ -541,7 +619,7 @@ try {
 							local.shellQuery.setDatasource(application.wheels.dataSourceName);
 							local.shellQuery.setSQL(request.wheels.params.command);
 							local.shellResult = local.shellQuery.execute().getResult();
-							
+
 							data.success = true;
 							data.result = local.shellResult;
 							data.message = "Command executed successfully.";
@@ -565,6 +643,92 @@ try {
 					}
 				}
 				break;
+
+			// ── Job Worker Commands ──────────────────────────────────────
+
+			case "jobsProcessNext":
+				// Process the next available job (used by `wheels jobs work`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueues = structKeyExists(request.wheels.params, "queues") ? request.wheels.params.queues : "";
+					local.jobTimeout = structKeyExists(request.wheels.params, "timeout") ? val(request.wheels.params.timeout) : 300;
+					local.jobResult = local.worker.processNext(queues=local.jobQueues, timeout=local.jobTimeout);
+					data.success = true;
+					data.jobResult = local.jobResult;
+					data.message = local.jobResult.skipped ? "No jobs available" : "Processed job #local.jobResult.jobId#";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error processing job: " & e.message;
+				}
+				break;
+
+			case "jobsStatus":
+				// Get queue statistics (used by `wheels jobs status`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					data.success = true;
+					data.stats = local.worker.getStats(queue=local.jobQueue);
+					data.message = "Queue statistics retrieved";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error getting status: " & e.message;
+				}
+				break;
+
+			case "jobsRetry":
+				// Retry failed jobs (used by `wheels jobs retry`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					local.jobLimit = structKeyExists(request.wheels.params, "limit") ? val(request.wheels.params.limit) : 0;
+					local.retryCount = local.worker.retryFailed(queue=local.jobQueue, limit=local.jobLimit);
+					data.success = true;
+					data.retried = local.retryCount;
+					data.message = "Retried #local.retryCount# failed job(s)";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error retrying jobs: " & e.message;
+				}
+				break;
+
+			case "jobsPurge":
+				// Purge old jobs (used by `wheels jobs purge`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					local.purgeStatus = structKeyExists(request.wheels.params, "status") ? request.wheels.params.status : "completed";
+					local.purgeDays = structKeyExists(request.wheels.params, "days") ? val(request.wheels.params.days) : 7;
+					local.purgeCount = local.worker.purge(status=local.purgeStatus, days=local.purgeDays, queue=local.jobQueue);
+					data.success = true;
+					data.purged = local.purgeCount;
+					data.message = "Purged #local.purgeCount# #local.purgeStatus# job(s)";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error purging jobs: " & e.message;
+				}
+				break;
+
+			case "jobsMonitor":
+				// Get monitoring data (used by `wheels jobs monitor`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					local.minutes = structKeyExists(request.wheels.params, "minutes") ? val(request.wheels.params.minutes) : 60;
+					data.success = true;
+					data.monitor = local.worker.getMonitorData(queue=local.jobQueue, minutes=local.minutes);
+					data.stats = local.worker.getStats(queue=local.jobQueue);
+					local.timeouts = local.worker.checkTimeouts();
+					if (local.timeouts > 0) {
+						data.timeoutsRecovered = local.timeouts;
+					}
+					data.message = "Monitor data retrieved";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error getting monitor data: " & e.message;
+				}
+				break;
+
 		}
 	}
 } catch (any e) {

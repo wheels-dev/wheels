@@ -16,7 +16,7 @@ Here's an example:
 ```javascript
 component {
   function init(){
-    this.version="1.4.5,2.0";
+    this.version="3.0,3.1";
     return this;
   }
 }
@@ -121,7 +121,7 @@ pluginManager.installPlugin(URL.plugin);
 
 ### Don't forget to comment!
 
-With Wheels 2.x we can take advantage of the inbuilt documentation generator. Try and tag your public facing functions appropriately.
+Wheels includes an inbuilt documentation generator. Try and tag your public facing functions appropriately.
 
 Here's an example from the wheels ical4J plugin:
 
@@ -154,7 +154,7 @@ The javaDoc style comments will automatically show this function under Plugins >
 
 ### Box.json
 
-With `2.x`, a `box.json` is required for new plugins. Read the [Publishing Plugins](https://wheels.dev/3.1.0/guides/plugins/publishing-plugins) chapter for more details on that. One advantage is that Wheels now includes the version and meta data for each plugin when there's a `box.json` file.
+A `box.json` is required for new plugins. Read the [Publishing Plugins](https://wheels.dev/3.1.0/guides/plugins/publishing-plugins) chapter for more details on that. One advantage is that Wheels now includes the version and meta data for each plugin when there's a `box.json` file.
 
 ```javascript
 // Version Number
@@ -168,13 +168,13 @@ This saves you having to read in the `box.json` file, should you wish to use it 
 
 ### Automatic Java Lib Mappings
 
-If you've ever wanted to do a quick wrapper for a java class/lib, this new feature in `2.x` means you can add a `.class` or `.jar` file, and it will be automatically mapped into the `this.javaSettings.loadpaths` setting when the application starts.
+If you've ever wanted to do a quick wrapper for a java class/lib, you can add a `.class` or `.jar` file, and it will be automatically mapped into the `this.javaSettings.loadpaths` setting when the application starts.
 
 This means you can distribute plugins with Java libs and they'll work properly without additional user intervention!
 
 ### Enabling Travis CI Testing
 
-One of the nicest things about `2.x` is the tighter integration with command-line tools such as CommandBox. We can take advantage of the new testing suite JSON return type and the new Wheels CLI in CommandBox 2.x to easily build a Travis CI test. It's perhaps easiest to just show the `.travis.yml` file - this goes in the root of your gitHub plugin repository, and once you've turned on testing under Travis.org, will run your test suite on every commit.
+Wheels has tight integration with command-line tools such as CommandBox. We can take advantage of the testing suite JSON return type and the Wheels CLI to easily build a CI test. It's perhaps easiest to just show the `.travis.yml` file - this goes in the root of your gitHub plugin repository, and once you've turned on testing under Travis.org, will run your test suite on every commit.
 
 {% code title=".travis.yml" %}
 ```yaml
@@ -184,8 +184,8 @@ jdk:
   - oraclejdk8
 before_install:
   # Get Commandbox
-  - sudo apt-key adv --keyserver keys.gnupg.net --recv 6DA70622
-  - sudo echo "deb http://downloads.ortussolutions.com/debs/noarch /" | sudo tee -a /etc/apt/sources.list.d/commandbox.list
+  - curl -fsSl https://downloads.ortussolutions.com/debs/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/commandbox.gpg > /dev/null
+  - sudo echo "deb [signed-by=/usr/share/keyrings/commandbox.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/commandbox.list
 install:
   # Install Commandbox
   - sudo apt-get update && sudo apt-get --assume-yes install CommandBox

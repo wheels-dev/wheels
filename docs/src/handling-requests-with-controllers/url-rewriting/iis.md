@@ -47,7 +47,7 @@ Please note that IIS6 was official End of Life as of 2015. These notes are inclu
 
 Unfortunately, there is no built-in URL rewriting mechanism in IIS 6, so getting Wheels working with pretty URLs is a little more complicated than with Apache and IIS 7 (which often comes with the official "URL Rewrite Module" installed by default). Here's what you need to do:
 
-* Download Ionic's [ISAPI Rewrite Filter](http://iirf.codeplex.com/). NOTE: the version must be v1.2.16 or later.
+* Download Ionic's ISAPI Rewrite Filter (IIRF). NOTE: CodePlex was shut down in 2021; IIRF is no longer maintained. The version must be v1.2.16 or later.
 * Unzip the file, get the `IsapiRewrite4.dll` file from the lib folder and put it in the root of your website. (It needs to be in the same folder as the `IsapiRewrite4.ini` file.)
 * To enable the rewrite filter in IIS 6, click on _Properties_ for your website, then go to the ISAPI Filters tab and click the _Add..._ button.
 * Type in anything you want as the _Filter Name_ and point the Executable to the `IsapiRewrite4.dll` file.

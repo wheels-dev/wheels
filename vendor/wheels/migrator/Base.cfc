@@ -12,11 +12,12 @@ component extends="wheels.Global"{
 		request.$wheelsMigrationOutput = request.$wheelsMigrationOutput & arguments.message & Chr(13);
 	}
 
-	public string function $getDBType() {
+	public string function $getDBType(string dataSource = "") {
 		local.appKey = $appKey();
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
 		local.info = $dbinfo(
 			type = "version",
-			datasource = application[local.appKey].dataSourceName,
+			datasource = local.dsName,
 			username = application[local.appKey].dataSourceUserName,
 			password = application[local.appKey].dataSourcePassword
 		);
@@ -33,7 +34,22 @@ component extends="wheels.Global"{
 		} else if (local.info.database_productname Contains "CockroachDB") {
 			local.adapterName = "CockroachDB";
 		} else if (local.info.driver_name Contains "PostgreSQL") {
-			local.adapterName = "PostgreSQL";
+			// The PostgreSQL JDBC driver reports "PostgreSQL" as product name even
+			// when connected to CockroachDB. Query version() to distinguish.
+			try {
+				local.versionQuery = queryExecute(
+					"SELECT version() AS v",
+					[],
+					{datasource: local.dsName}
+				);
+				if (IsQuery(local.versionQuery) && FindNoCase("CockroachDB", local.versionQuery.v)) {
+					local.adapterName = "CockroachDB";
+				} else {
+					local.adapterName = "PostgreSQL";
+				}
+			} catch (any e) {
+				local.adapterName = "PostgreSQL";
+			}
 			// NB: using mySQL adapter for H2 as the cli defaults to this for development
 		} else if (local.info.driver_name Contains "H2") {
 			// determine the emulation mode
@@ -85,14 +101,15 @@ component extends="wheels.Global"{
 		return local.foreignKeyList;
 	}
 
-	private void function $execute(required string sql) {
+	private void function $execute(required string sql, string dataSource = "") {
 		local.appKey = $appKey();
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
 		local.sql = Trim(arguments.sql);
 		local.info = $dbinfo(
 			type = "version",
-			datasource = application.wheels.dataSourceName,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
+			datasource = local.dsName,
+			username = application[local.appKey].dataSourceUserName,
+			password = application[local.appKey].dataSourcePassword
 		);
 		if (Right(local.sql, 1) neq ";" && !FindNoCase("Oracle", local.info.database_productname)) {
 			local.sql = local.sql &= ";";
@@ -112,7 +129,7 @@ component extends="wheels.Global"{
 			}
 			ArrayAppend(request.$wheelsDebugSQLResult, local.sql);
 		} else {
-			$query(datasource = application[local.appKey].dataSourceName, sql = local.sql);
+			$query(datasource = local.dsName, sql = local.sql);
 		}
 	}
 
@@ -124,9 +141,9 @@ component extends="wheels.Global"{
 		local.sql = Trim(arguments.sql);
 		local.info = $dbinfo(
 			type = "version",
-			datasource = application.wheels.dataSourceName,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
+			datasource = application[local.appKey].dataSourceName,
+			username = application[local.appKey].dataSourceUserName,
+			password = application[local.appKey].dataSourcePassword
 		);
 		if (Right(local.sql, 1) neq ";" && !FindNoCase("Oracle", local.info.database_productname)) {
 			local.sql = local.sql & ";";

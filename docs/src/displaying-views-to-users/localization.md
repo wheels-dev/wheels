@@ -21,7 +21,7 @@ Generally speaking, if you try and add Unicode characters such as umlauts into t
 ```
 {% endcode %}
 
-![Incorrect encoding example](https://files.readme.io/b18b015-umlaut\_1.png)![Incorrect encoding example](https://files.readme.io/b18b015-umlaut\_1.png)
+![Incorrect encoding example](https://files.readme.io/b18b015-umlaut_1.png)![Incorrect encoding example](https://files.readme.io/b18b015-umlaut_1.png)
 
 Incorrect encoding example
 
@@ -32,7 +32,7 @@ Incorrect encoding example
 ```
 {% endcode %}
 
-![Correct encoding](https://files.readme.io/605ed49-umlaut\_2.png)![Correct encoding](https://files.readme.io/605ed49-umlaut\_2.png)
+![Correct encoding](https://files.readme.io/605ed49-umlaut_2.png)![Correct encoding](https://files.readme.io/605ed49-umlaut_2.png)
 
 Correct encoding
 
@@ -54,7 +54,7 @@ Likewise, umlauts in routes would need for the `/config/routes.cfm` file to have
 
 If you're actively trying to avoid the use of `cfprocessingdirective`, you can resave the template or route file with `UTF-8-BOM`. Your local text editor should provide this facility; here's an example in Notepad++ (windows)
 
-![](https://files.readme.io/7ee1953-umlaut\_3.png)![](https://files.readme.io/7ee1953-umlaut\_3.png)
+![](https://files.readme.io/7ee1953-umlaut_3.png)![](https://files.readme.io/7ee1953-umlaut_3.png)
 
 ### Localizing Wheels Helpers
 

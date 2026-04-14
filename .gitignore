@@ -26,5 +26,21 @@ settings.json
 settings.xml
 *.db
 .claude/settings.local.json
-cli/tests/
+
+# Node.js (dev tooling: husky, commitlint)
+node_modules/
+# CLI test output (but track spec sources)
+cli/tests/*
+!cli/tests/specs/
 test-output/
+.worktrees/
+.grove/
+.claude/settings.local.json
+.DS_Store
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

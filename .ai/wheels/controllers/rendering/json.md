@@ -90,8 +90,6 @@ component extends="Controller" {
 
 ## Related
 - [Rendering Views](./views.md)
-- [API Development](../../patterns/api-development.md)
-- [Multiple Formats](../responding-with-multiple-formats.md)
 
 ## Important Notes
 - `renderWith()` handles format detection automatically

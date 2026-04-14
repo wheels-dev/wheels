@@ -60,7 +60,6 @@ component extends="Model" {
 ## Related
 - [Presence Validation](./presence.md)
 - [Format Validation](./format.md)
-- [Object Callbacks](../../database/object-callbacks.md)
 
 ## Important Notes
 - Custom validations run after built-in validations

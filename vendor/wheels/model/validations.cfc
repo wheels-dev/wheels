@@ -506,7 +506,7 @@ component {
 						// if the validation set does not allow blank values we can set an error right away, otherwise we call a method to run the actual check
 						if (
 							StructKeyExists(local.thisValidation.args, "property")
-							&& StructKeyExists(local.thisValidation.args,"allowBlank")
+							&& StructKeyExists(local.thisValidation.args, "allowBlank")
 							&& !local.thisValidation.args.allowBlank
 							&& (
 								!StructKeyExists(this, local.thisValidation.args.property)
@@ -518,26 +518,7 @@ component {
 								property = local.thisValidation.args.property,
 								name = replace(local.thisValidation.method, "$validates", "", "one")
 							);
-						} else if (
-							!StructKeyExists(local.thisValidation.args, "property")
-							|| (
-								StructKeyExists(this, local.thisValidation.args.property)
-								&& (
-									(
-										// Handle Oracle TIMESTAMP objects in BoxLang
-										structKeyExists(server, "boxlang") 
-										&& IsObject(this[local.thisValidation.args.property])
-										&& !IsStruct(this[local.thisValidation.args.property])
-										&& ListContains("oracle.sql.TIMESTAMP,oracle.sql.DATE", GetMetadata(this[local.thisValidation.args.property]).getName())
-									)
-									|| (
-										!IsObject(this[local.thisValidation.args.property])
-										&& Len(this[local.thisValidation.args.property])
-									)
-									|| local.thisValidation.method == "$validatesUniquenessOf"
-								)
-							)
-						) {
+						} else if ($shouldInvokeValidation(local.thisValidation)) {
 							$invoke(method = local.thisValidation.method, invokeArgs = local.thisValidation.args);
 						}
 					}
@@ -547,6 +528,42 @@ component {
 
 		// Now that we've run all the validation checks we return "true" if no errors exist on the object, "false" otherwise.
 		return !hasErrors();
+	}
+
+	/**
+	 * Determines whether a validation method should be invoked for the given validation rule.
+	 * Handles property existence checks, Oracle TIMESTAMP objects in BoxLang,
+	 * and the uniqueness-validation special case (always invokes regardless of value).
+	 */
+	public boolean function $shouldInvokeValidation(required struct validation) {
+		// No property constraint — always invoke
+		if (!StructKeyExists(arguments.validation.args, "property")) {
+			return true;
+		}
+
+		// Property must exist on the object
+		if (!StructKeyExists(this, arguments.validation.args.property)) {
+			return false;
+		}
+
+		local.value = this[arguments.validation.args.property];
+
+		// Oracle TIMESTAMP/DATE objects — always invoke validation
+		if ($engineAdapter().isOracleJdbcObject(local.value)) {
+			return true;
+		}
+
+		// Non-object with content — invoke
+		if (!IsObject(local.value) && Len(local.value)) {
+			return true;
+		}
+
+		// Uniqueness validation — always invoke (checks DB regardless of value)
+		if (arguments.validation.method == "$validatesUniquenessOf") {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -676,25 +693,22 @@ component {
 	 * Adds an error if the object property fail to pass the validation setup in the validatesNumericalityOf method.
 	 */
 	public void function $validatesNumericalityOf() {
-		local.propertyValue = this[arguments.property];
-		local.isValidNumber = IsNumeric(local.propertyValue);
-		
-		// Additional check for BoxLang compatibility - reject numbers with commas
-		if (structKeyExists(server, "boxlang") && local.isValidNumber && Find(",", local.propertyValue)) {
-			local.isValidNumber = false;
-		}
-		
-		if (
-			!local.isValidNumber || (
-				arguments.onlyInteger && Round(this[arguments.property]) != this[arguments.property]
-			) || (IsNumeric(arguments.greaterThan) && this[arguments.property] <= arguments.greaterThan) || (
-				IsNumeric(arguments.greaterThanOrEqualTo) && this[arguments.property] < arguments.greaterThanOrEqualTo
-			) || (IsNumeric(arguments.equalTo) && this[arguments.property] != arguments.equalTo) || (
-				IsNumeric(arguments.lessThan) && this[arguments.property] >= arguments.lessThan
-			) || (IsNumeric(arguments.lessThanOrEqualTo) && this[arguments.property] > arguments.lessThanOrEqualTo) || (
-				IsBoolean(arguments.odd) && arguments.odd && !BitAnd(this[arguments.property], 1)
-			) || (IsBoolean(arguments.even) && arguments.even && BitAnd(this[arguments.property], 1))
-		) {
+		local.value = this[arguments.property];
+		local.isValidNumber = IsNumeric(local.value);
+
+		local.isValidNumber = $engineAdapter().isNumericStrict(local.value);
+
+		local.failed = !local.isValidNumber
+			|| (arguments.onlyInteger && Round(local.value) != local.value)
+			|| (IsNumeric(arguments.greaterThan) && local.value <= arguments.greaterThan)
+			|| (IsNumeric(arguments.greaterThanOrEqualTo) && local.value < arguments.greaterThanOrEqualTo)
+			|| (IsNumeric(arguments.equalTo) && local.value != arguments.equalTo)
+			|| (IsNumeric(arguments.lessThan) && local.value >= arguments.lessThan)
+			|| (IsNumeric(arguments.lessThanOrEqualTo) && local.value > arguments.lessThanOrEqualTo)
+			|| (IsBoolean(arguments.odd) && arguments.odd && !BitAnd(local.value, 1))
+			|| (IsBoolean(arguments.even) && arguments.even && BitAnd(local.value, 1));
+
+		if (local.failed) {
 			addError(property = arguments.property, message = $validationErrorMessage(argumentCollection = arguments));
 		}
 	}
@@ -713,36 +727,14 @@ component {
 			local.where = [];
 
 			// create the WHERE clause to be used in the query that checks if an identical value already exists
-			// wrap value in single quotes unless it's numeric
-			// example: "userName='Joe'"
-			local.part = arguments.property & "=" & variables.wheels.class.adapter.$quoteValue(
-				str = this[arguments.property],
-				type = validationTypeForProperty(arguments.property)
-			);
-			if (
-				Right(local.part, 3) == "=''"
-				&& ListFindNoCase("integer,float,boolean", validationTypeForProperty(arguments.property))
-			) {
-				// when numeric property but blank we need to translate to IS NULL
-				local.part = SpanExcluding(local.part, "=") & " IS NULL";
-			}
-			ArrayAppend(local.where, local.part);
+			// example: "userName='Joe'" or "userName='Joe' AND account=1" with scope
+			ArrayAppend(local.where, $buildWhereClausePart(arguments.property));
 
-			// add scopes to the WHERE clause if passed in, this means that checks for other properties are done in the WHERE clause as well
-			// example: "userName='Joe'" becomes "userName='Joe' AND account=1" if scope is "account" for example
+			// add scopes to the WHERE clause if passed in
 			arguments.scope = $listClean(arguments.scope);
 			local.iEnd = ListLen(arguments.scope);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = ListGetAt(arguments.scope, local.i);
-				local.part = local.item & "=" & variables.wheels.class.adapter.$quoteValue(
-					str = this[local.item],
-					type = validationTypeForProperty(local.item)
-				);
-				if (Right(local.part, 3) == "=''" && ListFindNoCase("integer,float,boolean", validationTypeForProperty(local.item))) {
-					// when numeric property but blank we need to translate to IS NULL
-					local.part = SpanExcluding(local.part, "=") & " IS NULL";
-				}
-				ArrayAppend(local.where, local.part);
+				ArrayAppend(local.where, $buildWhereClausePart(ListGetAt(arguments.scope, local.i)));
 			}
 
 			// try to fetch duplicate objects from the database
@@ -775,6 +767,21 @@ component {
 	}
 
 	/**
+	 * Builds a single WHERE clause fragment for a property, quoting the value
+	 * and converting blank numeric properties to IS NULL.
+	 */
+	public string function $buildWhereClausePart(required string property) {
+		local.part = arguments.property & "=" & variables.wheels.class.adapter.$quoteValue(
+			str = this[arguments.property],
+			type = validationTypeForProperty(arguments.property)
+		);
+		if (Right(local.part, 3) == "=''" && ListFindNoCase("integer,float,boolean", validationTypeForProperty(arguments.property))) {
+			local.part = SpanExcluding(local.part, "=") & " IS NULL";
+		}
+		return local.part;
+	}
+
+	/**
 	 * Internal function.
 	 **/
 	public boolean function $validationExists(required string property, required string validation) {
@@ -800,122 +807,157 @@ component {
 	}
 
 	/**
-	 * Function to evaluate a condition string without using Evaluate()
+	 * Evaluate a condition string without using Evaluate().
+	 * Dispatches to typed sub-handlers based on the expression shape.
+	 *
 	 * @condition The condition to resolve
 	 */
 	public any function $evaluateConditionString(required string condition) {
-		// Replace CFScript operators with CFScript equivalents
-		local.operatorList = "eq,neq,lt,lte,gt,gte";
-		local.normalizedCondition = ReplaceList(condition, "==,!=,<,<=,>,>=", local.operatorList);
-		local.normalizedCondition = Replace(local.normalizedCondition, "  ", " ", "all"); // Normalize spaces
-		local.before = local.normalizedCondition;
+		local.normalized = $normalizeConditionOperators(arguments.condition);
+		local.split = $splitConditionOnOperator(local.normalized);
 
-		for(local.value in local.operatorList){
-			local.position = FindNoCase(local.value, local.normalizedCondition);
-			if(local.position){
-				local.middle = local.value;
-				local.before = trim(Mid(local.normalizedCondition,1,local.position - 1));
-				local.after = trim(Mid(local.normalizedCondition, local.position + len(local.middle), len(local.normalizedCondition)));
+		// this.method() or this.property references
+		if (Left(local.split.expression, 5) == "this.") {
+			local.result = $resolveThisReference(Mid(local.split.expression, 6, Len(local.split.expression)));
+			if (StructKeyExists(local.split, "operator") && StructKeyExists(local.result, "value")) {
+				return $resolveOperator(local.result.value, $unquoteConditionValue(local.split.rightOperand), local.split.operator);
 			}
+			return StructKeyExists(local.result, "value") ? local.result.value : false;
 		}
 
-		// Handle cases where the condition references `this`, logical comparisons, or function calls
-		if (Left(local.before, 5) == "this.") {
+		// Bare function calls: isActive() or !isActive()
+		if (Right(local.normalized, 2) == "()") {
+			return $evaluateBareCall(local.normalized);
+		}
 
-			// Handle `this.someMethod()` or `this.someVariable`
-			local.key = Mid(local.before, 6, len(local.before)); // Extract the part after "this."
-			local.beforeRegexPattern = "^(.*?)\(";
-			local.beforeMatch = REFindNoCase(local.beforeRegexPattern, local.key, 1, true);
+		// Space-separated logical expressions: a op b
+		return $evaluateLogicalExpression(local.normalized);
+	}
 
-			if (local.beforeMatch.pos[1] > 0) {
-				local.beforeParenthesis = Mid(local.key, 1, local.beforeMatch.len[1] - 1);
-				local.afterParenthesis = Mid(local.key, local.beforeMatch.len[1] + 1, len(local.key));
-			};
+	/**
+	 * Normalizes symbolic comparison operators to their CFML string equivalents.
+	 */
+	public string function $normalizeConditionOperators(required string condition) {
+		local.rv = ReplaceList(arguments.condition, "==,!=,<,<=,>,>=", "eq,neq,lt,lte,gt,gte");
+		return Replace(local.rv, "  ", " ", "all");
+	}
 
-			if(structKeyExists(local, 'afterParenthesis')){
-				local.afterRegexPattern = "^(.*?)\)";
-				local.afterMatch = REFindNoCase(local.afterRegexPattern, local.afterParenthesis, 1, true);
-				if (local.afterMatch.pos[1] > 0) {
-					local.afterParenthesis = Mid(local.afterParenthesis, 1, local.afterMatch.len[1] - 1);
-				}
-
-				if(structKeyExists(this, local.beforeParenthesis)){
-
-					if (IsCustomFunction(this[local.beforeParenthesis])) {
-						local.argumentsCollection = {};
-						// Parse parameters properly - split on comma first, then on equals
-						local.paramList = ListToArray(local.afterParenthesis, ",");
-						for (local.param in local.paramList) {
-							local.param = Trim(local.param);
-							if (Find("=", local.param)) {
-								// Split the parameter on "="
-								local.splitArg = ListToArray(local.param, "=");
-								if (ArrayLen(local.splitArg) >= 2) {
-									local.variableName = Trim(local.splitArg[1]); // Left-hand side (variable name)
-									local.variableValue = Trim(local.splitArg[2]); // Right-hand side (value)
-									// Remove quotes from the value
-									local.variableValue = Replace(local.variableValue, "'", "", "all");
-									local.variableValue = Replace(local.variableValue, '"', "", "all");
-									
-									// Add to the arguments collection
-									local.argumentsCollection[local.variableName] = local.variableValue;
-								}
-							}
-						}
-						local.rv = invoke(this, local.beforeParenthesis, local.argumentsCollection); // Call the function
-					} else {
-						local.rv = this[local.beforeParenthesis]; // Return the variable value
-					}
-				}
+	/**
+	 * Splits a normalized condition on the last matching comparison operator.
+	 * Returns {expression} always, plus {operator, rightOperand} when an operator is found.
+	 */
+	public struct function $splitConditionOnOperator(required string condition) {
+		local.rv = {expression: arguments.condition};
+		for (local.op in ListToArray("eq,neq,lt,lte,gt,gte")) {
+			local.position = FindNoCase(local.op, arguments.condition);
+			if (local.position) {
+				local.rv.expression = Trim(Mid(arguments.condition, 1, local.position - 1));
+				local.rv.operator = local.op;
+				local.rv.rightOperand = Trim(Mid(arguments.condition, local.position + Len(local.op), Len(arguments.condition)));
 			}
+		}
+		return local.rv;
+	}
 
-			if (StructKeyExists(this, local.key)) {
-				if (IsCustomFunction(this[local.key])) {
-					local.rv = invoke(this, local.key); // Call the function
+	/**
+	 * Resolves a reference to `this.xxx` — either a method call with arguments,
+	 * a zero-arg method, or a simple property lookup.
+	 * Returns {value: result} if resolved, or {} if not found.
+	 */
+	public struct function $resolveThisReference(required string key) {
+		local.rv = {};
+
+		// Try method call with parenthesized arguments
+		local.methodMatch = REFindNoCase("^(.*?)\(", arguments.key, 1, true);
+		if (local.methodMatch.pos[1] > 0) {
+			local.methodName = Mid(arguments.key, 1, local.methodMatch.len[1] - 1);
+			local.argsRaw = Mid(arguments.key, local.methodMatch.len[1] + 1, Len(arguments.key));
+			local.closeMatch = REFindNoCase("^(.*?)\)", local.argsRaw, 1, true);
+			if (local.closeMatch.pos[1] > 0) {
+				local.argsRaw = Mid(local.argsRaw, 1, local.closeMatch.len[1] - 1);
+			}
+			if (StructKeyExists(this, local.methodName)) {
+				if (IsCustomFunction(this[local.methodName])) {
+					local.rv.value = invoke(this, local.methodName, $parseConditionArgs(local.argsRaw));
 				} else {
-					local.rv = this[local.key]; // Return the variable value
+					local.rv.value = this[local.methodName];
 				}
 			}
-
-		} else if(right(local.normalizedCondition, 2) eq '()'){
-			if(find("!", local.normalizedCondition)){
-				local.normalizedCondition = replace(local.normalizedCondition, "!", "", "one");
-				return !invoke(this, replace(local.normalizedCondition, '()', ''));
-			}	else{
-				return invoke(this, replace(local.normalizedCondition, '()', ''));
-			}
-		} else {
-			// Handle logical expressions (e.g., "1 eq 0", "5 gt 3", "myFunction() eq true")
-			local.tokens = ListToArray(local.normalizedCondition, " ");
-			if (ArrayLen(local.tokens) < 3) {
-				return false; // Invalid condition
-			}
-
-			local.leftOperand = local.tokens[1];
-			local.operator = local.tokens[2];
-			local.rightOperand = local.tokens[3];
-
-			// Resolve variables or cast to numeric values
-			local.leftOperand = isNumeric(local.leftOperand) ? JavaCast("double", local.leftOperand) : local.leftOperand;
-			local.rightOperand = isNumeric(local.rightOperand) ? JavaCast("double", local.rightOperand) : local.rightOperand;
-			// Evaluate the logical expression
-			return $resolveOperator(local.leftOperand, local.rightOperand, local.operator);
 		}
 
-		if(structKeyExists(local, 'after') && structKeyExists(local, 'middle')){
-			local.singleRegexPattern = "^'.*'$";
-			local.doubleRegexPattern = '^".*"$';
-			if (REFindNoCase(local.singleRegexPattern, local.after)) {
-    	  local.after = Replace(local.after, "'", "", "all");
-    	}
-			if (REFindNoCase(local.doubleRegexPattern, local.after)) {
-    	  local.after = Replace(local.after, '"', "", "all");
-    	}
-
-			return $resolveOperator(local.rv, local.after, local.middle);
+		// Simple property or zero-arg method (no parentheses in key)
+		if (StructKeyExists(this, arguments.key)) {
+			if (IsCustomFunction(this[arguments.key])) {
+				local.rv.value = invoke(this, arguments.key);
+			} else {
+				local.rv.value = this[arguments.key];
+			}
 		}
 
-		return structKeyExists(local, rv)? local.rv : false;
+		return local.rv;
+	}
+
+	/**
+	 * Parses a comma-delimited argument string (e.g. "key1='val1',key2='val2'")
+	 * into a struct of named arguments.
+	 */
+	public struct function $parseConditionArgs(required string argsString) {
+		local.rv = {};
+		for (local.param in ListToArray(arguments.argsString, ",")) {
+			local.param = Trim(local.param);
+			if (Find("=", local.param)) {
+				local.splitArg = ListToArray(local.param, "=");
+				if (ArrayLen(local.splitArg) >= 2) {
+					local.varName = Trim(local.splitArg[1]);
+					local.varValue = Trim(local.splitArg[2]);
+					local.varValue = Replace(local.varValue, "'", "", "all");
+					local.varValue = Replace(local.varValue, '"', "", "all");
+					local.rv[local.varName] = local.varValue;
+				}
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Evaluates a bare function call like "isActive()" or "!isActive()".
+	 */
+	public any function $evaluateBareCall(required string condition) {
+		local.negate = Find("!", arguments.condition);
+		local.methodName = arguments.condition;
+		if (local.negate) {
+			local.methodName = Replace(local.methodName, "!", "", "one");
+		}
+		local.methodName = Replace(local.methodName, "()", "");
+		local.result = invoke(this, local.methodName);
+		return local.negate ? !local.result : local.result;
+	}
+
+	/**
+	 * Evaluates a space-separated logical expression like "1 eq 0" or "5 gt 3".
+	 */
+	public any function $evaluateLogicalExpression(required string condition) {
+		local.tokens = ListToArray(arguments.condition, " ");
+		if (ArrayLen(local.tokens) < 3) {
+			return false;
+		}
+		local.leftOperand = IsNumeric(local.tokens[1]) ? JavaCast("double", local.tokens[1]) : local.tokens[1];
+		local.rightOperand = IsNumeric(local.tokens[3]) ? JavaCast("double", local.tokens[3]) : local.tokens[3];
+		return $resolveOperator(local.leftOperand, local.rightOperand, local.tokens[2]);
+	}
+
+	/**
+	 * Strips surrounding single or double quotes from a condition value.
+	 */
+	public string function $unquoteConditionValue(required string value) {
+		local.rv = arguments.value;
+		if (REFindNoCase("^'.*'$", local.rv)) {
+			local.rv = Replace(local.rv, "'", "", "all");
+		}
+		if (REFindNoCase('^".*"$', local.rv)) {
+			local.rv = Replace(local.rv, '"', "", "all");
+		}
+		return local.rv;
 	}
 
 	/**

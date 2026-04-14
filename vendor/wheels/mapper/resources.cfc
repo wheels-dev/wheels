@@ -33,6 +33,7 @@ component {
 		string shallowName,
 		struct constraints,
 		any callback,
+		any binding,
 		string $call = "resource",
 		boolean $plural = false,
 		boolean mapFormat = variables.mapFormat
@@ -164,6 +165,11 @@ component {
 			local.args.mapFormat = arguments.mapFormat;
 		}
 
+		// Pass along binding preference.
+		if (StructKeyExists(arguments, "binding")) {
+			local.args.binding = arguments.binding;
+		}
+
 		// Scope the resource.
 		scope($call = arguments.$call, argumentCollection = local.args);
 
@@ -214,6 +220,7 @@ component {
 		string shallowName,
 		struct constraints,
 		any callback,
+		any binding,
 		boolean mapFormat = variables.mapFormat
 	) {
 		return resource(argumentCollection = arguments, $plural = true, $call = "resources");

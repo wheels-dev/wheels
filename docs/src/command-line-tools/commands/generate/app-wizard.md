@@ -55,8 +55,8 @@ Please enter a name for your application: MyWheelsApp
 ### Step 2: Template Selection
 ```
 Which Wheels Template shall we use?
-❯ 3.0.x - Wheels Base Template - Bleeding Edge
-  2.5.x - Wheels Base Template - Stable Release
+❯ 3.1.x - Wheels Base Template - Latest
+  3.0.x - Wheels Base Template - Stable Release
   Wheels Template - HTMX - Alpine.js - Simple.css
   Wheels Starter App
   Wheels - TodoMVC - HTMX - Demo App

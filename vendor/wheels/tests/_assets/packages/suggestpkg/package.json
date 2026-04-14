@@ -1,0 +1,11 @@
+{
+	"name": "wheels-suggestpkg",
+	"version": "1.0.0",
+	"description": "Test fixture: suggests goodpkg (soft dependency)",
+	"suggests": {
+		"wheels-goodpkg": ">=1.0.0"
+	},
+	"provides": {
+		"mixins": "controller"
+	}
+}

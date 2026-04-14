@@ -226,4 +226,3 @@ wheels dbmigrate remove table name=user_preferences
 - [`wheels dbmigrate create blank`](dbmigrate-create-blank.md) - Create custom migrations
 - [`wheels dbmigrate up`](dbmigrate-up.md) - Run migrations
 - [`wheels dbmigrate down`](dbmigrate-down.md) - Rollback migrations
-- [`wheels db schema`](db-schema.md) - Export table schemas

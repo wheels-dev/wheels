@@ -68,4 +68,3 @@ greeting &= "!";
 - [String Functions](string-functions.md)
 - [String Interpolation](string-interpolation.md)
 - [Variables](../variables.md)
-- [Operators](../../syntax/operators.md)

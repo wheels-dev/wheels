@@ -1,0 +1,15 @@
+{
+	"name": "TestManifestPlugin",
+	"version": "2.1.0",
+	"author": "Wheels Test Suite",
+	"description": "A full plugin.json manifest for testing",
+	"dependencies": ["SomeOtherPlugin"],
+	"mixins": "controller",
+	"middleware": [
+		{
+			"component": "TestMiddleware",
+			"options": {"priority": 10}
+		}
+	],
+	"wheelsVersion": "3.0"
+}

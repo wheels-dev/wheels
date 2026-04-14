@@ -1,0 +1,13 @@
+VERIFICATION
+
+This package downloads the LuCLI binary from the official GitHub releases.
+
+Package source: https://github.com/wheels-dev/wheels/tree/develop/tools/installer/chocolatey
+Upstream project: https://github.com/cybersonic/LuCLI
+
+To verify the download:
+1. Go to https://github.com/cybersonic/LuCLI/releases
+2. Download the .bat file for the version listed in the .nuspec
+3. Compare the SHA256 checksum with the value in chocolateyinstall.ps1
+
+License: https://github.com/cybersonic/LuCLI/blob/main/LICENSE

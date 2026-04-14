@@ -76,4 +76,4 @@ The analyze [code, performance] commands examines:
 
 - [wheels analyze code](analyze-code.md) - Code quality analysis
 - [wheels analyze performance](analyze-performance.md) - Performance analysis
-- [wheels test](../testing/test.md) - Run tests
+- [wheels test run](../test/test-run.md) - Run tests

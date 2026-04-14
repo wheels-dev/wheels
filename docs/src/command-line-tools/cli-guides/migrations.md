@@ -671,6 +671,5 @@ fi
 ## See Also
 
 - [wheels dbmigrate commands](../commands/database/dbmigrate-info.md) - Migration command reference
-- [Database Schema](../commands/database/db-schema.md) - Schema import/export
-- [Model Generation](../commands/generate/model.md) - Generate models with migrations
+- [Database Creation](../commands/database/db-create.md) - Create database
 - [Testing Guide](testing.md) - Testing migrations

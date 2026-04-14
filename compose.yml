@@ -172,7 +172,7 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2023/Dockerfile
     image: wheels-test-adobe2023:v1.0.1
-    tty: true          
+    tty: true
     stdin_open: true
     volumes:
       - ./:/wheels-test-suite
@@ -191,6 +191,12 @@ services:
         target: /wheels-test-suite/CFConfig.json
     ports:
       - "62023:62023"
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1G
     networks:
       - wheels-network
 
@@ -199,7 +205,7 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2025/Dockerfile
     image: wheels-test-adobe2025:v1.0.0
-    tty: true          
+    tty: true
     stdin_open: true
     volumes:
       - ./:/wheels-test-suite
@@ -218,6 +224,12 @@ services:
         target: /wheels-test-suite/CFConfig.json
     ports:
       - "62025:62025"
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1G
     networks:
       - wheels-network
 
@@ -228,21 +240,20 @@ services:
     image: wheels-test-boxlang:v1.0.0
     tty: true
     stdin_open: true
-    # volumes:
-    #   - ./:/wheels-test-suite
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/server.json
-    #     target: /wheels-test-suite/server.json
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/settings.cfm
-    #     target: /wheels-test-suite/config/settings.cfm
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/box.json
-    #     target: /wheels-test-suite/box.json
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/CFConfig.json
-    #     target: /wheels-test-suite/CFConfig.json
-    #
+    volumes:
+      - ./:/wheels-test-suite
+      - type: bind
+        source: ./tools/docker/boxlang/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/boxlang/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/boxlang/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/boxlang/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
     ports:
       - "60001:60001"
     networks:
@@ -293,14 +304,13 @@ services:
     build:
       context: ./
       dockerfile: ./tools/docker/sqlserver/Dockerfile_CICD
-    image: cfwheels-sqlserver:v1.0.2
+    image: wheels-sqlserver:v1.0.2
     restart: always
     environment:
       MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
       ACCEPT_EULA: Y
       MSSQL_PID: Developer
-      # Increase memory to ensure stability
-      MSSQL_MEMORY_LIMIT_MB: 4096
+      MSSQL_MEMORY_LIMIT_MB: 2048
     ports:
       - "1434:1433"
     healthcheck:
@@ -314,9 +324,37 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
-        reservations:
           memory: 2G
+        reservations:
+          memory: 512M
+    networks:
+      - wheels-network
+
+  cockroachdb:
+    image: cockroachdb/cockroach:latest-v24.3
+    restart: always
+    command: start-single-node --insecure --advertise-addr=cockroachdb
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health?ready=1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - cockroachdb_data:/cockroach/cockroach-data
+    networks:
+      - wheels-network
+
+  cockroachdb-init:
+    image: cockroachdb/cockroach:latest-v24.3
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    restart: "no"
+    command: sql --insecure --host=cockroachdb:26257 -e "CREATE DATABASE IF NOT EXISTS wheelstestdb; CREATE USER IF NOT EXISTS wheelstestdb; GRANT ALL ON DATABASE wheelstestdb TO wheelstestdb;"
     networks:
       - wheels-network
 
@@ -341,9 +379,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1536M
         reservations:
-          memory: 1G
+          memory: 512M
     networks:
       - wheels-network
 
@@ -351,3 +389,4 @@ volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
+  cockroachdb_data:

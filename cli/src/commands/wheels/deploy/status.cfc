@@ -55,7 +55,7 @@ component extends="./base" {
             print.line("-".repeatString(40));
             
             // Check SSH connectivity
-            var sshResult = $execBash("ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no #sshUser#@#server# 'echo OK'");
+            var sshResult = $execBash("ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'echo OK'");
             
             if (sshResult.exitCode != 0) {
                 print.redLine("✗ SSH Connection Failed");
@@ -68,7 +68,7 @@ component extends="./base" {
             print.greenLine("✓ SSH Connection OK");
             
             // Check Docker status
-            var dockerResult = $execBash("ssh #sshUser#@#server# 'docker --version'");
+            var dockerResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker --version'");
             if (dockerResult.exitCode != 0) {
                 print.redLine("✗ Docker Not Available");
                 allHealthy = false;
@@ -77,7 +77,7 @@ component extends="./base" {
             }
             
             // Check container status
-            var containerResult = $execBash("ssh #sshUser#@#server# 'docker ps --filter name=#serviceName# --format ""table {{.Names}}\t{{.Status}}\t{{.Image}}""'");
+            var containerResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker ps --filter name=" & $shellEscape(serviceName) & " --format ""table {{.Names}}\t{{.Status}}\t{{.Image}}""'");
             
             if (containerResult.exitCode == 0 && len(trim(containerResult.output))) {
                 var lines = listToArray(containerResult.output, chr(10));
@@ -117,8 +117,8 @@ component extends="./base" {
             
             // Check health endpoint
             if (structKeyExists(deployConfig, "healthcheck")) {
-                var healthUrl = "http://#server#:#deployConfig.healthcheck.port##deployConfig.healthcheck.path#";
-                var healthResult = $execBash("ssh #sshUser#@#server# 'curl -f -s -o /dev/null -w ""%{http_code}"" #healthUrl#'");
+                var healthUrl = "http://" & server & ":" & deployConfig.healthcheck.port & deployConfig.healthcheck.path;
+                var healthResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'curl -f -s -o /dev/null -w ""%{http_code}"" " & $shellEscape(healthUrl) & "'");
                 
                 if (healthResult.exitCode == 0 && trim(healthResult.output) == "200") {
                     print.greenLine("✓ Health Check Passed");
@@ -134,14 +134,14 @@ component extends="./base" {
                 print.line();
                 print.yellowLine("Container Details:");
                 
-                var inspectResult = $execBash("ssh #sshUser#@#server# 'docker inspect #serviceName# --format ""Created: {{.Created}}\nState: {{.State.Status}}\nRestartCount: {{.RestartCount}}\nPorts: {{range \$p, \$conf := .NetworkSettings.Ports}}{{if \$conf}}{{(index \$conf 0).HostPort}}->{{trimPrefix \""/tcp\"" \$p}} {{end}}{{end}}""'");
+                var inspectResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker inspect " & $shellEscape(serviceName) & " --format ""Created: {{.Created}}\nState: {{.State.Status}}\nRestartCount: {{.RestartCount}}\nPorts: {{range \$p, \$conf := .NetworkSettings.Ports}}{{if \$conf}}{{(index \$conf 0).HostPort}}->{{trimPrefix \""/tcp\"" \$p}} {{end}}{{end}}""'");
                 
                 if (inspectResult.exitCode == 0) {
                     print.line(inspectResult.output);
                 }
                 
                 // Check disk usage
-                var dfResult = $execBash("ssh #sshUser#@#server# 'df -h /opt/#serviceName# | tail -1'");
+                var dfResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'df -h /opt/" & $shellEscape(serviceName) & " | tail -1'");
                 if (dfResult.exitCode == 0) {
                     var dfParts = reReplace(trim(dfResult.output), "\s+", "|", "all");
                     var dfArray = listToArray(dfParts, "|");
@@ -156,7 +156,7 @@ component extends="./base" {
                 print.line();
                 print.yellowLine("Recent Logs:");
                 
-                var logsResult = $execBash("ssh #sshUser#@#server# 'docker logs --tail 20 #serviceName# 2>&1'");
+                var logsResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker logs --tail 20 " & $shellEscape(serviceName) & " 2>&1'");
                 if (logsResult.exitCode == 0) {
                     print.line("-".repeatString(40));
                     print.line(logsResult.output);
@@ -169,7 +169,7 @@ component extends="./base" {
                 print.line();
                 print.yellowLine("Database Status:");
                 
-                var dbResult = $execBash("ssh #sshUser#@#server# 'docker ps --filter name=#serviceName#_db --format ""{{.Status}}""'");
+                var dbResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker ps --filter name=" & $shellEscape(serviceName & "_db") & " --format ""{{.Status}}""'");
                 
                 if (dbResult.exitCode == 0 && len(trim(dbResult.output))) {
                     if (dbResult.output contains "Up") {

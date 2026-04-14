@@ -107,7 +107,34 @@ categorize_pr() {
     echo "enhancement"; return
   fi
 
-  # No recognized label - categorize by title keywords
+  # Check for conventional commit prefix (feat:, fix:, docs:, etc.)
+  if echo "$lower_title" | grep -qE '^fix(\(.*\))?[!]?:'; then
+    echo "bug"; return
+  fi
+  if echo "$lower_title" | grep -qE '^feat(\(.*\))?[!]?:'; then
+    # Sub-categorize feat by scope or title keywords
+    local scope
+    scope=$(echo "$lower_title" | sed -n 's/^feat(\([^)]*\)).*/\1/p')
+    case "$scope" in
+      model|orm) echo "model"; return ;;
+      controller) echo "controller"; return ;;
+      view) echo "view"; return ;;
+      cli) echo "cli"; return ;;
+    esac
+    echo "enhancement"; return
+  fi
+  if echo "$lower_title" | grep -qE '^docs(\(.*\))?[!]?:'; then
+    echo "docs"; return
+  fi
+  if echo "$lower_title" | grep -qE '^perf(\(.*\))?[!]?:'; then
+    echo "enhancement"; return
+  fi
+  # Breaking change indicator (! before colon or BREAKING CHANGE in body)
+  if echo "$lower_title" | grep -qE '^[a-z]+(\(.*\))?!:'; then
+    echo "breaking"; return
+  fi
+
+  # No recognized label or conventional prefix - categorize by title keywords
   if echo "$lower_title" | grep -qiE '(fix|bug|patch|hotfix|issue|error|crash|broken)'; then
     echo "bug"; return
   fi
@@ -129,8 +156,9 @@ while [ "$i" -lt "$PR_COUNT" ]; do
   TITLE=$(echo "$PR" | jq -r '.title')
   LABELS=$(echo "$PR" | jq '.labels')
 
-  # Clean up title - remove "commit: " prefix
+  # Clean up title - remove "commit: " prefix and conventional commit prefixes
   TITLE=$(echo "$TITLE" | sed 's/^commit: //' | sed 's/^Commit: //')
+  TITLE=$(echo "$TITLE" | sed -E 's/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?[!]?: //')
   # Capitalize first letter
   FIRST_CHAR=$(echo "$TITLE" | cut -c1 | tr '[:lower:]' '[:upper:]')
   REST=$(echo "$TITLE" | cut -c2-)

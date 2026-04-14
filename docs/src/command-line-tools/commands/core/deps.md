@@ -243,6 +243,6 @@ Common scenarios:
 ## See Also
 
 - [box install](https://commandbox.ortusbooks.com/package-management/installing-packages) - CommandBox package installation
-- [box.json](https://commandbox.ortusbooks.com/package-management/box.json) - Package descriptor documentation
+- [box.json](https://commandbox.ortusbooks.com/package-management) - Package descriptor documentation
 - [wheels init](init.md) - Initialize a Wheels application
-- [wheels plugins](../plugins/plugins.md) - Manage Wheels CLI plugins
+- [wheels plugins install](../plugins/plugins-install.md) - Install Wheels plugins

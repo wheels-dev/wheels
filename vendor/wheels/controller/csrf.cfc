@@ -147,17 +147,45 @@ component {
 
 	/**
 	 * Internal function.
+	 * Ensures a valid CSRF cookie encryption key exists when csrfStore is "cookie".
+	 */
+	public string function $ensureCsrfCookieEncryptionKey() {
+		if (!Len(application.wheels.csrfCookieEncryptionSecretKey)) {
+			// In production, require explicit configuration
+			if (application.wheels.environment == "production") {
+				Throw(
+					type = "Wheels.Security.MissingCsrfKey",
+					message = "csrfCookieEncryptionSecretKey must be configured in production.",
+					extendedInfo = "Set csrfCookieEncryptionSecretKey in your .env file or config/settings.cfm. Auto-generation is not allowed in production because the key is lost on application restart, invalidating all CSRF tokens."
+				);
+			}
+			// In non-production, auto-generate with warning
+			application.wheels.csrfCookieEncryptionSecretKey = GenerateSecretKey("AES");
+			try {
+				writeLog(
+					text = "Wheels WARNING: csrfCookieEncryptionSecretKey was empty — auto-generated a temporary AES key. Set this in config/settings.cfm for persistence across restarts.",
+					type = "warning",
+					file = "wheels_security"
+				);
+			} catch (any e) {}
+		}
+		return application.wheels.csrfCookieEncryptionSecretKey;
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $generateCookieAuthenticityToken() {
 		local.authenticityToken = $readAuthenticityTokenFromCookie();
 
 		// If cookie doesn't yet exist, create it.
 		if (!Len(local.authenticityToken)) {
+			local.encryptionKey = $ensureCsrfCookieEncryptionKey();
 			local.authenticityToken = GenerateSecretKey(application.wheels.csrfCookieEncryptionAlgorithm);
 			local.value = SerializeJSON({sessionId = CreateUUID(), authenticityToken = local.authenticityToken});
 			local.value = Encrypt(
 				local.value,
-				application.wheels.csrfCookieEncryptionSecretKey,
+				local.encryptionKey,
 				application.wheels.csrfCookieEncryptionAlgorithm,
 				application.wheels.csrfCookieEncryptionEncoding
 			);
@@ -189,9 +217,10 @@ component {
 		local.cookie = cookie[local.cookieName];
 
 		try {
+			local.encryptionKey = $ensureCsrfCookieEncryptionKey();
 			local.cookieAttrs = Decrypt(
 				local.cookie,
-				application.wheels.csrfCookieEncryptionSecretKey,
+				local.encryptionKey,
 				application.wheels.csrfCookieEncryptionAlgorithm,
 				application.wheels.csrfCookieEncryptionEncoding
 			);
@@ -232,6 +261,9 @@ component {
 			preserveCase = application.wheels.csrfCookiePreserveCase,
 			secure = application.wheels.csrfCookieSecure
 		};
+		if (Len(application.wheels.csrfCookieSameSite)) {
+			local.cookieStruct.sameSite = application.wheels.csrfCookieSameSite;
+		}
 		if (Len(application.wheels.csrfCookieDomain)) {
 			local.cookieStruct.domain = application.wheels.csrfCookieDomain;
 		}

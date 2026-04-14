@@ -665,4 +665,4 @@ component extends="Model" {
 - [Model Architecture](./architecture.md)
 - [Model Callbacks](./callbacks.md)
 - [User Authentication](./user-authentication.md)
-- [Form Helpers](../../views/helpers/forms.md)
+- [Form Helpers](../views/helpers/forms.md)

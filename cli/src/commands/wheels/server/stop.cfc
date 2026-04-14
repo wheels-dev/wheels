@@ -45,14 +45,15 @@ component extends="../base" {
 			stopCommand &= " --all";
 		}
 
-		print.yellowLine("Stopping Wheels development server...");
+		detailOutput.header("Stop Wheels Development Server");
 		
+		// Show command
+		detailOutput.subHeader("Executing Stop Command");
+		detailOutput.code(stopCommand);
 		// Execute the server stop command
 		command(stopCommand).run();
 		
-		print.line();
-		print.greenLine("Server stopped successfully!");
-		print.line();
+		detailOutput.statusSuccess("Server stopped successfully");
 	}
 
 }

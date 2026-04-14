@@ -29,7 +29,7 @@
 						<div class="item">
 							<div class="header">#sectionData.title#</div>
 							<div class="list">
-								#renderGuideItems(sectionData.items, docs.path)#
+								#local.docsHelper.renderGuideItems(sectionData.items, docs.path)#
 							</div>
 						</div>
 					</cfloop>
@@ -62,43 +62,6 @@
 			</div>
 		</div>
 	</div>
-
-	<cffunction name="renderGuideItems" access="public" returntype="string" output="true">
-		<cfargument name="items" required="true" type="array">
-		<cfargument name="currentPath" required="true" type="string">
-
-		<cfloop array="#arguments.items#" index="item">
-			<cfif structKeyExists(item, "link")>
-				<!--- Determine if the link is external --->
-				<cfset isExternal = reFindNoCase("^(http|https)://", item.link) GT 0>
-
-				<!--- Clean internal .md links --->
-				<cfif !isExternal>
-					<cfset cleanLink = lcase(reReplace(item.link, "\.md$", ""))>
-					<cfset isActive = (arguments.currentPath EQ cleanLink) ? " active" : "">
-				</cfif>
-
-				<cfif isExternal>
-					<!--- External Link --->
-					<a href="#item.link#" target="_blank" rel="noopener noreferrer" class="item">#item.title#</a>
-				<cfelse>
-					<!--- Internal Guide Link (routed through /wheels/guides/) --->
-					<a href="/wheels/guides/#cleanLink#" class="item#isActive#">#item.title#</a>
-				</cfif>
-
-			<cfelseif structKeyExists(item, "items")>
-				<!--- It's a subsection/group --->
-				<div class="header">#item.title#</div>
-				<div class="list">
-					<cfoutput>
-						#renderGuideItems(item.items, arguments.currentPath)#
-					</cfoutput>
-				</div>
-			</cfif>
-		</cfloop>
-
-		<cfreturn "">
-	</cffunction>
 
 
 	<!--- JavaScript for enhanced functionality --->

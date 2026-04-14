@@ -60,6 +60,14 @@ wheels mcp setup --noAutoStart
 
 ## How It Works
 
+### What gets created
+The setup command creates two configuration files in your project root:
+
+- **`.mcp.json`** — Used by Claude Code, Cursor, and other MCP-compatible editors
+- **`.opencode.json`** — Used by OpenCode-compatible editors
+
+Both files point to your Wheels application's MCP endpoint.
+
 ### Native CFML MCP Server
 Wheels includes a built-in MCP (Model Context Protocol) server that runs directly within your CFML application:
 
@@ -74,80 +82,29 @@ The setup command configures access to your Wheels application's MCP server at:
 http://localhost:[port]/wheels/mcp
 ```
 
-### Available Resources
-The MCP server provides access to:
-- **API Documentation**: Complete Wheels framework documentation
-- **Project Context**: Current project structure and configuration
-- **Code Patterns**: Common Wheels patterns and best practices
-- **Guides**: Framework tutorials and examples
-
-### Available Tools
-- **Code Generation**: Generate models, controllers, views, migrations
-- **Database Operations**: Run migrations, check schema
-- **Server Management**: Start, stop, restart development server
-- **Testing**: Run Wheels tests and validation
+### LuCLI Alternative
+If using LuCLI, MCP tools are auto-discovered via stdio transport without needing `wheels mcp setup`. See the [MCP Configuration Guide](./mcp-configuration-guide.md) for details.
 
 ## Supported IDEs
 
+The `wheels mcp setup` command creates project-level `.mcp.json` and `.opencode.json` files. These are auto-detected by most MCP-compatible editors:
+
 ### Claude Code
-Configuration file: `~/.claude/config.json`
-```json
-{
-  "mcpServers": {
-    "wheels": {
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:[port]/wheels/mcp"
-      }
-    }
-  }
-}
-```
+Reads `.mcp.json` from the project root automatically.
 
 ### Cursor
-Configuration file: `~/.cursor/config.json`
-```json
-{
-  "mcpServers": {
-    "wheels": {
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:[port]/wheels/mcp"
-      }
-    }
-  }
-}
+Copy or symlink `.mcp.json` to `.cursor/mcp.json`:
+```bash
+cp .mcp.json .cursor/mcp.json
 ```
 
-### Continue
-Configuration file: `~/.continue/config.json`
-```json
-{
-  "mcpServers": {
-    "wheels": {
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:[port]/wheels/mcp"
-      }
-    }
-  }
-}
-```
+### VS Code (Copilot / Continue / Cline)
+Add the MCP configuration to `.vscode/settings.json` — see the [MCP Configuration Guide](./mcp-configuration-guide.md#vs-code) for per-extension instructions.
 
 ### Windsurf
-Configuration file: `~/.windsurf/config.json`
-```json
-{
-  "mcpServers": {
-    "wheels": {
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:[port]/wheels/mcp"
-      }
-    }
-  }
-}
-```
+Reads `.mcp.json` from the project root.
+
+For detailed per-IDE configuration including the LuCLI stdio transport, see the [MCP Configuration Guide](./mcp-configuration-guide.md).
 
 ## Prerequisites
 

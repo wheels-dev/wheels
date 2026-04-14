@@ -4,10 +4,16 @@ This section contains documentation specific to the Wheels MVC framework for CFM
 
 ## Directory Structure
 
+### [Cross-Engine Compatibility](./cross-engine-compatibility.md)
+Critical reference for multi-engine development:
+- Lucee vs Adobe CF runtime differences
+- Database-specific gotchas (H2, MySQL, PostgreSQL, CockroachDB)
+- Testing across engines locally with Docker
+
 ### [CLI](./cli/)
 Command-line interface tools and generators:
 - Wheels CLI commands for scaffolding and development
-- Code generation utilities
+- Code generation utilities (including admin generator)
 - Development workflow tools
 
 ### [Communication](./communication/)
@@ -42,6 +48,7 @@ Data layer and ORM functionality:
 - Model associations and validations
 - Database migrations and schema management
 - Query building and optimization
+- Database seeding (convention-based, idempotent)
 
 ### [Files](./files/)
 File handling and management:

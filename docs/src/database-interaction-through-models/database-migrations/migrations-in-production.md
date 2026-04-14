@@ -34,7 +34,7 @@ Please consult the internal documentation API reference under Configurations > D
 
 ### Further considerations with automatic migrations
 
-If you are using automatic migrations, then you could lock down production mode even further. With Wheels 2.x there is more data available to development mode, such as the internal documentation, routing GUI and Migration GUI.
+If you are using automatic migrations, then you could lock down production mode even further. In development mode, there is more data available, such as the internal documentation, routing GUI and Migration GUI.
 
 **Turn off environment switching**
 

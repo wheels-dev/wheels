@@ -59,8 +59,6 @@ component extends="Controller" {
 5. Use `type="after"` for after filters
 
 ## Related
-- [Authentication Patterns](../authentication.md)
-- [Authorization Patterns](../authorization.md)
 - [Parameter Verification](../params/verification.md)
 
 ## Important Notes

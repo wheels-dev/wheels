@@ -656,4 +656,3 @@ function testCallbackChain() {
 - [Model Architecture](./architecture.md)
 - [Model Validations](./validations.md)
 - [User Authentication](./user-authentication.md)
-- [Performance Optimization](../patterns/performance.md)

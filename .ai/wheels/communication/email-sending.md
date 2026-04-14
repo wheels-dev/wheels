@@ -192,7 +192,6 @@ The Team
 - Additional variables passed to template
 
 ## Related
-- [Mailer Components](../patterns/mailer-components.md)
 - [View Templates](../views/layouts/structure.md)
 - [Configuration](../configuration/environments.md)
 

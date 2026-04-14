@@ -57,6 +57,9 @@
   * Testing Commands
     * [wheels test run](command-line-tools/commands/test/test-run.md)
     * [wheels advanced testing](command-line-tools/commands/test/test-advanced.md)
+  * Playwright Commands
+    * [wheels playwright:init](command-line-tools/commands/playwright/playwright-init.md)
+    * [wheels playwright:install](command-line-tools/commands/playwright/playwright-install.md)
   * Environment Management
     * [wheels env setup](command-line-tools/commands/environment/env-setup.md)
     * [wheels env list](command-line-tools/commands/environment/env-list.md)
@@ -97,12 +100,19 @@
     * [wheels plugin init](command-line-tools/commands/plugins/plugins-init.md)
   * Asset Management
     * [asset management commands](command-line-tools/commands/assets-cache-management.md)
+  * Job Commands
+    * [wheels jobs work](command-line-tools/commands/jobs/jobs-work.md)
+    * [wheels jobs status](command-line-tools/commands/jobs/jobs-status.md)
+    * [wheels jobs retry](command-line-tools/commands/jobs/jobs-retry.md)
+    * [wheels jobs purge](command-line-tools/commands/jobs/jobs-purge.md)
+    * [wheels jobs monitor](command-line-tools/commands/jobs/jobs-monitor.md)
 * CLI Development Guides
   * [Configuration Management](command-line-tools/configuration.md)
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
   * [Service Architecture](command-line-tools/cli-guides/service-architecture.md)
   * [Migrations Guide](command-line-tools/cli-guides/migrations.md)
   * [Testing Guide](command-line-tools/cli-guides/testing.md)
+  * [lucee.json Reference](command-line-tools/cli-guides/lucee-json-reference.md)
 
 ## Working with Wheels
 
@@ -111,6 +121,7 @@
 * [Directory Structure](working-with-wheels/directory-structure.md)
 * [Switching Environments](working-with-wheels/switching-environments.md)
 * [Testing Your Application](working-with-wheels/testing-your-application.md)
+* [End-to-End Testing](working-with-wheels/end-to-end-testing.md)
 * [Using the Test Environment](working-with-wheels/using-the-test-environment.md)
 * [Overriding Core Methods](working-with-wheels/overriding-core-methods.md)
 * [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
@@ -118,6 +129,7 @@
 * [Contributing to Wheels Windows Installer](working-with-wheels/contributing-to-wheels-windows-installer.md)
 * [Contributing to Wheels macOS Installer](working-with-wheels/contributing-to-wheels-macos-installer.md)
 * [Background Jobs](working-with-wheels/background-jobs.md)
+* [Dependency Injection](working-with-wheels/dependency-injection.md)
 * [Submitting Pull Requests](working-with-wheels/submitting-pull-requests.md)
 * [Documenting your Code](working-with-wheels/documenting-your-code.md)
 
@@ -130,6 +142,9 @@
 * [Sending Email](handling-requests-with-controllers/sending-email.md)
 * [Responding with Multiple Formats](handling-requests-with-controllers/responding-with-multiple-formats.md)
 * [Using the Flash](handling-requests-with-controllers/using-the-flash.md)
+* [Middleware](handling-requests-with-controllers/middleware.md)
+* [Rate Limiting](handling-requests-with-controllers/rate-limiting.md)
+* [Route Model Binding](handling-requests-with-controllers/route-model-binding.md)
 * [Using Filters](handling-requests-with-controllers/using-filters.md)
 * [Verification](handling-requests-with-controllers/verification.md)
 * [Event Handlers](handling-requests-with-controllers/event-handlers.md)
@@ -153,6 +168,7 @@
 * [Layouts](displaying-views-to-users/layouts.md)
 * [Form Helpers and Showing Errors](displaying-views-to-users/form-helpers-and-showing-errors.md)
 * [Displaying Links for Pagination](displaying-views-to-users/displaying-links-for-pagination.md)
+* [Pagination Helpers](displaying-views-to-users/pagination-helpers.md)
 * [Date, Media, and Text Helpers](displaying-views-to-users/date-media-and-text-helpers.md)
 * [Creating Custom View Helpers](displaying-views-to-users/creating-custom-view-helpers.md)
 * [Localization](displaying-views-to-users/localization.md)
@@ -175,6 +191,10 @@
 * [Transactions](database-interaction-through-models/transactions.md)
 * [Dirty Records](database-interaction-through-models/dirty-records.md)
 * [Soft Delete](database-interaction-through-models/soft-delete.md)
+* [Query Builder](database-interaction-through-models/query-builder.md)
+* [Enums](database-interaction-through-models/enums.md)
+* [Query Scopes](database-interaction-through-models/query-scopes.md)
+* [Batch Processing](database-interaction-through-models/batch-processing.md)
 * [Automatic Time Stamps](database-interaction-through-models/automatic-time-stamps.md)
 * [Database Migrations](database-interaction-through-models/database-migrations/README.md)
   * [Migrations in Production](database-interaction-through-models/database-migrations/migrations-in-production.md)
@@ -190,7 +210,6 @@
 
 * [Source Code](https://github.com/wheels-dev/wheels)
 * [Issue Tracker](https://github.com/wheels-dev/wheels/issues)
-* [Sponsor Us](https://opencollective.com/wheels)
 * [Community](https://github.com/wheels-dev/wheels/discussions)
 
 ## Plugins

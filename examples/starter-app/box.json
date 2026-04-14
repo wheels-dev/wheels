@@ -11,7 +11,6 @@
         "mvc",
         "rails",
         "wheels",
-        "cfwheels",
         "core"
     ],
     "repository":{
@@ -29,12 +28,12 @@
         ".env.example"
     ],
     "dependencies": {
-        "wheels-core": "^3.1.0",
-        "cfwheels-authenticateThis":"^1"
+        "wheels-core": "^4.0.0",
+        "wheels-authenticateThis":"^1"
     },
     "installPaths": {
         "wheels-core": "vendor/wheels/",
-        "cfwheels-authenticateThis":"plugins/authenticateThis/"
+        "wheels-authenticateThis":"plugins/authenticateThis/"
     },
     "private":false,
     "license":[

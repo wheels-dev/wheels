@@ -287,7 +287,7 @@ component {
                 continue;
             }
 
-            var cfType = mapToCFWheelsType(prop.type);
+            var cfType = mapToWheelsType(prop.type);
             var params = 'columnNames=''#prop.name#''';
 
             if (structKeyExists(prop, "default") && prop.default != "") {
@@ -352,9 +352,9 @@ component {
     }
     
     /**
-     * Map property type to CFWheels migration type
+     * Map property type to Wheels migration type
      */
-    private function mapToCFWheelsType(required string type) {
+    private function mapToWheelsType(required string type) {
         switch (lCase(arguments.type)) {
             case "string":
                 return "string";

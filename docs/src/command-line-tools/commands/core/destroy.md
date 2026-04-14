@@ -130,6 +130,5 @@ wheels destroy blog_post
 
 ## See Also
 
-- [wheels generate resource](../generate/resource.md) - Generate resources
 - [wheels generate scaffold](../generate/scaffold.md) - Generate scaffolding
 - [wheels dbmigrate remove table](../database/dbmigrate-remove-table.md) - Remove database tables

@@ -54,14 +54,14 @@ component output="false" {
 	 * Validates that a regex string compiles correctly.
 	 * Throws an error if the regex is invalid.
 	 */
-	public void function $compileRegex(required string regex) {
+	public void function $compileRegex(required string regex, string pattern = "", string name = "") {
 		local.patternClass = CreateObject("java", "java.util.regex.Pattern");
 		try {
 			local.patternClass.compile(arguments.regex);
 			return;
 		} catch (any e) {
 			local.identifier = arguments.pattern;
-			if (StructKeyExists(arguments, "name")) {
+			if (Len(arguments.name)) {
 				local.identifier = arguments.name;
 			}
 			Throw(
@@ -86,7 +86,7 @@ component output="false" {
 		local.pattern = ReReplace(local.pattern, "\/+\.", ".", "all");
 
 		// Return with a prepended slash.
-		return "/" & Replace(local.pattern, "//", "/", "all");
+		return "/" & local.pattern;
 	}
 
 	/**

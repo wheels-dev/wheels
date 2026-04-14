@@ -8,15 +8,20 @@ Wheels can often act as the "backend" in a modern web application, serving data 
 
 When we separate our systems in such a manner, we need to consider CORS (Cross Origin Resource Sharing) and how to properly serve requests which modern browsers will allow.
 
-### The "Quick and Dirty" approach
+### Getting Started
 
-If you just need to satisfy your CORS requirement quickly, you can do so from Wheels 2.0 onwards with a simple configuration switch in your `/config/settings.cfm` file: `set(allowCorsRequests=true);`.
+To enable CORS, add `set(allowCorsRequests=true);` to your `/config/settings.cfm` file. You must also configure your allowed origins explicitly — by default, no origins are permitted:
 
-By default, this will enable the following CORS headers:
+```javascript
+set(allowCorsRequests=true);
+set(accessControlAllowOrigin="https://app.domain.com");
+```
+
+This will enable the following CORS headers for matching requests:
 
 ```
 Access-Control-Allow-Origin 
-*
+https://app.domain.com
 
 Access-Control-Allow-Methods 
 GET, POST, PATCH, PUT, DELETE, OPTIONS
@@ -25,23 +30,19 @@ Access-Control-Allow-Headers
 Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With
 ```
 
-This will satisfy most requirements to get going quickly, but is more of a blanket "catch all" configuration which doesn't really restrict anything, or provide much information to the API consumer about your available resources.
+{% hint style="warning" %}
+Setting `accessControlAllowOrigin` to `"*"` (wildcard) allows any website to make cross-origin requests to your application. Only use this in development or when you explicitly intend to provide a public API.
+{% endhint %}
 
 ### Custom CORS Headers
 
-{% hint style="info" %}
-#### From Wheels 2.1
-
-The options below were introduced in Wheels 2.1
-{% endhint %}
-
-From Wheels 2.1, we can be more specific. We still need to specify `set(allowCorsRequests=true);` in our `/config/settings.cfm` to turn on the main CORS functionality, but we can now provide some additional configuration options to fine tune our responses.
+We can be more specific. We still need to specify `set(allowCorsRequests=true);` in our `/config/settings.cfm` to turn on the main CORS functionality, but we can also provide some additional configuration options to fine tune our responses.
 
 ### Access Control Allow Origin
 
 The Access Control Allow Origin header tells the browser whether the domain they are connecting from can access the requested resource.
 
-By default, this header is set to a wildcard allowing connection from any domain. But it might be your VueJS app lives at `app.domain.com` and we only want to allow access from that domain to our API.
+By default, this header is not set (empty string), meaning no cross-origin requests are allowed. You must explicitly configure your allowed origins. For example, if your VueJS app lives at `app.domain.com`:
 
 ```javascript
 // Wildcard
@@ -56,7 +57,7 @@ set(accessControlAllowOrigin="https://app.domain.com,https://staging-app.domain.
 
 You can also take advantage of the environment specific configurations, such as only allowing access to `localhost:8080` in `/config/development/settings.cfm` for example.
 
-**Wheels 2.2** allows for subdomain wildcard matching for CORS permitted origins:
+Wheels also allows for subdomain wildcard matching for CORS permitted origins:
 
 ```javascript
 // Match https://foo.domain.com or https://bar.domain.com or https://www.mydomain.com

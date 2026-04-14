@@ -60,7 +60,6 @@ user.reload(); // Refreshes all properties from database
 - [Creating Records](./creating-records.md)
 - [Updating Records](./updating-records.md)
 - [Associations](../associations/has-many.md)
-- [Pagination](../getting-paginated-data.md)
 
 ## Important Notes
 - Strings must be in single quotes in WHERE clauses

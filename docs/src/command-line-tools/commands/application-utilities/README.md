@@ -5,20 +5,19 @@ The Application Utilities commands provide essential tools for inspecting, analy
 ## Available Commands
 
 ### Route Management
-- [`wheels routes`](routes.md) - Display all application routes
-- [`wheels routes:match`](routes-match.md) - Find which route matches a given URL
+- `wheels routes` - Display all application routes
+- `wheels routes:match` - Find which route matches a given URL
 
 ### Application Information
 - [`wheels about`](about.md) - Display comprehensive application information
-- [`wheels version`](../core/info.md#version) - Show version information
 
 ### Code Analysis
-- [`wheels stats`](stats.md) - Display code statistics for your application
-- [`wheels notes`](notes.md) - Extract and display code annotations (TODO, FIXME, etc.)
+- `wheels stats` - Display code statistics for your application
+- `wheels notes` - Extract and display code annotations (TODO, FIXME, etc.)
 
 ### Health & Dependencies
-- [`wheels doctor`](doctor.md) - Run health checks on your application
-- [`wheels deptree`](deptree.md) - Display dependency tree
+- `wheels doctor` - Run health checks on your application
+- `wheels deptree` - Display dependency tree
 
 ## Quick Examples
 
@@ -120,10 +119,9 @@ wheels deptree production=true
 
 ## Related Commands
 
-- [`wheels test`](../testing/test.md) - Run tests to ensure code quality
+- [`wheels test run`](../test/test-run.md) - Run tests to ensure code quality
 - [`wheels analyze`](../analysis/analyze.md) - Deep code analysis
 - [`wheels deps`](../core/deps.md) - Manage Wheels-specific dependencies
-- [`wheels env`](../environment/env.md) - Manage environments
 
 ## Tips
 

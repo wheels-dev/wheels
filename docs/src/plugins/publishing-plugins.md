@@ -136,21 +136,9 @@ Your completed `box.json` might look something like this:
 ```
 {% endcode %}
 
-### Using the forgebox staging server (optional)
+### Testing your publishing process (optional)
 
-If this is the first time you've done this, you might want to try the forgebox staging server. That way you can make sure your publishing process is spot on without having lots of unnecessary versions pushed up. You can view the staging server version at [http://forgebox.stg.ortussolutions.com/](http://forgebox.stg.ortussolutions.com/)
-
-{% code title="CommandBox" %}
-```shell
-# Add staging server configuration
-$ config set endpoints.forgebox.APIURL=http://forgebox.stg.ortussolutions.com/api/v1
-
-# Revert back to production configuration
-$ config clear endpoints.forgebox.APIURL
-```
-{% endcode %}
-
-Remember this configuration will "stick", so make sure you change it back afterwards. (I find once changed, it might not kick in until you reload the CommandBox shell via `r`).
+If this is the first time you've done this, consider publishing a test version first to make sure your publishing process is spot on without having lots of unnecessary versions pushed up.
 
 ### Publishing a plugin to forgebox
 

@@ -105,10 +105,13 @@ component output=false extends="wheels.Global"{
 		}
 
 		// Manual identity retrieval for Lucee / ACF
+		// Pass the query result (if any) as returningIdentity — needed by adapters
+		// that use RETURNING clauses (e.g. CockroachDB) to retrieve generated keys.
 		wheels.id = $identitySelect(
-			primaryKey      = args.primaryKey,
-			queryAttributes = args.queryAttributes,
-			result          = wheels.result
+			primaryKey         = args.primaryKey,
+			queryAttributes    = args.queryAttributes,
+			result             = wheels.result,
+			returningIdentity  = structKeyExists(local, args.debugName) ? local[args.debugName] : ""
 		);
 
 		if (structKeyExists(wheels,"id") && isStruct(wheels.id) && !structIsEmpty(wheels.id)) {
@@ -128,7 +131,26 @@ component output=false extends="wheels.Global"{
 		variables.dataSource = arguments.dataSource;
 		variables.username = arguments.username;
 		variables.password = arguments.password;
+		variables.$sharedModel = false;
 		return this;
+	}
+
+	/**
+	 * Mark this adapter's model as shared (immune to tenant datasource overrides).
+	 * Shared models always use the default application datasource.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Multi-Tenancy]
+	 */
+	public void function $setSharedModel(required boolean flag) {
+		variables.$sharedModel = arguments.flag;
+	}
+
+	/**
+	 * Returns whether this adapter's model is shared.
+	 */
+	public boolean function $isSharedModel() {
+		return variables.$sharedModel;
 	}
 
 	/**
@@ -149,7 +171,8 @@ component output=false extends="wheels.Global"{
 	public any function $identitySelect(
 		required struct queryAttributes,
 		required struct result,
-		required string primaryKey
+		required string primaryKey,
+		any returningIdentity = ""
 	) {
 		local.query = {};
 		local.sql = Trim(arguments.result.sql);
@@ -455,7 +478,7 @@ component output=false extends="wheels.Global"{
 			arguments.type = $getValidationType(arguments.sqlType);
 		}
 		if (!ListFindNoCase("integer,float,boolean", arguments.type) || !Len(arguments.str)) {
-			local.rv = "'#arguments.str#'";
+			local.rv = "'#Replace(arguments.str, "'", "''", "all")#'";
 		} else {
 			local.rv = arguments.str;
 		}
@@ -547,6 +570,19 @@ component output=false extends="wheels.Global"{
 		string $primaryKey = "",
 		string $debugName = "query"
 	) {
+		// Multi-tenant datasource override: if a tenant is active and this model
+		// is not shared, route the query to the tenant's datasource.
+		// Use IsDefined() for safe nested scope traversal — StructKeyExists on
+		// the request scope can throw during app startup when request.wheels is absent.
+		if (
+			!variables.$sharedModel
+			&& arguments.dataSource == variables.dataSource
+			&& IsDefined("request.wheels.tenant.dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
+			arguments.dataSource = request.wheels.tenant.dataSource;
+		}
+
 		local.queryAttributes = {};
 		local.queryAttributes.dataSource = arguments.dataSource;
 		local.queryAttributes.username = variables.username;

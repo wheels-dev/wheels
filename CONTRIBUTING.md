@@ -41,9 +41,21 @@ We welcome contributions via **Issues** and **Pull Requests (PRs)**. Before you 
 
 ### Development Environment Setup
 
+**Quick Start (recommended):**
+
+```bash
+git clone https://github.com/wheels-dev/wheels.git
+cd wheels
+bash tools/scripts/setup.sh
+```
+
+This single command checks prerequisites, starts a MySQL container, installs dependencies via CommandBox, and verifies the environment. Run `bash tools/scripts/setup.sh --help` for options including `--full` (all databases) and `--docker` (no local CommandBox needed).
+
 **System Requirements:**
 
+* Docker and Docker Compose
 * Adobe ColdFusion 2018/2021/2023/2025 OR Lucee 5/6/7
+* CommandBox (optional with `--docker` mode)
 * Supported database: H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle, SQLite
 * Git for version control
 
@@ -52,11 +64,12 @@ In general, we follow the ["fork-and-pull" Git workflow](https://github.com/susa
 
 1. Fork the [wheels-dev/wheels](https://github.com/wheels-dev/wheels) repository to your own Github account
 2. Clone the project to your machine
-3. Create a branch locally with a succinct but descriptive name
-4. Commit changes to the branch
-5. Following the formatting and testing guidelines
-6. Push changes to your fork
-7. Open a PR in the [wheels-dev/wheels](https://github.com/wheels-dev/wheels) repository and follow the PR template so that we can efficiently review the changes.
+3. Run `bash tools/scripts/setup.sh` to set up your dev environment
+4. Create a branch locally with a succinct but descriptive name
+5. Commit changes to the branch
+6. Following the formatting and testing guidelines
+7. Push changes to your fork
+8. Open a PR in the [wheels-dev/wheels](https://github.com/wheels-dev/wheels) repository and follow the PR template so that we can efficiently review the changes.
 
 ---
 
@@ -101,6 +114,19 @@ We welcome PRs of all sizes — from typo fixes to major features. To make revie
 * Respect the `.editorconfig` settings for consistent formatting
 * Use meaningful variable and function names
 * Add comments for complex logic
+
+**Definition of Done:**
+
+A feature or enhancement is not complete until all of the following are satisfied:
+
+* **Tests** -- Unit tests covering happy path, edge cases, and error conditions in `vendor/wheels/tests/specs/`
+* **Framework Docs** -- New or updated page in `docs/src/` with a corresponding entry in `docs/src/SUMMARY.md`
+* **AI Reference Docs** -- New or updated file in `.ai/wheels/` so AI assistants have accurate context
+* **CLAUDE.md** -- Updated if the feature changes model, controller, or view conventions
+* **CHANGELOG.md** -- Entry under the `[Unreleased]` section
+* **Test runner passes** -- All existing tests still pass (`/wheels/app/tests?format=json`)
+
+Bug-fix PRs require tests and a CHANGELOG entry at minimum. Documentation-only PRs are exempt from the test requirement.
 
 If you're making a **breaking change** or working on **core functionality**, it's best to open an Issue first to discuss the approach.
 

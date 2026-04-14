@@ -1,0 +1,18 @@
+{
+  "name": "wheels",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Wheels CFML MVC Framework — dev tooling only",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.5.0",
+    "husky": "^9.0.0",
+    "dotenv": "^17.4.1"
+  }
+}

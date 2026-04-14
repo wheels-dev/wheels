@@ -29,10 +29,20 @@ component output="false" {
 		for (local.spec in variables.specs) {
 			// Merge WHERE clauses with AND
 			if (StructKeyExists(local.spec, "where") && Len(local.spec.where)) {
+				local.resolvedWhere = local.spec.where;
+				// If the scope carries whereParams, resolve ? placeholders into quoted values.
+				// The downstream SQL builder ($whereClause) will re-extract these via RESQLWhere
+				// regex and convert them into cfqueryparam parameters for true parameterized execution.
+				if (StructKeyExists(local.spec, "whereParams") && IsArray(local.spec.whereParams)) {
+					for (local.p in local.spec.whereParams) {
+						local.quotedVal = "'" & variables.modelReference.$escapeSqlValue(ToString(local.p.value)) & "'";
+						local.resolvedWhere = Replace(local.resolvedWhere, "?", local.quotedVal, "one");
+					}
+				}
 				if (StructKeyExists(local.merged, "where") && Len(local.merged.where)) {
-					local.merged.where = "(#local.merged.where#) AND (#local.spec.where#)";
+					local.merged.where = "(#local.merged.where#) AND (#local.resolvedWhere#)";
 				} else {
-					local.merged.where = local.spec.where;
+					local.merged.where = local.resolvedWhere;
 				}
 			}
 			// Append ORDER BY clauses
@@ -196,9 +206,10 @@ component output="false" {
 
 			// If the scope has a handler, call it to get dynamic spec
 			if (StructKeyExists(local.scopeDef, "handler") && Len(local.scopeDef.handler)) {
+				local.sanitizedArgs = variables.modelReference.$sanitizeScopeHandlerArgs(arguments.missingMethodArguments);
 				local.spec = variables.modelReference.$invoke(
 					method = local.scopeDef.handler,
-					invokeArgs = arguments.missingMethodArguments
+					invokeArgs = local.sanitizedArgs
 				);
 			} else {
 				local.spec = Duplicate(local.scopeDef);

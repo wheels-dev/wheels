@@ -285,9 +285,20 @@ component {
 			if (Len(arguments.appendToPage)) {
 				arguments.appendToPage = EncodeForHTML($canonicalize(arguments.appendToPage));
 			}
+			if (Len(arguments.anchorDivider)) {
+				arguments.anchorDivider = EncodeForHTML($canonicalize(arguments.anchorDivider));
+			}
 		}
 
 		if (arguments.showSinglePage || local.totalPages > 1) {
+			// Strip event handlers from appendToPage (parallel to prependToPage sanitization in the loop)
+			if (Len(arguments.appendToPage)) {
+				local.sanitizedAppend = reReplaceNoCase(arguments.appendToPage, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+				local.sanitizedAppend = reReplaceNoCase(local.sanitizedAppend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+				local.sanitizedAppend = reReplaceNoCase(local.sanitizedAppend, 'javascript\s*:', '', 'all');
+			} else {
+				local.sanitizedAppend = arguments.appendToPage;
+			}
 			if (Len(arguments.prepend)) {
 				local.start &= arguments.prepend;
 			}
@@ -307,12 +318,22 @@ component {
 						local.start &= arguments.prependToPage;
 					}
 					local.start &= linkTo(argumentCollection = local.linkToArguments);
-					if (Len(arguments.appendToPage) && arguments.appendOnAnchor) {
-						local.start &= arguments.appendToPage;
+					if (Len(local.sanitizedAppend) && arguments.appendOnAnchor) {
+						local.start &= local.sanitizedAppend;
 					}
 					local.start &= arguments.anchorDivider;
 				}
 			}
+			// Sanitize prependToPage once before the loop (input doesn't change per iteration).
+			// First decode HTML numeric entities so that encoded payloads like &#111;nmouseover
+			// are normalised before the regex strips event handlers and javascript: URIs.
+			if (Len(arguments.prependToPage)) {
+				local.decodedPrepend = $decodeHtmlEntities(arguments.prependToPage);
+				local.sanitizedPrepend = reReplaceNoCase(local.decodedPrepend, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+				local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+				local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, 'javascript\s*:', '', 'all');
+			}
+
 			local.middle = "";
 			for (local.i = 1; local.i <= local.totalPages; local.i++) {
 				if (
@@ -347,21 +368,27 @@ component {
 							We need the paginationLinks() function to set the active class to the parent of the current page item.
 							The changes made here set the active class to the immediate parent of the current page element in case nested elements are passed in.
 						 */
-						if(local.currentPage == local.i  && arguments.addActiveClassToPrependedParent && findNoCase('class', arguments.prependToPage)) {
-							local.prependToPageElementArr = listToArray(arguments.prependToPage, '<');
-							local.lastElementArrIndex = arrayLen(local.prependToPageElementArr);
-							local.lastElement = local.prependToPageElementArr[local.lastElementArrIndex];
-							local.classStringIndex = findNoCase('class=', local.lastElement) + 6;
-							local.startString = mid(local.lastElement, 1, local.classStringIndex);
-							local.midString = mid(local.lastElement, local.classStringIndex+1, len(local.lastElement)-local.classStringIndex+1);
-							local.activeMidString = 'active ' & local.midString;
-							local.modifiedLastElement = local.startString & local.activeMidString;
-							local.prependToPageElementArr[local.lastElementArrIndex] = local.modifiedLastElement;
-							local.activePrependToPage = arrayToList(local.prependToPageElementArr, '<');
-							local.activePrependToPage = '<' & local.activePrependToPage;
+
+						if(local.currentPage == local.i  && arguments.addActiveClassToPrependedParent && findNoCase('class', local.sanitizedPrepend)) {
+							// Inject "active " into the class attribute value via regex
+							if (reFindNoCase('class\s*=\s*[''"]', local.sanitizedPrepend)) {
+								local.activePrependToPage = reReplaceNoCase(
+									local.sanitizedPrepend,
+									'(class\s*=\s*[''"])',
+									'\1active ',
+									'one'
+								);
+							} else {
+								local.activePrependToPage = reReplaceNoCase(
+									local.sanitizedPrepend,
+									'(class\s*=\s*)',
+									'\1active ',
+									'one'
+								);
+							}
 							local.middle &= local.activePrependToPage;
 						} else {
-							local.middle &= arguments.prependToPage;
+							local.middle &= local.sanitizedPrepend;
 						}
 					}
 					if (local.currentPage != local.i || arguments.linkToCurrentPage) {
@@ -378,8 +405,8 @@ component {
 							local.middle &= NumberFormat(local.i);
 						}
 					}
-					if (Len(arguments.appendToPage)) {
-						local.middle &= arguments.appendToPage;
+					if (Len(local.sanitizedAppend)) {
+						local.middle &= local.sanitizedAppend;
 					}
 				}
 			}
@@ -399,8 +426,8 @@ component {
 						local.end &= arguments.prependToPage;
 					}
 					local.end &= linkTo(argumentCollection = local.linkToArguments);
-					if (Len(arguments.appendToPage) && arguments.appendOnAnchor) {
-						local.end &= arguments.appendToPage;
+					if (Len(local.sanitizedAppend) && arguments.appendOnAnchor) {
+						local.end &= local.sanitizedAppend;
 					}
 				}
 			}
@@ -416,8 +443,8 @@ component {
 					Len(local.middle) - Len(arguments.prependToPage)
 				);
 			}
-			if (Len(arguments.appendToPage) && !arguments.appendOnLast) {
-				local.middle = Mid(local.middle, 1, Len(local.middle) - Len(arguments.appendToPage));
+			if (Len(local.sanitizedAppend) && !arguments.appendOnLast) {
+				local.middle = Mid(local.middle, 1, Len(local.middle) - Len(local.sanitizedAppend));
 			}
 		}
 		return local.start & local.middle & local.end;
@@ -440,8 +467,7 @@ component {
 
 		// Create anchor elements with an href attribute for all URLs found in the text.
 		if (arguments.link != "emailAddresses") {
-			// For BoxLang compatibility
-			if (structKeyExists(server, "boxlang")) {
+			if ($engineAdapter().isBoxLang()) {
 				local.anchors = [];
 				local.tempText = arguments.text;
 				local.anchorMatches = ReMatchNoCase("<a\s[^>]*>.*?</a>", local.tempText);
@@ -519,6 +545,39 @@ component {
 			local.match = ReFindNoCase(arguments.regex, arguments.text, local.startPosition, true);
 		}
 		return arguments.text;
+	}
+
+	/**
+	 * Decodes HTML numeric entities (decimal &#NNN; and hex &#xHH;) to their character equivalents.
+	 * Used to normalise input before regex-based XSS sanitisation so that entity-encoded
+	 * payloads like &#111;nmouseover cannot bypass the pattern checks.
+	 */
+	public string function $decodeHtmlEntities(required string input) {
+		local.result = arguments.input;
+		// Decode hex entities: &#xHH;
+		local.pos = 1;
+		while (true) {
+			local.match = reFindNoCase('&##x([0-9a-f]+);', local.result, local.pos, true);
+			if (local.match.pos[1] == 0) break;
+			local.hex = Mid(local.result, local.match.pos[2], local.match.len[2]);
+			local.char = Chr(InputBaseN(local.hex, 16));
+			// Lucee 7 doesn't allow Left(str, 0); guard against match at position 1
+			local.prefix = local.match.pos[1] > 1 ? Left(local.result, local.match.pos[1] - 1) : "";
+			local.result = local.prefix & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
+			local.pos = local.match.pos[1] + Len(local.char);
+		}
+		// Decode decimal entities: &#NNN;
+		local.pos = 1;
+		while (true) {
+			local.match = reFind('&##(\d+);', local.result, local.pos, true);
+			if (local.match.pos[1] == 0) break;
+			local.dec = Mid(local.result, local.match.pos[2], local.match.len[2]);
+			local.char = Chr(Int(local.dec));
+			local.prefix = local.match.pos[1] > 1 ? Left(local.result, local.match.pos[1] - 1) : "";
+			local.result = local.prefix & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
+			local.pos = local.match.pos[1] + Len(local.char);
+		}
+		return local.result;
 	}
 
 	public string function $paramsToQueryString(required any params) {

@@ -18,6 +18,40 @@ component output="false" displayName="MCP Server" {
 		return this;
 	}
 
+	/** Rejects shell metacharacters (; | & $ ` ( ) { } < > ' " \ ~ ! * ? [ ] ^ % newlines) */
+	private boolean function $isSafeArgument(required string value) {
+		return reFind("[;\|&\$`\(\)\{\}<>\n\r'""\~\\!\*\?\[\]\^%]", arguments.value) == 0;
+	}
+
+	/** Allowlist: letters + digits, must start with a letter */
+	private boolean function $isValidType(required string value) {
+		return reFind("^[a-zA-Z][a-zA-Z0-9]*$", arguments.value) > 0;
+	}
+
+	/** Allowlist: letters, digits, underscores, dots; must start with letter or underscore */
+	private boolean function $isValidName(required string value) {
+		return reFind("^[a-zA-Z_][a-zA-Z0-9_\.]*$", arguments.value) > 0;
+	}
+
+	/** Allowlist: letters, digits, underscores, dots, hyphens, slashes */
+	private boolean function $isValidTarget(required string value) {
+		return reFind("^[a-zA-Z0-9_\.\-\/]*$", arguments.value) > 0;
+	}
+
+	/** Returns a validated local port from cgi.server_port (never trusts client headers) */
+	private numeric function $getLocalPort() {
+		local.port = cgi.server_port;
+		if (isNumeric(local.port) && local.port > 0 && local.port <= 65535) {
+			return int(local.port);
+		}
+		return StructKeyExists(server, "lucee") ? 60000 : 8500;
+	}
+
+	/** Validates that a URL targets localhost only */
+	private boolean function $isLocalUrl(required string url) {
+		return reFindNoCase("^https?://localhost:\d+", arguments.url) > 0;
+	}
+
 	public any function handleRequest(required any request, required string sessionId) {
 		// Handle batch requests (array of requests)
 		if (isArray(arguments.request)) {
@@ -957,15 +991,13 @@ Provide migration code following Wheels conventions."
 
 	private string function fetchFromAIEndpoint(required string endpoint) {
 		// Use the existing AI endpoint infrastructure
-		// Try to use the same port as the current request
-		local.currentPort = cgi.server_port;
-		if (local.currentPort == 0 || !len(local.currentPort)) {
-			// Fallback to default ports
-			local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-		}
+		local.currentPort = $getLocalPort();
 		local.url = "http://localhost:" & local.currentPort & arguments.endpoint;
 
 		try {
+			if (!$isLocalUrl(local.url)) {
+				return "Error: Internal request URL validation failed.";
+			}
 			cfhttp(url=local.url, method="GET", timeout="10", result="local.httpResult");
 
 			if (local.httpResult.status_code == 200) {
@@ -989,6 +1021,22 @@ Provide migration code following Wheels conventions."
 	private string function executeWheelsGenerate(required struct args) {
 		if (!structKeyExists(arguments.args, "type") || !structKeyExists(arguments.args, "name")) {
 			return "Error: Missing required parameters 'type' and 'name'";
+		}
+
+		if (!$isValidType(arguments.args.type)) {
+			return "Error: Invalid 'type' parameter. Must be alphanumeric (e.g., model, controller, scaffold).";
+		}
+
+		if (!$isValidName(arguments.args.name)) {
+			return "Error: Invalid 'name' parameter. Must be alphanumeric with optional underscores and dots.";
+		}
+
+		if (structKeyExists(arguments.args, "attributes") && len(arguments.args.attributes) && !$isSafeArgument(arguments.args.attributes)) {
+			return "Error: Invalid 'attributes' parameter. Contains disallowed characters.";
+		}
+
+		if (structKeyExists(arguments.args, "actions") && len(arguments.args.actions) && !$isSafeArgument(arguments.args.actions)) {
+			return "Error: Invalid 'actions' parameter. Contains disallowed characters.";
 		}
 
 		// Handle test generation to ensure proper directory structure
@@ -1017,6 +1065,12 @@ Provide migration code following Wheels conventions."
 		try {
 			// Determine test type and target directory
 			local.testName = arguments.args.name;
+
+			// Validate test name: only letters, digits, underscores; must start with a letter
+			if (!ReFind("^[a-zA-Z][a-zA-Z0-9_]*$", local.testName)) {
+				return "Error: Invalid test name. Use only letters, numbers, and underscores, starting with a letter.";
+			}
+
 			local.testType = "model"; // default
 			local.targetDir = "";
 
@@ -1062,6 +1116,13 @@ Provide migration code following Wheels conventions."
 			// Generate test file content
 			local.testFileName = local.testName & "Test.cfc";
 			local.testFilePath = local.fullTargetDir & local.testFileName;
+
+			// Defense-in-depth: verify resolved path stays within the target directory
+			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.testFilePath).getCanonicalPath();
+			local.canonicalBase = CreateObject("java", "java.io.File").init(local.fullTargetDir).getCanonicalPath();
+			if (!local.canonicalTarget.startsWith(local.canonicalBase)) {
+				return "Error: Invalid test file path - path traversal detected.";
+			}
 
 			// Create test file with proper TestBox structure
 			local.testContent = createTestFileContent(local.testName, local.testType);
@@ -1143,11 +1204,12 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'action'";
 		}
 
+		if (!$isValidType(arguments.args.action)) {
+			return "Error: Invalid 'action' parameter. Must be alphanumeric (e.g., info, latest, up, down, reset).";
+		}
+
 		try {
-			local.currentPort = cgi.server_port;
-			if (local.currentPort == 0 || !len(local.currentPort)) {
-				local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-			}
+			local.currentPort = $getLocalPort();
 			local.baseUrl = "http://localhost:" & local.currentPort & "/wheels/migrator";
 
 			switch (arguments.args.action) {
@@ -1174,6 +1236,9 @@ Provide migration code following Wheels conventions."
 		local.command = "wheels test run";
 
 		if (structKeyExists(arguments.args, "target") && len(arguments.args.target)) {
+			if (!$isValidTarget(arguments.args.target)) {
+				return "Error: Invalid 'target' parameter. Must be alphanumeric with optional dots, hyphens, underscores, or slashes.";
+			}
 			local.command &= " " & arguments.args.target;
 		}
 
@@ -1189,11 +1254,50 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'action'";
 		}
 
+		// Whitelist allowed server actions to prevent command injection
+		local.allowedActions = "start,stop,restart,status,log,env,info,list";
+		if (!ListFindNoCase(local.allowedActions, arguments.args.action)) {
+			return "Error: Invalid action '#EncodeForHTML(arguments.args.action)#'. Allowed: #local.allowedActions#";
+		}
+
 		local.command = "wheels server " & arguments.args.action;
 		return executeCommand(local.command);
 	}
 
 	private string function executeCommand(required string command) {
+		// Structural allowlist: only permit known wheels subcommands with safe arguments
+		var allowedSubcommands = "g,generate,test,server,dbmigrate,db:seed,jobs,reload,info,new,init,deps";
+
+		if (!len(trim(arguments.command))) {
+			return "Error: Empty command.";
+		}
+
+		if (!reFind("^wheels\s", arguments.command)) {
+			return "Error: Only 'wheels' commands are allowed.";
+		}
+
+		// Strip "wheels " prefix once — used by both primary and fallback paths
+		local.strippedArgs = trim(mid(arguments.command, 7));
+
+		if (!len(local.strippedArgs)) {
+			return "Error: Missing subcommand. Allowed: #allowedSubcommands#";
+		}
+
+		// Parse into parts and validate subcommand against allowlist
+		local.parts = ListToArray(local.strippedArgs, " ");
+		local.subcommand = local.parts[1];
+
+		if (!ListFindNoCase(allowedSubcommands, local.subcommand)) {
+			return "Error: Unknown subcommand '#EncodeForHTML(local.subcommand)#'. Allowed: #allowedSubcommands#";
+		}
+
+		// Validate each subsequent argument for shell metacharacters
+		for (var i = 2; i <= ArrayLen(local.parts); i++) {
+			if (!$isSafeArgument(local.parts[i])) {
+				return "Error: Argument contains disallowed characters.";
+			}
+		}
+
 		try {
 			// Get the application root directory using Application.cfc mappings
 			// The /app mapping points to the application's app directory (e.g., /project/app/)
@@ -1224,7 +1328,7 @@ Provide migration code following Wheels conventions."
 			// Execute the command
 			cfexecute(
 				name = "wheels",
-				arguments = mid(arguments.command, 7), // Remove "wheels " prefix
+				arguments = local.strippedArgs,
 				timeout = "30",
 				variable = "local.result",
 				errorVariable = "local.error",
@@ -1243,7 +1347,7 @@ Provide migration code following Wheels conventions."
 			try {
 				cfexecute(
 					name = "box",
-					arguments = arguments.command,
+					arguments = "wheels " & local.strippedArgs,
 					timeout = "30",
 					variable = "local.result",
 					errorVariable = "local.error",
@@ -1265,19 +1369,7 @@ Provide migration code following Wheels conventions."
 	private string function executeWheelsReload(required struct args) {
 		// Use the proper Wheels reload endpoint via HTTP request
 		try {
-			// Get the current port from HTTP_HOST header (most reliable)
-			local.currentPort = cgi.server_port;
-
-			// Try HTTP_HOST if server_port is not available
-			if (!len(local.currentPort) || local.currentPort == 0) {
-				if (structKeyExists(cgi, "http_host") && find(":", cgi.http_host)) {
-					local.currentPort = listLast(cgi.http_host, ":");
-				} else if (structKeyExists(cgi, "http_host")) {
-					local.currentPort = "80"; // Default HTTP port
-				} else {
-					local.currentPort = "8080"; // Default dev port
-				}
-			}
+			local.currentPort = $getLocalPort();
 
 			// Use the MCP endpoint itself with ?reload=true parameter - much simpler!
 			local.reloadUrl = "http://localhost:" & local.currentPort & "/wheels/mcp?reload=true";
@@ -1292,6 +1384,9 @@ Provide migration code following Wheels conventions."
 
 			// Method 1: HTTP request to /wheels/mcp?reload=true (cleanest approach)
 			try {
+				if (!$isLocalUrl(local.reloadUrl)) {
+					return "Error: Internal request URL validation failed.";
+				}
 				cfhttp(url=local.reloadUrl, method="GET", timeout="10", result="local.httpResult");
 
 				if (structKeyExists(local.httpResult, "status_code") &&
@@ -1360,11 +1455,12 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'target'";
 		}
 
+		if (!$isValidTarget(arguments.args.target)) {
+			return "Error: Invalid 'target' parameter. Must be alphanumeric (e.g., models, controllers, routes, all).";
+		}
+
 		try {
-			local.currentPort = cgi.server_port;
-			if (local.currentPort == 0 || !len(local.currentPort)) {
-				local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-			}
+			local.currentPort = $getLocalPort();
 			local.analysisUrl = "http://localhost:" & local.currentPort;
 
 			switch(arguments.args.target) {
@@ -1382,6 +1478,9 @@ Provide migration code following Wheels conventions."
 					return "Error: Invalid target '" & arguments.args.target & "'";
 			}
 
+			if (!$isLocalUrl(local.analysisUrl)) {
+				return "Error: Internal request URL validation failed.";
+			}
 			cfhttp(url=local.analysisUrl, method="GET", timeout="10", result="local.httpResult");
 
 			if (local.httpResult.status_code == 200) {
@@ -1421,6 +1520,9 @@ Provide migration code following Wheels conventions."
 
 			if (structKeyExists(arguments.args, "model") && len(arguments.args.model)) {
 				if (arguments.args.model != "all") {
+					if (!$isValidName(arguments.args.model)) {
+						return "Error: Invalid 'model' parameter. Must be alphanumeric with optional underscores and dots.";
+					}
 					local.command &= " models/" & arguments.args.model;
 				}
 			}
@@ -1434,6 +1536,9 @@ Provide migration code following Wheels conventions."
 	// Helper functions for migration operations
 
 	private string function getMigrationInfo(required string baseUrl) {
+		if (!$isLocalUrl(arguments.baseUrl)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -1480,6 +1585,9 @@ Provide migration code following Wheels conventions."
 	private string function executeMigrationCommand(required string baseUrl, required string command, required string version) {
 		local.url = arguments.baseUrl & "/" & arguments.command & "/" & arguments.version & "?confirm=1";
 
+		if (!$isLocalUrl(local.url)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=local.url, method="POST", timeout="30", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -1525,6 +1633,9 @@ Provide migration code following Wheels conventions."
 		}
 
 		// Get full migration data to find next pending migration
+		if (!$isLocalUrl(arguments.baseUrl)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -1550,6 +1661,9 @@ Provide migration code following Wheels conventions."
 
 	private string function executeMigrationDown(required string baseUrl) {
 		// Get current migration info to determine previous version
+		if (!$isLocalUrl(arguments.baseUrl)) {
+			return "Error: Internal request URL validation failed.";
+		}
 		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
 
 		if (local.httpResult.status_code == 200) {
@@ -1586,15 +1700,41 @@ Provide migration code following Wheels conventions."
 
 	// Helper functions for .ai documentation
 
+	/**
+	 * Validates a path segment is safe (no traversal or null bytes) and returns
+	 * the cleaned absolute path constrained within the application root.
+	 * Returns empty string if validation fails.
+	 */
+	private string function $validateDocumentationPath(required string relativePath) {
+		// Reject path traversal sequences and null bytes early
+		if (Find("..", arguments.relativePath) || Find(Chr(0), arguments.relativePath)) {
+			return "";
+		}
+
+		local.basePath = expandPath("/");
+		local.fullPath = local.basePath & arguments.relativePath;
+
+		// Clean up path separators
+		local.fullPath = replace(local.fullPath, "\\", "/", "all");
+		local.fullPath = replace(local.fullPath, "//", "/", "all");
+
+		// Canonical path containment check to prevent traversal
+		local.canonicalBase = CreateObject("java", "java.io.File").init(local.basePath).getCanonicalPath();
+		local.canonicalTarget = CreateObject("java", "java.io.File").init(local.fullPath).getCanonicalPath();
+
+		if (!local.canonicalTarget.startsWith(local.canonicalBase)) {
+			return "";
+		}
+
+		return local.fullPath;
+	}
+
 	private string function readAIDocumentation(required string filename) {
 		try {
-			// Ensure path is relative to application root
-			local.basePath = expandPath("/");
-			local.filePath = local.basePath & ".ai/" & arguments.filename;
-
-			// Clean up path separators
-			local.filePath = replace(local.filePath, "\\", "/", "all");
-			local.filePath = replace(local.filePath, "//", "/", "all");
+			local.filePath = $validateDocumentationPath(".ai/" & arguments.filename);
+			if (!len(local.filePath)) {
+				return "Error: Invalid filename";
+			}
 
 			if (fileExists(local.filePath)) {
 				return fileRead(local.filePath);
@@ -1608,13 +1748,10 @@ Provide migration code following Wheels conventions."
 
 	private string function aggregateAIDocumentation(required string folderPath) {
 		try {
-			// Ensure path is relative to application root
-			local.basePath = expandPath("/");
-			local.fullPath = local.basePath & arguments.folderPath;
-
-			// Clean up path separators
-			local.fullPath = replace(local.fullPath, "\\", "/", "all");
-			local.fullPath = replace(local.fullPath, "//", "/", "all");
+			local.fullPath = $validateDocumentationPath(arguments.folderPath);
+			if (!len(local.fullPath)) {
+				return "Error: Invalid folder path";
+			}
 
 			local.aggregatedContent = "";
 
@@ -1661,6 +1798,10 @@ Provide migration code following Wheels conventions."
 	private string function executeWheelsDevelop(required struct args) {
 		if (!structKeyExists(arguments.args, "task")) {
 			return "Error: Missing required parameter 'task'";
+		}
+
+		if (!$isSafeArgument(arguments.args.task)) {
+			return "Error: Invalid 'task' parameter. Contains disallowed characters.";
 		}
 
 		local.task = arguments.args.task;
@@ -2156,22 +2297,9 @@ Provide migration code following Wheels conventions."
 
 	private string function performBrowserTesting(required struct plan) {
 		local.result = "";
-		local.currentPort = cgi.server_port;
 
 		try {
-			// Get current port (same logic as reload function)
-			if (local.currentPort == 0 || !len(local.currentPort)) {
-				if (structKeyExists(cgi, "http_host") && find(":", cgi.http_host)) {
-					local.hostParts = listToArray(cgi.http_host, ":");
-					if (arrayLen(local.hostParts) >= 2) {
-						local.currentPort = local.hostParts[2];
-					}
-				}
-				if (local.currentPort == 0 || !len(local.currentPort)) {
-					local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
-				}
-			}
-
+			local.currentPort = $getLocalPort();
 			local.baseUrl = "http://localhost:" & local.currentPort;
 
 			local.result &= "• Testing homepage..." & chr(10);

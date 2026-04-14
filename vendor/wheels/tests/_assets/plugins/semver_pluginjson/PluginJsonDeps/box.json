@@ -1,0 +1,7 @@
+{
+	"name": "PluginJsonDeps",
+	"version": "1.0.0",
+	"dependencies": {
+		"DepPlugin": ">=9.0.0"
+	}
+}

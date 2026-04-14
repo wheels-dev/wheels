@@ -1,7 +1,7 @@
 # Background Jobs
 
 ## Description
-Wheels provides a database-backed job queue system for running tasks asynchronously. Jobs are persisted to a `_wheels_jobs` table, processed in priority order, and automatically retried with exponential backoff on failure.
+Wheels provides a database-backed job queue system for running tasks asynchronously. Jobs are persisted to a `wheels_jobs` table, processed in priority order, and automatically retried with exponential backoff on failure.
 
 ## Key Points
 - Jobs extend `wheels.Job` and implement a `perform()` method
@@ -17,7 +17,7 @@ Wheels provides a database-backed job queue system for running tasks asynchronou
 ```bash
 wheels dbmigrate latest
 ```
-This creates the `_wheels_jobs` table. The migration is at `app/migrator/migrations/20260221000001_create_wheels_jobs_table.cfc`.
+This creates the `wheels_jobs` table. The migration is at `app/migrator/migrations/20260221000001_createwheels_jobs_table.cfc`.
 
 ### 2. Create a Job
 ```cfm
@@ -177,7 +177,7 @@ count = job.purgeCompleted(days=30, queue="reports");
 
 ## Database Schema
 
-The `_wheels_jobs` table has these columns:
+The `wheels_jobs` table has these columns:
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -198,7 +198,35 @@ The `_wheels_jobs` table has these columns:
 
 ## Running Workers
 
-### Scheduled Task (Recommended)
+### Job Worker Daemon (Recommended)
+Use the CLI worker daemon for persistent job processing:
+
+```bash
+# Start a worker for all queues
+wheels jobs work
+
+# Process specific queues with custom interval
+wheels jobs work --queue=mailers,default --interval=3
+
+# Run multiple workers for parallelism
+wheels jobs work --queue=mailers &
+wheels jobs work --queue=default &
+```
+
+Workers claim jobs using optimistic locking (`UPDATE WHERE status='pending' AND id=:id`), so multiple workers can safely run concurrently without processing duplicates.
+
+### CLI Management Commands
+```bash
+wheels jobs status              # Per-queue breakdown
+wheels jobs status --format=json # JSON output
+wheels jobs retry               # Reset failed jobs to pending
+wheels jobs retry --queue=mailers --limit=10
+wheels jobs purge               # Purge completed jobs > 7 days
+wheels jobs purge --completed --failed --older-than=30
+wheels jobs monitor             # Live dashboard
+```
+
+### Scheduled Task (Alternative)
 Set up a CFML scheduled task to call `processQueue()` periodically:
 
 ```cfm
@@ -220,10 +248,57 @@ function processJobs() {
 }
 ```
 
-### CLI Command
-```bash
-# Process jobs via a controller endpoint
-curl http://localhost:8080/jobs/process?queue=default&limit=50
+## JobWorker Engine
+The `wheels.JobWorker` CFC provides the core worker logic:
+- `processNext(queues, timeout)` — Claim and process one job with optimistic locking
+- `checkTimeouts(timeout)` — Recover jobs stuck in 'processing'
+- `getStats(queue)` — Per-queue breakdown with totals
+- `getMonitorData(queue, minutes)` — Throughput, error rates, recent jobs
+- `retryFailed(queue, limit)` — Reset failed jobs to pending
+- `purge(status, days, queue)` — Delete old completed/failed jobs
+
+## Configurable Backoff
+Jobs support configurable exponential backoff via `this.baseDelay` and `this.maxDelay`:
+```cfm
+this.baseDelay = 2;     // Base delay in seconds (default: 2)
+this.maxDelay = 3600;   // Maximum delay cap (default: 3600)
+// Formula: Min(baseDelay * 2^attempt, maxDelay)
+```
+
+## Multi-Tenant Jobs
+
+Jobs automatically capture and restore tenant context. When a job is enqueued within a tenant request, the current `request.wheels.tenant` is serialized into the job's data as `$wheelsTenantContext`. When the job processes, the context is restored before `perform()` runs and removed from the data struct.
+
+### Capture (on enqueue)
+```cfm
+// In Job.cfc $insertJob() — automatic, no user code needed
+if (IsDefined("request.wheels.tenant.dataSource") && Len(request.wheels.tenant.dataSource)) {
+    arguments.data["$wheelsTenantContext"] = {
+        id: request.wheels.tenant.id,
+        dataSource: request.wheels.tenant.dataSource,
+        config: request.wheels.tenant.config
+    };
+}
+```
+
+### Restore (on process)
+```cfm
+// In Job.cfc $processJob() — automatic
+// 1. Deserialize job data
+// 2. If $wheelsTenantContext exists, set request.wheels.tenant
+// 3. Remove $wheelsTenantContext from data before calling perform()
+// 4. Call perform(data)
+// 5. Clean up request.wheels.tenant in finally block
+```
+
+### Example
+```cfm
+// Enqueued within a tenant request — context captured automatically
+job = new app.jobs.GenerateInvoiceJob();
+job.enqueue(data={userId: user.id});
+
+// When processed, perform() runs with the tenant's datasource active
+// model("Invoice").create(...) hits the correct tenant database
 ```
 
 ## Best Practices

@@ -104,6 +104,7 @@ component {
 			variables.wheels.class.mapping[arguments.name].value = arguments.column;
 		}
 		if (Len(arguments.sql)) {
+			$validateCalculatedPropertySql(sql=arguments.sql, propertyName=arguments.name);
 			variables.wheels.class.mapping[arguments.name].type = "sql";
 			variables.wheels.class.mapping[arguments.name].value = arguments.sql;
 			variables.wheels.class.mapping[arguments.name].select = arguments.select;
@@ -326,6 +327,7 @@ component {
 	 */
 	public struct function properties(boolean returnIncluded = true) {
 		local.rv = {};
+		local.propNames = propertyNames();
 		// loop through all properties and functions in the this scope
 		for (local.key in this) {
 			// don't return nested properties if returnIncluded is false
@@ -338,9 +340,9 @@ component {
 			}
 			if ($get("resetPropertiesStructKeyCase")) {
 				// try to get the property name from the list set on the object, this is just to avoid returning everything in ugly upper case which Adobe ColdFusion does by default
-				local.listPosition = ListFindNoCase(propertyNames(), local.key);
+				local.listPosition = ListFindNoCase(local.propNames, local.key);
 				if (local.listPosition) {
-					local.key = ListGetAt(propertyNames(), local.listPosition);
+					local.key = ListGetAt(local.propNames, local.listPosition);
 				}
 			}
 			// set property from the this scope in the struct that we will return
@@ -539,23 +541,7 @@ component {
 		struct associations = variables.wheels.class.associations
 	) {
 		if (IsObject(arguments.value)) {
-			// Handle Oracle BLOB objects in BoxLang
-			if (structKeyExists(server, "boxlang") && !IsStruct(arguments.value)) {
-				try {
-					local.className = GetMetadata(arguments.value).getName();
-					if (local.className == "oracle.sql.BLOB") {
-						// Convert Oracle BLOB to binary using getBytes() method
-						this[arguments.property] = arguments.value.getBytes();
-					} else {
-						this[arguments.property] = arguments.value;
-					}
-				} catch (any e) {
-					// If getMetadata fails, treat as regular object
-					this[arguments.property] = arguments.value;
-				}
-			} else {
-				this[arguments.property] = arguments.value;
-			}
+			this[arguments.property] = $resolveObjectValue(arguments.value);
 		} else if (
 			IsStruct(arguments.value)
 			&& StructKeyExists(arguments.associations, arguments.property)
@@ -597,6 +583,13 @@ component {
 	}
 
 	/**
+	 * Resolves an object value, converting Oracle JDBC objects via the engine adapter.
+	 */
+	public any function $resolveObjectValue(required any value) {
+		return $engineAdapter().coerceOracleObject(arguments.value);
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $updatePersistedProperties(string property) {
@@ -612,24 +605,16 @@ component {
 	 * Internal function.
 	 */
 	public any function $setDefaultValues() {
-		// persisted properties
-		for (local.key in variables.wheels.class.properties) {
-			if (
-				StructKeyExists(variables.wheels.class.properties[local.key], "defaultValue")
-				&& (!StructKeyExists(this, local.key) || !Len(this[local.key]))
-			) {
-				// set the default value unless it is blank or a value already exists for that property on the object
-				this[local.key] = variables.wheels.class.properties[local.key].defaultValue;
-			}
-		}
-		// non-persisted properties
-		for (local.key in variables.wheels.class.mapping) {
-			if (
-				StructKeyExists(variables.wheels.class.mapping[local.key], "defaultValue")
-				&& (!StructKeyExists(this, local.key) || !Len(this[local.key]))
-			) {
-				// set the default value unless it is blank or a value already exists for that property on the object
-				this[local.key] = variables.wheels.class.mapping[local.key].defaultValue;
+		// Set defaults from both persisted properties and non-persisted mappings
+		local.sources = [variables.wheels.class.properties, variables.wheels.class.mapping];
+		for (local.source in local.sources) {
+			for (local.key in local.source) {
+				if (
+					StructKeyExists(local.source[local.key], "defaultValue")
+					&& (!StructKeyExists(this, local.key) || !Len(this[local.key]))
+				) {
+					this[local.key] = local.source[local.key].defaultValue;
+				}
 			}
 		}
 	}
@@ -666,6 +651,150 @@ component {
 			local.rv = humanize(arguments.property);
 		}
 
+		return local.rv;
+	}
+
+	/**
+	 * Returns a struct containing all association definitions for this model.
+	 * Each key is the association name, and the value is a struct with association metadata
+	 * including `type` (belongsTo, hasMany, hasOne), `modelName`, `foreignKey`, `joinKey`, and `dependent`.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function associationInfo() {
+		return variables.wheels.class.associations;
+	}
+
+	/**
+	 * Returns a list of association names defined on this model.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public string function associationNames() {
+		return StructKeyList(variables.wheels.class.associations);
+	}
+
+	/**
+	 * Returns a struct containing all validation rules for this model, keyed by trigger (`onSave`, `onCreate`, `onUpdate`).
+	 * Each trigger contains an array of validation rule structs with `method`, `properties`, `message`, and other parameters.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function validationInfo() {
+		return variables.wheels.class.validations;
+	}
+
+	/**
+	 * Returns a struct containing all enum definitions for this model.
+	 * Each key is the property name, and the value contains `values` (name-to-stored-value mapping) and `names` (list of enum names).
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function enumInfo() {
+		return variables.wheels.class.enums;
+	}
+
+	/**
+	 * Returns a struct containing all named scope definitions for this model.
+	 * Each key is the scope name, and the value is a struct with query fragment keys like `where`, `order`, `select`, `include`.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function scopeInfo() {
+		return variables.wheels.class.scopes;
+	}
+
+	/**
+	 * Escapes a string value for safe inclusion in a SQL literal.
+	 * Strips null bytes, doubles backslashes (MySQL escape sequences), and doubles single quotes.
+	 *
+	 * DEPRECATED: Prefer parameterized queries (cfqueryparam / whereParams) over string escaping.
+	 * This function is retained for backwards compatibility with existing scope handlers
+	 * that use string interpolation in WHERE clauses.
+	 *
+	 * @value The string value to escape.
+	 */
+	public string function $escapeSqlValue(required string value) {
+		local.rv = Replace(arguments.value, Chr(0), "", "all");
+		local.rv = Replace(local.rv, "\", "\\", "all");
+		local.rv = Replace(local.rv, "'", "''", "all");
+		return local.rv;
+	}
+
+	/**
+	 * Sanitizes arguments passed to dynamic scope handler functions so that
+	 * string interpolation in WHERE clauses is safe against SQL injection.
+	 *
+	 * WARNING: For best security, scope handlers should use parameterized queries
+	 * rather than string interpolation. This sanitization is a safety net, not a
+	 * replacement for proper parameterization.
+	 *
+	 * @args The struct of arguments to sanitize (typically missingMethodArguments).
+	 */
+	public struct function $sanitizeScopeHandlerArgs(required struct args) {
+		local.sanitized = {};
+		for (local.key in arguments.args) {
+			local.val = arguments.args[local.key];
+			if (IsSimpleValue(local.val)) {
+				// Strip null bytes
+				local.val = Replace(local.val, Chr(0), "", "all");
+				// Strip SQL comment/statement markers before escaping
+				local.val = Replace(local.val, "--", "", "all");
+				local.val = Replace(local.val, "/*", "", "all");
+				local.val = Replace(local.val, "*/", "", "all");
+				local.val = Replace(local.val, ";", "", "all");
+				// Strip dangerous SQL keywords that could be used for injection.
+				// Word-boundary matching prevents false positives in normal values.
+				local.val = REReplaceNoCase(local.val, "\b(UNION|EXEC|EXECUTE|BENCHMARK|SLEEP|WAITFOR|DELAY)\b", "", "all");
+				local.val = REReplaceNoCase(local.val, "\bxp_\w*", "", "all");
+				local.val = REReplaceNoCase(local.val, "\bINTO\s+OUTFILE\b", "", "all");
+				local.val = REReplaceNoCase(local.val, "\bLOAD_FILE\s*\(", "(", "all");
+				local.val = REReplaceNoCase(local.val, "\bCHAR\s*\(", "(", "all");
+				local.sanitized[local.key] = $escapeSqlValue(local.val);
+			} else {
+				local.sanitized[local.key] = local.val;
+			}
+		}
+		return local.sanitized;
+	}
+
+	/**
+	 * Returns a struct containing all callback definitions for this model, keyed by callback type
+	 * (e.g., `beforeSave`, `afterCreate`). Each callback type contains an array of callback method names.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function callbackInfo() {
+		return variables.wheels.class.callbacks;
+	}
+
+	/**
+	 * Returns a comprehensive struct of all model metadata suitable for code generation and introspection tools.
+	 * Includes model name, table name, primary keys, properties, associations, validations, enums, scopes, and callbacks.
+	 *
+	 * [section: Model Class]
+	 * [category: Miscellaneous Functions]
+	 */
+	public struct function classInfo() {
+		local.rv = {};
+		local.rv.modelName = variables.wheels.class.modelName;
+		local.rv.tableName = tableName();
+		local.rv.primaryKeys = primaryKeys();
+		local.rv.propertyNames = propertyNames();
+		local.rv.properties = variables.wheels.class.properties;
+		local.rv.associations = variables.wheels.class.associations;
+		local.rv.validations = variables.wheels.class.validations;
+		local.rv.enums = variables.wheels.class.enums;
+		local.rv.scopes = variables.wheels.class.scopes;
+		local.rv.callbacks = variables.wheels.class.callbacks;
+		local.rv.calculatedProperties = variables.wheels.class.calculatedProperties;
+		local.rv.softDeletion = StructKeyExists(variables.wheels.class, "softDeletion") ? variables.wheels.class.softDeletion : false;
 		return local.rv;
 	}
 
@@ -733,6 +862,15 @@ component {
 		required string property,
 		required any values
 	) {
+		// Validate property name: alphanumeric and underscore only (prevents SQL injection via property name)
+		if (!ReFind("^[a-zA-Z_][a-zA-Z0-9_]*$", arguments.property)) {
+			Throw(
+				type = "Wheels.InvalidPropertyName",
+				message = "The property name `#arguments.property#` is invalid.",
+				extendedInfo = "Property names must contain only letters, numbers, and underscores, and must start with a letter or underscore."
+			);
+		}
+
 		if (!StructKeyExists(variables.wheels.class, "enums")) {
 			variables.wheels.class.enums = {};
 		}
@@ -767,9 +905,46 @@ component {
 		}
 		for (local.name in ListToArray(local.enumDef.names)) {
 			local.storedValue = local.enumDef.values[local.name];
+			// Validate enum stored values: only allow alphanumeric, underscore, hyphen, space, and dot.
+			// Enum values are developer-defined in model config(), so this is a strict allowlist.
+			if (IsSimpleValue(local.storedValue) && ReFind("[^a-zA-Z0-9_\- .]", ToString(local.storedValue))) {
+				Throw(
+					type = "Wheels.InvalidEnumValue",
+					message = "The enum value `#local.storedValue#` for property `#arguments.property#` contains invalid characters.",
+					extendedInfo = "Enum values must contain only alphanumeric characters, underscores, hyphens, spaces, and dots. Received: `#local.storedValue#`"
+				);
+			}
 			local.scopeDef = {};
-			local.scopeDef.where = "#arguments.property# = '#local.storedValue#'";
+			// Store value in whereParams for parameterized execution rather than
+			// interpolating into the WHERE string. ScopeChain.$mergeSpecs() resolves
+			// these into quoted values that $whereClause() re-parameterizes via cfqueryparam.
+			local.scopeDef.where = "#arguments.property# = ?";
+			local.scopeDef.whereParams = [{
+				value: ToString(local.storedValue),
+				type: "CF_SQL_VARCHAR"
+			}];
 			variables.wheels.class.scopes[local.name] = local.scopeDef;
 		}
+	}
+
+	/**
+	 * Validates that a calculated property SQL expression does not contain dangerous patterns.
+	 * Called at model config time when property(sql="...") is used. This is a defense-in-depth
+	 * measure: calculated property SQL is developer-defined, but this catches supply-chain attacks
+	 * or accidental interpolation of user input into SQL expressions.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Miscellaneous Functions]
+	 */
+	public string function $validateCalculatedPropertySql(required string sql, required string propertyName) {
+		local.dangerous = ";|\bUNION\b|INTO\s+(?:OUT|DUMP)|\bEXEC(UTE)?\b|xp_|LOAD_FILE|BENCHMARK|SLEEP\s*\(";
+		if (ReFindNoCase(local.dangerous, arguments.sql)) {
+			Throw(
+				type = "Wheels.InvalidCalculatedProperty",
+				message = "The calculated property `#arguments.propertyName#` contains potentially dangerous SQL patterns.",
+				extendedInfo = "Calculated property SQL must not contain semicolons, UNION, EXEC/EXECUTE, or other dangerous SQL constructs. Expression: #arguments.sql#"
+			);
+		}
+		return arguments.sql;
 	}
 }

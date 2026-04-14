@@ -2,7 +2,7 @@ component {
     this.title = "Wheels CLI";
     this.author = "Wheels.dev Team";
     this.description = "Modern CLI for Wheels Framework";
-    this.version = "3.1.0";
+    this.version = "4.0.0";
     this.autoMapModels = false;
     this.cfmapping = "wheels-cli";
     this.modelNamespace = "wheels-cli";
@@ -67,6 +67,12 @@ component {
             .to("#moduleMapping#.models.DetailOutputService");
         binder.map("MCPService@wheels-cli")
             .to("#moduleMapping#.models.MCPService");
+        binder.map("TestMigrationService@wheels-cli")
+            .to("#moduleMapping#.models.TestMigrationService");
+        binder.map("AdminIntrospectionService@wheels-cli")
+            .to("#moduleMapping#.models.AdminIntrospectionService");
+        binder.map("AdminViewService@wheels-cli")
+            .to("#moduleMapping#.models.AdminViewService");
 
         log.info('Wheels CLI Module loaded successfully.');
     }

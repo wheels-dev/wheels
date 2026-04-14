@@ -106,6 +106,11 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			// load the database adapter
 			variables.wheels.class.adapter = $assignAdapter();
 
+			// Propagate sharedModel flag to the adapter so it can bypass tenant datasource overrides
+			if (StructKeyExists(variables.wheels.class, "sharedModel") && variables.wheels.class.sharedModel) {
+				variables.wheels.class.adapter.$setSharedModel(true);
+			}
+
 			// get columns for the table
 			local.columns = variables.wheels.class.adapter.$getColumns(tableName()).filter(function(r) {
 				return !StructKeyExists(variables.wheels.class.ignoredColumns, arguments.r.column_name);
@@ -395,8 +400,25 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.adapterNamespace = "CockroachDB";
 			local.adapterName = "CockroachDBModel";
 		} else if (FindNoCase("PostgreSQL", local.info.driver_name)) {
-			local.adapterNamespace = "PostgreSQL";
-			local.adapterName = "PostgreSQLModel";
+			// The PostgreSQL JDBC driver reports "PostgreSQL" as product name even
+			// when connected to CockroachDB. Query version() to distinguish.
+			try {
+				local.versionQuery = queryExecute(
+					"SELECT version() AS v",
+					[],
+					{datasource: variables.wheels.class.dataSource}
+				);
+				if (IsQuery(local.versionQuery) && FindNoCase("CockroachDB", local.versionQuery.v)) {
+					local.adapterNamespace = "CockroachDB";
+					local.adapterName = "CockroachDBModel";
+				} else {
+					local.adapterNamespace = "PostgreSQL";
+					local.adapterName = "PostgreSQLModel";
+				}
+			} catch (any e) {
+				local.adapterNamespace = "PostgreSQL";
+				local.adapterName = "PostgreSQLModel";
+			}
 		} else if (FindNoCase("H2", local.info.driver_name)) {
 			local.adapterNamespace = "H2";
 			local.adapterName = "H2Model";
@@ -620,9 +642,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	}
 	
 	function onDIcomplete(){
-		if (structKeyExists(server, "boxlang")) {
-			variables.this = this;
-		}
+		$engineAdapter().prepareDIComplete(variables, this);
 		new wheels.Plugins().$initializeMixins(variables);
 	}
 }

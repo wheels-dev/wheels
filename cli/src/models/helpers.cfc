@@ -76,7 +76,7 @@ component accessors="true" singleton {
     }
 
 //=====================================================================
-//=     String Functions stolen from cfwheels
+//=     String Functions stolen from wheels
 //=====================================================================
 
     public string function stripTags(required string html){

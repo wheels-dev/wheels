@@ -270,19 +270,8 @@ component {
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.method = local.callbacks[local.i];
 				if (arguments.type == "afterFind") {
-					// Since this is an afterFind callback we need to handle it differently.
-					if (IsQuery(arguments.collection)) {
-						local.rv = $queryCallback(method = local.method, collection = arguments.collection);
-					} else {
-						local.invokeArgs = properties();
-						local.rv = $invoke(method = local.method, invokeArgs = local.invokeArgs);
-						if (StructKeyExists(local, "rv") && IsStruct(local.rv)) {
-							setProperties(local.rv);
-							StructDelete(local, "rv");
-						}
-					}
+					local.rv = $afterFindCallback(method = local.method, collection = arguments.collection);
 				} else {
-					// This is a regular callback so just call the method.
 					local.rv = $invoke(method = local.method);
 				}
 
@@ -322,43 +311,11 @@ component {
 						if (!QueryKeyExists(arguments.collection, local.key)) {
 							QueryAddColumn(arguments.collection, local.key, []);
 						}
-						if (structKeyExists(server, "boxlang")) {
-							if (local.result[local.key] == "") {
-								continue;
-							}
+						if ($engineAdapter().isBoxLang() && local.result[local.key] == "") {
+							continue;
 						}
-						
-						// Handle Oracle TIMESTAMP objects in BoxLang by converting to string
-						local.valueToAssign = local.result[local.key];
-						if (structKeyExists(server, "boxlang") && IsObject(local.valueToAssign) && !IsStruct(local.valueToAssign)) {
-							try {
-								local.className = GetMetadata(local.valueToAssign).getName();
-							} catch (any e) {
-								local.className = "";
-							}
-							if (local.className == "oracle.sql.TIMESTAMP" || local.className == "oracle.sql.DATE") {
-								// Convert Oracle timestamp to string first
-								local.timestampString = local.valueToAssign.toString();
-								// Parse the timestamp string manually
-								local.dateParts = ListToArray(local.timestampString, " ");
-								local.dateOnly = local.dateParts[1];
-								local.timeOnly = local.dateParts[2];
-								
-								local.dateComponents = ListToArray(local.dateOnly, "-");
-								local.timeComponents = ListToArray(local.timeOnly, ":");
-								
-								local.valueToAssign = CreateDateTime(
-									Val(local.dateComponents[1]), // year
-									Val(local.dateComponents[2]), // month  
-									Val(local.dateComponents[3]), // day
-									Val(local.timeComponents[1]), // hour
-									Val(local.timeComponents[2]), // minute
-									Val(ListFirst(local.timeComponents[3], ".")) // second (remove decimal)
-								);
-							}
-						}
-						
-						arguments.collection[local.key][local.rowNumber] = local.valueToAssign;
+
+						arguments.collection[local.key][local.rowNumber] = $engineAdapter().coerceOracleObject(local.result[local.key]);
 					}
 				} else if (IsBoolean(local.result) && !local.result) {
 					// Break the loop and return false if the callback returned false.
@@ -375,5 +332,32 @@ component {
 		}
 
 		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Executes an afterFind callback against a query or object.
+	 */
+	public any function $afterFindCallback(required string method, any collection = "") {
+		if (IsQuery(arguments.collection)) {
+			return $queryCallback(method = arguments.method, collection = arguments.collection);
+		}
+		local.invokeArgs = properties();
+		local.result = $invoke(method = arguments.method, invokeArgs = local.invokeArgs);
+		if (StructKeyExists(local, "result") && IsStruct(local.result)) {
+			setProperties(local.result);
+			return;
+		}
+		if (StructKeyExists(local, "result")) {
+			return local.result;
+		}
+	}
+
+	/**
+	 * Internal function.
+	 * Converts Oracle TIMESTAMP/DATE objects to CFML DateTime values via the engine adapter.
+	 */
+	public any function $coerceOracleTimestamp(required any value) {
+		return $engineAdapter().coerceOracleObject(arguments.value);
 	}
 }

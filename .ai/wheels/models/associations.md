@@ -450,5 +450,4 @@ function testPostBelongsToUser() {
 ## Related Documentation
 - [Model Architecture](./architecture.md)
 - [Advanced Patterns](./advanced-patterns.md)
-- [Common Errors](../../troubleshooting/common-errors.md)
-- [Performance Optimization](../patterns/performance.md)
+- [Common Errors](../troubleshooting/common-errors.md)

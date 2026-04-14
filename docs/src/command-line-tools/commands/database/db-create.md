@@ -481,5 +481,4 @@ This makes it easy to switch database types without changing variable names.
 ## Related Commands
 
 - [`wheels db drop`](db-drop.md) - Drop an existing database
-- [`wheels db setup`](db-setup.md) - Create and setup database
 - [`wheels dbmigrate latest`](dbmigrate-latest.md) - Run migrations after creating database

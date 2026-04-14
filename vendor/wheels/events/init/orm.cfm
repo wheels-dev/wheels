@@ -20,6 +20,7 @@
 		};
 		application.$wheels.tableNamePrefix = "";
 		application.$wheels.obfuscateURLs = false;
+		application.$wheels.routeModelBinding = false;
 		application.$wheels.reloadPassword = "";
 		application.$wheels.redirectAfterReload = false;
 		application.$wheels.softDeleteProperty = "deletedAt";
@@ -31,6 +32,7 @@
 		application.$wheels.deletePluginDirectories = true;
 		application.$wheels.loadIncompatiblePlugins = true;
 		application.$wheels.automaticValidations = true;
+		application.$wheels.throwOnColumnNotFound = true;
 		application.$wheels.setUpdatedAtOnCreate = true;
 		application.$wheels.useExpandedColumnAliases = false;
 		application.$wheels.lowerCaseTableNames = false;

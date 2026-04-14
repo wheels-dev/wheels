@@ -10,28 +10,32 @@ Get up and running with Wheels CLI in minutes.
 
 ## Prerequisites
 
-- CommandBox 5.0+
-- Java 8+
-- Database (MySQL, PostgreSQL, SQL Server, or H2)
+- Java 21 (installed automatically with Wheels CLI)
+- Database (SQLite works out of the box, or MySQL, PostgreSQL, SQL Server)
 
 ## Installation
 
-### Install CommandBox
-
 ```bash
-# macOS/Linux
-curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo apt-key add -
-echo "deb https://downloads.ortussolutions.com/debs/noarch /" | sudo tee -a /etc/apt/sources.list.d/commandbox.list
-sudo apt-get update && sudo apt-get install commandbox
+# macOS
+brew tap wheels-dev/wheels
+brew install wheels
 
-# Windows (PowerShell as Admin)
-iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-choco install commandbox
+# Windows
+choco install wheels
 ```
 
-### Install Wheels CLI
+Verify:
 
 ```bash
+wheels --version
+```
+
+### Alternative: CommandBox
+
+If you prefer [CommandBox](https://www.ortussolutions.com/products/commandbox):
+
+```bash
+brew install commandbox    # or choco install commandbox
 box install wheels-cli
 ```
 
@@ -73,10 +77,10 @@ wheels db create
 ### 3. Start Server
 
 ```bash
-box server start
+wheels start
 ```
 
-Visit http://localhost:3000
+Visit http://localhost:8080
 
 ## Creating Your First Feature
 
@@ -130,13 +134,13 @@ You now have a fully functional blog post management system!
 
 ```bash
 # Run all tests
-wheels test run
+wheels test
 
-# Watch mode
-wheels test run --watch
+# Filter by directory
+wheels test --filter=models
 
 # Specific tests
-wheels test run tests/models/PostTest.cfc
+wheels test --filter=tests.specs.models.PostSpec
 ```
 
 ### Adding Relationships
@@ -272,14 +276,13 @@ In `/config/settings.cfm`:
 
 **Port already in use:**
 ```bash
-box server start port=3001
+wheels start --port=3001
 ```
 
 **Database connection failed:**
 ```bash
-# Check datasource
-box server info
-box server show
+# Check server info
+wheels info
 ```
 
 **Migration failed:**
@@ -312,9 +315,9 @@ wheels db shell --web
 ## Next Steps
 
 1. **Read the Guides:**
-   - [Service Architecture](service-architecture.md)
-   - [Testing Guide](testing.md)
-   - [Migration Guide](migrations.md)
+   - [Service Architecture](cli-guides/service-architecture.md)
+   - [Testing Guide](cli-guides/testing.md)
+   - [Migration Guide](cli-guides/migrations.md)
 
 2. **Explore Commands:**
    - `wheels --help`
@@ -354,9 +357,9 @@ echo '<cfset resources("authors")>' >> config/routes.cfm
 wheels db setup --seed-count=10
 
 # Start development
-wheels server start
+wheels start
 
-# Visit http://localhost:3000/posts
+# Visit http://localhost:8080/posts
 ```
 
 You now have a working blog with posts, authors, and comments!

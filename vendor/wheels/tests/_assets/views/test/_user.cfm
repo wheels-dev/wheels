@@ -1,5 +1,7 @@
 <cfif IsDefined("request.partialTests.currentTotal")>
-	<cfset request.partialTests.currentTotal = request.partialTests.currentTotal + arguments.current>
+	<cfif StructKeyExists(arguments, "current")>
+		<cfset request.partialTests.currentTotal = request.partialTests.currentTotal + arguments.current>
+	</cfif>
 	<cfif StructKeyExists(arguments, "current") AND arguments.current IS 3>
 		<cfset request.partialTests.thirdUserName = arguments.firstName>
 	</cfif>

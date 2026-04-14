@@ -153,6 +153,16 @@ Commands for running and managing tests.
 - **`wheels test watch`** - Rerun tests on any change
   [Documentation](test/test-advanced.md)
 
+## Playwright Commands
+
+Commands for end-to-end testing with Playwright.
+
+- **`wheels playwright:init`** (alias: `wheels playwright init`) - Initialize Playwright project
+  [Documentation](playwright/playwright-init.md)
+
+- **`wheels playwright:install`** (alias: `wheels playwright install`) - Install Playwright browsers
+  [Documentation](playwright/playwright-install.md)
+
 ## Environment Management
 
 Commands for managing development environments and application context.
@@ -188,8 +198,8 @@ Commands for analyzing code quality and patterns.
 - **`wheels analyze performance`** - Performance analysis
   [Documentation](analysis/analyze-performance.md)
 
-- **`wheels analyze security`** - Security analysis
-  [Documentation](analysis/analyze-security.md)
+- **`wheels security scan`** - Security scanning
+  [Documentation](security/security-scan.md)
 
 ## Config Commands
 

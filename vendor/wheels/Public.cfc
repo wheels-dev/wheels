@@ -4,6 +4,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * Internal function.
 	 */
 	public struct function $init() {
+		include "/wheels/public/helpers.cfm";
 		return this;
 	}
 
@@ -23,7 +24,6 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 	function routetester(verb, path) {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/routetester.cfm";
 		return "";
 	}
@@ -32,7 +32,6 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 	function api() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/api.cfm";
 		return "";
 	}
@@ -73,12 +72,17 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			cfcontent(type="text/plain");
 		}
 
-		// Include the TestBox runner directly without buffering
-		include "/wheels/tests_testbox/runner.cfm";
+		// Include the TestBox runner
+		include "/wheels/tests/runner.cfm";
 
 		// Ensure we abort to prevent any further processing
 		abort;
 	}
+	public function clitests() {
+		include "/wheels/public/views/clitests.cfm";
+		abort;
+	}
+
 	function packages() {
 		include "/wheels/public/views/packages.cfm";
 		return "";
@@ -107,8 +111,20 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/migrator/sql.cfm";
 		return "";
 	}
+	function consoleeval() {
+		include "/wheels/public/views/consoleeval.cfm";
+		return "";
+	}
 	function cli() {
 		include "/wheels/public/views/cli.cfm";
+		return "";
+	}
+	function packagelist() {
+		include "/wheels/public/views/packagelist.cfm";
+		return "";
+	}
+	function packageentry() {
+		include "/wheels/public/views/packageentry.cfm";
 		return "";
 	}
 	function plugins() {
@@ -182,43 +198,58 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	function guides() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/guides.cfm";
 		return "";
 	}
 
 	function ai() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/ai.cfm";
 		return "";
 	}
 
 	function guideImage() {
 		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
-		var assetPath = expandPath("/wheels/docs/src/.gitbook/assets/" & file);
 
-		if (fileExists(assetPath)) {
-			var ext = lcase(listLast(file, "."));
-			var mime = "application/octet-stream";
-			switch (ext) {
-				case "png": mime = "image/png"; break;
-				case "jpg":
-				case "jpeg": mime = "image/jpeg"; break;
-				case "gif": mime = "image/gif"; break;
-				case "svg": mime = "image/svg+xml"; break;
-				case "webp": mime = "image/webp"; break;
-			}
-			cfheader(name="Content-Type", value=mime);
-			cffile(action="readBinary", file=assetPath, variable="imgData");
-			cfcontent(type=mime, variable=imgData);
-		} else {
+		file = getFileFromPath(file);
+		if (!len(file) || find("..", file) || reFind("[/\\]", file)) {
 			cfheader(statusCode=404);
 			writeOutput("Image not found");
+			return;
 		}
+
+		var assetsDir = expandPath("/wheels/docs/src/.gitbook/assets/");
+		var assetPath = assetsDir & file;
+
+		try {
+			var canonicalAssets = createObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
+			var canonicalPath = createObject("java", "java.io.File").init(assetPath).getCanonicalPath();
+		} catch (any e) {
+			cfheader(statusCode=404);
+			writeOutput("Image not found");
+			return;
+		}
+		if (!fileExists(assetPath) || CompareNoCase(left(canonicalPath, len(canonicalAssets)), canonicalAssets) != 0) {
+			cfheader(statusCode=404);
+			writeOutput("Image not found");
+			return;
+		}
+
+		var ext = lcase(listLast(file, "."));
+		var mime = "application/octet-stream";
+		switch (ext) {
+			case "png": mime = "image/png"; break;
+			case "jpg":
+			case "jpeg": mime = "image/jpeg"; break;
+			case "gif": mime = "image/gif"; break;
+			case "svg": mime = "image/svg+xml"; break;
+			case "webp": mime = "image/webp"; break;
+		}
+		cfheader(name="Content-Type", value=mime);
+		cffile(action="readBinary", file=assetPath, variable="imgData");
+		cfcontent(type=mime, variable=imgData);
 	}
 
 	function mcp() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/mcp.cfm";
 		return "";
 	}

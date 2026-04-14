@@ -681,4 +681,3 @@ if (user.posts().exists()) {
 - [Model Architecture](./architecture.md)
 - [Model Associations](./associations.md)
 - [Advanced Patterns](./advanced-patterns.md)
-- [Database Configuration](../../configuration/database.md)

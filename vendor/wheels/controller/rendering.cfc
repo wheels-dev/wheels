@@ -174,6 +174,9 @@ component {
 		boolean hideDebugInformation = false,
 		string status = $statusCode()
 	) {
+		// Mark that renderWith was called so the auto-render block in $callAction
+		// won't attempt view file lookup if renderWith fails mid-execution.
+		variables.$instance.renderWithAttempted = true;
 		$args(name = "renderWith", args = arguments);
 		local.contentType = $requestContentType();
 		local.acceptableFormats = $acceptableFormats(action = arguments.action);
@@ -494,6 +497,17 @@ component {
 		string $baseTemplatePath = $get("viewPath"),
 		boolean $prependWithUnderscore = true
 	) {
+		// Strip null bytes and URL-decode before traversal checks to prevent encoded bypasses
+		arguments.$name = Replace(arguments.$name, Chr(0), "", "all");
+		local.decoded = URLDecode(arguments.$name);
+		if (Find("..", local.decoded) || Find(Chr(92), local.decoded)) {
+			Throw(
+				type="Wheels.InvalidPartialPath",
+				message="The partial name `#EncodeForHTML(arguments.$name)#` contains invalid path characters.",
+				extendedInfo="Partial names must not contain '..' or backslashes (including URL-encoded variants)."
+			);
+		}
+
 		local.rv = arguments.$baseTemplatePath;
 
 		// Handle dot notation in the controller name.
@@ -507,13 +521,12 @@ component {
 			local.fileName = Replace("_" & local.fileName, "__", "_", "one");
 		}
 
-		// BoxLang compatibility: Extract folder name more reliably
-		if (structKeyExists(server, "boxlang")) {
-			// For BoxLang, extract folder path manually to handle version differences
+		// Engine compatibility: Extract folder name reliably
+		if ($engineAdapter().isBoxLang()) {
+			// Extract folder path manually to handle engine version differences
 			local.tempName = arguments.$name;
 			if (Find("/", local.tempName)) {
 				local.folderName = Left(local.tempName, Len(local.tempName) - Len(ListLast(local.tempName, "/")));
-				// Remove trailing slash if present, but only if there's more than just "/"
 				if (Right(local.folderName, 1) == "/" AND Len(local.folderName) > 1) {
 					local.folderName = Left(local.folderName, Len(local.folderName) - 1);
 				}
@@ -883,6 +896,14 @@ component {
 	 */
 	public boolean function $performedRender() {
 		return StructKeyExists(variables.$instance, "response");
+	}
+
+	/**
+	 * Internal function.
+	 * Returns true if renderWith() was called (even if it failed before completing).
+	 */
+	public boolean function $renderWithAttempted() {
+		return StructKeyExists(variables.$instance, "renderWithAttempted") && variables.$instance.renderWithAttempted;
 	}
 
 	/**

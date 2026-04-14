@@ -28,13 +28,23 @@ component output="false" extends="wheels.Global"{
 		local.rv = "";
 		local.currentVersion = getCurrentMigrationVersion();
 		local.appKey = $appKey();
-		if (local.currentVersion == arguments.version) {
+
+		// Load migrations early to detect unapplied "gap" migrations before short-circuiting
+		local.migrations = getAvailableMigrations();
+		local.hasPendingMigrations = false;
+		for (local.m in local.migrations) {
+			if (local.m.status != "migrated" && local.m.version <= arguments.version) {
+				local.hasPendingMigrations = true;
+				break;
+			}
+		}
+
+		if (local.currentVersion == arguments.version && !local.hasPendingMigrations) {
 			local.rv = "Database is currently at version #arguments.version#. No migration required.#Chr(13)#";
 		} else {
 			if (!DirectoryExists(this.paths.sql) && application[local.appKey].writeMigratorSQLFiles) {
 				DirectoryCreate(this.paths.sql);
 			}
-			local.migrations = getAvailableMigrations();
 			if (local.currentVersion > arguments.version && arguments.missingMigFlag == false) {
 				local.rv = "Migrating from #local.currentVersion# down to #arguments.version#.#Chr(13)#";
 				for (local.i = ArrayLen(local.migrations); local.i >= 1; local.i--) {
@@ -249,6 +259,9 @@ component output="false" extends="wheels.Global"{
 				ArrayAppend(local.rv, local.migration);
 			}
 		};
+		ArraySort(local.rv, function(a, b) {
+			return Compare(a.version, b.version);
+		});
 		return local.rv;
 	}
 

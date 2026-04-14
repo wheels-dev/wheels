@@ -43,16 +43,16 @@ component aliases="wheels plugin search" extends="../base" {
             detailOutput.output("Searching, please wait...");
             detailOutput.line();
 
-            // Use forgebox show command to get all cfwheels-plugins
+            // Use forgebox show command to get all wheels-plugins
             var forgeboxResult = command('forgebox show')
-                .params(type='cfwheels-plugins')
+                .params(type='wheels-plugins')
                 .run(returnOutput=true);
 
             var results = [];
 
             // Parse the output - ForgeBox returns formatted output like:
             // PluginName    ( Author )
-            // Type: CFWheels Plugins
+            // Type: Wheels Plugins
             // Slug: "slug-name"
             // Description text
             if (len(forgeboxResult)) {

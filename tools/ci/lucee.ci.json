@@ -1,0 +1,55 @@
+{
+  "name": "wheels-ci",
+  "lucee": {
+    "version": "7.0.1.100"
+  },
+  "port": 60007,
+  "shutdownPort": 60008,
+  "webroot": "./public",
+  "openBrowser": false,
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "256m"
+  },
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  },
+  "admin": {
+    "enabled": true,
+    "password": "wheels_test_password"
+  },
+  "enableLucee": true,
+  "enableREST": false,
+  "monitoring": {
+    "enabled": false
+  },
+  "configuration": {
+    "datasources": {
+      "wheelstestdb_sqlite": {
+        "class": "org.sqlite.JDBC",
+        "database": "wheelstestdb",
+        "dbdriver": "Other",
+        "dsn": "jdbc:sqlite:{project}/wheelstestdb.db",
+        "host": "",
+        "password": "",
+        "username": ""
+      },
+      "wheelstestdb_sqlite_tenant_b": {
+        "class": "org.sqlite.JDBC",
+        "database": "wheelstestdb_tenant_b",
+        "dbdriver": "Other",
+        "dsn": "jdbc:sqlite:{project}/wheelstestdb_tenant_b.db",
+        "host": "",
+        "password": "",
+        "username": ""
+      }
+    },
+    "mappings": {
+      "/wheels": "../vendor/wheels",
+      "/app": "../app",
+      "/config": "../config",
+      "/tests": "../tests"
+    }
+  }
+}

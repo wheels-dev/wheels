@@ -112,7 +112,5 @@ caseStruct = ${ Name: "Luis" };
 - `weak` - Lucee only: weak references
 
 ## Related Concepts
-- [Structure Methods](structure-methods.md)
-- [Structure Iteration](structure-iteration.md)
 - [Variables](../variables.md)
 - [Variable Scopes](../variable-scopes.md)

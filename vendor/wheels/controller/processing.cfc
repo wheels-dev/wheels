@@ -136,15 +136,21 @@ component {
 				extendedInfo = "Make sure your action does not have the same name as any of the built-in Wheels functions."
 			);
 		}
-		if (StructKeyExists(this, arguments.action) && IsCustomFunction(this[arguments.action])) {
-			$invoke(method = arguments.action);
-		} else if (StructKeyExists(this, "onMissingMethod")) {
-			local.invokeArgs = {};
-			local.invokeArgs.missingMethodName = arguments.action;
-			local.invokeArgs.missingMethodArguments = {};
-			$invoke(method = "onMissingMethod", invokeArgs = local.invokeArgs);
+		try {
+			if (StructKeyExists(this, arguments.action) && IsCustomFunction(this[arguments.action])) {
+				$invoke(method = arguments.action);
+			} else if (StructKeyExists(this, "onMissingMethod")) {
+				local.invokeArgs = {};
+				local.invokeArgs.missingMethodName = arguments.action;
+				local.invokeArgs.missingMethodArguments = {};
+				$invoke(method = "onMissingMethod", invokeArgs = local.invokeArgs);
+			}
+		} catch (any e) {
+			// Re-throw the original error instead of falling through to the
+			// auto-render block, which would produce a misleading ViewNotFound.
+			Throw(object = e);
 		}
-		if (!$performedRenderOrRedirect()) {
+		if (!$performedRenderOrRedirect() && !$renderWithAttempted()) {
 			// Check if we should skip automatic view rendering
 			local.contentType = $requestContentType();
 			local.acceptableFormats = $acceptableFormats(action = arguments.action);

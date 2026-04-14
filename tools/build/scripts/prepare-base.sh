@@ -32,6 +32,7 @@ echo "Copying app scaffold files..."
 cp -r app "${BUILD_DIR}/"
 cp -r config "${BUILD_DIR}/"
 cp -r db "${BUILD_DIR}/"
+cp -r packages "${BUILD_DIR}/"
 cp -r plugins "${BUILD_DIR}/"
 cp -r public "${BUILD_DIR}/"
 cp -r tests "${BUILD_DIR}/"
@@ -42,7 +43,6 @@ cp vendor/wheels/.keep "${BUILD_DIR}/vendor/.keep" 2>/dev/null || touch "${BUILD
 echo "Copying AI documentation..."
 cp -r .ai "${BUILD_DIR}/"
 cp CLAUDE.md "${BUILD_DIR}/"
-cp AGENTS.md "${BUILD_DIR}/"
 cp -r .claude "${BUILD_DIR}/"
 cp -r .opencode "${BUILD_DIR}/" 2>/dev/null || true
 

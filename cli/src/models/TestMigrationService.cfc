@@ -37,7 +37,7 @@ component singleton {
 			}
 			
 			// Check if it's a CFC file
-			if (!listLast(arguments.filePath, ".") == "cfc") {
+			if (listLast(arguments.filePath, ".") != "cfc") {
 				return {
 					success = false,
 					skipped = true,
@@ -59,12 +59,13 @@ component singleton {
 		var result = {
 			content = content,
 			changes = [],
-			warnings = []
+			warnings = [],
+			fileName = getFileFromPath(arguments.filePath)
 		};
-		
+
 		// Convert component extends
 		result = convertComponentExtends(result);
-		
+
 		// Convert test methods to BDD format
 		result = convertTestMethods(result);
 		
@@ -146,7 +147,7 @@ component singleton {
 			try {
 				// Skip already migrated files
 				var fileContent = fileRead(file);
-				if (findNoCase('extends="tests.BaseSpec"', fileContent) || findNoCase("extends='tests.BaseSpec'", fileContent)) {
+				if (findNoCase('extends="wheels.WheelsTest"', fileContent) || findNoCase("extends='wheels.WheelsTest'", fileContent)) {
 					arrayAppend(results, {
 						success = true,
 						filePath = file,
@@ -184,15 +185,19 @@ component singleton {
 		var patterns = [
 			{
 				pattern = 'extends\s*=\s*"tests\.Test"',
-				replacement = 'extends="tests.BaseSpec"'
+				replacement = 'extends="wheels.WheelsTest"'
 			},
 			{
 				pattern = "extends\s*=\s*'tests\.Test'",
-				replacement = 'extends="tests.BaseSpec"'
+				replacement = 'extends="wheels.WheelsTest"'
 			},
 			{
 				pattern = 'extends\s*=\s*"wheels\.Test"',
-				replacement = 'extends="tests.BaseSpec"'
+				replacement = 'extends="wheels.WheelsTest"'
+			},
+			{
+				pattern = 'extends\s*=\s*"app\.tests\.Test"',
+				replacement = 'extends="wheels.WheelsTest"'
 			}
 		];
 		
@@ -204,7 +209,7 @@ component singleton {
 					p.replacement,
 					"all"
 				);
-				arrayAppend(arguments.result.changes, "Updated component extends to TestBox BaseSpec");
+				arrayAppend(arguments.result.changes, "Updated component extends to wheels.WheelsTest");
 			}
 		}
 		
@@ -228,7 +233,11 @@ component singleton {
 				if (componentMatch.pos[1] > 0) {
 					var insertPos = componentMatch.pos[1] + componentMatch.len[1];
 					var indent = chr(10) & chr(9);
-					var runWrapper = indent & "function run() {" & indent & chr(9) & 'describe("Test Suite", () => {' & indent & indent;
+					// Use file name for describe label (strip .cfc and Test/Spec suffix)
+					var describeName = structKeyExists(arguments.result, "fileName")
+						? reReplaceNoCase(reReplaceNoCase(arguments.result.fileName, "\.(cfc|cfm)$", ""), "(Test|Spec)$", "")
+						: "Test Suite";
+					var runWrapper = indent & "function run() {" & indent & chr(9) & 'describe("#describeName#", () => {' & indent & indent;
 					
 					// Insert run wrapper
 					arguments.result.content = insert(runWrapper, arguments.result.content, insertPos);
@@ -272,26 +281,29 @@ component singleton {
 	
 	/**
 	 * Convert test method name to readable description
+	 * Handles both test_ (underscore) and testCamelCase patterns:
+	 *   test_create_validation_passes → "create validation passes"
+	 *   Test_Auth_has_Default_Properties → "Auth has Default Properties"
+	 *   testUserCanLogin → "user can login"
 	 */
 	private function convertTestNameToDescription(required string methodName) {
 		var description = arguments.methodName;
-		
-		// Remove "test" prefix
-		description = reReplaceNoCase(description, "^test", "", "one");
-		
-		// Convert camelCase to spaces
-		description = reReplace(description, "([A-Z])", " \1", "all");
-		
-		// Clean up
-		description = trim(lCase(description));
-		
-		// Handle common patterns
-		description = replaceNoCase(description, "should ", "should ", "all");
-		
-		if (left(description, 6) != "should") {
-			description = "should " & description;
+
+		// Remove "test" or "test_" prefix (case-insensitive)
+		description = reReplaceNoCase(description, "^test_?", "", "one");
+
+		// Replace underscores with spaces
+		description = replace(description, "_", " ", "all");
+
+		// Convert camelCase to spaces (only if no underscores were present)
+		if (!findNoCase("_", arguments.methodName)) {
+			description = reReplace(description, "([a-z])([A-Z])", "\1 \2", "all");
 		}
-		
+
+		// Clean up multiple spaces
+		description = reReplace(description, "\s+", " ", "all");
+		description = trim(description);
+
 		return description;
 	}
 	
@@ -370,27 +382,42 @@ component singleton {
 	
 	/**
 	 * Convert lifecycle methods
+	 * Replaces function signature and removes super.setup()/super.teardown() calls
 	 */
 	private function convertLifecycleMethods(required struct result) {
 		var conversions = [
-			{from = "function setup()", to = "beforeEach(() => {"},
-			{from = "function teardown()", to = "afterEach(() => {"},
-			{from = "function beforeTests()", to = "beforeAll(() => {"},
-			{from = "function afterTests()", to = "afterAll(() => {"}
+			{pattern = "function\s+setup\s*\(\s*\)", replacement = "beforeEach(() =>", label = "setup -> beforeEach"},
+			{pattern = "function\s+teardown\s*\(\s*\)", replacement = "afterEach(() =>", label = "teardown -> afterEach"},
+			{pattern = "function\s+beforeTests\s*\(\s*\)", replacement = "beforeAll(() =>", label = "beforeTests -> beforeAll"},
+			{pattern = "function\s+afterTests\s*\(\s*\)", replacement = "afterAll(() =>", label = "afterTests -> afterAll"}
 		];
-		
+
 		for (var conversion in conversions) {
-			if (findNoCase(conversion.from, arguments.result.content)) {
-				arguments.result.content = replaceNoCase(
+			if (reFindNoCase(conversion.pattern, arguments.result.content)) {
+				arguments.result.content = reReplaceNoCase(
 					arguments.result.content,
-					conversion.from,
-					conversion.to,
+					conversion.pattern,
+					conversion.replacement,
 					"all"
 				);
-				arrayAppend(arguments.result.changes, "Converted lifecycle method: #conversion.from#");
+				arrayAppend(arguments.result.changes, "Converted lifecycle: #conversion.label#");
 			}
 		}
-		
+
+		// Remove super.setup() and super.teardown() calls (not needed in TestBox)
+		arguments.result.content = reReplaceNoCase(
+			arguments.result.content,
+			"\s*super\.setup\(\)\s*;?\s*",
+			chr(10),
+			"all"
+		);
+		arguments.result.content = reReplaceNoCase(
+			arguments.result.content,
+			"\s*super\.teardown\(\)\s*;?\s*",
+			chr(10),
+			"all"
+		);
+
 		return arguments.result;
 	}
 	
@@ -398,8 +425,8 @@ component singleton {
 	 * Add required imports if missing
 	 */
 	private function addRequiredImports(required struct result) {
-		// Check if BaseSpec import is needed and not present
-		if (!findNoCase("tests.BaseSpec", arguments.result.content) && 
+		// Check if WheelsTest import is needed and not present
+		if (!findNoCase("wheels.WheelsTest", arguments.result.content) &&
 		    findNoCase("extends=", arguments.result.content)) {
 			// Add helpful comment at the top
 			var comment = "/**" & chr(10);

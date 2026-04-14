@@ -43,6 +43,14 @@ component {
 		local.rv = "";
 		if (StructKeyExists(arguments.useIndex, arguments.modelName)) {
 			local.indexName = arguments.useIndex[arguments.modelName];
+			// Validate index name to prevent SQL injection — only alphanumeric and underscores allowed
+			if (!IsSimpleValue(local.indexName) || !ReFind("^[a-zA-Z0-9_]+$", local.indexName)) {
+				Throw(
+					type = "Wheels.InvalidIndexName",
+					message = "Invalid index name.",
+					extendedInfo = "The index name contains invalid characters. Only letters, numbers, and underscores are allowed."
+				);
+			}
 			if (arguments.adapterName == "MySQLModel") {
 				local.rv = "USE INDEX(#local.indexName#)";
 			} else if (arguments.adapterName == "MicrosoftSQLServerModel") {
@@ -236,8 +244,6 @@ component {
 		if (Len(arguments.order)) {
 			if (arguments.order == "random") {
 				local.rv = variables.wheels.class.adapter.$randomOrder();
-			} else if (Find("(", arguments.order)) {
-				local.rv = arguments.order;
 			} else {
 				// Setup an array containing class info for current class and all the ones that should be included.
 				local.classes = [];
@@ -254,8 +260,25 @@ component {
 					if (!Find(" ASC", local.iItem) && !Find(" DESC", local.iItem)) {
 						local.iItem &= " ASC";
 					}
-					if (Find(".", local.iItem)) {
-						local.rv = ListAppend(local.rv, local.iItem);
+					if (Find("(", local.iItem)) {
+						// Reject raw SQL expressions — calculated properties should be referenced by name
+						local.property = Trim(SpanExcluding(local.iItem, " "));
+						Throw(
+							type = "Wheels.InvalidOrderClause",
+							message = "Raw SQL expressions are not allowed in the ORDER BY clause. Use a calculated property name instead.",
+							extendedInfo = "The order item `#local.property#` contains parentheses which are not permitted. Define a calculated property using the `property()` method in your model's `config()` and reference it by name in the `order` argument."
+						);
+					} else if (Find(".", local.iItem)) {
+						// Prevent SQL injection via dot-notation — only allow table.column identifiers
+						if (REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?$", local.iItem)) {
+							local.rv = ListAppend(local.rv, local.iItem);
+						} else {
+							Throw(
+								type = "Wheels.InvalidOrderClause",
+								message = "Invalid dot-notation in ORDER BY clause: `#local.iItem#`.",
+								extendedInfo = "Dot-notation order items must follow the `tablename.columnname` pattern using only alphanumeric characters and underscores."
+							);
+						}
 					} else {
 						local.property = ListLast(SpanExcluding(local.iItem, " "), ".");
 						local.jEnd = ArrayLen(local.classes);
@@ -279,12 +302,20 @@ component {
 								}
 							}
 						}
-						if (application.wheels.showErrorInformation && !Len(local.toAdd)) {
-							Throw(
-								type = "Wheels.ColumnNotFound",
-								message = "Wheels looked for the column mapped to the `#local.property#` property but couldn't find it in the database table.",
-								extendedInfo = "Verify the `order` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
-							);
+						if (!Len(local.toAdd)) {
+							if (application.wheels.throwOnColumnNotFound) {
+								Throw(
+									type = "Wheels.ColumnNotFound",
+									message = "Wheels looked for the column mapped to the `#local.property#` property but couldn't find it in the database table.",
+									extendedInfo = "Verify the `order` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+								);
+							} else {
+								writeLog(
+									text = "ColumnNotFound: column mapped to `#local.property#` not found in database table (order clause). Set throwOnColumnNotFound=true to throw an exception.",
+									type = "warning",
+									file = "wheels_columnnotfound"
+								);
+							}
 						}
 					}
 				}
@@ -329,6 +360,39 @@ component {
 
 			local.rv = ArrayToList(local.groupByItems);
 		} else if (Len(arguments.group)) {
+			// Validate each GROUP BY item before passing to $createSQLFieldList (mirrors ORDER BY validation)
+			local.groupArray = ListToArray(arguments.group);
+			for (local.g = 1; local.g <= ArrayLen(local.groupArray); local.g++) {
+				local.gItem = Trim(local.groupArray[local.g]);
+				if (Find("(", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "Raw SQL expressions with parentheses are not allowed in the GROUP BY clause. Use only column names or table.column notation."
+					);
+				}
+				if (Find(";", local.gItem) || Find("--", local.gItem) || Find("/*", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "The GROUP BY item '#EncodeForHTML(local.gItem)#' contains invalid characters."
+					);
+				}
+				if (Find(".", local.gItem) && !REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "The GROUP BY item '#EncodeForHTML(local.gItem)#' contains invalid characters. Only table.column notation is allowed."
+					);
+				}
+				if (Find(" AS ", local.gItem)) {
+					Throw(
+						type = "Wheels.InvalidGroupByClause",
+						message = "Invalid GROUP BY clause.",
+						extendedInfo = "Aliases (AS) are not allowed in the GROUP BY clause."
+					);
+				}
+			}
 			local.args.list = arguments.group;
 			local.rv = $createSQLFieldList(argumentCollection = local.args);
 		}
@@ -532,12 +596,20 @@ component {
 					Added an exception in case the column specified in the select or group argument does not exist in the database.
 					This will only be in case when not using "table.column" or "column AS something" since in those cases Wheels passes through the select clause unchanged.
 				*/
-				if (application.wheels.showErrorInformation && !Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem) EQ 0) {
-					Throw(
-						type = "Wheels.ColumnNotFound",
-						message = "Wheels looked for the column mapped to the `#local.iItem#` property but couldn't find it in the database table.",
-						extendedInfo = "Verify the `#arguments.clause#` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
-					);
+				if (!Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem) EQ 0) {
+					if (application.wheels.throwOnColumnNotFound) {
+						Throw(
+							type = "Wheels.ColumnNotFound",
+							message = "Wheels looked for the column mapped to the `#local.iItem#` property but couldn't find it in the database table.",
+							extendedInfo = "Verify the `#arguments.clause#` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+						);
+					} else {
+						writeLog(
+							text = "ColumnNotFound: column mapped to `#local.iItem#` not found in database table (#arguments.clause# clause). Set throwOnColumnNotFound=true to throw an exception.",
+							type = "warning",
+							file = "wheels_columnnotfound"
+						);
+					}
 				}
 
 				if (Len(local.toAppend)) {
@@ -634,7 +706,7 @@ component {
 		// Issue#1273: Added this section to allow included tables to be referenced in the query
 		local.migration = CreateObject("component", "wheels.migrator.Migration").init();
 		local.tempSql = "";
-		if(arguments.include != "" && ListFind('PostgreSQL,H2,MicrosoftSQLServer,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2,MicrosoftSQLServer,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			local.tempSql = arguments.sql;
 		}
 		local.whereClause = $whereClause(
@@ -645,19 +717,20 @@ component {
 			useIndex = arguments.useIndex,
 			sql = local.tempSql
 		);
-		if(arguments.include != "" && ListFind('PostgreSQL', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
-			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "FROM #arguments.include#");
-			}
-		}
-		else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
-			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
-			}
-		}
-		else if(arguments.include != "" && ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
-			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #arguments.include#");
+		if(arguments.include != "" && structKeyExists(arguments, "sql") && left(arguments.sql[1], 6) == 'UPDATE'){
+			// Resolve include via $expandedAssociations to get safe table names (prevents SQL injection)
+			local.expandedAssociations = $expandedAssociations(include=arguments.include);
+			if(ArrayLen(local.expandedAssociations)){
+				local.resolvedTableName = variables.wheels.class.adapter.$quoteIdentifier(local.expandedAssociations[1].tableName);
+				if(ListFind('PostgreSQL,CockroachDB', local.migration.adapter.adapterName())){
+					ArrayAppend(arguments.sql, "FROM #local.resolvedTableName#");
+				}
+				else if(ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
+					ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
+				}
+				else if(ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName())){
+					ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #local.resolvedTableName#");
+				}
 			}
 		}
 		local.iEnd = ArrayLen(local.whereClause);
@@ -680,9 +753,13 @@ component {
 			}
 			ArrayPrepend(local.classes, variables.wheels.class);
 			// Issue#1273: Added this section to allow included tables to be referenced in the query
+			// SECURITY NOTE: The JOIN strings used below are safe from injection because they are
+			// constructed internally by $expandedAssociations() using $quoteIdentifier() for all
+			// table and column names (see the join-building loop in $expandedAssociations). The
+			// include parameter is validated against registered associations before reaching here.
 			local.joinclause = "";
 			local.migration = CreateObject("component", "wheels.migrator.Migration").init();
-			if(arguments.include != "" && ListFind('PostgreSQL,H2', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+			if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
 				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
 					if(structKeyExists(local.classes[local.i], "JOIN")){
 						local.joinclause &= local.classes[local.i].JOIN.Split("ON")[2];
@@ -767,12 +844,24 @@ component {
 							}
 						}
 					}
-					if (application.wheels.showErrorInformation && !StructKeyExists(local.param, "column")) {
-						Throw(
-							type = "Wheels.ColumnNotFound",
-							message = "Wheels looked for the column mapped to the `#local.param.property#` property but couldn't find it in the database table.",
-							extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
-						);
+					if (!StructKeyExists(local.param, "column")) {
+						if (application.wheels.throwOnColumnNotFound) {
+							Throw(
+								type = "Wheels.ColumnNotFound",
+								message = "Wheels looked for the column mapped to the `#local.param.property#` property but couldn't find it in the database table.",
+								extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+							);
+						} else {
+							writeLog(
+								text = "ColumnNotFound: column mapped to `#local.param.property#` not found in database table (where clause). Set throwOnColumnNotFound=true to throw an exception.",
+								type = "warning",
+								file = "wheels_columnnotfound"
+							);
+							// Undo the ? replacement so where/params arrays stay in sync.
+							// The raw column name passes through to the database as-is.
+							local.where = Replace(local.where, Replace(local.element, local.elementDataPart, "?", "one"), local.element);
+							continue;
+						}
 					}
 					local.temp = ReFind(
 						"^[a-zA-Z0-9-_\.]* ?#variables.wheels.class.RESQLOperators#",
@@ -856,21 +945,17 @@ component {
 					local.start = local.temp.pos[4] + local.temp.len[4];
 					local.extractedValue = Mid(arguments.where, local.temp.pos[4], local.temp.len[4]);
 
-					// BoxLang compatibility: Handle comma-separated values in IN clauses differently
-					if (StructKeyExists(server, "boxlang")) {
+					// Handle comma-separated values in IN clauses
+					if ($engineAdapter().isBoxLang()) {
 						local.processedValue = local.extractedValue;
-						// Remove outer parentheses if present (e.g., "(1,2,3)" -> "1,2,3")
 						if (Left(local.processedValue, 1) == "(" && Right(local.processedValue, 1) == ")") {
 							local.processedValue = Mid(local.processedValue, 2, Len(local.processedValue) - 2);
 						}
-						
-						// BoxLang: Only apply quote cleanup if the value contains quotes
 						if (Find("'", local.processedValue) > 0 || Find(Chr(34), local.processedValue) > 0) {
 							local.cleanedValue = local.processedValue;							
 							local.cleanedValue = ReReplace(local.cleanedValue, "'([^']*)'", "\1", "ALL");
 							local.doubleQuote = Chr(34);
 							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#([^#local.doubleQuote#]*)#local.doubleQuote#", "\1", "ALL");
-							
 							ArrayAppend(local.originalValues, local.cleanedValue);
 						} else {
 							ArrayAppend(local.originalValues, local.processedValue);

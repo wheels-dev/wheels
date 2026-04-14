@@ -1,0 +1,14 @@
+{
+	"datasources": {
+		"wheels-dev": {
+			"class": "org.gjt.mm.mysql.Driver",
+			"database": "wheelstestdb",
+			"dbdriver": "mysql",
+			"dsn": "jdbc:mysql://{host}:{port}/{database}",
+			"host": "mysql",
+			"password": "wheelstestdb",
+			"port": "3306",
+			"username": "wheelstestdb"
+		}
+	}
+}

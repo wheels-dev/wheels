@@ -205,6 +205,7 @@ nav:
       - 'Service Architecture': 'command-line-tools/cli-guides/service-architecture.md'
       - 'Migrations Guide': 'command-line-tools/cli-guides/migrations.md'
       - 'Testing Guide': 'command-line-tools/cli-guides/testing.md'
+      - 'Migrating from CommandBox to LuCLI': 'command-line-tools/cli-guides/migration-from-commandbox.md'
   - 'Working with Wheels':
     - 'Conventions': 'working-with-wheels/conventions.md'
     - 'Configuration and Defaults': 'working-with-wheels/configuration-and-defaults.md'
@@ -215,6 +216,8 @@ nav:
     - 'Contributing to Wheels': 'working-with-wheels/contributing-to-wheels.md'
     - 'Submitting Pull Requests': 'working-with-wheels/submitting-pull-requests.md'
     - 'Documenting your Code': 'working-with-wheels/documenting-your-code.md'
+    - 'Background Jobs': 'working-with-wheels/background-jobs.md'
+    - 'Multi-Tenancy': 'working-with-wheels/multi-tenancy.md'
   - 'Handling Requests with Controllers':
     - 'Request Handling': 'handling-requests-with-controllers/request-handling.md'
     - 'Rendering Content': 'handling-requests-with-controllers/rendering-content.md'
@@ -236,6 +239,7 @@ nav:
     - 'Caching': 'handling-requests-with-controllers/caching.md'
     - 'Nesting Controllers': 'handling-requests-with-controllers/nesting-controllers.md'
     - 'CORS Requests': 'handling-requests-with-controllers/cors-requests.md'
+    - 'Middleware': 'handling-requests-with-controllers/middleware.md'
   - 'Displaying Views to Users':
     - 'Pages': 'displaying-views-to-users/pages.md'
     - 'Partials': 'displaying-views-to-users/partials.md'

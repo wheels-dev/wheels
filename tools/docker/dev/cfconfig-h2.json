@@ -1,0 +1,14 @@
+{
+	"datasources": {
+		"wheels-dev": {
+			"class": "org.h2.Driver",
+			"dbdriver": "H2",
+			"custom": "mode=MySQL&path=/app/db/",
+			"database": "wheelstestdb",
+			"dsn": "jdbc:h2:{path}{database};MODE={mode}",
+			"allow": "511",
+			"clob": true,
+			"blob": true
+		}
+	}
+}

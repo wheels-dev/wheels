@@ -680,4 +680,3 @@ component extends="Model" {
 - [Model Validations](./validations.md)
 - [Model Associations](./associations.md)
 - [Model Performance](./performance.md)
-- [Security Best Practices](../../security/authentication.md)

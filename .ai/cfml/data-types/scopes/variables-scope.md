@@ -338,7 +338,5 @@ component {
 
 ## Related Concepts
 
-- [Application Scope](application-scope.md)
-- [Local Scope](local-scope.md)
 - [Component Basics](../../components/component-basics.md)
 - [Functions](../../components/functions.md)
