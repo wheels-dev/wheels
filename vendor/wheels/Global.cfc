@@ -3400,6 +3400,103 @@ component output="false" {
 		}
 	}
 
+	/**
+	 * Registers a callback function to be invoked when an unhandled error occurs.
+	 * Callbacks receive a single argument: the exception struct.
+	 * Multiple callbacks are invoked in registration order. A failing callback
+	 * is logged and skipped — it will not prevent other callbacks from running.
+	 * Should be called during app initialization, not per-request.
+	 *
+	 * [section: Configuration]
+	 * [category: Error Handling]
+	 *
+	 * @callback A function that accepts an exception struct argument. Must complete quickly — long-running callbacks delay error responses.
+	 */
+	public void function registerOnError(required function callback) {
+		ArrayAppend(application.wheels.onErrorCallbacks, arguments.callback);
+	}
+
+	/**
+	 * Fires all registered onError callbacks. Each runs in its own try/catch
+	 * so a broken callback cannot suppress other callbacks or break error rendering.
+	 */
+	public void function $fireOnErrorCallbacks(required any exception) {
+		if (
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "onErrorCallbacks")
+			&& IsArray(application.wheels.onErrorCallbacks)
+		) {
+			for (var cb in application.wheels.onErrorCallbacks) {
+				try {
+					cb(arguments.exception);
+				} catch (any e) {
+					cflog(text = "onError callback failed: #e.message#", type = "error", file = "wheels-errors");
+				}
+			}
+		}
+	}
+
+	/**
+	 * Verifies that mixin-assembled objects satisfy critical interface contracts.
+	 * Runs only in development mode at the end of application bootstrap.
+	 * Checks a subset of essential methods — full verification is done by test specs.
+	 * Logs warnings instead of throwing to avoid blocking app startup.
+	 * Note: the model check is a no-op at startup because models are lazy-loaded
+	 * (application.wheels.models is empty until the first model() call).
+	 * It activates when called later or from tests.
+	 */
+	public void function $verifyInterfaceContracts() {
+		local.issues = [];
+
+		// Check Model interface (requires at least one model to be loaded)
+		try {
+			local.modelMethods = [
+				"findAll", "findOne", "findByKey", "count", "exists",
+				"save", "valid", "update", "delete",
+				"hasMany", "belongsTo", "hasOne",
+				"validatesPresenceOf"
+			];
+			if (StructKeyExists(application.wheels, "models") && !StructIsEmpty(application.wheels.models)) {
+				local.sampleModelName = StructKeyArray(application.wheels.models)[1];
+				local.sampleModel = model(local.sampleModelName);
+				for (local.m in local.modelMethods) {
+					if (!StructKeyExists(local.sampleModel, local.m)) {
+						ArrayAppend(local.issues, "Model(#local.sampleModelName#) missing: #local.m#()");
+					}
+				}
+			}
+		} catch (any e) {
+			ArrayAppend(local.issues, "Model contract check failed: #e.message#");
+		}
+
+		// Check Controller interface
+		try {
+			local.controllerMethods = [
+				"renderView", "renderPartial", "renderText", "redirectTo",
+				"linkTo", "urlFor", "startFormTag", "endFormTag",
+				"filters", "verifies"
+			];
+			local.params = {controller: "wheels", action: "wheels"};
+			local.testController = controller(name = "wheels", params = local.params);
+			for (local.m in local.controllerMethods) {
+				if (!StructKeyExists(local.testController, local.m)) {
+					ArrayAppend(local.issues, "Controller missing: #local.m#()");
+				}
+			}
+		} catch (any e) {
+			ArrayAppend(local.issues, "Controller contract check failed: #e.message#");
+		}
+
+		// Report issues as warnings
+		if (ArrayLen(local.issues)) {
+			local.msg = "Interface contract warnings: " & ArrayToList(local.issues, "; ");
+			cflog(text = local.msg, type = "warning", file = "wheels-errors");
+			if (StructKeyExists(application, "wheels") && application.wheels.showDebugInformation) {
+				request.wheels.interfaceWarnings = local.issues;
+			}
+		}
+	}
+
 	// User-defined global functions
 	include "/app/global/functions.cfm";
 }

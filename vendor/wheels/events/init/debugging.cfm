@@ -16,6 +16,9 @@
 		} else {
 			application.$wheels.errorEmailAddress = "";
 		}
+		// Error lifecycle hooks — callbacks invoked when an error occurs.
+		// Packages and app code can register via registerOnError(callback).
+		application.$wheels.onErrorCallbacks = [];
 		if (application.$wheels.environment == "production") {
 			application.$wheels.showErrorInformation = false;
 			application.$wheels.sendEmailOnError = true;
