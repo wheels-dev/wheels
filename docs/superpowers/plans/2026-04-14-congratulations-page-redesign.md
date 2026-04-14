@@ -1,3 +1,41 @@
+# Congratulations Page Redesign Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Replace the static congratulations page with a modern dashboard showing runtime info, CLI detection with install instructions, quick-start action cards, and v4.0 feature highlights.
+
+**Architecture:** Single-file rewrite of `vendor/wheels/public/views/congratulations.cfm`. All styling uses existing `--w-*` CSS custom properties from the Catppuccin theme in `_header.cfm`. No new files, no new dependencies.
+
+**Tech Stack:** CFML (cfm template), CSS Grid, vanilla JavaScript (~10 lines for tab switching)
+
+**Spec:** `docs/superpowers/specs/2026-04-14-congratulations-page-redesign.md`
+
+**Mockup:** `.superpowers/brainstorm/78539-1776200777/content/hero-layout-v3.html`
+
+---
+
+### Task 1: Rewrite congratulations.cfm
+
+**Files:**
+- Modify: `vendor/wheels/public/views/congratulations.cfm` (full rewrite, lines 1-63)
+
+The current file is 63 lines. The new version replaces everything between the `_header.cfm` and `_footer.cfm` includes.
+
+**Key CFML references the template needs:**
+- `get("version")` — returns version string like `"4.0.0"`
+- `application.$wheels.serverName` — `"Lucee"`, `"Adobe ColdFusion"`, or `"BoxLang"`
+- `application.$wheels.serverVersion` — e.g. `"7.0.1.65"`
+- `application.wheels.dataSourceName` — datasource name string
+- `get("environment")` — `"development"`, `"production"`, etc.
+- `server.os.name` — OS detection for CLI install tab pre-selection
+- `FileExists(ExpandPath("/cli/lucli/Module.cfc"))` — CLI detection
+- `pageHeader()` is available from `helpers.cfm` but we are NOT using it (the hero replaces it)
+
+- [ ] **Step 1: Write the new congratulations.cfm**
+
+Replace the entire contents of `vendor/wheels/public/views/congratulations.cfm` with:
+
+```cfm
 <!--- cfformat-ignore-start --->
 <cfinclude template="../layout/_header.cfm">
 <cfscript>
@@ -395,3 +433,31 @@ function wheelsCliTab(el, cmd, prompt) {
 
 <cfinclude template="../layout/_footer.cfm">
 <!--- cfformat-ignore-end --->
+```
+
+- [ ] **Step 2: Verify the page renders**
+
+Start the server if not running, then load the congratulations page:
+
+```bash
+curl -s "http://localhost:8080/?reload=true&password=wheels" > /dev/null
+curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/"
+```
+
+Expected: HTTP 200. Open in browser to visually verify:
+- Hero shows version, engine, database, environment
+- CLI banner or CLI-detected line displays correctly
+- Three action cards render in a row
+- Six feature tiles render in a 3x2 grid
+- Footer links and route hint display
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add vendor/wheels/public/views/congratulations.cfm
+git commit -m "feat(view): redesign congratulations page for v4.0
+
+Replace static welcome text with dashboard-style page showing runtime
+info, CLI detection with install instructions, quick-start action
+cards, and v4.0 feature highlights."
+```
