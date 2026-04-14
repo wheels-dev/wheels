@@ -36,6 +36,64 @@ component extends="modules.BaseModule" {
 		return this;
 	}
 
+	/**
+	 * Extract positional arguments from LuCLI's argCollection or __arguments.
+	 *
+	 * LuCLI dispatches module subcommands as:
+	 *   module.subcommand(argumentCollection={arg1:"val1", arg2:"val2", ...})
+	 * where argCollection contains positional args as arg1..argN keys.
+	 *
+	 * Falls back to __arguments (minus the subcommand at index 1) for
+	 * direct CFC invocation in tests.
+	 */
+	private array function getArgs(struct callerArgs = {}) {
+		// Prefer caller's arguments (LuCLI passes argCollection which spreads
+		// positional args as arg1, arg2, ... into the function's arguments scope)
+		if (structKeyExists(callerArgs, "arg1")) {
+			return argsFromCollection(callerArgs);
+		}
+
+		// Fallback: __arguments (direct invocation / tests)
+		var raw = __arguments ?: [];
+		if (isArray(raw) && arrayLen(raw) > 0) {
+			return raw;
+		}
+		return [];
+	}
+
+	/**
+	 * Reconstruct args array from LuCLI's argCollection.
+	 * Positional args are stored as arg1, arg2, ... (order matters).
+	 * Named args (--key=value) are stored as key=value and must be
+	 * re-prefixed with -- so parseGeneratorArgs() can parse them.
+	 */
+	private array function argsFromCollection(required struct coll) {
+		var result = [];
+
+		// Extract positional args in order
+		var i = 1;
+		while (structKeyExists(coll, "arg#i#")) {
+			arrayAppend(result, coll["arg#i#"]);
+			i++;
+		}
+
+		// Re-add named args as --key=value flags
+		for (var key in coll) {
+			if (reFindNoCase("^arg\d+$", key)) continue; // skip positional
+			var value = coll[key];
+			if (isSimpleValue(value) && value == "true") {
+				// Boolean flag: --key
+				arrayAppend(result, "--" & key);
+			} else if (isSimpleValue(value) && value == "false") {
+				// Negated flag: skip (--no-key was already converted)
+			} else if (isSimpleValue(value)) {
+				arrayAppend(result, "--" & key & "=" & value);
+			}
+		}
+
+		return result;
+	}
+
 	// ─────────────────────────────────────────────────
 	//  generate — Code generation
 	// ─────────────────────────────────────────────────
@@ -44,7 +102,7 @@ component extends="modules.BaseModule" {
 	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, snippets)
 	 */
 	public string function generate() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
@@ -137,7 +195,7 @@ component extends="modules.BaseModule" {
 	 * hint: Run database migrations (latest, up, down, info)
 	 */
 	public string function migrate() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var action = arrayLen(args) ? lCase(args[1]) : "latest";
 
 		switch (action) {
@@ -166,7 +224,7 @@ component extends="modules.BaseModule" {
 	 * hint: Run database seeds (convention-based or generated)
 	 */
 	public string function seed() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var environment = "";
 		var mode = "auto";
 
@@ -192,7 +250,7 @@ component extends="modules.BaseModule" {
 	 * hint: Run test suite with optional filter and reporter
 	 */
 	public string function test() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var filter = "";
 		var reporter = "simple";
 		var format = "json";
@@ -276,7 +334,7 @@ component extends="modules.BaseModule" {
 	 * hint: Start the Wheels development server via LuCLI
 	 */
 	public string function start() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 
 		out("Starting Wheels server...", "cyan");
 
@@ -307,7 +365,7 @@ component extends="modules.BaseModule" {
 	 * hint: Scaffold a new Wheels project directory
 	 */
 	public string function new() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels new <appname> [options]", "yellow");
@@ -381,7 +439,7 @@ component extends="modules.BaseModule" {
 	 * hint: Create application components (wheels create app <name> [options])
 	 */
 	public string function create() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels create <type> <name> [options]", "yellow");
@@ -551,7 +609,7 @@ component extends="modules.BaseModule" {
 	 * hint: Launch interactive CFML console with Wheels app context (model, service, get)
 	 */
 	public string function console() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var password = "";
 
 		// Parse --password=value
@@ -911,7 +969,7 @@ component extends="modules.BaseModule" {
 	 * hint: Analyze Wheels application code for quality issues, anti-patterns, and complexity metrics
 	 */
 	public string function analyze() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var target = arrayLen(args) ? lCase(args[1]) : "all";
 
 		if (!arrayLen(args) && !directoryExists(variables.projectRoot & "/app")) {
@@ -1024,7 +1082,7 @@ component extends="modules.BaseModule" {
 	 * hint: Remove generated components (resource, model, controller, view)
 	 */
 	public string function destroy() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 
 		var positional = [];
 		var force = false;
@@ -1122,7 +1180,7 @@ component extends="modules.BaseModule" {
 	 * hint: Run health checks on your Wheels application
 	 */
 	public string function doctor() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var verbose = false;
 		for (var arg in args) {
 			if (arg == "--verbose" || arg == "-v") verbose = true;
@@ -1195,7 +1253,7 @@ component extends="modules.BaseModule" {
 	 * hint: Show code statistics for your Wheels application
 	 */
 	public string function stats() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var verbose = false;
 		for (var arg in args) {
 			if (arg == "--verbose" || arg == "-v") verbose = true;
@@ -1256,7 +1314,7 @@ component extends="modules.BaseModule" {
 	 * hint: Extract TODO, FIXME, and other annotations from your codebase
 	 */
 	public string function notes() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 		var annotations = "TODO,FIXME,OPTIMIZE";
 		var custom = "";
 
@@ -1308,7 +1366,7 @@ component extends="modules.BaseModule" {
 	 * hint: Database management commands (reset, status, version)
 	 */
 	public string function db() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels db <command>", "yellow");
@@ -1351,7 +1409,7 @@ component extends="modules.BaseModule" {
 	 * hint: Check for breaking changes before upgrading Wheels
 	 */
 	public string function upgrade() {
-		var args = __arguments ?: [];
+		var args = getArgs(arguments);
 
 		if (!arrayLen(args) || lCase(args[1]) != "check") {
 			out("Usage: wheels upgrade check [--to=<version>]", "yellow");
@@ -1882,7 +1940,8 @@ component extends="modules.BaseModule" {
 			}
 			out("");
 			out("Admin interface generated for #modelName#.", "green");
-			out("Visit /admin/#lCase(getService(""helpers"").pluralize(modelName))# after reloading.", "cyan");
+			var adminPath = lCase(getService("helpers").pluralize(modelName));
+			out("Visit /admin/#adminPath# after reloading.", "cyan");
 		} else {
 			for (var err in result.errors) {
 				out(err, "red");
@@ -2769,8 +2828,21 @@ component extends="modules.BaseModule" {
 		// Copy template directory tree to target, processing placeholders
 		copyTemplateDir(templateDir, targetDir, appName, context);
 
-		// Install Wheels framework into vendor/wheels/
-		installWheelsFramework(targetDir, appName);
+		// Install Wheels framework into vendor/wheels/ — abort (and clean up)
+		// if the framework source cannot be located. Without vendor/wheels/
+		// the scaffolded app cannot boot (onApplicationStart would fail on the
+		// missing `/wheels/Injector.cfc` mapping, producing a misleading
+		// "key [WO] doesn't exist" error downstream).
+		if (!installWheelsFramework(targetDir, appName)) {
+			// Remove the partially-created app directory so the user can retry
+			// cleanly after providing a framework source.
+			try {
+				directoryDelete(targetDir, true);
+			} catch (any e) {
+				// Best-effort cleanup — if this fails the user can remove it manually.
+			}
+			return "";
+		}
 
 		// Set up embedded database: H2 if explicitly requested, SQLite by default
 		if (opts.setupH2) {
@@ -2916,26 +2988,91 @@ component extends="modules.BaseModule" {
 	 * Copy the Wheels framework into the new application's vendor/wheels/ directory.
 	 * Resolves the framework source from the current project installation.
 	 */
-	private void function installWheelsFramework(required string targetDir, required string appName) {
-		var wheelsSource = "";
-
-		// Look for vendor/wheels in the resolved project root
-		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
-			wheelsSource = variables.projectRoot & "/vendor/wheels";
-		}
+	private boolean function installWheelsFramework(required string targetDir, required string appName) {
+		var wheelsSource = resolveFrameworkSource();
 
 		if (!len(wheelsSource)) {
-			out("  Warning: Could not locate Wheels framework source.", "yellow");
-			out("  You will need to install the framework manually into vendor/wheels/");
-			out("  See: https://guides.wheels.dev/docs/getting-started");
-			return;
+			out("", "red");
+			out("Error: Could not locate the Wheels framework source.", "red");
+			out("");
+			out("A scaffolded app requires vendor/wheels/ to boot. Tried:", "yellow");
+			for (var candidate in variables.frameworkSearchPaths ?: []) {
+				out("  - #candidate#");
+			}
+			out("");
+			out("To fix, either:", "bold");
+			out("  1. Run `wheels new` from inside a directory that contains");
+			out("     vendor/wheels/ (e.g. an existing Wheels project, or a");
+			out("     checkout of the wheels repository).");
+			out("  2. Set WHEELS_FRAMEWORK_PATH to point at a vendor/wheels/ directory:");
+			out("       WHEELS_FRAMEWORK_PATH=/path/to/vendor/wheels wheels new #appName#");
+			out("");
+			out("See: https://guides.wheels.dev/docs/getting-started");
+			return false;
 		}
 
-		out("Installing Wheels framework...");
+		out("Installing Wheels framework from #wheelsSource#...");
 		var vendorDir = targetDir & "/vendor/wheels";
 		ensureDirectory(vendorDir);
 		directoryCopy(wheelsSource, vendorDir, true);
 		printCreated(appName & "/vendor/wheels/");
+		return true;
+	}
+
+	/**
+	 * Resolve the path to a vendor/wheels framework source directory, checking
+	 * (in order): the WHEELS_FRAMEWORK_PATH env var, the resolved project
+	 * root, and the installed module's own location (e.g. when the LuCLI
+	 * module lives inside a wheels checkout at cli/lucli/). Records every
+	 * path tried in variables.frameworkSearchPaths so the caller can report
+	 * them if nothing is found.
+	 */
+	private string function resolveFrameworkSource() {
+		variables.frameworkSearchPaths = [];
+
+		// 1. Explicit override via environment variable — highest priority.
+		try {
+			var javaSystem = createObject("java", "java.lang.System");
+			var override = javaSystem.getenv("WHEELS_FRAMEWORK_PATH");
+			if (!isNull(override) && len(trim(override))) {
+				arrayAppend(variables.frameworkSearchPaths, override & "  (from $WHEELS_FRAMEWORK_PATH)");
+				if (directoryExists(override)) {
+					return override;
+				}
+			}
+		} catch (any e) {
+			// Ignore — env var not accessible in this runtime.
+		}
+
+		// 2. Project root (e.g. user ran `wheels new` from inside an existing
+		//    Wheels app or a wheels repo checkout).
+		if (len(variables.projectRoot)) {
+			var projectCandidate = variables.projectRoot & "/vendor/wheels";
+			arrayAppend(variables.frameworkSearchPaths, projectCandidate);
+			if (directoryExists(projectCandidate)) {
+				return projectCandidate;
+			}
+		}
+
+		// 3. Module root — if the LuCLI module itself lives inside a wheels
+		//    repo checkout (cli/lucli/), walk up to find vendor/wheels/.
+		if (len(variables.moduleRoot)) {
+			var File = createObject("java", "java.io.File");
+			var dir = variables.moduleRoot;
+			for (var i = 0; i < 6; i++) {
+				var candidate = File.init(dir).getCanonicalPath();
+				var frameworkCandidate = candidate & "/vendor/wheels";
+				arrayAppend(variables.frameworkSearchPaths, frameworkCandidate);
+				if (directoryExists(frameworkCandidate)) {
+					return frameworkCandidate;
+				}
+				var parent = File.init(candidate).getParent();
+				if (isNull(parent) || parent == candidate) break;
+				dir = parent;
+			}
+		}
+
+		return "";
 	}
 
 	/**
