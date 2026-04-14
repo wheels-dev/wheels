@@ -57,6 +57,9 @@
   * Testing Commands
     * [wheels test run](command-line-tools/commands/test/test-run.md)
     * [wheels advanced testing](command-line-tools/commands/test/test-advanced.md)
+  * Playwright Commands
+    * [wheels playwright:init](command-line-tools/commands/playwright/playwright-init.md)
+    * [wheels playwright:install](command-line-tools/commands/playwright/playwright-install.md)
   * Environment Management
     * [wheels env setup](command-line-tools/commands/environment/env-setup.md)
     * [wheels env list](command-line-tools/commands/environment/env-list.md)
