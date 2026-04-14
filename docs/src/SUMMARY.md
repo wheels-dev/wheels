@@ -123,6 +123,7 @@
 * [Directory Structure](working-with-wheels/directory-structure.md)
 * [Switching Environments](working-with-wheels/switching-environments.md)
 * [Testing Your Application](working-with-wheels/testing-your-application.md)
+* [End-to-End Testing](working-with-wheels/end-to-end-testing.md)
 * [Using the Test Environment](working-with-wheels/using-the-test-environment.md)
 * [Overriding Core Methods](working-with-wheels/overriding-core-methods.md)
 * [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
