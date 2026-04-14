@@ -55,7 +55,8 @@ component extends="../base" {
                 
                 // Extract region from image name
                 if (!len(trim(arguments.image))) {
-                    error("AWS ECR requires image name to determine region. Use --image=123456789.dkr.ecr.region.amazonaws.com/repo:tag");
+                    detailOutput.error("AWS ECR requires image name to determine region. Use --image=123456789.dkr.ecr.region.amazonaws.com/repo:tag");
+                    return;
                 }
                 
                 var region = extractAWSRegion(arguments.image);
@@ -131,7 +132,8 @@ component extends="../base" {
                         detailOutput.output("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
                         local.registryUrl = ask(message="");
                         if (!len(trim(local.registryUrl))) {
-                             error("Azure ACR requires a registry URL.");
+                            detailOutput.error("Azure ACR requires a registry URL.");
+                            return;
                         }
                     }
                 }
@@ -192,7 +194,8 @@ component extends="../base" {
                         detailOutput.output("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
                         local.registryUrl = ask(message="");
                         if (!len(trim(local.registryUrl))) {
-                             error("Private registry URL is required.");
+                            detailOutput.error("Private registry URL is required.");
+                            return;
                         }
                     }
                 }
@@ -400,15 +403,18 @@ component extends="../base" {
         switch(lCase(arguments.registry)) {
             case "dockerhub":
                 if (!len(trim(local.prefix))) {
-                    error("Docker Hub requires --username or --namespace parameter");
+                    detailOutput.error("Docker Hub requires --username or --namespace parameter");
+                    return;
                 }
                 return local.prefix & "/" & arguments.projectName & ":" & arguments.tag;
                 
             case "ecr":
-                error("AWS ECR requires full image path. Use --image=123456789.dkr.ecr.region.amazonaws.com/repo:tag");
+                detailOutput.error("AWS ECR requires full image path. Use --image=123456789.dkr.ecr.region.amazonaws.com/repo:tag");
+                return;
                 
             case "gcr":
-                error("GCR requires full image path. Use --image=gcr.io/project-id/image:tag");
+                detailOutput.error("GCR requires full image path. Use --image=gcr.io/project-id/image:tag");
+                return;
                 
             case "acr":
                 local.registryUrl = "";
@@ -419,14 +425,16 @@ component extends="../base" {
                 } else {
                     local.registryUrl = ask("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
                     if (!len(trim(local.registryUrl))) {
-                        error("Azure ACR requires a registry URL to determine image path.");
+                        detailOutput.error("Azure ACR requires a registry URL to determine image path.");
+                        return;
                     }
                 }
                 return local.registryUrl & "/" & arguments.projectName & ":" & arguments.tag;
                 
             case "ghcr":
                 if (!len(trim(local.prefix))) {
-                    error("GitHub Container Registry requires --username or --namespace parameter");
+                    detailOutput.error("GitHub Container Registry requires --username or --namespace parameter");
+                    return;
                 }
                 return "ghcr.io/" & lCase(local.prefix) & "/" & arguments.projectName & ":" & arguments.tag;
                 
@@ -439,7 +447,8 @@ component extends="../base" {
                 } else {
                     local.registryUrl = ask("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
                     if (!len(trim(local.registryUrl))) {
-                        error("Private registry requires a registry URL to determine image path.");
+                        detailOutput.error("Private registry requires a registry URL to determine image path.");
+                        return;
                     }
                 }
                 
@@ -451,7 +460,8 @@ component extends="../base" {
                 return local.finalImg;
                 
             default:
-                error("Unsupported registry type");
+                detailOutput.error("Unsupported registry type");
+                return;
         }
     }
 
@@ -491,7 +501,8 @@ component extends="../base" {
         local.output = arrayToList(local.outputParts, chr(10));
         
         if (local.exitCode neq 0 && arguments.showOutput) {
-            error("Command failed with exit code: " & local.exitCode);
+            detailOutput.error("Command failed with exit code: " & local.exitCode);
+            return;
         }
 
         return { exitCode: local.exitCode, output: local.output };
@@ -536,7 +547,8 @@ component extends="../base" {
         local.output = arrayToList(local.outputParts, chr(10));
         
         if (local.exitCode neq 0) {
-            error("Command failed with exit code: " & local.exitCode);
+            detailOutput.error("Command failed with exit code: " & local.exitCode);
+            return;
         }
 
         return { exitCode: local.exitCode, output: local.output };
@@ -641,7 +653,8 @@ component extends="../base" {
         local.result = runLocalCommand(sshCmd);
 
         if (local.result.exitCode neq 0) {
-            error("Remote command failed: " & arguments.cmd & " (Exit code: " & local.result.exitCode & ")");
+            detailOutput.error("Remote command failed: " & arguments.cmd & " (Exit code: " & local.result.exitCode & ")");
+            return;
         }
 
         return local.result;
@@ -655,7 +668,8 @@ component extends="../base" {
         var filePath = fileSystemUtil.resolvePath(arguments.textFile);
 
         if (!fileExists(filePath)) {
-            error("Text file not found: #filePath#");
+            detailOutput.error("Text file not found: #filePath#");
+            return;
         }
 
         try {
@@ -692,14 +706,16 @@ component extends="../base" {
             }
 
             if (arrayLen(servers) == 0) {
-                error("No valid servers found in text file");
+                detailOutput.error("No valid servers found in text file");
+                return;
             }
 
             detailOutput.statusSuccess("Loaded #arrayLen(servers)# server(s) from text file");
             return servers;
 
         } catch (any e) {
-            error("Error reading text file: #e.message#");
+            detailOutput.error("Error reading text file: #e.message#");
+            return;
         }
     }
 
@@ -710,7 +726,8 @@ component extends="../base" {
         var configPath = fileSystemUtil.resolvePath(arguments.configFile);
 
         if (!fileExists(configPath)) {
-            error("Config file not found: #configPath#");
+            detailOutput.error("Config file not found: #configPath#");
+            return;
         }
 
         try {
@@ -718,20 +735,24 @@ component extends="../base" {
             var config = deserializeJSON(configContent);
 
             if (!structKeyExists(config, "servers") || !isArray(config.servers)) {
-                error("Invalid config file format. Expected { ""servers"": [ ... ] }");
+                detailOutput.error("Invalid config file format. Expected { ""servers"": [ ... ] }");
+                return;
             }
 
             if (arrayLen(config.servers) == 0) {
-                error("No servers defined in config file");
+                detailOutput.error("No servers defined in config file");
+                return;
             }
 
             for (var i = 1; i <= arrayLen(config.servers); i++) {
                 var serverConfig = config.servers[i];
                 if (!structKeyExists(serverConfig, "host") || !len(trim(serverConfig.host))) {
-                    error("Server #i# is missing required 'host' field");
+                    detailOutput.error("Server #i# is missing required 'host' field");
+                    return;
                 }
                 if (!structKeyExists(serverConfig, "user") || !len(trim(serverConfig.user))) {
-                    error("Server #i# is missing required 'user' field");
+                    detailOutput.error("Server #i# is missing required 'user' field");
+                    return;
                 }
                 
                 var projectName = getProjectName();
@@ -750,7 +771,209 @@ component extends="../base" {
             return config.servers;
 
         } catch (any e) {
-            error("Error parsing config file: #e.message#");
+            detailOutput.error("Error parsing config file: #e.message#");
+            return;
+        }
+    }
+
+    // =============================================================================
+    // CENTRALIZED CONFIG RESOLUTION
+    // =============================================================================
+
+    /**
+     * Global Docker Defaults
+     */
+    public struct function getDefaults() {
+        return {
+            configFile        = "config/deploy.yml",
+            legacyConfigFile  = "deploy-servers.json",
+            legacyTextFile    = "deploy-servers.txt",
+            defaultTag        = "latest",
+            defaultPort       = 8090,
+            defaultRole       = "production"
+        };
+    }
+
+    /**
+     * Determine App Name from various sources
+     */
+    private string function resolveAppName() {
+        var folderName = listLast(getCWD(), "/");
+        return len(folderName) ? lcase(folderName) : "wheels-app";
+    }
+
+    /**
+     * Resolve final configuration
+     * Priority: CLI args > config file > init defaults > hardcoded defaults
+     */
+    public struct function resolveConfig(struct cliArgs = {}) {
+        var defaults = getDefaults();
+        var config   = {};
+        
+        config.appName = resolveAppName();
+
+        if (fileExists(getCWD() & defaults.configFile)) {
+            config = readDeployConfig(defaults.configFile);
+        } else if (fileExists(getCWD() & defaults.legacyConfigFile)) {
+            config = deserializeJSON(fileRead(defaults.legacyConfigFile));
+        }
+
+        structAppend(config, cliArgs, true);
+
+        normalizeConfig(config, defaults);
+
+        return config;
+    }
+
+    /**
+     * Read and parse config/deploy.yml with full YAML support
+     */
+    private struct function readDeployConfig(string configPath) {
+        var config = { "name": "", "image": "", "servers": [] };
+        
+        try {
+            var fullPath = fileSystemUtil.resolvePath(arguments.configPath);
+            if (!fileExists(fullPath)) {
+                return config;
+            }
+
+            var content = fileRead(fullPath);
+            
+            if (isJSON(content)) {
+                return deserializeJSON(content);
+            }
+
+            var lines = listToArray(content, chr(10));
+            var currentServer = {};
+
+            for (var line in lines) {
+                var trimmedLine = trim(line);
+                if (
+                    !len(trimmedLine) 
+                    || left(trimmedLine, 2) == "##" 
+                    || asc(left(trimmedLine, 1)) == 35
+                ) {
+                    continue;
+                }
+
+                if (find("name:", trimmedLine) == 1) {
+                    config.name = trim(replace(trimmedLine, "name:", ""));
+                } else if (find("image:", trimmedLine) == 1) {
+                    var imageValue = trim(replace(trimmedLine, "image:", ""));
+
+                    if (find(":", imageValue)) {
+                        var parts = listToArray(imageValue, ":");
+                        config.imageName = parts[1];
+                        config.tag = parts[2];
+                    } else {
+                        config.imageName = imageValue;
+                    }
+                } else if (find("tag:", trimmedLine) == 1) {
+                    config.tag = trim(replace(trimmedLine, "tag:", ""));
+                } else if (find("- host:", trimmedLine)) {
+                    if (!structIsEmpty(currentServer)) {
+                        arrayAppend(config.servers, currentServer);
+                    }
+                    currentServer = { "host": trim(replace(trimmedLine, "- host:", "")), "port": 22, "role": "production" };
+                } else if (find("user:", trimmedLine) && !structIsEmpty(currentServer)) {
+                    currentServer.user = trim(replace(trimmedLine, "user:", ""));
+                } else if (find("port:", trimmedLine) && !structIsEmpty(currentServer)) {
+                    currentServer.port = val(trim(replace(trimmedLine, "port:", "")));
+                } else if (find("role:", trimmedLine) && !structIsEmpty(currentServer)) {
+                    currentServer.role = trim(replace(trimmedLine, "role:", ""));
+                }
+            }
+
+            if (!structIsEmpty(currentServer)) {
+                arrayAppend(config.servers, currentServer);
+            }
+
+        } catch (any e) {
+            // Return empty config on error
+        }
+
+        return config;
+    }
+
+    /**
+     * Normalize config with computed values
+     */
+    private void function normalizeConfig(required struct config, required struct defaults) {
+        // Ensure name
+        if (!structKeyExists(config, "name") || !len(trim(config.name))) {
+            config.name = defaults.appName;
+        }
+
+        // Ensure imageName
+        if (!structKeyExists(config, "imageName") || !len(trim(config.imageName))) {
+            config.imageName = lcase(config.name);
+        }
+
+        // Ensure tag
+        if (!structKeyExists(config, "tag") || !len(trim(config.tag))) {
+            config.tag = defaults.defaultTag;
+        }
+
+        // Ensure port
+        if (!structKeyExists(config, "port") || !isNumeric(config.port)) {
+            config.port = defaults.defaultPort;
+        }
+
+        // Compose final image
+        config.image = config.imageName & ":" & config.tag;
+
+        // IMPORTANT: Do NOT force "-app" if compose already defines it
+        config.containerName = config.name;
+    }
+
+    /**
+     * Get Container Name
+     */
+    public string function getContainerName(required struct config) {
+        return config.containerName;
+    }
+
+    /**
+     * Get Full Image Name
+     */
+    public string function getImageName(required struct config) {
+        return config.fullImageName;
+    }
+
+    // =============================================================================
+    // FLOW VALIDATION / STATE TRACKING
+    // =============================================================================
+
+    /**
+     * Check if Docker configuration exists (created by wheels docker init)
+     */
+    public boolean function hasDockerConfig() {
+        var dockerfilePath = getCWD() & "/Dockerfile";
+        var composePath = getCWD() & "/docker-compose.yml";
+        var composePathYaml = getCWD() & "/docker-compose.yaml";
+        
+        return fileExists(dockerfilePath) || fileExists(composePath) || fileExists(composePathYaml);
+    }
+
+    /**
+     * Check if image has been built locally
+     */
+    public boolean function hasLocalImage(required string imageName) {
+        try {
+            var result = runLocalCommand(
+                ["docker", "image", "ls", "--format", "{{.Repository}}"],
+                false
+            );
+
+            if (result.exitCode neq 0) {
+                return false;
+            }
+
+            var images = listToArray(trim(result.output), chr(10));
+            return arrayContains(images, arguments.imageName);
+
+        } catch (any e) {
+            return false;
         }
     }
 
