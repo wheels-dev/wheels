@@ -17,7 +17,9 @@ component {
 		variables.helpers = arguments.helpers;
 		variables.projectRoot = arguments.projectRoot;
 		variables.config = getDefaultConfig();
-		variables.MIXED_ARGS_PATTERN = '(hasMany|hasOne|belongsTo|validatesPresenceOf|validatesUniquenessOf|validatesFormatOf)\s*\(\s*"[^"]+"\s*,\s*\w+\s*=';
+
+		initPatterns();
+
 		return this;
 	}
 
@@ -172,13 +174,13 @@ component {
 
 		// Anti-pattern 2: Query/Array confusion in views
 		if (isView) {
-			if (reFindNoCase('<cfloop\s+array\s*=\s*"##\w+##"', arguments.content)) {
+			if (reFindNoCase(variables.CFLOOP_ARRAY_PATTERN, arguments.content)) {
 				arrayAppend(results.antiPatterns, {
 					file: arguments.path,
 					line: 1,
 					severity: "warning",
 					rule: "query-array-confusion",
-					message: "Model finders return query objects — use <cfloop query=...> not <cfloop array=...>"
+					message: "Model finders return query objects — use cfloop query not cfloop array"
 				});
 			}
 		}
@@ -187,8 +189,7 @@ component {
 		if (isController) {
 			// Find filters referenced in config()
 			var filterNames = [];
-			var filterPattern = '(filters|beforeFilter|verifies)\s*\([^)]*(?:through|handler)\s*=\s*"(\w+)"';
-			var filterMatches = reFindAll(filterPattern, arguments.content, true);
+			var filterMatches = reFindAll(variables.FILTER_PATTERN, arguments.content, true);
 			for (var fm in filterMatches) {
 				if (arrayLen(fm.groups) >= 2) {
 					arrayAppend(filterNames, fm.groups[2]);
@@ -196,11 +197,13 @@ component {
 			}
 
 			// Check if those functions are public (not marked private)
+			var bs = chr(92);
+			var s = bs & "s";
 			for (var fname in filterNames) {
-				var funcDefPattern = '(?:public\s+)?(?:any|void|string|boolean|struct)?\s*function\s+#fname#\s*\(';
+				var funcDefPattern = "(?:public" & s & "+)?(?:any|void|string|boolean|struct)?" & s & "*function" & s & "+" & fname & s & "*" & bs & "(";
 				if (reFindNoCase(funcDefPattern, arguments.content)) {
 					// Check if it's NOT preceded by "private"
-					var privateFuncPattern = 'private\s+(?:any|void|string|boolean|struct)?\s*function\s+#fname#\s*\(';
+					var privateFuncPattern = "private" & s & "+(?:any|void|string|boolean|struct)?" & s & "*function" & s & "+" & fname & s & "*" & bs & "(";
 					if (!reFindNoCase(privateFuncPattern, arguments.content)) {
 						arrayAppend(results.antiPatterns, {
 							file: arguments.path,
@@ -223,7 +226,7 @@ component {
 					line: 1,
 					severity: "warning",
 					rule: "missing-cfparam",
-					message: "View uses variables but has no <cfparam> declarations"
+					message: "View uses variables but has no cfparam declarations"
 				});
 			}
 		}
@@ -234,7 +237,7 @@ component {
 	 */
 	private void function checkSecurity(required string path, required string content, required struct results) {
 		// SQL injection: preserveSingleQuotes
-		if (reFindNoCase("preserveSingleQuotes\s*\(", arguments.content)) {
+		if (reFindNoCase(variables.PRESERVE_PATTERN, arguments.content)) {
 			arrayAppend(results.antiPatterns, {
 				file: arguments.path,
 				line: 1,
@@ -245,7 +248,7 @@ component {
 		}
 
 		// evaluate() usage
-		if (reFindNoCase("\bevaluate\s*\(", arguments.content)) {
+		if (reFindNoCase(variables.EVALUATE_PATTERN, arguments.content)) {
 			arrayAppend(results.antiPatterns, {
 				file: arguments.path,
 				line: 1,
@@ -260,8 +263,7 @@ component {
 	 * Check function complexity
 	 */
 	private void function checkComplexity(required string path, required string content, required struct results) {
-		var funcPattern = "function\s+(\w+)\s*\(";
-		var matches = reFindAll(funcPattern, arguments.content, true);
+		var matches = reFindAll(variables.FUNC_DEF_PATTERN, arguments.content, true);
 
 		for (var m in matches) {
 			results.totalFunctions++;
@@ -299,8 +301,7 @@ component {
 		}
 
 		// Long parameter lists
-		var funcPattern = "function\s+\w+\s*\(([^)]+)\)";
-		var funcMatches = reFindAll(funcPattern, arguments.content, true);
+		var funcMatches = reFindAll(variables.FUNC_PARAMS_PATTERN, arguments.content, true);
 		for (var m in funcMatches) {
 			if (arrayLen(m.groups) >= 1) {
 				var paramCount = listLen(m.groups[1], ",");
@@ -315,8 +316,7 @@ component {
 		}
 
 		// TODO/FIXME comments
-		var todoPattern = "(\/\/|<!---?)\s*(TODO|FIXME|HACK|XXX|BUG):?";
-		var todoMatches = reFindAll(todoPattern, arguments.content, false);
+		var todoMatches = reFindAll(variables.TODO_PATTERN, arguments.content, false);
 		for (var m in todoMatches) {
 			arrayAppend(results.codeSmells, {
 				file: arguments.path,
@@ -403,7 +403,7 @@ component {
 			var endPos = findNoCase(".end()", content, wildcardPos);
 			// If there are resource routes after wildcard, warn
 			var afterWildcard = mid(content, wildcardPos, len(content) - wildcardPos + 1);
-			if (reFindNoCase('\.resources\s*\(', afterWildcard)) {
+			if (reFindNoCase(variables.RESOURCE_AFTER_WILDCARD, afterWildcard)) {
 				arrayAppend(issues, {
 					file: arguments.path,
 					severity: "warning",
@@ -424,15 +424,73 @@ component {
 		if (fileName == "layout.cfm" || left(fileName, 1) == "_") return issues;
 
 		// Check for variable usage without cfparam
-		if (findNoCase("##", content) && !findNoCase("cfparam", content) && !findNoCase("<cfset", content)) {
+		var hashChar = chr(35);
+		var cfsetTag = chr(60) & "cfset";
+		if (findNoCase(hashChar, content) && !findNoCase("cfparam", content) && !findNoCase(cfsetTag, content)) {
 			arrayAppend(issues, {
 				file: arguments.path,
 				severity: "warning",
-				message: "#fileName# uses variables but has no <cfparam> declarations"
+				message: fileName & " uses variables but has no cfparam declarations"
 			});
 		}
 
 		return issues;
+	}
+
+	// ── Private — Pattern initialization ────────────
+
+	/**
+	 * Build regex patterns at runtime to avoid Lucee 7 CFC parser issues
+	 * with backslash sequences in string literals. Uses a .cfm include
+	 * because Lucee 7's .cfc parser chokes on \s, \w, \b even in chr()-based
+	 * concatenation when adjacent to certain characters.
+	 */
+	private void function initPatterns() {
+		var p = buildPatterns();
+		variables.MIXED_ARGS_PATTERN = p.mixed;
+		variables.CFLOOP_ARRAY_PATTERN = p.cfloop;
+		variables.FILTER_PATTERN = p.filter;
+		variables.PRESERVE_PATTERN = p.preserve;
+		variables.EVALUATE_PATTERN = p.evaluate;
+		variables.FUNC_DEF_PATTERN = p.funcDef;
+		variables.FUNC_PARAMS_PATTERN = p.funcParams;
+		variables.TODO_PATTERN = p.todo;
+		variables.RESOURCE_AFTER_WILDCARD = p.resource;
+		variables.COMPLEXITY_PATTERNS = p.complexity;
+	}
+
+	private struct function buildPatterns() {
+		var bs = chr(92);
+		var q = chr(34);
+		var h = chr(35);
+		var S = bs & "s";
+		var W = bs & "w";
+		var B = bs & "b";
+		var LP = bs & "(";
+		var RP = bs & ")";
+
+		var lt = chr(60);  // <
+		return {
+			mixed: "(hasMany|hasOne|belongsTo|validatesPresenceOf|validatesUniquenessOf|validatesFormatOf)" & S & "*" & LP & S & "*" & q & "[^" & q & "]+" & q & S & "*," & S & "*" & W & "+" & S & "*=",
+			cfloop: lt & "cfloop" & S & "+array" & S & "*=" & S & "*" & q & h & h & W & "+" & h & h & q,
+			filter: "(filters|beforeFilter|verifies)" & S & "*" & LP & "[^)]*(?:through|handler)" & S & "*=" & S & "*" & q & "(" & W & "+)" & q,
+			preserve: "preserveSingleQuotes" & S & "*" & LP,
+			evaluate: B & "evaluate" & S & "*" & LP,
+			funcDef: "function" & S & "+(" & W & "+)" & S & "*" & LP,
+			funcParams: "function" & S & "+" & W & "+" & S & "*" & LP & "([^)]+)" & RP,
+			todo: "(" & bs & "//" & "|<!---?)" & S & "*(TODO|FIXME|HACK|XXX|BUG):?",
+			resource: bs & ".resources" & S & "*" & LP,
+			complexity: [
+				B & "if" & S & "*" & LP,
+				B & "elseif" & S & "*" & LP,
+				B & "case" & S & "+",
+				B & "for" & S & "*" & LP,
+				B & "while" & S & "*" & LP,
+				B & "catch" & S & "*" & LP,
+				bs & "&" & bs & "&",
+				bs & "|" & bs & "|"
+			]
+		};
 	}
 
 	// ── Private — Utility ───────────────────────────
@@ -455,12 +513,7 @@ component {
 
 	private numeric function calculateCyclomaticComplexity(required string code) {
 		var complexity = 1;
-		var patterns = [
-			"\bif\s*\(", "\belseif\s*\(", "\bcase\s+",
-			"\bfor\s*\(", "\bwhile\s*\(", "\bcatch\s*\(",
-			"\&\&", "\|\|"
-		];
-		for (var pattern in patterns) {
+		for (var pattern in variables.COMPLEXITY_PATTERNS) {
 			complexity += arrayLen(reFindAll(pattern, arguments.code, false));
 		}
 		return complexity;

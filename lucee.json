@@ -54,7 +54,8 @@
       "/wheels": "../vendor/wheels",
       "/app": "../app",
       "/config": "../config",
-      "/tests": "../tests"
+      "/tests": "../tests",
+      "/cli": "../cli"
     }
   }
 }
