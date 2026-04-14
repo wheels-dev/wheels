@@ -36,6 +36,8 @@ The `wheels docker build` command handles the building of Docker images for your
 | `--nocache` | Build without using cache | `false` |
 | `--pull` | Always attempt to pull a newer version of the base image | `false` |
 
+**Note**: If neither `--local` nor `--remote` is specified, `--local` is used by default.
+
 ## Detailed Examples
 
 ### Local Development Builds
@@ -72,6 +74,57 @@ Forces the remote servers to pull fresh base images and ignore build cache.
 ```bash
 wheels docker build --remote --nocache --pull
 ```
+
+### Remote Build Requirements
+
+If you plan to use --remote builds, your server must be prepared to allow automated SSH execution and Docker access.
+
+The Wheels CLI executes Docker commands remotely over SSH, for example:
+```bash
+ssh user@host "docker ps"
+ssh user@host "docker compose build"
+```
+Because these commands run non-interactively, the server must support passwordless SSH authentication and the user must have permission to run Docker commands.
+
+#### Configure Passwordless SSH Access
+
+Generate an SSH key if you do not already have one:
+```bash
+ssh-keygen -t rsa -b 4096
+```
+Press Enter to accept the default location.
+
+Copy your public key to the remote server:
+```bash
+ssh-copy-id user@host
+```
+Verify that you can log in without entering a password:
+```bash
+ssh user@host
+```
+If configured correctly, the connection should work without prompting for a password.
+
+#### Ensure Docker Permissions
+
+The remote user must have permission to run Docker commands. Otherwise you may see an error such as:
+```
+permission denied while trying to connect to the Docker daemon socket
+```
+Add the user to the Docker group on the remote server:
+```bash
+sudo usermod -aG docker user
+```
+Apply the group changes:
+```bash
+newgrp docker
+```
+Alternatively, log out and log back into the server.
+
+Verify Docker access:
+```bash
+docker ps
+```
+If this command runs successfully without sudo, the server is correctly configured.
 
 ## How It Works
 

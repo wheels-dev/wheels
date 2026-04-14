@@ -24,6 +24,8 @@ The `wheels docker stop` command halts running containers. It supports stopping 
 | `--servers` | Specific servers to stop (defaults to `config/deploy.yml`) | `""` |
 | `--removeContainer` | Also remove the container after stopping | `false` |
 
+**Note**: If neither `--local` nor `--remote` is specified, `--local` is used by default.
+
 ## Detailed Examples
 
 ### Local Management

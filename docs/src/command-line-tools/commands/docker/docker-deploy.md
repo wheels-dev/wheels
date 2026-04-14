@@ -26,6 +26,8 @@ The `wheels docker deploy` command manages the deployment lifecycle of your Dock
 | `--skipDockerCheck` | Skip Docker installation check on remote servers | `false` |
 | `--blueGreen` | Enable Blue/Green deployment strategy (zero downtime) - for remote deployment | `false` |
 
+**Note**: If neither `--local` nor `--remote` is specified, `--local` is used by default.
+
 ## Detailed Examples
 
 ### Local Deployment

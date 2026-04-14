@@ -139,7 +139,7 @@ component extends="DockerCommand" {
         if (len(trim(arguments.serverNumbers)) == 0 && fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                detailOutput.identical("Found config/deploy.yml, loading server configuration");
+                detailOutput.statusSuccess("Found config/deploy.yml, loading server configuration");
                 allServers = deployConfig.servers;
                 
                 // Add defaults
@@ -160,11 +160,11 @@ component extends="DockerCommand" {
         
         if (arrayLen(serversToStop) == 0) {
             if (fileExists(textConfigPath)) {
-                detailOutput.identical("Found deploy-servers.txt, loading server configuration");
+                detailOutput.statusSuccess("Found deploy-servers.txt, loading server configuration");
                 allServers = loadServersFromTextFile("deploy-servers.txt");
                 serversToStop = filterServers(allServers, arguments.serverNumbers);
             } else if (fileExists(jsonConfigPath)) {
-                detailOutput.identical("Found deploy-servers.json, loading server configuration");
+                detailOutput.statusSuccess("Found deploy-servers.json, loading server configuration");
                 allServers = loadServersFromConfig("deploy-servers.json");
                 serversToStop = filterServers(allServers, arguments.serverNumbers);
             } else {
