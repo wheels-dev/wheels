@@ -12,11 +12,11 @@ component {
 	 * @return   true if the path matches at least one pattern
 	 */
 	boolean function matchPatterns(required array patterns, required string path) {
-		// Extract just the filename from the full path
-		var filename = listLast(replace(arguments.path, "\", "/", "all"), "/");
+		var normalizedPath = replace(arguments.path, "\", "/", "all");
 
 		for (var pattern in arguments.patterns) {
-			if (matchPattern(trim(pattern), filename)) {
+			var normalizedPattern = trim(pattern);
+			if (matchPattern(normalizedPattern, normalizedPath)) {
 				return true;
 			}
 		}
@@ -42,7 +42,7 @@ component {
 				regex &= c;
 			}
 		}
-		// Match the full filename (case-insensitive)
+		// Match the full path (case-insensitive)
 		return reFindNoCase("^" & regex & "$", arguments.filename) > 0;
 	}
 
