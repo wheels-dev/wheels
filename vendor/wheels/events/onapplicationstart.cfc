@@ -359,6 +359,11 @@ component {
 		// Run the developer's on application start code.
 		application.wo.$include(template = "#application.wheels.eventPath#/onapplicationstart.cfm");
 
+		// Dev-mode: verify interface contracts after all mixins are loaded
+		if (application.wheels.environment == "development") {
+			application.wo.$verifyInterfaceContracts();
+		}
+
 		// Auto Migrate Database if requested
 		if (application.wheels.enableMigratorComponent && application.wheels.autoMigrateDatabase) {
 			application.wheels.migrator.migrateToLatest();
