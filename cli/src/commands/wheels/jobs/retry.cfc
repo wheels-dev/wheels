@@ -7,7 +7,9 @@
  * wheels jobs retry --limit=10
  * {code}
  */
-component extends="../../base" {
+component extends="../base" {
+
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
 	/**
 	 * @queue Filter by queue name (default: all queues)
@@ -24,9 +26,7 @@ component extends="../../base" {
 			return;
 		}
 
-		print.line();
-		print.boldBlueLine("Retry Failed Jobs");
-		print.line();
+		detailOutput.header("Retry Failed Jobs");
 
 		// Build URL parameters
 		local.urlParams = "&command=jobsRetry";
@@ -44,14 +44,12 @@ component extends="../../base" {
 
 		if (StructKeyExists(local.result, "retried")) {
 			if (local.result.retried > 0) {
-				print.greenLine("Retried #local.result.retried# failed job(s).");
-				print.line("Jobs have been reset to 'pending' and will be processed on the next cycle.");
+				detailOutput.success("Retried #local.result.retried# failed job(s).");
+				detailOutput.output("Jobs have been reset to 'pending' and will be processed on the next cycle.");
 			} else {
-				print.line("No failed jobs to retry.");
+				detailOutput.output("No failed jobs to retry.");
 			}
 		}
-
-		print.line();
 	}
 
 }
