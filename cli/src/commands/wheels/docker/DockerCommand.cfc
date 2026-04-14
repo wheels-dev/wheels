@@ -501,8 +501,7 @@ component extends="../base" {
         local.output = arrayToList(local.outputParts, chr(10));
         
         if (local.exitCode neq 0 && arguments.showOutput) {
-            detailOutput.error("Command failed with exit code: " & local.exitCode);
-            return;
+            error("Command failed with exit code: " & local.exitCode);
         }
 
         return { exitCode: local.exitCode, output: local.output };
@@ -653,8 +652,7 @@ component extends="../base" {
         local.result = runLocalCommand(sshCmd);
 
         if (local.result.exitCode neq 0) {
-            detailOutput.error("Remote command failed: " & arguments.cmd & " (Exit code: " & local.result.exitCode & ")");
-            return;
+            error("Remote command failed: " & arguments.cmd & " (Exit code: " & local.result.exitCode & ")");
         }
 
         return local.result;

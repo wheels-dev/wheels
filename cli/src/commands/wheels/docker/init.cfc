@@ -186,10 +186,11 @@ component extends="DockerCommand" {
 
         detailOutput.line();
         detailOutput.statusSuccess("Docker configuration created successfully!");
-        detailOutput.line();
         detailOutput.statusInfo("To start your Docker environment:");
-        detailOutput.output("docker-compose up -d", true);
-        detailOutput.line();
+        detailOutput.nextSteps([
+            "Run wheels docker build to build the Docker images",
+            "Run wheels docker deploy to start the containers"
+        ]);
     }
 
     private function createDockerfile(string cfengine, string cfVersion, numeric appPort, string db, boolean production=false) {
@@ -408,9 +409,9 @@ CMD ["box", "server", "start", "--console", "--force"]';
             local.volumes = '
     volumes:
       - .:/app
-      - ../../../vendor/wheels:/app/vendor/wheels
-      - ../../../docs:/app/vendor/wheels/docs
-      - ../../../tests:/app/tests';
+      - ./vendor/wheels:/app/vendor/wheels
+      - ./docs:/app/vendor/wheels/docs
+      - ./tests:/app/tests';
         }
 
         // Build app depends_on based on database

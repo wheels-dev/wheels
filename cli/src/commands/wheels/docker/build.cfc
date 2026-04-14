@@ -168,7 +168,7 @@ component extends="DockerCommand" {
         if (len(trim(arguments.serverNumbers)) == 0 && fileExists(ymlConfigPath)) {
             var deployConfig = readDeployConfig(ymlConfigPath);
             if (arrayLen(deployConfig.servers)) {
-                detailOutput.identical("Found config/deploy.yml, loading server configuration");
+                detailOutput.statusSuccess("Found config/deploy.yml, loading server configuration");
                 allServers = deployConfig.servers;
                 
                 // Add default remoteDir if not present
@@ -189,11 +189,11 @@ component extends="DockerCommand" {
         
         if (arrayLen(serversToBuild) == 0) {
             if (fileExists(textConfigPath)) {
-                detailOutput.identical("Found deploy-servers.txt, loading server configuration");
+                detailOutput.statusSuccess("Found deploy-servers.txt, loading server configuration");
                 allServers = loadServersFromTextFile("deploy-servers.txt");
                 serversToBuild = filterServers(allServers, arguments.serverNumbers);
             } else if (fileExists(jsonConfigPath)) {
-                detailOutput.identical("Found deploy-servers.json, loading server configuration");
+                detailOutput.statusSuccess("Found deploy-servers.json, loading server configuration");
                 allServers = loadServersFromConfig("deploy-servers.json");
                 serversToBuild = filterServers(allServers, arguments.serverNumbers);
             } else {
@@ -214,7 +214,7 @@ component extends="DockerCommand" {
         buildOnServers(serversToBuild, arguments.nocache, arguments.pull);
 
         detailOutput.line();
-        detailOutput.success("Build operations completed on all servers!");
+        detailOutput.statusInfo("Build operations completed on all server(s)!");
     }
 
     /**
@@ -282,13 +282,13 @@ component extends="DockerCommand" {
      */
     private function buildOnServer(required struct serverConfig, boolean nocache, boolean pull) {
         var local = {};
+
+        var config = resolveConfig();
         local.host = arguments.serverConfig.host;
         local.user = arguments.serverConfig.user;
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
         local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : config.image;
         local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.imageName#";
-
-        var config = resolveConfig();
         
         // Use image name from config or server config
         local.baseImageName = len(local.imageName) ? local.imageName : config.image;
@@ -332,7 +332,7 @@ component extends="DockerCommand" {
                 executeRemoteCommand(local.host, local.user, local.port, local.checkDockerfileCmd);
                 detailOutput.statusSuccess("Found Dockerfile on remote server");
             } catch (any e2) {
-                error("No Dockerfile or docker-compose.yml found on remote server in: " & local.remoteDir);
+                error("No Dockerfile or docker-compose.yml found on remote server in: #local.remoteDir#.#chr(10)#The directory exists but does not contain any build configuration.#chr(10)#");
             }
         }
 
@@ -343,7 +343,6 @@ component extends="DockerCommand" {
             local.buildCmd = "cd " & local.remoteDir & " && ";
             
             // Check if user can run docker without sudo
-            local.buildCmd &= "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then ";
             local.buildCmd &= "docker compose build";
             
             if (arguments.nocache) {
@@ -353,18 +352,6 @@ component extends="DockerCommand" {
             if (arguments.pull) {
                 local.buildCmd &= " --pull";
             }
-            
-            local.buildCmd &= "; else sudo docker compose build";
-            
-            if (arguments.nocache) {
-                local.buildCmd &= " --no-cache";
-            }
-            
-            if (arguments.pull) {
-                local.buildCmd &= " --pull";
-            }
-            
-            local.buildCmd &= "; fi";
 
             executeRemoteCommand(local.host, local.user, local.port, local.buildCmd);
             detailOutput.statusSuccess("Docker Compose build completed");
@@ -440,14 +427,17 @@ component extends="DockerCommand" {
         local.remoteTar = "/tmp/buildsrc_" & local.timestamp & ".tar.gz";
 
         detailOutput.statusInfo("Creating source tarball...");
-        runProcess(["tar", "-czf", local.tarFile, "-C", getCWD(), "."]);
+        runLocalCommand(["tar", "-czf", local.tarFile, "-C", getCWD(), "--exclude=._*", "."]);
 
         detailOutput.statusInfo("Uploading source code to remote server...");
-        runProcess(["scp", "-P", arguments.port, local.tarFile, arguments.user & "@" & arguments.host & ":" & local.remoteTar]);
+        runLocalCommand(["scp", "-P", arguments.port, local.tarFile, arguments.user & "@" & arguments.host & ":" & local.remoteTar]);
         fileDelete(local.tarFile);
         
         detailOutput.statusInfo("Extracting source code...");
-        local.extractCmd = "tar -xzf " & local.remoteTar & " -C " & arguments.remoteDir & " && rm " & local.remoteTar;
+        local.extractCmd = 
+            "tar -xzf " & local.remoteTar & " -C " & arguments.remoteDir & " && " &
+            "rm " & local.remoteTar & " && " &
+            "find " & arguments.remoteDir & " -name '._*' -delete";
         executeRemoteCommand(arguments.host, arguments.user, arguments.port, local.extractCmd);
         
         detailOutput.statusSuccess("Source code uploaded successfully");
@@ -541,78 +531,6 @@ component extends="DockerCommand" {
         } catch (any e) {
             error("Error parsing config file: #e.message#");
         }
-    }
-
-    // =============================================================================
-    // HELPER FUNCTIONS
-    // =============================================================================
-
-    private function testSSHConnection(string host, string user, numeric port) {
-        var local = {};
-        detailOutput.statusInfo("Testing SSH connection to " & arguments.host & "...");
-        local.result = runProcess([
-            "ssh",
-            "-o", "BatchMode=yes",
-            "-o", "PreferredAuthentications=publickey",
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
-            "-p", arguments.port,
-            arguments.user & "@" & arguments.host,
-            "echo connected"
-        ]);
-        return (local.result.exitCode eq 0 and findNoCase("connected", local.result.output));
-    }
-
-    private function executeRemoteCommand(string host, string user, numeric port, string cmd) {
-        var local = {};
-        detailOutput.statusInfo("Running: ssh -p " & arguments.port & " " & arguments.user & "@" & arguments.host & " " & arguments.cmd);
-
-        local.result = runProcess([
-            "ssh",
-            "-o", "BatchMode=yes",
-            "-o", "PreferredAuthentications=publickey",
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "ServerAliveInterval=30",
-            "-o", "ServerAliveCountMax=3",
-            "-p", arguments.port,
-            arguments.user & "@" & arguments.host,
-            arguments.cmd
-        ]);
-
-        if (local.result.exitCode neq 0) {
-            detailOutput.error("Remote command failed: " & arguments.cmd);
-            setExitCode(1);
-        }
-
-        return local.result;
-    }
-
-    private function runProcess(array cmd) {
-        var local = {};
-        local.javaCmd = createObject("java","java.util.ArrayList").init();
-        for (var c in arguments.cmd) {
-            local.javaCmd.add(c & "");
-        }
-
-        local.pb = createObject("java","java.lang.ProcessBuilder").init(local.javaCmd);
-        local.pb.redirectErrorStream(true);
-        local.proc = local.pb.start();
-
-        local.isr = createObject("java","java.io.InputStreamReader").init(local.proc.getInputStream(), "UTF-8");
-        local.br = createObject("java","java.io.BufferedReader").init(local.isr);
-        local.outputParts = [];
-
-        while (true) {
-            local.line = local.br.readLine();
-            if (isNull(local.line)) break;
-            arrayAppend(local.outputParts, local.line);
-            detailOutput.output(local.line);
-        }
-
-        local.exitCode = local.proc.waitFor();
-        local.output = arrayToList(local.outputParts, chr(10));
-
-        return { exitCode: local.exitCode, output: local.output };
     }
 
 }

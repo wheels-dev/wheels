@@ -32,6 +32,8 @@ The `wheels docker exec` command allows you to run arbitrary commands inside you
 | `--local` | Execute in local container | `true` |
 | `--remote` | Execute in remote container | `false` |
 
+**Note**: If neither `--local` nor `--remote` is specified, `--local` is used by default.
+
 ## Detailed Examples
 
 ### Basic Execution

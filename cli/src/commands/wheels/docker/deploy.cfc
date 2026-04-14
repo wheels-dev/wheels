@@ -3,10 +3,9 @@
  *
  * {code:bash}
  * wheels docker deploy --local
- * wheels docker deploy --local --environment=staging
  * wheels docker deploy --remote
- * wheels docker deploy --remote --servers=deploy-servers.txt
- * wheels docker deploy --remote --blue-green
+ * wheels docker deploy --remote --serversFile=deploy-servers.txt
+ * wheels docker deploy --remote --blueGreen
  * {code}
  */
 component extends="DockerCommand" {
@@ -218,7 +217,7 @@ component extends="DockerCommand" {
     // REMOTE DEPLOYMENT
     // =============================================================================
     
-    private function deployRemote(string serversFile, boolean skipDockerCheck, boolean blueGreen, string tag="") {
+    private function deployRemote(string serversFile, boolean skipDockerCheck, boolean blueGreen) {
         // Check for deploy-servers file (text or json) in current directory
         var textConfigPath = fileSystemUtil.resolvePath("deploy-servers.txt");
         var jsonConfigPath = fileSystemUtil.resolvePath("deploy-servers.json");
@@ -244,7 +243,7 @@ component extends="DockerCommand" {
         else if (fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                detailOutput.identical("Found config/deploy.yml, loading server configuration");
+                detailOutput.statusSuccess("Found config/deploy.yml, loading server configuration");
                 servers = deployConfig.servers;
                 
                 // Add defaults for missing fields
@@ -260,10 +259,10 @@ component extends="DockerCommand" {
         }
         // 2. Otherwise, look for default files
         else if (fileExists(textConfigPath)) {
-           detailOutput.identical("Found deploy-servers.txt, loading server configuration");
+           detailOutput.statusSuccess("Found deploy-servers.txt, loading server configuration");
             servers = loadServersFromTextFile("deploy-servers.txt");
         } else if (fileExists(jsonConfigPath)) {
-           detailOutput.identical("Found deploy-servers.json, loading server configuration");
+           detailOutput.statusSuccess("Found deploy-servers.json, loading server configuration");
             servers = loadServersFromConfig("deploy-servers.json");
         } else {
             detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
@@ -271,40 +270,36 @@ component extends="DockerCommand" {
         }
 
         if (arrayLen(servers) == 0) {
-            detailOutput.error("No servers configured for deployment");
+            detailOutput.error("No server(s) configured for deployment");
             return;
         }
 
         detailOutput.statusInfo("Starting remote deployment to #arrayLen(servers)# server(s)...");
         if (arguments.blueGreen) {
-        detailOutput.output("Strategy: Blue/Green Deployment (Zero Downtime)");
+            detailOutput.output("Strategy: Blue/Green Deployment (Zero Downtime)");
         }
 
         // Deploy to all servers sequentially
-        deployToMultipleServersSequential(servers, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
+        var result = deployToMultipleServersSequential(servers, arguments.skipDockerCheck, arguments.blueGreen);
 
-        detailOutput.line();
-        detailOutput.success("Deployment to all servers completed!");
+        if (result == 1) {
+            detailOutput.statusSuccess("Deployment to all server(s) completed!");
+        } else {
+            detailOutput.statusFailed("Deployment failed on one or more servers.");
+        }
+        
     }
 
     /**
      * Deploy to multiple servers sequentially
      */
-    private function deployToMultipleServersSequential(required array servers, boolean skipDockerCheck, boolean blueGreen, string tag="") {
+    private function deployToMultipleServersSequential(required array servers, boolean skipDockerCheck, boolean blueGreen) {
         var successCount = 0;
         var failureCount = 0;
         var serverConfig = {};
 
         for (var i = 1; i <= arrayLen(servers); i++) {
             serverConfig = servers[i];
-            
-            // Override tag if provided via CLI argument
-            if (len(arguments.tag)) {
-                serverConfig.tag = arguments.tag;
-            } else if (!structKeyExists(serverConfig, "tag")) {
-                 // Default tag is latest if not specified in server config either
-                 serverConfig.tag = "latest";
-            }
             
             detailOutput.header("Deploying to server #i# of #arrayLen(servers)#: #serverConfig.host#");
 
@@ -321,6 +316,12 @@ component extends="DockerCommand" {
                 detailOutput.statusFailed("Failed to deploy to #serverConfig.host#: #e.message#");
             }
         }
+
+        if(successCount == arrayLen(servers)) {
+            return 1;
+        } else {
+            return 0;
+        }
     }
     
     /**
@@ -331,23 +332,13 @@ component extends="DockerCommand" {
         local.host = arguments.serverConfig.host;
         local.user = arguments.serverConfig.user;
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
-        local.projectName = getProjectName(); // Use unique project name
-        
+        local.projectName = getProjectName();
         // Use standard directory based on Project Name
         local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.projectName#";
         
-        local.tag = structKeyExists(arguments.serverConfig, "tag") ? arguments.serverConfig.tag : "latest";
-        local.deployConfig = getDeployConfig();
-        
-        // Smart Tag Logic
-        if (find(":", local.tag)) {
-            local.imageName = local.tag;
-        } else if (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) {
-            local.imageName = local.deployConfig.image & ":" & local.tag;
-        } else {
-            local.imageName = local.projectName & ":" & local.tag;
-        }
-        local.containerName = local.projectName;
+        var config = resolveConfig();
+        local.containerName = config.containerName;
+        local.imageName = config.image;
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
@@ -363,9 +354,20 @@ component extends="DockerCommand" {
             detailOutput.skip("Skipping Docker installation check (--skipDockerCheck flag is set)");
         }
 
-        // Step 2: Create remote directory
-        detailOutput.statusInfo("Creating remote directory...");
-        executeRemoteCommand(local.host, local.user, local.port, "mkdir -p " & local.remoteDir);
+        // Step 2: Check if remote directory exists
+        detailOutput.statusInfo("Checking remote directory...");
+        local.checkDirCmd = "test -d " & local.remoteDir;
+        local.dirExists = false;
+
+        try {
+            executeRemoteCommand(local.host, local.user, local.port, local.checkDirCmd);
+            local.dirExists = true;
+            detailOutput.statusSuccess("Remote directory exists");
+        } catch (any e) {
+            detailOutput.error("Remote directory '#local.remoteDir#' not found on #local.host#.");
+            detailOutput.output("Please run 'wheels docker build --remote' first to upload source and build the image.");
+            return;
+        }
 
         // Step 3: Check for docker-compose file
         local.useCompose = hasDockerComposeFile();
@@ -382,38 +384,20 @@ component extends="DockerCommand" {
             }
         }
 
-        // Step 4: Tar and upload project
-        local.timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
-        local.tarFile = getTempFile(getTempDirectory(), "deploysrc_") & ".tar.gz";
-        local.remoteTar = "/tmp/deploysrc_" & local.timestamp & ".tar.gz";
-
-        detailOutput.statusInfo("Creating source tarball...");
-        runLocalCommand(["tar", "-czf", local.tarFile, "-C", getCWD(), "."]);
-
-        detailOutput.statusInfo(" Uploading to remote server...");
-        var scpCmd = ["scp", "-P", local.port];
-        scpCmd.addAll(getSSHOptions());
-        scpCmd.addAll([local.tarFile, local.user & "@" & local.host & ":" & local.remoteTar]);
-        runLocalCommand(scpCmd);
-        fileDelete(local.tarFile);
-
         // Step 5: Build and run on remote
         local.deployScript = "";
         local.deployScript &= chr(35) & "!/bin/bash" & chr(10);
         local.deployScript &= "set -e" & chr(10);
-        local.deployScript &= "echo 'Extracting source to " & local.remoteDir & " ...'" & chr(10);
-        local.deployScript &= "mkdir -p " & local.remoteDir & chr(10);
-        local.deployScript &= "tar --overwrite -xzf " & local.remoteTar & " -C " & local.remoteDir & chr(10);
         local.deployScript &= "cd " & local.remoteDir & chr(10);
 
         if (local.useCompose) {
             // Use docker-compose
             local.deployScript &= "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then" & chr(10);
-            local.deployScript &= "  docker compose down || true" & chr(10);
-            local.deployScript &= "  docker compose up -d --build" & chr(10);
+            local.deployScript &= "  docker compose -f docker-compose.yml down || true" & chr(10);
+            local.deployScript &= "  docker compose -f docker-compose.yml up -d" & chr(10);
             local.deployScript &= "else" & chr(10);
-            local.deployScript &= "  sudo docker compose down || true" & chr(10);
-            local.deployScript &= "  sudo docker compose up -d --build" & chr(10);
+            local.deployScript &= "  sudo docker compose -f docker-compose.yml down || true" & chr(10);
+            local.deployScript &= "  sudo docker compose -f docker-compose.yml up -d" & chr(10);
             local.deployScript &= "fi" & chr(10);
         } else {
             // Use standard docker commands
@@ -459,7 +443,7 @@ component extends="DockerCommand" {
         
         runInteractiveCommand(execCmd);
 
-        detailOutput.success("Deployment to #local.host# completed successfully!");
+        detailOutput.success("Deployment process to #local.host# completed successfully!");
     }
 
     /**
@@ -472,9 +456,9 @@ component extends="DockerCommand" {
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
         local.projectName = getProjectName();
         local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.projectName#";
-        
-        local.tag = structKeyExists(arguments.serverConfig, "tag") ? arguments.serverConfig.tag : "latest";
-        local.imageName = local.projectName; // Just project name, tag is separate variable in B/G script
+        var config = resolveConfig();
+        local.containerName = config.containerName;
+        local.imageName = config.image;
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
@@ -488,9 +472,20 @@ component extends="DockerCommand" {
             ensureDockerInstalled(local.host, local.user, local.port);
         }
 
-        // Step 2: Create remote directory
-        detailOutput.statusInfo("Creating remote directory...");
-        executeRemoteCommand(local.host, local.user, local.port, "mkdir -p " & local.remoteDir);
+        // Step 2: Check if remote directory exists
+        detailOutput.statusInfo("Checking remote directory...");
+        local.checkDirCmd = "test -d " & local.remoteDir;
+        local.dirExists = false;
+
+        try {
+            executeRemoteCommand(local.host, local.user, local.port, local.checkDirCmd);
+            local.dirExists = true;
+            detailOutput.statusSuccess("Remote directory exists");
+        } catch (any e) {
+            detailOutput.error("Remote directory '#local.remoteDir#' not found on #local.host#.");
+            detailOutput.output("Please run 'wheels docker build --remote' first to upload source and build the image.");
+            return;
+        }
 
         // Step 3: Determine Port
         local.exposedPort = getDockerExposedPort();
@@ -501,39 +496,18 @@ component extends="DockerCommand" {
             detailOutput.statusSuccess("Found EXPOSE port: " & local.exposedPort);
         }
 
-        // Step 4: Tar and upload project
-        local.timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
-        local.tarFile = getTempFile(getTempDirectory(), "deploysrc_") & ".tar.gz";
-        local.remoteTar = "/tmp/deploysrc_" & local.timestamp & ".tar.gz";
-
-        detailOutput.statusInfo("Creating source tarball...");
-        runLocalCommand(["tar", "-czf", local.tarFile, "-C", getCWD(), "."]);
-
-        detailOutput.statusInfo(" Uploading to remote server...");
-        var scpCmd = ["scp", "-P", local.port];
-        scpCmd.addAll(getSSHOptions());
-        scpCmd.addAll([local.tarFile, local.user & "@" & local.host & ":" & local.remoteTar]);
-        runLocalCommand(scpCmd);
-        fileDelete(local.tarFile);
-
         // Step 5: Generate Blue/Green Deployment Script
         local.deployScript = "";
         local.deployScript &= chr(35) & "!/bin/bash" & chr(10);
         local.deployScript &= "set -e" & chr(10);
         
         // Setup variables
-        local.deployScript &= "APP_NAME='" & local.imageName & "'" & chr(10);
+        local.deployScript &= "APP_NAME='" & config.name & "'" & chr(10);
         local.deployScript &= "APP_PORT='" & local.exposedPort & "'" & chr(10);
         local.deployScript &= "REMOTE_DIR='" & local.remoteDir & "'" & chr(10);
-        local.deployScript &= "REMOTE_TAR='" & local.remoteTar & "'" & chr(10);
         local.deployScript &= "NETWORK_NAME='web'" & chr(10);
         local.deployScript &= "PROXY_NAME='nginx-proxy'" & chr(10);
-        local.deployScript &= "TAG='" & local.tag & "'" & chr(10);
-        
-        // Extract source
-        local.deployScript &= "echo 'Extracting source to ' $REMOTE_DIR ' ...'" & chr(10);
-        local.deployScript &= "mkdir -p $REMOTE_DIR" & chr(10);
-        local.deployScript &= "tar --overwrite -xzf $REMOTE_TAR -C $REMOTE_DIR" & chr(10);
+        local.deployScript &= "TAG='" & config.tag & "'" & chr(10);
         local.deployScript &= "cd $REMOTE_DIR" & chr(10);
         
         // Build Image
@@ -612,10 +586,18 @@ component extends="DockerCommand" {
         var execCmd = ["ssh", "-p", local.port];
         execCmd.addAll(getSSHOptions());
         execCmd.addAll([local.user & "@" & local.host, "chmod +x /tmp/deploy-bluegreen.sh && bash /tmp/deploy-bluegreen.sh"]);
-        
-        runInteractiveCommand(execCmd);
 
-        detailOutput.success("Blue/Green Deployment to #local.host# completed successfully!");
+        try{
+            var result = runInteractiveCommand(execCmd);
+            detailOutput.success("Blue/Green Deployment process to #local.host# completed successfully!");
+        } catch (any e) {
+            detailOutput.statusFailed("Blue/Green deployment failed on #local.host#");
+            detailOutput.error("Error: " & e.message);
+
+            if (structKeyExists(e, "detail") && len(e.detail)) {
+                detailOutput.output("Details: " & e.detail);
+            }
+        }
     }
     
     /**

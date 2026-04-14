@@ -39,7 +39,7 @@ component extends="DockerCommand" {
             return;
         }
 
-        if (!arguments.local && !arguments.remote) {
+        if (!arguments.local && !arguments.remote) {  
             arguments.local = true;
         }
 
@@ -87,7 +87,7 @@ component extends="DockerCommand" {
         else if (fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                detailOutput.identical("Found config/deploy.yml, loading server configuration");
+                detailOutput.statusSuccess("Found config/deploy.yml, loading server configuration");
                 serverList = deployConfig.servers;
                 
                 // Add defaults for missing fields
@@ -106,10 +106,10 @@ component extends="DockerCommand" {
         }
         // 2. Otherwise, look for default files
         else if (fileExists(textConfigPath)) {
-            detailOutput.identical("Found deploy-servers.txt, loading server configuration");
+            detailOutput.statusSuccess("Found deploy-servers.txt, loading server configuration");
             serverList = loadServersFromTextFile("deploy-servers.txt");
         } else if (fileExists(jsonConfigPath)) {
-            detailOutput.identical("Found deploy-servers.json, loading server configuration");
+            detailOutput.statusSuccess("Found deploy-servers.json, loading server configuration");
             serverList = loadServersFromConfig("deploy-servers.json");
         } else {
             detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
@@ -159,7 +159,8 @@ component extends="DockerCommand" {
         local.user = arguments.serverConfig.user;
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
         local.projectName = getProjectName();
-        local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : local.projectName;
+        var config = resolveConfig({});
+        local.imageName = config.containerName;
 
         // 1. Check SSH Connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
@@ -214,7 +215,11 @@ component extends="DockerCommand" {
         }
 
         if (!len(containerName)) {
-            detailOutput.error("Could not find running container for service: " & arguments.service);
+            if(arguments.service == "app") {
+                detailOutput.error("Could not find running container for service: " & projectName);
+            } else {
+                detailOutput.error("Could not find running container for service: " & arguments.service);
+            }
             return;
         }
 
@@ -245,7 +250,6 @@ component extends="DockerCommand" {
         // 4. Execute
         detailOutput.statusInfo("Executing: " & arguments.command);
         detailOutput.statusInfo("Container: " & containerName);
-        detailOutput.output();
         
         // Use runInteractiveCommand for both interactive and non-interactive
         // For non-interactive, it streams output nicely.
