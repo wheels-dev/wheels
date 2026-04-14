@@ -37,6 +37,7 @@ test-output/
 .grove/
 .claude/settings.local.json
 .DS_Store
+.superpowers/
 
 # Playwright
 /test-results/
