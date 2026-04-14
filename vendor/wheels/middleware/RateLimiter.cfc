@@ -17,7 +17,29 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @storage Backend: "memory" or "database".
 	 * @keyFunction Closure that receives the request struct and returns a string key. Defaults to client IP.
 	 * @headerPrefix Prefix for rate limit response headers.
-	 * @trustProxy Whether to use X-Forwarded-For for client IP resolution.
+	 * @trustProxy Whether to use X-Forwarded-For for client IP resolution. Defaults to false for security.
+	 *   WARNING: Only enable this when your application sits behind a trusted reverse proxy (e.g. nginx,
+	 *   HAProxy, AWS ALB) that strips or overwrites the X-Forwarded-For header from downstream clients.
+	 *   Without a proxy that sanitizes this header, any client can spoof arbitrary IPs to bypass rate
+	 *   limiting entirely. Your proxy MUST be configured to either: (a) drop incoming X-Forwarded-For and
+	 *   set it to the real client IP, or (b) append the client IP so the rightmost entry is trustworthy.
+	 *   If your proxy appends, the default proxyStrategy="last" uses the rightmost (proxy-added) IP.
+	 * @proxyStrategy Which IP to extract from X-Forwarded-For: "last" (rightmost, added by the nearest
+	 *   trusted proxy — default, secure when the proxy appends the real client IP) or "first" (leftmost,
+	 *   client-supplied — available for backward compatibility but vulnerable to spoofing).
+	 * @maxStoreSize Maximum number of entries allowed in the in-memory store. When exceeded during cleanup,
+	 *   the oldest entries are evicted. Prevents unbounded memory growth from attackers rotating client keys.
+	 *   Only applies when storage="memory". Default: 100000.
+	 * @maxTimestampsPerKey Maximum number of timestamps stored per client key in the sliding window strategy.
+	 *   Prevents a single attacker from exhausting heap memory by making rapid requests. After pruning expired
+	 *   entries, arrays exceeding this limit are truncated to keep only the most recent timestamps.
+	 *   Default: maxRequests * 3. Only applies to the "slidingWindow" strategy with storage="memory".
+	 * @maxKeyLength Maximum length of a client key before it is replaced with a SHA-256 hash.
+	 *   Prevents unbounded memory consumption from attackers supplying arbitrarily long keys
+	 *   (e.g., via long X-Forwarded-For chains or custom key functions). Default: 128.
+	 * @failOpen When true, requests are allowed through if the rate limiter lock times out.
+	 *   Default false (fail-closed, secure by default). Set to true if availability
+	 *   is more important than strict rate enforcement.
 	 */
 	public RateLimiter function init(
 		numeric maxRequests = 60,
@@ -26,7 +48,12 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		string storage = "memory",
 		any keyFunction = "",
 		string headerPrefix = "X-RateLimit",
-		boolean trustProxy = true
+		boolean trustProxy = false,
+		string proxyStrategy = "last",
+		numeric maxStoreSize = 100000,
+		numeric maxTimestampsPerKey = 0,
+		numeric maxKeyLength = 128,
+		boolean failOpen = false
 	) {
 		if (!ListFindNoCase("fixedWindow,slidingWindow,tokenBucket", arguments.strategy)) {
 			throw(
@@ -42,6 +69,13 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
+		if (!ListFindNoCase("first,last", arguments.proxyStrategy)) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidProxyStrategy",
+				message = "Invalid proxy strategy: #arguments.proxyStrategy#. Must be first or last."
+			);
+		}
+
 		variables.maxRequests = arguments.maxRequests;
 		variables.windowSeconds = arguments.windowSeconds;
 		variables.strategy = arguments.strategy;
@@ -49,13 +83,19 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.keyFunction = arguments.keyFunction;
 		variables.headerPrefix = arguments.headerPrefix;
 		variables.trustProxy = arguments.trustProxy;
+		variables.proxyStrategy = arguments.proxyStrategy;
+		variables.maxStoreSize = arguments.maxStoreSize;
+		variables.maxTimestampsPerKey = arguments.maxTimestampsPerKey > 0 ? arguments.maxTimestampsPerKey : arguments.maxRequests * 3;
+		variables.maxKeyLength = arguments.maxKeyLength;
+		variables.failOpen = arguments.failOpen;
 
 		// In-memory store using ConcurrentHashMap for thread safety.
 		if (variables.storage == "memory") {
 			variables.store = CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init();
 		}
 
-		// Throttle cleanup to once per minute.
+		// Throttle cleanup interval in seconds.
+		variables.cleanupThrottleSeconds = 10;
 		variables.lastCleanup = 0;
 
 		// Track whether DB table has been verified.
@@ -74,6 +114,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Periodic cleanup for memory storage.
 		if (variables.storage == "memory") {
 			$maybeCleanup(local.now);
+			// Emergency eviction if store is at capacity and this is a new key.
+			if (variables.store.size() >= variables.maxStoreSize && !variables.store.containsKey(local.clientKey)) {
+				$evictOldest(local.now);
+			}
 		}
 
 		// Check rate limit based on strategy.
@@ -116,12 +160,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 	/**
 	 * Resolve the client key from the request — uses keyFunction if provided, otherwise client IP.
+	 * Keys exceeding maxKeyLength are replaced with their SHA-256 hash to bound memory usage.
 	 */
 	private string function $resolveKey(required struct request) {
 		if (IsCustomFunction(variables.keyFunction) || IsClosure(variables.keyFunction)) {
-			return variables.keyFunction(arguments.request);
+			local.key = variables.keyFunction(arguments.request);
+		} else {
+			local.key = $getClientIp(arguments.request);
 		}
-		return $getClientIp(arguments.request);
+
+		if (Len(local.key) > variables.maxKeyLength) {
+			local.key = Hash(local.key, "SHA-256");
+		}
+
+		return local.key;
 	}
 
 	/**
@@ -143,6 +195,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					local.forwarded = cgi.http_x_forwarded_for;
 				}
 				if (Len(Trim(local.forwarded))) {
+					if (variables.proxyStrategy == "last") {
+						return Trim(ListLast(local.forwarded));
+					}
 					return Trim(ListFirst(local.forwarded));
 				}
 			} catch (any e) {
@@ -159,6 +214,23 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		return "unknown";
+	}
+
+	/**
+	 * Handle a rate limiter error (lock timeout or DB failure) according to the failOpen setting.
+	 * Returns a struct with `allowed` and `remaining` reflecting the decision.
+	 */
+	private struct function $handleError(required string context, required string clientKey) {
+		local.mode = variables.failOpen ? "fail-open" : "fail-closed";
+		writeLog(
+			text = "Rate limiter #arguments.context# (#local.mode#) for key: #arguments.clientKey#",
+			type = "warning",
+			file = "wheels_ratelimiter"
+		);
+		return {
+			allowed: variables.failOpen,
+			remaining: 0
+		};
 	}
 
 	// ---------------------------------------------------------------------------
@@ -197,7 +269,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				}
 			}
 		} catch (any e) {
-			// Fail open on lock timeout.
+			local.err = $handleError("lock timeout", local.storeKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: local.resetAt};
@@ -237,6 +311,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					}
 				}
 
+				// Cap per-key array size to prevent memory exhaustion from rapid requests.
+				if (ArrayLen(local.pruned) > variables.maxTimestampsPerKey) {
+					local.pruned = local.pruned.slice(ArrayLen(local.pruned) - variables.maxTimestampsPerKey + 1);
+				}
+
 				if (ArrayLen(local.pruned) >= variables.maxRequests) {
 					local.allowed = false;
 					local.remaining = 0;
@@ -252,7 +331,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				variables.store.put(arguments.clientKey, local.pruned);
 			}
 		} catch (any e) {
-			// Fail open on lock timeout.
+			local.err = $handleError("lock timeout", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: local.resetAt};
@@ -304,7 +385,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				variables.store.put(arguments.clientKey, local.bucket);
 			}
 		} catch (any e) {
-			// Fail open on lock timeout.
+			local.err = $handleError("lock timeout", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: local.resetAt};
@@ -315,17 +398,17 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * Periodically clean up stale entries from in-memory store (throttled to once per minute).
+	 * Periodically clean up stale entries from in-memory store (throttled to once per cleanupThrottleSeconds).
 	 */
 	private void function $maybeCleanup(required numeric now) {
-		if ((arguments.now - variables.lastCleanup) < 60) {
+		if ((arguments.now - variables.lastCleanup) < variables.cleanupThrottleSeconds) {
 			return;
 		}
 
 		try {
 			cflock(name = "wheels-ratelimit-cleanup", type = "exclusive", timeout = 1) {
 				// Double-check after acquiring lock.
-				if ((arguments.now - variables.lastCleanup) < 60) {
+				if ((arguments.now - variables.lastCleanup) < variables.cleanupThrottleSeconds) {
 					return;
 				}
 				variables.lastCleanup = arguments.now;
@@ -374,9 +457,108 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				for (local.key in local.keysToRemove) {
 					variables.store.remove(local.key);
 				}
+
+				// If store still exceeds maxStoreSize after expiry cleanup, evict oldest entries.
+				if (variables.store.size() > variables.maxStoreSize) {
+					$evictOldest(arguments.now);
+				}
 			}
 		} catch (any e) {
 			// Lock timeout or error — skip cleanup this time.
+		}
+	}
+
+	/**
+	 * Evict entries from the in-memory store when it exceeds maxStoreSize.
+	 * First removes fully expired entries, then evicts the oldest 25% to create headroom.
+	 * Entries whose age cannot be determined score 0 (youngest) and are evicted last.
+	 */
+	private void function $evictOldest(required numeric now) {
+		try {
+			local.keys = variables.store.keySet().toArray();
+			local.storeSize = ArrayLen(local.keys);
+			local.targetSize = Int(variables.maxStoreSize * 0.75);
+			local.toEvict = local.storeSize - local.targetSize;
+
+			if (local.toEvict <= 0) {
+				return;
+			}
+
+			// First pass: remove fully expired entries (cheap, no sorting needed).
+			local.currentWindowId = Int(arguments.now / variables.windowSeconds);
+			local.windowStart = arguments.now - variables.windowSeconds;
+			local.expiredCount = 0;
+			for (local.key in local.keys) {
+				if (local.expiredCount >= local.toEvict) {
+					break;
+				}
+				if (variables.store.containsKey(local.key)) {
+					local.value = variables.store.get(local.key);
+					local.isExpired = false;
+
+					if (variables.strategy == "fixedWindow" && Find(":", local.key)) {
+						local.windowId = Val(ListLast(local.key, ":"));
+						local.isExpired = local.windowId < local.currentWindowId;
+					} else if (variables.strategy == "slidingWindow" && IsArray(local.value)) {
+						if (ArrayLen(local.value) == 0) {
+							local.isExpired = true;
+						} else {
+							// Expired if newest timestamp is outside the window.
+							local.isExpired = local.value[ArrayLen(local.value)] <= local.windowStart;
+						}
+					} else if (variables.strategy == "tokenBucket" && IsStruct(local.value) && StructKeyExists(local.value, "tokens")) {
+						local.isExpired = local.value.tokens >= variables.maxRequests && (arguments.now - local.value.lastRefill) > variables.windowSeconds;
+					}
+
+					if (local.isExpired) {
+						variables.store.remove(local.key);
+						local.expiredCount++;
+					}
+				}
+			}
+
+			// If expired-entry removal was sufficient, skip the expensive sort.
+			if (local.expiredCount >= local.toEvict) {
+				return;
+			}
+
+			// Second pass: sort remaining entries by age and evict oldest.
+			local.remainingToEvict = local.toEvict - local.expiredCount;
+			local.keys = variables.store.keySet().toArray();
+			local.entries = [];
+			for (local.key in local.keys) {
+				local.age = 0;
+				if (variables.store.containsKey(local.key)) {
+					local.value = variables.store.get(local.key);
+
+					if (variables.strategy == "fixedWindow" && Find(":", local.key)) {
+						local.windowId = Val(ListLast(local.key, ":"));
+						local.age = local.currentWindowId - local.windowId;
+					} else if (variables.strategy == "slidingWindow" && IsArray(local.value) && ArrayLen(local.value) > 0) {
+						local.age = arguments.now - local.value[1];
+					} else if (variables.strategy == "tokenBucket" && IsStruct(local.value) && StructKeyExists(local.value, "lastRefill")) {
+						local.age = arguments.now - local.value.lastRefill;
+					}
+				}
+				ArrayAppend(local.entries, {key: local.key, age: local.age});
+			}
+
+			// Sort by age descending (oldest first).
+			ArraySort(local.entries, function(a, b) {
+				return (b.age < a.age) ? -1 : ((b.age > a.age) ? 1 : 0);
+			});
+
+			// Evict the oldest entries.
+			local.evicted = 0;
+			for (local.entry in local.entries) {
+				if (local.evicted >= local.remainingToEvict) {
+					break;
+				}
+				variables.store.remove(local.entry.key);
+				local.evicted++;
+			}
+		} catch (any e) {
+			// Best-effort eviction — don't let errors propagate.
 		}
 	}
 
@@ -419,7 +601,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					local.remaining = variables.maxRequests - local.qCount.counter;
 				}
 			} catch (any e2) {
-				// Fail open.
+				local.err = $handleError("DB error", arguments.clientKey);
+				local.allowed = local.err.allowed;
+				local.remaining = local.err.remaining;
 			}
 		}
 
@@ -461,7 +645,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				local.remaining = variables.maxRequests - local.qCount.cnt - 1;
 			}
 		} catch (any e) {
-			// Fail open.
+			local.err = $handleError("DB error", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: arguments.resetAt};
@@ -516,7 +702,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				);
 			}
 		} catch (any e) {
-			// Fail open.
+			local.err = $handleError("DB error", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: arguments.resetAt};

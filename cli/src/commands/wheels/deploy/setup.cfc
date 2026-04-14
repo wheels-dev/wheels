@@ -49,7 +49,7 @@ component extends="./base" {
         // Build SSH options
         var sshOptions = "";
         if (len(arguments.sshKey)) {
-            sshOptions = "-i #arguments.sshKey#";
+            sshOptions = "-i " & $shellEscape(arguments.sshKey);
         }
         
         var sshUser = deployConfig.ssh.user ?: "root";
@@ -61,7 +61,7 @@ component extends="./base" {
             
             // Test SSH connection
             print.yellowLine("Testing SSH connection...");
-            var result = $execBash("ssh #sshOptions# -o ConnectTimeout=10 -o StrictHostKeyChecking=no #sshUser#@#server# 'echo Connection successful'");
+            var result = $execBash("ssh " & sshOptions & " -o ConnectTimeout=10 -o StrictHostKeyChecking=no " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'echo Connection successful'");
             
             if (result.exitCode != 0) {
                 print.redLine("✗ Failed to connect to #server#");
@@ -88,7 +88,7 @@ component extends="./base" {
                 ];
                 
                 for (var cmd in dockerCommands) {
-                    result = $execBash("ssh #sshOptions# #sshUser#@#server# '#cmd#'");
+                    result = $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " " & $shellEscape(cmd));
                     if (result.exitCode != 0 && !arguments.force) {
                         print.redLine("✗ Docker installation failed");
                         break;
@@ -96,7 +96,7 @@ component extends="./base" {
                 }
                 
                 // Verify Docker installation
-                result = $execBash("ssh #sshOptions# #sshUser#@#server# 'docker --version'");
+                result = $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker --version'");
                 if (result.exitCode == 0) {
                     print.greenLine("✓ Docker installed successfully");
                 }
@@ -105,14 +105,14 @@ component extends="./base" {
             // Setup directories
             print.yellowLine("Creating deployment directories...");
             var directories = [
-                "/opt/#deployConfig.service#",
-                "/opt/#deployConfig.service#/config",
-                "/opt/#deployConfig.service#/storage",
-                "/opt/#deployConfig.service#/logs"
+                "/opt/" & deployConfig.service,
+                "/opt/" & deployConfig.service & "/config",
+                "/opt/" & deployConfig.service & "/storage",
+                "/opt/" & deployConfig.service & "/logs"
             ];
-            
+
             for (var dir in directories) {
-                $execBash("ssh #sshOptions# #sshUser#@#server# 'mkdir -p #dir#'");
+                $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'mkdir -p " & $shellEscape(dir) & "'");
             }
             print.greenLine("✓ Directories created");
             
@@ -121,10 +121,10 @@ component extends="./base" {
                 print.yellowLine("Setting up Traefik...");
                 
                 // Create Traefik network
-                $execBash("ssh #sshOptions# #sshUser#@#server# 'docker network create traefik || true'");
-                
+                $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker network create traefik || true'");
+
                 // Create Traefik directories
-                $execBash("ssh #sshOptions# #sshUser#@#server# 'mkdir -p /opt/traefik /opt/traefik/letsencrypt'");
+                $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'mkdir -p /opt/traefik /opt/traefik/letsencrypt'");
                 
                 // Create Traefik config
                 var traefikConfig = "version: '3.8'
@@ -159,12 +159,10 @@ networks:
     external: true";
                 
                 // Write Traefik config to server
-                $execBash("ssh #sshOptions# #sshUser#@#server# 'cat > /opt/traefik/docker-compose.yml << EOF
-#traefikConfig#
-EOF'");
+                $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat > /opt/traefik/docker-compose.yml << EOF" & chr(10) & traefikConfig & chr(10) & "EOF'");
                 
                 // Start Traefik
-                result = $execBash("ssh #sshOptions# #sshUser#@#server# 'cd /opt/traefik && docker compose up -d'");
+                result = $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/traefik && docker compose up -d'");
                 
                 if (result.exitCode == 0) {
                     print.greenLine("✓ Traefik setup completed");
@@ -183,7 +181,7 @@ EOF'");
             ];
             
             for (var cmd in firewallCommands) {
-                $execBash("ssh #sshOptions# #sshUser#@#server# '#cmd#' || true");
+                $execBash("ssh " & sshOptions & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " " & $shellEscape(cmd) & " || true");
             }
             print.greenLine("✓ Firewall configured");
             

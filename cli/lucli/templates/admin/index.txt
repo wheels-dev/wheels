@@ -1,0 +1,27 @@
+<cfparam name="{{plural}}" default="">
+<h1>{{PluralCap}} Admin</h1>
+<p>#linkTo(text="New {{SingularCap}}", route="admin~new_{{singular}}")#</p>
+<cfif {{plural}}.recordCount>
+<table>
+	<thead>
+		<tr>
+{{indexHeaders}}
+			<th>Actions</th>
+		</tr>
+	</thead>
+	<tbody>
+		<cfloop query="{{plural}}">
+		<tr>
+{{indexCells}}
+			<td>
+				#linkTo(text="Show", route="admin~{{singular}}", key={{plural}}.{{primaryKey}})#
+				#linkTo(text="Edit", route="admin~edit_{{singular}}", key={{plural}}.{{primaryKey}})#
+			</td>
+		</tr>
+		</cfloop>
+	</tbody>
+</table>
+<cfelse>
+<p>No {{plural}} found.</p>
+</cfif>
+#paginationNav()#

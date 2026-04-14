@@ -195,6 +195,17 @@ jobs:
           ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
+      - name: Build Wheels Module Tarball
+        run: |
+          mkdir -p artifacts/wheels/${{ env.WHEELS_VERSION }}
+          tar czf artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-${{ env.WHEELS_VERSION }}.tar.gz -C cli/lucli .
+          cd cli/lucli && zip -r ../../artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-${{ env.WHEELS_VERSION }}.zip . && cd ../..
+          cd artifacts/wheels/${{ env.WHEELS_VERSION }}
+          md5sum wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.md5 || md5 -r wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.md5
+          sha512sum wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.sha512
+          md5sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5 || md5 -r wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5
+          sha512sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512
+
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -234,7 +245,17 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
             artifacts/wheels/wheels-starter-app-be.zip
-      
+
+      - name: Upload Wheels Module Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-module
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.sha512
+
       - name: Upload All Wheels Artifacts (Combined)
         uses: actions/upload-artifact@v4
         with:
@@ -287,3 +308,30 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+
+      #############################################
+      # Create Snapshot Pre-Release (develop only)
+      #############################################
+
+      - name: Create Snapshot Pre-Release
+        if: github.ref != 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.WHEELS_VERSION }}
+          name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
+          body: "Snapshot build from develop. Not for production use."
+          draft: false
+          prerelease: true
+          files: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512

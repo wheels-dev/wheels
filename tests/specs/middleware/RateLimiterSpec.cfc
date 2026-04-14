@@ -43,6 +43,27 @@ component extends="wheels.WheelsTest" {
 					}).toThrow("Wheels.RateLimiter.InvalidStorage");
 				});
 
+				it("accepts proxyStrategy first", function() {
+					var mw = new wheels.middleware.RateLimiter(proxyStrategy = "first");
+					expect(mw).toBeInstanceOf("wheels.middleware.RateLimiter");
+				});
+
+				it("accepts proxyStrategy last", function() {
+					var mw = new wheels.middleware.RateLimiter(proxyStrategy = "last");
+					expect(mw).toBeInstanceOf("wheels.middleware.RateLimiter");
+				});
+
+				it("throws on invalid proxyStrategy", function() {
+					expect(function() {
+						new wheels.middleware.RateLimiter(proxyStrategy = "middle");
+					}).toThrow("Wheels.RateLimiter.InvalidProxyStrategy");
+				});
+
+				it("accepts custom maxStoreSize", function() {
+					var mw = new wheels.middleware.RateLimiter(maxStoreSize = 500);
+					expect(mw).toBeInstanceOf("wheels.middleware.RateLimiter");
+				});
+
 				it("accepts a custom keyFunction", function() {
 					var mw = new wheels.middleware.RateLimiter(
 						keyFunction = function(request) { return "custom-key"; }

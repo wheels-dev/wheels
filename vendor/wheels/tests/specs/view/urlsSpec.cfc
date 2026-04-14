@@ -141,15 +141,15 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with external links", () => {
-				e = '<a href="http://www.cfwheels.com">CFWheels</a>'
-				r = _controller.linkTo(href = "http://www.cfwheels.com", text = "CFWheels")
+				e = '<a href="http://www.wheels.dev">Wheels</a>'
+				r = _controller.linkTo(href = "http://www.wheels.dev", text = "Wheels")
 		
 				expect(e).toBe(r)
 			})
 
 			it("works with linkto arguments", () => {
-				e = '<a confirm="confirm-value" disabled="disabled-value" href="/">CFWheels</a>'
-				r = _controller.linkTo(href = "/", text = "CFWheels", confirm = "confirm-value", disabled = "disabled-value")
+				e = '<a confirm="confirm-value" disabled="disabled-value" href="/">Wheels</a>'
+				r = _controller.linkTo(href = "/", text = "Wheels", confirm = "confirm-value", disabled = "disabled-value")
 		
 				expect(e).toBe(r)
 			})

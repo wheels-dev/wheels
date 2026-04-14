@@ -119,6 +119,88 @@ component extends="wheels.WheelsTest" {
 
 				expect(result).toInclude("<li class='active page-item'>")
 			})
+
+			it("strips event handler XSS from prependToPage when adding active class", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prepend                         = "<ul>",
+					append                          = "</ul>",
+					prependToPage                   = '<li class="page-item" onmouseover="alert(1)">',
+					appendToPage                    = "</li>",
+					addActiveClassToPrependedParent = true,
+					linkToCurrentPage               = true,
+					encode                          = "attributes",
+					class                           = "page-link"
+				)
+
+				expect(result).notToInclude("onmouseover")
+				expect(result).notToInclude("alert(1)")
+				expect(result).toInclude('class="active page-item"')
+			})
+
+			it("strips javascript URI XSS from prependToPage when adding active class", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prepend                         = "<ul>",
+					append                          = "</ul>",
+					prependToPage                   = '<li class="page-item" style="background:url(javascript:alert(1))">',
+					appendToPage                    = "</li>",
+					addActiveClassToPrependedParent = true,
+					linkToCurrentPage               = true,
+					encode                          = "attributes",
+					class                           = "page-link"
+				)
+
+				expect(result).notToInclude("javascript:")
+				expect(result).toInclude('class="active page-item"')
+			})
+
+			it("strips onclick XSS from prependToPage when adding active class", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prepend                         = "<ul>",
+					append                          = "</ul>",
+					prependToPage                   = "<li class='page-item' onclick='alert(document.cookie)'>",
+					appendToPage                    = "</li>",
+					addActiveClassToPrependedParent = true,
+					linkToCurrentPage               = true,
+					encode                          = "attributes",
+					class                           = "page-link"
+				)
+
+				expect(result).notToInclude("onclick")
+				expect(result).notToInclude("alert(document.cookie)")
+				expect(result).toInclude("class='active page-item'")
+			})
+
+			it("encodes anchorDivider to prevent XSS", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					windowSize       = 0,
+					alwaysShowAnchors = true,
+					anchorDivider    = '<script>alert(1)</script>',
+					encode           = true
+				)
+
+				expect(result).notToInclude("<script>")
+				expect(result).notToInclude("</script>")
+				expect(result).notToInclude("alert(1)")
+			})
+
+			it("strips event handler XSS from appendToPage", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prependToPage                   = "<li>",
+					appendToPage                    = '<span onmouseover="alert(1)">x</span></li>',
+					addActiveClassToPrependedParent = false,
+					linkToCurrentPage               = true,
+					encode                          = "attributes"
+				)
+
+				expect(result).notToInclude("onmouseover")
+				expect(result).notToInclude("alert(1)")
+				expect(result).toInclude("<span")
+			})
 		})
 	}
 

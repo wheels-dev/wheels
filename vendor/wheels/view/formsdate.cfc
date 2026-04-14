@@ -124,8 +124,8 @@ component {
 		} else if (isInstanceOf(local.value, "oracle.sql.TIMESTAMP")){
 			local.value = local.value.timestampValue();
 		}
-		if (structKeyExists(server, "boxlang") && IsSimpleValue(local.value) && Len(local.value)) {
-			// BoxLang compatibility: Fix date parsing issues
+		if ($engineAdapter().isBoxLang() && IsSimpleValue(local.value) && Len(local.value)) {
+			// Engine compatibility: Fix date parsing issues
 			// Handle SQL Server format YYYY-MM-DD HH:MM:SS
 			if (ReFindNoCase("^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", local.value)) {
 				local.parts = ListToArray(Left(local.value, 10), "-");

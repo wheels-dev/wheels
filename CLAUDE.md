@@ -127,7 +127,7 @@ t.timestamps();  // creates both createdAt and updatedAt
 ```
 
 ### 8. Database-Agnostic Dates in Migrations
-Use `NOW()` — it works across MySQL, PostgreSQL, SQL Server, H2.
+Use `NOW()` — it works across MySQL, PostgreSQL, SQL Server, H2, SQLite.
 ```cfm
 // WRONG — database-specific
 execute("INSERT INTO users (name, createdAt) VALUES ('Admin', CURRENT_TIMESTAMP)");
@@ -486,11 +486,59 @@ component extends="wheels.WheelsTest" {
 - **Force reload**: append `&reload=true` after adding new model CFCs
 - **Closure gotcha**: CFML closures can't access outer `local` vars — use shared structs (`var result = {count: 0}`)
 - **Scope gotcha in test infra**: Wheels internal functions (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
+- **`#` escape gotcha**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiters. In string literals, escape as `&##111;`. Comments (`//`) are fine since they aren't evaluated. Unescaped `#` in strings causes "Invalid Syntax Closing [#] not found" compilation errors that crash the **entire** test suite (not just that file).
+- **`$clearRoutes()` in test specs**: Test CFCs that manipulate routes must define their own `$clearRoutes()` method — it is NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc`.
+- **`Left(str, 0)` crashes Lucee 7**: Use a ternary guard: `local.match.pos[1] > 1 ? Left(str, local.match.pos[1] - 1) : ""`
 - Run with MCP `wheels_test()` or CLI `wheels test run`
 
-## Running Tests Locally (Docker)
+## Running Tests Locally (LuCLI — Recommended)
 
 **IMPORTANT: Always run the test suite before pushing.** Do not rely on CI alone.
+
+### Fastest method: one command
+```bash
+bash tools/test-local.sh              # run all core tests
+bash tools/test-local.sh model        # run model tests only
+bash tools/test-local.sh security     # run security tests only
+```
+
+The script handles everything: creates SQLite DBs, starts a LuCLI server if needed, runs tests, reports results, cleans up. No Docker required.
+
+### Prerequisites (one-time setup)
+```bash
+# Install LuCLI (0.3.3+ recommended)
+brew install lucli    # or download from GitHub releases
+# Java 21 required
+brew install openjdk@21
+```
+
+### Manual method (if you need a persistent server)
+```bash
+cd /path/to/wheels
+sqlite3 wheelstestdb.db "SELECT 1;"
+sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+lucli server run --port=8080
+
+# In another terminal:
+curl -s "http://localhost:8080/?reload=true&password=wheels"
+curl -sf "http://localhost:8080/wheels/core/tests?db=sqlite&format=json" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(f'{d[\"totalPass\"]} pass, {d[\"totalFail\"]} fail, {d[\"totalError\"]} error')"
+```
+
+### Run specific test directories
+```bash
+bash tools/test-local.sh model        # vendor/wheels/tests/specs/model/
+bash tools/test-local.sh controller   # vendor/wheels/tests/specs/controller/
+bash tools/test-local.sh view         # vendor/wheels/tests/specs/view/
+bash tools/test-local.sh security     # vendor/wheels/tests/specs/security/
+bash tools/test-local.sh middleware   # vendor/wheels/tests/specs/middleware/
+bash tools/test-local.sh dispatch     # vendor/wheels/tests/specs/dispatch/
+bash tools/test-local.sh migrator     # vendor/wheels/tests/specs/migrator/
+```
+
+## Running Tests Locally (Docker — Legacy)
+
+Docker is still supported for cross-engine testing (Adobe CF, multiple Lucee versions, multiple databases). For day-to-day development, use the LuCLI method above.
 
 ### Minimum: test both Lucee AND Adobe before pushing
 Lucee and Adobe CF have different runtime behaviors (struct member functions,
@@ -498,12 +546,12 @@ application scope, closure scoping). Always test at least **two engines**:
 ```bash
 cd /path/to/wheels/rig    # must be in the repo root with compose.yml
 
-# Start both engines (H2 is built-in, no external DB needed)
+# Start both engines (SQLite is built-in on all engines, no external DB needed)
 docker compose up -d lucee6 adobe2025
 
 # Wait ~60s for startup, then run both:
-curl -s -o /tmp/lucee6-results.json "http://localhost:60006/wheels/core/tests?db=h2&format=json"
-curl -s -o /tmp/adobe2025-results.json "http://localhost:62025/wheels/core/tests?db=h2&format=json"
+curl -s -o /tmp/lucee6-results.json "http://localhost:60006/wheels/core/tests?db=sqlite&format=json"
+curl -s -o /tmp/adobe2025-results.json "http://localhost:62025/wheels/core/tests?db=sqlite&format=json"
 
 # Check results (HTTP 200=pass, 417=failures)
 for f in /tmp/lucee6-results.json /tmp/adobe2025-results.json; do
@@ -541,7 +589,7 @@ curl -sf "http://localhost:60006/wheels/core/tests?db=mysql&format=json" > /tmp/
 
 ### Run a specific test directory
 ```bash
-curl "http://localhost:60006/wheels/core/tests?db=h2&format=json&directory=tests.specs.controller"
+curl "http://localhost:60006/wheels/core/tests?db=sqlite&format=json&directory=tests.specs.controller"
 ```
 
 ### Known cross-engine gotchas
@@ -675,7 +723,7 @@ Client-side: `const es = new EventSource('/controller/notifications');`
 ## Reference Docs
 
 Deeper documentation lives in `.ai/` — Claude will search it automatically when needed:
-- `.ai/wheels/cross-engine-compatibility.md` — **Start here** for Lucee/Adobe/H2 gotchas
+- `.ai/wheels/cross-engine-compatibility.md` — **Start here** for Lucee/Adobe cross-engine gotchas
 - `.ai/cfml/` — CFML language reference (syntax, data types, components)
 - `.ai/wheels/models/` — ORM details, associations, validations, scopes, enums
 - `.ai/wheels/controllers/` — filters, rendering, security
@@ -684,6 +732,20 @@ Deeper documentation lives in `.ai/` — Claude will search it automatically whe
 - `.ai/wheels/cli/` — generators (including admin generator)
 - `.ai/wheels/testing/` — unit testing with TestBox, test infrastructure, common gotchas
 - `.ai/wheels/configuration/` — routing, environments, settings, DI container
+
+## Commit Message Conventions
+
+This repo uses commitlint. Commit messages must follow: `type(scope): lowercase subject`
+
+**Valid scopes:** `model`, `controller`, `view`, `router`, `middleware`, `migration`, `cli`, `test`, `config`, `di`, `job`, `mailer`, `plugin`, `sse`, `seed`, `docs`
+
+**Invalid scope:** `security` — use the layer it touches (e.g., `model` for SQL injection fix, `view` for XSS fix, `config` for consoleeval hardening, `cli` for MCP server fixes).
+
+**Subject must be lowercase.** No sentence-case, start-case, or pascal-case. Write `fix(model): validate index names` not `fix(model): Validate index names`.
+
+## Branding
+
+The project name is **Wheels** (not "CFWheels"). The rebrand happened at v3.0. Always use "Wheels" in new code, comments, commit messages, PR descriptions, and documentation.
 
 ## MCP Server
 

@@ -10,19 +10,32 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	/**
 	 * Creates the CORS middleware with configurable options.
 	 *
-	 * @allowOrigins Comma-delimited list of allowed origins. Use "*" for any origin.
+	 * @allowOrigins Comma-delimited list of allowed origins, or "*" for any origin. Defaults to "" (no origins allowed). You must explicitly configure allowed origins for CORS to function.
 	 * @allowMethods Comma-delimited list of allowed HTTP methods.
 	 * @allowHeaders Comma-delimited list of allowed request headers.
 	 * @allowCredentials Whether to allow credentials (cookies, auth headers).
 	 * @maxAge Preflight cache duration in seconds.
 	 */
 	public Cors function init(
-		string allowOrigins = "*",
+		string allowOrigins = "",
 		string allowMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		string allowHeaders = "Content-Type,Authorization,X-Requested-With",
 		boolean allowCredentials = false,
 		numeric maxAge = 86400
 	) {
+		// The CORS spec forbids Access-Control-Allow-Origin: * with
+		// Access-Control-Allow-Credentials: true.  Browsers silently
+		// reject the response, which often leads developers to weaken
+		// security further.  Fail fast with a clear message instead.
+		if (arguments.allowOrigins == "*" && arguments.allowCredentials) {
+			Throw(
+				type    = "Wheels.Cors.InvalidConfiguration",
+				message = "CORS misconfiguration: allowOrigins=""*"" cannot be combined with allowCredentials=true. "
+					& "The CORS specification forbids this combination and browsers will reject the response. "
+					& "Either list specific origins (e.g. allowOrigins=""https://myapp.com"") or set allowCredentials=false."
+			);
+		}
+
 		variables.allowOrigins = arguments.allowOrigins;
 		variables.allowMethods = arguments.allowMethods;
 		variables.allowHeaders = arguments.allowHeaders;

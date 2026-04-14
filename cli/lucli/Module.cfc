@@ -2,7 +2,7 @@
  * Wheels CLI Module for LuCLI
  *
  * Provides code generation, migrations, testing, and server management
- * for CFWheels applications. Each public function is a subcommand:
+ * for Wheels applications. Each public function is a subcommand:
  *
  *   wheels new myapp
  *   wheels create app myapp --port=3000
@@ -11,7 +11,7 @@
  *   wheels test --filter=models
  *   wheels start
  *
- * hint: CFWheels framework CLI - create, generate, migrate, test, and manage your app
+ * hint: Wheels framework CLI - create, generate, migrate, test, and manage your app
  */
 component extends="modules.BaseModule" {
 
@@ -62,6 +62,7 @@ component extends="modules.BaseModule" {
 			out("  property      Generate an add-column migration for a model property");
 			out("  helper        Generate a helper file in app/helpers/");
 			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
+			out("  admin         Generate admin CRUD interface for an existing model");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate app myapp");
@@ -75,6 +76,7 @@ component extends="modules.BaseModule" {
 			out("  wheels generate property User email:string");
 			out("  wheels generate helper formatting");
 			out("  wheels generate snippets auth");
+			out("  wheels generate admin User");
 			return "";
 		}
 
@@ -118,6 +120,8 @@ component extends="modules.BaseModule" {
 				return generateHelper(remaining);
 			case "snippets":
 				return generateSnippets(remaining);
+			case "admin":
+				return generateAdmin(remaining);
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
@@ -141,12 +145,43 @@ component extends="modules.BaseModule" {
 			case "up":
 			case "down":
 			case "info":
-				return runMigration(action);
+				try {
+					return runMigration(action);
+				} catch (MigrationError e) {
+					out("Migration failed: #e.message#", "red");
+					return "";
+				}
 			default:
 				out("Unknown migration action: #action#", "red");
 				out("Usage: wheels migrate [latest|up|down|info]");
 				return "";
 		}
+	}
+
+	// ─────────────────────────────────────────────────
+	//  seed — Database seeding
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Run database seeds (convention-based or generated)
+	 */
+	public string function seed() {
+		var args = __arguments ?: [];
+		var environment = "";
+		var mode = "auto";
+
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (reFindNoCase("^--environment=", arg)) {
+				environment = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--mode=", arg)) {
+				mode = valueAfterEquals(arg);
+			} else if (arg == "--generate") {
+				mode = "generate";
+			}
+		}
+
+		return runSeed(mode, environment);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -162,6 +197,9 @@ component extends="modules.BaseModule" {
 		var reporter = "simple";
 		var format = "json";
 		var verboseOutput = false;
+		var ciMode = false;
+		var coreTests = false;
+		var db = "sqlite";
 
 		// Parse named arguments from --key=value or --key value
 		for (var i = 1; i <= arrayLen(args); i++) {
@@ -174,15 +212,30 @@ component extends="modules.BaseModule" {
 				reporter = args[++i];
 			} else if (reFindNoCase("^--reporter=", arg)) {
 				reporter = valueAfterEquals(arg);
+			} else if (arg == "--db" && i < arrayLen(args)) {
+				db = args[++i];
+			} else if (reFindNoCase("^--db=", arg)) {
+				db = valueAfterEquals(arg);
 			} else if (arg == "--verbose" || arg == "-v") {
 				verboseOutput = true;
+			} else if (arg == "--ci") {
+				ciMode = true;
+			} else if (arg == "--core") {
+				coreTests = true;
 			} else if (!arg.startsWith("--")) {
 				// Positional arg is the filter directory
 				filter = arg;
 			}
 		}
 
-		return runTests(filter, reporter, format, verboseOutput);
+		// Auto-detect: if vendor/wheels/tests/ exists, default to core tests
+		if (!coreTests && len(variables.projectRoot)) {
+			if (directoryExists(variables.projectRoot & "/vendor/wheels/tests")) {
+				coreTests = true;
+			}
+		}
+
+		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -313,9 +366,9 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Default datasource and reload password to app name if not specified
+		// Default datasource to app name, generate random reload password
 		if (!len(options.datasource)) options.datasource = lCase(appName);
-		if (!len(options.reloadPassword)) options.reloadPassword = lCase(appName);
+		if (!len(options.reloadPassword)) options.reloadPassword = generateRandomPassword();
 
 		return scaffoldNewApp(appName, options);
 	}
@@ -615,6 +668,23 @@ component extends="modules.BaseModule" {
 					System.out.print(chr(27) & "[2J" & chr(27) & "[H");
 					System.out.flush();
 					continue;
+
+				case "/models":
+					consoleExec(evalUrl, "structKeyArray(application.wheels.models).sort('textnocase')", password);
+					continue;
+
+				case "/routes":
+					consoleExec(evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", password);
+					continue;
+
+				case "/version":
+					consoleExec(evalUrl, "application.wheels.version", password);
+					continue;
+
+				case "/ds":
+				case "/datasource":
+					consoleExec(evalUrl, "application.wheels.dataSourceName", password);
+					continue;
 			}
 
 			// Evaluate expression
@@ -811,11 +881,15 @@ component extends="modules.BaseModule" {
 	private void function printConsoleHelp() {
 		out("");
 		out("Wheels Console Commands:", "bold");
-		out("  /help, /h     Show this help");
-		out("  /env          Show environment info");
-		out("  /reload       Reload the application");
-		out("  /clear        Clear the screen");
-		out("  /exit, /quit  Exit the console");
+		out("  /help, /h       Show this help");
+		out("  /env            Show environment info");
+		out("  /models         List all registered models");
+		out("  /routes         List all routes");
+		out("  /version        Show Wheels version");
+		out("  /ds             Show current datasource");
+		out("  /reload         Reload the application");
+		out("  /clear          Clear the screen");
+		out("  /exit, /quit    Exit the console");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');
@@ -824,8 +898,8 @@ component extends="modules.BaseModule" {
 		out('  model("User").count()                        Count records');
 		out('  model("Post").findAll(where="status=''draft''")  Filtered query');
 		out('  get("environment")                           Framework setting');
-		out('  application.wheels.version                   Wheels version');
 		out('  service("emailService")                      Resolve a service');
+		out('  application.wheels.version                   Wheels version');
 		out("");
 	}
 
@@ -940,6 +1014,361 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  destroy — Remove generated components
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Remove generated components (resource, model, controller, view)
+	 */
+	public string function destroy() {
+		var args = __arguments ?: [];
+
+		var positional = [];
+		var force = false;
+		for (var a in args) {
+			if (a == "--force") { force = true; }
+			else { arrayAppend(positional, a); }
+		}
+		if (!arrayLen(positional)) {
+			out("Usage: wheels destroy <name> [type]", "yellow");
+			out("");
+			out("Types:", "bold");
+			out("  resource    Remove model + controller + views + tests + route + migration (default)");
+			out("  model       Remove model + test + generate drop-table migration");
+			out("  controller  Remove controller + test");
+			out("  view        Remove view directory (or single file with controller/view syntax)");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels destroy User");
+			out("  wheels destroy Products controller");
+			out("  wheels destroy Product model");
+			out("  wheels destroy products/index view");
+			return "";
+		}
+		var name = trim(positional[1]);
+		var type = arrayLen(positional) > 1 ? lCase(trim(positional[2])) : "resource";
+
+		if (!listFindNoCase("resource,model,controller,view", type)) {
+			out("Unknown type: #type#. Valid types: resource, model, controller, view", "red");
+			return "";
+		}
+
+		var svc = getService("destroy");
+
+		// Show preview and confirm
+		var preview = svc.previewDestroy(name, type);
+		if (!arrayLen(preview)) {
+			out("Nothing to destroy.", "yellow");
+			return "";
+		}
+
+		out("The following will be deleted:", "yellow");
+		for (var item in preview) {
+			out("  #item#");
+		}
+		out("");
+
+		if (!force) {
+			out("Use --force to confirm deletion.", "yellow");
+			return "";
+		}
+
+		var result = {};
+		switch (type) {
+			case "resource":
+				result = svc.destroyResource(name);
+				break;
+			case "model":
+				result = svc.destroyModel(name);
+				break;
+			case "controller":
+				result = svc.destroyController(name);
+				break;
+			case "view":
+				result = svc.destroyView(name);
+				break;
+		}
+
+		// Output results
+		for (var deleted in result.deleted) {
+			out("  delete  #deleted#", "red");
+		}
+		for (var warning in result.warnings) {
+			out("  skip    #warning#", "yellow");
+		}
+		if (structKeyExists(result, "migrationPath") && len(result.migrationPath)) {
+			out("");
+			out("Migration generated: #result.migrationPath#", "cyan");
+			out("Run 'wheels migrate latest' to apply.", "cyan");
+		}
+		return "";
+	}
+
+	/**
+	 * hint: Alias for destroy
+	 */
+	public string function d() {
+		return destroy();
+	}
+
+	// ─────────────────────────────────────────────────
+	//  doctor — Application health checks
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Run health checks on your Wheels application
+	 */
+	public string function doctor() {
+		var args = __arguments ?: [];
+		var verbose = false;
+		for (var arg in args) {
+			if (arg == "--verbose" || arg == "-v") verbose = true;
+		}
+
+		var svc = getService("doctor");
+		var results = svc.runChecks();
+
+		out("Wheels Health Check", "bold");
+		out(repeatString("=", 40));
+		out("");
+
+		// Issues
+		if (arrayLen(results.issues)) {
+			out("Issues (#arrayLen(results.issues)#):", "red");
+			for (var issue in results.issues) {
+				out("  x #issue#", "red");
+			}
+			out("");
+		}
+
+		// Warnings
+		if (arrayLen(results.warnings)) {
+			out("Warnings (#arrayLen(results.warnings)#):", "yellow");
+			for (var warning in results.warnings) {
+				out("  ! #warning#", "yellow");
+			}
+			out("");
+		}
+
+		// Passed (verbose only, or when no issues)
+		if (verbose || (results.status == "HEALTHY")) {
+			out("Passed (#arrayLen(results.passed)#):", "green");
+			for (var passed in results.passed) {
+				out("  + #passed#", "green");
+			}
+			out("");
+		}
+
+		// Status
+		switch (results.status) {
+			case "CRITICAL":
+				out("Status: CRITICAL", "red");
+				break;
+			case "WARNING":
+				out("Status: WARNING", "yellow");
+				break;
+			case "HEALTHY":
+				out("Status: HEALTHY", "green");
+				break;
+		}
+
+		// Recommendations
+		if (arrayLen(results.recommendations)) {
+			out("");
+			out("Recommendations:", "cyan");
+			for (var rec in results.recommendations) {
+				out("  * #rec#", "cyan");
+			}
+		}
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  stats — Code statistics
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Show code statistics for your Wheels application
+	 */
+	public string function stats() {
+		var args = __arguments ?: [];
+		var verbose = false;
+		for (var arg in args) {
+			if (arg == "--verbose" || arg == "-v") verbose = true;
+		}
+
+		var svc = getService("stats");
+		var data = svc.getStats();
+
+		out("Code Statistics", "bold");
+		out(repeatString("=", 70));
+
+		// Header
+		var fmt = "%-14s %6s %7s %10s %8s %7s";
+		out(sprintf(fmt, "Category", "Files", "LOC", "Comments", "Blanks", "Total"));
+		out(repeatString("-", 70));
+
+		// Rows
+		for (var cat in data.categories) {
+			out(sprintf(fmt,
+				cat.name,
+				cat.files,
+				cat.loc,
+				cat.comments,
+				cat.blanks,
+				cat.total
+			));
+		}
+
+		out(repeatString("-", 70));
+		out(sprintf(fmt,
+			"Total",
+			data.totals.files,
+			data.totals.loc,
+			data.totals.comments,
+			data.totals.blanks,
+			data.totals.total
+		));
+		out("");
+		out("Code-to-test ratio: 1:#data.codeToTestRatio#");
+		out("Average lines/file: #data.avgLinesPerFile#");
+
+		if (verbose && arrayLen(data.topFiles)) {
+			out("");
+			out("Top 10 Largest Files:", "bold");
+			for (var f in data.topFiles) {
+				out("  #f.lines# lines  #f.path#");
+			}
+		}
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  notes — Code annotations
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Extract TODO, FIXME, and other annotations from your codebase
+	 */
+	public string function notes() {
+		var args = __arguments ?: [];
+		var annotations = "TODO,FIXME,OPTIMIZE";
+		var custom = "";
+
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (reFindNoCase("^--annotations=", arg)) {
+				annotations = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--custom=", arg)) {
+				custom = valueAfterEquals(arg);
+			}
+		}
+
+		var svc = getService("stats");
+		var data = svc.getNotes(annotations, custom);
+
+		if (data.total == 0) {
+			out("No annotations found.", "green");
+			return "";
+		}
+
+		for (var aType in data.types) {
+			var items = data.annotations[aType];
+			if (!arrayLen(items)) continue;
+
+			out("#aType# (#arrayLen(items)#):", "yellow");
+			for (var item in items) {
+				var desc = len(item.text) ? " -- #item.text#" : "";
+				out("  #item.file#:#item.line##desc#");
+			}
+			out("");
+		}
+
+		// Summary line
+		var parts = [];
+		for (var aType in data.types) {
+			var count = arrayLen(data.annotations[aType]);
+			if (count) arrayAppend(parts, "#count# #aType#");
+		}
+		out("Summary: #data.total# annotations (#arrayToList(parts, ', ')#)", "cyan");
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  db — Database management
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Database management commands (reset, status, version)
+	 */
+	public string function db() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args)) {
+			out("Usage: wheels db <command>", "yellow");
+			out("");
+			out("Commands:", "bold");
+			out("  reset    Run pending migrations and reseed the database");
+			out("  status   Show migration status (applied vs pending)");
+			out("  version  Show current database schema version");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels db reset");
+			out("  wheels db reset --skip-seed");
+			out("  wheels db status");
+			out("  wheels db status --pending");
+			out("  wheels db version --detailed");
+			return "";
+		}
+
+		var subcommand = lCase(args[1]);
+
+		switch (subcommand) {
+			case "reset":
+				return dbReset(args);
+			case "status":
+				return dbStatus(args);
+			case "version":
+				return dbVersion(args);
+			default:
+				out("Unknown db command: #subcommand#", "red");
+				out("Valid commands: reset, status, version");
+				return "";
+		}
+	}
+
+	// ─────────────────────────────────────────────────
+	//  upgrade — Upgrade assistance
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Check for breaking changes before upgrading Wheels
+	 */
+	public string function upgrade() {
+		var args = __arguments ?: [];
+
+		if (!arrayLen(args) || lCase(args[1]) != "check") {
+			out("Usage: wheels upgrade check [--to=<version>]", "yellow");
+			out("");
+			out("Scans your app for breaking changes between versions.");
+			out("Does not perform the upgrade — use 'brew upgrade wheels' for that.");
+			return "";
+		}
+
+		var targetVersion = "";
+		for (var i = 2; i <= arrayLen(args); i++) {
+			if (reFindNoCase("^--to=", args[i])) {
+				targetVersion = valueAfterEquals(args[i]);
+			}
+		}
+
+		return runUpgradeCheck(targetVersion);
 	}
 
 	// ═════════════════════════════════════════════════
@@ -1401,6 +1830,69 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Generate admin CRUD interface for an existing model
+	 */
+	private string function generateAdmin(array args = []) {
+		if (!arrayLen(arguments.args)) {
+			out("Usage: wheels generate admin <modelName> [--force] [--no-routes]", "yellow");
+			out("");
+			out("Generates an admin controller and views by introspecting an existing model.");
+			out("Requires a running server.");
+			return "";
+		}
+
+		var modelName = capitalize(arguments.args[1]);
+		var force = false;
+		var noRoutes = false;
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			if (arguments.args[i] == "--force") force = true;
+			if (arguments.args[i] == "--no-routes") noRoutes = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			out("Admin generation requires a running server for model introspection.");
+			return "";
+		}
+
+		// Introspect the model via the server
+		out("Introspecting model: #modelName#...", "cyan");
+		try {
+			var introspectUrl = "http://localhost:#serverPort#/wheels/cli?command=introspect&model=#modelName#&format=json";
+			var response = makeHttpRequest(introspectUrl);
+			var modelData = deserializeJSON(response);
+
+			if (!modelData.success) {
+				out("Error: #modelData.message#", "red");
+				return "";
+			}
+		} catch (any e) {
+			out("Error introspecting model: #e.message#", "red");
+			return "";
+		}
+
+		// Generate admin files
+		var svc = getService("admin");
+		var result = svc.generateAdmin(modelData=modelData, force=force, noRoutes=noRoutes);
+
+		if (result.success) {
+			for (var generated in result.generated) {
+				printCreated(generated);
+			}
+			out("");
+			out("Admin interface generated for #modelName#.", "green");
+			out("Visit /admin/#lCase(getService(""helpers"").pluralize(modelName))# after reloading.", "cyan");
+		} else {
+			for (var err in result.errors) {
+				out(err, "red");
+			}
+		}
+
+		return "";
+	}
+
+	/**
 	 * List all available snippet patterns
 	 */
 	private string function listSnippets() {
@@ -1432,8 +1924,7 @@ component extends="modules.BaseModule" {
 	 * Each entry has: name, description, hint, generate(projectRoot, force) -> array of relative paths
 	 */
 	private struct function getSnippetRegistry() {
-		var nl = chr(10);
-		var tab = chr(9);
+		var snippetDir = getDirectoryFromPath(getCurrentTemplatePath()) & "templates/snippets/";
 
 		return {
 			"auth": {
@@ -1443,82 +1934,15 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					// Session controller
-					var sessionCtrl = 'component extends="Controller" {' & nl
-						& nl
-						& tab & 'function config() {' & nl
-						& tab & tab & 'verifies(only="create", params="username,password");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Login form' & nl
-						& tab & ' */' & nl
-						& tab & 'function new() {' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Process login' & nl
-						& tab & ' */' & nl
-						& tab & 'function create() {' & nl
-						& tab & tab & 'var user = model("User").findOne(where="username=''##params.username##''");' & nl
-						& tab & tab & 'if (IsObject(user) && user.authenticate(params.password)) {' & nl
-						& tab & tab & tab & 'session.currentUserId = user.key();' & nl
-						& tab & tab & tab & 'flashInsert(success="Logged in successfully.");' & nl
-						& tab & tab & tab & 'redirectTo(route="root");' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'flashInsert(error="Invalid username or password.");' & nl
-						& tab & tab & tab & 'renderView(action="new");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Logout' & nl
-						& tab & ' */' & nl
-						& tab & 'function delete() {' & nl
-						& tab & tab & 'structDelete(session, "currentUserId");' & nl
-						& tab & tab & 'flashInsert(success="You have been logged out.");' & nl
-						& tab & tab & 'redirectTo(route="root");' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var sessionCtrl = fileRead(snippetDir & "auth-sessions-controller.txt");
 					var p = writeSnippetFile(projectRoot, "app/controllers/Sessions.cfc", sessionCtrl, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Login view
-					var loginView = '<cfparam name="params.username" default="">' & nl
-						& nl
-						& '<h1>Log In</h1>' & nl
-						& nl
-						& '##flashMessages()##' & nl
-						& nl
-						& '##startFormTag(route="sessions", method="post")##' & nl
-						& tab & '<div class="mb-3">' & nl
-						& tab & tab & '##textField(name="username", label="Username", class="form-control")##' & nl
-						& tab & '</div>' & nl
-						& tab & '<div class="mb-3">' & nl
-						& tab & tab & '##passwordField(name="password", label="Password", class="form-control")##' & nl
-						& tab & '</div>' & nl
-						& tab & '##submitTag(value="Log In", class="btn btn-primary")##' & nl
-						& '##endFormTag()##';
+					var loginView = fileRead(snippetDir & "auth-login-view.txt");
 					p = writeSnippetFile(projectRoot, "app/views/sessions/new.cfm", loginView, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Auth filter helper (for Controller.cfc)
-					var authFilter = '<!--- Include in your base Controller.cfc config(): filters(through="authenticate") --->' & nl
-						& nl
-						& '<cfscript>' & nl
-						& 'private function authenticate() {' & nl
-						& tab & 'if (!structKeyExists(session, "currentUserId")) {' & nl
-						& tab & tab & 'flashInsert(error="Please log in to continue.");' & nl
-						& tab & tab & 'redirectTo(controller="sessions", action="new");' & nl
-						& tab & '}' & nl
-						& tab & 'currentUser = model("User").findByKey(session.currentUserId);' & nl
-						& tab & 'if (!IsObject(currentUser)) {' & nl
-						& tab & tab & 'structDelete(session, "currentUserId");' & nl
-						& tab & tab & 'redirectTo(controller="sessions", action="new");' & nl
-						& tab & '}' & nl
-						& '}' & nl
-						& '</cfscript>';
+					var authFilter = fileRead(snippetDir & "auth-filter.txt");
 					p = writeSnippetFile(projectRoot, "app/snippets/auth-filter.cfm", authFilter, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1532,60 +1956,11 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					// Soft delete model mixin
-					var content = '<!---' & nl
-						& tab & 'Soft Delete Pattern' & nl
-						& tab & 'Requires: deletedAt (datetime, nullable) column on the table.' & nl
-						& tab & 'Migration: t.datetime(columnNames="deletedAt", null=true, default="NULL");' & nl
-						& nl
-						& tab & 'Usage in your model config():' & nl
-						& tab & tab & 'beforeDelete("softDelete");' & nl
-						& tab & tab & 'scope(name="active", where="deletedAt IS NULL");' & nl
-						& tab & tab & 'scope(name="trashed", where="deletedAt IS NOT NULL");' & nl
-						& '--->' & nl
-						& nl
-						& '<cfscript>' & nl
-						& '/**' & nl
-						& ' * Soft delete: set deletedAt instead of removing the row.' & nl
-						& ' * Return false to prevent the actual DELETE.' & nl
-						& ' */' & nl
-						& 'private boolean function softDelete() {' & nl
-						& tab & 'this.updateProperty(property="deletedAt", value=Now());' & nl
-						& tab & 'return false;' & nl
-						& '}' & nl
-						& nl
-						& '/**' & nl
-						& ' * Restore a soft-deleted record.' & nl
-						& ' */' & nl
-						& 'public boolean function restore() {' & nl
-						& tab & 'return this.updateProperty(property="deletedAt", value="");' & nl
-						& '}' & nl
-						& nl
-						& '/**' & nl
-						& ' * Check if the record has been soft-deleted.' & nl
-						& ' */' & nl
-						& 'public boolean function isTrashed() {' & nl
-						& tab & 'return len(this.deletedAt) && isDate(this.deletedAt);' & nl
-						& '}' & nl
-						& '</cfscript>';
+					var content = fileRead(snippetDir & "soft-delete-mixin.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/soft-delete.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Migration
-					var migration = 'component extends="wheels.migrator.Migration" {' & nl
-						& nl
-						& tab & 'function up() {' & nl
-						& tab & tab & '// Add to your table: change "tablename" below' & nl
-						& tab & tab & 'addColumn(table="tablename", columnType="datetime", columnName="deletedAt", null=true, default="NULL");' & nl
-						& tab & tab & 'addIndex(table="tablename", columnNames="deletedAt");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function down() {' & nl
-						& tab & tab & 'removeIndex(table="tablename", columnNames="deletedAt");' & nl
-						& tab & tab & 'removeColumn(table="tablename", columnName="deletedAt");' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var migration = fileRead(snippetDir & "soft-delete-migration.txt");
 					p = writeSnippetFile(projectRoot, "app/snippets/soft-delete-migration.cfc", migration, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1599,54 +1974,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = 'component extends="Controller" {' & nl
-						& nl
-						& tab & 'function config() {' & nl
-						& tab & tab & 'provides("json");' & nl
-						& tab & tab & 'verifies(params="key", paramsTypes="integer", only="show,update,delete");' & nl
-						& tab & tab & 'filters(through="findRecord", only="show,update,delete");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function index() {' & nl
-						& tab & tab & 'var page = val(params.page) > 0 ? val(params.page) : 1;' & nl
-						& tab & tab & 'records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");' & nl
-						& tab & tab & 'renderWith(data=records, layout=false);' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function show() {' & nl
-						& tab & tab & 'renderWith(data=record, layout=false);' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function create() {' & nl
-						& tab & tab & 'record = model("Item").new(params.item);' & nl
-						& tab & tab & 'if (record.save()) {' & nl
-						& tab & tab & tab & 'renderWith(data=record, layout=false, status=201);' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'renderWith(data={errors: record.allErrors()}, layout=false, status=422);' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function update() {' & nl
-						& tab & tab & 'if (record.update(properties=params.item)) {' & nl
-						& tab & tab & tab & 'renderWith(data=record, layout=false);' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'renderWith(data={errors: record.allErrors()}, layout=false, status=422);' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function delete() {' & nl
-						& tab & tab & 'record.delete();' & nl
-						& tab & tab & 'renderWith(data={message: "Record deleted."}, layout=false);' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'private function findRecord() {' & nl
-						& tab & tab & 'record = model("Item").findByKey(params.key);' & nl
-						& tab & tab & 'if (!IsObject(record)) {' & nl
-						& tab & tab & tab & 'renderWith(data={error: "Record not found."}, layout=false, status=404);' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var content = fileRead(snippetDir & "api-controller.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/api-controller.cfc", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1660,64 +1988,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = 'component extends="Controller" {' & nl
-						& nl
-						& tab & 'function config() {' & nl
-						& tab & tab & 'verifies(params="key", paramsTypes="integer", only="show,edit,update,delete");' & nl
-						& tab & tab & 'filters(through="findRecord", only="show,edit,update,delete");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function index() {' & nl
-						& tab & tab & 'var page = val(params.page) > 0 ? val(params.page) : 1;' & nl
-						& tab & tab & 'records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function show() {' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function new() {' & nl
-						& tab & tab & 'record = model("Item").new();' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function create() {' & nl
-						& tab & tab & 'record = model("Item").new(params.item);' & nl
-						& tab & tab & 'if (record.save()) {' & nl
-						& tab & tab & tab & 'flashInsert(success="Item was created successfully.");' & nl
-						& tab & tab & tab & 'redirectTo(action="index");' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'flashInsert(error="There was a problem creating the item.");' & nl
-						& tab & tab & tab & 'renderView(action="new");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function edit() {' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function update() {' & nl
-						& tab & tab & 'if (record.update(properties=params.item)) {' & nl
-						& tab & tab & tab & 'flashInsert(success="Item was updated successfully.");' & nl
-						& tab & tab & tab & 'redirectTo(action="index");' & nl
-						& tab & tab & '} else {' & nl
-						& tab & tab & tab & 'flashInsert(error="There was a problem updating the item.");' & nl
-						& tab & tab & tab & 'renderView(action="edit");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'function delete() {' & nl
-						& tab & tab & 'record.delete();' & nl
-						& tab & tab & 'flashInsert(success="Item was deleted successfully.");' & nl
-						& tab & tab & 'redirectTo(action="index");' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & 'private function findRecord() {' & nl
-						& tab & tab & 'record = model("Item").findByKey(params.key);' & nl
-						& tab & tab & 'if (!IsObject(record)) {' & nl
-						& tab & tab & tab & 'flashInsert(error="Item not found.");' & nl
-						& tab & tab & tab & 'redirectTo(action="index");' & nl
-						& tab & tab & '}' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var content = fileRead(snippetDir & "crud-controller.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/crud-controller.cfc", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1731,36 +2002,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = '<!--- app/views/shared/_flash.cfm --->' & nl
-						& '<cfparam name="flash" default="##flashMessages(includeEmptyContainer=false)##">' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "success")>' & nl
-						& tab & '<div class="alert alert-success alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("success")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "error")>' & nl
-						& tab & '<div class="alert alert-danger alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("error")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "warning")>' & nl
-						& tab & '<div class="alert alert-warning alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("warning")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>' & nl
-						& nl
-						& '<cfif structKeyExists(flash(), "info")>' & nl
-						& tab & '<div class="alert alert-info alert-dismissible fade show" role="alert">' & nl
-						& tab & tab & '##flash("info")##' & nl
-						& tab & tab & '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' & nl
-						& tab & '</div>' & nl
-						& '</cfif>';
+					var content = fileRead(snippetDir & "flash-messages.txt");
 					var p = writeSnippetFile(projectRoot, "app/views/shared/_flash.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1774,39 +2016,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = '<!--- app/snippets/pagination-view.cfm --->' & nl
-						& '<!--- Example paginated list view --->' & nl
-						& '<cfparam name="records" default="">' & nl
-						& nl
-						& '<h1>Items</h1>' & nl
-						& nl
-						& '##paginationNav(showInfo=true)##' & nl
-						& nl
-						& '<table class="table table-striped">' & nl
-						& tab & '<thead>' & nl
-						& tab & tab & '<tr>' & nl
-						& tab & tab & tab & '<th>ID</th>' & nl
-						& tab & tab & tab & '<th>Name</th>' & nl
-						& tab & tab & tab & '<th>Created</th>' & nl
-						& tab & tab & tab & '<th>Actions</th>' & nl
-						& tab & tab & '</tr>' & nl
-						& tab & '</thead>' & nl
-						& tab & '<tbody>' & nl
-						& tab & tab & '<cfoutput query="records">' & nl
-						& tab & tab & '<tr>' & nl
-						& tab & tab & tab & '<td>##records.id##</td>' & nl
-						& tab & tab & tab & '<td>##encodeForHTML(records.name)##</td>' & nl
-						& tab & tab & tab & '<td>##dateFormat(records.createdAt, "mmm d, yyyy")##</td>' & nl
-						& tab & tab & tab & '<td>' & nl
-						& tab & tab & tab & tab & '##linkTo(text="View", route="item", key=records.id)##' & nl
-						& tab & tab & tab & tab & '##linkTo(text="Edit", route="editItem", key=records.id)##' & nl
-						& tab & tab & tab & '</td>' & nl
-						& tab & tab & '</tr>' & nl
-						& tab & tab & '</cfoutput>' & nl
-						& tab & '</tbody>' & nl
-						& '</table>' & nl
-						& nl
-						& '##paginationNav()##';
+					var content = fileRead(snippetDir & "pagination-view.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/pagination-view.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1820,51 +2030,11 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					// Main seeds file
-					var content = '<!--- app/db/seeds.cfm --->' & nl
-						& '<!--- Shared seeds: run in all environments --->' & nl
-						& '<cfscript>' & nl
-						& nl
-						& '// Roles' & nl
-						& 'seedOnce(modelName="Role", uniqueProperties="name", properties={' & nl
-						& tab & 'name: "admin", description: "Administrator with full access"' & nl
-						& '});' & nl
-						& 'seedOnce(modelName="Role", uniqueProperties="name", properties={' & nl
-						& tab & 'name: "member", description: "Regular member"' & nl
-						& '});' & nl
-						& nl
-						& '// Settings' & nl
-						& 'seedOnce(modelName="Setting", uniqueProperties="key", properties={' & nl
-						& tab & 'key: "site.name", value: "My Wheels App"' & nl
-						& '});' & nl
-						& 'seedOnce(modelName="Setting", uniqueProperties="key", properties={' & nl
-						& tab & 'key: "site.perPage", value: "25"' & nl
-						& '});' & nl
-						& nl
-						& '</cfscript>';
+					var content = fileRead(snippetDir & "seeds.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/seeds.cfm", content, force);
 					if (len(p)) arrayAppend(created, p);
 
-					// Development seeds
-					var devContent = '<!--- app/db/seeds/development.cfm --->' & nl
-						& '<!--- Development-only seeds: test data --->' & nl
-						& '<cfscript>' & nl
-						& nl
-						& '// Dev admin user' & nl
-						& 'seedOnce(modelName="User", uniqueProperties="email", properties={' & nl
-						& tab & 'firstName: "Dev", lastName: "Admin",' & nl
-						& tab & 'email: "admin@example.com", roleId: 1' & nl
-						& '});' & nl
-						& nl
-						& '// Sample records for development' & nl
-						& 'for (var i = 1; i <= 10; i++) {' & nl
-						& tab & 'seedOnce(modelName="User", uniqueProperties="email", properties={' & nl
-						& tab & tab & 'firstName: "Test", lastName: "User ##i##",' & nl
-						& tab & tab & 'email: "user##i##@example.com", roleId: 2' & nl
-						& tab & '});' & nl
-						& '}' & nl
-						& nl
-						& '</cfscript>';
+					var devContent = fileRead(snippetDir & "seeds-development.txt");
 					p = writeSnippetFile(projectRoot, "app/snippets/seeds-development.cfm", devContent, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -1878,38 +2048,7 @@ component extends="modules.BaseModule" {
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
-					var content = 'component extends="wheels.Mailer" {' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Send welcome email to a new user.' & nl
-						& tab & ' */' & nl
-						& tab & 'public void function sendWelcome(required any user) {' & nl
-						& tab & tab & 'mail(' & nl
-						& tab & tab & tab & 'to=arguments.user.email,' & nl
-						& tab & tab & tab & 'from="noreply@example.com",' & nl
-						& tab & tab & tab & 'subject="Welcome to the app!",' & nl
-						& tab & tab & tab & 'template="/app/views/mailers/user/welcome",' & nl
-						& tab & tab & tab & 'layout="/app/views/mailers/layout",' & nl
-						& tab & tab & tab & 'user=arguments.user' & nl
-						& tab & tab & ');' & nl
-						& tab & '}' & nl
-						& nl
-						& tab & '/**' & nl
-						& tab & ' * Send password reset instructions.' & nl
-						& tab & ' */' & nl
-						& tab & 'public void function sendPasswordReset(required any user, required string token) {' & nl
-						& tab & tab & 'mail(' & nl
-						& tab & tab & tab & 'to=arguments.user.email,' & nl
-						& tab & tab & tab & 'from="noreply@example.com",' & nl
-						& tab & tab & tab & 'subject="Password Reset",' & nl
-						& tab & tab & tab & 'template="/app/views/mailers/user/password_reset",' & nl
-						& tab & tab & tab & 'layout="/app/views/mailers/layout",' & nl
-						& tab & tab & tab & 'user=arguments.user,' & nl
-						& tab & tab & tab & 'token=arguments.token' & nl
-						& tab & tab & ');' & nl
-						& tab & '}' & nl
-						& nl
-						& '}';
+					var content = fileRead(snippetDir & "user-mailer.txt");
 					var p = writeSnippetFile(projectRoot, "app/snippets/user-mailer.cfc", content, force);
 					if (len(p)) arrayAppend(created, p);
 
@@ -2023,36 +2162,399 @@ component extends="modules.BaseModule" {
 		var serverPort = detectServerPort();
 		if (!serverPort) {
 			out("No running Wheels server detected.", "red");
-			out("Migrations require a running server. Start with: wheels start");
+			out("Migrations require a running server. Start with: wheels server start");
 			return "";
 		}
 
 		out("Running migration: #action#...", "cyan");
 
 		try {
-			var migrateUrl = "http://localhost:#serverPort#/wheels/app/tests?type=app&reload=true";
-
+			var command = "";
 			switch (action) {
-				case "latest":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=migrateToLatest&reload=true&password=";
-					break;
-				case "up":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=migrateUp&reload=true&password=";
-					break;
-				case "down":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=migrateDown&reload=true&password=";
-					break;
-				case "info":
-					migrateUrl = "http://localhost:#serverPort#/?controller=wheels&action=wheels&view=migrate&type=info&reload=true&password=";
-					break;
+				case "latest": command = "migrateTo"; break;
+				case "up":     command = "migrateUp"; break;
+				case "down":   command = "migrateDown"; break;
+				case "info":   command = "info"; break;
+			}
+
+			var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
+			if (action == "latest") {
+				// migrateTo needs a version — omitting it runs to latest
+				migrateUrl &= "&version=";
 			}
 
 			var httpResult = makeHttpRequest(migrateUrl);
-			out("Migration #action# completed.", "green");
-			verbose(httpResult);
+
+			try {
+				var result = deserializeJSON(httpResult);
+				if (structKeyExists(result, "message") && len(result.message)) {
+					out(result.message, "green");
+				} else {
+					out("Migration #action# completed.", "green");
+				}
+			} catch (any jsonErr) {
+				out("Migration #action# completed.", "green");
+				verbose(httpResult);
+			}
+		} catch (any e) {
+			throw(type="MigrationError", message=e.message, detail=e.detail ?: "");
+		}
+
+		return "";
+	}
+
+	// ── Seed Execution ──────────────────────────────
+
+	private string function runSeed(string mode = "auto", string environment = "") {
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running Wheels server detected.", "red");
+			out("Seeding requires a running server. Start with: wheels server start");
+			return "";
+		}
+
+		out("Running database seeds...", "cyan");
+
+		try {
+			var seedUrl = "http://localhost:#serverPort#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
+			if (len(environment)) {
+				seedUrl &= "&environment=#environment#";
+			}
+
+			var httpResult = makeHttpRequest(seedUrl);
+
+			try {
+				var result = deserializeJSON(httpResult);
+				if (structKeyExists(result, "success") && result.success) {
+					if (structKeyExists(result, "totalCreated")) {
+						out("Seeded: #result.totalCreated# created, #result.totalSkipped# skipped", "green");
+					} else {
+						out("Seeding completed.", "green");
+					}
+				} else {
+					out("Seeding failed: #result.message ?: 'unknown error'#", "red");
+				}
+			} catch (any jsonErr) {
+				out("Seeding completed.", "green");
+				verbose(httpResult);
+			}
+		} catch (any e) {
+			out("Seeding failed: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	// ── DB Commands ─────────────────────────────────
+
+	/**
+	 * Reset database: run pending migrations and reseed
+	 */
+	private string function dbReset(array args = []) {
+		var force = false;
+		var skipSeed = false;
+		for (var arg in arguments.args) {
+			if (arg == "--force") force = true;
+			if (arg == "--skip-seed") skipSeed = true;
+		}
+
+		if (!force) {
+			out("This will run pending migrations and reseed the database.", "yellow");
+			out("Use --force to confirm: wheels db reset --force", "yellow");
+			return "";
+		}
+
+		// Step 1: Migrate
+		try {
+			out("Running migrations...", "cyan");
+			runMigration("latest");
 		} catch (any e) {
 			out("Migration failed: #e.message#", "red");
+			return "";
 		}
+
+		// Step 2: Seed (unless skipped)
+		if (!skipSeed) {
+			out("Running seeds...", "cyan");
+			runSeed("auto", "");
+		}
+
+		out("");
+		out("Database reset complete.", "green");
+		return "";
+	}
+
+	/**
+	 * Show migration status
+	 */
+	private string function dbStatus(array args = []) {
+		var pendingOnly = false;
+		for (var arg in arguments.args) {
+			if (arg == "--pending") pendingOnly = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			return "";
+		}
+
+		try {
+			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+			var response = makeHttpRequest(statusUrl);
+			var data = deserializeJSON(response);
+
+			if (!data.success) {
+				out("Error: #data.message#", "red");
+				return "";
+			}
+
+			out("Migration Status", "bold");
+			out(repeatString("=", 70));
+
+			var fmt = "%-16s %-30s %-10s %s";
+			out(sprintf(fmt, "Version", "Description", "Status", "Applied"));
+			out(repeatString("-", 70));
+
+			for (var m in data.migrations) {
+				if (pendingOnly && m.status != "pending") continue;
+
+				var statusColor = m.status == "applied" ? "green" : "yellow";
+				var appliedAt = structKeyExists(m, "appliedAt") && len(m.appliedAt) ? m.appliedAt : "-";
+				out(sprintf(fmt, m.version, left(m.description, 30), m.status, appliedAt), statusColor);
+			}
+
+			out("");
+			out("Total: #data.summary.total# | Applied: #data.summary.applied# | Pending: #data.summary.pending#", "cyan");
+
+		} catch (any e) {
+			out("Error fetching migration status: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	/**
+	 * Show current database schema version
+	 */
+	private string function dbVersion(array args = []) {
+		var detailed = false;
+		for (var arg in arguments.args) {
+			if (arg == "--detailed") detailed = true;
+		}
+
+		var serverPort = detectServerPort();
+		if (!serverPort) {
+			out("No running server detected. Start with 'wheels start' first.", "red");
+			return "";
+		}
+
+		try {
+			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
+			var response = makeHttpRequest(versionUrl);
+			var data = deserializeJSON(response);
+
+			out("Database version: #data.version#", "bold");
+
+			if (detailed) {
+				// Also fetch status for extra detail
+				var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+				var statusResponse = makeHttpRequest(statusUrl);
+				var statusData = deserializeJSON(statusResponse);
+
+				if (statusData.success && arrayLen(statusData.migrations)) {
+					// Find last applied migration
+					var lastApplied = "";
+					for (var m in statusData.migrations) {
+						if (m.status == "applied") lastApplied = m;
+					}
+					if (isStruct(lastApplied)) {
+						var appliedAt = structKeyExists(lastApplied, "appliedAt") && len(lastApplied.appliedAt) ? lastApplied.appliedAt : "unknown";
+						out("Last migration:   #lastApplied.description# (applied #appliedAt#)");
+					}
+
+					out("Total migrations: #statusData.summary.total#");
+					out("Pending:          #statusData.summary.pending#");
+
+					// Show next pending
+					if (statusData.summary.pending > 0) {
+						for (var m in statusData.migrations) {
+							if (m.status == "pending") {
+								out("Next:             #m.version# -- #m.description#");
+								break;
+							}
+						}
+					}
+				}
+			}
+
+		} catch (any e) {
+			out("Error fetching database version: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	// ── Upgrade Check ────────────────────────────────
+
+	/**
+	 * Scan app for breaking changes between current and target version.
+	 */
+	private string function runUpgradeCheck(string targetVersion = "") {
+		// Detect current version
+		var boxJsonPath = variables.projectRoot & "/vendor/wheels/box.json";
+		var currentVersion = "unknown";
+		if (fileExists(boxJsonPath)) {
+			try {
+				var boxData = deserializeJSON(fileRead(boxJsonPath));
+				currentVersion = boxData.version ?: "unknown";
+			} catch (any e) {}
+		}
+
+		// Determine target version
+		var target = arguments.targetVersion;
+		if (!len(target)) {
+			try {
+				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
+				var response = makeHttpRequest(apiUrl);
+				var releaseData = deserializeJSON(response);
+				target = replace(releaseData.tag_name, "v", "");
+			} catch (any e) {
+				out("Could not fetch latest version. Use --to=<version> to specify.", "yellow");
+				return "";
+			}
+		}
+
+		out("Current version: #currentVersion#", "bold");
+		out("Target version:  #target#", "bold");
+		out("");
+
+		// Compare major versions
+		var currentMajor = val(listFirst(currentVersion, "."));
+		var targetMajor = val(listFirst(target, "."));
+
+		if (currentMajor == targetMajor) {
+			out("Same major version — no known breaking changes.", "green");
+			out("Upgrade with: brew upgrade wheels");
+			return "";
+		}
+
+		// Breaking changes database
+		var checks = [];
+
+		// 2.x -> 3.x
+		if (currentMajor <= 2 && targetMajor >= 3) {
+			arrayAppend(checks, {
+				description: "Legacy plugin directory",
+				pattern: "",
+				checkType: "directory",
+				path: "app/plugins",
+				fix: "Migrate to packages/ + vendor/ activation model"
+			});
+			arrayAppend(checks, {
+				description: "Old test base class (wheels.Test)",
+				pattern: 'extends\s*=\s*"wheels\.Test"',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Change to extends="wheels.WheelsTest"'
+			});
+		}
+
+		// 3.x -> 4.x
+		if (currentMajor <= 3 && targetMajor >= 4) {
+			arrayAppend(checks, {
+				description: "Legacy plugin directory (deprecated in 4.x)",
+				pattern: "",
+				checkType: "directory",
+				path: "plugins",
+				fix: "Migrate to packages/ + vendor/ system"
+			});
+			arrayAppend(checks, {
+				description: "Old test base class (wheels.Test)",
+				pattern: 'extends\s*=\s*"wheels\.Test"',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Change to extends="wheels.WheelsTest"'
+			});
+			arrayAppend(checks, {
+				description: "Direct WireBox references",
+				pattern: "application\.wirebox",
+				checkType: "grep",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				fix: "Use service() or inject() from the DI container instead"
+			});
+		}
+
+		// Run checks
+		var issues = [];
+		var passed = [];
+
+		for (var check in checks) {
+			if (check.checkType == "directory") {
+				var dirPath = variables.projectRoot & "/" & check.path;
+				if (directoryExists(dirPath)) {
+					var contents = directoryList(dirPath, false, "name");
+					if (arrayLen(contents)) {
+						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [check.path & "/"]});
+					} else {
+						arrayAppend(passed, check.description);
+					}
+				} else {
+					arrayAppend(passed, check.description);
+				}
+			} else if (check.checkType == "grep") {
+				var scanPath = variables.projectRoot & "/" & check.scanDir;
+				if (!directoryExists(scanPath)) {
+					arrayAppend(passed, check.description);
+					continue;
+				}
+				var matches = [];
+				for (var ext in listToArray(check.extensions)) {
+					var files = directoryList(scanPath, true, "path", "*." & ext);
+					for (var filePath in files) {
+						var content = fileRead(filePath);
+						var lines = listToArray(content, chr(10), true);
+						for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+							if (reFindNoCase(check.pattern, lines[lineNum])) {
+								var relPath = replace(filePath, variables.projectRoot & "/", "");
+								arrayAppend(matches, "#relPath#:#lineNum#");
+							}
+						}
+					}
+				}
+				if (arrayLen(matches)) {
+					arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
+				} else {
+					arrayAppend(passed, check.description);
+				}
+			}
+		}
+
+		// Output
+		if (arrayLen(issues)) {
+			out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
+			for (var issue in issues) {
+				out("  ! #issue.description#", "yellow");
+				for (var match in issue.matches) {
+					out("    #match#");
+				}
+				out("    -> #issue.fix#", "cyan");
+				out("");
+			}
+		}
+
+		if (arrayLen(passed)) {
+			out("All Clear (#arrayLen(passed)# checks):", "green");
+			for (var p in passed) {
+				out("  + #p#", "green");
+			}
+		}
+
+		out("");
+		out("Upgrade with: brew upgrade wheels");
 
 		return "";
 	}
@@ -2063,23 +2565,27 @@ component extends="modules.BaseModule" {
 		string filter = "",
 		string reporter = "simple",
 		string format = "json",
-		boolean verboseOutput = false
+		boolean verboseOutput = false,
+		boolean coreTests = false,
+		string db = "sqlite",
+		boolean ciMode = false
 	) {
 		var serverPort = detectServerPort();
 		if (!serverPort) {
 			out("No running Wheels server detected.", "red");
-			out("Tests require a running server. Start with: wheels start");
+			out("Start with: wheels start", "yellow");
+			out("Or use: bash tools/test-local.sh (auto-manages server)", "yellow");
 			return "";
 		}
 
-		out("Running tests...", "cyan");
+		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
+		out("Running #(coreTests ? 'core' : 'app')# tests (#db#)...", "cyan");
 
 		try {
-			var testUrl = "http://localhost:#serverPort#/wheels/app/tests?format=#format#";
+			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
 			if (len(filter)) {
 				testUrl &= "&directory=#filter#";
 			}
-			testUrl &= "&reload=true";
 
 			var httpResult = makeHttpRequest(testUrl);
 
@@ -2234,7 +2740,7 @@ component extends="modules.BaseModule" {
 		var opts = {
 			port: structKeyExists(options, "port") ? options.port : 8080,
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
-			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : lCase(appName),
+			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
@@ -2294,17 +2800,18 @@ component extends="modules.BaseModule" {
 		out("Application created!", "green");
 		out("");
 		out("Configuration:", "bold");
-		out("  Port:       #opts.port#");
-		out("  Datasource: #opts.datasource#");
+		out("  Port:            #opts.port#");
+		out("  Datasource:      #opts.datasource#");
+		out("  Reload password: #opts.reloadPassword#");
 		if (opts.setupH2) {
-			out("  Database:   H2 embedded (db/h2/)", "green");
+			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
-			out("  Database:   SQLite (db/development.sqlite)", "green");
+			out("  Database:        SQLite (db/development.sqlite)", "green");
 		}
 		out("");
 		out("Next steps:", "bold");
 		out("  cd #appName#");
-		out("  wheels start");
+		out("  wheels server start");
 		return "";
 	}
 
@@ -2367,10 +2874,14 @@ component extends="modules.BaseModule" {
 		var nl = chr(10);
 		var tab = chr(9);
 
-		// Create db directory for SQLite data files
+		// Create db directory and empty SQLite files
 		var dbDir = targetDir & "/db";
 		ensureDirectory(dbDir);
+		fileWrite(dbDir & "/development.sqlite", "");
+		fileWrite(dbDir & "/test.sqlite", "");
 		printCreated(appName & "/db/");
+		printCreated(appName & "/db/development.sqlite");
+		printCreated(appName & "/db/test.sqlite");
 
 		// Build SQLite datasource configuration for config/app.cfm
 		var sqliteConfig = "";
@@ -2382,7 +2893,7 @@ component extends="modules.BaseModule" {
 		sqliteConfig &= tab & "};";
 
 		// Also add a test database datasource
-		sqliteConfig &= nl & tab & 'this.datasources["wheelstestdb"] = {' & nl;
+		sqliteConfig &= nl & tab & 'this.datasources["#datasourceName#_test"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
 		sqliteConfig &= tab & tab & 'bundleName: "org.xerial.sqlite-jdbc",' & nl;
 		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")' & nl;
@@ -2416,7 +2927,7 @@ component extends="modules.BaseModule" {
 		if (!len(wheelsSource)) {
 			out("  Warning: Could not locate Wheels framework source.", "yellow");
 			out("  You will need to install the framework manually into vendor/wheels/");
-			out("  See: https://guides.cfwheels.org/docs/installing-cfwheels");
+			out("  See: https://guides.wheels.dev/docs/getting-started");
 			return;
 		}
 
@@ -2670,14 +3181,16 @@ component extends="modules.BaseModule" {
 	/**
 	 * Make an HTTP GET request and return the response body
 	 */
-	private string function makeHttpRequest(required string url) {
-		var URL = createObject("java", "java.net.URL").init(url);
-		var conn = URL.openConnection();
+	private string function makeHttpRequest(required string requestUrl) {
+		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
+		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("GET");
 		conn.setConnectTimeout(5000);
-		conn.setReadTimeout(10000);
+		conn.setReadTimeout(120000);
 
-		var scanner = createObject("java", "java.util.Scanner").init(conn.getInputStream(), "UTF-8");
+		var responseCode = conn.getResponseCode();
+		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {
 			response &= scanner.nextLine() & chr(10);
@@ -2689,9 +3202,9 @@ component extends="modules.BaseModule" {
 	/**
 	 * Make an HTTP POST request with a JSON body and return the response
 	 */
-	private string function makeHttpPost(required string url, required string body) {
-		var URL = createObject("java", "java.net.URL").init(url);
-		var conn = URL.openConnection();
+	private string function makeHttpPost(required string requestUrl, required string body) {
+		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
+		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("POST");
 		conn.setConnectTimeout(5000);
 		conn.setReadTimeout(30000);
@@ -2752,6 +3265,31 @@ component extends="modules.BaseModule" {
 						projectRoot = variables.projectRoot
 					);
 					break;
+				case "destroy":
+					variables.services.destroy = new services.Destroy(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
+					);
+					break;
+				case "doctor":
+					variables.services.doctor = new services.Doctor(
+						projectRoot = variables.projectRoot
+					);
+					break;
+				case "stats":
+					variables.services.stats = new services.Stats(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot
+					);
+					break;
+				case "admin":
+					variables.services.admin = new services.Admin(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
+					);
+					break;
 				default:
 					throw("Unknown service: #name#");
 			}
@@ -2790,6 +3328,43 @@ component extends="modules.BaseModule" {
 		var pos = find("=", arg);
 		if (pos == 0) return "";
 		return mid(arg, pos + 1, len(arg));
+	}
+
+	/**
+	 * Simple sprintf-like formatting for fixed-width columns.
+	 * Supports %-Ns (left-aligned string) and %Ns (right-aligned string).
+	 */
+	private string function sprintf(required string format) {
+		var result = arguments.format;
+		var argIndex = 2;
+		// Replace each %... placeholder with the corresponding argument
+		while (reFindNoCase("%-?\d+s", result) && argIndex <= structCount(arguments)) {
+			var match = reFindNoCase("(%-?)(\d+)s", result, 1, true);
+			if (match.pos[1] == 0) break;
+			var leftAlign = len(mid(result, match.pos[2], match.len[2])) > 1;
+			var width = val(mid(result, match.pos[3], match.len[3]));
+			var value = toString(arguments[argIndex]);
+			if (leftAlign) {
+				value = value & repeatString(" ", max(0, width - len(value)));
+			} else {
+				value = repeatString(" ", max(0, width - len(value))) & value;
+			}
+			result = left(result, match.pos[1] - 1) & value & mid(result, match.pos[1] + match.len[1], len(result));
+			argIndex++;
+		}
+		return result;
+	}
+
+	/**
+	 * Generate a random alphanumeric password for reload protection.
+	 */
+	private string function generateRandomPassword(numeric length = 16) {
+		var chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+		var result = "";
+		for (var i = 1; i <= arguments.length; i++) {
+			result &= mid(chars, randRange(1, len(chars)), 1);
+		}
+		return result;
 	}
 
 }

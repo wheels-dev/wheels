@@ -1,0 +1,15 @@
+<cfparam name="params.username" default="">
+
+<h1>Log In</h1>
+
+#flashMessages()#
+
+#startFormTag(route="sessions", method="post")#
+	<div class="mb-3">
+		#textField(name="username", label="Username", class="form-control")#
+	</div>
+	<div class="mb-3">
+		#passwordField(name="password", label="Password", class="form-control")#
+	</div>
+	#submitTag(value="Log In", class="btn btn-primary")#
+#endFormTag()#

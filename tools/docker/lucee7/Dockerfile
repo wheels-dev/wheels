@@ -38,5 +38,6 @@ COPY tools/docker/lucee7/CFConfig.json ${APP_DIR}/CFConfig.json
 # Install dependencies
 RUN box install
 
-# WARM UP THE SERVER
+# WARM UP THE SERVER (starts Lucee so extensions can deploy)
 RUN ${BUILD_DIR}/util/warmup-server.sh
+

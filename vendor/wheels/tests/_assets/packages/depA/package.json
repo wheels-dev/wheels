@@ -1,0 +1,11 @@
+{
+	"name": "wheels-depA",
+	"version": "1.0.0",
+	"description": "Test fixture: requires depB",
+	"requires": {
+		"wheels-depB": ">=1.0.0"
+	},
+	"provides": {
+		"mixins": "controller"
+	}
+}

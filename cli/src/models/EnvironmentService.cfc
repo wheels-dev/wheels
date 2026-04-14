@@ -1693,7 +1693,7 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
 
     /**
     * Gets the current environment using the same logic as Application.cfc
-    * @projectRoot The root directory of the CFWheels project
+    * @projectRoot The root directory of the Wheels project
     * @return String The current environment name, or empty string if not found
     */
     public function getCurrentEnvironment(projectRoot) {

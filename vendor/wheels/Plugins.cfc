@@ -139,6 +139,13 @@ component output="false" extends="wheels.Global"{
 		local.wheelsVersion = $normalizeWheelsVersion();
 		for (local.pluginKey in local.pluginKeys) {
 			local.pluginValue = local.plugins[local.pluginKey];
+			try {
+				WriteLog(
+					text = "[Wheels] Loading plugin '##local.pluginKey##' from ##local.pluginValue.folderPath##",
+					type = "information",
+					file = "wheels_security"
+				);
+			} catch (any e) {}
 			local.plugin = CreateObject("component", $componentPathToPlugin(local.pluginKey, local.pluginValue.name)).init();
 			// Determine the compatibility version list. If a plugin.json exists and
 			// declares wheelsVersion, use that instead of the CFC's this.version
@@ -161,7 +168,7 @@ component output="false" extends="wheels.Global"{
 					&& !$isServiceProvider(local.plugin)
 					&& !$hasPluginManifest(local.pluginKey)
 				) {
-					local.warning = 'Plugin "#local.pluginKey#" uses legacy mixin injection without a plugin.json manifest or ServiceProvider.cfc. Mixin-only plugins will be deprecated in Wheels 4.0. See: https://guides.cfwheels.org/docs/migrating-plugins-to-service-providers';
+					local.warning = 'Plugin "#local.pluginKey#" uses legacy mixin injection without a plugin.json manifest or ServiceProvider.cfc. Mixin-only plugins will be deprecated in Wheels 4.0. See: https://guides.wheels.dev/docs/migrating-plugins-to-service-providers';
 					ArrayAppend(variables.$class.deprecationWarnings, {
 						plugin = local.pluginKey,
 						message = local.warning
@@ -236,7 +243,7 @@ component output="false" extends="wheels.Global"{
 				// Log an info-level suggestion so authors know about the new manifest option.
 				WriteLog(
 					type = "information",
-					text = "[Wheels] Plugin '#local.plugin#' does not have a plugin.json manifest. Consider adding one for declarative metadata, dependency management, and middleware registration. See: https://guides.cfwheels.org/docs/plugin-json-manifest"
+					text = "[Wheels] Plugin '#local.plugin#' does not have a plugin.json manifest. Consider adding one for declarative metadata, dependency management, and middleware registration. See: https://guides.wheels.dev/docs/plugin-json-manifest"
 				);
 			}
 		}

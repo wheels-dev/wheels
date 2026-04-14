@@ -87,24 +87,46 @@
 			"validate": "false"
 		},
 		"wheelstestdb_h2": {
-			"class":"org.h2.Driver",
-			"dbdriver":"H2",
-			"custom":"mode=MySQL&path=./tools/docker/lucee6/H2.db/",
-			"database":"wheelstestdb",
-			"dsn":"jdbc:h2:{path}{database};MODE={mode}",
-			"allow":"511",
-			"clob":true,
-			"blob":true
+			"class": "org.h2.Driver",
+			"dbdriver": "H2",
+			"custom": "mode=MySQL&path=./tools/docker/lucee6/H2.db/",
+			"database": "wheelstestdb",
+			"dsn": "jdbc:h2:{path}{database};MODE={mode}",
+			"allow": "511",
+			"clob": true,
+			"blob": true
 		},
 		"wheelstestdb_h2_sqlserver": {
-			"class":"org.h2.Driver",
-			"dbdriver":"H2",
-			"custom":"mode=MSSQLServer&path=./tools/docker/lucee6/H2.db/",
-			"database":"wheelstestdb",
-			"dsn":"jdbc:h2:{path}{database};MODE={mode}",
-			"allow":"511",
-			"clob":true,
-			"blob":true
+			"class": "org.h2.Driver",
+			"dbdriver": "H2",
+			"custom": "mode=MSSQLServer&path=./tools/docker/lucee6/H2.db/",
+			"database": "wheelstestdb",
+			"dsn": "jdbc:h2:{path}{database};MODE={mode}",
+			"allow": "511",
+			"clob": true,
+			"blob": true
+		},
+		"wheelstestdb_sqlite": {
+			"blob": "false",
+			"class": "org.sqlite.JDBC",
+			"clob": "false",
+			"database": "wheelstestdb",
+			"dbdriver": "Other",
+			"dsn": "jdbc:sqlite:/app/wheelstestdb.db",
+			"host": "",
+			"password": "",
+			"username": ""
+		},
+		"wheelstestdb_sqlite_tenant_b": {
+			"blob": "false",
+			"class": "org.sqlite.JDBC",
+			"clob": "false",
+			"database": "wheelstestdb_tenant_b",
+			"dbdriver": "Other",
+			"dsn": "jdbc:sqlite:/app/wheelstestdb_tenant_b.db",
+			"host": "",
+			"password": "",
+			"username": ""
 		},
 		"wheelstestdb_oracle": {
 			"blob": "false",
@@ -120,28 +142,6 @@
 			"port": "1521",
 			"username": "wheelstestdb",
 			"validate": "false"
-		},
-		"wheelstestdb_sqlite":{
-			"blob":"false",
-			"class":"org.sqlite.JDBC",
-			"clob":"false",
-			"database":"wheelstestdb",
-			"dbdriver":"Other",
-			"dsn":"jdbc:sqlite:/app/wheelstestdb.db",
-			"host":"",
-			"password":"",
-			"username":""
-		},
-		"wheelstestdb_sqlite_tenant_b":{
-			"blob":"false",
-			"class":"org.sqlite.JDBC",
-			"clob":"false",
-			"database":"wheelstestdb_tenant_b",
-			"dbdriver":"Other",
-			"dsn":"jdbc:sqlite:/app/wheelstestdb_tenant_b.db",
-			"host":"",
-			"password":"",
-			"username":""
 		}
 	}
 }

@@ -195,7 +195,65 @@ try {
 					data.message = "Error retrieving schema: " & e.message;
 				}
 				break;
-				
+
+			case "introspect":
+				data.success = false;
+				if (!structKeyExists(request.wheels.params, "model") || !len(request.wheels.params.model)) {
+					data.message = "Missing required parameter: model";
+					break;
+				}
+
+				try {
+					local.modelName = request.wheels.params.model;
+					local.modelInstance = model(local.modelName);
+					local.classData = local.modelInstance.$classData();
+
+					data.model = local.modelName;
+					data.tableName = local.classData.tableName ?: lCase(local.modelName) & "s";
+					data.primaryKey = local.classData.keys ?: "id";
+
+					data.columns = [];
+					if (structKeyExists(local.classData, "properties")) {
+						for (local.propName in local.classData.properties) {
+							local.prop = local.classData.properties[local.propName];
+							local.colInfo = {
+								name: local.propName,
+								type: local.prop.type ?: "string",
+								primaryKey: listFindNoCase(data.primaryKey, local.propName) > 0
+							};
+							if (structKeyExists(local.prop, "maxLength") && val(local.prop.maxLength) > 0) {
+								local.colInfo.maxLength = local.prop.maxLength;
+							}
+							if (right(local.propName, 2) == "Id" && len(local.propName) > 2) {
+								local.colInfo.foreignKey = true;
+								local.refName = left(local.propName, len(local.propName) - 2);
+								local.colInfo.referencedModel = uCase(left(local.refName, 1)) & mid(local.refName, 2, len(local.refName) - 1);
+							}
+							arrayAppend(data.columns, local.colInfo);
+						}
+					}
+
+					data.associations = [];
+					if (structKeyExists(local.classData, "associations")) {
+						for (local.assocName in local.classData.associations) {
+							local.assoc = local.classData.associations[local.assocName];
+							local.assocModelName = local.assoc.modelName ?: local.assocName;
+							local.assocModelName = uCase(left(local.assocModelName, 1)) & mid(local.assocModelName, 2, len(local.assocModelName) - 1);
+							arrayAppend(data.associations, {
+								type: local.assoc.type ?: "belongsTo",
+								name: local.assocName,
+								modelName: local.assocModelName
+							});
+						}
+					}
+
+					data.success = true;
+					data.message = "Model introspected successfully";
+				} catch (any e) {
+					data.message = "Error introspecting model: " & e.message;
+				}
+				break;
+
 			case "dbSeed":
 				local.mode = structKeyExists(request.wheels.params, "mode") ? request.wheels.params.mode : "auto";
 				local.environment = structKeyExists(request.wheels.params, "environment") ? request.wheels.params.environment : get("environment");

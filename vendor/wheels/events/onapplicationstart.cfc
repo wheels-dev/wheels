@@ -45,6 +45,15 @@ component {
 		}
 		application.$wheels.serverVersionMajor = ListFirst(application.$wheels.serverVersion, ".,");
 
+		// Instantiate the engine adapter for centralized cross-engine behavior.
+		if (application.$wheels.serverName == "BoxLang") {
+			application.$wheels.engineAdapter = new wheels.engineAdapters.BoxLang.BoxLangAdapter(application.$wheels.serverVersion);
+		} else if (application.$wheels.serverName == "Lucee") {
+			application.$wheels.engineAdapter = new wheels.engineAdapters.Lucee.LuceeAdapter(application.$wheels.serverVersion);
+		} else {
+			application.$wheels.engineAdapter = new wheels.engineAdapters.Adobe.AdobeAdapter(application.$wheels.serverVersion);
+		}
+
 		local.upgradeTo = application.wo.$checkMinimumVersion(
 			engine = application.$wheels.serverName,
 			version = application.$wheels.serverVersion
@@ -73,7 +82,7 @@ component {
 
 		// Set up containers for routes, caches, settings etc.
 		// TODO remove the static version number
-		application.$wheels.version = "3.0.0";
+		application.$wheels.version = "4.0.0";
 		try {
 			application.$wheels.hostName = CreateObject("java", "java.net.InetAddress").getLocalHost().getHostName();
 		} catch (any e) {
@@ -119,20 +128,75 @@ component {
 			application.$wheels.allowEnvironmentSwitchViaUrl = false;
 		}
 
+		// Rate limit reload attempts: 5 failed password attempts within 5 minutes locks the IP
+		if (!StructKeyExists(application, "$reloadRateLimit")) {
+			application.$reloadRateLimit = {};
+		}
+		local.reloadRateLimitKey = cgi.REMOTE_ADDR;
+		local.reloadRateLimited = false;
+		if (StructKeyExists(application.$reloadRateLimit, local.reloadRateLimitKey)) {
+			local.rl = application.$reloadRateLimit[local.reloadRateLimitKey];
+			if (local.rl.count >= 5 && DateDiff("n", local.rl.firstAttempt, Now()) < 5) {
+				local.reloadRateLimited = true;
+			}
+			if (DateDiff("n", local.rl.firstAttempt, Now()) >= 5) {
+				StructDelete(application.$reloadRateLimit, local.reloadRateLimitKey);
+			}
+		}
+
 		// Set environment either from the url or the developer's environment.cfm file.
+		local.reloadPasswordMatched = false;
 		if (
-			StructKeyExists(URL, "reload")
+			!local.reloadRateLimited
+			&& StructKeyExists(URL, "reload")
 			&& !IsBoolean(URL.reload)
 			&& Len(url.reload)
 			&& StructKeyExists(application.$wheels, "reloadPassword")
-			&& (
-				!Len(application.$wheels.reloadPassword)
-				|| (StructKeyExists(URL, "password") && URL.password == application.$wheels.reloadPassword)
+			&& Len(application.$wheels.reloadPassword)
+			&& StructKeyExists(URL, "password")
+			&& CreateObject("java", "java.security.MessageDigest").isEqual(
+				Hash(URL.password, "SHA-256").getBytes("UTF-8"),
+				Hash(application.$wheels.reloadPassword, "SHA-256").getBytes("UTF-8")
 			)
 		) {
+			local.reloadPasswordMatched = true;
 			application.$wheels.environment = URL.reload;
+			try {
+				writeLog(
+					file="wheels_security",
+					type="warning",
+					text="Environment switched to '" & URL.reload & "' via URL from " & cgi.REMOTE_ADDR
+				);
+			} catch (any e) {
+				// Fail silently if logging fails
+			}
 		} else {
 			application.wo.$include(template = "/config/environment.cfm");
+		}
+
+		// Track failed reload password attempts
+		if (
+			StructKeyExists(URL, "reload")
+			&& StructKeyExists(URL, "password")
+			&& !local.reloadRateLimited
+			&& !local.reloadPasswordMatched
+		) {
+			if (!StructKeyExists(application.$reloadRateLimit, local.reloadRateLimitKey)) {
+				application.$reloadRateLimit[local.reloadRateLimitKey] = {count: 0, firstAttempt: Now()};
+			}
+			application.$reloadRateLimit[local.reloadRateLimitKey].count++;
+			try {
+				writeLog(file="wheels_security", type="warning", text="Reload password rejected from #cgi.REMOTE_ADDR#");
+			} catch (any e) {
+			}
+		}
+
+		// Log successful reload
+		if (local.reloadPasswordMatched) {
+			try {
+				writeLog(file="wheels_security", type="information", text="Reload accepted from #cgi.REMOTE_ADDR# (environment: #URL.reload#)");
+			} catch (any e) {
+			}
 		}
 
 		// If we're not allowed to switch, override and replace with the old environment
@@ -202,9 +266,28 @@ component {
 		application.$wheels.initialized = true;
 
 		// Load general developer settings first, then override with environment specific ones.
+		// Track the initial default so we can detect if the developer explicitly overrides it.
+		local.envSwitchDefault = application.$wheels.allowEnvironmentSwitchViaUrl;
 		application.wo.$include(template = "/config/settings.cfm");
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
 			application.wo.$include(template = "/config/#application.$wheels.environment#/settings.cfm");
+		}
+
+		// In production-like environments, disable URL-based environment switching by default.
+		// Developers can override by explicitly calling set(allowEnvironmentSwitchViaUrl=true) in settings.cfm.
+		if (
+			ListFindNoCase("production,testing,maintenance", application.$wheels.environment)
+			&& application.$wheels.allowEnvironmentSwitchViaUrl == local.envSwitchDefault
+			&& local.envSwitchDefault
+		) {
+			application.$wheels.allowEnvironmentSwitchViaUrl = false;
+		}
+
+		// Warn if reloadPassword is empty — URL-based reload and environment switching are disabled.
+		if (!Len(application.$wheels.reloadPassword)) {
+			try {
+				writeLog(file="wheels_security", type="warning", text="Wheels: reloadPassword is empty — URL-based environment switching and application reload are disabled until a password is set in config/settings.cfm");
+			} catch (any e) {}
 		}
 
 		// Load DI service registrations.
@@ -245,9 +328,7 @@ component {
 
 		// Allow developers to inject plugins and packages into the application variables scope.
 		if (!StructIsEmpty(application.$wheels.mixins)) {
-			if (structKeyExists(server, "boxlang")) {
-				variables.this = this;
-			}
+			application.$wheels.engineAdapter.prepareDIComplete(variables, this);
 			new wheels.Plugins().$initializeMixins(variables);
 		}
 

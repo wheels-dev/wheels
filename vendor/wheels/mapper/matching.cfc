@@ -340,17 +340,11 @@ component {
 		}
 
 		// See if we have any globing in the pattern and if so add a constraint for each glob.
-		// BoxLang compatibility: Use different regex pattern to match globs
-		local.globRegex = StructKeyExists(server, "boxlang") ? "\*\[([^\]]+)\]" : "\*([^\/]+)";
+		local.globRegex = $engineAdapter().globRegex();
 		if (ReFindNoCase(local.globRegex, arguments.pattern)) {
 			local.globs = ReMatch(local.globRegex, arguments.pattern);
 			for (local.glob in local.globs) {
-				// For BoxLang: extract variable name from *[varname] pattern
-				if (StructKeyExists(server, "boxlang")) {
-					local.var = ReReplace(local.glob, "\*\[([^\]]+)\]", "\1");
-				} else {
-					local.var = ReplaceList(local.glob, "*,[,]", "");
-				}
+				local.var = $engineAdapter().extractGlobVariable(local.glob);
 				arguments.pattern = Replace(arguments.pattern, local.glob, "[#local.var#]");
 				arguments.constraints[local.var] = ".*";
 			}

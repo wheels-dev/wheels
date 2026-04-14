@@ -335,11 +335,7 @@ component {
 		$clearRequestCache();
 		local.generatedKey = variables.wheels.class.adapter.$generatedKey();
 		if (StructKeyExists(local.inserted.result, local.generatedKey)) {
-			if (StructKeyExists(server, "boxlang")) {
-				if (!local.primaryKeyExplicitlySet) {
-					this[primaryKeys(1)] = local.inserted.result[local.generatedKey];
-				}
-			} else {
+			if (!$engineAdapter().isBoxLang() || !local.primaryKeyExplicitlySet) {
 				this[primaryKeys(1)] = local.inserted.result[local.generatedKey];
 			}
 		}

@@ -4,40 +4,28 @@ description: Install Wheels and get a local development server running
 
 # Getting Started
 
-The quickest way to get started with Wheels 3.1 is via [LuCLI](https://github.com/cybersonic/LuCLI) — a lightweight, Lucee-native command line tool. LuCLI starts in under a second, includes built-in MCP support for AI-assisted development, and provides everything you need for your daily development workflow.
+The quickest way to get started with Wheels is with a single install command. The `wheels` CLI gives you project scaffolding, code generation, database migrations, testing, and a built-in development server — all in one tool.
 
-If you're already using [CommandBox](https://www.ortussolutions.com/products/commandbox), it continues to work with Wheels 3.1. See the [alternative setup with CommandBox](#alternative-setup-with-commandbox) section below, or the full [Migration Guide](command-line-tools/cli-guides/migration-from-commandbox.md) for a detailed comparison.
+If you're already using [CommandBox](https://www.ortussolutions.com/products/commandbox), it continues to work with Wheels. See the [alternative setup with CommandBox](#alternative-setup-with-commandbox) section below, or the full [Migration Guide](command-line-tools/cli-guides/migration-from-commandbox.md) for a detailed comparison.
 
-## Install LuCLI
-
-Install LuCLI using your platform's package manager:
+## Install Wheels CLI
 
 ```bash
 # macOS
-brew install lucli
+brew tap wheels-dev/wheels
+brew install wheels
 
 # Windows
-choco install lucli
-
-# Manual (any OS)
-# Download from https://github.com/cybersonic/LuCLI/releases
+choco install wheels
 ```
 
 Verify the installation:
 
 ```bash
-lucli --version
+wheels --version
 ```
 
-### Install the Wheels Module
-
-LuCLI uses modules to extend its functionality. Install the Wheels module to get all framework-specific commands:
-
-```bash
-lucli modules install wheels
-```
-
-This adds the `wheels` command to your terminal with commands for creating applications, generating code, running migrations, testing, and more.
+You should see the Wheels version and banner. Java 21 is installed automatically as a dependency.
 
 ## Create Your First Application
 
@@ -215,13 +203,7 @@ See the [Hello Database](introduction/readme/beginner-tutorial-hello-database.md
 
 ## Set Up AI-Assisted Development
 
-LuCLI includes a built-in MCP server that integrates with AI editors like Claude Code, Cursor, and VS Code Copilot. This gives your AI assistant direct access to Wheels commands — generating code, running migrations, and running tests.
-
-Start the MCP server:
-
-```bash
-lucli mcp wheels
-```
+The Wheels CLI includes a built-in MCP server that integrates with AI editors like Claude Code, Cursor, and VS Code Copilot. This gives your AI assistant direct access to Wheels commands — generating code, running migrations, and running tests.
 
 For Claude Code, add this to your project's `.mcp.json`:
 
@@ -229,8 +211,8 @@ For Claude Code, add this to your project's `.mcp.json`:
 {
   "mcpServers": {
     "wheels": {
-      "command": "lucli",
-      "args": ["mcp", "wheels"]
+      "command": "wheels",
+      "args": ["mcp"]
     }
   }
 }
@@ -277,7 +259,7 @@ You now have a working Wheels application with a database-backed feature, tests,
 
 ## Alternative Setup with CommandBox
 
-[CommandBox](https://www.ortussolutions.com/products/commandbox) is a full-featured CFML toolbox that also works with Wheels. It offers additional capabilities like ForgeBox package management, an interactive REPL, and support for both Lucee and Adobe ColdFusion servers.
+[CommandBox](https://www.ortussolutions.com/products/commandbox) is a full-featured CFML toolbox that also works with Wheels. It offers additional capabilities like ForgeBox package management and support for both Lucee and Adobe ColdFusion servers.
 
 ### Install CommandBox
 
@@ -307,11 +289,13 @@ box server start
 
 The daily workflow is nearly identical. The key differences:
 
-| Task | LuCLI | CommandBox |
-|------|-------|-----------|
+| Task | Wheels CLI | CommandBox |
+|------|-----------|-----------|
+| Install | `brew install wheels` | `brew install commandbox` + `box install wheels-cli` |
 | Start server | `wheels start` | `box server start` |
 | Run migrations | `wheels migrate latest` | `wheels dbmigrate latest` |
 | Run tests | `wheels test` | `wheels test run` |
 | Config file | `lucee.json` | `box.json` + `server.json` |
+| MCP server | `wheels mcp` | Not available |
 
 For a complete mapping of all commands, see the [Migration Guide](command-line-tools/cli-guides/migration-from-commandbox.md).

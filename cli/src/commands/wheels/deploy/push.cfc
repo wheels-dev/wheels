@@ -89,7 +89,7 @@ component extends="./base" {
             print.boldLine("Building Docker image...");
             print.line();
             
-            var buildResult = $execBash("docker build -t #deployConfig.image#:#arguments.tag# -t #imageName# .");
+            var buildResult = $execBash("docker build -t " & $shellEscape(deployConfig.image & ":" & arguments.tag) & " -t " & $shellEscape(imageName) & " .");
             
             if (buildResult.exitCode != 0) {
                 print.redLine("✗ Docker build failed!");
@@ -107,7 +107,7 @@ component extends="./base" {
             
             // Login to registry
             print.yellowLine("Logging into registry...");
-            var loginResult = $execBash("docker login #deployConfig.registry.server# -u #deployConfig.registry.username#");
+            var loginResult = $execBash("docker login " & $shellEscape(deployConfig.registry.server) & " -u " & $shellEscape(deployConfig.registry.username));
             
             if (loginResult.exitCode != 0) {
                 print.redLine("✗ Registry login failed!");
@@ -116,7 +116,7 @@ component extends="./base" {
             }
             
             // Push image
-            var pushResult = $execBash("docker push #imageName#");
+            var pushResult = $execBash("docker push " & $shellEscape(imageName));
             
             if (pushResult.exitCode != 0) {
                 print.redLine("✗ Image push failed!");
@@ -162,20 +162,18 @@ component extends="./base" {
             print.yellowLine("Copying environment configuration...");
             var envPath = fileSystemUtil.resolvePath(".env.deploy");
             if (fileExists(envPath)) {
-                $execBash("scp #envPath# #sshUser#@#server#:/opt/#serviceName#/.env");
+                $execBash("scp " & $shellEscape(envPath) & " " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & ":/opt/" & $shellEscape(serviceName) & "/.env");
             }
             
             // Create docker-compose file for the application
             var composeContent = generateDockerCompose(deployConfig, imageName);
             
             // Write compose file to server
-            $execBash("ssh #sshUser#@#server# 'cat > /opt/#serviceName#/docker-compose.yml << EOF
-#composeContent#
-EOF'");
+            $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat > /opt/" & $shellEscape(serviceName) & "/docker-compose.yml << EOF" & chr(10) & composeContent & chr(10) & "EOF'");
             
             // Pull new image
             print.yellowLine("Pulling new image...");
-            var pullResult = $execBash("ssh #sshUser#@#server# 'docker pull #imageName#'");
+            var pullResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker pull " & $shellEscape(imageName) & "'");
             
             if (pullResult.exitCode != 0) {
                 print.redLine("✗ Failed to pull image on #server#");
@@ -187,7 +185,7 @@ EOF'");
                 print.yellowLine("Performing rolling deployment...");
                 
                 // Start new container with temporary name
-                $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose up -d --no-deps --scale #serviceName#=2 #serviceName#'");
+                $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose up -d --no-deps --scale " & $shellEscape(serviceName) & "=2 " & $shellEscape(serviceName) & "'");
                 
                 // Wait for health check
                 print.yellowLine("Waiting for health check...");
@@ -197,21 +195,21 @@ EOF'");
                     print.greenLine("✓ Health check passed");
                     
                     // Remove old container
-                    $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose up -d --no-deps --remove-orphans #serviceName#'");
+                    $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose up -d --no-deps --remove-orphans " & $shellEscape(serviceName) & "'");
                 } else {
                     print.redLine("✗ Health check failed, rolling back...");
-                    $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose down'");
+                    $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose down'");
                     continue;
                 }
             } else {
                 // Simple restart
                 print.yellowLine("Restarting application...");
-                $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose down && docker compose up -d'");
+                $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose down && docker compose up -d'");
             }
             
             // Clean up old images
             print.yellowLine("Cleaning up old images...");
-            $execBash("ssh #sshUser#@#server# 'docker image prune -f'");
+            $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'docker image prune -f'");
             
             print.greenLine("✓ Deployment to #server# completed");
             print.line();
@@ -369,10 +367,10 @@ networks:
     ) {
         var sshUser = config.ssh.user ?: "root";
         var startTime = getTickCount();
-        var checkUrl = "http://#server#:#config.healthcheck.port##config.healthcheck.path#";
-        
+        var checkUrl = "http://" & server & ":" & config.healthcheck.port & config.healthcheck.path;
+
         while ((getTickCount() - startTime) < (arguments.timeout * 1000)) {
-            var result = $execBash("ssh #sshUser#@#arguments.server# 'curl -f -s -o /dev/null -w ""%{http_code}"" #checkUrl#'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(arguments.server) & " 'curl -f -s -o /dev/null -w ""%{http_code}"" " & $shellEscape(checkUrl) & "'");
             
             if (result.exitCode == 0 && trim(result.output) == "200") {
                 return true;

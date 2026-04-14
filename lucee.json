@@ -1,10 +1,12 @@
 {
   "name": "wheels",
-  "version": "7.0.2.101",
+  "lucee": {
+    "version": "7.0.0.395"
+  },
   "port": 8080,
   "shutdownPort": 8081,
   "webroot": "./public",
-  "openBrowser": true,
+  "openBrowser": false,
   "jvm": {
     "maxMemory": "512m",
     "minMemory": "128m"
@@ -14,18 +16,40 @@
     "routerFile": "index.cfm"
   },
   "admin": {
-    "enabled": true
+    "enabled": true,
+    "password": "wheels"
   },
   "enableLucee": true,
   "enableREST": false,
-  "monitoring": {
-    "enabled": false,
-    "jmx": {
-      "port": 8082
+  "dependencies": {
+    "sqlite-jdbc": {
+      "type": "java",
+      "groupId": "org.xerial",
+      "artifactId": "sqlite-jdbc",
+      "version": "3.47.2.0"
     }
   },
   "configuration": {
-    "datasources": {},
+    "datasources": {
+      "wheelstestdb_sqlite": {
+        "class": "org.sqlite.JDBC",
+        "database": "wheelstestdb",
+        "dbdriver": "Other",
+        "dsn": "jdbc:sqlite:#project:path#/wheelstestdb.db",
+        "host": "",
+        "password": "",
+        "username": ""
+      },
+      "wheelstestdb_sqlite_tenant_b": {
+        "class": "org.sqlite.JDBC",
+        "database": "wheelstestdb_tenant_b",
+        "dbdriver": "Other",
+        "dsn": "jdbc:sqlite:#project:path#/wheelstestdb_tenant_b.db",
+        "host": "",
+        "password": "",
+        "username": ""
+      }
+    },
     "mappings": {
       "/wheels": "../vendor/wheels",
       "/app": "../app",

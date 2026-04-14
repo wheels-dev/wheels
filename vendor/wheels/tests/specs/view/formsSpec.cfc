@@ -75,8 +75,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with image", () => {
-				r = _controller.buttonTag(image = "http://www.cfwheels.com/logo.jpg")
-				e = '<button type="submit" value="save"><img alt="Logo" src="http://www.cfwheels.com/logo.jpg" type="image"></button>'
+				r = _controller.buttonTag(image = "http://www.wheels.dev/logo.jpg")
+				e = '<button type="submit" value="save"><img alt="Logo" src="http://www.wheels.dev/logo.jpg" type="image"></button>'
 
 				expect(e).toBe(r)
 			})
@@ -863,11 +863,24 @@ component extends="wheels.WheelsTest" {
 				args.controller = "testcontroller"
 				g.set(functionName = "startFormTag", encode = false)
 				request.$wheelsProtectedFromForgery = true
+				// Save and configure routes so "root" route is available
+				_savedRoutes = Duplicate(application.wheels.routes)
+				_savedRewrite = application.wheels.URLRewriting
+				application.wheels.URLRewriting = "On"
+				$clearRoutes()
+				g.mapper()
+					.root(to="home##index")
+					.get(name="testcontroller", pattern="/testcontroller/[action]", to="testcontroller##index")
+					.wildcard()
+				.end()
+				g.$setNamedRoutePositions()
 			})
 
 			afterEach(() => {
 				g.set(functionName = "startFormTag", encode = true)
 				request.$wheelsProtectedFromForgery = false
+				application.wheels.routes = _savedRoutes
+				application.wheels.URLRewriting = _savedRewrite
 			})
 
 			it("works with no csrf when not enabled", () => {
@@ -1228,5 +1241,11 @@ component extends="wheels.WheelsTest" {
 
 	function changeBirthday(required any value) {
 		user.birthday = arguments.value;
+	}
+
+	public void function $clearRoutes() {
+		application.wheels.routes = [];
+		application.wheels.staticRoutes = {};
+		application.wheels.namedRoutePositions = {};
 	}
 }

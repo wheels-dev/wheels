@@ -304,7 +304,7 @@ services:
     build:
       context: ./
       dockerfile: ./tools/docker/sqlserver/Dockerfile_CICD
-    image: cfwheels-sqlserver:v1.0.2
+    image: wheels-sqlserver:v1.0.2
     restart: always
     environment:
       MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq

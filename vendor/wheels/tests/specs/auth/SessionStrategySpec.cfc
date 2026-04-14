@@ -103,6 +103,14 @@ component extends="wheels.WheelsTest" {
 					expect(captured.principal.id).toBe(99);
 				});
 
+				it("does not error when sessionRotate is called during login", function() {
+					// sessionRotate() is wrapped in try/catch so login works
+					// even on engines that don't support it
+					strategy.login(principal = {id = 42});
+					expect(strategy.isLoggedIn()).toBeTrue();
+					expect(strategy.currentUser().id).toBe(42);
+				});
+
 				it("creates intermediate session structs for nested keys", function() {
 					strategy.login(principal = {id = 5});
 

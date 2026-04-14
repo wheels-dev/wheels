@@ -488,7 +488,7 @@ component {
 			if (structKeyExists(prop, "association")) continue;
 			if (!structKeyExists(prop, "type")) continue;
 
-			var cfType = mapToCFWheelsType(prop.type);
+			var cfType = mapToWheelsType(prop.type);
 			var params = "columnNames='#prop.name#'";
 			params &= ", default=''";
 			params &= ", allowNull=" & (structKeyExists(prop, "required") && prop.required ? "false" : "true");
@@ -537,9 +537,9 @@ component {
 	}
 
 	/**
-	 * Map property type to CFWheels migration column type
+	 * Map property type to Wheels migration column type
 	 */
-	private string function mapToCFWheelsType(required string type) {
+	private string function mapToWheelsType(required string type) {
 		switch (lCase(arguments.type)) {
 			case "string": return "string";
 			case "text": return "text";

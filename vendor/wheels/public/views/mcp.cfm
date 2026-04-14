@@ -2,14 +2,48 @@
 // MCP (Model Context Protocol) Server Implementation
 // Implements Streamable HTTP transport with JSON-RPC 2.0
 
-// Set CORS headers for cross-origin requests
-cfheader(name="Access-Control-Allow-Origin", value="*");
-cfheader(name="Access-Control-Allow-Methods", value="GET, POST, OPTIONS");
-cfheader(name="Access-Control-Allow-Headers", value="Content-Type, Accept, Mcp-Session-Id");
+// ── Security: development mode only ─────────────
+if (
+	structKeyExists(application, "wheels")
+	&& structKeyExists(application.wheels, "environment")
+	&& application.wheels.environment != "development"
+) {
+	cfheader(statusCode="403");
+	cfheader(name="Content-Type", value="application/json");
+	local.errorResponse = {
+		"jsonrpc": "2.0",
+		"error": {
+			"code": -32001,
+			"message": "MCP endpoint is only available in development mode"
+		}
+	};
+	local.errorResponse["id"] = javaCast("null", "");
+	writeOutput(serializeJSON(local.errorResponse));
+	abort;
+}
 
-// Handle OPTIONS preflight requests
+// ── Security: localhost only ────────────────────
+local.remoteAddr = cgi.REMOTE_ADDR;
+if (!listFind("127.0.0.1,::1,0:0:0:0:0:0:0:1", local.remoteAddr)) {
+	cfheader(statusCode="403");
+	cfheader(name="Content-Type", value="application/json");
+	local.errorResponse = {
+		"jsonrpc": "2.0",
+		"error": {
+			"code": -32001,
+			"message": "MCP endpoint is restricted to localhost"
+		}
+	};
+	local.errorResponse["id"] = javaCast("null", "");
+	writeOutput(serializeJSON(local.errorResponse));
+	abort;
+}
+
+// Handle OPTIONS requests — CORS is unnecessary since endpoint is localhost-only
 if (cgi.request_method == "OPTIONS") {
-	cfheader(statusCode="200");
+	cfheader(statusCode="405");
+	cfheader(name="Content-Type", value="application/json");
+	writeOutput(serializeJSON({"error": "OPTIONS method not supported"}));
 	abort;
 }
 
@@ -130,7 +164,7 @@ try {
 				"error": {
 					"code": -32700,
 					"message": "Parse error",
-					"data": e.message
+					"data": "Request body is not valid JSON"
 				}
 			};
 			local.errorResponse["id"] = javaCast("null", "");
@@ -160,13 +194,24 @@ try {
 	}));
 
 } catch (any e) {
-	// Handle unexpected errors
+	try {
+		writeLog(
+			file="wheels_mcp",
+			type="error",
+			text="MCP error: " & e.message & " | Detail: " & (structKeyExists(e, "detail") ? e.detail : "")
+		);
+	} catch (any logErr) {
+		// Fail silently if logging fails
+	}
 	cfheader(statusCode="500");
 	cfheader(name="Content-Type", value="application/json");
 	writeOutput(serializeJSON({
-		"error": "Internal server error",
-		"message": e.message,
-		"detail": structKeyExists(e, "detail") ? e.detail : ""
+		"jsonrpc": "2.0",
+		"error": {
+			"code": -32603,
+			"message": "Internal error"
+		},
+		"id": javaCast("null", "")
 	}));
 }
 </cfscript>

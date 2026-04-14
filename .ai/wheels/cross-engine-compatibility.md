@@ -153,9 +153,9 @@ cd /path/to/wheels/rig    # repo root with compose.yml
 
 docker compose up -d lucee6 adobe2025
 
-# Wait ~60s, then test both with H2
-curl -s "http://localhost:60006/wheels/core/tests?db=h2&format=json" > /tmp/lucee6.json
-curl -s "http://localhost:62025/wheels/core/tests?db=h2&format=json" > /tmp/adobe2025.json
+# Wait ~60s, then test both with SQLite (works on ALL engines — H2 is Lucee-only)
+curl -s "http://localhost:60006/wheels/core/tests?db=sqlite&format=json" > /tmp/lucee6.json
+curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&format=json" > /tmp/adobe2025.json
 ```
 
 ### Engine Ports
