@@ -350,7 +350,7 @@ component {
 	/**
 	 * Recursively collect failure/error specs from suiteStats.
 	 */
-	public void function $collectFailures(
+	private void function $collectFailures(
 		required array suiteStats,
 		required string bundleName,
 		required array failures
