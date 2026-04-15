@@ -110,7 +110,7 @@ component {
 			);
 		}
 
-		// Work on shallow copies so callers' arrays aren't mutated
+		// Deep-copy inputs so callers' arrays aren't mutated
 		local.remainingAdds = Duplicate(arguments.addColumns);
 		local.remainingRemoves = Duplicate(arguments.removeColumns);
 		local.confirmedRenames = [];
