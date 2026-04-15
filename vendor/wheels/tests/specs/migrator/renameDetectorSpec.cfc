@@ -102,6 +102,41 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("detect() — empty inputs", () => {
+
+				it("returns all four keys with empty arrays given empty inputs", () => {
+					local.result = detector.detect(
+						addColumns = [],
+						removeColumns = [],
+						addTypes = {},
+						removeTypes = {}
+					);
+					expect(local.result).toHaveKey("confirmedRenames");
+					expect(local.result).toHaveKey("suggestedRenames");
+					expect(local.result).toHaveKey("remainingAdds");
+					expect(local.result).toHaveKey("remainingRemoves");
+					expect(local.result.confirmedRenames).toBeArray();
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(0);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(0);
+					expect(ArrayLen(local.result.remainingAdds)).toBe(0);
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(0);
+				});
+
+				it("returns inputs unchanged when no hints and no heuristic matches", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "bio", type: "text", nullable: true, "default": ""}],
+						removeColumns = [{name: "legacy_flag"}],
+						addTypes = {"bio": "text"},
+						removeTypes = {"legacy_flag": "boolean"}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(0);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(0);
+					expect(ArrayLen(local.result.remainingAdds)).toBe(1);
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(1);
+				});
+
+			});
+
 		});
 
 	}

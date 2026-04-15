@@ -84,4 +84,44 @@ component {
 		return 1.0 - (local.dist / local.maxLen);
 	}
 
+	/**
+	 * Main entry point. Pairs added columns with removed columns based
+	 * on explicit hints and heuristic similarity.
+	 *
+	 * @addColumns    Array of {name, type, nullable, default}.
+	 * @removeColumns Array of {name}.
+	 * @addTypes      Struct keyed by add column name → migration type.
+	 * @removeTypes   Struct keyed by remove column name → migration type.
+	 * @hints         {renames: {"oldCol": "newCol", ...}}
+	 * @threshold     Heuristic confidence cutoff (default 0.7).
+	 */
+	public struct function detect(
+		required array addColumns,
+		required array removeColumns,
+		required struct addTypes,
+		required struct removeTypes,
+		struct hints = {},
+		numeric threshold = 0.7
+	) {
+		if (arguments.threshold < 0 || arguments.threshold > 1) {
+			Throw(
+				type = "Wheels.InvalidThreshold",
+				message = "heuristicThreshold must be between 0 and 1, got " & arguments.threshold
+			);
+		}
+
+		// Work on shallow copies so callers' arrays aren't mutated
+		local.remainingAdds = Duplicate(arguments.addColumns);
+		local.remainingRemoves = Duplicate(arguments.removeColumns);
+		local.confirmedRenames = [];
+		local.suggestedRenames = [];
+
+		return {
+			confirmedRenames: local.confirmedRenames,
+			suggestedRenames: local.suggestedRenames,
+			remainingAdds: local.remainingAdds,
+			remainingRemoves: local.remainingRemoves
+		};
+	}
+
 }
