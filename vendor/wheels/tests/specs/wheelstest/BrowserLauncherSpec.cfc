@@ -1,7 +1,7 @@
 component extends="wheels.WheelsTest" {
 
     function beforeAll() {
-        variables.launcher = CreateObject("component", "wheels.wheelstest.BrowserLauncher");
+        variables.launcher = new wheels.wheelstest.BrowserLauncher();
     }
 
     function run() {
@@ -53,6 +53,59 @@ component extends="wheels.WheelsTest" {
                 } finally {
                     fileDelete(tmpJar);
                 }
+            });
+
+            it("classpathJarPaths() returns one path per manifest classpath entry", () => {
+                var paths = variables.launcher.$classpathJarPaths(installDir="/tmp/browser");
+                var expectedCount = arrayLen(variables.launcher.getManifest().classpath);
+                expect(arrayLen(paths)).toBe(expectedCount);
+                for (var p in paths) {
+                    expect(p).toInclude("/tmp/browser/lib/");
+                    expect(p).toEndWith(".jar");
+                }
+            });
+
+            it("acquireBrowser() throws BrowserLauncherNotReady before $loadJars()", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                expect(() => {
+                    l.acquireBrowser(engine="chromium");
+                }).toThrow(type="Wheels.BrowserLauncherNotReady");
+            });
+
+            it("$loadJars() transitions state uninitialized -> ready -> shut-down", () => {
+                // Integration: requires Playwright install (~/.wheels/browser/lib/)
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                var allPresent = true;
+                for (var p in paths) {
+                    if (!fileExists(p)) {
+                        allPresent = false;
+                        break;
+                    }
+                }
+                if (!allPresent) {
+                    debug("Skipping: Playwright JARs not installed. Run tools/install-playwright.sh");
+                    return;
+                }
+                expect(l.getState()).toBe("uninitialized");
+                l.$loadJars(jarPaths=paths);
+                expect(l.getState()).toBe("ready");
+                l.release();
+                expect(l.getState()).toBe("shut-down");
+            });
+
+            it("resolves com.microsoft.playwright.Playwright class through the URLClassLoader", () => {
+                // Integration: requires Playwright install
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                var klass = l.getClassLoader().loadClass("com.microsoft.playwright.Playwright");
+                expect(klass).notToBeNull();
+                expect(klass.getName()).toBe("com.microsoft.playwright.Playwright");
+                l.release();
             });
         });
     }

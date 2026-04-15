@@ -430,13 +430,15 @@ git commit -m "feat(test): add temporary Playwright install bootstrap"
 
 ## Task 4: `BrowserLauncher` — Playwright instance + Browser acquisition
 
-**⚠ Manifest amended in Task 3:** The original plan assumed two JARs (client + driver-bundle). Task 3 discovered Playwright's full runtime set is seven JARs and restructured the manifest to a `classpath` array. That invalidates the `$jarPath` + `$driverBundlePath` helpers and the integration-test skip logic shown below. Before implementing, replace the two-helper pattern with:
+**⚠ Amended from original plan.** Task 3 discovered Playwright's full runtime set is seven JARs and restructured the manifest to a `classpath` array. Task 4's implementation diverges from the original plan as follows:
 
-- **`$classpathJarPaths(installDir) → array`** — reads `variables.$manifest.classpath` and returns `[installDir & "/lib/" & entry.filename, …]` for every entry.
-- **Skip logic** — `ArrayEvery(paths, fileExists)` rather than two individual `fileExists` checks.
-- **`$loadJars(jarPaths)`** — unchanged; already takes an array. Just pass it all seven paths.
+- **Added: `$classpathJarPaths(installDir) → array`** — reads `variables.$manifest.classpath` and returns `[installDir & "/lib/" & entry.filename, …]` for every entry.
+- **Added: `getManifest()`, `getClassLoader()`, `getState()`** — accessors for the private `variables.$*` scope, needed by tests (CFML `variables` scope isn't externally accessible).
+- **Added: `$findZeroArgMethod()`** — Lucee's Java-varargs bridge can't reliably express an empty `Class<?>[]` to `Class.getMethod(String, Class<?>...)`, so locate zero-arg methods by iterating `getMethods()`.
+- **Dropped: `$driverBundlePath()`** — no longer a meaningful notion once the manifest drives everything through `classpath[]`.
+- **`$loadJars(jarPaths)`** — unchanged from original design. Just pass it all seven paths from `$classpathJarPaths()`.
 
-The `$jarPath()` helper written in Task 2 still works for the client JAR specifically (used in unit tests), so it does not need to be removed.
+**⚠ Known blocker — browser launch path hangs.** `acquireBrowser()` is implemented but the full `Playwright.create() → chromium() → launch()` path hangs when invoked through the URLClassLoader on Lucee 7 + OpenJDK 21. The Node driver process spawns (`~/.lucli/servers/wheels/temp/playwright-java-*/node cli.js run-driver`) but the Java side blocks on IPC read indefinitely. Tests in this PR verify the foundation layer (classpath walker + URLClassLoader loading + state machine + class-resolution through the loader); full browser integration is deferred to a follow-up debug pass. Hypothesis: Lucee's method-call interception on URLClassLoader-loaded classes interferes with the node process's stdin/stdout inheritance.
 
 **Files:**
 - Modify: `vendor/wheels/wheelstest/BrowserLauncher.cfc`
