@@ -39,14 +39,6 @@ if (StructKeyExists(application.wheels, "docs")) {
 	// Now safely append to documentScope
 	ArrayAppend(documentScope, {"name" = "model", "scope" = modelInstance});
 	
-	/* 
-		To fix the issue below:
-		https://github.com/wheels-dev/wheels/issues/1132
-		
-		To add the test framework functions in the documentation. Added the Test component in the documentScope.
-	*/
-	ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "wheels.tests.Test")});
-
 	ArrayAppend(documentScope, {"name" = "mapper", "scope" = application.wheels.mapper});
 	if (application.wheels.enablePluginsComponent) {
 		ArrayAppend(documentScope, {"name" = "migrator", "scope" = application.wheels.migrator});
