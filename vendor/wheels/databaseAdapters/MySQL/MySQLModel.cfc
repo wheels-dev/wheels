@@ -114,11 +114,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Throws if the lock could not be acquired within the timeout.
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
-		local.result = $query(
-			sql = "SELECT GET_LOCK('#arguments.name#', #arguments.timeout#) AS lockResult",
-			dataSource = variables.dataSource,
-			username = variables.username,
-			password = variables.password
+		local.result = queryExecute(
+			"SELECT GET_LOCK(?, ?) AS lockResult",
+			[arguments.name, arguments.timeout],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
 		if (!IsQuery(local.result) || local.result.lockResult != 1) {
 			Throw(
@@ -133,11 +132,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Release a MySQL advisory lock.
 	 */
 	public void function $releaseAdvisoryLock(required string name) {
-		$query(
-			sql = "SELECT RELEASE_LOCK('#arguments.name#')",
-			dataSource = variables.dataSource,
-			username = variables.username,
-			password = variables.password
+		queryExecute(
+			"SELECT RELEASE_LOCK(?)",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
 	}
 

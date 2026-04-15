@@ -38,6 +38,16 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toBe("locked");
 			})
 
+			it("safely handles lock names with single quotes", () => {
+				// Regression guard: verify lock names are parameterized, not interpolated.
+				// On SQLite this is a no-op, but the call must not throw a SQL syntax error
+				// regardless of adapter. With proper parameterization, "O'Brien" is fine.
+				local.result = g.model("author").withAdvisoryLock(name="O'Brien's lock", callback=function() {
+					return "safe";
+				});
+				expect(local.result).toBe("safe");
+			})
+
 		})
 
 		describe("Tests that forUpdate on QueryBuilder", () => {

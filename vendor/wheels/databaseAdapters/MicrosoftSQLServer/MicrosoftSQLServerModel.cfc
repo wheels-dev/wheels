@@ -216,11 +216,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * The lock is scoped to the current session.
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
-		$query(
-			sql = "EXEC sp_getapplock @Resource='#arguments.name#', @LockMode='Exclusive', @LockTimeout=#arguments.timeout * 1000#",
-			dataSource = variables.dataSource,
-			username = variables.username,
-			password = variables.password
+		queryExecute(
+			"EXEC sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockTimeout = ?",
+			[arguments.name, arguments.timeout * 1000],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
 	}
 
@@ -228,11 +227,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Release a SQL Server application lock.
 	 */
 	public void function $releaseAdvisoryLock(required string name) {
-		$query(
-			sql = "EXEC sp_releaseapplock @Resource='#arguments.name#'",
-			dataSource = variables.dataSource,
-			username = variables.username,
-			password = variables.password
+		queryExecute(
+			"EXEC sp_releaseapplock @Resource = ?",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
 	}
 

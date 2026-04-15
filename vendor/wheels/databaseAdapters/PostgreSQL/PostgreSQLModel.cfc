@@ -184,11 +184,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * The lock name is hashed to an integer using hashtext().
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
-		$query(
-			sql = "SELECT pg_advisory_lock(hashtext('#arguments.name#'))",
-			dataSource = variables.dataSource,
-			username = variables.username,
-			password = variables.password
+		queryExecute(
+			"SELECT pg_advisory_lock(hashtext(?))",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
 	}
 
@@ -196,11 +195,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Release a PostgreSQL advisory lock.
 	 */
 	public void function $releaseAdvisoryLock(required string name) {
-		$query(
-			sql = "SELECT pg_advisory_unlock(hashtext('#arguments.name#'))",
-			dataSource = variables.dataSource,
-			username = variables.username,
-			password = variables.password
+		queryExecute(
+			"SELECT pg_advisory_unlock(hashtext(?))",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
 	}
 
