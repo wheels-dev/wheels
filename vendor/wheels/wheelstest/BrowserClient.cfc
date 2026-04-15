@@ -56,7 +56,7 @@ component {
     // ─── Interaction ─────────────────────────────────────────────────
 
     public BrowserClient function click(required string selector) {
-        variables.page.locator(arguments.selector).click();
+        $locator(arguments.selector).click();
         return this;
     }
 
@@ -75,7 +75,7 @@ component {
         required string selector,
         required string value
     ) {
-        variables.page.locator(arguments.selector).fill(arguments.value);
+        $locator(arguments.selector).fill(arguments.value);
         return this;
     }
 
@@ -87,12 +87,12 @@ component {
         required string selector,
         required string value
     ) {
-        variables.page.locator(arguments.selector).pressSequentially(arguments.value);
+        $locator(arguments.selector).pressSequentially(arguments.value);
         return this;
     }
 
     public BrowserClient function clear(required string selector) {
-        variables.page.locator(arguments.selector).clear();
+        $locator(arguments.selector).clear();
         return this;
     }
 
@@ -100,17 +100,17 @@ component {
         required string selector,
         required string value
     ) {
-        variables.page.locator(arguments.selector).selectOption(arguments.value);
+        $locator(arguments.selector).selectOption(arguments.value);
         return this;
     }
 
     public BrowserClient function check(required string selector) {
-        variables.page.locator(arguments.selector).check();
+        $locator(arguments.selector).check();
         return this;
     }
 
     public BrowserClient function uncheck(required string selector) {
-        variables.page.locator(arguments.selector).uncheck();
+        $locator(arguments.selector).uncheck();
         return this;
     }
 
@@ -120,7 +120,7 @@ component {
     ) {
         var emptyStringArr = javaCast("String[]", []);
         var path = createObject("java", "java.nio.file.Paths").get(arguments.filePath, emptyStringArr);
-        variables.page.locator(arguments.selector).setInputFiles(path);
+        $locator(arguments.selector).setInputFiles(path);
         return this;
     }
 
@@ -128,9 +128,118 @@ component {
         required string fromSelector,
         required string toSelector
     ) {
-        variables.page.locator(arguments.fromSelector)
-            .dragTo(variables.page.locator(arguments.toSelector));
+        $locator(arguments.fromSelector)
+            .dragTo($locator(arguments.toSelector));
         return this;
+    }
+
+    // ─── Keyboard ────────────────────────────────────────────────────
+
+    /**
+     * Press a keyboard key against the element matching `selector`.
+     * Key syntax follows Playwright: "Enter", "Tab", "Escape",
+     * "Control+A", "Shift+Home", etc.
+     */
+    public BrowserClient function keys(
+        required string selector,
+        required string key
+    ) {
+        $locator(arguments.selector).press(arguments.key);
+        return this;
+    }
+
+    /**
+     * Press Enter. If selector is given, presses inside that element
+     * (useful for "submit the form by pressing Enter in the last input").
+     * Otherwise sends Enter to whatever has focus.
+     */
+    public BrowserClient function pressEnter(string selector = "") {
+        return $pressSpecial(selector=arguments.selector, key="Enter");
+    }
+
+    public BrowserClient function pressTab(string selector = "") {
+        return $pressSpecial(selector=arguments.selector, key="Tab");
+    }
+
+    public BrowserClient function pressEscape(string selector = "") {
+        return $pressSpecial(selector=arguments.selector, key="Escape");
+    }
+
+    private BrowserClient function $pressSpecial(
+        required string selector,
+        required string key
+    ) {
+        if (len(arguments.selector) > 0) {
+            $locator(arguments.selector).press(arguments.key);
+        } else {
+            variables.page.keyboard().press(arguments.key);
+        }
+        return this;
+    }
+
+    // ─── Waiting ─────────────────────────────────────────────────────
+
+    /**
+     * Waits for a selector to become visible. Uses Playwright's default
+     * timeout (30s). seconds param is accepted for API compatibility with
+     * the plan, but not currently honored — configurable timeout requires
+     * building Locator$WaitForOptions through the URLClassLoader, which is
+     * fragile (see Task 7 press() commentary). Uses .first() so selectors
+     * that match multiple elements resolve to the first one.
+     */
+    public BrowserClient function waitFor(
+        required string selector,
+        numeric seconds = 30
+    ) {
+        $locator(arguments.selector).first().waitFor();
+        return this;
+    }
+
+    /**
+     * Waits for visible text to appear anywhere on the page. Same timeout
+     * caveat as waitFor().
+     */
+    public BrowserClient function waitForText(
+        required string text,
+        numeric seconds = 30
+    ) {
+        variables.page.getByText(arguments.text).first().waitFor();
+        return this;
+    }
+
+    // ─── Scoping ─────────────────────────────────────────────────────
+
+    /**
+     * Runs `callback(scopedClient)` with selectors resolved relative to the
+     * first element matching `selector`. Useful for "fill the email field
+     * inside the signin form, even if there's another email field elsewhere
+     * on the page".
+     *
+     *     client.within("form##signin", (scoped) => {
+     *         scoped.fill("##email", "alice@example.com");
+     *     });
+     */
+    public BrowserClient function within(
+        required string selector,
+        required any callback
+    ) {
+        var scoped = new wheels.wheelstest.BrowserClient()
+            .init(
+                page=variables.page,
+                context=variables.context,
+                baseUrl=variables.baseUrl
+            );
+        scoped.$setScope(variables.page.locator(arguments.selector).first());
+        arguments.callback(scoped);
+        return this;
+    }
+
+    /**
+     * Used by within() to restrict $locator() to a subtree. Public so the
+     * parent BrowserClient can set scope on the clone it creates.
+     */
+    public void function $setScope(required any rootLocator) {
+        variables.$scope = arguments.rootLocator;
     }
 
     // ─── Terminals ───────────────────────────────────────────────────
@@ -162,6 +271,18 @@ component {
                 message="BrowserClient paths must start with '/': " & arguments.path
             );
         }
+    }
+
+    /**
+     * Returns a locator for `selector`, scoped to our within() subtree when
+     * one is set. All interaction methods route through here so within()
+     * works uniformly for click/fill/type/check/select/etc.
+     */
+    private any function $locator(required string selector) {
+        if (structKeyExists(variables, "$scope")) {
+            return variables.$scope.locator(arguments.selector);
+        }
+        return variables.page.locator(arguments.selector);
     }
 
 }

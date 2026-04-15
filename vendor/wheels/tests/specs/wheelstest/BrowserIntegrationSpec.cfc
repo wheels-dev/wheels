@@ -173,5 +173,82 @@ component extends="wheels.WheelsTest" {
                 expect(variables.pg.locator("##s").inputValue()).toBe("b");
             });
         });
+
+        describe("BrowserClient — keyboard, waiting, scoping", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("keys(selector, 'Enter') dispatches an Enter keypress", () => {
+                if (variables.skipBrowserTests) return;
+                var html = "<input id='i' onkeydown=""if(event.key==='Enter') document.getElementById('o').textContent='e'""><div id='o'></div>";
+                variables.bc.visitUrl("data:text/html," & html);
+                variables.bc.keys("##i", "Enter");
+                expect(variables.pg.locator("##o").textContent()).toBe("e");
+            });
+
+            it("pressEnter(selector) is shorthand for keys(selector, 'Enter')", () => {
+                if (variables.skipBrowserTests) return;
+                var html = "<input id='i' onkeydown=""if(event.key==='Enter') document.getElementById('o').textContent='E'""><div id='o'></div>";
+                variables.bc.visitUrl("data:text/html," & html);
+                variables.bc.pressEnter("##i");
+                expect(variables.pg.locator("##o").textContent()).toBe("E");
+            });
+
+            it("pressTab() with no selector sends Tab to keyboard", () => {
+                if (variables.skipBrowserTests) return;
+                // Focus input A, press Tab, expect input B to have focus.
+                var html = "<input id='a' autofocus><input id='b'>";
+                variables.bc.visitUrl("data:text/html," & html);
+                // Give the page a tick to apply autofocus.
+                variables.bc.click("##a");
+                variables.bc.pressTab();
+                // activeElement's id reflects focus
+                var focusedId = variables.pg.evaluate("() => document.activeElement.id");
+                expect(focusedId).toBe("b");
+            });
+
+            it("waitFor(selector) resolves once the element is visible", () => {
+                if (variables.skipBrowserTests) return;
+                // Script injects a new node after 50ms; waitFor blocks until it appears.
+                var html = "<div id='root'></div><script>setTimeout(() => { var n = document.createElement('span'); n.id = 'late'; n.textContent = 'hi'; document.getElementById('root').appendChild(n); }, 50);</script>";
+                variables.bc.visitUrl("data:text/html," & html);
+                var result = variables.bc.waitFor("##late");
+                expect(result).toBe(variables.bc);
+                expect(variables.pg.locator("##late").textContent()).toBe("hi");
+            });
+
+            it("waitForText(text) resolves once the text appears", () => {
+                if (variables.skipBrowserTests) return;
+                var html = "<div id='root'></div><script>setTimeout(() => { document.getElementById('root').textContent = 'Delayed Text'; }, 50);</script>";
+                variables.bc.visitUrl("data:text/html," & html);
+                variables.bc.waitForText("Delayed Text");
+                expect(variables.pg.locator("##root").textContent()).toBe("Delayed Text");
+            });
+
+            it("within(selector, callback) scopes interactions to a subtree", () => {
+                if (variables.skipBrowserTests) return;
+                // Two forms with same-id inputs. within() should restrict
+                // our fill() to the second form.
+                var html = "<form id='f1'><input id='email'></form><form id='f2'><input id='email'></form>";
+                variables.bc.visitUrl("data:text/html," & html);
+                variables.bc.within("form##f2", (scoped) => {
+                    scoped.fill("##email", "in-f2");
+                });
+                // f1's email is still empty; f2's email got set.
+                expect(variables.pg.locator("##f1 ##email").inputValue()).toBe("");
+                expect(variables.pg.locator("##f2 ##email").inputValue()).toBe("in-f2");
+            });
+        });
     }
 }
