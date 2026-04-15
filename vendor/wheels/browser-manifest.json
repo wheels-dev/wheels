@@ -1,0 +1,16 @@
+{
+    "schemaVersion": 1,
+    "playwrightJavaVersion": "1.52.0",
+    "playwrightJavaJar": {
+        "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/playwright/1.52.0/playwright-1.52.0.jar",
+        "sha256": "37eb1cd92d971469834755e139fd3193d03674917b498cc51f4cae715237ba39",
+        "size": 619097
+    },
+    "browsers": {
+        "chromium": "136.0.7103.25",
+        "firefox": "137.0",
+        "webkit": "18.4"
+    },
+    "minJavaVersion": 21,
+    "installDir": "~/.wheels/browser"
+}
