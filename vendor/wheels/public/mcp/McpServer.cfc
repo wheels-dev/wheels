@@ -744,7 +744,7 @@ component output="false" displayName="MCP Server" {
 				"arguments": [
 					{
 						"name": "action",
-						"description": "Migration action (latest, up, down, reset, info)",
+						"description": "Migration action (latest, up, down, reset, info, diff)",
 						"required": true
 					}
 				]
@@ -1223,8 +1223,10 @@ Provide migration code following Wheels conventions."
 					return executeMigrationDown(local.baseUrl);
 				case "reset":
 					return executeMigrationCommand(local.baseUrl, "migrateTo", "0");
+				case "diff":
+					return $executeMigrationDiff(arguments.args);
 				default:
-					return "Error: Unknown migration action '" & arguments.args.action & "'. Supported actions: info, latest, up, down, reset";
+					return "Error: Unknown migration action '" & arguments.args.action & "'. Supported actions: info, latest, up, down, reset, diff";
 			}
 
 		} catch (any e) {
@@ -1695,6 +1697,55 @@ Provide migration code following Wheels conventions."
 			return executeMigrationCommand(arguments.baseUrl, "migrateTo", local.previousVersion);
 		} else {
 			return "Error: Unable to get migration status";
+		}
+	}
+
+	/**
+	 * Calls the CLI bridge to run auto-migration diff (single model or all models).
+	 * Returns the JSON envelope produced by cli.cfm's "diff" command handler.
+	 */
+	private string function $executeMigrationDiff(required struct args) {
+		try {
+			local.qs = "&command=diff";
+
+			if (StructKeyExists(arguments.args, "modelName") && Len(arguments.args.modelName)) {
+				if (!$isValidType(arguments.args.modelName)) {
+					return SerializeJSON({success: false, error: "InvalidInput", message: "Invalid modelName"});
+				}
+				local.qs &= "&modelName=" & URLEncodedFormat(arguments.args.modelName);
+			}
+
+			if (StructKeyExists(arguments.args, "hints") && IsStruct(arguments.args.hints)) {
+				local.qs &= "&hints=" & URLEncodedFormat(SerializeJSON(arguments.args.hints));
+			}
+
+			if (StructKeyExists(arguments.args, "heuristicThreshold") && IsNumeric(arguments.args.heuristicThreshold)) {
+				local.qs &= "&threshold=" & arguments.args.heuristicThreshold;
+			}
+
+			if (StructKeyExists(arguments.args, "write") && IsBoolean(arguments.args.write) && arguments.args.write) {
+				local.qs &= "&write=true";
+			}
+
+			local.currentPort = $getLocalPort();
+			local.baseUrl = "http://localhost:" & local.currentPort
+				& "/?controller=wheels&action=wheels&view=cli" & local.qs;
+
+			if (!$isLocalUrl(local.baseUrl)) {
+				return SerializeJSON({success: false, error: "SecurityError", message: "Internal request URL validation failed"});
+			}
+
+			cfhttp(url=local.baseUrl, method="GET", timeout="30", result="local.httpResult");
+
+			if (!IsJSON(local.httpResult.fileContent)) {
+				return SerializeJSON({success: false, error: "BridgeError", message: "Non-JSON response from bridge"});
+			}
+
+			// Passthrough — bridge already returns the envelope we want.
+			return local.httpResult.fileContent;
+
+		} catch (any e) {
+			return SerializeJSON({success: false, error: e.type, message: e.message});
 		}
 	}
 
