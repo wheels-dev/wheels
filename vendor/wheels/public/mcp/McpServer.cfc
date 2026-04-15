@@ -1716,7 +1716,17 @@ Provide migration code following Wheels conventions."
 			}
 
 			if (StructKeyExists(arguments.args, "hints") && IsStruct(arguments.args.hints)) {
-				local.qs &= "&hints=" & URLEncodedFormat(SerializeJSON(arguments.args.hints));
+				// For diffAll (no modelName), the input hints is model-keyed:
+				//   {"User": {"renames": {...}}}
+				// AutoMigrator.diffAll reads options.hints, so we must wrap.
+				// For single-model, the input hints is {"renames": {...}} and
+				// AutoMigrator.diff reads options.renames directly.
+				if (!StructKeyExists(arguments.args, "modelName") || !Len(arguments.args.modelName)) {
+					local.wrappedHints = {hints: arguments.args.hints};
+					local.qs &= "&hints=" & URLEncodedFormat(SerializeJSON(local.wrappedHints));
+				} else {
+					local.qs &= "&hints=" & URLEncodedFormat(SerializeJSON(arguments.args.hints));
+				}
 			}
 
 			if (StructKeyExists(arguments.args, "heuristicThreshold") && IsNumeric(arguments.args.heuristicThreshold)) {
