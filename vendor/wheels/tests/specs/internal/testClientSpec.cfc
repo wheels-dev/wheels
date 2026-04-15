@@ -1,5 +1,20 @@
 component extends="wheels.WheelsTest" {
 
+	/**
+	 * Helper: create a TestClient with a pre-set fake response for unit-testing
+	 * assertion logic without making real HTTP calls.
+	 */
+	private any function $fakeClient(string body = "", numeric status = 200, struct headers = {}) {
+		var fc = new wheels.wheelstest.TestClient();
+		// Directly set internal state to test assertions in isolation
+		fc.$setFakeResponse(
+			statusCode = "#arguments.status# OK",
+			fileContent = arguments.body,
+			responseHeader = arguments.headers
+		);
+		return fc;
+	}
+
 	function run() {
 
 		describe("TestClient", () => {
@@ -108,14 +123,15 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("assertJson() validates JSON response", () => {
-					tc.get("/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.internal.model");
-					tc.assertJson();
+					var fc = $fakeClient(body = '{"name":"wheels","version":4}');
+					fc.assertJson();
+					fc.assertJson({name: "wheels"});
 				});
 
 				it("assertJson() fails on non-JSON response", () => {
-					tc.get("/");
+					var fc = $fakeClient(body = "<html>not json</html>");
 					expect(function() {
-						tc.assertJson();
+						fc.assertJson();
 					}).toThrow("TestBox.AssertionFailed");
 				});
 
@@ -124,6 +140,12 @@ component extends="wheels.WheelsTest" {
 					expect(function() {
 						tc.assertRedirect();
 					}).toThrow("TestBox.AssertionFailed");
+				});
+
+				it("assertRedirect() passes on 3xx status", () => {
+					var fc = $fakeClient(status = 302, headers = {Location: "/dashboard"});
+					fc.assertRedirect();
+					fc.assertRedirect(to = "/dashboard");
 				});
 
 			});
@@ -191,20 +213,14 @@ component extends="wheels.WheelsTest" {
 			describe("assertSeeInOrder", () => {
 
 				it("passes when texts appear in order", () => {
-					tc.get("/");
-					var body = tc.content();
-					expect(Len(body)).toBeGT(20, "Response body must be >20 chars for ordering test");
-					tc.assertSeeInOrder([Mid(body, 1, 5), Mid(body, 10, 5)]);
+					var fc = $fakeClient(body = "alpha beta gamma delta");
+					fc.assertSeeInOrder(["alpha", "beta", "gamma"]);
 				});
 
 				it("fails when texts appear out of order", () => {
-					tc.get("/");
-					var body = tc.content();
-					expect(Len(body)).toBeGT(20, "Response body must be >20 chars for ordering test");
-					var first = Mid(body, 10, 5);
-					var second = Mid(body, 1, 5);
+					var fc = $fakeClient(body = "alpha beta gamma delta");
 					expect(function() {
-						tc.assertSeeInOrder([first, second]);
+						fc.assertSeeInOrder(["gamma", "alpha"]);
 					}).toThrow("TestBox.AssertionFailed");
 				});
 
@@ -213,11 +229,21 @@ component extends="wheels.WheelsTest" {
 			describe("assertJsonPath", () => {
 
 				it("resolves dot-notation paths in JSON", () => {
-					tc.get("/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.internal.model");
-					tc.assertJson();
-					var jsonData = tc.json();
-					expect(StructKeyExists(jsonData, "totalPass")).toBeTrue("Expected JSON to contain totalPass key");
-					tc.assertJsonPath("totalPass", jsonData.totalPass);
+					var fc = $fakeClient(body = '{"user":{"name":"John","roles":["admin","editor"]}}');
+					fc.assertJsonPath("user.name", "John");
+				});
+
+				it("resolves 1-based array indices in JSON", () => {
+					var fc = $fakeClient(body = '{"items":["a","b","c"]}');
+					fc.assertJsonPath("items.1", "a");
+					fc.assertJsonPath("items.3", "c");
+				});
+
+				it("fails on missing path", () => {
+					var fc = $fakeClient(body = '{"name":"wheels"}');
+					expect(function() {
+						fc.assertJsonPath("missing.key", "val");
+					}).toThrow("TestBox.AssertionFailed");
 				});
 
 			});
@@ -227,6 +253,11 @@ component extends="wheels.WheelsTest" {
 				it("passes when header exists", () => {
 					tc.get("/");
 					tc.assertHeader("Content-Type");
+				});
+
+				it("passes when header matches value", () => {
+					var fc = $fakeClient(headers = {"X-Custom": "hello"});
+					fc.assertHeader("X-Custom", "hello");
 				});
 
 				it("fails when header is missing", () => {

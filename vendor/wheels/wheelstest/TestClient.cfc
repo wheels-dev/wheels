@@ -437,6 +437,24 @@ component {
 		return {};
 	}
 
+	// ─── Test Helpers ────────────────────────────────────────────
+
+	/**
+	 * Set a fake response for unit-testing assertions without making HTTP calls.
+	 * Used by test specs to verify assertion logic in isolation.
+	 */
+	public void function $setFakeResponse(
+		string statusCode = "200 OK",
+		string fileContent = "",
+		struct responseHeader = {}
+	) {
+		variables.lastResponse = {
+			statusCode: arguments.statusCode,
+			fileContent: arguments.fileContent,
+			responseHeader: arguments.responseHeader
+		};
+	}
+
 	// ─── Private Helpers ─────────────────────────────────────────────
 
 	/**
