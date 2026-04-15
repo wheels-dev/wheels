@@ -71,6 +71,37 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("$score", () => {
+
+				it("scores identical normalized tokens as 1.0", () => {
+					expect(detector.$score("full_name", "fullName")).toBe(1.0);
+				});
+
+				it("scores identical raw strings as 1.0", () => {
+					expect(detector.$score("bio", "bio")).toBe(1.0);
+				});
+
+				it("scores case-only differences as 1.0", () => {
+					expect(detector.$score("FULLNAME", "fullname")).toBe(1.0);
+				});
+
+				it("scores near-matches above threshold", () => {
+					// emailaddr vs emailaddress: distance 3, maxLen 12, score ≈ 0.75
+					local.s = detector.$score("email_addr", "emailAddress");
+					expect(local.s >= 0.70 && local.s < 1.0).toBeTrue();
+				});
+
+				it("scores unrelated strings below threshold", () => {
+					local.s = detector.$score("bio", "description");
+					expect(local.s < 0.5).toBeTrue();
+				});
+
+				it("returns 0 for both empty strings", () => {
+					expect(detector.$score("", "")).toBe(0);
+				});
+
+			});
+
 		});
 
 	}

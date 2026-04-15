@@ -65,4 +65,23 @@ component {
 		return local.prev[local.lenB + 1];
 	}
 
+	/**
+	 * Similarity score in [0.0, 1.0]. 1.0 means identical normalized
+	 * tokens (case/underscore/hyphen variants of the same name).
+	 * Otherwise 1 - (Levenshtein / maxLength) of normalized forms.
+	 */
+	public numeric function $score(required string nameA, required string nameB) {
+		local.a = $normalizeToken(arguments.nameA);
+		local.b = $normalizeToken(arguments.nameB);
+		local.maxLen = Max(Len(local.a), Len(local.b));
+		if (local.maxLen == 0) {
+			return 0;
+		}
+		if (local.a == local.b) {
+			return 1.0;
+		}
+		local.dist = $levenshtein(local.a, local.b);
+		return 1.0 - (local.dist / local.maxLen);
+	}
+
 }
