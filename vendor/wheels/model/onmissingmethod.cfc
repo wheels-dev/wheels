@@ -305,11 +305,57 @@ component {
 					arguments.missingMethodArguments.returnIncluded = false;
 				}
 			} else if (ListFindNoCase(variables.wheels.class.associations[local.key].methods, arguments.missingMethodName)) {
+				local.assoc = variables.wheels.class.associations[local.key];
+
+				// Polymorphic belongsTo: resolve model dynamically from the type column.
+				if (
+					StructKeyExists(local.assoc, "polymorphic")
+					&& local.assoc.polymorphic
+					&& local.assoc.type == "belongsTo"
+				) {
+					local.name = ReplaceNoCase(arguments.missingMethodName, local.key, "object");
+					local.foreignKeyProp = local.assoc.foreignKey;
+					local.foreignTypeProp = local.assoc.foreignType;
+
+					if (local.name == "object") {
+						// Read the type column to determine which model to query.
+						if (StructKeyExists(this, local.foreignTypeProp) && Len(this[local.foreignTypeProp])
+							&& StructKeyExists(this, local.foreignKeyProp) && Len(this[local.foreignKeyProp])) {
+							local.componentReference = model(this[local.foreignTypeProp]);
+							local.method = "findByKey";
+							arguments.missingMethodArguments.key = this[local.foreignKeyProp];
+						}
+					} else if (local.name == "hasObject") {
+						// Check if the foreign key is non-empty.
+						if (StructKeyExists(this, local.foreignKeyProp) && Len(this[local.foreignKeyProp])
+							&& StructKeyExists(this, local.foreignTypeProp) && Len(this[local.foreignTypeProp])) {
+							local.componentReference = model(this[local.foreignTypeProp]);
+							local.method = "exists";
+							arguments.missingMethodArguments.key = this[local.foreignKeyProp];
+						} else {
+							local.rv = false;
+						}
+					}
+
+					if (Len(local.method) && StructKeyExists(local, "componentReference")) {
+						local.rv = $invoke(
+							componentReference = local.componentReference,
+							method = local.method,
+							invokeArgs = arguments.missingMethodArguments
+						);
+					}
+					continue;
+				}
+
 				local.info = $expandedAssociations(include = local.key);
 				local.info = local.info[1];
 				local.componentReference = model(local.info.modelName);
+				local.isPolymorphic = StructKeyExists(local.info, "as") && Len(local.info.as) && StructKeyExists(local.info, "foreignType");
 				if (local.info.type == "hasOne") {
 					local.where = $keyWhereString(properties = local.info.foreignKey, keys = primaryKeys());
+					if (local.isPolymorphic) {
+						local.where = "(#local.where#) AND (#local.info.foreignType# = '#variables.wheels.class.modelName#')";
+					}
 					if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
 						local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
 					}
@@ -326,9 +372,15 @@ component {
 					} else if (local.name == "newObject") {
 						local.method = "new";
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
+						if (local.isPolymorphic) {
+							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
+						}
 					} else if (local.name == "createObject") {
 						local.method = "create";
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
+						if (local.isPolymorphic) {
+							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
+						}
 					} else if (local.name == "removeObject") {
 						local.method = "updateOne";
 						arguments.missingMethodArguments.where = local.where;
@@ -377,6 +429,9 @@ component {
 						local.where = $keyWhereString(properties = local.info.foreignKey, keys = local.info.joinKey);
 					} else {
 						local.where = $keyWhereString(properties = local.info.foreignKey, keys = primaryKeys());
+					}
+					if (local.isPolymorphic) {
+						local.where = "(#local.where#) AND (#local.info.foreignType# = '#variables.wheels.class.modelName#')";
 					}
 					if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
 						local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
@@ -496,9 +551,15 @@ component {
 					} else if (local.name == "newObject") {
 						local.method = "new";
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
+						if (local.isPolymorphic) {
+							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
+						}
 					} else if (local.name == "createObject") {
 						local.method = "create";
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
+						if (local.isPolymorphic) {
+							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
+						}
 					} else if (local.name == "objectCount") {
 						local.method = "count";
 						arguments.missingMethodArguments.where = local.where;

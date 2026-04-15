@@ -17,10 +17,22 @@ component {
 		string modelName = "",
 		string foreignKey = "",
 		string joinKey = "",
-		string joinType
+		string joinType,
+		boolean polymorphic = false
 	) {
 		$args(name = "belongsTo", args = arguments);
 		arguments.type = "belongsTo";
+
+		// Polymorphic belongsTo: the name is the interface name (e.g. "commentable").
+		// foreignKey defaults to {name}Id, and we add a foreignType column {name}Type.
+		if (arguments.polymorphic) {
+			if (!Len(arguments.foreignKey)) {
+				arguments.foreignKey = "#arguments.name#id";
+			}
+			arguments.foreignType = "#arguments.name#type";
+			// Don't infer modelName — it's resolved at runtime from the type column.
+			arguments.modelName = "";
+		}
 
 		// The dynamic shortcut methods to add to this class (e.g. "post" , "hasPost").
 		arguments.methods = "";
@@ -53,12 +65,22 @@ component {
 		string joinType,
 		string dependent,
 		string shortcut = "",
-		string through = "#singularize(arguments.shortcut)#,#arguments.name#"
+		string through = "#singularize(arguments.shortcut)#,#arguments.name#",
+		string as = ""
 	) {
 		$args(name = "hasMany", args = arguments);
 		local.singularizedName = capitalize(singularize(arguments.name));
 		local.capitalizedName = capitalize(arguments.name);
 		arguments.type = "hasMany";
+
+		// Polymorphic hasMany: `as` is the polymorphic interface name on the child side.
+		// foreignKey defaults to {as}Id, and foreignType is {as}Type.
+		if (Len(arguments.as)) {
+			if (!Len(arguments.foreignKey)) {
+				arguments.foreignKey = "#arguments.as#id";
+			}
+			arguments.foreignType = "#arguments.as#type";
+		}
 
 		// The dynamic shortcut methods to add to this class (e.g. "comment", "commentCount", "addComment" etc).
 		arguments.methods = "";
@@ -96,11 +118,21 @@ component {
 		string foreignKey = "",
 		string joinKey = "",
 		string joinType,
-		string dependent
+		string dependent,
+		string as = ""
 	) {
 		$args(name = "hasOne", args = arguments);
 		local.capitalizedName = capitalize(arguments.name);
 		arguments.type = "hasOne";
+
+		// Polymorphic hasOne: `as` is the polymorphic interface name on the child side.
+		// foreignKey defaults to {as}Id, and foreignType is {as}Type.
+		if (Len(arguments.as)) {
+			if (!Len(arguments.foreignKey)) {
+				arguments.foreignKey = "#arguments.as#id";
+			}
+			arguments.foreignType = "#arguments.as#type";
+		}
 
 		// The dynamic shortcut methods to add to this class (e.g. "profile", "createProfile", "deleteProfile" etc).
 		arguments.methods = "";
@@ -131,7 +163,11 @@ component {
 		arguments.nested.rejectIfBlank = "";
 
 		// Infer model name from association name unless developer specified it already.
-		if (!Len(arguments.modelName)) {
+		// Polymorphic belongsTo skips inference — the model is resolved at runtime from the type column.
+		if (
+			!Len(arguments.modelName)
+			&& !(StructKeyExists(arguments, "polymorphic") && arguments.polymorphic)
+		) {
 			if (arguments.type == "hasMany") {
 				arguments.modelName = singularize(local.associationName);
 			} else {
@@ -143,7 +179,7 @@ component {
 		arguments.pluralizedName = pluralize(local.associationName);
 
 		// Set a friendly label for the foreign key on belongsTo associations (e.g. 'userid' becomes 'User');
-		if (arguments.type == "belongsTo") {
+		if (arguments.type == "belongsTo" && !(StructKeyExists(arguments, "polymorphic") && arguments.polymorphic)) {
 			// Get the property name using the specified foreign key or the wheels convention of modelName + id;
 			if (Len(arguments.foreignKey)) {
 				local.propertyName = arguments.foreignKey; // custom foreign key column

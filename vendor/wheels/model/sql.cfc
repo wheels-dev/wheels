@@ -1159,6 +1159,18 @@ component {
 				);
 			}
 
+			// Polymorphic belongsTo cannot be eager-loaded via include — the target model varies per row.
+			if (
+				StructKeyExists(local.classAssociations[local.name], "polymorphic")
+				&& local.classAssociations[local.name].polymorphic
+			) {
+				Throw(
+					type = "Wheels.PolymorphicIncludeNotSupported",
+					message = "Cannot use `include` with the polymorphic belongsTo association `#local.name#`.",
+					extendedInfo = "Polymorphic belongsTo associations resolve the target model dynamically per row. Use the dynamic method (e.g. `obj.#local.name#()`) instead of `include`."
+				);
+			}
+
 			// create a reference to the associated class
 			local.associatedClass = model(local.classAssociations[local.name].modelName);
 
@@ -1251,6 +1263,21 @@ component {
 						);
 					}
 				}
+
+				// Polymorphic hasMany/hasOne with `as`: add type discriminator to JOIN ON clause.
+				if (
+					StructKeyExists(local.classAssociations[local.name], "as")
+					&& Len(local.classAssociations[local.name].as)
+					&& StructKeyExists(local.classAssociations[local.name], "foreignType")
+				) {
+					local.typeColumn = local.classAssociations[local.name].foreignType;
+					local.typeValue = local.class.$classData().modelName;
+					local.toAppend = ListAppend(
+						local.toAppend,
+						"#variables.wheels.class.adapter.$quoteIdentifier(local.tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(local.typeColumn)# = '#local.typeValue#'"
+					);
+				}
+
 				local.classAssociations[local.name].join = local.join & Replace(local.toAppend, ",", " AND ", "all");
 			}
 
