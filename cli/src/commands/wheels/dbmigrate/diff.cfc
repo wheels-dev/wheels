@@ -57,6 +57,7 @@ component aliases='wheels db diff' extends="../base" {
 			}
 		} catch (any e) {
 			detailOutput.error("Failed to run diff: " & e.message);
+			setExitCode(1);
 		}
 	}
 
