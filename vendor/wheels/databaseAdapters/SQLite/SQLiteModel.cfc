@@ -123,6 +123,30 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 
 	/**
+	 * SQLite uses file-level locking and does not support advisory locks.
+	 * This is a no-op to allow code that uses advisory locks to run without errors on SQLite.
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		// No-op: SQLite has file-level locking only.
+		// Advisory locks are not meaningful for SQLite.
+	}
+
+	/**
+	 * No-op release for SQLite.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		// No-op
+	}
+
+	/**
+	 * SQLite does not support SELECT ... FOR UPDATE.
+	 * Returns empty string to no-op.
+	 */
+	public string function $forUpdateClause() {
+		return "";
+	}
+
+	/**
 	 * Default VALUES syntax (same as MySQL).
 	 */
 	public string function $defaultValues() {

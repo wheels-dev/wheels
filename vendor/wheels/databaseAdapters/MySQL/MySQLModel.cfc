@@ -109,6 +109,37 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Acquire a MySQL advisory lock using GET_LOCK.
+	 * Returns after the lock is acquired or the timeout expires.
+	 * Throws if the lock could not be acquired within the timeout.
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		local.result = queryExecute(
+			"SELECT GET_LOCK(?, ?) AS lockResult",
+			[arguments.name, arguments.timeout],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+		if (!IsQuery(local.result) || local.result.lockResult != 1) {
+			Throw(
+				type = "Wheels.AdvisoryLockTimeout",
+				message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+				extendedInfo = "The MySQL GET_LOCK function returned a non-1 result, indicating the lock could not be acquired."
+			);
+		}
+	}
+
+	/**
+	 * Release a MySQL advisory lock.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		queryExecute(
+			"SELECT RELEASE_LOCK(?)",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 */
 	public string function $defaultValues() {

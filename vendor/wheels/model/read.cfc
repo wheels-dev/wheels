@@ -49,7 +49,8 @@ component {
 		struct useIndex = {},
 		string dataSource = variables.wheels.class.dataSource,
 		numeric $limit = "0",
-		numeric $offset = "0"
+		numeric $offset = "0",
+		boolean $forUpdate = "false"
 	) {
 		$args(name = "findAll", args = arguments);
 		$setDebugName(name = "findAll", args = arguments);
@@ -268,6 +269,12 @@ component {
 				local.orderBy = $orderByClause(order = arguments.order, include = arguments.include);
 				if (Len(local.orderBy)) {
 					ArrayAppend(local.sql, local.orderBy);
+				}
+				if (arguments.$forUpdate) {
+					local.forUpdateClause = variables.wheels.class.adapter.$forUpdateClause();
+					if (Len(local.forUpdateClause)) {
+						ArrayAppend(local.sql, local.forUpdateClause);
+					}
 				}
 				local.lockName = "findAllSQLLock" & application.applicationName;
 				local.executeArgs = {key = local.queryShellKey, value = local.sql, category = "sql"};

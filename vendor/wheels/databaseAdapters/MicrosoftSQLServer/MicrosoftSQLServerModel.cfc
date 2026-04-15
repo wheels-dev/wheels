@@ -212,6 +212,38 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Acquire a SQL Server application lock using sp_getapplock.
+	 * The lock is scoped to the current session.
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		queryExecute(
+			"EXEC sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockTimeout = ?",
+			[arguments.name, arguments.timeout * 1000],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+	}
+
+	/**
+	 * Release a SQL Server application lock.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		queryExecute(
+			"EXEC sp_releaseapplock @Resource = ?",
+			[arguments.name],
+			{datasource: variables.dataSource, username: variables.username, password: variables.password}
+		);
+	}
+
+	/**
+	 * SQL Server uses table hints (WITH (UPDLOCK)) instead of trailing FOR UPDATE.
+	 * Table hints require modifying the FROM clause which is too complex for initial implementation.
+	 * Returns empty string to no-op.
+	 */
+	public string function $forUpdateClause() {
+		return "";
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 */
 	public string function $generatedKey() {

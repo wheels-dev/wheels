@@ -486,6 +486,44 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Acquire a database advisory lock with the given name.
+	 * Advisory locks are application-level locks that don't lock rows or tables.
+	 * Individual database adapters override this with their specific implementation.
+	 *
+	 * @name A unique name identifying the lock.
+	 * @timeout Maximum seconds to wait for the lock.
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Advisory locks are not supported for this database adapter.",
+			extendedInfo = "The #GetMetaData(this).name# adapter does not implement advisory locking. Use a database that supports advisory locks (PostgreSQL, MySQL, or SQL Server) or implement application-level locking."
+		);
+	}
+
+	/**
+	 * Release a previously acquired advisory lock.
+	 * Individual database adapters override this with their specific implementation.
+	 *
+	 * @name The name of the lock to release.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Advisory locks are not supported for this database adapter.",
+			extendedInfo = "The #GetMetaData(this).name# adapter does not implement advisory locking."
+		);
+	}
+
+	/**
+	 * Returns the SQL clause for pessimistic row locking (e.g., "FOR UPDATE").
+	 * Individual database adapters override this when the default is not appropriate.
+	 */
+	public string function $forUpdateClause() {
+		return "FOR UPDATE";
+	}
+
+	/**
 	 * Remove the maxRows argument and add a limit argument instead.
 	 * The args argument is the original arguments passed in by reference so we just modify it without passing it back.
 	 */

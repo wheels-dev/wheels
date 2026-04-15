@@ -39,6 +39,29 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 	}
 
 	/**
+	 * CockroachDB does not support advisory locks.
+	 * Use forUpdate() for row-level locking instead.
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "CockroachDB does not support advisory locks.",
+			extendedInfo = "Use forUpdate() for row-level locking instead. CockroachDB supports SELECT ... FOR UPDATE for pessimistic locking within transactions."
+		);
+	}
+
+	/**
+	 * CockroachDB does not support advisory locks.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "CockroachDB does not support advisory locks.",
+			extendedInfo = "Use forUpdate() for row-level locking instead."
+		);
+	}
+
+	/**
 	 * Override query setup to append RETURNING clause to INSERTs.
 	 * CockroachDB does not support pg_get_serial_sequence()/currval(),
 	 * so the RETURNING clause is the correct way to retrieve generated keys.
