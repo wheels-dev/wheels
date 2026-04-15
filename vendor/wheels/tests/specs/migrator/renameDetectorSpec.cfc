@@ -137,6 +137,116 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("detect() — explicit hints", () => {
+
+				it("confirms rename when hint maps existing remove to existing add", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "fullName", type: "string", nullable: true, "default": ""}],
+						removeColumns = [{name: "full_name"}],
+						addTypes = {"fullName": "string"},
+						removeTypes = {"full_name": "string"},
+						hints = {renames: {"full_name": "fullName"}}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(1);
+					expect(local.result.confirmedRenames[1].from).toBe("full_name");
+					expect(local.result.confirmedRenames[1].to).toBe("fullName");
+					expect(local.result.confirmedRenames[1].type).toBe("string");
+					expect(local.result.confirmedRenames[1].source).toBe("hint");
+					expect(ArrayLen(local.result.remainingAdds)).toBe(0);
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(0);
+				});
+
+				it("leaves non-hinted columns in remaining arrays", () => {
+					local.result = detector.detect(
+						addColumns = [
+							{name: "fullName", type: "string", nullable: true, "default": ""},
+							{name: "bio", type: "text", nullable: true, "default": ""}
+						],
+						removeColumns = [
+							{name: "full_name"},
+							{name: "legacy_flag"}
+						],
+						addTypes = {"fullName": "string", "bio": "text"},
+						removeTypes = {"full_name": "string", "legacy_flag": "boolean"},
+						hints = {renames: {"full_name": "fullName"}}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(1);
+					expect(ArrayLen(local.result.remainingAdds)).toBe(1);
+					expect(local.result.remainingAdds[1].name).toBe("bio");
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(1);
+					expect(local.result.remainingRemoves[1].name).toBe("legacy_flag");
+				});
+
+				it("raises InvalidRenameHint when hint from-column is not in removes", () => {
+					expect(() => {
+						detector.detect(
+							addColumns = [{name: "fullName", type: "string", nullable: true, "default": ""}],
+							removeColumns = [{name: "legacy_flag"}],
+							addTypes = {"fullName": "string"},
+							removeTypes = {"legacy_flag": "boolean"},
+							hints = {renames: {"nonexistent": "fullName"}}
+						);
+					}).toThrow("Wheels.InvalidRenameHint");
+				});
+
+				it("raises InvalidRenameHint when hint to-column is not in adds", () => {
+					expect(() => {
+						detector.detect(
+							addColumns = [{name: "fullName", type: "string", nullable: true, "default": ""}],
+							removeColumns = [{name: "full_name"}],
+							addTypes = {"fullName": "string"},
+							removeTypes = {"full_name": "string"},
+							hints = {renames: {"full_name": "nonexistent"}}
+						);
+					}).toThrow("Wheels.InvalidRenameHint");
+				});
+
+				it("raises RenameHintTypeMismatch when hinted pair has different types", () => {
+					expect(() => {
+						detector.detect(
+							addColumns = [{name: "fullName", type: "text", nullable: true, "default": ""}],
+							removeColumns = [{name: "full_name"}],
+							addTypes = {"fullName": "text"},
+							removeTypes = {"full_name": "string"},
+							hints = {renames: {"full_name": "fullName"}}
+						);
+					}).toThrow("Wheels.RenameHintTypeMismatch");
+				});
+
+				it("CFML struct keys are unique, so same from-key can't collide (no-op test)", () => {
+					// CFML struct keys are inherently unique; duplicate-from detection is a
+					// CLI-layer concern (Task 12). This spec just documents the expectation.
+					expect(() => {
+						detector.detect(
+							addColumns = [
+								{name: "fullName", type: "string", nullable: true, "default": ""},
+								{name: "displayName", type: "string", nullable: true, "default": ""}
+							],
+							removeColumns = [{name: "full_name"}],
+							addTypes = {"fullName": "string", "displayName": "string"},
+							removeTypes = {"full_name": "string"},
+							hints = {renames: {"full_name": "fullName"}}
+						);
+					}).notToThrow();
+				});
+
+				it("raises DuplicateRenameHint when two hints share the same to-column", () => {
+					expect(() => {
+						detector.detect(
+							addColumns = [{name: "fullName", type: "string", nullable: true, "default": ""}],
+							removeColumns = [
+								{name: "full_name"},
+								{name: "display_name"}
+							],
+							addTypes = {"fullName": "string"},
+							removeTypes = {"full_name": "string", "display_name": "string"},
+							hints = {renames: {"full_name": "fullName", "display_name": "fullName"}}
+						);
+					}).toThrow("Wheels.DuplicateRenameHint");
+				});
+
+			});
+
 		});
 
 	}

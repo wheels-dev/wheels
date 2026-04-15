@@ -116,12 +116,85 @@ component {
 		local.confirmedRenames = [];
 		local.suggestedRenames = [];
 
+		// --- Explicit-hint pass ---
+		local.hintRenames = StructKeyExists(arguments.hints, "renames") ? arguments.hints.renames : {};
+
+		// Detect duplicate `to` mappings (duplicate `from` impossible — struct keys are unique)
+		local.seenTos = {};
+		for (local.oldName in local.hintRenames) {
+			local.newName = local.hintRenames[local.oldName];
+			if (StructKeyExists(local.seenTos, LCase(local.newName))) {
+				Throw(
+					type = "Wheels.DuplicateRenameHint",
+					message = "duplicate rename hint: column '" & local.newName
+						& "' appears as destination of multiple renames"
+				);
+			}
+			local.seenTos[LCase(local.newName)] = true;
+		}
+
+		// Process each hint
+		for (local.oldName in local.hintRenames) {
+			local.newName = local.hintRenames[local.oldName];
+			local.removeIdx = $findColumnIndex(local.remainingRemoves, local.oldName);
+			local.addIdx = $findColumnIndex(local.remainingAdds, local.newName);
+
+			if (local.removeIdx == 0) {
+				Throw(
+					type = "Wheels.InvalidRenameHint",
+					message = "rename hint references column '" & local.oldName
+						& "' which is not in the removed-columns set"
+				);
+			}
+			if (local.addIdx == 0) {
+				Throw(
+					type = "Wheels.InvalidRenameHint",
+					message = "rename hint references column '" & local.newName
+						& "' which is not in the added-columns set"
+				);
+			}
+
+			local.rType = arguments.removeTypes[local.oldName];
+			local.aType = arguments.addTypes[local.newName];
+			if (local.rType != local.aType) {
+				Throw(
+					type = "Wheels.RenameHintTypeMismatch",
+					message = "rename hint " & local.oldName & " -> " & local.newName
+						& " has type mismatch: " & local.rType & " -> " & local.aType
+						& ". Rename + retype requires separate migrations."
+				);
+			}
+
+			ArrayAppend(local.confirmedRenames, {
+				from: local.oldName,
+				to: local.newName,
+				type: local.aType,
+				source: "hint"
+			});
+			ArrayDeleteAt(local.remainingRemoves, local.removeIdx);
+			ArrayDeleteAt(local.remainingAdds, local.addIdx);
+		}
+
 		return {
 			confirmedRenames: local.confirmedRenames,
 			suggestedRenames: local.suggestedRenames,
 			remainingAdds: local.remainingAdds,
 			remainingRemoves: local.remainingRemoves
 		};
+	}
+
+	/**
+	 * Case-insensitive column lookup in an array of {name: ...} structs.
+	 * Returns 1-based index, or 0 if not found.
+	 */
+	public numeric function $findColumnIndex(required array columns, required string name) {
+		local.target = LCase(arguments.name);
+		for (local.i = 1; local.i <= ArrayLen(arguments.columns); local.i++) {
+			if (LCase(arguments.columns[local.i].name) == local.target) {
+				return local.i;
+			}
+		}
+		return 0;
 	}
 
 }
