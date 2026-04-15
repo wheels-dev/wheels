@@ -226,7 +226,7 @@ component {
 			if (StructKeyExists(hdrs, "Location")) {
 				loc = hdrs.Location;
 			}
-			if (loc != arguments.to && !FindNoCase(arguments.to, loc)) {
+			if (!FindNoCase(arguments.to, loc)) {
 				$assertionError("Expected redirect to '#arguments.to#' but Location header is '#loc#'.");
 			}
 		}
@@ -307,9 +307,9 @@ component {
 
 	/**
 	 * Assert a value at a dot-notation path in the JSON response.
-	 * Array indices are 0-based in the path but 1-based internally (CFML arrays).
+	 * Array indices are 1-based (matching CFML convention).
 	 *
-	 * Example: assertJsonPath("users.0.name", "John")
+	 * Example: assertJsonPath("users.1.name", "John")
 	 *
 	 * @path          Dot-notation path into the JSON structure
 	 * @expectedValue Expected value at that path
@@ -327,10 +327,9 @@ component {
 		for (var i = 1; i <= ArrayLen(segments); i++) {
 			var segment = segments[i];
 			if (IsNumeric(segment) && IsArray(current)) {
-				// 0-based input -> 1-based CFML
-				var idx = Int(segment) + 1;
+				var idx = Int(segment);
 				if (idx < 1 || idx > ArrayLen(current)) {
-					$assertionError("JSON path '#arguments.path#' failed: array index #segment# (0-based) is out of bounds (array length: #ArrayLen(current)#).");
+					$assertionError("JSON path '#arguments.path#' failed: array index #segment# is out of bounds (array length: #ArrayLen(current)#).");
 				}
 				current = current[idx];
 			} else if (IsStruct(current) && StructKeyExists(current, segment)) {
@@ -449,7 +448,7 @@ component {
 	 * @body    Request body struct
 	 * @headers Per-request headers
 	 */
-	public void function $makeRequest(
+	private void function $makeRequest(
 		required string method,
 		required string path,
 		struct params = {},
@@ -508,9 +507,10 @@ component {
 			for (var cookieStr in setCookieHeader) {
 				var cookieParts = ListToArray(cookieStr, ";");
 				if (ArrayLen(cookieParts)) {
-					var nameVal = ListToArray(Trim(cookieParts[1]), "=");
-					if (ArrayLen(nameVal) >= 2) {
-						variables.cookies[nameVal[1]] = nameVal[2];
+					var pair = Trim(cookieParts[1]);
+					var eqPos = Find("=", pair);
+					if (eqPos > 0) {
+						variables.cookies[Left(pair, eqPos - 1)] = Mid(pair, eqPos + 1, Len(pair) - eqPos);
 					}
 				}
 			}
@@ -523,7 +523,7 @@ component {
 	 *
 	 * @message Descriptive error message
 	 */
-	public void function $assertionError(required string message) {
+	private void function $assertionError(required string message) {
 		Throw(type = "TestBox.AssertionFailed", message = arguments.message);
 	}
 

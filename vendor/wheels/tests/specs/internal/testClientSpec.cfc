@@ -5,7 +5,7 @@ component extends="wheels.WheelsTest" {
 		describe("TestClient", () => {
 
 			beforeEach(() => {
-				client = $testClient();
+				tc = $testClient();
 			});
 
 			describe("initialization", () => {
@@ -25,18 +25,33 @@ component extends="wheels.WheelsTest" {
 			describe("request methods", () => {
 
 				it("get() makes HTTP GET request", () => {
-					client.get("/");
-					expect(client.statusCode()).toBeGT(0);
+					tc.get("/");
+					expect(tc.statusCode()).toBeGT(0);
 				});
 
 				it("post() makes HTTP POST request", () => {
-					client.post("/");
-					expect(client.statusCode()).toBeGT(0);
+					tc.post("/");
+					expect(tc.statusCode()).toBeGT(0);
+				});
+
+				it("put() makes HTTP PUT request", () => {
+					tc.put("/");
+					expect(tc.statusCode()).toBeGT(0);
+				});
+
+				it("patch() makes HTTP PATCH request", () => {
+					tc.patch("/");
+					expect(tc.statusCode()).toBeGT(0);
+				});
+
+				it("delete() makes HTTP DELETE request", () => {
+					tc.delete("/");
+					expect(tc.statusCode()).toBeGT(0);
 				});
 
 				it("visit() is alias for get()", () => {
-					client.visit("/");
-					expect(client.statusCode()).toBeGT(0);
+					tc.visit("/");
+					expect(tc.statusCode()).toBeGT(0);
 				});
 
 			});
@@ -44,88 +59,71 @@ component extends="wheels.WheelsTest" {
 			describe("assertions", () => {
 
 				it("assertStatus() passes on correct status code", () => {
-					client.get("/");
-					client.assertStatus(client.statusCode());
+					tc.get("/");
+					tc.assertStatus(tc.statusCode());
 				});
 
 				it("assertStatus() fails on wrong status code", () => {
-					client.get("/");
+					tc.get("/");
 					expect(function() {
-						client.assertStatus(999);
+						tc.assertStatus(999);
 					}).toThrow("TestBox.AssertionFailed");
 				});
 
 				it("assertOk() passes on 200 response", () => {
-					client.get("/?reload=true&password=wheels");
-					client.assertOk();
+					tc.get("/");
+					tc.assertOk();
 				});
 
 				it("assertNotFound() passes on 404 response", () => {
-					client.get("/wheels-nonexistent-route-that-should-404");
-					client.assertNotFound();
+					tc.get("/wheels-nonexistent-route-that-should-404");
+					tc.assertNotFound();
 				});
 
 				it("assertSee() finds text in response body", () => {
-					client.get("/");
-					var body = client.content();
-					if (Len(body)) {
-						var snippet = Left(body, 10);
-						if (Len(snippet)) {
-							client.assertSee(snippet);
-						}
-					}
+					tc.get("/");
+					expect(Len(tc.content())).toBeGT(0, "Response body should not be empty");
+					tc.assertSee(Left(tc.content(), 10));
 				});
 
 				it("assertSee() fails when text is not found", () => {
-					client.get("/");
+					tc.get("/");
 					expect(function() {
-						client.assertSee("ZZZZZ_THIS_TEXT_SHOULD_NEVER_EXIST_ZZZZZ");
+						tc.assertSee("ZZZZZ_THIS_TEXT_SHOULD_NEVER_EXIST_ZZZZZ");
 					}).toThrow("TestBox.AssertionFailed");
 				});
 
 				it("assertDontSee() confirms text is absent", () => {
-					client.get("/");
-					client.assertDontSee("ZZZZZ_THIS_TEXT_SHOULD_NEVER_EXIST_ZZZZZ");
+					tc.get("/");
+					tc.assertDontSee("ZZZZZ_THIS_TEXT_SHOULD_NEVER_EXIST_ZZZZZ");
 				});
 
 				it("assertDontSee() fails when text is present", () => {
-					client.get("/");
-					var body = client.content();
-					if (Len(body)) {
-						var snippet = Left(body, 10);
-						if (Len(snippet)) {
-							expect(function() {
-								client.assertDontSee(snippet);
-							}).toThrow("TestBox.AssertionFailed");
-						}
-					}
+					tc.get("/");
+					expect(Len(tc.content())).toBeGT(0, "Response body should not be empty");
+					var snippet = Left(tc.content(), 10);
+					expect(function() {
+						tc.assertDontSee(snippet);
+					}).toThrow("TestBox.AssertionFailed");
 				});
 
 				it("assertJson() validates JSON response", () => {
-					client.get("/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.internal.model");
-					client.assertJson();
+					tc.get("/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.internal.model");
+					tc.assertJson();
 				});
 
 				it("assertJson() fails on non-JSON response", () => {
-					client.get("/");
-					var body = client.content();
-					if (Len(body) && Left(Trim(body), 1) != "{" && Left(Trim(body), 1) != "[") {
-						expect(function() {
-							client.assertJson();
-						}).toThrow("TestBox.AssertionFailed");
-					}
+					tc.get("/");
+					expect(function() {
+						tc.assertJson();
+					}).toThrow("TestBox.AssertionFailed");
 				});
 
-				it("assertRedirect() checks 3xx status", () => {
-					client.get("/");
-					var code = client.statusCode();
-					if (code >= 300 && code < 400) {
-						client.assertRedirect();
-					} else {
-						expect(function() {
-							client.assertRedirect();
-						}).toThrow("TestBox.AssertionFailed");
-					}
+				it("assertRedirect() fails on non-redirect status", () => {
+					tc.get("/");
+					expect(function() {
+						tc.assertRedirect();
+					}).toThrow("TestBox.AssertionFailed");
 				});
 
 			});
@@ -133,19 +131,19 @@ component extends="wheels.WheelsTest" {
 			describe("request configuration", () => {
 
 				it("withHeaders() adds custom headers", () => {
-					client.withHeaders({"X-Custom-Test": "hello"});
-					client.get("/");
-					expect(client.statusCode()).toBeGT(0);
+					tc.withHeaders({"X-Custom-Test": "hello"});
+					tc.get("/");
+					expect(tc.statusCode()).toBeGT(0);
 				});
 
 				it("withHeader() adds a single header", () => {
-					client.withHeader("X-Custom-Test", "hello");
-					client.get("/");
-					expect(client.statusCode()).toBeGT(0);
+					tc.withHeader("X-Custom-Test", "hello");
+					tc.get("/");
+					expect(tc.statusCode()).toBeGT(0);
 				});
 
 				it("asJson() sets content type and returns client for chaining", () => {
-					var result = client.asJson();
+					var result = tc.asJson();
 					expect(result).toBeInstanceOf("wheels.wheelstest.TestClient");
 				});
 
@@ -154,46 +152,38 @@ component extends="wheels.WheelsTest" {
 			describe("response accessors", () => {
 
 				beforeEach(() => {
-					client.get("/");
+					tc.get("/");
 				});
 
 				it("content() returns response body as string", () => {
-					expect(client.content()).toBeString();
+					expect(tc.content()).toBeString();
 				});
 
 				it("statusCode() returns numeric status", () => {
-					expect(client.statusCode()).toBeNumeric();
+					expect(tc.statusCode()).toBeNumeric();
 				});
 
 				it("headers() returns response headers struct", () => {
-					expect(client.headers()).toBeStruct();
+					expect(tc.headers()).toBeStruct();
 				});
 
 				it("response() returns full response struct", () => {
-					expect(client.response()).toBeStruct();
+					expect(tc.response()).toBeStruct();
 				});
 
 			});
 
 			describe("chaining", () => {
 
-				it("supports fluent chaining: visit().assertOk().assertSee()", () => {
-					client.visit("/?reload=true&password=wheels");
-					var code = client.statusCode();
-					if (code == 200) {
-						var body = client.content();
-						if (Len(body)) {
-							var snippet = Left(body, 5);
-							if (Len(snippet)) {
-								client.assertOk().assertSee(snippet);
-							}
-						}
-					}
+				it("supports fluent chaining: get().assertOk().assertSee()", () => {
+					tc.get("/");
+					expect(Len(tc.content())).toBeGT(0, "Response body should not be empty");
+					tc.assertOk().assertSee(Left(tc.content(), 5));
 				});
 
 				it("supports withHeaders().get().assertStatus() chain", () => {
-					client.withHeader("Accept", "text/html").get("/");
-					client.assertStatus(client.statusCode());
+					tc.withHeader("Accept", "text/html").get("/");
+					tc.assertStatus(tc.statusCode());
 				});
 
 			});
@@ -201,25 +191,21 @@ component extends="wheels.WheelsTest" {
 			describe("assertSeeInOrder", () => {
 
 				it("passes when texts appear in order", () => {
-					client.get("/");
-					var body = client.content();
-					if (Len(body) > 20) {
-						var first = Mid(body, 1, 5);
-						var second = Mid(body, 10, 5);
-						client.assertSeeInOrder([first, second]);
-					}
+					tc.get("/");
+					var body = tc.content();
+					expect(Len(body)).toBeGT(20, "Response body must be >20 chars for ordering test");
+					tc.assertSeeInOrder([Mid(body, 1, 5), Mid(body, 10, 5)]);
 				});
 
 				it("fails when texts appear out of order", () => {
-					client.get("/");
-					var body = client.content();
-					if (Len(body) > 20) {
-						var first = Mid(body, 10, 5);
-						var second = Mid(body, 1, 5);
-						expect(function() {
-							client.assertSeeInOrder([first, second]);
-						}).toThrow("TestBox.AssertionFailed");
-					}
+					tc.get("/");
+					var body = tc.content();
+					expect(Len(body)).toBeGT(20, "Response body must be >20 chars for ordering test");
+					var first = Mid(body, 10, 5);
+					var second = Mid(body, 1, 5);
+					expect(function() {
+						tc.assertSeeInOrder([first, second]);
+					}).toThrow("TestBox.AssertionFailed");
 				});
 
 			});
@@ -227,11 +213,11 @@ component extends="wheels.WheelsTest" {
 			describe("assertJsonPath", () => {
 
 				it("resolves dot-notation paths in JSON", () => {
-					client.get("/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.internal.model");
-					var jsonData = client.json();
-					if (StructKeyExists(jsonData, "totalPass")) {
-						client.assertJsonPath("totalPass", jsonData.totalPass);
-					}
+					tc.get("/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.internal.model");
+					tc.assertJson();
+					var jsonData = tc.json();
+					expect(StructKeyExists(jsonData, "totalPass")).toBeTrue("Expected JSON to contain totalPass key");
+					tc.assertJsonPath("totalPass", jsonData.totalPass);
 				});
 
 			});
@@ -239,15 +225,29 @@ component extends="wheels.WheelsTest" {
 			describe("assertHeader", () => {
 
 				it("passes when header exists", () => {
-					client.get("/");
-					client.assertHeader("Content-Type");
+					tc.get("/");
+					tc.assertHeader("Content-Type");
 				});
 
 				it("fails when header is missing", () => {
-					client.get("/");
+					tc.get("/");
 					expect(function() {
-						client.assertHeader("X-Nonexistent-Header-For-Test");
+						tc.assertHeader("X-Nonexistent-Header-For-Test");
 					}).toThrow("TestBox.AssertionFailed");
+				});
+
+			});
+
+			describe("post with body", () => {
+
+				it("sends form fields by default", () => {
+					tc.post("/", {testField: "testValue"});
+					expect(tc.statusCode()).toBeGT(0);
+				});
+
+				it("sends JSON body when asJson()", () => {
+					tc.asJson().post("/", {testField: "testValue"});
+					expect(tc.statusCode()).toBeGT(0);
 				});
 
 			});
