@@ -348,6 +348,91 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("detect() — ambiguity", () => {
+
+				it("demotes ambiguous score-1.0 pair to suggestedRenames", () => {
+					// Two removes that both normalize-match the same add:
+					// "full_name" and "fullName" both → "fullname"; add "FULLNAME" → "fullname"
+					// Both pairs score 1.0, both ambiguous.
+					local.result = detector.detect(
+						addColumns = [{name: "FULLNAME", type: "string", nullable: true, "default": ""}],
+						removeColumns = [
+							{name: "full_name"},
+							{name: "fullName"}
+						],
+						addTypes = {"FULLNAME": "string"},
+						removeTypes = {"full_name": "string", "fullName": "string"}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(0);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(1);
+					expect(local.result.suggestedRenames[1].ambiguous).toBeTrue();
+					expect(local.result.suggestedRenames[1].confidence).toBe(1.0);
+				});
+
+				it("marks one-remove matching two adds as ambiguous", () => {
+					// "full_name" matches both "fullName" (1.0) and "fulName" (~0.88)
+					local.result = detector.detect(
+						addColumns = [
+							{name: "fullName", type: "string", nullable: true, "default": ""},
+							{name: "fulName", type: "string", nullable: true, "default": ""}
+						],
+						removeColumns = [{name: "full_name"}],
+						addTypes = {"fullName": "string", "fulName": "string"},
+						removeTypes = {"full_name": "string"}
+					);
+					// Both scores >= 0.7; full_name appears in 2 candidates, so both ambiguous.
+					// Greedy picks highest (1.0) first: full_name → fullName ambiguous.
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(0);
+					expect(ArrayLen(local.result.suggestedRenames)).toBeGTE(1);
+					for (local.s in local.result.suggestedRenames) {
+						expect(local.s.ambiguous).toBeTrue();
+					}
+				});
+
+				it("greedy assignment picks highest confidence first", () => {
+					// "email_addr" (string) only matches "emailAddress" at ~0.75.
+					// "email" (string) matches "emailAddress" at ~0.42 (below 0.7, so not in scores)
+					// and matches nothing else. Greedy claims email_addr → emailAddress as suggested.
+					local.result = detector.detect(
+						addColumns = [{name: "emailAddress", type: "string", nullable: true, "default": ""}],
+						removeColumns = [
+							{name: "email_addr"},
+							{name: "email"}
+						],
+						addTypes = {"emailAddress": "string"},
+						removeTypes = {"email_addr": "string", "email": "string"}
+					);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(1);
+					expect(local.result.suggestedRenames[1].from).toBe("email_addr");
+				});
+
+			});
+
+			describe("detect() — hints consume before heuristic", () => {
+
+				it("excludes hinted columns from the heuristic candidate pool", () => {
+					// "full_name" → "fullName" via hint; "display_name" → "displayName" via heuristic (score 1.0)
+					local.result = detector.detect(
+						addColumns = [
+							{name: "fullName", type: "string", nullable: true, "default": ""},
+							{name: "displayName", type: "string", nullable: true, "default": ""}
+						],
+						removeColumns = [
+							{name: "full_name"},
+							{name: "display_name"}
+						],
+						addTypes = {"fullName": "string", "displayName": "string"},
+						removeTypes = {"full_name": "string", "display_name": "string"},
+						hints = {renames: {"full_name": "fullName"}}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(2);
+					// Hint-sourced rename comes first (insertion order)
+					expect(local.result.confirmedRenames[1].source).toBe("hint");
+					expect(local.result.confirmedRenames[2].source).toBe("heuristic");
+				});
+
+			});
+
 		});
 
 	}
