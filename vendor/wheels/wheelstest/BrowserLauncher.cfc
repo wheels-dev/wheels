@@ -58,7 +58,14 @@ component {
      * Default entry point — reads env var + home dir from the runtime.
      */
     public string function resolveInstallDir() {
-        var envVar = server.system.environment["WHEELS_BROWSER_HOME"] ?: "";
+        var envVar = "";
+        if (
+            StructKeyExists(server, "system")
+            && StructKeyExists(server.system, "environment")
+            && StructKeyExists(server.system.environment, "WHEELS_BROWSER_HOME")
+        ) {
+            envVar = server.system.environment["WHEELS_BROWSER_HOME"];
+        }
         return $resolveInstallDir(envVar=envVar, homeDir=getUserHome());
     }
 
