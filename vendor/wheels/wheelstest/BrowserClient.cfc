@@ -53,6 +53,86 @@ component {
         return this;
     }
 
+    // ─── Interaction ─────────────────────────────────────────────────
+
+    public BrowserClient function click(required string selector) {
+        variables.page.locator(arguments.selector).click();
+        return this;
+    }
+
+    /**
+     * Clicks the first element matching the given visible text. Simpler than
+     * getByRole because it avoids building Playwright option objects through
+     * the URLClassLoader. If you need role-specific matching (e.g. button
+     * only, ignoring headings), use click("button:has-text('...')") instead.
+     */
+    public BrowserClient function press(required string buttonText) {
+        variables.page.getByText(arguments.buttonText).first().click();
+        return this;
+    }
+
+    public BrowserClient function fill(
+        required string selector,
+        required string value
+    ) {
+        variables.page.locator(arguments.selector).fill(arguments.value);
+        return this;
+    }
+
+    /**
+     * Types character-by-character (like a human). Slower than fill() but
+     * triggers per-keystroke event handlers (autosuggest, live validation).
+     */
+    public BrowserClient function type(
+        required string selector,
+        required string value
+    ) {
+        variables.page.locator(arguments.selector).pressSequentially(arguments.value);
+        return this;
+    }
+
+    public BrowserClient function clear(required string selector) {
+        variables.page.locator(arguments.selector).clear();
+        return this;
+    }
+
+    public BrowserClient function select(
+        required string selector,
+        required string value
+    ) {
+        variables.page.locator(arguments.selector).selectOption(arguments.value);
+        return this;
+    }
+
+    public BrowserClient function check(required string selector) {
+        variables.page.locator(arguments.selector).check();
+        return this;
+    }
+
+    public BrowserClient function uncheck(required string selector) {
+        variables.page.locator(arguments.selector).uncheck();
+        return this;
+    }
+
+    public BrowserClient function attach(
+        required string selector,
+        required string filePath
+    ) {
+        var emptyStringArr = javaCast("String[]", []);
+        var path = createObject("java", "java.nio.file.Paths").get(arguments.filePath, emptyStringArr);
+        variables.page.locator(arguments.selector).setInputFiles(path);
+        return this;
+    }
+
+    public BrowserClient function dragAndDrop(
+        required string fromSelector,
+        required string toSelector
+    ) {
+        variables.page.locator(arguments.fromSelector)
+            .dragTo(variables.page.locator(arguments.toSelector));
+        return this;
+    }
+
     // ─── Terminals ───────────────────────────────────────────────────
 
     public string function currentUrl() {
@@ -83,4 +163,5 @@ component {
             );
         }
     }
+
 }
