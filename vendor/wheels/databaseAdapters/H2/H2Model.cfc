@@ -181,7 +181,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * H2 upsert using MERGE INTO table (cols) KEY (uniqueBy) VALUES syntax.
+	 * H2 upsert using single MERGE INTO with multi-row VALUES.
+	 * H2 syntax: MERGE INTO t (cols) KEY (uniqueBy) VALUES (row1), (row2), ...
 	 */
 	public array function $upsertSQL(
 		required string tableName,
@@ -200,22 +201,24 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		local.colList = "";
 		for (local.col in arguments.columns) {
 			if (Len(local.colList)) local.colList &= ", ";
-			local.colList &= local.col;
+			local.colList &= $quoteIdentifier(local.col);
 		}
 
 		// Build KEY clause.
 		local.keyList = "";
 		for (local.u in arguments.uniqueBy) {
 			if (Len(local.keyList)) local.keyList &= ", ";
-			local.keyList &= local.u;
+			local.keyList &= $quoteIdentifier(local.u);
 		}
 
-		// H2 MERGE processes one VALUES set at a time; loop batches.
+		ArrayAppend(local.sql, "MERGE INTO #arguments.tableName# (#local.colList#) KEY (#local.keyList#) VALUES ");
+
+		// Build value rows.
 		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
 			if (local.r > arguments.batchStart) {
-				ArrayAppend(local.sql, "; ");
+				ArrayAppend(local.sql, ", ");
 			}
-			ArrayAppend(local.sql, "MERGE INTO #arguments.tableName# (#local.colList#) KEY (#local.keyList#) VALUES (");
+			ArrayAppend(local.sql, "(");
 			for (local.p = 1; local.p <= ArrayLen(arguments.validProperties); local.p++) {
 				if (local.p > 1) ArrayAppend(local.sql, ", ");
 				local.propName = arguments.validProperties[local.p];

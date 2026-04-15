@@ -77,6 +77,9 @@ component extends="wheels.WheelsTest" {
 					var found = g.model("bulkItem").findOne(where="code = 'BULK-NTS-1'");
 					expect(found).toBeInstanceOf("component");
 					expect(found.name).toBe("NoTimestamp1");
+					// Timestamps should be empty since the column is nullable and timestamps=false.
+					expect(Len(Trim(found.createdAt))).toBe(0, "createdAt should be empty when timestamps=false");
+					expect(Len(Trim(found.updatedAt))).toBe(0, "updatedAt should be empty when timestamps=false");
 
 					transaction action="rollback";
 				}
