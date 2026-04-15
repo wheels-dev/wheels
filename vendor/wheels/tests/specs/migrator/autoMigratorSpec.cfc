@@ -325,6 +325,73 @@ component extends="wheels.WheelsTest" {
 					expect(local.cfc).toInclude("allowNull=true");
 				});
 
+				it("emits renameColumn in up() for each renameColumns entry", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: [],
+						renameColumns: [
+							{from: "full_name", to: "fullName", type: "string", source: "hint"}
+						],
+						suggestedRenames: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "rename_name_field");
+					expect(local.cfc).toInclude('renameColumn(table="test_models", columnName="full_name", newColumnName="fullName")');
+				});
+
+				it("emits reversed renameColumn in down() for each renameColumns entry", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: [],
+						renameColumns: [
+							{from: "full_name", to: "fullName", type: "string", source: "hint"}
+						],
+						suggestedRenames: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "rename_name_field");
+					// down() reverses: fullName -> full_name
+					expect(local.cfc).toInclude('renameColumn(table="test_models", columnName="fullName", newColumnName="full_name")');
+				});
+
+				it("handles diff results without renameColumns key (backward compat)", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [{name: "bio", type: "text", nullable: true, "default": ""}],
+						removeColumns: [],
+						changeColumns: []
+						// Note: no renameColumns key — simulate legacy callers
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "add_bio");
+					expect(local.cfc).toInclude('addColumn(table="test_models"');
+				});
+
+				it("orders up() body as renames then adds then removes then changes", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [{name: "bio", type: "text", nullable: true, "default": ""}],
+						removeColumns: [{name: "legacy"}],
+						changeColumns: [{name: "status", from: {type: "string"}, to: {type: "integer"}}],
+						renameColumns: [{from: "full_name", to: "fullName", type: "string", source: "hint"}],
+						suggestedRenames: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "mixed");
+					local.renameAt = Find("renameColumn(", local.cfc);
+					local.addAt = Find("addColumn(", local.cfc);
+					local.removeAt = Find('removeColumn(table="test_models", columnName="legacy"', local.cfc);
+					local.changeAt = Find("changeColumn(", local.cfc);
+					expect(local.renameAt).toBeGT(0);
+					expect(local.renameAt).toBeLT(local.addAt);
+					expect(local.addAt).toBeLT(local.removeAt);
+					expect(local.removeAt).toBeLT(local.changeAt);
+				});
+
 			});
 
 			describe("diffAll() — rename integration", () => {

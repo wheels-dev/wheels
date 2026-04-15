@@ -231,6 +231,19 @@ component extends="wheels.migrator.Base" {
 		local.upBody = "";
 		local.downBody = "";
 
+		// Emit renameColumns first in up(); reversed renames go last in down()
+		local.renameColumns = StructKeyExists(arguments.diffResult, "renameColumns")
+			? arguments.diffResult.renameColumns
+			: [];
+		local.iEnd = ArrayLen(local.renameColumns);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.r = local.renameColumns[local.i];
+			local.upBody &= local.tab & local.tab
+				& 'renameColumn(table="' & arguments.diffResult.tableName
+				& '", columnName="' & local.r.from
+				& '", newColumnName="' & local.r.to & '");' & local.nl;
+		}
+
 		local.iEnd = ArrayLen(arguments.diffResult.addColumns);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.col = arguments.diffResult.addColumns[local.i];
@@ -266,6 +279,15 @@ component extends="wheels.migrator.Base" {
 				& 'changeColumn(table="' & arguments.diffResult.tableName
 				& '", columnName="' & local.col.name
 				& '", columnType="' & local.col.from.type & '");' & local.nl;
+		}
+
+		// Append reversed renames to down() (after other reversals)
+		for (local.i = 1; local.i <= ArrayLen(local.renameColumns); local.i++) {
+			local.r = local.renameColumns[local.i];
+			local.downBody &= local.tab & local.tab
+				& 'renameColumn(table="' & arguments.diffResult.tableName
+				& '", columnName="' & local.r.to
+				& '", newColumnName="' & local.r.from & '");' & local.nl;
 		}
 
 		if (!Len(Trim(local.upBody))) {
