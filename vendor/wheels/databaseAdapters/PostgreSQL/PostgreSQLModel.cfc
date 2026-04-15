@@ -179,6 +179,32 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Acquire a PostgreSQL advisory lock using pg_advisory_lock.
+	 * This is a session-level lock that blocks until acquired.
+	 * The lock name is hashed to an integer using hashtext().
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		$query(
+			sql = "SELECT pg_advisory_lock(hashtext('#arguments.name#'))",
+			dataSource = variables.dataSource,
+			username = variables.username,
+			password = variables.password
+		);
+	}
+
+	/**
+	 * Release a PostgreSQL advisory lock.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		$query(
+			sql = "SELECT pg_advisory_unlock(hashtext('#arguments.name#'))",
+			dataSource = variables.dataSource,
+			username = variables.username,
+			password = variables.password
+		);
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 * PostgreSQL uses double-quotes to quote identifiers (ANSI SQL standard).
 	 */

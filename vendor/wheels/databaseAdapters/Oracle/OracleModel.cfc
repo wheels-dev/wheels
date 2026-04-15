@@ -65,6 +65,28 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Oracle advisory locks require DBMS_LOCK package setup which is not available by default.
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Oracle advisory locks require DBMS_LOCK package setup.",
+			extendedInfo = "Oracle supports advisory locks via the DBMS_LOCK package, but this requires DBA-level setup and is not supported by Wheels out of the box. Use forUpdate() for row-level locking instead."
+		);
+	}
+
+	/**
+	 * Oracle advisory locks require DBMS_LOCK package setup.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "Oracle advisory locks require DBMS_LOCK package setup.",
+			extendedInfo = "Oracle supports advisory locks via the DBMS_LOCK package, but this requires DBA-level setup and is not supported by Wheels out of the box."
+		);
+	}
+
+	/**
 	 * Call functions to make adapter specific changes to arguments before executing query.
 	 */
 	public struct function $querySetup(

@@ -128,6 +128,28 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * H2 does not support advisory locks.
+	 */
+	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "H2 does not support advisory locks.",
+			extendedInfo = "Advisory locks are not available in H2. Consider using a different database for features that require advisory locking."
+		);
+	}
+
+	/**
+	 * H2 does not support advisory locks.
+	 */
+	public void function $releaseAdvisoryLock(required string name) {
+		Throw(
+			type = "Wheels.AdvisoryLockNotSupported",
+			message = "H2 does not support advisory locks.",
+			extendedInfo = "Advisory locks are not available in H2."
+		);
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 * When using H2, cfdbinfo incorrectly returns information_schema tables.
 	 * To fix we create a new query result that excludes these tables.

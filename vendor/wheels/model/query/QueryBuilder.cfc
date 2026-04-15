@@ -32,6 +32,7 @@ component output="false" {
 		variables.offsetValue = 0;
 		variables.distinctValue = false;
 		variables.groupClause = "";
+		variables.forUpdateValue = false;
 		return this;
 	}
 
@@ -212,6 +213,20 @@ component output="false" {
 	}
 
 	/**
+	 * Add a FOR UPDATE clause to the query for pessimistic row locking.
+	 * The locked rows will be held until the current transaction commits or rolls back.
+	 * Must be used within a transaction to be effective.
+	 *
+	 * Support varies by database:
+	 * - PostgreSQL, MySQL, CockroachDB, H2, Oracle: Appends FOR UPDATE
+	 * - SQL Server, SQLite: No-op (MSSQL uses table hints, SQLite has file-level locking)
+	 */
+	public any function forUpdate() {
+		variables.forUpdateValue = true;
+		return this;
+	}
+
+	/**
 	 * Build the accumulated arguments into a struct suitable for finder methods.
 	 */
 	public struct function $buildFinderArgs(struct extraArgs = {}) {
@@ -279,6 +294,11 @@ component output="false" {
 		// Apply LIMIT
 		if (variables.limitValue > 0) {
 			local.args.maxRows = variables.limitValue;
+		}
+
+		// Add FOR UPDATE flag if set
+		if (variables.forUpdateValue) {
+			local.args.$forUpdate = true;
 		}
 
 		// Merge in any extra arguments passed to the terminal method
@@ -390,7 +410,7 @@ component output="false" {
 		Throw(
 			type = "Wheels.MethodNotFound",
 			message = "The method `#arguments.missingMethodName#` was not found on the query builder for `#variables.modelReference.$classData().modelName#`.",
-			extendedInfo = "Available methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy, limit, offset, select, include, group, distinct, get, first, findAll, findOne, count, exists, updateAll, deleteAll, findEach, findInBatches."
+			extendedInfo = "Available methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy, limit, offset, select, include, group, distinct, forUpdate, get, first, findAll, findOne, count, exists, updateAll, deleteAll, findEach, findInBatches."
 		);
 	}
 
