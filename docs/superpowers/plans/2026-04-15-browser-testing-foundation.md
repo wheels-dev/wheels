@@ -68,26 +68,47 @@ Expected: 64-char hex SHA256. Record it.
 
 - [ ] **Step 3: Write `vendor/wheels/browser-manifest.json`**
 
+Playwright Java needs Maven's full transitive runtime graph on the classpath to boot (the standalone client JAR isn't sufficient). Since this script doesn't use Maven, the manifest pins **every** runtime JAR under a `classpath` array. Walk `com.microsoft.playwright:playwright`'s POM plus its parent to enumerate:
+
+- `com.microsoft.playwright:playwright` — client API + CLI
+- `com.microsoft.playwright:driver` — `impl.driver.Driver` class
+- `com.microsoft.playwright:driver-bundle` — bundled Node + JS driver (~190MB)
+- `com.google.code.gson:gson` — JSON
+- `org.java-websocket:Java-WebSocket` — WS transport
+- `org.slf4j:slf4j-api` + `org.slf4j:slf4j-simple` — logging
+
+For each JAR, `curl -sSL <url> -o /tmp/x && shasum -a 256 /tmp/x` to compute SHA256.
+
 ```json
 {
-    "schemaVersion": 1,
-    "playwrightJavaVersion": "1.45.0",
-    "playwrightJavaJar": {
-        "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/playwright/1.45.0/playwright-1.45.0.jar",
-        "sha256": "REPLACE_WITH_SHA256_FROM_STEP_2",
-        "size": 51380224
-    },
+    "schemaVersion": 2,
+    "playwrightJavaVersion": "1.52.0",
+    "classpath": [
+        {
+            "filename": "playwright-1.52.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/playwright/1.52.0/playwright-1.52.0.jar",
+            "sha256": "REPLACE_ME",
+            "size": 619097
+        },
+        {
+            "filename": "driver-1.52.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/driver/1.52.0/driver-1.52.0.jar",
+            "sha256": "REPLACE_ME",
+            "size": 6863
+        }
+        // ... driver-bundle, gson, Java-WebSocket, slf4j-api, slf4j-simple
+    ],
     "browsers": {
-        "chromium": "1124",
-        "firefox": "1440",
-        "webkit": "2033"
+        "chromium": "136.0.7103.25",
+        "firefox": "137.0",
+        "webkit": "18.4"
     },
     "minJavaVersion": 21,
     "installDir": "~/.wheels/browser"
 }
 ```
 
-Substitute `REPLACE_WITH_SHA256_FROM_STEP_2` and `"1.45.0"` with the real values from steps 1-2.
+Substitute each `REPLACE_ME` with the SHA256 from step 2.
 
 - [ ] **Step 4: Commit**
 
@@ -296,11 +317,7 @@ git commit -m "feat(test): add BrowserLauncher JAR path discovery"
 
 Integration tests in subsequent tasks require Playwright installed locally. This is a temporary bootstrap script; PR 2 will replace it with `wheels browser:install`.
 
-**Important — two-JAR install:** Playwright Java needs **both** artifacts on the classpath to boot:
-- `playwright-<ver>.jar` (client API, ~600KB) — pinned under `playwrightJavaJar` in manifest
-- `driver-bundle-<ver>.jar` (bundled Node + driver, ~191MB) — pinned under `playwrightDriverBundle` in manifest
-
-The bootstrap downloads both, SHA-verifies both, then runs `playwright install chromium` using **both on the classpath** so the CLI can find the driver.
+**Important — full classpath install:** Playwright Java needs all seven runtime JARs on the classpath to boot (client, driver, driver-bundle, plus transitive `gson`, `Java-WebSocket`, `slf4j-api`, `slf4j-simple`). The manifest's `classpath` array pins every one; the script iterates the array, downloads each, SHA-verifies, then invokes `playwright install chromium` with all seven on the classpath.
 
 **Files:**
 - Create: `tools/install-playwright.sh`
@@ -313,73 +330,85 @@ Create `tools/install-playwright.sh`:
 #!/usr/bin/env bash
 # Temporary bootstrap for browser testing. Replaced by `wheels browser:install`
 # once PR 2 lands. Reads vendor/wheels/browser-manifest.json for pinned versions.
+#
+# Playwright Java needs the full classpath — client, driver, driver-bundle, plus
+# transitive runtime deps (gson, Java-WebSocket, slf4j) — to boot. Maven normally
+# resolves these; since we bootstrap without Maven, the manifest pins every JAR
+# with SHA256, and this script downloads + verifies each before invoking the CLI.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/vendor/wheels/browser-manifest.json"
 INSTALL_DIR="${WHEELS_BROWSER_HOME:-$HOME/.wheels/browser}"
+LIB_DIR="$INSTALL_DIR/lib"
 
 if [[ ! -f "$MANIFEST" ]]; then
     echo "ERROR: $MANIFEST not found" >&2
     exit 1
 fi
 
-# Helper: download a JAR from a manifest entry, SHA-verify, place at target path.
-# Usage: download_jar <manifest-key> <target-jar-path>
-download_jar() {
-    local key="$1"
-    local target="$2"
+mkdir -p "$LIB_DIR"
 
-    local url sha
-    url=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['$key']['url'])")
-    sha=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['$key']['sha256'])")
+# Read classpath entries as tab-separated rows: filename\turl\tsha256.
+# Avoids bash-4 `mapfile` so the script works with macOS's default bash 3.2.
+ENTRIES_FILE=$(mktemp)
+trap 'rm -f "$ENTRIES_FILE"' EXIT
+python3 -c "
+import json
+m = json.load(open('$MANIFEST'))
+for e in m['classpath']:
+    print(e['filename'] + '\t' + e['url'] + '\t' + e['sha256'])
+" > "$ENTRIES_FILE"
+
+ENTRY_COUNT=$(wc -l < "$ENTRIES_FILE" | tr -d ' ')
+if [[ "$ENTRY_COUNT" -eq 0 ]]; then
+    echo "ERROR: manifest has no classpath entries" >&2
+    exit 1
+fi
+
+CLASSPATH=""
+while IFS=$'\t' read -r filename url sha; do
+    target="$LIB_DIR/$filename"
 
     if [[ -f "$target" ]]; then
-        local actual
         actual=$(shasum -a 256 "$target" | awk '{print $1}')
         if [[ "$actual" == "$sha" ]]; then
-            echo "✓ $(basename "$target") already present (SHA verified)"
-            return
+            echo "✓ $filename already present (SHA verified)"
+            CLASSPATH+="$target:"
+            continue
         fi
-        echo "! $(basename "$target") exists but SHA mismatch; re-downloading"
+        echo "! $filename exists but SHA mismatch; re-downloading"
         rm -f "$target"
     fi
 
-    echo "Downloading $(basename "$target") from Maven Central..."
+    echo "Downloading $filename from Maven Central..."
     curl -sSL -o "$target" "$url"
 
-    local actual
     actual=$(shasum -a 256 "$target" | awk '{print $1}')
     if [[ "$actual" != "$sha" ]]; then
-        echo "ERROR: SHA mismatch for $target" >&2
+        echo "ERROR: SHA mismatch for $filename" >&2
         echo "  expected: $sha" >&2
         echo "  actual:   $actual" >&2
         rm -f "$target"
         exit 1
     fi
-    echo "✓ $(basename "$target") downloaded and SHA-verified"
-}
+    echo "✓ $filename downloaded and SHA-verified"
+    CLASSPATH+="$target:"
+done < "$ENTRIES_FILE"
 
-VERSION=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['playwrightJavaVersion'])")
-CLIENT_JAR="$INSTALL_DIR/lib/playwright-$VERSION.jar"
-DRIVER_JAR="$INSTALL_DIR/lib/driver-bundle-$VERSION.jar"
-
-mkdir -p "$INSTALL_DIR/lib"
-
-download_jar "playwrightJavaJar"      "$CLIENT_JAR"
-download_jar "playwrightDriverBundle" "$DRIVER_JAR"
+# Strip trailing colon
+CLASSPATH="${CLASSPATH%:}"
 
 echo ""
-echo "Installing Chromium via Playwright CLI (requires both JARs on classpath)..."
-java -cp "$CLIENT_JAR:$DRIVER_JAR" com.microsoft.playwright.CLI install chromium
+echo "Installing Chromium via Playwright CLI (full classpath: $ENTRY_COUNT JARs)..."
+java -cp "$CLASSPATH" com.microsoft.playwright.CLI install chromium
 
 echo ""
 echo "Done."
-echo "  Client JAR:     $CLIENT_JAR"
-echo "  Driver bundle:  $DRIVER_JAR"
-echo "  Browsers:       ~/.cache/ms-playwright/ (Playwright default cache dir)"
-echo "  Install dir:    $INSTALL_DIR"
+echo "  JARs:        $LIB_DIR/  ($ENTRY_COUNT files)"
+echo "  Browsers:    ~/.cache/ms-playwright/ (Playwright default cache dir)"
+echo "  Install dir: $INSTALL_DIR"
 ```
 
 - [ ] **Step 2: Make executable and test it runs**
@@ -388,7 +417,7 @@ echo "  Install dir:    $INSTALL_DIR"
 chmod +x tools/install-playwright.sh
 bash tools/install-playwright.sh
 ```
-Expected: downloads JAR, verifies SHA, installs Chromium. `~/.wheels/browser/lib/playwright-1.45.0.jar` and `~/.wheels/browser/browsers/chromium-*/` exist afterward.
+Expected: downloads all 7 JARs (reusing any already present with matching SHA), installs Chromium. `~/.wheels/browser/lib/*.jar` (7 files) and `~/Library/Caches/ms-playwright/chromium-*/` exist afterward. Re-running should be a no-op (all JARs SHA-verified present).
 
 - [ ] **Step 3: Commit**
 
@@ -400,6 +429,14 @@ git commit -m "feat(test): add temporary Playwright install bootstrap"
 ---
 
 ## Task 4: `BrowserLauncher` — Playwright instance + Browser acquisition
+
+**⚠ Manifest amended in Task 3:** The original plan assumed two JARs (client + driver-bundle). Task 3 discovered Playwright's full runtime set is seven JARs and restructured the manifest to a `classpath` array. That invalidates the `$jarPath` + `$driverBundlePath` helpers and the integration-test skip logic shown below. Before implementing, replace the two-helper pattern with:
+
+- **`$classpathJarPaths(installDir) → array`** — reads `variables.$manifest.classpath` and returns `[installDir & "/lib/" & entry.filename, …]` for every entry.
+- **Skip logic** — `ArrayEvery(paths, fileExists)` rather than two individual `fileExists` checks.
+- **`$loadJars(jarPaths)`** — unchanged; already takes an array. Just pass it all seven paths.
+
+The `$jarPath()` helper written in Task 2 still works for the client JAR specifically (used in unit tests), so it does not need to be removed.
 
 **Files:**
 - Modify: `vendor/wheels/wheelstest/BrowserLauncher.cfc`

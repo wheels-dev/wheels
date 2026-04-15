@@ -1,16 +1,50 @@
 {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "playwrightJavaVersion": "1.52.0",
-    "playwrightJavaJar": {
-        "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/playwright/1.52.0/playwright-1.52.0.jar",
-        "sha256": "37eb1cd92d971469834755e139fd3193d03674917b498cc51f4cae715237ba39",
-        "size": 619097
-    },
-    "playwrightDriverBundle": {
-        "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/driver-bundle/1.52.0/driver-bundle-1.52.0.jar",
-        "sha256": "144c435fbca910da329a903a47d2f93bc9723acc1320a2b45b604ea335ae5242",
-        "size": 200138356
-    },
+    "classpath": [
+        {
+            "filename": "playwright-1.52.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/playwright/1.52.0/playwright-1.52.0.jar",
+            "sha256": "37eb1cd92d971469834755e139fd3193d03674917b498cc51f4cae715237ba39",
+            "size": 619097
+        },
+        {
+            "filename": "driver-1.52.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/driver/1.52.0/driver-1.52.0.jar",
+            "sha256": "bfed51b42047ff11c7de62d6756e3b4ec459f41ff407fd2082c8cc5e52e875df",
+            "size": 6863
+        },
+        {
+            "filename": "driver-bundle-1.52.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/driver-bundle/1.52.0/driver-bundle-1.52.0.jar",
+            "sha256": "144c435fbca910da329a903a47d2f93bc9723acc1320a2b45b604ea335ae5242",
+            "size": 200138356
+        },
+        {
+            "filename": "gson-2.12.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.12.1/gson-2.12.1.jar",
+            "sha256": "ebee13d5fb7477cd7f1cc010e0c356df8ca80709715248da97f79e35ccb4fbec",
+            "size": 285943
+        },
+        {
+            "filename": "Java-WebSocket-1.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/java-websocket/Java-WebSocket/1.6.0/Java-WebSocket-1.6.0.jar",
+            "sha256": "eae29213e4f16515639c28957200f011b3967fffcada1962cf0255d24919c22f",
+            "size": 140686
+        },
+        {
+            "filename": "slf4j-api-2.0.17.jar",
+            "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+            "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832",
+            "size": 69908
+        },
+        {
+            "filename": "slf4j-simple-2.0.17.jar",
+            "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/2.0.17/slf4j-simple-2.0.17.jar",
+            "sha256": "ddfea59ac074c6d3e24ac2c38622d2d963895e17f70b38ed4bdae4d780be6964",
+            "size": 15716
+        }
+    ],
     "browsers": {
         "chromium": "136.0.7103.25",
         "firefox": "137.0",
