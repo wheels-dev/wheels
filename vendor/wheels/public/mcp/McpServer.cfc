@@ -1720,7 +1720,7 @@ Provide migration code following Wheels conventions."
 			}
 
 			if (StructKeyExists(arguments.args, "heuristicThreshold") && IsNumeric(arguments.args.heuristicThreshold)) {
-				local.qs &= "&threshold=" & arguments.args.heuristicThreshold;
+				local.qs &= "&threshold=" & URLEncodedFormat(arguments.args.heuristicThreshold);
 			}
 
 			if (StructKeyExists(arguments.args, "write") && IsBoolean(arguments.args.write) && arguments.args.write) {
