@@ -49,11 +49,11 @@ A systemwide feature comparison of Wheels 4.0 against Rails 8, Laravel 12, and D
 | Indexes | addIndex/removeIndex | add_index/remove_index | index/dropIndex | db_index=True |
 | Foreign keys | addForeignKey/dropForeignKey | add_foreign_key | foreign/foreignId | ForeignKey auto |
 | Raw SQL | `execute("SQL")` | `execute("SQL")` | `DB::statement("SQL")` | `RunSQL("SQL")` |
-| Auto-generation | Via CLI generators + `AutoMigrator` (model→DB schema diff) | Via CLI generators | Via CLI generators | `makemigrations` (auto from models) |
+| Auto-generation | Via CLI generators + `AutoMigrator` (model→DB schema diff + rename detection) | Via CLI generators | Via CLI generators | `makemigrations` (auto from models) |
 | Reversible | Manual up/down | `change` method (auto-reverse) | Manual up/down | Auto-reverse |
 | Seed data | seedOnce() + environment seeds | db/seeds.rb | Seeders | fixtures/loaddata |
 
-**Wheels auto-migrations:** `AutoMigrator.diff(modelName)` compares model property definitions against the current DB schema and returns add/remove/change column lists. `generateMigrationCFC()` produces a migration CFC with both up() and down() methods. Limitations: cannot detect column renames (always generates remove+add), calculated properties excluded.
+**Wheels auto-migrations:** `AutoMigrator.diff(modelName, options)` compares model property definitions against the current DB schema and returns add/remove/change/rename column lists. Renames are detected via explicit hints (`options.renames={"old":"new"}`) plus heuristic suggestions (normalized-token + Levenshtein, configurable threshold). `generateMigrationCFC()` produces a migration CFC with both up() and down() methods, emitting `renameColumn` calls for confirmed renames. Calculated properties excluded from diff.
 
 **Wheels distinction:** `seedOnce()` is idempotent by design — safe to re-run. Rails/Laravel seeds are not idempotent by default.
 
@@ -260,6 +260,7 @@ Only Wheels and Laravel have full DI containers. Wheels uses explicit `map/bind`
 13. **Auto-migrations** — `AutoMigrator.diff(modelName)` generates migration CFCs from model→DB schema differences
 14. **HTTP test client** — Fluent `visit().assertOk().assertSee()` integration testing
 15. **Parallel test runner** — `ParallelRunner` partitions bundles across worker threads
+16. **Auto-migration rename detection** — `AutoMigrator.diff()` accepts explicit rename hints AND runs heuristic similarity analysis (normalized-token + Levenshtein) to suggest likely renames. Rails requires manual `rename_column`; Django uses interactive CLI only. Wheels offers both programmatic hints and automatic suggestions in the diff engine.
 
 ## Where Wheels Trails
 
@@ -268,7 +269,6 @@ Only Wheels and Laravel have full DI containers. Wheels uses explicit `map/bind`
 3. **WebSocket support** — SSE covers many use cases but no bidirectional channel (deliberate design choice given CFML's request-response model)
 4. **Browser testing** — No native integration (Capybara/Dusk equivalents); HTTP-level testing via TestClient is supported
 5. **Asset pipeline maturity** — Vite integration is new; Rails/Laravel have years of refinement
-6. **Migration rename detection** — `AutoMigrator` cannot detect column renames (always generates remove+add); Django/Rails behave the same way without explicit hints
 
 ## Recently Closed Gaps (April 2026)
 
@@ -280,3 +280,4 @@ The following gaps were closed in v4.0:
 - **Auto-migrations from models** ([#2102](https://github.com/wheels-dev/wheels/pull/2102))
 - **HTTP test client** ([#2099](https://github.com/wheels-dev/wheels/pull/2099))
 - **Parallel test execution** ([#2100](https://github.com/wheels-dev/wheels/pull/2100))
+- **Auto-migration rename detection** — explicit hints + heuristic suggestions via `AutoMigrator`, new `wheels dbmigrate diff` CLI command, MCP `wheels_migrate(action="diff")`
