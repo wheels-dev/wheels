@@ -49,6 +49,8 @@
 		application.$wheels.functions.count = {parameterize = true};
 		application.$wheels.functions.csrfMetaTags = {encode = true};
 		application.$wheels.functions.create = {parameterize = true, reload = false};
+		application.$wheels.functions.insertAll = {parameterize = true};
+		application.$wheels.functions.upsertAll = {parameterize = true};
 		application.$wheels.functions.dateSelect = {
 			label = false,
 			labelPlacement = "around",

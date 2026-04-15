@@ -200,8 +200,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		required array records,
 		required numeric batchStart,
 		required numeric batchEnd,
-		required struct propertyInfo,
-		required any quoteFunc
+		required struct propertyInfo
 	) {
 		local.sql = [];
 

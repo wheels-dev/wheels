@@ -641,7 +641,6 @@ component output=false extends="wheels.Global"{
 	 * @batchStart Starting index in the records array.
 	 * @batchEnd Ending index in the records array.
 	 * @propertyInfo Struct of model property metadata.
-	 * @quoteFunc Reference to the adapter's `$quoteIdentifier` function.
 	 */
 	public array function $upsertSQL(
 		required string tableName,
@@ -652,8 +651,7 @@ component output=false extends="wheels.Global"{
 		required array records,
 		required numeric batchStart,
 		required numeric batchEnd,
-		required struct propertyInfo,
-		required any quoteFunc
+		required struct propertyInfo
 	) {
 		Throw(
 			type = "Wheels.UpsertNotSupported",
