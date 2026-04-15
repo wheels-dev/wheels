@@ -615,6 +615,48 @@ CockroachDB is marked as soft-fail in `.github/workflows/tests.yml` — failures
 docker compose down    # Stop all containers
 ```
 
+## Auto-Migration Quick Reference
+
+Generate migrations from model/DB schema diffs. Rename detection via explicit hints (authoritative) + heuristic suggestions (normalized-token + Levenshtein).
+
+```cfm
+// Programmatic
+var am = CreateObject("component", "wheels.migrator.AutoMigrator");
+
+// Single model
+var d = am.diff("User");
+var d = am.diff("User", {renames: {"full_name": "fullName"}});
+var d = am.diff("User", {heuristicThreshold: 0.85});
+
+// All models (per-model hints keyed by model name)
+var all = am.diffAll({
+    hints: {"User": {renames: {"full_name": "fullName"}}},
+    heuristicThreshold: 0.7
+});
+
+// Write migration CFC from diff result
+am.writeMigration(d, "rename_name_field");
+```
+
+```bash
+# CLI
+wheels dbmigrate diff User                                    # preview
+wheels dbmigrate diff User --rename=full_name:fullName        # with hint
+wheels dbmigrate diff User --write --name=rename_name         # commit file
+wheels dbmigrate diff --threshold=0.85                        # all models, stricter
+wheels dbmigrate diff --rename=User.full_name:fullName        # diffAll hint
+```
+
+**Diff result struct:**
+```
+{modelName, tableName,
+ addColumns, removeColumns, changeColumns,        // pruned of rename pairs
+ renameColumns,       // confirmed renames (emitted into up/down)
+ suggestedRenames}    // heuristic candidates for display
+```
+
+**Limits:** PK renames not detected; rename + type change requires separate migrations; calculated properties excluded from diff.
+
 ## Database Seeding Quick Reference
 
 Convention-based, idempotent seeding with CLI support.
