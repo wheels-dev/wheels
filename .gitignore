@@ -36,6 +36,8 @@ test-output/
 .worktrees/
 .grove/
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
 .DS_Store
 .superpowers/
 
