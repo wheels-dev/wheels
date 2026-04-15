@@ -25,4 +25,36 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         }
     }
 
+    /**
+     * Create a TestClient and visit the given path (HTTP GET).
+     * Returns the TestClient for fluent assertion chaining.
+     *
+     * Usage in tests:
+     *   visit("/users").assertOk().assertSee("John")
+     *
+     * @path URL path to visit
+     */
+    public any function visit(required string path) {
+        return $testClient().get(arguments.path);
+    }
+
+    /**
+     * Return a configured TestClient instance.
+     * The base URL is auto-detected from the current server port.
+     */
+    public any function $testClient() {
+        return new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
+    }
+
+    /**
+     * Auto-detect the base URL of the running test server.
+     */
+    private string function $getTestBaseUrl() {
+        var port = CGI.SERVER_PORT;
+        if (!Len(port) || port == 0) {
+            port = 8080;
+        }
+        return "http://localhost:" & port;
+    }
+
 }
