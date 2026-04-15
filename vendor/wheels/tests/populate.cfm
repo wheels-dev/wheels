@@ -96,7 +96,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems">
+<cfset local.tables = "c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems">
 <cfloop list="#local.tables#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
@@ -350,6 +350,42 @@ CREATE TABLE c_o_r_e_bulkitems
 ) #local.storageEngine#
 </cfquery>
 
+<!--- polymorphic association test tables --->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_polyarticles
+(
+	id #local.identityColumnType#
+	,title varchar(255) NOT NULL
+	,createdat #local.datetimeColumnType# NULL
+	,updatedat #local.datetimeColumnType# NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_polyphotos
+(
+	id #local.identityColumnType#
+	,url varchar(255) NOT NULL
+	,createdat #local.datetimeColumnType# NULL
+	,updatedat #local.datetimeColumnType# NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_polycomments
+(
+	id #local.identityColumnType#
+	,body #local.textColumnType# NOT NULL
+	,commentableid #local.intColumnType# NULL
+	,commentabletype varchar(255) NULL
+	,createdat #local.datetimeColumnType# NULL
+	,updatedat #local.datetimeColumnType# NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
 <!--- create views --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
 CREATE VIEW c_o_r_e_userphotos AS
@@ -583,3 +619,28 @@ FROM c_o_r_e_users u INNER JOIN c_o_r_e_galleries g ON u.id = g.userid
 <!--- uppercase table --->
 <cfset model("category").create(category_name = "Quick Brown Foxes")>
 <cfset model("category").create(category_name = "Lazy Dogs")>
+
+<!--- polymorphic association test data --->
+<cfset local.polyArticle1 = model("polyArticle").create(title = "First Article")>
+<cfset local.polyArticle2 = model("polyArticle").create(title = "Second Article")>
+<cfset local.polyPhoto1 = model("polyPhoto").create(url = "http://example.com/photo1.jpg")>
+<cfset local.polyPhoto2 = model("polyPhoto").create(url = "http://example.com/photo2.jpg")>
+
+<!--- comments on articles --->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+INSERT INTO c_o_r_e_polycomments (body, commentableid, commentabletype) VALUES ('Comment on article 1', #local.polyArticle1.id#, 'PolyArticle')
+</cfquery>
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+INSERT INTO c_o_r_e_polycomments (body, commentableid, commentabletype) VALUES ('Another comment on article 1', #local.polyArticle1.id#, 'PolyArticle')
+</cfquery>
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+INSERT INTO c_o_r_e_polycomments (body, commentableid, commentabletype) VALUES ('Comment on article 2', #local.polyArticle2.id#, 'PolyArticle')
+</cfquery>
+
+<!--- comments on photos --->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+INSERT INTO c_o_r_e_polycomments (body, commentableid, commentabletype) VALUES ('Comment on photo 1', #local.polyPhoto1.id#, 'PolyPhoto')
+</cfquery>
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+INSERT INTO c_o_r_e_polycomments (body, commentableid, commentabletype) VALUES ('Comment on photo 2', #local.polyPhoto2.id#, 'PolyPhoto')
+</cfquery>
