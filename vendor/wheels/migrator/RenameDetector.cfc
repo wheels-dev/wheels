@@ -175,6 +175,81 @@ component {
 			ArrayDeleteAt(local.remainingAdds, local.addIdx);
 		}
 
+		// --- Heuristic pass ---
+		local.scores = [];
+		for (local.r = 1; local.r <= ArrayLen(local.remainingRemoves); local.r++) {
+			local.rCol = local.remainingRemoves[local.r];
+			for (local.a = 1; local.a <= ArrayLen(local.remainingAdds); local.a++) {
+				local.aCol = local.remainingAdds[local.a];
+				if (arguments.removeTypes[local.rCol.name] != arguments.addTypes[local.aCol.name]) {
+					continue;
+				}
+				local.sc = $score(local.rCol.name, local.aCol.name);
+				if (local.sc >= arguments.threshold) {
+					ArrayAppend(local.scores, {
+						from: local.rCol.name,
+						to: local.aCol.name,
+						confidence: local.sc,
+						type: arguments.addTypes[local.aCol.name]
+					});
+				}
+			}
+		}
+
+		// Sort by confidence DESC
+		ArraySort(local.scores, function(x, y) {
+			if (x.confidence > y.confidence) return -1;
+			if (x.confidence < y.confidence) return 1;
+			return 0;
+		});
+
+		// Pre-count ambiguity from the full candidate set (before greedy assignment).
+		// This ensures ambiguous score-1.0 pairs are demoted to suggestedRenames.
+		local.fromCount = {};
+		local.toCount = {};
+		for (local.candidate in local.scores) {
+			local.fromCount[local.candidate.from] = (StructKeyExists(local.fromCount, local.candidate.from) ? local.fromCount[local.candidate.from] : 0) + 1;
+			local.toCount[local.candidate.to] = (StructKeyExists(local.toCount, local.candidate.to) ? local.toCount[local.candidate.to] : 0) + 1;
+		}
+
+		// Greedy assignment
+		local.usedFroms = {};
+		local.usedTos = {};
+		for (local.candidate in local.scores) {
+			if (StructKeyExists(local.usedFroms, local.candidate.from) || StructKeyExists(local.usedTos, local.candidate.to)) {
+				continue;
+			}
+			local.usedFroms[local.candidate.from] = true;
+			local.usedTos[local.candidate.to] = true;
+			local.isAmbiguous = (local.fromCount[local.candidate.from] > 1 || local.toCount[local.candidate.to] > 1);
+
+			if (local.candidate.confidence == 1.0 && !local.isAmbiguous) {
+				// Auto-confirmed heuristic: consume the pair from remaining arrays.
+				ArrayAppend(local.confirmedRenames, {
+					from: local.candidate.from,
+					to: local.candidate.to,
+					type: local.candidate.type,
+					source: "heuristic"
+				});
+				local.rIdx = $findColumnIndex(local.remainingRemoves, local.candidate.from);
+				local.aIdx = $findColumnIndex(local.remainingAdds, local.candidate.to);
+				if (local.rIdx > 0) ArrayDeleteAt(local.remainingRemoves, local.rIdx);
+				if (local.aIdx > 0) ArrayDeleteAt(local.remainingAdds, local.aIdx);
+			} else {
+				// Suggestion: informational only. DO NOT consume the columns —
+				// leave them in remainingAdds/remainingRemoves so that if the user
+				// writes the migration without a hint, drop+add is still emitted
+				// (predictable behavior; no silent rename).
+				ArrayAppend(local.suggestedRenames, {
+					from: local.candidate.from,
+					to: local.candidate.to,
+					type: local.candidate.type,
+					confidence: local.candidate.confidence,
+					ambiguous: local.isAmbiguous
+				});
+			}
+		}
+
 		return {
 			confirmedRenames: local.confirmedRenames,
 			suggestedRenames: local.suggestedRenames,

@@ -247,6 +247,107 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("detect() — heuristic pass", () => {
+
+				it("auto-confirms unambiguous score-1.0 matches as heuristic source", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "fullName", type: "string", nullable: true, "default": ""}],
+						removeColumns = [{name: "full_name"}],
+						addTypes = {"fullName": "string"},
+						removeTypes = {"full_name": "string"}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(1);
+					expect(local.result.confirmedRenames[1].from).toBe("full_name");
+					expect(local.result.confirmedRenames[1].to).toBe("fullName");
+					expect(local.result.confirmedRenames[1].source).toBe("heuristic");
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(0);
+				});
+
+				it("suggests above-threshold but below-1.0 matches", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "emailAddress", type: "string", nullable: true, "default": ""}],
+						removeColumns = [{name: "email_addr"}],
+						addTypes = {"emailAddress": "string"},
+						removeTypes = {"email_addr": "string"}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(0);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(1);
+					expect(local.result.suggestedRenames[1].from).toBe("email_addr");
+					expect(local.result.suggestedRenames[1].to).toBe("emailAddress");
+					expect(local.result.suggestedRenames[1].confidence >= 0.7).toBeTrue();
+					expect(local.result.suggestedRenames[1].confidence < 1.0).toBeTrue();
+					expect(local.result.suggestedRenames[1].ambiguous).toBeFalse();
+				});
+
+				it("leaves suggested-rename columns in remainingAdds and remainingRemoves", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "emailAddress", type: "string", nullable: true, "default": ""}],
+						removeColumns = [{name: "email_addr"}],
+						addTypes = {"emailAddress": "string"},
+						removeTypes = {"email_addr": "string"}
+					);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(1);
+					expect(ArrayLen(local.result.remainingAdds)).toBe(1);
+					expect(local.result.remainingAdds[1].name).toBe("emailAddress");
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(1);
+					expect(local.result.remainingRemoves[1].name).toBe("email_addr");
+				});
+
+				it("does not pair when score is below threshold", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "description", type: "text", nullable: true, "default": ""}],
+						removeColumns = [{name: "bio"}],
+						addTypes = {"description": "text"},
+						removeTypes = {"bio": "text"}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(0);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(0);
+					expect(ArrayLen(local.result.remainingAdds)).toBe(1);
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(1);
+				});
+
+				it("does not pair when types differ", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "fullName", type: "text", nullable: true, "default": ""}],
+						removeColumns = [{name: "full_name"}],
+						addTypes = {"fullName": "text"},
+						removeTypes = {"full_name": "string"}
+					);
+					expect(ArrayLen(local.result.confirmedRenames)).toBe(0);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(0);
+					expect(ArrayLen(local.result.remainingAdds)).toBe(1);
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(1);
+				});
+
+				it("respects a custom threshold", () => {
+					local.result = detector.detect(
+						addColumns = [{name: "emailAddress", type: "string", nullable: true, "default": ""}],
+						removeColumns = [{name: "email_addr"}],
+						addTypes = {"emailAddress": "string"},
+						removeTypes = {"email_addr": "string"},
+						hints = {},
+						threshold = 0.9
+					);
+					expect(ArrayLen(local.result.suggestedRenames)).toBe(0);
+					expect(ArrayLen(local.result.remainingAdds)).toBe(1);
+					expect(ArrayLen(local.result.remainingRemoves)).toBe(1);
+				});
+
+				it("raises InvalidThreshold when threshold is out of range", () => {
+					expect(() => {
+						detector.detect(
+							addColumns = [],
+							removeColumns = [],
+							addTypes = {},
+							removeTypes = {},
+							hints = {},
+							threshold = 1.5
+						);
+					}).toThrow("Wheels.InvalidThreshold");
+				});
+
+			});
+
 		});
 
 	}
