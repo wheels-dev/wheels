@@ -188,4 +188,65 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return """#LCase(arguments.name)#""";
 	}
 
+	/**
+	 * PostgreSQL upsert using ON CONFLICT ... DO UPDATE SET col = EXCLUDED.col syntax.
+	 */
+	public array function $upsertSQL(
+		required string tableName,
+		required array columns,
+		required array uniqueBy,
+		required array updateColumns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo
+	) {
+		local.sql = [];
+
+		// Build column list.
+		local.colList = "";
+		for (local.col in arguments.columns) {
+			if (Len(local.colList)) local.colList &= ", ";
+			local.colList &= $quoteIdentifier(local.col);
+		}
+
+		ArrayAppend(local.sql, "INSERT INTO #arguments.tableName# (#local.colList#) VALUES ");
+
+		// Build value rows.
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			if (local.r > arguments.batchStart) {
+				ArrayAppend(local.sql, ", ");
+			}
+			ArrayAppend(local.sql, "(");
+			for (local.p = 1; local.p <= ArrayLen(arguments.validProperties); local.p++) {
+				if (local.p > 1) ArrayAppend(local.sql, ", ");
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				ArrayAppend(local.sql, $buildBulkParam(value=local.val, propName=local.propName, propertyInfo=arguments.propertyInfo));
+			}
+			ArrayAppend(local.sql, ")");
+		}
+
+		// ON CONFLICT clause.
+		local.uniqueList = "";
+		for (local.u in arguments.uniqueBy) {
+			if (Len(local.uniqueList)) local.uniqueList &= ", ";
+			local.uniqueList &= $quoteIdentifier(local.u);
+		}
+
+		if (ArrayLen(arguments.updateColumns)) {
+			local.setClause = "";
+			for (local.uc in arguments.updateColumns) {
+				if (Len(local.setClause)) local.setClause &= ", ";
+				local.setClause &= $quoteIdentifier(local.uc) & " = EXCLUDED." & $quoteIdentifier(local.uc);
+			}
+			ArrayAppend(local.sql, " ON CONFLICT (#local.uniqueList#) DO UPDATE SET #local.setClause#");
+		} else {
+			ArrayAppend(local.sql, " ON CONFLICT (#local.uniqueList#) DO NOTHING");
+		}
+
+		return local.sql;
+	}
+
 }

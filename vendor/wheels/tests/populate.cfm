@@ -96,7 +96,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES">
+<cfset local.tables = "c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems">
 <cfloop list="#local.tables#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
@@ -332,6 +332,21 @@ CREATE TABLE c_o_r_e_CATEGORIES
 	ID #local.identityColumnType#
 	,CATEGORY_NAME varchar(100) NOT NULL
 	,PRIMARY KEY(ID)
+) #local.storageEngine#
+</cfquery>
+
+<!--- table for bulk operations tests (insertAll/upsertAll) --->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_bulkitems
+(
+	id #local.identityColumnType#
+	,code varchar(50) NOT NULL
+	,name varchar(100) NOT NULL
+	,quantity #local.intColumnType# DEFAULT 0 NOT NULL
+	,createdat #local.datetimeColumnType# NULL
+	,updatedat #local.datetimeColumnType# NULL
+	,PRIMARY KEY(id)
+	,UNIQUE(code)
 ) #local.storageEngine#
 </cfquery>
 
