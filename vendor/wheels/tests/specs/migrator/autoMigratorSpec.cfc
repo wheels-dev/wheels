@@ -325,6 +325,42 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("$sanitizeFileName", () => {
+
+				it("lowercases input", () => {
+					expect(autoMigrator.$sanitizeFileName("AddUserEmail")).toBe("adduseremail");
+				});
+
+				it("replaces spaces with underscores", () => {
+					expect(autoMigrator.$sanitizeFileName("add user email")).toBe("add_user_email");
+				});
+
+				it("replaces special chars with underscores", () => {
+					expect(autoMigrator.$sanitizeFileName("add;user/email")).toBe("add_user_email");
+				});
+
+				it("collapses consecutive underscores", () => {
+					expect(autoMigrator.$sanitizeFileName("add___user")).toBe("add_user");
+				});
+
+				it("trims leading and trailing underscores", () => {
+					expect(autoMigrator.$sanitizeFileName("__add_user__")).toBe("add_user");
+				});
+
+				it("returns 'migration' for empty input", () => {
+					expect(autoMigrator.$sanitizeFileName("")).toBe("migration");
+				});
+
+				it("returns 'migration' for input that sanitizes to empty", () => {
+					expect(autoMigrator.$sanitizeFileName("///")).toBe("migration");
+				});
+
+				it("preserves alphanumerics and underscores", () => {
+					expect(autoMigrator.$sanitizeFileName("add_field_v2")).toBe("add_field_v2");
+				});
+
+			});
+
 		});
 
 	}

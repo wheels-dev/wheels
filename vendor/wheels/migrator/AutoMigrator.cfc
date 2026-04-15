@@ -255,8 +255,10 @@ component extends="wheels.migrator.Base" {
 
 		local.content = generateMigrationCFC(arguments.diffResult, arguments.migrationName);
 
-		local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
-		local.fileName = local.timestamp & "_" & arguments.migrationName & ".cfc";
+		// Use millisecond precision to reduce filename collision risk on rapid successive calls.
+		local.now = Now();
+		local.timestamp = DateFormat(local.now, "yyyymmdd") & TimeFormat(local.now, "HHmmssL");
+		local.fileName = local.timestamp & "_" & $sanitizeFileName(arguments.migrationName) & ".cfc";
 
 		local.migrationDir = ExpandPath("/app/migrator/migrations/");
 		if (!DirectoryExists(local.migrationDir)) {
@@ -269,6 +271,18 @@ component extends="wheels.migrator.Base" {
 			output = local.content,
 			addNewLine = false
 		);
+	}
+
+	/**
+	 * Sanitizes a string for use as a filename component.
+	 * Lowercases, collapses non-alphanumeric chars to underscores, and trims edge underscores.
+	 */
+	public string function $sanitizeFileName(required string name) {
+		local.safe = LCase(arguments.name);
+		local.safe = ReReplace(local.safe, "[^a-z0-9_]+", "_", "all");
+		local.safe = ReReplace(local.safe, "_+", "_", "all");
+		local.safe = ReReplace(local.safe, "^_|_$", "", "all");
+		return Len(local.safe) ? local.safe : "migration";
 	}
 
 	/**
