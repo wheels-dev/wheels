@@ -3,10 +3,10 @@
 <cfscript>
 	// Runtime info
 	local.wheelsVersion = get("version");
-	local.engineName = application.$wheels.serverName;
-	local.engineVersion = ListFirst(application.$wheels.serverVersion, ".");
-	if (ListLen(application.$wheels.serverVersion, ".") > 1) {
-		local.engineVersion &= "." & ListGetAt(application.$wheels.serverVersion, 2, ".");
+	local.engineName = application.wheels.serverName;
+	local.engineVersion = ListFirst(application.wheels.serverVersion, ".");
+	if (ListLen(application.wheels.serverVersion, ".") > 1) {
+		local.engineVersion &= "." & ListGetAt(application.wheels.serverVersion, 2, ".");
 	}
 	local.dbName = application.wheels.dataSourceName;
 	local.environment = get("environment");
