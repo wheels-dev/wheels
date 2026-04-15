@@ -296,6 +296,12 @@ git commit -m "feat(test): add BrowserLauncher JAR path discovery"
 
 Integration tests in subsequent tasks require Playwright installed locally. This is a temporary bootstrap script; PR 2 will replace it with `wheels browser:install`.
 
+**Important — two-JAR install:** Playwright Java needs **both** artifacts on the classpath to boot:
+- `playwright-<ver>.jar` (client API, ~600KB) — pinned under `playwrightJavaJar` in manifest
+- `driver-bundle-<ver>.jar` (bundled Node + driver, ~191MB) — pinned under `playwrightDriverBundle` in manifest
+
+The bootstrap downloads both, SHA-verifies both, then runs `playwright install chromium` using **both on the classpath** so the CLI can find the driver.
+
 **Files:**
 - Create: `tools/install-playwright.sh`
 
@@ -319,39 +325,61 @@ if [[ ! -f "$MANIFEST" ]]; then
     exit 1
 fi
 
+# Helper: download a JAR from a manifest entry, SHA-verify, place at target path.
+# Usage: download_jar <manifest-key> <target-jar-path>
+download_jar() {
+    local key="$1"
+    local target="$2"
+
+    local url sha
+    url=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['$key']['url'])")
+    sha=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['$key']['sha256'])")
+
+    if [[ -f "$target" ]]; then
+        local actual
+        actual=$(shasum -a 256 "$target" | awk '{print $1}')
+        if [[ "$actual" == "$sha" ]]; then
+            echo "✓ $(basename "$target") already present (SHA verified)"
+            return
+        fi
+        echo "! $(basename "$target") exists but SHA mismatch; re-downloading"
+        rm -f "$target"
+    fi
+
+    echo "Downloading $(basename "$target") from Maven Central..."
+    curl -sSL -o "$target" "$url"
+
+    local actual
+    actual=$(shasum -a 256 "$target" | awk '{print $1}')
+    if [[ "$actual" != "$sha" ]]; then
+        echo "ERROR: SHA mismatch for $target" >&2
+        echo "  expected: $sha" >&2
+        echo "  actual:   $actual" >&2
+        rm -f "$target"
+        exit 1
+    fi
+    echo "✓ $(basename "$target") downloaded and SHA-verified"
+}
+
 VERSION=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['playwrightJavaVersion'])")
-JAR_URL=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['playwrightJavaJar']['url'])")
-JAR_SHA=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['playwrightJavaJar']['sha256'])")
-JAR_PATH="$INSTALL_DIR/lib/playwright-$VERSION.jar"
+CLIENT_JAR="$INSTALL_DIR/lib/playwright-$VERSION.jar"
+DRIVER_JAR="$INSTALL_DIR/lib/driver-bundle-$VERSION.jar"
 
 mkdir -p "$INSTALL_DIR/lib"
 
-if [[ -f "$JAR_PATH" ]]; then
-    ACTUAL_SHA=$(shasum -a 256 "$JAR_PATH" | awk '{print $1}')
-    if [[ "$ACTUAL_SHA" == "$JAR_SHA" ]]; then
-        echo "✓ Playwright JAR already installed at $JAR_PATH"
-    else
-        echo "! JAR exists but SHA mismatch; re-downloading"
-        rm -f "$JAR_PATH"
-    fi
-fi
+download_jar "playwrightJavaJar"      "$CLIENT_JAR"
+download_jar "playwrightDriverBundle" "$DRIVER_JAR"
 
-if [[ ! -f "$JAR_PATH" ]]; then
-    echo "Downloading Playwright Java $VERSION..."
-    curl -sSL -o "$JAR_PATH" "$JAR_URL"
-    ACTUAL_SHA=$(shasum -a 256 "$JAR_PATH" | awk '{print $1}')
-    if [[ "$ACTUAL_SHA" != "$JAR_SHA" ]]; then
-        echo "ERROR: SHA mismatch. Expected $JAR_SHA, got $ACTUAL_SHA" >&2
-        rm -f "$JAR_PATH"
-        exit 1
-    fi
-    echo "✓ Downloaded and verified"
-fi
+echo ""
+echo "Installing Chromium via Playwright CLI (requires both JARs on classpath)..."
+java -cp "$CLIENT_JAR:$DRIVER_JAR" com.microsoft.playwright.CLI install chromium
 
-echo "Installing Chromium via Playwright CLI..."
-java -cp "$JAR_PATH" com.microsoft.playwright.CLI install chromium
-
-echo "Done. Install dir: $INSTALL_DIR"
+echo ""
+echo "Done."
+echo "  Client JAR:     $CLIENT_JAR"
+echo "  Driver bundle:  $DRIVER_JAR"
+echo "  Browsers:       ~/.cache/ms-playwright/ (Playwright default cache dir)"
+echo "  Install dir:    $INSTALL_DIR"
 ```
 
 - [ ] **Step 2: Make executable and test it runs**
@@ -385,19 +413,18 @@ Append to `vendor/wheels/tests/specs/wheelstest/BrowserLauncherSpec.cfc`, inside
 describe("BrowserLauncher integration (requires Playwright install)", () => {
 
     it("acquireBrowser('chromium') returns a Java Browser instance", () => {
-        // skip if JAR missing — will be loud in unit-test CI but silent locally
+        // skip if JARs missing — will be loud in unit-test CI but silent locally
         // when developer hasn't run install-playwright.sh yet
         var installDir = variables.launcher.resolveInstallDir();
-        var jarPath = variables.launcher.$jarPath(
-            installDir=installDir,
-            version=variables.launcher.$manifest.playwrightJavaVersion
-        );
-        if (!fileExists(jarPath)) {
-            debug("Skipping: Playwright JAR not installed. Run tools/install-playwright.sh");
+        var version = variables.launcher.$manifest.playwrightJavaVersion;
+        var clientJar = variables.launcher.$jarPath(installDir=installDir, version=version);
+        var driverJar = variables.launcher.$driverBundlePath(installDir=installDir, version=version);
+        if (!fileExists(clientJar) || !fileExists(driverJar)) {
+            debug("Skipping: Playwright JARs not installed. Run tools/install-playwright.sh");
             return;
         }
 
-        variables.launcher.$loadJar(jarPath=jarPath);
+        variables.launcher.$loadJars(jarPaths=[clientJar, driverJar]);
         var browser = variables.launcher.acquireBrowser(engine="chromium");
 
         expect(browser).notToBeNull();
@@ -412,15 +439,14 @@ describe("BrowserLauncher integration (requires Playwright install)", () => {
 
     it("acquireBrowser() returns the same Browser across calls (singleton per engine)", () => {
         var installDir = variables.launcher.resolveInstallDir();
-        var jarPath = variables.launcher.$jarPath(
-            installDir=installDir,
-            version=variables.launcher.$manifest.playwrightJavaVersion
-        );
-        if (!fileExists(jarPath)) {
+        var version = variables.launcher.$manifest.playwrightJavaVersion;
+        var clientJar = variables.launcher.$jarPath(installDir=installDir, version=version);
+        var driverJar = variables.launcher.$driverBundlePath(installDir=installDir, version=version);
+        if (!fileExists(clientJar) || !fileExists(driverJar)) {
             return;
         }
 
-        variables.launcher.$loadJar(jarPath=jarPath);
+        variables.launcher.$loadJars(jarPaths=[clientJar, driverJar]);
         var b1 = variables.launcher.acquireBrowser(engine="chromium");
         var b2 = variables.launcher.acquireBrowser(engine="chromium");
 
@@ -429,6 +455,10 @@ describe("BrowserLauncher integration (requires Playwright install)", () => {
     });
 });
 ```
+
+**Note on new methods:** Task 4 adds two methods beyond what Task 2 shipped:
+- `$driverBundlePath(installDir, version)` — parallel to `$jarPath`, returns path to driver-bundle JAR
+- `$loadJars(jarPaths)` — loads an array of JAR paths onto the classloader (supersedes the single-path `$loadJar` originally planned)
 
 - [ ] **Step 2: Run test — expect fail on missing `acquireBrowser` method**
 
@@ -445,27 +475,36 @@ Append to `vendor/wheels/wheelstest/BrowserLauncher.cfc` (before the closing `}`
 
 ```cfm
 /**
- * Dynamically loads the Playwright JAR into the current ClassLoader so
- * CreateObject("java", ...) can find Playwright classes. Lucee-specific;
+ * Returns the filesystem path to the driver-bundle JAR.
+ * Parallel to $jarPath (which returns the client JAR path).
+ */
+public string function $driverBundlePath(
+    required string installDir,
+    required string version
+) {
+    return arguments.installDir & "/lib/driver-bundle-" & arguments.version & ".jar";
+}
+
+/**
+ * Dynamically loads the Playwright JARs into a URLClassLoader so
+ * CreateObject("java", ...) can find Playwright classes.
+ *
+ * Takes an array so callers can load the client JAR + driver-bundle JAR
+ * (both are required for Playwright to boot). Lucee-specific;
  * Adobe CF support deferred.
  *
  * Must be called before any acquireBrowser() call.
  */
-public void function $loadJar(required string jarPath) {
+public void function $loadJars(required array jarPaths) {
     if (variables.$state != "uninitialized") {
         return;  // idempotent
     }
 
-    // Use Lucee's JavaLoader equivalent — application scope javaSettings
-    var jarDir = getDirectoryFromPath(arguments.jarPath);
-    application.$wheelsBrowserJarDir = jarDir;
-
-    // Lucee 7: reload the classloader by touching Application.cfc settings
-    // Alternative: use the java.net.URLClassLoader directly
-    var urlClass = createObject("java", "java.net.URL");
-    var jarFile = createObject("java", "java.io.File").init(arguments.jarPath);
-    var jarUrl = jarFile.toURI().toURL();
-    var urls = [jarUrl];
+    var urls = [];
+    for (var jarPath in arguments.jarPaths) {
+        var jarFile = createObject("java", "java.io.File").init(jarPath);
+        arrayAppend(urls, jarFile.toURI().toURL());
+    }
 
     var parentLoader = createObject("java", "java.lang.Thread")
         .currentThread()
@@ -486,7 +525,7 @@ public any function acquireBrowser(string engine = "chromium") {
     if (variables.$state != "ready") {
         throw(
             type="Wheels.BrowserLauncherNotReady",
-            message="Call $loadJar() first. State: " & variables.$state
+            message="Call $loadJars() first. State: " & variables.$state
         );
     }
 
@@ -734,16 +773,15 @@ component extends="wheels.WheelsTest" {
     function beforeAll() {
         variables.launcher = CreateObject("component", "wheels.wheelstest.BrowserLauncher");
         var installDir = variables.launcher.resolveInstallDir();
-        var jarPath = variables.launcher.$jarPath(
-            installDir=installDir,
-            version=variables.launcher.$manifest.playwrightJavaVersion
-        );
-        if (!fileExists(jarPath)) {
+        var version = variables.launcher.$manifest.playwrightJavaVersion;
+        var clientJar = variables.launcher.$jarPath(installDir=installDir, version=version);
+        var driverJar = variables.launcher.$driverBundlePath(installDir=installDir, version=version);
+        if (!fileExists(clientJar) || !fileExists(driverJar)) {
             variables.skipBrowserTests = true;
             return;
         }
         variables.skipBrowserTests = false;
-        variables.launcher.$loadJar(jarPath=jarPath);
+        variables.launcher.$loadJars(jarPaths=[clientJar, driverJar]);
         variables.browser = variables.launcher.acquireBrowser(engine="chromium");
         variables.baseUrl = "http://localhost:8080";
     }
@@ -2527,11 +2565,14 @@ component extends="wheels.WheelsTest" {
      */
     private any function $ensureLauncher() {
         if (!structKeyExists(application, "$wheelsBrowserLauncher")) {
-            var l = CreateObject("component", "wheels.wheelstest.BrowserLauncher");
+            var l = CreateObject("component", "wheels.wheelstest.BrowserLauncher").init();
             var installDir = l.resolveInstallDir();
-            var jarPath = l.$jarPath(installDir=installDir, version=l.$manifest.playwrightJavaVersion);
-            l.$verifyInstall(jarPath=jarPath);
-            l.$loadJar(jarPath=jarPath);
+            var version = l.$manifest.playwrightJavaVersion;
+            var clientJar = l.$jarPath(installDir=installDir, version=version);
+            var driverJar = l.$driverBundlePath(installDir=installDir, version=version);
+            l.$verifyInstall(jarPath=clientJar);
+            l.$verifyInstall(jarPath=driverJar);
+            l.$loadJars(jarPaths=[clientJar, driverJar]);
             application.$wheelsBrowserLauncher = l;
         }
         return application.$wheelsBrowserLauncher;

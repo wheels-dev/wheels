@@ -6,6 +6,11 @@
         "sha256": "37eb1cd92d971469834755e139fd3193d03674917b498cc51f4cae715237ba39",
         "size": 619097
     },
+    "playwrightDriverBundle": {
+        "url": "https://repo1.maven.org/maven2/com/microsoft/playwright/driver-bundle/1.52.0/driver-bundle-1.52.0.jar",
+        "sha256": "144c435fbca910da329a903a47d2f93bc9723acc1320a2b45b604ea335ae5242",
+        "size": 200138356
+    },
     "browsers": {
         "chromium": "136.0.7103.25",
         "firefox": "137.0",
