@@ -70,6 +70,81 @@ component extends="wheels.migrator.Migration" {
 }
 ```
 
+## Auto-Generating Migrations from Models
+
+When you're evolving a model — adding properties, renaming columns, changing types — you can let `wheels dbmigrate diff` generate the migration for you instead of writing it by hand. It compares your model's property definitions against the live database schema and emits the appropriate `addColumn`, `removeColumn`, `changeColumn`, and `renameColumn` calls.
+
+### Basic Workflow
+
+1. Edit your model (add/rename properties, change types).
+2. Run `wheels dbmigrate diff ModelName` to preview the migration.
+3. If the preview looks right, run with `--write` to commit the CFC.
+4. Run `wheels dbmigrate latest` to apply.
+
+```bash
+wheels dbmigrate diff User              # preview
+wheels dbmigrate diff User --write      # write migration file
+wheels dbmigrate latest                 # apply
+```
+
+### Rename Detection
+
+The diff engine detects column renames in two ways:
+
+**Explicit hints** — tell it which old column maps to which new column:
+
+```bash
+wheels dbmigrate diff User --rename=full_name:fullName
+```
+
+**Heuristic suggestions** — the engine analyzes unclaimed removes and adds, scoring them by normalized-token match + Levenshtein edit distance. Unambiguous exact matches (e.g., `full_name` ↔ `fullName`) auto-confirm. Lower-confidence or ambiguous candidates are emitted as suggestions that require `--rename` to commit.
+
+Example output:
+
+```
+Suggested renames (pass --rename to confirm)
+  email_addr -> emailAddress    [string]  confidence: 0.75
+    wheels dbmigrate diff User --rename=email_addr:emailAddress
+```
+
+### Ambiguity
+
+When multiple renames are plausible, the engine flags them as `AMBIGUOUS` and never auto-confirms:
+
+```
+Suggested renames (pass --rename to confirm)
+  full_name -> fullName       [string]  confidence: 1.00 [AMBIGUOUS]
+  full_name -> displayName    [string]  confidence: 0.73 [AMBIGUOUS]
+```
+
+Resolve by specifying the intended pair explicitly.
+
+### All-Models Mode
+
+Omit the model name to diff every model:
+
+```bash
+wheels dbmigrate diff                            # preview all changes
+wheels dbmigrate diff --write                    # one migration per changed model
+wheels dbmigrate diff --rename=User.full_name:fullName    # scoped hint
+```
+
+### Tuning the Heuristic
+
+The default threshold is `0.7`. Lower it to see more speculative suggestions; raise it for stricter matching:
+
+```bash
+wheels dbmigrate diff User --threshold=0.85    # strict: only close matches suggested
+wheels dbmigrate diff User --threshold=0.5     # permissive: more suggestions
+```
+
+### Limitations
+
+- Primary key renames are not detected (PKs are excluded from the input).
+- Rename + type change in a single step is refused. Rename first, then change the type in a separate migration.
+- Calculated properties (`property(sql="...")`) are excluded from the diff entirely.
+- Detection is name-based; the engine does not compare row data.
+
 ## Table Operations
 
 ### Creating Tables
