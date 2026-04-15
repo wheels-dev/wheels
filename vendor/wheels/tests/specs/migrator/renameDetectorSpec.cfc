@@ -37,6 +37,40 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("$levenshtein", () => {
+
+				it("returns 0 for identical strings", () => {
+					expect(detector.$levenshtein("abc", "abc")).toBe(0);
+				});
+
+				it("returns length of other when one string is empty", () => {
+					expect(detector.$levenshtein("", "abc")).toBe(3);
+					expect(detector.$levenshtein("abc", "")).toBe(3);
+				});
+
+				it("returns 1 for single substitution", () => {
+					expect(detector.$levenshtein("cat", "bat")).toBe(1);
+				});
+
+				it("returns 1 for single insertion", () => {
+					expect(detector.$levenshtein("cat", "cats")).toBe(1);
+				});
+
+				it("returns 1 for single deletion", () => {
+					expect(detector.$levenshtein("cats", "cat")).toBe(1);
+				});
+
+				it("handles transposition as two edits", () => {
+					expect(detector.$levenshtein("ab", "ba")).toBe(2);
+				});
+
+				it("computes distance for realistic column names", () => {
+					// emailaddr → emailaddress: insert 'e', 's', 's' = 3
+					expect(detector.$levenshtein("emailaddr", "emailaddress")).toBe(3);
+				});
+
+			});
+
 		});
 
 	}
