@@ -3,7 +3,6 @@
  * database schema and generates migration CFC files automatically.
  *
  * Limitations:
- * - Cannot detect column renames. A renamed column appears as removeColumn + addColumn.
  * - Calculated properties (property(sql="...")) are excluded from the diff.
  * - Tableless models are skipped.
  */
@@ -14,9 +13,10 @@ component extends="wheels.migrator.Base" {
 	 * the actual database columns and returns a struct describing the differences.
 	 *
 	 * @modelName The name of the model to diff (e.g. "User").
-	 * @return Struct with keys: modelName, tableName, addColumns, removeColumns, changeColumns.
+	 * @options Optional struct: renames (explicit hints), heuristicThreshold (0-1, default 0.7).
+	 * @return Struct with keys: modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames.
 	 */
-	public struct function diff(required string modelName) {
+	public struct function diff(required string modelName, struct options = {}) {
 		local.modelObj = model(arguments.modelName);
 		local.tableName = local.modelObj.tableName();
 		local.primaryKeyList = local.modelObj.primaryKeys();
@@ -120,12 +120,46 @@ component extends="wheels.migrator.Base" {
 			}
 		}
 
+		// Build type lookups for RenameDetector
+		local.addTypesMap = {};
+		for (local.col in local.addColumns) {
+			local.addTypesMap[local.col.name] = local.col.type;
+		}
+		local.removeTypesMap = {};
+		for (local.col in local.removeColumns) {
+			// Remove columns carry only name; look up migration type from actualColumns
+			local.actual = local.actualColumns[LCase(local.col.name)];
+			local.removeTypesMap[local.col.name] = $dbTypeToMigrationType(local.actual.typeName);
+		}
+
+		// Build hints struct from options
+		local.hints = {};
+		if (StructKeyExists(arguments.options, "renames")) {
+			local.hints.renames = arguments.options.renames;
+		}
+		local.threshold = StructKeyExists(arguments.options, "heuristicThreshold")
+			? arguments.options.heuristicThreshold
+			: 0.7;
+
+		// Delegate to RenameDetector
+		local.detector = CreateObject("component", "wheels.migrator.RenameDetector");
+		local.detection = local.detector.detect(
+			addColumns = local.addColumns,
+			removeColumns = local.removeColumns,
+			addTypes = local.addTypesMap,
+			removeTypes = local.removeTypesMap,
+			hints = local.hints,
+			threshold = local.threshold
+		);
+
 		return {
 			modelName: arguments.modelName,
 			tableName: local.tableName,
-			addColumns: local.addColumns,
-			removeColumns: local.removeColumns,
-			changeColumns: local.changeColumns
+			addColumns: local.detection.remainingAdds,
+			removeColumns: local.detection.remainingRemoves,
+			changeColumns: local.changeColumns,
+			renameColumns: local.detection.confirmedRenames,
+			suggestedRenames: local.detection.suggestedRenames
 		};
 	}
 
@@ -133,11 +167,17 @@ component extends="wheels.migrator.Base" {
 	 * Iterates all models registered in the application, calls diff() on each,
 	 * and returns combined results. Skips tableless models and models that fail to load.
 	 *
+	 * @options Optional struct: hints (per-model rename hints keyed by model name), heuristicThreshold (0-1, default 0.7).
 	 * @return Struct keyed by model name, each value is the diff result for that model.
 	 */
-	public struct function diffAll() {
+	public struct function diffAll(struct options = {}) {
 		local.results = {};
 		local.appKey = $appKey();
+
+		local.perModelHints = StructKeyExists(arguments.options, "hints") ? arguments.options.hints : {};
+		local.threshold = StructKeyExists(arguments.options, "heuristicThreshold")
+			? arguments.options.heuristicThreshold
+			: 0.7;
 
 		if (StructKeyExists(application[local.appKey], "models")) {
 			for (local.modelName in application[local.appKey].models) {
@@ -149,12 +189,21 @@ component extends="wheels.migrator.Base" {
 						continue;
 					}
 
-					local.diffResult = diff(local.modelName);
+					// Build this model's options: {renames, heuristicThreshold}
+					local.modelOptions = {heuristicThreshold: local.threshold};
+					if (StructKeyExists(local.perModelHints, local.modelName)
+						&& StructKeyExists(local.perModelHints[local.modelName], "renames")) {
+						local.modelOptions.renames = local.perModelHints[local.modelName].renames;
+					}
+
+					local.diffResult = diff(local.modelName, local.modelOptions);
 
 					if (
 						ArrayLen(local.diffResult.addColumns)
 						|| ArrayLen(local.diffResult.removeColumns)
 						|| ArrayLen(local.diffResult.changeColumns)
+						|| ArrayLen(local.diffResult.renameColumns)
+						|| ArrayLen(local.diffResult.suggestedRenames)
 					) {
 						local.results[local.modelName] = local.diffResult;
 					}
@@ -181,6 +230,19 @@ component extends="wheels.migrator.Base" {
 		local.tab = Chr(9);
 		local.upBody = "";
 		local.downBody = "";
+
+		// Emit renameColumns first in up(); reversed renames go last in down()
+		local.renameColumns = StructKeyExists(arguments.diffResult, "renameColumns")
+			? arguments.diffResult.renameColumns
+			: [];
+		local.iEnd = ArrayLen(local.renameColumns);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.r = local.renameColumns[local.i];
+			local.upBody &= local.tab & local.tab
+				& 'renameColumn(table="' & arguments.diffResult.tableName
+				& '", columnName="' & local.r.from
+				& '", newColumnName="' & local.r.to & '");' & local.nl;
+		}
 
 		local.iEnd = ArrayLen(arguments.diffResult.addColumns);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -217,6 +279,15 @@ component extends="wheels.migrator.Base" {
 				& 'changeColumn(table="' & arguments.diffResult.tableName
 				& '", columnName="' & local.col.name
 				& '", columnType="' & local.col.from.type & '");' & local.nl;
+		}
+
+		// Append reversed renames to down() (after other reversals)
+		for (local.i = 1; local.i <= ArrayLen(local.renameColumns); local.i++) {
+			local.r = local.renameColumns[local.i];
+			local.downBody &= local.tab & local.tab
+				& 'renameColumn(table="' & arguments.diffResult.tableName
+				& '", columnName="' & local.r.to
+				& '", newColumnName="' & local.r.from & '");' & local.nl;
 		}
 
 		if (!Len(Trim(local.upBody))) {

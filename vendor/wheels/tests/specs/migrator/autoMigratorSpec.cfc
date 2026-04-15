@@ -187,7 +187,9 @@ component extends="wheels.WheelsTest" {
 						local.d = local.result[local.modelName];
 						local.hasChanges = ArrayLen(local.d.addColumns) > 0
 							|| ArrayLen(local.d.removeColumns) > 0
-							|| ArrayLen(local.d.changeColumns) > 0;
+							|| ArrayLen(local.d.changeColumns) > 0
+							|| ArrayLen(local.d.renameColumns) > 0
+							|| ArrayLen(local.d.suggestedRenames) > 0;
 						expect(local.hasChanges).toBeTrue();
 					}
 				});
@@ -321,6 +323,123 @@ component extends="wheels.WheelsTest" {
 
 					expect(local.cfc).toInclude("allowNull=false");
 					expect(local.cfc).toInclude("allowNull=true");
+				});
+
+				it("emits renameColumn in up() for each renameColumns entry", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: [],
+						renameColumns: [
+							{from: "full_name", to: "fullName", type: "string", source: "hint"}
+						],
+						suggestedRenames: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "rename_name_field");
+					expect(local.cfc).toInclude('renameColumn(table="test_models", columnName="full_name", newColumnName="fullName")');
+				});
+
+				it("emits reversed renameColumn in down() for each renameColumns entry", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: [],
+						renameColumns: [
+							{from: "full_name", to: "fullName", type: "string", source: "hint"}
+						],
+						suggestedRenames: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "rename_name_field");
+					// down() reverses: fullName -> full_name
+					expect(local.cfc).toInclude('renameColumn(table="test_models", columnName="fullName", newColumnName="full_name")');
+				});
+
+				it("handles diff results without renameColumns key (backward compat)", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [{name: "bio", type: "text", nullable: true, "default": ""}],
+						removeColumns: [],
+						changeColumns: []
+						// Note: no renameColumns key — simulate legacy callers
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "add_bio");
+					expect(local.cfc).toInclude('addColumn(table="test_models"');
+				});
+
+				it("orders up() body as renames then adds then removes then changes", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [{name: "bio", type: "text", nullable: true, "default": ""}],
+						removeColumns: [{name: "legacy"}],
+						changeColumns: [{name: "status", from: {type: "string"}, to: {type: "integer"}}],
+						renameColumns: [{from: "full_name", to: "fullName", type: "string", source: "hint"}],
+						suggestedRenames: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "mixed");
+					local.renameAt = Find("renameColumn(", local.cfc);
+					local.addAt = Find("addColumn(", local.cfc);
+					local.removeAt = Find('removeColumn(table="test_models", columnName="legacy"', local.cfc);
+					local.changeAt = Find("changeColumn(", local.cfc);
+					expect(local.renameAt).toBeGT(0);
+					expect(local.renameAt).toBeLT(local.addAt);
+					expect(local.addAt).toBeLT(local.removeAt);
+					expect(local.removeAt).toBeLT(local.changeAt);
+				});
+
+			});
+
+			describe("diffAll() — rename integration", () => {
+
+				it("accepts an options struct with per-model hints", () => {
+					// Should not throw; models without matching adds/removes simply get no renames.
+					local.result = autoMigrator.diffAll(options={
+						hints: {"Author": {renames: {}}},
+						heuristicThreshold: 0.7
+					});
+					expect(local.result).toBeStruct();
+				});
+
+				it("accepts an options struct with threshold only", () => {
+					local.result = autoMigrator.diffAll(options={heuristicThreshold: 0.9});
+					expect(local.result).toBeStruct();
+				});
+
+				it("is backward-compatible when called with no arguments", () => {
+					local.result = autoMigrator.diffAll();
+					expect(local.result).toBeStruct();
+				});
+
+			});
+
+			describe("diff() — rename integration", () => {
+
+				it("returns renameColumns and suggestedRenames keys in the result", () => {
+					local.result = autoMigrator.diff("Author");
+					expect(local.result).toHaveKey("renameColumns");
+					expect(local.result).toHaveKey("suggestedRenames");
+					expect(local.result.renameColumns).toBeArray();
+					expect(local.result.suggestedRenames).toBeArray();
+				});
+
+				it("accepts options struct without breaking existing callers", () => {
+					// Backward-compat: diff(modelName) with no options still works
+					local.r1 = autoMigrator.diff("Author");
+					local.r2 = autoMigrator.diff(modelName="Author", options={});
+					expect(local.r1.tableName).toBe(local.r2.tableName);
+				});
+
+				it("threads heuristicThreshold through options", () => {
+					// Threshold of 0.01 would make even unrelated pairs candidates.
+					// We can't easily induce a rename without a real model mismatch, so
+					// just verify the call doesn't explode.
+					local.result = autoMigrator.diff(modelName="Author", options={heuristicThreshold: 0.01});
+					expect(local.result).toHaveKey("renameColumns");
 				});
 
 			});

@@ -195,3 +195,78 @@ Whereas SQL Server would use:
 * timestamp = DATETIME&#x20;
 * uniqueidentifier = UNIQUEIDENTIFIER&#x20;
 * char = CHAR',limit=10
+
+## Auto-Migration: Generate from Model Changes
+
+Wheels can generate migrations for you from your model changes. Instead of writing `addColumn`/`removeColumn` calls by hand, edit the model, run `wheels dbmigrate diff`, and let the framework produce the CFC.
+
+### Walk-Through
+
+Suppose you have a `User` model and decide to:
+- Rename the `full_name` column to `fullName`
+- Add a `bio` column
+- Remove the legacy `legacy_flag` column
+
+Edit `app/models/User.cfc` to reflect the new shape (via property definitions, associations, etc.), then run:
+
+```bash
+wheels dbmigrate diff User
+```
+
+You'll see a preview:
+
+```
+Diff for User (users)
+
+  Renames (will apply)
+    full_name -> fullName    [string]  (source: heuristic)
+
+  Adds
+    + bio    [text]
+
+  Removes
+    - legacy_flag    (will DROP)
+
+Preview only - no migration file written. Pass --write to commit.
+```
+
+Because `full_name` and `fullName` normalize to the same token, the detector auto-confirmed the rename. If you'd instead renamed `email_addr` to `emailAddress`, the engine would ask you to confirm with `--rename`:
+
+```
+Suggested renames (pass --rename to confirm)
+  email_addr -> emailAddress    [string]  confidence: 0.75
+    wheels dbmigrate diff User --rename=email_addr:emailAddress
+```
+
+When the preview looks right, commit:
+
+```bash
+wheels dbmigrate diff User --write
+```
+
+This writes a file like `app/migrator/migrations/20260415093052123_auto_user_changes.cfc` with both `up()` and `down()` methods. Apply it the usual way:
+
+```bash
+wheels dbmigrate latest
+```
+
+### When to Use
+
+Auto-migration is best when:
+- You've made straightforward property changes to a model.
+- You want a starting point for a migration (you can still hand-edit the generated CFC before applying).
+- You're running in development and want fast iteration.
+
+For production migrations involving complex data transformations, hand-written migrations remain the right tool.
+
+### Programmatic API
+
+The CLI wraps `AutoMigrator`, which you can also call directly:
+
+```cfm
+var autoMigrator = CreateObject("component", "wheels.migrator.AutoMigrator");
+var diffResult = autoMigrator.diff("User", {renames: {"full_name": "fullName"}});
+autoMigrator.writeMigration(diffResult, "rename_name_field");
+```
+
+See the [wheels dbmigrate diff](../../command-line-tools/commands/database/dbmigrate-diff.md) reference for all options.
