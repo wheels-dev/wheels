@@ -11,10 +11,14 @@ A systemwide feature comparison of Wheels 4.0 against Rails 8, Laravel 12, and D
 | ActiveRecord pattern | Yes | Yes | Yes (Eloquent) | No (Data Mapper) |
 | Chainable query builder | `where().orderBy().limit().get()` | `where().order().limit()` | `where()->orderBy()->get()` | `filter().order_by()[:n]` |
 | Named scopes | `scope(name, where/handler)` | `scope :name, -> {}` | `scopeName()` | `Manager` methods |
-| Associations | hasMany/belongsTo/hasOne | has_many/belongs_to/has_one/HABTM | hasMany/belongsTo/hasOne/belongsToMany | ForeignKey/ManyToMany/OneToOne |
+| Associations | hasMany/belongsTo/hasOne (+ polymorphic) | has_many/belongs_to/has_one/HABTM | hasMany/belongsTo/hasOne/belongsToMany | ForeignKey/ManyToMany/OneToOne |
+| Polymorphic associations | `belongsTo(polymorphic=true)` + `hasMany(as=)` | `belongs_to :x, polymorphic: true` | `morphTo`/`morphMany` | `GenericForeignKey` (contrib) |
 | Through/shortcut assoc | hasMany(shortcut/through) | has_many :through | hasManyThrough | Through models |
 | Eager loading | `include="assoc"` | `.includes(:assoc)` | `::with('assoc')` | `select_related/prefetch_related` |
 | Batch processing | findEach/findInBatches | find_each/find_in_batches | chunk/chunkById/lazy | iterator() |
+| Bulk insert/upsert | `insertAll(records)` / `upsertAll(records, uniqueBy)` | `insert_all` / `upsert_all` | `upsert([...], unique)` | `bulk_create` / `bulk_update` |
+| Advisory locks | `withAdvisoryLock(name, callback)` | Via gem (with_advisory_lock) | No native | No native |
+| Pessimistic locking | `.forUpdate()` on QueryBuilder | `.lock("FOR UPDATE")` | `->lockForUpdate()` | `.select_for_update()` |
 | Dirty tracking | hasChanged/changedFrom/changes | changed?/changes | isDirty/getOriginal | No built-in |
 | Soft deletes | Built-in (column flag) | Via gem (paranoia/discard) | Built-in (SoftDeletes trait) | Via package (django-safedelete) |
 | Enums | `enum(property, values)` + auto scopes/checkers | `enum :status, {}` | `$casts['status'] = Enum` | `TextChoices/IntegerChoices` |
@@ -30,9 +34,7 @@ A systemwide feature comparison of Wheels 4.0 against Rails 8, Laravel 12, and D
 | Nested properties | nestedProperties(autoSave) | accepts_nested_attributes_for | No native (Livewire) | Inline formsets |
 | Database support | MySQL, PostgreSQL, MSSQL, SQLite, H2, CockroachDB, Oracle | PostgreSQL, MySQL, SQLite, Trilogy | MySQL, PostgreSQL, SQLite, SQL Server | PostgreSQL, MySQL, SQLite, Oracle, MariaDB |
 
-**Wheels strengths:** Built-in soft deletes, enum auto-scopes/checkers, multi-return formats (objects/structs/query/sql), calculated properties via SQL, 7 database adapters including CockroachDB and H2.
-
-**Wheels gaps:** No polymorphic associations, no database-level advisory locks, no insert_all/upsert_all bulk operations.
+**Wheels strengths:** Built-in soft deletes, enum auto-scopes/checkers, multi-return formats (objects/structs/query/sql), calculated properties via SQL, polymorphic associations, bulk insert/upsert with per-DB UPSERT syntax, advisory locks (where supported), 7 database adapters including CockroachDB and H2.
 
 ---
 
@@ -47,11 +49,11 @@ A systemwide feature comparison of Wheels 4.0 against Rails 8, Laravel 12, and D
 | Indexes | addIndex/removeIndex | add_index/remove_index | index/dropIndex | db_index=True |
 | Foreign keys | addForeignKey/dropForeignKey | add_foreign_key | foreign/foreignId | ForeignKey auto |
 | Raw SQL | `execute("SQL")` | `execute("SQL")` | `DB::statement("SQL")` | `RunSQL("SQL")` |
-| Auto-generation | Via CLI generators | Via CLI generators | Via CLI generators | `makemigrations` (auto from models) |
+| Auto-generation | Via CLI generators + `AutoMigrator` (model→DB schema diff) | Via CLI generators | Via CLI generators | `makemigrations` (auto from models) |
 | Reversible | Manual up/down | `change` method (auto-reverse) | Manual up/down | Auto-reverse |
 | Seed data | seedOnce() + environment seeds | db/seeds.rb | Seeders | fixtures/loaddata |
 
-**Django advantage:** Auto-generates migrations from model changes. All others require manual migration creation.
+**Wheels auto-migrations:** `AutoMigrator.diff(modelName)` compares model property definitions against the current DB schema and returns add/remove/change column lists. `generateMigrationCFC()` produces a migration CFC with both up() and down() methods. Limitations: cannot detect column renames (always generates remove+add), calculated properties excluded.
 
 **Wheels distinction:** `seedOnce()` is idempotent by design — safe to re-run. Rails/Laravel seeds are not idempotent by default.
 
@@ -214,11 +216,15 @@ Only Wheels and Laravel have full DI containers. Wheels uses explicit `map/bind`
 | Test framework | TestBox (BDD) | Minitest/RSpec | PHPUnit/Pest | pytest/unittest |
 | BDD syntax | `describe/it/expect` | RSpec `describe/it/expect` | Pest `describe/it/expect` | pytest style |
 | Fixtures/Factories | Test models + populate.cfm | Fixtures + FactoryBot | Factories (Eloquent) | Fixtures + factory_boy |
-| HTTP testing | Via curl/request | Integration tests + Capybara | HTTP tests + Dusk | Client + Selenium |
+| HTTP/integration testing | Built-in `TestClient` (`visit/get/post`, `assertOk/assertSee/assertJson/...`) | Integration tests + Capybara | HTTP tests + Dusk | Client + Selenium |
 | Database isolation | Per-test reload option | Transactions/DatabaseCleaner | RefreshDatabase trait | TransactionTestCase |
-| Parallel testing | No native | Minitest parallel | `--parallel` | `--parallel` flag |
-| Browser testing | No native | System tests (Capybara) | Dusk (Selenium) | Selenium/Playwright |
+| Parallel testing | Built-in `ParallelRunner` (cfthread, partitioned bundles) | Minitest parallel | `--parallel` | `--parallel` flag |
+| Browser testing | No native (use external tools) | System tests (Capybara) | Dusk (Selenium) | Selenium/Playwright |
 | Multi-engine testing | Lucee + Adobe CF + BoxLang | Single runtime | Single runtime | Single runtime |
+
+**Wheels TestClient:** Fluent HTTP test client for integration tests. Chainable API: `visit("/users").assertOk().assertSee("John")`. Includes assertions for status codes, body content (`assertSee`/`assertDontSee`/`assertSeeInOrder`), JSON responses (`assertJson`/`assertJsonPath` with dot notation), redirects, headers, and cookies. Cookies are tracked across requests for session support.
+
+**Wheels ParallelRunner:** Discovers test bundles, partitions them across N workers via round-robin, fires parallel HTTP requests through `cfthread`, and aggregates JSON results. Configurable worker count and timeout.
 
 **Wheels distinction:** Must test across multiple CFML engines and databases. Unique overhead but unique quality assurance.
 
@@ -248,15 +254,29 @@ Only Wheels and Laravel have full DI containers. Wheels uses explicit `map/bind`
 7. **Enum auto-scopes** — `enum()` generates scopes AND boolean checkers
 8. **Route model binding at router level** — Resolves before controller instantiation
 9. **Multi-engine CI** — Tests across Lucee, Adobe CF, BoxLang x 7 databases
+10. **Bulk insert/upsert** — `insertAll()` and `upsertAll()` with per-DB UPSERT syntax for all 7 adapters
+11. **Polymorphic associations** — `belongsTo(polymorphic=true)` and `hasMany(as=)` with type-discriminator JOINs
+12. **Advisory locks** — `withAdvisoryLock(name, callback)` with try/finally release; pessimistic `forUpdate()` on QueryBuilder
+13. **Auto-migrations** — `AutoMigrator.diff(modelName)` generates migration CFCs from model→DB schema differences
+14. **HTTP test client** — Fluent `visit().assertOk().assertSee()` integration testing
+15. **Parallel test runner** — `ParallelRunner` partitions bundles across worker threads
 
 ## Where Wheels Trails
 
 1. **Ecosystem size** — Dozens of packages vs thousands of gems/composer packages/PyPI packages
 2. **Community size** — Small compared to Rails/Laravel/Django communities
-3. **Auto-migrations** — Django auto-generates migrations from model changes
-4. **Polymorphic associations** — Rails has `belongs_to :commentable, polymorphic: true`
-5. **Bulk operations** — No `insert_all`/`upsert_all` equivalent
-6. **WebSocket support** — SSE covers many use cases but no bidirectional channel
-7. **Browser testing** — No native integration (Capybara/Dusk equivalents)
-8. **Parallel test execution** — Not supported natively
-9. **Asset pipeline maturity** — Vite integration is new; Rails/Laravel have years of refinement
+3. **WebSocket support** — SSE covers many use cases but no bidirectional channel (deliberate design choice given CFML's request-response model)
+4. **Browser testing** — No native integration (Capybara/Dusk equivalents); HTTP-level testing via TestClient is supported
+5. **Asset pipeline maturity** — Vite integration is new; Rails/Laravel have years of refinement
+6. **Migration rename detection** — `AutoMigrator` cannot detect column renames (always generates remove+add); Django/Rails behave the same way without explicit hints
+
+## Recently Closed Gaps (April 2026)
+
+The following gaps were closed in v4.0:
+
+- **Bulk operations** ([#2101](https://github.com/wheels-dev/wheels/pull/2101)) — `insertAll`/`upsertAll`
+- **Polymorphic associations** ([#2104](https://github.com/wheels-dev/wheels/pull/2104))
+- **Advisory locks + SELECT FOR UPDATE** ([#2103](https://github.com/wheels-dev/wheels/pull/2103))
+- **Auto-migrations from models** ([#2102](https://github.com/wheels-dev/wheels/pull/2102))
+- **HTTP test client** ([#2099](https://github.com/wheels-dev/wheels/pull/2099))
+- **Parallel test execution** ([#2100](https://github.com/wheels-dev/wheels/pull/2100))
