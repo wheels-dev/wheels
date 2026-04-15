@@ -93,6 +93,7 @@ try {
 					}
 				} catch (any e) {
 					data.success = false;
+					data.error = e.type;
 					data.message = e.message;
 				}
 				break;
