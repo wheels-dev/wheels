@@ -762,6 +762,79 @@ if (isSSERequest()) { renderSSE(data="..."); }
 
 Client-side: `const es = new EventSource('/controller/notifications');`
 
+## Browser Testing Quick Reference
+
+Foundation landed in v4.0 (PR 1 of 4). Specs extend `wheels.wheelstest.BrowserTest` and drive a real Chromium through `this.browser` — a fluent DSL wrapping Playwright Java.
+
+```cfm
+// vendor/wheels/tests/specs/browser/LoginBrowserSpec.cfc
+component extends="wheels.wheelstest.BrowserTest" {
+
+    this.browserEngine = "chromium";   // chromium only in PR 1
+
+    function run() {
+        // browserDescribe() wraps describe() with beforeEach/afterEach that
+        // create a fresh Page per `it`. TestBox's BDD lifecycle only treats
+        // beforeAll/afterAll as class-level, so we register per-it hooks
+        // from inside the suite body via this helper.
+        browserDescribe("Login flow", () => {
+            it("can load a page and read its title", () => {
+                if (this.browserTestSkipped) return;
+                this.browser.visitUrl("data:text/html,<title>Hi</title><h1>x</h1>")
+                            .assertTitleContains("Hi");
+            });
+        });
+    }
+}
+```
+
+Install Playwright locally before first run (~370MB download: JARs + Chromium):
+
+```bash
+bash tools/install-playwright.sh    # temp bootstrap; replaced by `wheels browser:install` in PR 2
+```
+
+Then run browser specs via the normal test suite:
+```bash
+bash tools/test-local.sh                    # skips browser specs if JARs missing
+```
+
+### Implemented DSL methods
+
+- **Navigation:** visit, visitUrl, back, forward, refresh
+- **Interaction:** click, press, fill, type, clear, select, check, uncheck, attach, dragAndDrop
+- **Keyboard:** keys, pressEnter, pressTab, pressEscape
+- **Waiting:** waitFor, waitForText
+- **Scoping:** within(selector, callback)
+- **Viewport:** resize, resizeToMobile, resizeToTablet, resizeToDesktop
+- **Script:** script (returns `page.evaluate` result), pause
+- **Assertions (text/vis/presence):** assertSee, assertDontSee, assertSeeIn, assertVisible, assertMissing, assertPresent, assertNotPresent
+- **Assertions (URL/title/query):** assertUrlIs, assertUrlContains, assertTitleContains, assertQueryStringHas, assertQueryStringMissing
+- **Assertions (form):** assertInputValue, assertChecked, assertHasClass
+- **Terminals:** currentUrl, title, pageSource, text, value, screenshot
+
+### Deferred to follow-up PRs
+
+These need a reflection-based Playwright option-object builder (URLClassLoader + Lucee OSGi trap), a running fixture-app server, or `createDynamicProxy` plumbing — each worth its own focused pass:
+
+- Auth: `loginAs(identifier)`, `logout()` — test-only route + fixture server
+- Cookies: `setCookie`, `deleteCookie`, `cookie` — needs `options.Cookie`
+- Dialogs: `acceptDialog`, `dismissDialog`, `typeInDialog` — needs `createDynamicProxy` → `Consumer<Dialog>`
+- `waitForUrl`, `assertRouteIs` — depend on baseUrl concat + Wheels `urlFor` context
+- Configurable timeouts on `waitFor` — needs `Locator$WaitForOptions`
+- `visitRoute` — depends on controller-context `urlFor`
+- Viewport configuration at `BrowserTest` level — needs `ViewportSize` + `Browser$NewContextOptions`
+- Auto screenshot on failure — needs TestBox aroundEach + failure hook
+
+### Key gotchas
+
+- **`##` in selectors** — CFML requires `##` to emit literal `#`. `"##email"` → `"#email"` at runtime.
+- **`client` is a Lucee reserved scope.** `var client = ...` in a closure throws "client scope is not enabled". Use `var c = ...` or `var bc = ...`.
+- **Data URLs work for most tests** — no server needed for ~95% of DSL coverage. Full HTTP integration (cookies, form submits, redirects) needs a running fixture app; that wiring is the same as Wheels Web app bootstrap (separate server + baseUrl).
+- **`this.browserTestSkipped`** — when Playwright JARs aren't installed (fresh CI, clean machine), `beforeAll` sets this flag and `browserDescribe`'s hooks short-circuit. All `it`s should check `if (this.browserTestSkipped) return;` to stay green on CI.
+
+Full reference: `.ai/wheels/testing/browser-testing.md`.
+
 ## Reference Docs
 
 Deeper documentation lives in `.ai/` — Claude will search it automatically when needed:
