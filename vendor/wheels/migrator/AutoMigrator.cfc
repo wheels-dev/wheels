@@ -167,11 +167,17 @@ component extends="wheels.migrator.Base" {
 	 * Iterates all models registered in the application, calls diff() on each,
 	 * and returns combined results. Skips tableless models and models that fail to load.
 	 *
+	 * @options Optional struct: hints (per-model rename hints keyed by model name), heuristicThreshold (0-1, default 0.7).
 	 * @return Struct keyed by model name, each value is the diff result for that model.
 	 */
-	public struct function diffAll() {
+	public struct function diffAll(struct options = {}) {
 		local.results = {};
 		local.appKey = $appKey();
+
+		local.perModelHints = StructKeyExists(arguments.options, "hints") ? arguments.options.hints : {};
+		local.threshold = StructKeyExists(arguments.options, "heuristicThreshold")
+			? arguments.options.heuristicThreshold
+			: 0.7;
 
 		if (StructKeyExists(application[local.appKey], "models")) {
 			for (local.modelName in application[local.appKey].models) {
@@ -183,12 +189,21 @@ component extends="wheels.migrator.Base" {
 						continue;
 					}
 
-					local.diffResult = diff(local.modelName);
+					// Build this model's options: {renames, heuristicThreshold}
+					local.modelOptions = {heuristicThreshold: local.threshold};
+					if (StructKeyExists(local.perModelHints, local.modelName)
+						&& StructKeyExists(local.perModelHints[local.modelName], "renames")) {
+						local.modelOptions.renames = local.perModelHints[local.modelName].renames;
+					}
+
+					local.diffResult = diff(local.modelName, local.modelOptions);
 
 					if (
 						ArrayLen(local.diffResult.addColumns)
 						|| ArrayLen(local.diffResult.removeColumns)
 						|| ArrayLen(local.diffResult.changeColumns)
+						|| ArrayLen(local.diffResult.renameColumns)
+						|| ArrayLen(local.diffResult.suggestedRenames)
 					) {
 						local.results[local.modelName] = local.diffResult;
 					}

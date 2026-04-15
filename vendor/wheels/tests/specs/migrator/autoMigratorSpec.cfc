@@ -187,7 +187,9 @@ component extends="wheels.WheelsTest" {
 						local.d = local.result[local.modelName];
 						local.hasChanges = ArrayLen(local.d.addColumns) > 0
 							|| ArrayLen(local.d.removeColumns) > 0
-							|| ArrayLen(local.d.changeColumns) > 0;
+							|| ArrayLen(local.d.changeColumns) > 0
+							|| ArrayLen(local.d.renameColumns) > 0
+							|| ArrayLen(local.d.suggestedRenames) > 0;
 						expect(local.hasChanges).toBeTrue();
 					}
 				});
@@ -321,6 +323,29 @@ component extends="wheels.WheelsTest" {
 
 					expect(local.cfc).toInclude("allowNull=false");
 					expect(local.cfc).toInclude("allowNull=true");
+				});
+
+			});
+
+			describe("diffAll() — rename integration", () => {
+
+				it("accepts an options struct with per-model hints", () => {
+					// Should not throw; models without matching adds/removes simply get no renames.
+					local.result = autoMigrator.diffAll(options={
+						hints: {"Author": {renames: {}}},
+						heuristicThreshold: 0.7
+					});
+					expect(local.result).toBeStruct();
+				});
+
+				it("accepts an options struct with threshold only", () => {
+					local.result = autoMigrator.diffAll(options={heuristicThreshold: 0.9});
+					expect(local.result).toBeStruct();
+				});
+
+				it("is backward-compatible when called with no arguments", () => {
+					local.result = autoMigrator.diffAll();
+					expect(local.result).toBeStruct();
 				});
 
 			});
