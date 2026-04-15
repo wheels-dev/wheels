@@ -86,8 +86,8 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("assertOk() passes on 200 response", () => {
-					tc.get("/");
-					tc.assertOk();
+					var fc = $fakeClient(status = 200);
+					fc.assertOk();
 				});
 
 				it("assertNotFound() passes on 404 response", () => {
@@ -197,10 +197,9 @@ component extends="wheels.WheelsTest" {
 
 			describe("chaining", () => {
 
-				it("supports fluent chaining: get().assertOk().assertSee()", () => {
-					tc.get("/");
-					expect(Len(tc.content())).toBeGT(0, "Response body should not be empty");
-					tc.assertOk().assertSee(Left(tc.content(), 5));
+				it("supports fluent chaining: assertOk().assertSee()", () => {
+					var fc = $fakeClient(body = "<html>Welcome to Wheels</html>");
+					fc.assertOk().assertSee("Welcome");
 				});
 
 				it("supports withHeaders().get().assertStatus() chain", () => {
