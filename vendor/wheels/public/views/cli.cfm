@@ -45,6 +45,57 @@ try {
 			case "migrateToLatest":
 				data.message = migrator.migrateToLatest();
 				break;
+			case "diff":
+				try {
+					local.autoMigrator = CreateObject("component", "wheels.migrator.AutoMigrator");
+					local.options = {};
+
+					// Parse hints from URL: hints={"renames":{"old":"new"}} as JSON-encoded string
+					if (StructKeyExists(request.wheels.params, "hints") && Len(request.wheels.params.hints)) {
+						local.decodedHints = DeserializeJSON(request.wheels.params.hints);
+						if (IsStruct(local.decodedHints)) {
+							StructAppend(local.options, local.decodedHints, true);
+						}
+					}
+					if (StructKeyExists(request.wheels.params, "threshold") && Len(request.wheels.params.threshold) && IsNumeric(request.wheels.params.threshold)) {
+						local.options.heuristicThreshold = request.wheels.params.threshold;
+					}
+
+					if (StructKeyExists(request.wheels.params, "modelName") && Len(request.wheels.params.modelName)) {
+						local.diffResult = local.autoMigrator.diff(request.wheels.params.modelName, local.options);
+
+						// Optionally write the migration file
+						local.migrationWritten = "";
+						if (StructKeyExists(request.wheels.params, "write") && request.wheels.params.write == "true") {
+							local.migName = StructKeyExists(request.wheels.params, "name") && Len(request.wheels.params.name) ? request.wheels.params.name : "";
+							local.autoMigrator.writeMigration(local.diffResult, local.migName);
+							local.migrationWritten = "written";
+						}
+
+						data.success = true;
+						data.model = local.diffResult;
+						data.migrationWritten = local.migrationWritten;
+					} else {
+						// diffAll path
+						local.diffAllResult = local.autoMigrator.diffAll(local.options);
+
+						local.written = [];
+						if (StructKeyExists(request.wheels.params, "write") && request.wheels.params.write == "true") {
+							for (local.m in local.diffAllResult) {
+								local.autoMigrator.writeMigration(local.diffAllResult[local.m], "");
+								ArrayAppend(local.written, local.m);
+							}
+						}
+
+						data.success = true;
+						data.models = local.diffAllResult;
+						data.migrationsWritten = local.written;
+					}
+				} catch (any e) {
+					data.success = false;
+					data.message = e.message;
+				}
+				break;
 			case "redoMigration":
 				if (StructKeyExists(request.wheels.params, "version")) {
 					local.redoVersion = request.wheels.params.version;
