@@ -171,12 +171,12 @@ component {
 	/**
 	 * Assert the response has the given HTTP status code.
 	 *
-	 * @statusCode Expected HTTP status code
+	 * @expectedStatus Expected HTTP status code
 	 */
-	public TestClient function assertStatus(required numeric statusCode) {
+	public TestClient function assertStatus(required numeric expectedStatus) {
 		var actual = statusCode();
-		if (actual != arguments.statusCode) {
-			$assertionError("Expected status code #arguments.statusCode# but received #actual#.");
+		if (actual != arguments.expectedStatus) {
+			$assertionError("Expected status code #arguments.expectedStatus# but received #actual#.");
 		}
 		return this;
 	}
