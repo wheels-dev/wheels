@@ -107,6 +107,42 @@ component extends="wheels.WheelsTest" {
                 expect(klass.getName()).toBe("com.microsoft.playwright.Playwright");
                 l.release();
             });
+
+            it("acquireBrowser('chromium') launches a real headless browser", () => {
+                // Full end-to-end integration. Slow (~2-3s): starts a node driver
+                // process and a Chromium instance.
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    var browser = l.acquireBrowser(engine="chromium");
+                    expect(browser).notToBeNull();
+                    expect(isObject(browser)).toBeTrue();
+                    // Smoke: the Browser should report it's connected
+                    expect(browser.isConnected()).toBeTrue();
+                } finally {
+                    l.release();
+                }
+            });
+
+            it("acquireBrowser() returns the same Browser across calls (singleton per engine)", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    var b1 = l.acquireBrowser(engine="chromium");
+                    var b2 = l.acquireBrowser(engine="chromium");
+                    expect(b1).toBe(b2);
+                } finally {
+                    l.release();
+                }
+            });
         });
     }
 }

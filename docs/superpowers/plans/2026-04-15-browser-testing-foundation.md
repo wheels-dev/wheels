@@ -435,10 +435,12 @@ git commit -m "feat(test): add temporary Playwright install bootstrap"
 - **Added: `$classpathJarPaths(installDir) → array`** — reads `variables.$manifest.classpath` and returns `[installDir & "/lib/" & entry.filename, …]` for every entry.
 - **Added: `getManifest()`, `getClassLoader()`, `getState()`** — accessors for the private `variables.$*` scope, needed by tests (CFML `variables` scope isn't externally accessible).
 - **Added: `$findZeroArgMethod()`** — Lucee's Java-varargs bridge can't reliably express an empty `Class<?>[]` to `Class.getMethod(String, Class<?>...)`, so locate zero-arg methods by iterating `getMethods()`.
+- **Added: `$pushTCCL()` / `$popTCCL()`** — Playwright's `DriverJar` uses `Thread.currentThread().getContextClassLoader()` to find bundled-driver resources. Default TCCL (AppClassLoader) doesn't see our JARs, so every call into Playwright runtime code must swap TCCL for the duration.
 - **Dropped: `$driverBundlePath()`** — no longer a meaningful notion once the manifest drives everything through `classpath[]`.
+- **URLClassLoader parent = `PlatformClassLoader`** (not `SystemClassLoader` / TCCL). With AppClassLoader as parent, URLClassLoader fails to resolve cross-JAR superclass references (e.g. `driver-bundle`'s `DriverJar extends driver.jar`'s `Driver`) with `NoClassDefFoundError` at `defineClass` time. PlatformClassLoader only exposes the JDK stdlib, giving our JARs a self-contained layer.
 - **`$loadJars(jarPaths)`** — unchanged from original design. Just pass it all seven paths from `$classpathJarPaths()`.
 
-**⚠ Known blocker — browser launch path hangs.** `acquireBrowser()` is implemented but the full `Playwright.create() → chromium() → launch()` path hangs when invoked through the URLClassLoader on Lucee 7 + OpenJDK 21. The Node driver process spawns (`~/.lucli/servers/wheels/temp/playwright-java-*/node cli.js run-driver`) but the Java side blocks on IPC read indefinitely. Tests in this PR verify the foundation layer (classpath walker + URLClassLoader loading + state machine + class-resolution through the loader); full browser integration is deferred to a follow-up debug pass. Hypothesis: Lucee's method-call interception on URLClassLoader-loaded classes interferes with the node process's stdin/stdout inheritance.
+Two non-obvious Playwright+Lucee integration traps were resolved during implementation (see commit body for the full debug trail): cross-JAR class resolution required dropping the AppClassLoader from the parent chain, and resource lookup required swapping TCCL during every call that reaches into Playwright runtime code.
 
 **Files:**
 - Modify: `vendor/wheels/wheelstest/BrowserLauncher.cfc`

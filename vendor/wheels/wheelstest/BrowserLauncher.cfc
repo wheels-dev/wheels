@@ -156,14 +156,43 @@ component {
             arrayAppend(urls, jarFile.toURI().toURL());
         }
 
-        var parentLoader = createObject("java", "java.lang.Thread")
-            .currentThread()
-            .getContextClassLoader();
+        // PARENT = PlatformClassLoader (not SystemClassLoader / TCCL).
+        // If AppClassLoader is the parent, URLClassLoader fails to resolve
+        // cross-JAR superclass references (e.g. driver-bundle's DriverJar extends
+        // driver.jar's Driver) with a NoClassDefFoundError at defineClass time.
+        // PlatformClassLoader only exposes the JDK stdlib, so our JARs form a
+        // clean self-contained layer.
+        var parentLoader = createObject("java", "java.lang.ClassLoader")
+            .getPlatformClassLoader();
         var classLoader = createObject("java", "java.net.URLClassLoader")
             .init(urls, parentLoader);
 
         variables.$classLoader = classLoader;
         variables.$state = "ready";
+    }
+
+    /**
+     * Swap the current thread's context classloader to our URLClassLoader,
+     * returning the previous one. Callers MUST restore via $restoreTCCL in a
+     * finally block so we don't leak our classloader to unrelated threads.
+     *
+     * Playwright uses `Thread.currentThread().getContextClassLoader()` inside
+     * `DriverJar.getDriverResourceURI()` to locate `driver/<platform>/` resources
+     * in the driver-bundle JAR. Default TCCL is the AppClassLoader — which
+     * doesn't have our JARs — so the lookup returns null and Playwright's init
+     * fails with an NPE. Swap TCCL for the duration of any call that reaches
+     * into Playwright's runtime code.
+     */
+    private any function $pushTCCL() {
+        var thread = createObject("java", "java.lang.Thread").currentThread();
+        var previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(variables.$classLoader);
+        return previous;
+    }
+
+    private void function $popTCCL(required any previousLoader) {
+        createObject("java", "java.lang.Thread").currentThread()
+            .setContextClassLoader(arguments.previousLoader);
     }
 
     /**
@@ -183,26 +212,29 @@ component {
             return variables.$browsers[arguments.engine];
         }
 
-        if (!isObject(variables.$playwright)) {
-            // Resolve Playwright classes through our URLClassLoader (the servlet's
-            // default classpath doesn't include these JARs). We call Playwright.create()
-            // via reflection to avoid Lucee's createObject("java", ...) path, which
-            // would try to resolve the URLClassLoader as an OSGi bundle.
-            //
-            // Lucee's CFML-to-Java bridge mishandles getMethod's Class<?>... varargs
-            // with no args, so locate the zero-arg create() method by iterating
-            // getDeclaredMethods().
-            var playwrightClass = variables.$classLoader.loadClass("com.microsoft.playwright.Playwright");
-            var createMethod = $findZeroArgMethod(klass=playwrightClass, name="create");
-            variables.$playwright = createMethod.invoke(javaCast("null", ""), javaCast("Object[]", []));
+        // Swap TCCL to our URLClassLoader for the duration of Playwright calls —
+        // Playwright's DriverJar uses TCCL to find bundled driver resources, and
+        // default TCCL (AppClassLoader) doesn't have driver-bundle.jar.
+        var previousTCCL = $pushTCCL();
+        try {
+            if (!isObject(variables.$playwright)) {
+                // Playwright.create() via reflection: Lucee's varargs bridge can't
+                // pass an empty Class<?>[] to getMethod(String, Class<?>...) cleanly,
+                // so locate the zero-arg overload by iterating getMethods().
+                var playwrightClass = variables.$classLoader.loadClass("com.microsoft.playwright.Playwright");
+                var createMethod = $findZeroArgMethod(klass=playwrightClass, name="create");
+                variables.$playwright = createMethod.invoke(javaCast("null", ""), javaCast("Object[]", []));
+            }
+
+            var browserType = $getBrowserType(engine=arguments.engine);
+            // LaunchOptions via reflection through URLClassLoader is fragile;
+            // zero-arg launch() defaults to headless=true, which is what we want.
+            var launchMethod = $findZeroArgMethod(klass=browserType.getClass(), name="launch");
+            var browser = launchMethod.invoke(browserType, javaCast("Object[]", []));
+        } finally {
+            $popTCCL(previousLoader=previousTCCL);
         }
 
-        var browserType = $getBrowserType(engine=arguments.engine);
-        var launchOptionsClass = variables.$classLoader.loadClass("com.microsoft.playwright.BrowserType$LaunchOptions");
-        var launchOptions = launchOptionsClass.getDeclaredConstructor().newInstance();
-        launchOptions.setHeadless(javaCast("boolean", true));
-
-        var browser = browserType.launch(launchOptions);
         variables.$browsers[arguments.engine] = browser;
         return browser;
     }
