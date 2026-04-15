@@ -311,10 +311,197 @@ component {
         variables.$scope = arguments.rootLocator;
     }
 
+    // ─── Assertions: text + visibility + presence ────────────────────
+
+    public BrowserClient function assertSee(required string text) {
+        if (!findNoCase(arguments.text, variables.page.content())) {
+            $assertFail("Expected page to contain '" & arguments.text & "'");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertDontSee(required string text) {
+        if (findNoCase(arguments.text, variables.page.content())) {
+            $assertFail("Expected page NOT to contain '" & arguments.text & "'");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertSeeIn(
+        required string selector,
+        required string text
+    ) {
+        var elementText = $locator(arguments.selector).textContent();
+        if (!findNoCase(arguments.text, elementText)) {
+            $assertFail("Expected '" & arguments.selector & "' to contain '"
+                & arguments.text & "', got '" & elementText & "'");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertVisible(required string selector) {
+        if (!$locator(arguments.selector).first().isVisible()) {
+            $assertFail("Expected '" & arguments.selector & "' to be visible");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertMissing(required string selector) {
+        var count = $locator(arguments.selector).count();
+        if (count > 0) {
+            $assertFail("Expected '" & arguments.selector & "' to be missing, found "
+                & count & " element(s)");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertPresent(required string selector) {
+        if ($locator(arguments.selector).count() == 0) {
+            $assertFail("Expected '" & arguments.selector & "' to be present in DOM");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertNotPresent(required string selector) {
+        if ($locator(arguments.selector).count() > 0) {
+            $assertFail("Expected '" & arguments.selector & "' to be absent from DOM");
+        }
+        return this;
+    }
+
+    // ─── Assertions: URL + title ─────────────────────────────────────
+
+    /**
+     * Exact URL match. For data: / about: / file: URLs, compares full URL.
+     * For http(s) URLs, compares the path portion only (protocol + host stripped).
+     */
+    public BrowserClient function assertUrlIs(required string expected) {
+        var current = variables.page.url();
+        // If caller passed a path (starts with /), compare path-only; else full URL
+        if (left(arguments.expected, 1) == "/") {
+            var currentPath = $pathFromUrl(current);
+            if (currentPath != arguments.expected) {
+                $assertFail("Expected path '" & arguments.expected
+                    & "', got '" & currentPath & "' (full URL: '" & current & "')");
+            }
+        } else if (current != arguments.expected) {
+            $assertFail("Expected URL '" & arguments.expected & "', got '" & current & "'");
+        }
+        return this;
+    }
+
+    /** Substring match — more forgiving than assertUrlIs for dynamic URLs. */
+    public BrowserClient function assertUrlContains(required string substring) {
+        var current = variables.page.url();
+        if (!find(arguments.substring, current)) {
+            $assertFail("Expected URL to contain '" & arguments.substring
+                & "', got '" & current & "'");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertTitleContains(required string text) {
+        var pageTitle = variables.page.title();
+        if (!findNoCase(arguments.text, pageTitle)) {
+            $assertFail("Expected title to contain '" & arguments.text
+                & "', got '" & pageTitle & "'");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertQueryStringHas(
+        required string key,
+        string value = ""
+    ) {
+        var query = $queryParamsFromUrl(variables.page.url());
+        if (!structKeyExists(query, arguments.key)) {
+            $assertFail("Expected query string to contain '" & arguments.key
+                & "', current params: " & serializeJSON(query));
+        }
+        if (len(arguments.value) > 0 && query[arguments.key] != arguments.value) {
+            $assertFail("Expected '" & arguments.key & "' = '" & arguments.value
+                & "', got '" & query[arguments.key] & "'");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertQueryStringMissing(required string key) {
+        var query = $queryParamsFromUrl(variables.page.url());
+        if (structKeyExists(query, arguments.key)) {
+            $assertFail("Expected query string NOT to contain '" & arguments.key & "'");
+        }
+        return this;
+    }
+
+    // ─── Assertions: form + attributes ───────────────────────────────
+
+    public BrowserClient function assertInputValue(
+        required string selector,
+        required string value
+    ) {
+        var actual = $locator(arguments.selector).inputValue();
+        if (actual != arguments.value) {
+            $assertFail("Expected input '" & arguments.selector & "' value '"
+                & arguments.value & "', got '" & actual & "'");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertChecked(required string selector) {
+        if (!$locator(arguments.selector).isChecked()) {
+            $assertFail("Expected '" & arguments.selector & "' to be checked");
+        }
+        return this;
+    }
+
+    public BrowserClient function assertHasClass(
+        required string selector,
+        required string class
+    ) {
+        var classAttr = $locator(arguments.selector).getAttribute("class") ?: "";
+        var classes = listToArray(classAttr, " ");
+        if (!arrayContainsNoCase(classes, arguments.class)) {
+            $assertFail("Expected '" & arguments.selector & "' to have class '"
+                & arguments.class & "', got '" & classAttr & "'");
+        }
+        return this;
+    }
+
     // ─── Terminals ───────────────────────────────────────────────────
 
     public string function currentUrl() {
         return variables.page.url();
+    }
+
+    public string function title() {
+        return variables.page.title();
+    }
+
+    /** Full HTML of the rendered page. */
+    public string function pageSource() {
+        return variables.page.content();
+    }
+
+    /** textContent of the first element matching `selector`. */
+    public string function text(required string selector) {
+        return $locator(arguments.selector).textContent();
+    }
+
+    /** Current value of an input/textarea/select element. */
+    public string function value(required string selector) {
+        return $locator(arguments.selector).inputValue();
+    }
+
+    /**
+     * Screenshot to `path`. Uses the no-arg screenshot() → byte[] overload
+     * rather than Page$ScreenshotOptions, since building the options class
+     * through the URLClassLoader hits Lucee's OSGi-bundle resolver (same
+     * trap documented on press() / waitFor() earlier in this file).
+     */
+    public BrowserClient function screenshot(required string path) {
+        var bytes = variables.page.screenshot();
+        fileWrite(arguments.path, bytes);
+        return this;
     }
 
     // ─── Accessors (primarily for tests & lifecycle managers) ────────
@@ -352,6 +539,64 @@ component {
             return variables.$scope.locator(arguments.selector);
         }
         return variables.page.locator(arguments.selector);
+    }
+
+    /**
+     * Throws Wheels.BrowserAssertionFailed with the given message. Callers
+     * in the DSL use this to surface failures in a way tests can catch
+     * distinctly from other errors.
+     */
+    private void function $assertFail(required string message) {
+        throw(
+            type="Wheels.BrowserAssertionFailed",
+            message=arguments.message
+        );
+    }
+
+    /**
+     * Extract the path portion of a URL, stripping scheme+host and query.
+     * Returns "/" when the URL has no explicit path. For data:/file: URLs,
+     * returns the full URL (they have no conventional "path").
+     */
+    private string function $pathFromUrl(required string url) {
+        if (!reFindNoCase("^https?://", arguments.url)) {
+            return arguments.url;  // not an http(s) URL — can't strip host
+        }
+        var noScheme = reReplace(arguments.url, "^https?://", "");
+        var firstSlash = find("/", noScheme);
+        if (firstSlash == 0) {
+            return "/";
+        }
+        var pathPlusQuery = mid(noScheme, firstSlash, len(noScheme));
+        var qIdx = find("?", pathPlusQuery);
+        if (qIdx > 0) {
+            return left(pathPlusQuery, qIdx - 1);
+        }
+        return pathPlusQuery;
+    }
+
+    /**
+     * Parse the query string of a URL into a struct. Keys with no `=`
+     * map to empty string. Values are URL-decoded.
+     */
+    private struct function $queryParamsFromUrl(required string url) {
+        var result = {};
+        var qIdx = find("?", arguments.url);
+        if (qIdx == 0) return result;
+        var queryString = mid(arguments.url, qIdx + 1, len(arguments.url));
+        // Strip fragment if present
+        var hashIdx = find("##", queryString);
+        if (hashIdx > 0) queryString = left(queryString, hashIdx - 1);
+        var pairs = listToArray(queryString, "&");
+        for (var p in pairs) {
+            var eqIdx = find("=", p);
+            if (eqIdx == 0) {
+                result[p] = "";
+            } else {
+                result[left(p, eqIdx - 1)] = urlDecode(mid(p, eqIdx + 1, len(p)));
+            }
+        }
+        return result;
     }
 
 }

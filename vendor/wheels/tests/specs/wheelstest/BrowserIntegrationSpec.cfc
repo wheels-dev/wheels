@@ -302,5 +302,184 @@ component extends="wheels.WheelsTest" {
                 expect(variables.bc.script("() => document.querySelector('h1').textContent")).toBe("Hello");
             });
         });
+
+        describe("BrowserClient — text + visibility + presence assertions", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("assertSee passes when text is on page", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Welcome</h1>").assertSee("Welcome");
+            });
+
+            it("assertSee throws Wheels.BrowserAssertionFailed when absent", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>A</h1>");
+                expect(() => variables.bc.assertSee("Missing")).toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertDontSee passes when text is absent", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>A</h1>").assertDontSee("Missing");
+            });
+
+            it("assertSeeIn scopes text search to a selector", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Title</h1><p>Body text</p>")
+                    .assertSeeIn("h1", "Title");
+                expect(() => variables.bc.assertSeeIn("h1", "Body"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertVisible passes when element is rendered", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='e'>").assertVisible("##e");
+            });
+
+            it("assertMissing passes when selector matches no elements", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='e'>").assertMissing("##nope");
+            });
+
+            it("assertPresent / assertNotPresent check DOM presence", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='e'>")
+                    .assertPresent("##e")
+                    .assertNotPresent("##nope");
+            });
+        });
+
+        describe("BrowserClient — URL + title + query assertions", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("assertUrlContains matches a substring of the current URL", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>X</h1>")
+                    .assertUrlContains("text/html");
+            });
+
+            it("assertUrlContains throws when substring not present", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>X</h1>");
+                expect(() => variables.bc.assertUrlContains("not-here"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertTitleContains matches via <title> element", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<title>My Page</title><h1>X</h1>")
+                    .assertTitleContains("My Page");
+                expect(() => variables.bc.assertTitleContains("Other"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertQueryStringHas / Missing parse the URL's query", () => {
+                if (variables.skipBrowserTests) return;
+                // data: URL with a query string. Playwright preserves the ?
+                variables.bc.visitUrl("data:text/html,<h1>X</h1>?foo=bar&baz=qux")
+                    .assertQueryStringHas("foo", "bar")
+                    .assertQueryStringHas("baz")
+                    .assertQueryStringMissing("nope");
+            });
+        });
+
+        describe("BrowserClient — form assertions + terminals", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("assertInputValue matches on filled value", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='e'>")
+                    .fill("##e", "hello")
+                    .assertInputValue("##e", "hello");
+            });
+
+            it("assertChecked passes on checked box", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='cb' type='checkbox'>")
+                    .check("##cb")
+                    .assertChecked("##cb");
+            });
+
+            it("assertHasClass passes when element has the named class", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<div id='d' class='foo bar baz'>x</div>")
+                    .assertHasClass("##d", "bar")
+                    .assertHasClass("##d", "foo");
+                expect(() => variables.bc.assertHasClass("##d", "nope"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("title() returns the <title> element content", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<title>T</title><h1>X</h1>");
+                expect(variables.bc.title()).toBe("T");
+            });
+
+            it("pageSource() returns full rendered HTML", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Hello</h1>");
+                expect(variables.bc.pageSource()).toInclude("Hello");
+            });
+
+            it("text(selector) returns the element's textContent", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Heading</h1>");
+                expect(variables.bc.text("h1")).toBe("Heading");
+            });
+
+            it("value(selector) returns current input value", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='e' value='preset'>");
+                expect(variables.bc.value("##e")).toBe("preset");
+            });
+
+            it("screenshot(path) writes a non-empty PNG file", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Snap</h1>");
+                var tmpPath = getTempDirectory() & "wheels-bc-" & createUUID() & ".png";
+                try {
+                    variables.bc.screenshot(tmpPath);
+                    expect(fileExists(tmpPath)).toBeTrue();
+                    expect(getFileInfo(tmpPath).size).toBeGT(0);
+                } finally {
+                    if (fileExists(tmpPath)) fileDelete(tmpPath);
+                }
+            });
+        });
     }
 }
