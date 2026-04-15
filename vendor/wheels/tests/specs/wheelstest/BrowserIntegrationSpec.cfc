@@ -250,5 +250,57 @@ component extends="wheels.WheelsTest" {
                 expect(variables.pg.locator("##f2 ##email").inputValue()).toBe("in-f2");
             });
         });
+
+        describe("BrowserClient — viewport + script", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("resize(w, h) sets viewport size; script can read window dims", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>X</h1>");
+                variables.bc.resize(800, 600);
+                var w = variables.bc.script("() => window.innerWidth");
+                var h = variables.bc.script("() => window.innerHeight");
+                expect(w).toBe(800);
+                expect(h).toBe(600);
+            });
+
+            it("resizeToMobile() sets 375x667", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>X</h1>").resizeToMobile();
+                expect(variables.bc.script("() => window.innerWidth")).toBe(375);
+                expect(variables.bc.script("() => window.innerHeight")).toBe(667);
+            });
+
+            it("resizeToTablet() sets 768x1024", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>X</h1>").resizeToTablet();
+                expect(variables.bc.script("() => window.innerWidth")).toBe(768);
+            });
+
+            it("resizeToDesktop() sets 1440x900", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>X</h1>").resizeToDesktop();
+                expect(variables.bc.script("() => window.innerWidth")).toBe(1440);
+            });
+
+            it("script(js) evaluates and returns result", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Hello</h1>");
+                expect(variables.bc.script("() => 2 + 2")).toBe(4);
+                expect(variables.bc.script("() => document.querySelector('h1').textContent")).toBe("Hello");
+            });
+        });
     }
 }

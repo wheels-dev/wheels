@@ -207,6 +207,75 @@ component {
         return this;
     }
 
+    // ─── Viewport ────────────────────────────────────────────────────
+
+    /**
+     * Resize the page's viewport. Takes effect immediately; CSS media
+     * queries re-evaluate.
+     */
+    public BrowserClient function resize(
+        required numeric width,
+        required numeric height
+    ) {
+        variables.page.setViewportSize(
+            javaCast("int", arguments.width),
+            javaCast("int", arguments.height)
+        );
+        return this;
+    }
+
+    /** iPhone SE-like viewport (common mobile test size). */
+    public BrowserClient function resizeToMobile() {
+        return resize(375, 667);
+    }
+
+    /** iPad portrait-like viewport. */
+    public BrowserClient function resizeToTablet() {
+        return resize(768, 1024);
+    }
+
+    /** Typical laptop viewport. */
+    public BrowserClient function resizeToDesktop() {
+        return resize(1440, 900);
+    }
+
+    // ─── Script + Pause ──────────────────────────────────────────────
+
+    /**
+     * Evaluate a JavaScript expression in the page context and return the
+     * result. Useful for assertions on computed state or reaching into
+     * page.document.activeElement etc.
+     *
+     *     client.script("() => document.title")
+     *     client.script("() => 2 + 2")  // returns 4
+     */
+    public any function script(required string js) {
+        return variables.page.evaluate(arguments.js);
+    }
+
+    /**
+     * Pauses execution for `milliseconds` ms. For debugging real failures
+     * (when you want to hand-inspect browser state) — NOT for synchronizing
+     * with the page. Use waitFor/waitForText instead for synchronization;
+     * sleeps are flaky and slow.
+     *
+     * Prints a warning on use so a stray pause doesn't sneak past review.
+     * Silenceable via BROWSER_TEST_PAUSE_WARNING=off.
+     */
+    public BrowserClient function pause(required numeric milliseconds) {
+        var envOff = false;
+        try {
+            envOff = (createObject("java", "java.lang.System")
+                .getenv("BROWSER_TEST_PAUSE_WARNING") ?: "on") == "off";
+        } catch (any e) {}
+        if (!envOff) {
+            writeOutput("⚠ BrowserClient.pause() called for " & arguments.milliseconds
+                & "ms. Remove before committing or set BROWSER_TEST_PAUSE_WARNING=off." & chr(10));
+        }
+        sleep(arguments.milliseconds);
+        return this;
+    }
+
     // ─── Scoping ─────────────────────────────────────────────────────
 
     /**
