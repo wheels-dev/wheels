@@ -3,7 +3,6 @@
  * database schema and generates migration CFC files automatically.
  *
  * Limitations:
- * - Cannot detect column renames. A renamed column appears as removeColumn + addColumn.
  * - Calculated properties (property(sql="...")) are excluded from the diff.
  * - Tableless models are skipped.
  */
@@ -14,9 +13,10 @@ component extends="wheels.migrator.Base" {
 	 * the actual database columns and returns a struct describing the differences.
 	 *
 	 * @modelName The name of the model to diff (e.g. "User").
-	 * @return Struct with keys: modelName, tableName, addColumns, removeColumns, changeColumns.
+	 * @options Optional struct: renames (explicit hints), heuristicThreshold (0-1, default 0.7).
+	 * @return Struct with keys: modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames.
 	 */
-	public struct function diff(required string modelName) {
+	public struct function diff(required string modelName, struct options = {}) {
 		local.modelObj = model(arguments.modelName);
 		local.tableName = local.modelObj.tableName();
 		local.primaryKeyList = local.modelObj.primaryKeys();
@@ -120,12 +120,46 @@ component extends="wheels.migrator.Base" {
 			}
 		}
 
+		// Build type lookups for RenameDetector
+		local.addTypesMap = {};
+		for (local.col in local.addColumns) {
+			local.addTypesMap[local.col.name] = local.col.type;
+		}
+		local.removeTypesMap = {};
+		for (local.col in local.removeColumns) {
+			// Remove columns carry only name; look up migration type from actualColumns
+			local.actual = local.actualColumns[LCase(local.col.name)];
+			local.removeTypesMap[local.col.name] = $dbTypeToMigrationType(local.actual.typeName);
+		}
+
+		// Build hints struct from options
+		local.hints = {};
+		if (StructKeyExists(arguments.options, "renames")) {
+			local.hints.renames = arguments.options.renames;
+		}
+		local.threshold = StructKeyExists(arguments.options, "heuristicThreshold")
+			? arguments.options.heuristicThreshold
+			: 0.7;
+
+		// Delegate to RenameDetector
+		local.detector = CreateObject("component", "wheels.migrator.RenameDetector");
+		local.detection = local.detector.detect(
+			addColumns = local.addColumns,
+			removeColumns = local.removeColumns,
+			addTypes = local.addTypesMap,
+			removeTypes = local.removeTypesMap,
+			hints = local.hints,
+			threshold = local.threshold
+		);
+
 		return {
 			modelName: arguments.modelName,
 			tableName: local.tableName,
-			addColumns: local.addColumns,
-			removeColumns: local.removeColumns,
-			changeColumns: local.changeColumns
+			addColumns: local.detection.remainingAdds,
+			removeColumns: local.detection.remainingRemoves,
+			changeColumns: local.changeColumns,
+			renameColumns: local.detection.confirmedRenames,
+			suggestedRenames: local.detection.suggestedRenames
 		};
 	}
 

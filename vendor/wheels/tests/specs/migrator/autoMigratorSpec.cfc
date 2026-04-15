@@ -325,6 +325,33 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("diff() — rename integration", () => {
+
+				it("returns renameColumns and suggestedRenames keys in the result", () => {
+					local.result = autoMigrator.diff("Author");
+					expect(local.result).toHaveKey("renameColumns");
+					expect(local.result).toHaveKey("suggestedRenames");
+					expect(local.result.renameColumns).toBeArray();
+					expect(local.result.suggestedRenames).toBeArray();
+				});
+
+				it("accepts options struct without breaking existing callers", () => {
+					// Backward-compat: diff(modelName) with no options still works
+					local.r1 = autoMigrator.diff("Author");
+					local.r2 = autoMigrator.diff(modelName="Author", options={});
+					expect(local.r1.tableName).toBe(local.r2.tableName);
+				});
+
+				it("threads heuristicThreshold through options", () => {
+					// Threshold of 0.01 would make even unrelated pairs candidates.
+					// We can't easily induce a rename without a real model mismatch, so
+					// just verify the call doesn't explode.
+					local.result = autoMigrator.diff(modelName="Author", options={heuristicThreshold: 0.01});
+					expect(local.result).toHaveKey("renameColumns");
+				});
+
+			});
+
 			describe("$sanitizeFileName", () => {
 
 				it("lowercases input", () => {
