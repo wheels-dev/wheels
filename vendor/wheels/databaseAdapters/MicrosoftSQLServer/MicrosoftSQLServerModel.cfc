@@ -272,4 +272,77 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return "[#arguments.name#]";
 	}
 
+	/**
+	 * SQL Server upsert using MERGE statement syntax.
+	 */
+	public array function $upsertSQL(
+		required string tableName,
+		required array columns,
+		required array uniqueBy,
+		required array updateColumns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo,
+		required any quoteFunc
+	) {
+		local.sql = [];
+
+		// Build column list for SELECT.
+		local.colList = "";
+		local.selectCols = "";
+		for (local.c = 1; local.c <= ArrayLen(arguments.columns); local.c++) {
+			if (Len(local.colList)) {
+				local.colList &= ", ";
+				local.selectCols &= ", ";
+			}
+			local.colList &= $quoteIdentifier(arguments.columns[local.c]);
+			local.selectCols &= "source." & $quoteIdentifier(arguments.columns[local.c]);
+		}
+
+		// MERGE INTO target USING (VALUES rows) AS source(cols) ON match
+		ArrayAppend(local.sql, "MERGE INTO #arguments.tableName# WITH (HOLDLOCK) AS target USING (VALUES ");
+
+		// Build value rows.
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			if (local.r > arguments.batchStart) {
+				ArrayAppend(local.sql, ", ");
+			}
+			ArrayAppend(local.sql, "(");
+			for (local.p = 1; local.p <= ArrayLen(arguments.validProperties); local.p++) {
+				if (local.p > 1) ArrayAppend(local.sql, ", ");
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				ArrayAppend(local.sql, $buildBulkParam(value=local.val, propName=local.propName, propertyInfo=arguments.propertyInfo));
+			}
+			ArrayAppend(local.sql, ")");
+		}
+
+		ArrayAppend(local.sql, ") AS source (#local.colList#) ON ");
+
+		// ON clause.
+		local.onClause = "";
+		for (local.u in arguments.uniqueBy) {
+			if (Len(local.onClause)) local.onClause &= " AND ";
+			local.onClause &= "target." & $quoteIdentifier(local.u) & " = source." & $quoteIdentifier(local.u);
+		}
+		ArrayAppend(local.sql, local.onClause);
+
+		// WHEN MATCHED THEN UPDATE.
+		if (ArrayLen(arguments.updateColumns)) {
+			local.setClause = "";
+			for (local.uc in arguments.updateColumns) {
+				if (Len(local.setClause)) local.setClause &= ", ";
+				local.setClause &= "target." & $quoteIdentifier(local.uc) & " = source." & $quoteIdentifier(local.uc);
+			}
+			ArrayAppend(local.sql, " WHEN MATCHED THEN UPDATE SET #local.setClause#");
+		}
+
+		// WHEN NOT MATCHED THEN INSERT.
+		ArrayAppend(local.sql, " WHEN NOT MATCHED THEN INSERT (#local.colList#) VALUES (#local.selectCols#);");
+
+		return local.sql;
+	}
+
 }

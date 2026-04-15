@@ -154,4 +154,74 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return """#UCase(arguments.name)#""";
 	}
 
+	/**
+	 * Oracle upsert using MERGE INTO target USING (SELECT ... FROM dual) source ON ... syntax.
+	 */
+	public array function $upsertSQL(
+		required string tableName,
+		required array columns,
+		required array uniqueBy,
+		required array updateColumns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo,
+		required any quoteFunc
+	) {
+		local.sql = [];
+
+		// Oracle MERGE handles one row at a time; loop over the batch.
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			if (local.r > arguments.batchStart) {
+				ArrayAppend(local.sql, "; ");
+			}
+
+			// Build USING (SELECT val1 AS col1, val2 AS col2 FROM dual) source.
+			local.selectParts = "";
+			for (local.p = 1; local.p <= ArrayLen(arguments.validProperties); local.p++) {
+				if (Len(local.selectParts)) local.selectParts &= ", ";
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				// We need inline values for Oracle MERGE with dual.
+				local.selectParts &= "'" & Replace(local.val, "'", "''", "all") & "' AS " & $quoteIdentifier(arguments.columns[local.p]);
+			}
+
+			ArrayAppend(local.sql, "MERGE INTO #arguments.tableName# target USING (SELECT #local.selectParts# FROM dual) source ON (");
+
+			// ON clause.
+			local.onClause = "";
+			for (local.u in arguments.uniqueBy) {
+				if (Len(local.onClause)) local.onClause &= " AND ";
+				local.onClause &= "target." & $quoteIdentifier(local.u) & " = source." & $quoteIdentifier(local.u);
+			}
+			ArrayAppend(local.sql, local.onClause & ")");
+
+			// WHEN MATCHED THEN UPDATE.
+			if (ArrayLen(arguments.updateColumns)) {
+				local.setClause = "";
+				for (local.uc in arguments.updateColumns) {
+					if (Len(local.setClause)) local.setClause &= ", ";
+					local.setClause &= "target." & $quoteIdentifier(local.uc) & " = source." & $quoteIdentifier(local.uc);
+				}
+				ArrayAppend(local.sql, " WHEN MATCHED THEN UPDATE SET #local.setClause#");
+			}
+
+			// WHEN NOT MATCHED THEN INSERT.
+			local.colList = "";
+			local.valList = "";
+			for (local.c = 1; local.c <= ArrayLen(arguments.columns); local.c++) {
+				if (Len(local.colList)) {
+					local.colList &= ", ";
+					local.valList &= ", ";
+				}
+				local.colList &= $quoteIdentifier(arguments.columns[local.c]);
+				local.valList &= "source." & $quoteIdentifier(arguments.columns[local.c]);
+			}
+			ArrayAppend(local.sql, " WHEN NOT MATCHED THEN INSERT (#local.colList#) VALUES (#local.valList#)");
+		}
+
+		return local.sql;
+	}
+
 }

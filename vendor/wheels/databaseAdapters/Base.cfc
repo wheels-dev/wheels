@@ -628,5 +628,57 @@ component output=false extends="wheels.Global"{
 		);
 	}
 
+	/**
+	 * Generates database-specific UPSERT SQL as an array compatible with `$querySetup()`.
+	 * Base implementation throws an error — each adapter must override with its own syntax.
+	 *
+	 * @tableName The quoted table name.
+	 * @columns Array of column names to insert/update.
+	 * @uniqueBy Array of column names forming the unique constraint.
+	 * @updateColumns Array of column names to update on conflict.
+	 * @validProperties Array of model property names corresponding to `columns`.
+	 * @records Array of record structs.
+	 * @batchStart Starting index in the records array.
+	 * @batchEnd Ending index in the records array.
+	 * @propertyInfo Struct of model property metadata.
+	 * @quoteFunc Reference to the adapter's `$quoteIdentifier` function.
+	 */
+	public array function $upsertSQL(
+		required string tableName,
+		required array columns,
+		required array uniqueBy,
+		required array updateColumns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo,
+		required any quoteFunc
+	) {
+		Throw(
+			type = "Wheels.UpsertNotSupported",
+			message = "Upsert is not supported by this database adapter.",
+			extendedInfo = "Override `$upsertSQL()` in the specific database adapter to enable upsert support."
+		);
+	}
+
+	/**
+	 * Builds parameter struct for a single value in a bulk operation.
+	 * Used by adapter upsert implementations.
+	 */
+	public struct function $buildBulkParam(
+		required string value,
+		required string propName,
+		required struct propertyInfo
+	) {
+		local.propInfo = arguments.propertyInfo[arguments.propName];
+		return {
+			value: arguments.value,
+			type: local.propInfo.type,
+			dataType: local.propInfo.dataType,
+			scale: local.propInfo.scale,
+			null: (!Len(arguments.value) && local.propInfo.nullable)
+		};
+	}
 
 }

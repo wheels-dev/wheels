@@ -180,5 +180,53 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return local.columns;
 	}
 
+	/**
+	 * H2 upsert using MERGE INTO table (cols) KEY (uniqueBy) VALUES syntax.
+	 */
+	public array function $upsertSQL(
+		required string tableName,
+		required array columns,
+		required array uniqueBy,
+		required array updateColumns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo,
+		required any quoteFunc
+	) {
+		local.sql = [];
+
+		// Build column list.
+		local.colList = "";
+		for (local.col in arguments.columns) {
+			if (Len(local.colList)) local.colList &= ", ";
+			local.colList &= local.col;
+		}
+
+		// Build KEY clause.
+		local.keyList = "";
+		for (local.u in arguments.uniqueBy) {
+			if (Len(local.keyList)) local.keyList &= ", ";
+			local.keyList &= local.u;
+		}
+
+		// H2 MERGE processes one VALUES set at a time; loop batches.
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			if (local.r > arguments.batchStart) {
+				ArrayAppend(local.sql, "; ");
+			}
+			ArrayAppend(local.sql, "MERGE INTO #arguments.tableName# (#local.colList#) KEY (#local.keyList#) VALUES (");
+			for (local.p = 1; local.p <= ArrayLen(arguments.validProperties); local.p++) {
+				if (local.p > 1) ArrayAppend(local.sql, ", ");
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				ArrayAppend(local.sql, $buildBulkParam(value=local.val, propName=local.propName, propertyInfo=arguments.propertyInfo));
+			}
+			ArrayAppend(local.sql, ")");
+		}
+
+		return local.sql;
+	}
 
 }
