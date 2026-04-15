@@ -1,0 +1,332 @@
+component extends="wheels.WheelsTest" {
+
+	function beforeAll() {
+		g = application.wo;
+		autoMigrator = CreateObject("component", "wheels.migrator.AutoMigrator");
+	}
+
+	function run() {
+
+		describe("AutoMigrator", () => {
+
+			describe("$cfSqlTypeToMigrationType", () => {
+
+				it("maps cf_sql_integer to integer", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_integer")).toBe("integer");
+				});
+
+				it("maps cf_sql_varchar to string", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_varchar")).toBe("string");
+				});
+
+				it("maps cf_sql_longvarchar to text", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_longvarchar")).toBe("text");
+				});
+
+				it("maps cf_sql_timestamp to datetime", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_timestamp")).toBe("datetime");
+				});
+
+				it("maps cf_sql_date to date", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_date")).toBe("date");
+				});
+
+				it("maps cf_sql_time to time", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_time")).toBe("time");
+				});
+
+				it("maps cf_sql_bit to boolean", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_bit")).toBe("boolean");
+				});
+
+				it("maps cf_sql_decimal to decimal", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_decimal")).toBe("decimal");
+				});
+
+				it("maps cf_sql_float to float", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_float")).toBe("float");
+				});
+
+				it("maps cf_sql_double to float", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_double")).toBe("float");
+				});
+
+				it("maps cf_sql_bigint to biginteger", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_bigint")).toBe("biginteger");
+				});
+
+				it("maps cf_sql_binary to binary", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_binary")).toBe("binary");
+				});
+
+				it("maps cf_sql_blob to binary", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_blob")).toBe("binary");
+				});
+
+				it("maps cf_sql_smallint to integer", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_smallint")).toBe("integer");
+				});
+
+				it("maps cf_sql_tinyint to integer", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_tinyint")).toBe("integer");
+				});
+
+				it("maps cf_sql_numeric to decimal", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_numeric")).toBe("decimal");
+				});
+
+				it("defaults unknown types to string", () => {
+					expect(autoMigrator.$cfSqlTypeToMigrationType("cf_sql_unknown_type")).toBe("string");
+				});
+
+			});
+
+			describe("$dbTypeToMigrationType", () => {
+
+				it("maps varchar to string", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("varchar")).toBe("string");
+				});
+
+				it("maps int to integer", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("int")).toBe("integer");
+				});
+
+				it("maps text to text", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("text")).toBe("text");
+				});
+
+				it("maps datetime to datetime", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("datetime")).toBe("datetime");
+				});
+
+				it("maps timestamp to datetime", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("timestamp")).toBe("datetime");
+				});
+
+				it("maps boolean to boolean", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("boolean")).toBe("boolean");
+				});
+
+				it("maps decimal to decimal", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("decimal")).toBe("decimal");
+				});
+
+				it("maps float to float", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("float")).toBe("float");
+				});
+
+				it("maps bigint to biginteger", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("bigint")).toBe("biginteger");
+				});
+
+				it("maps blob to binary", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("blob")).toBe("binary");
+				});
+
+				it("returns unknown for unrecognized types", () => {
+					expect(autoMigrator.$dbTypeToMigrationType("geometry_collection_xyz")).toBe("unknown");
+				});
+
+			});
+
+			describe("diff()", () => {
+
+				it("returns a struct with required keys", () => {
+					local.result = autoMigrator.diff("Author");
+					expect(local.result).toBeStruct();
+					expect(local.result).toHaveKey("modelName");
+					expect(local.result).toHaveKey("tableName");
+					expect(local.result).toHaveKey("addColumns");
+					expect(local.result).toHaveKey("removeColumns");
+					expect(local.result).toHaveKey("changeColumns");
+					expect(local.result.modelName).toBe("Author");
+					expect(local.result.tableName).toBe("c_o_r_e_authors");
+				});
+
+				it("returns arrays for column changes", () => {
+					local.result = autoMigrator.diff("Author");
+					expect(local.result.addColumns).toBeArray();
+					expect(local.result.removeColumns).toBeArray();
+					expect(local.result.changeColumns).toBeArray();
+				});
+
+				it("excludes calculated properties from diff", () => {
+					// The Author model has calculated property "numberofitems" with sql="..."
+					// These should NOT appear in addColumns since they are virtual
+					local.result = autoMigrator.diff("Author");
+					local.addColumnNames = "";
+					for (local.col in local.result.addColumns) {
+						local.addColumnNames = ListAppend(local.addColumnNames, local.col.name);
+					}
+					expect(ListFindNoCase(local.addColumnNames, "numberofitems")).toBe(0);
+				});
+
+				it("does not flag primary key columns for removal", () => {
+					local.result = autoMigrator.diff("Author");
+					// The primary key "id" should never appear in removeColumns
+					local.removeNames = "";
+					for (local.col in local.result.removeColumns) {
+						local.removeNames = ListAppend(local.removeNames, local.col.name);
+					}
+					expect(ListFindNoCase(local.removeNames, "id")).toBe(0);
+				});
+
+			});
+
+			describe("diffAll()", () => {
+
+				it("returns a struct", () => {
+					local.result = autoMigrator.diffAll();
+					expect(local.result).toBeStruct();
+				});
+
+				it("only includes models with actual differences", () => {
+					local.result = autoMigrator.diffAll();
+					// Each entry should have non-empty change arrays
+					for (local.modelName in local.result) {
+						local.d = local.result[local.modelName];
+						local.hasChanges = ArrayLen(local.d.addColumns) > 0
+							|| ArrayLen(local.d.removeColumns) > 0
+							|| ArrayLen(local.d.changeColumns) > 0;
+						expect(local.hasChanges).toBeTrue();
+					}
+				});
+
+			});
+
+			describe("generateMigrationCFC()", () => {
+
+				it("produces valid CFC content with up and down methods", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [{name: "email", type: "string", nullable: true, "default": ""}],
+						removeColumns: [{name: "legacy_field"}],
+						changeColumns: [{name: "status", from: {type: "string"}, to: {type: "integer"}}]
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "update_test_models");
+
+					expect(local.cfc).toInclude("extends=""wheels.migrator.Migration""");
+					expect(local.cfc).toInclude("function up()");
+					expect(local.cfc).toInclude("function down()");
+				});
+
+				it("generates addColumn in up for new columns", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [{name: "email", type: "string", nullable: true, "default": ""}],
+						removeColumns: [],
+						changeColumns: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "add_email");
+
+					expect(local.cfc).toInclude('addColumn(table="test_models"');
+					expect(local.cfc).toInclude('columnType="string"');
+					expect(local.cfc).toInclude('columnName="email"');
+				});
+
+				it("generates removeColumn in down for new columns", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [{name: "email", type: "string", nullable: true, "default": ""}],
+						removeColumns: [],
+						changeColumns: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "add_email");
+
+					// The down() should have removeColumn to reverse the addColumn
+					expect(local.cfc).toInclude('removeColumn(table="test_models", columnName="email")');
+				});
+
+				it("generates removeColumn in up for dropped columns", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [{name: "legacy_field"}],
+						changeColumns: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "remove_legacy");
+
+					expect(local.cfc).toInclude('removeColumn(table="test_models", columnName="legacy_field")');
+				});
+
+				it("generates changeColumn in up for type changes", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: [{name: "status", from: {type: "string"}, to: {type: "integer"}}]
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "change_status");
+
+					expect(local.cfc).toInclude('changeColumn(table="test_models", columnName="status", columnType="integer")');
+				});
+
+				it("generates reverse changeColumn in down", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: [{name: "status", from: {type: "string"}, to: {type: "integer"}}]
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "change_status");
+
+					// down() should reverse: change back from integer to string
+					expect(local.cfc).toInclude('changeColumn(table="test_models", columnName="status", columnType="string")');
+				});
+
+				it("handles empty diff with no-op comments", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "no_changes");
+
+					expect(local.cfc).toInclude("No changes detected");
+				});
+
+				it("includes migration name in the hint", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [],
+						removeColumns: [],
+						changeColumns: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "my_migration_name");
+
+					expect(local.cfc).toInclude('hint="my_migration_name"');
+				});
+
+				it("generates allowNull attribute for addColumn", () => {
+					local.diffResult = {
+						modelName: "TestModel",
+						tableName: "test_models",
+						addColumns: [
+							{name: "required_field", type: "string", nullable: false, "default": ""},
+							{name: "optional_field", type: "string", nullable: true, "default": ""}
+						],
+						removeColumns: [],
+						changeColumns: []
+					};
+					local.cfc = autoMigrator.generateMigrationCFC(local.diffResult, "add_fields");
+
+					expect(local.cfc).toInclude("allowNull=false");
+					expect(local.cfc).toInclude("allowNull=true");
+				});
+
+			});
+
+		});
+
+	}
+
+}
