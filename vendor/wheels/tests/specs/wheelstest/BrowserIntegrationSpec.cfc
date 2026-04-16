@@ -303,8 +303,11 @@ component extends="wheels.WheelsTest" {
 
             it("resolves immediately when URL already matches", () => {
                 if (variables.skipBrowserTests) return;
-                variables.bc.visitUrl("data:text/html,<h1>Here</h1>");
-                variables.bc.waitForUrl("data:text/html,*", 5);
+                var targetUrl = "data:text/html,<h1>Here</h1>";
+                variables.bc.visitUrl(targetUrl);
+                // Use the exact URL rather than a glob — data: URLs don't
+                // follow path-based glob conventions.
+                variables.bc.waitForUrl(variables.bc.currentUrl(), 5);
             });
 
             it("throws on timeout when URL does not match", () => {

@@ -392,12 +392,18 @@ component {
 
     /**
      * Delete a specific cookie by name from the browser context.
+     * Constructs ClearCookiesOptions and sets the public `name` field
+     * directly (bypassing the overloaded setter) to avoid reflection
+     * ambiguity between setName(String) and setName(Pattern).
      */
     public BrowserClient function deleteCookie(required string name) {
         var opts = variables.$launcher.$buildOption(
-            className="com.microsoft.playwright.BrowserContext$ClearCookiesOptions",
-            setterMap={setName: arguments.name}
+            className="com.microsoft.playwright.BrowserContext$ClearCookiesOptions"
         );
+        // Set the public `name` field directly rather than calling the
+        // overloaded setName() setter. The field type is Object, so a
+        // CFML string assignment works without type-mismatch issues.
+        opts.name = arguments.name;
         variables.context.clearCookies(opts);
         return this;
     }
