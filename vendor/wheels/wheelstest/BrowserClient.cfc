@@ -368,6 +368,64 @@ component {
         variables.$scope = arguments.rootLocator;
     }
 
+    // ─── Cookies ─────────────────────────────────────────────────────
+
+    /**
+     * Set a cookie on the current browser context. Requires the page to
+     * have been navigated to a real HTTP origin (not data: URLs).
+     */
+    public BrowserClient function setCookie(
+        required string name,
+        required string value,
+        required string url
+    ) {
+        var cookieObj = variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.options.Cookie",
+            constructorArgs=[arguments.name, arguments.value],
+            setterMap={setUrl: arguments.url}
+        );
+        var cookieList = createObject("java", "java.util.Collections")
+            .singletonList(cookieObj);
+        variables.context.addCookies(cookieList);
+        return this;
+    }
+
+    /**
+     * Delete a specific cookie by name from the browser context.
+     */
+    public BrowserClient function deleteCookie(required string name) {
+        var opts = variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.BrowserContext$ClearCookiesOptions",
+            setterMap={setName: arguments.name}
+        );
+        variables.context.clearCookies(opts);
+        return this;
+    }
+
+    /**
+     * Read a cookie by name from the browser context. Returns a struct
+     * with name, value, domain, path, expires, httpOnly, secure.
+     * Throws BrowserAssertionFailed if cookie not found.
+     */
+    public struct function cookie(required string name) {
+        var cookies = variables.context.cookies();
+        for (var i = 0; i < cookies.size(); i++) {
+            var c = cookies.get(javaCast("int", i));
+            if (c.name == arguments.name) {
+                return {
+                    name: c.name,
+                    value: c.value,
+                    domain: c.domain ?: "",
+                    path: c.path ?: "",
+                    expires: c.expires ?: -1,
+                    httpOnly: c.httpOnly ?: false,
+                    secure: c.secure ?: false
+                };
+            }
+        }
+        $assertFail("Cookie '" & arguments.name & "' not found");
+    }
+
     // ─── Assertions: text + visibility + presence ────────────────────
 
     public BrowserClient function assertSee(required string text) {

@@ -663,5 +663,75 @@ component extends="wheels.WheelsTest" {
                 expect(variables.pg.locator("##o").textContent()).toBe("ESC");
             });
         });
+
+        describe("BrowserClient — cookies", () => {
+
+            // Cookie operations require a real HTTP origin — data: URLs do not
+            // support cookies. We detect the test server at http://localhost and
+            // the port from CGI or default to 8080. Tests skip if no server is
+            // reachable.
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                // Detect the test server port from CGI (the request that runs
+                // this spec is itself served by the test server).
+                var testPort = cgi.server_port ?: "8080";
+                variables.testBaseUrl = "http://localhost:" & testPort;
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl=variables.testBaseUrl, launcher=variables.launcher);
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("setCookie sets a cookie and cookie() reads it back", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                variables.bc.setCookie(name="testCookie", value="hello123", url=testUrl);
+                var c = variables.bc.cookie("testCookie");
+                expect(c.name).toBe("testCookie");
+                expect(c.value).toBe("hello123");
+            });
+
+            it("deleteCookie removes a specific cookie", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                variables.bc.setCookie(name="toDelete", value="bye", url=testUrl);
+                var c = variables.bc.cookie("toDelete");
+                expect(c.value).toBe("bye");
+                variables.bc.deleteCookie("toDelete");
+                expect(() => {
+                    variables.bc.cookie("toDelete");
+                }).toThrow("Wheels.BrowserAssertionFailed");
+            });
+
+            it("cookie() throws when cookie not found", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                expect(() => {
+                    variables.bc.cookie("nonexistent_cookie_xyz");
+                }).toThrow("Wheels.BrowserAssertionFailed");
+            });
+
+            it("setCookie is chainable", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                var result = variables.bc.setCookie(name="chain1", value="a", url=testUrl)
+                    .setCookie(name="chain2", value="b", url=testUrl);
+                expect(result).toBeInstanceOf("wheels.wheelstest.BrowserClient");
+            });
+        });
     }
 }
