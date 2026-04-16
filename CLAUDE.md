@@ -791,7 +791,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 Install Playwright locally before first run (~370MB download: JARs + Chromium):
 
 ```bash
-bash tools/install-playwright.sh    # temp bootstrap; replaced by `wheels browser:install` in PR 2
+wheels browser:install              # downloads JARs + Chromium
 ```
 
 Then run browser specs via the normal test suite:
@@ -801,30 +801,25 @@ bash tools/test-local.sh                    # skips browser specs if JARs missin
 
 ### Implemented DSL methods
 
-- **Navigation:** visit, visitUrl, back, forward, refresh
+- **Navigation:** visit, visitUrl, back, forward, refresh, visitRoute
 - **Interaction:** click, press, fill, type, clear, select, check, uncheck, attach, dragAndDrop
 - **Keyboard:** keys, pressEnter, pressTab, pressEscape
-- **Waiting:** waitFor, waitForText
+- **Waiting:** waitFor, waitForText, waitForUrl
 - **Scoping:** within(selector, callback)
+- **Cookies:** setCookie, deleteCookie, cookie, clearCookies
+- **Auth:** loginAs, logout
+- **Dialogs:** acceptDialog, dismissDialog, dialogMessage (Lucee-only via createDynamicProxy)
 - **Viewport:** resize, resizeToMobile, resizeToTablet, resizeToDesktop
 - **Script:** script (returns `page.evaluate` result), pause
 - **Assertions (text/vis/presence):** assertSee, assertDontSee, assertSeeIn, assertVisible, assertMissing, assertPresent, assertNotPresent
-- **Assertions (URL/title/query):** assertUrlIs, assertUrlContains, assertTitleContains, assertQueryStringHas, assertQueryStringMissing
+- **Assertions (URL/title/query):** assertUrlIs, assertUrlContains, assertTitleContains, assertQueryStringHas, assertQueryStringMissing, assertRouteIs
 - **Assertions (form):** assertInputValue, assertChecked, assertHasClass
 - **Terminals:** currentUrl, title, pageSource, text, value, screenshot
 
-### Deferred to follow-up PRs
+### Deferred to PR 4
 
-These need a reflection-based Playwright option-object builder (URLClassLoader + Lucee OSGi trap), a running fixture-app server, or `createDynamicProxy` plumbing — each worth its own focused pass:
-
-- Auth: `loginAs(identifier)`, `logout()` — test-only route + fixture server
-- Cookies: `setCookie`, `deleteCookie`, `cookie` — needs `options.Cookie`
-- Dialogs: `acceptDialog`, `dismissDialog`, `typeInDialog` — needs `createDynamicProxy` → `Consumer<Dialog>`
-- `waitForUrl`, `assertRouteIs` — depend on baseUrl concat + Wheels `urlFor` context
-- Configurable timeouts on `waitFor` — needs `Locator$WaitForOptions`
-- `visitRoute` — depends on controller-context `urlFor`
-- Viewport configuration at `BrowserTest` level — needs `ViewportSize` + `Browser$NewContextOptions`
-- Auto screenshot on failure — needs TestBox aroundEach + failure hook
+- CI workflow integration (Playwright install + browser specs in GitHub Actions)
+- Reference docs promotion from draft `.ai/` to published docs
 
 ### Key gotchas
 
