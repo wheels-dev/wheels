@@ -5,6 +5,10 @@ param name="request.wheels.params.format" default="html";
 
 // Setup paths
 local.docsPath = "/wheels/docs/src/";
+if (!directoryExists(expandPath(local.docsPath))) {
+    // Fall back to relative path
+    local.docsPath = "../../wheels/docs/src/";
+}
 local.summaryPath = local.docsPath & "SUMMARY.md";
 
 // Get navigation structure
