@@ -764,7 +764,7 @@ Client-side: `const es = new EventSource('/controller/notifications');`
 
 ## Browser Testing Quick Reference
 
-Foundation landed in v4.0 (PR 1 of 4). Specs extend `wheels.wheelstest.BrowserTest` and drive a real Chromium through `this.browser` — a fluent DSL wrapping Playwright Java.
+Shipped in v4.0 across PRs #2113, #2115, #2116. Specs extend `wheels.wheelstest.BrowserTest` and drive a real Chromium through `this.browser` — a fluent DSL wrapping Playwright Java.
 
 ```cfm
 // vendor/wheels/tests/specs/browser/LoginBrowserSpec.cfc
@@ -816,17 +816,15 @@ bash tools/test-local.sh                    # skips browser specs if JARs missin
 - **Assertions (form):** assertInputValue, assertChecked, assertHasClass
 - **Terminals:** currentUrl, title, pageSource, text, value, screenshot
 
-### Deferred to PR 4
-
-- CI workflow integration (Playwright install + browser specs in GitHub Actions)
-- Reference docs promotion from draft `.ai/` to published docs
-
 ### Key gotchas
 
 - **`##` in selectors** — CFML requires `##` to emit literal `#`. `"##email"` → `"#email"` at runtime.
 - **`client` is a Lucee reserved scope.** `var client = ...` in a closure throws "client scope is not enabled". Use `var c = ...` or `var bc = ...`.
 - **Data URLs work for most tests** — no server needed for ~95% of DSL coverage. Full HTTP integration (cookies, form submits, redirects) needs a running fixture app; that wiring is the same as Wheels Web app bootstrap (separate server + baseUrl).
 - **`this.browserTestSkipped`** — when Playwright JARs aren't installed (fresh CI, clean machine), `beforeAll` sets this flag and `browserDescribe`'s hooks short-circuit. All `it`s should check `if (this.browserTestSkipped) return;` to stay green on CI.
+- **CI runs browser tests** — `pr.yml` and `snapshot.yml` install Playwright JARs + Chromium (cached via `browser-manifest.json` hash). Browser specs run as part of the normal test suite. `WHEELS_BROWSER_TEST_BASE_URL=http://localhost:60007` is set automatically.
+- **Fixture routes** — `/_browser/login-as` and `/_browser/logout` are mounted automatically in test mode. They must come before `.wildcard()` in routes.cfm.
+- **Dialogs are Lucee-only** — `acceptDialog`, `dismissDialog`, `dialogMessage` use `createDynamicProxy` which is Lucee-specific. Specs skip gracefully on other engines.
 
 Full reference: `.ai/wheels/testing/browser-testing.md`.
 

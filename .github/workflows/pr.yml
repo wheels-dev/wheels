@@ -47,6 +47,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       LUCLI_VERSION: "0.3.3"
       WHEELS_CI: "true"
+      WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
     steps:
       - uses: actions/checkout@v5
 
@@ -68,6 +69,42 @@ jobs:
           sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
           sqlite3 wheelstestdb.db "SELECT 1;"
           sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+
+      - name: Cache Playwright
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.wheels/browser/lib
+            ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('vendor/wheels/browser-manifest.json') }}
+          restore-keys: |
+            playwright-
+
+      - name: Install Playwright
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.wheels/browser/lib
+
+          # Download JARs from manifest
+          for row in $(jq -c '.classpath[]' vendor/wheels/browser-manifest.json); do
+            URL=$(echo "$row" | jq -r '.url')
+            FILE=$(echo "$row" | jq -r '.filename')
+            SHA=$(echo "$row" | jq -r '.sha256')
+
+            echo "Downloading ${FILE}..."
+            curl -sL "$URL" -o ~/.wheels/browser/lib/"$FILE"
+
+            ACTUAL=$(sha256sum ~/.wheels/browser/lib/"$FILE" | cut -d' ' -f1)
+            if [ "$ACTUAL" != "$SHA" ]; then
+              echo "::error::SHA-256 mismatch for ${FILE}: expected ${SHA}, got ${ACTUAL}"
+              exit 1
+            fi
+          done
+
+          # Build classpath and install Chromium + system deps
+          CP=$(ls ~/.wheels/browser/lib/*.jar | tr '\n' ':')
+          java -cp "$CP" com.microsoft.playwright.CLI install --with-deps chromium
 
       - name: Download SQLite JDBC driver
         run: |
