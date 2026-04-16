@@ -434,6 +434,7 @@ component {
     private any function $constructWithArgs(required any klass, required array args) {
         var constructors = arguments.klass.getDeclaredConstructors();
         var targetArity = arrayLen(arguments.args);
+        var lastError = "";
 
         for (var i = 1; i <= arrayLen(constructors); i++) {
             var paramTypes = constructors[i].getParameterTypes();
@@ -449,14 +450,15 @@ component {
                 }
                 return constructors[i].newInstance(javaCast("Object[]", castedArgs));
             } catch (any e) {
-                // Type mismatch — try next constructor with same arity
+                lastError = e.message;
             }
         }
 
         throw(
             type="Wheels.BrowserOptionError",
-            message="No constructor with " & targetArity & " arg(s) found on "
+            message="No constructor with " & targetArity & " arg(s) succeeded on "
                 & arguments.klass.getName()
+                & (len(lastError) ? ". Last error: " & lastError : "")
         );
     }
 
