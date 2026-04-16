@@ -14,6 +14,10 @@ Upgrading an existing application involves more than swapping the `wheels` folde
 
 ---
 
+{% hint style="info" %}
+**Upgrading to Wheels 4.0?** See the dedicated [Upgrading to Wheels 4.0](upgrading-to-4.0.md) guide — it covers all breaking changes, the Legacy Compatibility Adapter, and recommended migrations.
+{% endhint %}
+
 ## General Upgrade Process for Existing Applications
 
 **1. Backup First**

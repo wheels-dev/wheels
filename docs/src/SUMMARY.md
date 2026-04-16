@@ -10,6 +10,7 @@
 * [Requirements](introduction/requirements.md)
 * [Manual Installation](introduction/manual-installation.md)
 * [Upgrading](introduction/upgrading.md)
+  * [Upgrading to Wheels 4.0](introduction/upgrading-to-4.0.md)
 * [Screencasts](introduction/screencasts.md)
 
 ## Command Line Tools
