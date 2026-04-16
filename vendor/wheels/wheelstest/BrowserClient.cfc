@@ -13,6 +13,11 @@ component {
     variables.context = "";
     variables.baseUrl = "";
     variables.$launcher = "";
+    variables.$pendingDialogAction = "";
+    variables.$lastDialogMessage = "";
+    variables.$dialogProxy = "";
+    variables.$dialogState = "";
+    variables.$dialogSupported = "";
 
     public BrowserClient function init(
         any page = "",
@@ -432,6 +437,45 @@ component {
         $assertFail("Cookie '" & arguments.name & "' not found");
     }
 
+    // ─── Dialogs ─────────────────────────────────────────────────────
+
+    /**
+     * Registers intent to accept the next JavaScript dialog (alert, confirm,
+     * prompt). Must be called BEFORE the interaction that triggers the dialog.
+     * The optional `text` argument provides input for prompt() dialogs.
+     *
+     *     this.browser.acceptDialog().click("##delete-btn")
+     *     this.browser.acceptDialog(text="yes").click("##confirm-btn")
+     */
+    public BrowserClient function acceptDialog(string text = "") {
+        $requireDialogSupport();
+        variables.$pendingDialogAction = {type: "accept", text: arguments.text};
+        return this;
+    }
+
+    /**
+     * Registers intent to dismiss the next JavaScript dialog. Must be called
+     * BEFORE the interaction that triggers the dialog.
+     *
+     *     this.browser.dismissDialog().click("##cancel-btn")
+     */
+    public BrowserClient function dismissDialog() {
+        $requireDialogSupport();
+        variables.$pendingDialogAction = {type: "dismiss", text: ""};
+        return this;
+    }
+
+    /**
+     * Returns the message text from the last dialog that was handled by
+     * acceptDialog() or dismissDialog(). Terminal — not chainable.
+     *
+     *     this.browser.acceptDialog().click("##alert-btn");
+     *     var msg = this.browser.dialogMessage();
+     */
+    public string function dialogMessage() {
+        return variables.$lastDialogMessage;
+    }
+
     // ─── Auth ────────────────────────────────────────────────────────
 
     /**
@@ -780,6 +824,79 @@ component {
             }
         }
         return result;
+    }
+
+    /**
+     * Checks that the current engine supports createDynamicProxy (Lucee-only).
+     * Caches the result so the check only runs once per BrowserClient instance.
+     */
+    private void function $requireDialogSupport() {
+        if (isBoolean(variables.$dialogSupported) && variables.$dialogSupported) return;
+        if (isBoolean(variables.$dialogSupported) && !variables.$dialogSupported) {
+            throw(
+                type="Wheels.BrowserDialogNotSupported",
+                message="Dialog handling requires Lucee. This engine does not support createDynamicProxy."
+            );
+        }
+        try {
+            createDynamicProxy(
+                {accept: function(x) {}},
+                ["java.lang.Runnable"]
+            );
+            variables.$dialogSupported = true;
+        } catch (any e) {
+            variables.$dialogSupported = false;
+            throw(
+                type="Wheels.BrowserDialogNotSupported",
+                message="Dialog handling requires Lucee. This engine does not support createDynamicProxy."
+            );
+        }
+    }
+
+    /**
+     * Registers a one-shot Consumer<Dialog> listener on the page. Called
+     * by dialog-aware interaction methods (click, press, keys) when
+     * $pendingDialogAction is set.
+     */
+    public void function $registerDialogListener() {
+        if (!isStruct(variables.$pendingDialogAction)) return;
+
+        var action = variables.$pendingDialogAction;
+        var state = {lastMessage: "", handled: false};
+        variables.$dialogState = state;
+
+        var handler = {
+            accept: function(dialog) {
+                state.lastMessage = dialog.message();
+                state.handled = true;
+                if (action.type == "accept") {
+                    if (len(action.text)) {
+                        dialog.accept(action.text);
+                    } else {
+                        dialog.accept();
+                    }
+                } else {
+                    dialog.dismiss();
+                }
+            }
+        };
+
+        variables.$dialogProxy = createDynamicProxy(handler, ["java.util.function.Consumer"]);
+        variables.page.onDialog(variables.$dialogProxy);
+    }
+
+    /**
+     * Cleans up after a dialog interaction. Copies the dialog message to
+     * $lastDialogMessage and resets pending state. Called by dialog-aware
+     * interaction methods after the Playwright action completes.
+     */
+    public void function $clearDialogListener() {
+        if (isStruct(variables.$dialogState)) {
+            variables.$lastDialogMessage = variables.$dialogState.lastMessage ?: "";
+        }
+        variables.$pendingDialogAction = "";
+        variables.$dialogProxy = "";
+        variables.$dialogState = "";
     }
 
 }
