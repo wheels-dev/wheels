@@ -24,7 +24,7 @@ The `/wheels_execute` command implements a comprehensive 7-phase development wor
 1. **Pre-Flight Documentation Loading** - Systematically load relevant patterns from `.ai` folder
 2. **Intelligent Analysis & Planning** - Parse requirements and create detailed implementation plan
 3. **Template-Driven Implementation** - Generate code using established patterns with error recovery
-4. **TestBox BDD Test Suite Creation** - Write comprehensive BDD tests before marking complete
+4. **WheelsTest BDD Test Suite Creation** - Write comprehensive BDD tests before marking complete
 5. **Multi-Level Testing Execution** - Run unit tests, integration tests, and validation
 6. **Comprehensive Browser Testing** - Test every button, form, and link automatically
 7. **Quality Assurance & Reporting** - Anti-pattern detection and final validation
@@ -51,7 +51,7 @@ The `/wheels_execute` command implements a comprehensive 7-phase development wor
 - **Consistency Enforcement**: Ensure patterns match existing codebase
 - **Security Integration**: Add CSRF protection, validation, authentication
 
-### Phase 4: TestBox BDD Test Suite Creation (10-20 minutes)
+### Phase 4: WheelsTest BDD Test Suite Creation (10-20 minutes)
 - **Model Tests**: Write BDD specs for all model functionality, validations, and associations
 - **Controller Tests**: Write BDD specs for all controller actions and security filters
 - **Integration Tests**: Write BDD specs for complete user workflows and CRUD operations
@@ -124,7 +124,7 @@ model("Post").findByKey(params.key);
 A feature is only considered complete when ALL of the following are true:
 - [ ] ✅ All relevant `.ai` documentation was consulted
 - [ ] ✅ No anti-patterns detected in generated code
-- [ ] ✅ **Comprehensive TestBox BDD test suite written and passing**
+- [ ] ✅ **Comprehensive WheelsTest BDD test suite written and passing**
 - [ ] ✅ **All model BDD specs pass (validations, associations, methods)**
 - [ ] ✅ **All controller BDD specs pass (actions, filters, security)**
 - [ ] ✅ **All integration BDD specs pass (user workflows, CRUD)**
@@ -189,7 +189,7 @@ The workflow automatically tests:
 Code will be automatically rejected if:
 - Any mixed argument styles are detected
 - Any `ArrayLen()` calls on model associations exist
-- **Any TestBox BDD spec fails**
+- **Any WheelsTest BDD spec fails**
 - **Test coverage is below 90%**
 - **Missing BDD specs for any component**
 - Any browser test fails
@@ -210,11 +210,11 @@ Code will be automatically rejected if:
 - Input validation must be implemented
 - SQL injection prevention must be verified
 
-## TestBox BDD Testing Requirements
+## WheelsTest BDD Testing Requirements
 
 ### Mandatory BDD Test Structure
 
-Every component MUST have comprehensive TestBox BDD specs using the following structure:
+Every component MUST have comprehensive WheelsTest BDD specs using the following structure:
 
 #### Model Specs (`/tests/specs/models/`)
 ```cfm
@@ -222,7 +222,7 @@ component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         // Setup database and test environment
-        application.testbox = new testbox.system.TestBox();
+        application.wheelstest = new wheels.wheelstest.system.TestBox();
     }
 
     function afterAll() {
@@ -318,7 +318,7 @@ component extends="wheels.WheelsTest" {
 component extends="wheels.WheelsTest" {
 
     function beforeAll() {
-        application.testbox = new testbox.system.TestBox();
+        application.wheelstest = new wheels.wheelstest.system.TestBox();
     }
 
     function run() {
@@ -503,7 +503,7 @@ wheels test all --coverage --reporter=json
 - **Overall**: Minimum 90% total coverage across all components
 
 #### Test Data Management
-- Use TestBox's `beforeEach()` and `afterEach()` for test isolation
+- Use WheelsTest's `beforeEach()` and `afterEach()` for test isolation
 - Create test fixtures for complex scenarios
 - Always clean up test data to prevent test pollution
 - Use database transactions for faster test execution
@@ -538,7 +538,7 @@ Error: ArrayLen() on query object detected
 → Validate: Browser test confirms functionality
 ```
 
-#### TestBox BDD Test Failure Recovery
+#### WheelsTest BDD Test Failure Recovery
 ```
 Error: BDD specs failing or missing
 → Load: .ai/wheels/testing/ documentation
@@ -595,7 +595,7 @@ Based on application type detected:
 - **Flexibility**: Claude Code can adapt the workflow dynamically
 - **Error Handling**: Better error recovery and human-readable feedback
 - **Documentation Integration**: Direct access to `.ai` folder without MCP resource limitations
-- **Comprehensive Testing**: TestBox BDD specs + Browser testing + Integration testing
+- **Comprehensive Testing**: WheelsTest BDD specs + Browser testing + Integration testing
 - **Test Coverage**: Mandatory 90%+ coverage with detailed analysis
 - **Quality Assurance**: No feature complete without passing test suite
 - **Reporting**: Rich, detailed reporting with screenshots, test results, and coverage analysis
