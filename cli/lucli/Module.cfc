@@ -1429,6 +1429,45 @@ component extends="modules.BaseModule" {
 		return runUpgradeCheck(targetVersion);
 	}
 
+	// ─────────────────────────────────────────────────
+	//  browser — Browser testing management
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Browser testing commands (install, test)
+	 */
+	public string function browser() {
+		var args = getArgs(arguments);
+
+		if (!arrayLen(args)) {
+			out("Usage: wheels browser <command>", "yellow");
+			out("");
+			out("Commands:", "bold");
+			out("  install  Download Playwright JARs and browser binaries");
+			out("  test     Run browser test suite");
+			out("");
+			out("Examples:", "bold");
+			out("  wheels browser install");
+			out("  wheels browser install --force");
+			out("  wheels browser test");
+			out("  wheels browser test --verbose");
+			return "";
+		}
+
+		var subcommand = lCase(args[1]);
+
+		switch (subcommand) {
+			case "install":
+				return browserInstall(args);
+			case "test":
+				return browserTest(args);
+			default:
+				out("Unknown browser command: #subcommand#", "red");
+				out("Valid commands: install, test");
+				return "";
+		}
+	}
+
 	// ═════════════════════════════════════════════════
 	//  PRIVATE — Implementation details
 	// ═════════════════════════════════════════════════
@@ -3465,6 +3504,259 @@ component extends="modules.BaseModule" {
 		var pos = find("=", arg);
 		if (pos == 0) return "";
 		return mid(arg, pos + 1, len(arg));
+	}
+
+	// ── Browser Testing ─────────────────────────────
+
+	private string function browserInstall(array args = []) {
+		var force = false;
+		var browserName = "chromium";
+
+		for (var i = 2; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (arg == "--force") {
+				force = true;
+			} else if (reFindNoCase("^--browser=", arg)) {
+				browserName = valueAfterEquals(arg);
+			}
+		}
+
+		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
+		if (!fileExists(manifestPath)) {
+			out("browser-manifest.json not found at: #manifestPath#", "red");
+			return "";
+		}
+		var manifest = deserializeJSON(fileRead(manifestPath));
+
+		var installDir = $resolveBrowserInstallDir();
+		out("Install directory: #installDir#");
+		out("Playwright version: #manifest.playwrightJavaVersion ?: 'unknown'#");
+		out("");
+
+		var downloaded = 0;
+		var skipped = 0;
+		for (var entry in manifest.classpath) {
+			var jarPath = installDir & "/lib/" & entry.filename;
+			var needsDownload = force;
+
+			if (!fileExists(jarPath)) {
+				needsDownload = true;
+			} else if (!force) {
+				var currentSha = $sha256(jarPath);
+				if (currentSha != lCase(entry.sha256)) {
+					out("  SHA mismatch: #entry.filename# - re-downloading", "yellow");
+					needsDownload = true;
+				}
+			}
+
+			if (needsDownload) {
+				out("  Downloading #entry.filename#...");
+				try {
+					var parentDir = getDirectoryFromPath(jarPath);
+					if (!directoryExists(parentDir)) {
+						directoryCreate(parentDir, true);
+					}
+					cfhttp(
+						url=entry.url,
+						method="GET",
+						getAsBinary="yes",
+						timeout=300,
+						result="local.httpResponse"
+					);
+					if (!findNoCase("200", local.httpResponse.statusCode)) {
+						out("  FAILED: HTTP #local.httpResponse.statusCode#", "red");
+						return "";
+					}
+					fileWrite(jarPath, local.httpResponse.fileContent);
+					var sha = $sha256(jarPath);
+					if (sha != lCase(entry.sha256)) {
+						out("  FAILED (SHA mismatch)", "red");
+						out("    Expected: #lCase(entry.sha256)#", "red");
+						out("    Got:      #sha#", "red");
+						return "";
+					}
+					out("  OK: #entry.filename#", "green");
+					downloaded++;
+				} catch (any e) {
+					out("  FAILED: #e.message#", "red");
+					return "";
+				}
+			} else {
+				out("  #entry.filename#", "green");
+				skipped++;
+			}
+		}
+
+		out("");
+		out("JARs: #downloaded# downloaded, #skipped# up-to-date");
+		out("");
+		out("Installing #browserName# browser binaries...");
+
+		var classpath = "";
+		for (var entry in manifest.classpath) {
+			if (len(classpath)) classpath &= ":";
+			classpath &= installDir & "/lib/" & entry.filename;
+		}
+
+		try {
+			cfexecute(
+				name="java",
+				arguments="-cp #classpath# com.microsoft.playwright.CLI install #browserName#",
+				timeout=300,
+				variable="local.stdout",
+				errorVariable="local.stderr"
+			);
+			out("Browser install OK", "green");
+		} catch (any e) {
+			out("Browser install FAILED", "red");
+			out(local.stderr ?: e.message, "red");
+			return "";
+		}
+
+		out("");
+		out("Browser testing ready. Run: wheels browser test", "green");
+		return "";
+	}
+
+	private string function browserTest(array args = []) {
+		var format = "text";
+		var verboseOutput = false;
+		var directory = "wheels.tests.specs.wheelstest";
+
+		for (var i = 2; i <= arrayLen(args); i++) {
+			var arg = args[i];
+			if (arg == "--verbose" || arg == "-v") {
+				verboseOutput = true;
+			} else if (reFindNoCase("^--format=", arg)) {
+				format = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--directory=", arg)) {
+				directory = valueAfterEquals(arg);
+			} else if (!arg.startsWith("--")) {
+				directory = arg;
+			}
+		}
+
+		// Pre-flight: verify Playwright JARs
+		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
+		if (!fileExists(manifestPath)) {
+			out("browser-manifest.json not found at: #manifestPath#", "red");
+			return "";
+		}
+		var manifest = deserializeJSON(fileRead(manifestPath));
+		var installDir = $resolveBrowserInstallDir();
+
+		var allInstalled = true;
+		var missingJars = [];
+		var mismatchedJars = [];
+		for (var entry in manifest.classpath) {
+			var jarPath = installDir & "/lib/" & entry.filename;
+			if (!fileExists(jarPath)) {
+				allInstalled = false;
+				arrayAppend(missingJars, entry.filename);
+			} else if ($sha256(jarPath) != lCase(entry.sha256)) {
+				allInstalled = false;
+				arrayAppend(mismatchedJars, entry.filename);
+			}
+		}
+
+		if (!allInstalled) {
+			out("Playwright not installed.", "red");
+			if (arrayLen(missingJars)) {
+				out("Missing: #arrayToList(missingJars, ', ')#", "yellow");
+			}
+			if (arrayLen(mismatchedJars)) {
+				out("SHA mismatch: #arrayToList(mismatchedJars, ', ')#", "yellow");
+			}
+			out("");
+			out("Run: wheels browser install");
+			return "";
+		}
+
+		out("Running browser tests...", "cyan");
+		out("Directory: #directory#");
+		out("");
+
+		var serverPort = $getServerPort();
+		var testUrl = "http://localhost:#serverPort#/wheels/core/tests?db=sqlite&format=json&directory=#directory#";
+
+		try {
+			var httpResult = makeHttpRequest(testUrl);
+		} catch (any e) {
+			out("Failed to reach test runner at: #testUrl#", "red");
+			out("Is the server running? Try: wheels start", "yellow");
+			return "";
+		}
+
+		if (format == "json") {
+			out(httpResult);
+			return "";
+		}
+
+		try {
+			var data = deserializeJSON(httpResult);
+			var totalPass = data.totalPass ?: 0;
+			var totalFail = data.totalFail ?: 0;
+			var totalError = data.totalError ?: 0;
+
+			out("Pass: #totalPass#  Fail: #totalFail#  Error: #totalError#");
+			out("");
+
+			for (var bundle in (data.bundleStats ?: [])) {
+				for (var suite in (bundle.suiteStats ?: [])) {
+					for (var spec in (suite.specStats ?: [])) {
+						if (listFindNoCase("Failed,Error", spec.status ?: "")) {
+							out("  #spec.status ?: ''#: #spec.name ?: 'unknown'#", "red");
+							if (verboseOutput && len(spec.failMessage ?: "")) {
+								out("    #left(spec.failMessage, 200)#", "yellow");
+							}
+						}
+					}
+				}
+			}
+
+			if (totalFail == 0 && totalError == 0) {
+				out("All browser tests passed.", "green");
+			}
+		} catch (any e) {
+			out("Failed to parse test results: #e.message#", "red");
+			if (verboseOutput) {
+				out(left(httpResult ?: "", 500));
+			}
+		}
+
+		return "";
+	}
+
+	private string function $resolveBrowserInstallDir() {
+		var envHome = "";
+		try {
+			envHome = createObject("java", "java.lang.System")
+				.getenv("WHEELS_BROWSER_HOME") ?: "";
+		} catch (any e) {}
+		if (len(trim(envHome))) return envHome;
+		var home = createObject("java", "java.lang.System").getProperty("user.home");
+		return home & "/.wheels/browser";
+	}
+
+	private string function $sha256(required string filePath) {
+		var md = createObject("java", "java.security.MessageDigest")
+			.getInstance("SHA-256");
+		var digest = md.digest(fileReadBinary(arguments.filePath));
+		return lCase(
+			createObject("java", "java.util.HexFormat").of().formatHex(digest)
+		);
+	}
+
+	private string function $getServerPort() {
+		try {
+			if (
+				structKeyExists(server, "lucli")
+				&& structKeyExists(server.lucli, "port")
+			) {
+				return server.lucli.port;
+			}
+		} catch (any e) {}
+		return detectServerPort() ?: "8080";
 	}
 
 	/**
