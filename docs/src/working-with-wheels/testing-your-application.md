@@ -1,18 +1,18 @@
 ---
-description: A comprehensive guide to testing your Wheels application using TestBox 6...
+description: A comprehensive guide to testing your Wheels application using WheelsTest...
 ---
 
 # Testing Your Application
 
-This guide provides comprehensive instructions for testing your Wheels 3.0 application using TestBox 6. Wheels 3.0 now includes TestBox integration as an enabled option, moving beyond the legacy RocketUnit framework. TestBox is already included in your installation through box.json dependency management.
+This guide provides comprehensive instructions for testing your Wheels application using WheelsTest — Wheels' in-house testing framework (a fork of Ortus TestBox). WheelsTest replaces the legacy RocketUnit framework and is included in your installation through box.json dependency management.
 
 ## Overview
 
-TestBox 6 is a next-generation testing framework for ColdFusion (CFML) based on BDD (Behavior Driven Development) and TDD (Test Driven Development), providing a clean, obvious syntax for writing tests. It serves as a comprehensive testing engine with multi-format output capabilities and database testing support.
+WheelsTest is a next-generation testing framework for ColdFusion (CFML) based on BDD (Behavior Driven Development) and TDD (Test Driven Development), providing a clean, obvious syntax for writing tests. It serves as a comprehensive testing engine with multi-format output capabilities and database testing support.
 
-For comprehensive TestBox documentation, refer to the [official TestBox documentation](https://testbox.ortusbooks.com/).
+WheelsTest inherits its BDD syntax from upstream Ortus TestBox. For comprehensive BDD syntax reference, see the [upstream TestBox documentation](https://testbox.ortusbooks.com/).
 
-### TestBox Features
+### WheelsTest Features
 
 - BDD style or xUnit style testing
 - Testing life-cycle methods
@@ -23,7 +23,7 @@ For comprehensive TestBox documentation, refer to the [official TestBox document
 - Test skipping and labels
 - Code coverage via FusionReactor
 
-For a complete list of features, see the [TestBox Features documentation](https://testbox.ortusbooks.com/v6.x/getting-started/overview).
+For a complete list of features, see the [upstream TestBox features documentation](https://testbox.ortusbooks.com/v6.x/getting-started/overview).
 
 ## Project Directory Structure
 
@@ -51,32 +51,32 @@ your-app/
 │   └── runner.cfm
 ```
 
-**Note**: By default, TestBox runs tests located in the `tests/specs/` directory, unless configured otherwise.
+**Note**: By default, WheelsTest runs tests located in the `tests/specs/` directory, unless configured otherwise.
 
-## TestBox Test Runner Configuration
+## WheelsTest Test Runner Configuration
 
 ### Main Test Runner
 
 Update `tests/runner.cfm`:
 
-For detailed information on TestBox runners and configuration options, refer to the [TestBox Runners documentation](https://testbox.ortusbooks.com/v6.x/getting-started/running-tests).
+For detailed runner and configuration options, refer to the [upstream TestBox runners documentation](https://testbox.ortusbooks.com/v6.x/getting-started/running-tests) (WheelsTest preserves the same runner API).
 
 ```cfscript
-<!--- TestBox Test Runner for Wheels 3.0 --->
+<!--- WheelsTest Test Runner for Wheels --->
 <cfsetting requestTimeOut="1800">
 <cfscript>
-    testBox = new testbox.system.TestBox(directory="tests.specs")
+    testBox = new wheels.wheelstest.system.TestBox(directory="tests.specs")
 
     setTestboxEnvironment()
 
     if (!structKeyExists(url, "format") || url.format eq "html") {
         result = testBox.run(
-            reporter = "testbox.system.reports.JSONReporter"
+            reporter = "wheels.wheelstest.system.reports.JSONReporter"
         );
     }
     else if(url.format eq "json"){
         result = testBox.run(
-            reporter = "testbox.system.reports.JSONReporter"
+            reporter = "wheels.wheelstest.system.reports.JSONReporter"
         );
         cfcontent(type="application/json");
         cfheader(name="Access-Control-Allow-Origin", value="*");
@@ -161,14 +161,14 @@ For detailed information on TestBox runners and configuration options, refer to 
     }
     else if (url.format eq "txt") {
         result = testBox.run(
-            reporter = "testbox.system.reports.TextReporter"
+            reporter = "wheels.wheelstest.system.reports.TextReporter"
         )        
         cfcontent(type="text/plain");
         writeOutput(result)
     }
     else if(url.format eq "junit"){
         result = testBox.run(
-            reporter = "testbox.system.reports.ANTJUnitReporter"
+            reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter"
         )
         cfcontent(type="text/xml");
         writeOutput(result)
@@ -186,7 +186,7 @@ For detailed information on TestBox runners and configuration options, refer to 
         // creating backup for original environment
         application.$$$wheels = Duplicate(application.wheels)
 
-        // load testbox routes
+        // load wheelstest routes
         application.wo.$include(template = "/tests/routes.cfm")
         application.wo.$setNamedRoutePositions()
 
@@ -288,9 +288,9 @@ Update `tests/populate.cfm` for test database setup:
 
 ## Writing Controller Tests
 
-TestBox 6 test bundles should extend `wheels.WheelsTest` and use BDD syntax with `describe()`, `it()`, and `expect()`.
+WheelsTest test bundles should extend `wheels.WheelsTest` and use BDD syntax with `describe()`, `it()`, and `expect()`.
 
-For comprehensive information on TestBox BDD syntax and expectations, see the [TestBox BDD documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer) and [TestBox Expectations documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations).
+For comprehensive BDD syntax and expectation reference, see the [upstream TestBox BDD primer](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer) and [expectations reference](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations).
 
 ### Example Controller Testing
 
@@ -547,7 +547,7 @@ component extends="wheels.WheelsTest" {
 
 ## Writing Function Tests
 
-For detailed information on testing functions and utility methods, refer to the [TestBox Unit Testing documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-xunit-primer).
+For detailed information on testing functions and utility methods, refer to the [upstream TestBox xUnit primer](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-xunit-primer) (WheelsTest preserves the xUnit-style API).
 
 ### Example Function Testing
 
@@ -609,15 +609,15 @@ component extends="wheels.WheelsTest" {
 
 ### Wheels 3.0 Test URL Structure
 
-Wheels 3.0 provides convenient URL routing for both TestBox and legacy testing:
+Wheels 3.0 provides convenient URL routing for both WheelsTest and legacy RocketUnit testing:
 
-**TestBox Testing URLs:**
+**WheelsTest URLs:**
 
 ```
-# Run your application TestBox tests
+# Run your application WheelsTest specs
 http://localhost:8080/wheels/app/tests
 
-# Run Wheels core framework TestBox tests  
+# Run Wheels core framework specs
 http://localhost:8080/wheels/core/tests
 ```
 
@@ -633,7 +633,7 @@ http://localhost:8080/wheels/legacy/core/tests
 
 ### Web Interface Access
 
-Access your TestBox tests through multiple formats:
+Access your WheelsTest tests through multiple formats:
 
 ```
 # HTML Interface (default)
@@ -646,14 +646,14 @@ http://localhost:8080/wheels/app/tests?format=json
 http://localhost:8080/wheels/app/tests?format=txt
 ```
 
-For more information on running tests and available formats, see the [TestBox Web Runner documentation](https://testbox.ortusbooks.com/v6.x/getting-started/running-tests/test-runner).
+For more information on running tests and available formats, see the [upstream TestBox web runner documentation](https://testbox.ortusbooks.com/v6.x/getting-started/running-tests/test-runner).
 
 ### Framework Core Testing
 
 You can also run tests for the Wheels framework itself:
 
 ```
-# Run Wheels core TestBox tests
+# Run Wheels core WheelsTest specs
 http://localhost:8080/wheels/core/tests
 
 # Run Wheels core legacy tests  
@@ -722,7 +722,7 @@ Your test suite should provide comprehensive coverage for:
 - Validation rules
 - Custom algorithms
 
-For detailed guidance on what to test and testing strategies, see the [TestBox Testing Code Coverage documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/introduction).
+For detailed guidance on what to test and testing strategies, see the [upstream TestBox testing and code coverage documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/introduction).
 
 ## Common Gotchas
 
@@ -803,9 +803,9 @@ component extends="Model" {
 }
 ```
 
-### TestBox JSON Output Contains Non-Standard Booleans
+### WheelsTest JSON Output Contains Non-Standard Booleans
 
-When parsing TestBox JSON results programmatically (e.g., in CI/CD scripts), be aware that the Wheels TestBox runner may produce JSON with unquoted `true`/`false` boolean values, which can cause strict JSON parsers to fail.
+When parsing WheelsTest JSON results programmatically (e.g., in CI/CD scripts), be aware that the WheelsTest runner may produce JSON with unquoted `true`/`false` boolean values, which can cause strict JSON parsers to fail.
 
 **Workaround:** Use Node.js `JSON.parse()` instead of tools like `jq` for parsing test results:
 
@@ -816,19 +816,19 @@ node -e "const j = JSON.parse(require('fs').readFileSync('results.json','utf8'))
 
 ## Best Practices
 
-For comprehensive testing best practices and advanced techniques, refer to the [TestBox Testing documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods).
+For comprehensive testing best practices and advanced techniques, refer to the [upstream TestBox life-cycle methods documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods) (WheelsTest preserves the same lifecycle).
 
 {% hint style="info" %}
 **Naming Convention for Test Specs**
 
-Always name your test specs with `Test` or `Spec` in their filename, otherwise TestBox 6 won’t detect and run them.
+Always name your test specs with `Test` or `Spec` in their filename, otherwise WheelsTest won’t detect and run them.
 {% endhint %}
 
 ---
 
 ## Legacy RocketUnit Testing Framework
 
-> **Note**: This section documents the legacy RocketUnit testing framework used in earlier Wheels versions. For new Wheels 3.0 applications, use the TestBox approach documented above. This information is maintained for reference and migration purposes.
+> **Note**: This section documents the legacy RocketUnit testing framework used in earlier Wheels versions. For new Wheels applications, use the WheelsTest approach documented above. This information is maintained for reference and migration purposes.
 
 ## Legacy RocketUnit Overview
 
@@ -1194,9 +1194,9 @@ The RocketUnit framework was tightly integrated with the Wheels framework, provi
 - Helper function testing
 - Layout and partial testing
 
-### Migration from Legacy RocketUnit to TestBox
+### Migration from Legacy RocketUnit to WheelsTest
 
-When migrating from the legacy RocketUnit system to TestBox 6, consider the following mapping:
+When migrating from the legacy RocketUnit system to WheelsTest, consider the following mapping:
 
 #### Syntax Migration
 
@@ -1210,7 +1210,7 @@ When migrating from the legacy RocketUnit system to TestBox 6, consider the foll
 - `tests/functions/` → `tests/specs/functional/`
 - `tests/requests/` → `tests/specs/controllers/`
 - Component extensions change from `app.tests.Test` to `wheels.WheelsTest`
-- File names changed to include `Spec` or `Test` to align with TestBox 6 naming requirements
+- File names changed to include `Spec` or `Test` to align with WheelsTest naming requirements
 
 #### Lifecycle Migration
 
@@ -1221,14 +1221,14 @@ When migrating from the legacy RocketUnit system to TestBox 6, consider the foll
 
 ### Legacy Reference and Historical Context
 
-The RocketUnit framework served the Wheels community well for many years, providing a solid foundation for test-driven development in CFML applications. While TestBox now provides more modern BDD/TDD capabilities, understanding the legacy system helps with:
+The RocketUnit framework served the Wheels community well for many years, providing a solid foundation for test-driven development in CFML applications. While WheelsTest now provides more modern BDD/TDD capabilities, understanding the legacy system helps with:
 
 - **Migration Planning**: Understanding existing test structures for conversion
 - **Historical Context**: Appreciating the evolution of CFML testing frameworks
 - **Legacy Maintenance**: Supporting older Wheels applications still using RocketUnit
 - **Framework Archaeology**: Understanding the testing heritage of the Wheels framework
 
-The comprehensive testing infrastructure provided by RocketUnit established many of the testing patterns and practices that continue in the modern TestBox implementation, ensuring continuity and familiarity for developers transitioning between the frameworks.
+The comprehensive testing infrastructure provided by RocketUnit established many of the testing patterns and practices that continue in the modern WheelsTest implementation, ensuring continuity and familiarity for developers transitioning between the frameworks.
 
 ---
 
@@ -1236,7 +1236,7 @@ This comprehensive testing approach ensures your Wheels 3.0 application is thoro
 
 ## Running Legacy RocketUnit Tests in Wheels 3.0
 
-If you already have application-level tests written with RocketUnit in a Wheels 2.x app, you don’t need to rewrite them immediately when upgrading to Wheels 3.0. Wheels 3.0 still provides backward compatibility for running RocketUnit tests alongside TestBox.
+If you already have application-level tests written with RocketUnit in a Wheels 2.x app, you don’t need to rewrite them immediately when upgrading to Wheels 3.0. Wheels 3.0 still provides backward compatibility for running RocketUnit tests alongside WheelsTest.
 To run your existing RocketUnit tests:
 
 1. Copy the entire contents of that `tests/` folder.
@@ -1245,4 +1245,4 @@ To run your existing RocketUnit tests:
 http://localhost:8080/wheels/legacy/app/tests
 
 
-This approach lets you continue running your legacy RocketUnit test suite unchanged inside a Wheels 3.0 project while you gradually migrate to TestBox. It’s particularly useful for teams upgrading large applications where a complete migration cannot be done in one step.
+This approach lets you continue running your legacy RocketUnit test suite unchanged inside a Wheels 3.0 project while you gradually migrate to WheelsTest. It’s particularly useful for teams upgrading large applications where a complete migration cannot be done in one step.
