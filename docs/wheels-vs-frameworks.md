@@ -266,9 +266,8 @@ Only Wheels and Laravel have full DI containers. Wheels uses explicit `map/bind`
 
 1. **Ecosystem size** — Dozens of packages vs thousands of gems/composer packages/PyPI packages
 2. **Community size** — Small compared to Rails/Laravel/Django communities
-3. **WebSocket support** — SSE covers many use cases but no bidirectional channel (deliberate design choice given CFML's request-response model)
-4. **Browser testing** — No native integration (Capybara/Dusk equivalents); HTTP-level testing via TestClient is supported
-5. **Asset pipeline maturity** — Vite integration is new; Rails/Laravel have years of refinement
+3. **Bidirectional real-time (WebSocket)** — Wheels ships SSE as the first-class real-time primitive (server→client streams with automatic heartbeats, channel subscriptions, and Last-Event-ID resumption). Full bidirectional WebSocket is a deliberate non-goal: it would require engine-specific plumbing that would compromise Wheels' cross-engine uniformity across Lucee, Adobe CF, and BoxLang. Use SSE for push; use plain HTTP for client→server.
+4. **Asset pipeline maturity** — Vite integration is new; Rails/Laravel have years of refinement
 
 ## Recently Closed Gaps (April 2026)
 
@@ -281,3 +280,4 @@ The following gaps were closed in v4.0:
 - **HTTP test client** ([#2099](https://github.com/wheels-dev/wheels/pull/2099))
 - **Parallel test execution** ([#2100](https://github.com/wheels-dev/wheels/pull/2100))
 - **Auto-migration rename detection** — explicit hints + heuristic suggestions via `AutoMigrator`, new `wheels dbmigrate diff` CLI command, MCP `wheels_migrate(action="diff")`
+- **Browser testing** ([#2113](https://github.com/wheels-dev/wheels/pull/2113), [#2115](https://github.com/wheels-dev/wheels/pull/2115), [#2116](https://github.com/wheels-dev/wheels/pull/2116), [#2121](https://github.com/wheels-dev/wheels/pull/2121)) — native CFML browser testing via Playwright Java. Specs extend `wheels.wheelstest.BrowserTest` and drive a real Chromium through a fluent DSL (~60 methods: navigation, interaction, assertions, waiting, scoping, cookies, loginAs/logout, dialogs, viewport, screenshots). `wheels browser:install` / `wheels browser:test` CLI commands, Playwright cache + install in CI.
