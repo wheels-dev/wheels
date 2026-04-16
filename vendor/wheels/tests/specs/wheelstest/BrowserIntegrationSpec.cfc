@@ -54,6 +54,17 @@ component extends="wheels.WheelsTest" {
             });
         });
 
+        describe("BrowserClient — launcher wiring", () => {
+
+            it("exposes launcher via getLauncher()", () => {
+                if (variables.skipBrowserTests) return;
+                var bc = new wheels.wheelstest.BrowserClient()
+                    .init(baseUrl="", launcher=variables.launcher);
+                expect(isObject(bc.getLauncher())).toBeTrue();
+                expect(bc.getLauncher().getState()).toBe("ready");
+            });
+        });
+
         describe("BrowserClient — navigation against real Chromium (data: URLs)", () => {
 
             // data: URLs avoid needing a fixture server; still exercises real
@@ -116,7 +127,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -189,7 +200,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -266,7 +277,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -318,7 +329,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -375,7 +386,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -421,7 +432,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -505,7 +516,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {

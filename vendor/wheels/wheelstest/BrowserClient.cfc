@@ -12,15 +12,18 @@ component {
     variables.page = "";
     variables.context = "";
     variables.baseUrl = "";
+    variables.$launcher = "";
 
     public BrowserClient function init(
         any page = "",
         any context = "",
-        string baseUrl = ""
+        string baseUrl = "",
+        any launcher = ""
     ) {
         variables.page = arguments.page;
         variables.context = arguments.context;
         variables.baseUrl = arguments.baseUrl;
+        variables.$launcher = arguments.launcher;
         return this;
     }
 
@@ -311,7 +314,8 @@ component {
             .init(
                 page=variables.page,
                 context=variables.context,
-                baseUrl=variables.baseUrl
+                baseUrl=variables.baseUrl,
+                launcher=variables.$launcher
             );
         scoped.$setScope(variables.page.locator(arguments.selector).first());
         arguments.callback(scoped);
@@ -531,6 +535,10 @@ component {
 
     public string function getBaseUrl() {
         return variables.baseUrl;
+    }
+
+    public any function getLauncher() {
+        return variables.$launcher;
     }
 
     // ─── Internal helpers ────────────────────────────────────────────

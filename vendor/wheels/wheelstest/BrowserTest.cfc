@@ -112,7 +112,8 @@ component extends="wheels.WheelsTest" {
             .init(
                 page=variables.$page,
                 context=variables.$context,
-                baseUrl=variables.$baseUrl
+                baseUrl=variables.$baseUrl,
+                launcher=variables.$launcher
             );
     }
 
