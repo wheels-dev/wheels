@@ -61,6 +61,45 @@ component {
         return this;
     }
 
+    // ─── Route Navigation ───────────────────────────────────────────
+
+    /**
+     * Navigates to a named route by resolving it through application.wo.URLFor().
+     * Requires the Wheels app to be running (routes must be loaded).
+     *
+     *     this.browser.visitRoute(route="browserTestDashboard")
+     *     this.browser.visitRoute(route="user", key=42)
+     */
+    public BrowserClient function visitRoute(
+        required string route,
+        any key = "",
+        string params = ""
+    ) {
+        var path = $resolveRoute(argumentCollection=arguments);
+        return visit(path);
+    }
+
+    /**
+     * Asserts that the current page URL matches the given named route.
+     * Compares path portions only (ignores protocol, host, port).
+     *
+     *     this.browser.visitRoute(route="browserTestDashboard")
+     *                 .assertRouteIs(route="browserTestDashboard")
+     */
+    public BrowserClient function assertRouteIs(
+        required string route,
+        any key = "",
+        string params = ""
+    ) {
+        var expectedPath = $resolveRoute(argumentCollection=arguments);
+        var actualPath = $pathFromUrl(currentUrl());
+        if (actualPath != expectedPath) {
+            $assertFail("Expected route '" & arguments.route & "' (" & expectedPath
+                & ") but was at " & actualPath);
+        }
+        return this;
+    }
+
     // ─── Interaction ─────────────────────────────────────────────────
 
     public BrowserClient function click(required string selector) {
@@ -842,6 +881,29 @@ component {
             }
         }
         return result;
+    }
+
+    /**
+     * Resolves a named route to a URL path using application.wo.URLFor().
+     * Ensures request.wheels.urlForCache exists (required by URLFor internals).
+     */
+    private string function $resolveRoute(
+        required string route,
+        any key = "",
+        string params = ""
+    ) {
+        if (!structKeyExists(request, "wheels") || !structKeyExists(request.wheels, "urlForCache")) {
+            if (!structKeyExists(request, "wheels")) {
+                request.wheels = {};
+            }
+            request.wheels.urlForCache = {};
+        }
+        return application.wo.URLFor(
+            route=arguments.route,
+            key=arguments.key,
+            params=arguments.params,
+            onlyPath=true
+        );
     }
 
     /**
