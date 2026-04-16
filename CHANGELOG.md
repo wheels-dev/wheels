@@ -20,17 +20,146 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+> **Wheels 4.0** — the release that started as 3.1 and grew into a major version. Closes multiple framework-maturity gaps against Rails, Laravel, and Django. See [docs/releases/wheels-4.0-audit.md](docs/releases/wheels-4.0-audit.md) for the full audit trail (185 merged PRs since 3.0.0). Contributors: @bpamiri, @zainforbjs, @chapmandu, @mlibbe.
+
 ### Added
-- Job worker daemon with CLI commands (`wheels jobs work/status/retry/purge/monitor`) for persistent background job processing with optimistic locking, timeout recovery, and live monitoring
-- Configurable exponential backoff for jobs via `this.baseDelay` and `this.maxDelay` with formula `Min(baseDelay * 2^attempt, maxDelay)`
-- Rate limiting middleware with `wheels.middleware.RateLimiter` supporting fixed window, sliding window, and token bucket strategies with in-memory and database storage
-- Composable pagination view helpers: `paginationInfo()`, `previousPageLink()`, `nextPageLink()`, `firstPageLink()`, `lastPageLink()`, `pageNumberLinks()`, and `paginationNav()` for building custom pagination UIs
-- Route model binding with `binding=true` on resource routes or `set(routeModelBinding=true)` globally to auto-resolve model instances from route key parameters
-- Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries
-- Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation
-- Query scopes with `scope()` for reusable, composable query fragments in models
-- Batch processing with `findEach()` and `findInBatches()` for memory-efficient record iteration
-- Expanded DI container with `asRequestScoped()` for per-request service instances, `service()` global helper, declarative `inject()` in controller config, `bind()` interface binding, auto-wiring of init() arguments, and `config/services.cfm` for service registration
+
+**ORM & data layer**
+- Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `whereNotIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries (#1922)
+- Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation (#1921)
+- Query scopes with `scope()` for reusable, composable query fragments in models (#1920)
+- Batch processing with `findEach()` and `findInBatches()` for memory-efficient record iteration (#1919)
+- Bulk insert/upsert operations (`insertAll()` / `upsertAll()`) with per-adapter native UPSERT syntax across MySQL, PostgreSQL, SQL Server, SQLite, H2, CockroachDB, and Oracle (#2101)
+- Polymorphic associations via `belongsTo(polymorphic=true)` and `hasMany(as=...)` with type-discriminator JOINs (#2104)
+- Advisory locks (`withAdvisoryLock(name, callback)`) and pessimistic locking (`.forUpdate()` on QueryBuilder) for `SELECT ... FOR UPDATE` (#2103)
+- CockroachDB database adapter — seventh supported database, with `unique_rowid()` PK convention and `RETURNING` clause identity select (#1876, #1986, #1993, #1999)
+- `throwOnColumnNotFound` config setting for strict column validation in WHERE clauses (#1938)
+- SQL identifier quoting for reserved-word conflicts in table/column names (#1874)
+
+**Migrations**
+- Auto-migration generation from model/DB schema diff (`AutoMigrator.diff(modelName)`, `writeMigration()`) (#2102)
+- Auto-migration rename detection via explicit hints plus heuristic suggestions (normalized-token + Levenshtein) with new `wheels dbmigrate diff` CLI command and MCP integration (#2112)
+
+**Routing**
+- Router modernization: `group()` helper, typed constraints (`whereNumber`, `whereAlpha`, `whereUuid`, `whereSlug`, `whereIn`), API versioning via `.version(1)`, performance indexes (#1891, #1894)
+- Route model binding with `binding=true` on resource routes or `set(routeModelBinding=true)` globally to auto-resolve model instances from route key parameters (#1929)
+
+**Middleware pipeline (new core framework)**
+- Middleware pipeline: closure-based chain running at dispatch level before controller instantiation, route-scoped via `.scope(middleware=[...])` or global via `set(middleware=[...])` (#1924)
+- Rate limiting middleware with `wheels.middleware.RateLimiter` supporting fixed window, sliding window, and token bucket strategies with in-memory and database storage (#1931)
+- SecurityHeaders middleware emits Content-Security-Policy, HSTS, and Permissions-Policy headers (#2036)
+- Multi-tenant support with per-request datasource switching (#1951)
+
+**Views**
+- Composable pagination view helpers: `paginationInfo()`, `previousPageLink()`, `nextPageLink()`, `firstPageLink()`, `lastPageLink()`, `pageNumberLinks()`, and `paginationNav()` for building custom pagination UIs (#1930)
+- XSS helpers formalized: `h()`, `hAttr()`, `stripTags()`, `stripLinks()` (#2097)
+- Redesigned v4.0 congratulations page for scaffolded apps (#2098)
+
+**Background jobs & real-time**
+- Job worker daemon with CLI commands (`wheels jobs work/status/retry/purge/monitor`) for persistent background job processing with optimistic locking, timeout recovery, and live monitoring (#1934)
+- Configurable exponential backoff for jobs via `this.baseDelay` and `this.maxDelay` with formula `Min(baseDelay * 2^attempt, maxDelay)` (#1934)
+- Pub/sub channels for SSE: `subscribeToChannel()`, `publish()`, `poll()`, with DatabaseAdapter and in-memory implementations (#1940)
+
+**Dependency injection**
+- Expanded DI container with `asRequestScoped()` for per-request service instances, `service()` global helper, declarative `inject()` in controller config, `bind()` interface binding, auto-wiring of init() arguments, and `config/services.cfm` for service registration (#1933)
+
+**Testing infrastructure**
+- HTTP test client (`TestClient`) for integration testing with fluent assertions: `visit()`, `assertOk()`, `assertSee()`, `assertJson()`, `assertJsonPath()`, cookie tracking, session support (#2099)
+- Parallel test execution runner (`ParallelRunner`) partitioning bundles across `cfthread` workers (#2100)
+- Browser testing via Playwright Java with `BrowserTest` base class, fluent DSL (navigation, interaction, keyboard, waiting, scoping, cookies, auth, dialogs, viewport, script, screenshots, assertions), and `wheels browser:install` command (#2113, #2115, #2116, #2121)
+
+**Package system**
+- Package system (`PackageLoader`) with `packages/` → `vendor/` activation model, `package.json` manifests with `provides.mixins` targets, per-package error isolation (#1995)
+- Module system with dependency graph (requires/replaces/suggests topological sort) and lazy loading (#2017)
+- LuCLI module distribution via wheels-cli-lucli repo (#2018)
+
+**Engine adapters & cross-engine**
+- Engine adapter modules encapsulating Lucee, Adobe CF, and BoxLang engine-specific behavior (#2016)
+- Interface-driven design contracts for framework extension points (#2014)
+
+**Migration & legacy**
+- Legacy compatibility adapter for 3.x → 4.0 migration soft-landing (#2015)
+
+**CLI & LuCLI**
+- LuCLI Phase 2: zero-Docker local testing via `tools/test-local.sh` (#2063)
+- LuCLI Phase 2: service layer, generators, MCP annotations (#1941)
+- LuCLI Phase 3–4: scaffold, seed, in-process services (#2065)
+- LuCLI-native Lucee 7 + SQLite CI pipeline (#2032)
+- LuCLI tier 1 commands module + TestBox test suite (#2092, #2093)
+- Playwright CLI commands for browser testing (#2013, #2021)
+
+**Configuration & developer experience**
+- `env()` helper for cross-scope environment variable access (#1985)
+- Pre-request logging (#1895)
+- Debug panel redesign (W-001, W-002) (#2000, #2001)
+- Gap migration detection in `migrateTo()` — detects and runs previously-skipped migrations, not just the endpoint (#1928)
+- Calculated property SQL validation at model config time (#2067)
+- GROUP BY validation with dot-notation, matching ORDER BY parser (#2084)
+
+### Changed
+
+- **Breaking:** CORS middleware default changed from wildcard `*` to deny-all. Apps must explicitly configure `allowOrigins` or set an explicit wildcard. (#2039)
+- **Breaking:** `allowEnvironmentSwitchViaUrl` defaults to `false` in production (#2076)
+- **Breaking:** Reload password must be non-empty for environment switching in production (#2082)
+- **Breaking:** HSTS header defaults on in production (#2081)
+- **Breaking:** CSRF cookie now sets `SameSite` attribute (#2035)
+- **Breaking:** RateLimiter `trustProxy` default changed from `true` to `false` (#2024)
+- **Breaking:** RateLimiter proxy strategy default changed to `last` (#2088)
+- **Breaking:** `wheels snippets` CLI command renamed to `wheels code` (#1852)
+- **Breaking:** TestBox test base class namespace renamed: new tests extend `wheels.WheelsTest` (old `wheels.Test` preserved during 4.0 as a deprecation path) (#1889)
+- **Breaking:** Tests directory `tests/specs/functions/` renamed to `tests/specs/functional/` (#1872)
+- **Breaking:** `application.wirebox` renamed to `application.wheelsdi` (#1888)
+- CFWheels branding removed from active code and metadata (continuation of the 3.0 rebrand) (#2064)
+- Project version bumped to 4.0.0-SNAPSHOT (#2066)
+- Internal rim modernized: WireBox/TestBox replaced; `init()` decomposed (#1883)
+- Monorepo flattened to clone-and-run structure (#1885)
+- Architecture hardening: XSS helpers consolidated, error hooks added, interface verification (#2097)
+- CSRF cookie encryption key auto-generated when empty (apps should still set their own for stable cross-deploy cookies) (#2054)
+- CI engine testing restructured: 42 jobs reduced to 8 via engine-grouped testing (#1939)
+
+### Deprecated
+
+- Legacy `plugins/` folder — superseded by the new `packages/` → `vendor/` activation model. Plugins still load, with a deprecation warning. (#1995)
+- RocketUnit test style for new tests — TestBox BDD is required going forward. Existing RocketUnit specs continue to run. (#1925)
+- `wheels.Test` test base class — extend `wheels.WheelsTest` instead (#1889)
+
+### Removed
+
+- Legacy RocketUnit core test scaffolding (existing app specs still run; framework-level runner removed) (#1925)
+- Railo compatibility workaround from `$initializeMixins` — Railo is no longer a target (#1987)
+- `server.cfc` file (#1902)
+- Stale monorepo artifacts after repository flatten (#1988)
+
+### Fixed
+
+- View lookup after `renderText()` / `renderWith()` no longer breaks subsequent partial rendering (#1991)
+- Scaffolded apps from `wheels new` now boot correctly (#2096)
+- CockroachDB primary key uses `unique_rowid()` instead of `SERIAL` (#1986)
+- CockroachDB SQL generation fixes and soft-fail removed from test matrix (#1999)
+- CockroachDB `RETURNING` clause identity select (#1993)
+- `$canonicalize` catches `IllegalArgumentException` for malformed percent-encoded sequences (#2006)
+- Base template build no longer fails on `vendor/.keep` gitignore negation (#1994)
+- Adobe Oracle coercion preserved after adapter module refactor (#2030, #2031)
+- Engine adapter startup + cross-engine compatibility fixes across Lucee/Adobe/BoxLang (#2028)
+- Enum scope WHERE clauses escape single quotes correctly (#2023)
+- Numerous CLI, docker, installer, and documentation fixes landed across ~25 PRs not itemized here; see `git log v3.0.0+33..HEAD --merges` for the full list.
+
+### Security
+
+This release includes 40+ security-hardening PRs. Key themes:
+
+- **SQL injection defenses** — QueryBuilder property + operator validation (#2025); ORDER BY clause hardening (#2026); `$quoteValue()` single-quote escaping (#2033); scope handler argument sanitization and blacklist expansion (#2043, #2045, #2061, #2070, #2090); geography property / WKT handling (#2044, #2055); enum scope WHERE clauses (#2056, #2070); `include` param in UPDATE queries (#2047); index hints via `$indexHint` (#2058).
+- **Path traversal** — partial template rendering (#2071); `guideImage` endpoint (#2037); MCP documentation reader (#2049, #2062); encoded-bypass attempts (#2089).
+- **Session, cookie, CSRF** — SameSite attribute on CSRF cookie (#2035); auto-generated CSRF encryption key when empty (#2054); session fixation prevention on login (#2034); open-redirect prevention in `redirectTo()` (#2038); CSRF key enforced in production (#2079).
+- **Console & reload endpoints** — `consoleeval` POST-only + robust IPv6 + Content-Type checks (#2059); rate limiting and constant-time comparison on reload (#2077); hash-based reload password comparison (#2022); hardened console REPL endpoint (#2046).
+- **CORS middleware** — wildcard → deny-all default (#2039); wildcard+credentials rejected (#2053); CORS + CSRF cookie defaults hardened (#2027).
+- **Rate limiter** — memory exhaustion and IP spoofing mitigations (#2041, #2048, #2080); fail-closed on lock timeout (#2069); proxy strategy default changed to `last` (#2088).
+- **SSE** — newline injection prevention in event fields and data (#2051).
+- **MCP endpoint** — auth gate + input validation (#2050); command injection blocklist replaced with structural allowlist (#2083); CSRNG session tokens (#2087); exception detail suppression (#2072); port validation (#2075); unnecessary CORS headers removed (#2074).
+- **XSS (pagination)** — HTML entity encoding bypass (#2057); `prependToPage` / `anchorDivider` / `appendToPage` sanitization (#2042, #2060).
+- **JWT** — algorithm claim validation to prevent algorithm confusion (#2079); constant-time signature verification (#2086).
+- **CLI shell argument validation** — deploy command sanitization (#2068, #2073); quote blocking and box fallback fix (#2073); command injection in `db shell` (#2040).
+- **Known security limitations** documented for operators (#2078).
 
 ----
 
