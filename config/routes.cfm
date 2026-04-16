@@ -8,7 +8,7 @@
 		// CLI-Appends-Here
 
 		// Browser test fixture routes — only available in testing environment
-		.scope(path="/_browser", $call="scope")
+		.scope(path="/_browser")
 			.get(name="browserTestHome", pattern="/home", to="BrowserTestHome##index")
 			.get(name="browserTestLogin", pattern="/login", to="BrowserTestSessions##new")
 			.post(name="browserTestAuthenticate", pattern="/login", to="BrowserTestSessions##create")

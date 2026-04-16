@@ -2,11 +2,11 @@ component extends="wheels.wheelstest.BrowserTest" {
 
     function run() {
 
-        describe("Dialog handling", () -> {
+        describe("Dialog handling", () => {
 
-            browserDescribe("acceptDialog", () -> {
+            browserDescribe("acceptDialog", () => {
 
-                it("auto-accepts an alert dialog", () -> {
+                it("auto-accepts an alert dialog", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<button id='btn' onclick=""alert('hello')"">Alert</button>")
@@ -17,7 +17,7 @@ component extends="wheels.wheelstest.BrowserTest" {
                     expect(true).toBeTrue();
                 });
 
-                it("captures the dialog message text", () -> {
+                it("captures the dialog message text", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<button id='btn' onclick=""alert('test message')"">Alert</button>")
@@ -26,7 +26,7 @@ component extends="wheels.wheelstest.BrowserTest" {
                     expect(this.browser.dialogMessage()).toBe("test message");
                 });
 
-                it("accepts a confirm dialog returning true", () -> {
+                it("accepts a confirm dialog returning true", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<button id='btn' onclick=""document.getElementById('r').textContent=confirm('sure?')"">Confirm</button><span id='r'></span>")
@@ -35,7 +35,7 @@ component extends="wheels.wheelstest.BrowserTest" {
                     expect(this.browser.text("##r")).toBe("true");
                 });
 
-                it("sends text to a prompt dialog", () -> {
+                it("sends text to a prompt dialog", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<button id='btn' onclick=""document.getElementById('r').textContent=prompt('name?')"">Prompt</button><span id='r'></span>")
@@ -46,9 +46,9 @@ component extends="wheels.wheelstest.BrowserTest" {
 
             });
 
-            browserDescribe("dismissDialog", () -> {
+            browserDescribe("dismissDialog", () => {
 
-                it("dismisses a confirm dialog returning false", () -> {
+                it("dismisses a confirm dialog returning false", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<button id='btn' onclick=""document.getElementById('r').textContent=confirm('sure?')"">Confirm</button><span id='r'></span>")
@@ -57,7 +57,7 @@ component extends="wheels.wheelstest.BrowserTest" {
                     expect(this.browser.text("##r")).toBe("false");
                 });
 
-                it("dismisses a prompt returning null", () -> {
+                it("dismisses a prompt returning null", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<button id='btn' onclick=""document.getElementById('r').textContent=String(prompt('name?'))"">Prompt</button><span id='r'></span>")
@@ -68,9 +68,9 @@ component extends="wheels.wheelstest.BrowserTest" {
 
             });
 
-            browserDescribe("dialog with press()", () -> {
+            browserDescribe("dialog with press()", () => {
 
-                it("handles dialog triggered by press()", () -> {
+                it("handles dialog triggered by press()", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<button onclick=""alert('pressed')"">Click me</button>")
@@ -81,9 +81,9 @@ component extends="wheels.wheelstest.BrowserTest" {
 
             });
 
-            browserDescribe("dialog with keys()", () -> {
+            browserDescribe("dialog with keys()", () => {
 
-                it("handles dialog triggered by keys()", () -> {
+                it("handles dialog triggered by keys()", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<input id='inp' onkeydown=""if(event.key==='Enter')alert('enter pressed')"">")
@@ -94,9 +94,9 @@ component extends="wheels.wheelstest.BrowserTest" {
 
             });
 
-            browserDescribe("dialogMessage", () -> {
+            browserDescribe("dialogMessage", () => {
 
-                it("returns empty string when no dialog has fired", () -> {
+                it("returns empty string when no dialog has fired", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitUrl("data:text/html,<p>no dialog</p>");

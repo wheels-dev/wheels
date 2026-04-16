@@ -2,18 +2,18 @@ component extends="wheels.wheelstest.BrowserTest" {
 
     function run() {
 
-        describe("Route navigation (fixture server)", () -> {
+        describe("Route navigation (fixture server)", () => {
 
-            browserDescribe("visitRoute", () -> {
+            browserDescribe("visitRoute", () => {
 
-                it("navigates to a named route", () -> {
+                it("navigates to a named route", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestHome")
                         .assertSee("Welcome to the browser test fixture");
                 });
 
-                it("navigates to dashboard route", () -> {
+                it("navigates to dashboard route", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .loginAs("alice@example.com")
@@ -23,16 +23,16 @@ component extends="wheels.wheelstest.BrowserTest" {
 
             });
 
-            browserDescribe("assertRouteIs", () -> {
+            browserDescribe("assertRouteIs", () => {
 
-                it("passes when on the correct route", () -> {
+                it("passes when on the correct route", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestHome")
                         .assertRouteIs(route="browserTestHome");
                 });
 
-                it("fails with descriptive message when on wrong route", () -> {
+                it("fails with descriptive message when on wrong route", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestHome");
@@ -47,9 +47,9 @@ component extends="wheels.wheelstest.BrowserTest" {
 
             });
 
-            browserDescribe("$resolveRoute", () -> {
+            browserDescribe("$resolveRoute", () => {
 
-                it("resolves a named route to a path", () -> {
+                it("resolves a named route to a path", () => {
                     if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestLogin")
