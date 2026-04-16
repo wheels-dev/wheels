@@ -162,7 +162,7 @@ If you're making a **breaking change** or working on **core functionality**, it'
 
 **Writing Tests:**
 
-* Use TestBox for new test cases
+* Use WheelsTest for new test cases
 * Place tests in the appropriate `/tests` directory
 * Follow existing test patterns and naming conventions
 * Include both positive and negative test cases
@@ -187,7 +187,7 @@ Understanding the monorepo structure will help you navigate contributions:
 * `/docs/` — API documentation and guides
 * `/examples/` — Sample applications
 * `/templates/` — Scaffolding templates for new apps
-* `/tests/` — TestBox test suites
+* `/tests/` — WheelsTest test suites
 * `/tools/` — Build scripts, Docker configs, utilities
 
 **Important Files:**
@@ -204,8 +204,8 @@ Understanding the monorepo structure will help you navigate contributions:
 **Dependencies:**
 Wheels 3.0 includes these core dependencies (automatically managed):
 
-* **WireBox** — Dependency injection and object management
-* **TestBox** — Testing framework
+* **wheelsdi** — Dependency injection and object management (in-house; formerly WireBox)
+* **WheelsTest** — Testing framework (in-house; formerly TestBox)
 
 **Database Support:**
 
@@ -241,6 +241,6 @@ When asking for help:
 
 ---
 
-💡 **New to Wheels 3.0?** The framework now uses a monorepo architecture with WireBox and TestBox as core dependencies. The directory structure has been modernized with `/app`, `/public`, and `/vendor` directories. Take time to explore these changes.
+💡 **New to Wheels 3.0?** The framework now uses a monorepo architecture with wheelsdi and WheelsTest as core components. The directory structure has been modernized with `/app`, `/public`, and `/vendor` directories. Take time to explore these changes.
 
 **Thank you for contributing to Wheels!**

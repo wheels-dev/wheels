@@ -26,7 +26,7 @@ packages/sentry/
 ├── box.json               # CommandBox package metadata
 ├── README.md              # User-facing documentation
 └── tests/
-    └── SentrySpec.cfc     # TestBox BDD specs
+    └── SentrySpec.cfc     # WheelsTest BDD specs
 ```
 
 ## Configuration

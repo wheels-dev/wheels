@@ -1,6 +1,6 @@
 # Wheels Testing Quick Start
 
-This directory contains the test suite for your Wheels application using TestBox.
+This directory contains the test suite for your Wheels application using WheelsTest.
 
 ## Quick Start
 
@@ -21,13 +21,13 @@ wheels generate test api v1.users
 
 ```bash
 # Run all tests
-box testbox run
+wheels test run
 
 # Run specific directory
-box testbox run --directory=tests/specs/unit
+wheels test run --directory=tests/specs/unit
 
 # Watch mode for TDD
-box testbox watch
+wheels test watch
 ```
 
 Or visit: `http://localhost/tests/runner.cfm`
@@ -136,6 +136,5 @@ wheels test migrate tests --recursive
 ## Documentation
 
 For comprehensive documentation, see:
-- [Testing with TestBox Guide](/docs/testing-with-testbox.md)
-- [TestBox Documentation](https://testbox.ortusbooks.com/)
 - [Wheels Testing Guide](https://wheels.dev/3.1.0/guides/working-with-wheels/testing-your-application)
+- [BDD syntax reference (upstream TestBox docs)](https://testbox.ortusbooks.com/) — WheelsTest inherits the same BDD syntax as upstream Ortus TestBox

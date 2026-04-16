@@ -457,7 +457,7 @@ Disabled links render as `<span class="disabled">` by default. All helpers accep
 
 ## Testing Quick Reference
 
-**All new tests use TestBox BDD syntax.** RocketUnit (`test_` prefix, `assert()`) is legacy only — never use it for new tests.
+**All new tests use WheelsTest BDD syntax.** RocketUnit (`test_` prefix, `assert()`) is legacy only — never use it for new tests.
 
 ### Two test suites
 - **App tests**: `/wheels/app/tests` — project-specific tests in `tests/specs/`. Uses `tests/populate.cfm` for test data and `tests/TestRunner.cfc` for setup.
@@ -774,7 +774,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 
     function run() {
         // browserDescribe() wraps describe() with beforeEach/afterEach that
-        // create a fresh Page per `it`. TestBox's BDD lifecycle only treats
+        // create a fresh Page per `it`. WheelsTest's BDD lifecycle only treats
         // beforeAll/afterAll as class-level, so we register per-it hooks
         // from inside the suite body via this helper.
         browserDescribe("Login flow", () => {
@@ -838,7 +838,7 @@ Deeper documentation lives in `.ai/` — Claude will search it automatically whe
 - `.ai/wheels/views/` — layouts, partials, form helpers (including HTML5), link helpers
 - `.ai/wheels/database/` — migrations, queries, seeding, advanced operations
 - `.ai/wheels/cli/` — generators (including admin generator)
-- `.ai/wheels/testing/` — unit testing with TestBox, test infrastructure, common gotchas
+- `.ai/wheels/testing/` — unit testing with WheelsTest, test infrastructure, common gotchas
 - `.ai/wheels/configuration/` — routing, environments, settings, DI container
 
 ## Commit Message Conventions

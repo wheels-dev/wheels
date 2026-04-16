@@ -125,7 +125,7 @@ plugins/            # Third-party plugins
 - **3.1.0-snapshot** - MVC Framework
 - **Lucee 5,6,7, Adobe 2018-2025, Boxlang** - CFML Engine
 - **Database** - MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, H2
-- **TestBox** - Testing framework (vendored with Wheels)
+- **WheelsTest** - Testing framework (vendored with Wheels)
 
 ### Frontend
 
@@ -293,10 +293,10 @@ tests/
 
 ```bash
 # Run all tests
-box testbox run
+wheels test run
 
 # Run specific test suite
-box testbox run --directory tests/requests/
+wheels test run --directory tests/requests/
 ```
 
 ## Support & Resources

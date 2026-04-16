@@ -46,7 +46,7 @@ public/
   Application.cfc
   index.cfm
 tests/
-  TestBox/
+  specs/
 vendor
 ```
 
@@ -141,7 +141,7 @@ compose.yml
 
 **test-artifacts/** - Files generated during test suite execution, typically excluded from version control.
 
-**tests/** - Complete TestBox test suite for framework validation and regression testing.
+**tests/** - Complete WheelsTest test suite for framework validation and regression testing.
 
 **tools/** - Build scripts, Docker configurations, and development utilities for maintaining the framework.
 

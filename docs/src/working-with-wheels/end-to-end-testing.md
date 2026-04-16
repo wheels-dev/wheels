@@ -7,7 +7,7 @@ description: A comprehensive guide to end-to-end testing your Wheels application
 This guide covers how to install, configure, and run Playwright end-to-end (E2E) tests for your Wheels application. Playwright enables you to test your application from a user's perspective, simulating real browser interactions across multiple browsers.
 
 {% hint style="info" %}
-This guide covers the **Node.js/TypeScript Playwright** approach. For native CFML browser testing that runs inside TestBox, see [Browser Testing](browser-testing.md).
+This guide covers the **Node.js/TypeScript Playwright** approach. For native CFML browser testing that runs inside WheelsTest, see [Browser Testing](browser-testing.md).
 {% endhint %}
 
 ## Overview
@@ -490,6 +490,6 @@ Verify the server is listening on the correct interface:
 
 ## Related Documentation
 
-- [Testing Your Application](testing-your-application.md) - Unit and integration testing with TestBox
+- [Testing Your Application](testing-your-application.md) - Unit and integration testing with WheelsTest
 - [Using the Test Environment](using-the-test-environment.md) - Docker-based test environment for framework testing
 - [Request Handling](handling-requests-with-controllers/request-handling.md) - Understanding Wheels request lifecycle

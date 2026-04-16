@@ -1,11 +1,11 @@
 # Controller Testing
 
 ## Description
-Comprehensive guide to testing Wheels controllers using TestBox 5 with modern BDD (Behavior Driven Development) syntax. Wheels 3.0 uses TestBox integration for testing controllers with `describe()`, `it()`, and `expect()` patterns.
+Comprehensive guide to testing Wheels controllers using WheelsTest with modern BDD (Behavior Driven Development) syntax. Wheels uses WheelsTest for testing controllers with `describe()`, `it()`, and `expect()` patterns.
 
-## TestBox BDD Testing Structure
+## WheelsTest BDD Testing Structure
 
-### Modern Test Structure (TestBox 5)
+### Modern Test Structure (WheelsTest)
 ```cfm
 // tests/specs/controllers/ProductsControllerSpec.cfc
 component extends="wheels.WheelsTest" {
@@ -862,7 +862,7 @@ function setupTestData() {
 }
 ```
 
-## TestBox BDD Best Practices
+## WheelsTest BDD Best Practices
 
 ### 1. Write Focused, Descriptive Tests
 ```cfm
@@ -964,13 +964,13 @@ describe("Email Integration", () => {
 });
 ```
 
-## Modern TestBox Resources
+## BDD Reference — Upstream TestBox Docs
 
-For comprehensive TestBox 5 documentation:
-- [TestBox BDD Documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer)
-- [TestBox Expectations](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations)
-- [MockBox Documentation](https://testbox.ortusbooks.com/v6.x/mocking/mockbox)
-- [TestBox Life-cycle Methods](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods)
+WheelsTest inherits the BDD syntax from upstream Ortus TestBox. For comprehensive BDD, expectation, and lifecycle reference:
+- [BDD Primer](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer)
+- [Expectations](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations)
+- [MockBox](https://testbox.ortusbooks.com/v6.x/mocking/mockbox)
+- [Life-cycle Methods](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods)
 
 ## Related Documentation
 - [Controller Architecture](./architecture.md)

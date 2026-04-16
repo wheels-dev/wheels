@@ -33,7 +33,7 @@ Three CFCs under `vendor/wheels/wheelstest/`:
 
 1. **`BrowserLauncher.cfc`** — process-level owner of the Playwright instance. Reads `vendor/wheels/browser-manifest.json`, walks the `classpath[]` array to compute JAR paths, loads them into a `URLClassLoader` with `PlatformClassLoader` as parent (critical — see Gotchas below), acquires one `Browser` per engine, caches it. State machine: `uninitialized → ready → shut-down`.
 2. **`BrowserClient.cfc`** — the DSL. Takes a `Page`, a `BrowserContext`, and a base URL; wraps Playwright's locator/page APIs with the ~40 chainable methods enumerated below.
-3. **`BrowserTest.cfc`** — TestBox BDD base class. `beforeAll` lazy-initializes an application-scoped launcher so all spec CFCs in a test run share one Chromium startup (~1.7 s). Provides `browserDescribe(title, body)` which wraps `describe()` with per-`it` beforeEach/afterEach that create a fresh `BrowserContext` and inject it as `this.browser`.
+3. **`BrowserTest.cfc`** — WheelsTest BDD base class. `beforeAll` lazy-initializes an application-scoped launcher so all spec CFCs in a test run share one Chromium startup (~1.7 s). Provides `browserDescribe(title, body)` which wraps `describe()` with per-`it` beforeEach/afterEach that create a fresh `BrowserContext` and inject it as `this.browser`.
 
 ## Spec structure
 
@@ -60,7 +60,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 
 ### Why `browserDescribe` instead of `beforeEach` on the class
 
-TestBox BDD treats `beforeAll`/`afterAll` as class-level lifecycle hooks but `beforeEach`/`afterEach` as *registration* functions that must be called from inside a `describe` body. So the natural "add a method named `beforeEach` to the parent class and let inheritance do its thing" pattern doesn't work. `browserDescribe` sidesteps this by calling `describe(...)` internally and registering the hooks from within the suite body.
+WheelsTest BDD treats `beforeAll`/`afterAll` as class-level lifecycle hooks but `beforeEach`/`afterEach` as *registration* functions that must be called from inside a `describe` body. So the natural "add a method named `beforeEach` to the parent class and let inheritance do its thing" pattern doesn't work. `browserDescribe` sidesteps this by calling `describe(...)` internally and registering the hooks from within the suite body.
 
 ## CI / skip logic
 
@@ -314,7 +314,7 @@ Dialog handling requires implementing Playwright's `Consumer<Dialog>` Java inter
 
 The `/_browser/*` fixture routes (login-as, logout, login form, protected page) are mounted by the framework in test mode. They must come before `.wildcard()` in `config/routes.cfm` or the wildcard catches them first. The framework handles this automatically, but custom route files that override the default order should be aware.
 
-### Fat arrow closures in TestBox suites
+### Fat arrow closures in WheelsTest suites
 
 CFML fat arrow syntax (`() => { ... }`) works in most contexts, but closure semantics can differ from `function() { ... }` in edge cases related to `this` binding and component scope. In browser test specs, fat arrows work well for `describe`/`it` callbacks because `this` refers to the spec CFC instance. If you encounter scope issues, switch to explicit `function()` syntax.
 

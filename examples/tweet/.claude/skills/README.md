@@ -108,7 +108,7 @@ Generate database-agnostic Wheels migrations for schema changes.
 **Auto-fixes all detected issues before writing files!**
 
 #### 6. [wheels-test-generator](wheels-test-generator/SKILL.md)
-Generate TestBox BDD test specs for models, controllers, and integrations.
+Generate WheelsTest BDD test specs for models, controllers, and integrations.
 
 **Activates when:**
 - Creating tests/specs

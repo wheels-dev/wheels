@@ -2,9 +2,9 @@
 
 ## Two Test Frameworks
 
-Wheels has two test frameworks. **All new tests must use TestBox.**
+Wheels has two test frameworks. **All new tests must use WheelsTest.**
 
-| | TestBox (current) | RocketUnit (legacy) |
+| | WheelsTest (current) | RocketUnit (legacy) |
 |---|---|---|
 | **Syntax** | `describe`/`it`/`expect` (BDD) | `test_methodName()` + `assert()` |
 | **Base class** | `wheels.WheelsTest` | `wheels.Test` |
@@ -12,7 +12,7 @@ Wheels has two test frameworks. **All new tests must use TestBox.**
 | **Runner URL** | `/wheels/app/tests` | `/wheels/tests/core` |
 | **Status** | Active, all new tests | Legacy, backwards-compat only |
 
-## TestBox Test Structure
+## WheelsTest Test Structure
 
 ### File Layout
 
@@ -30,7 +30,7 @@ tests/
     controllers/     <- Controller specs
     functional/      <- End-to-end specs
   populate.cfm       <- Creates/seeds test tables (runs before every test suite)
-  runner.cfm         <- TestBox runner (web entry point)
+  runner.cfm         <- WheelsTest runner (web entry point)
 ```
 
 ### Writing a Spec
@@ -59,7 +59,7 @@ component extends="wheels.WheelsTest" {
 ### Key Points
 
 - **Extend `wheels.WheelsTest`** — this injects all `application.wo` methods (like `model()`) into the test scope automatically.
-- **Use `function run()`** — TestBox calls this to discover specs. Not `init()`, not `config()`.
+- **Use `function run()`** — WheelsTest calls this to discover specs. Not `init()`, not `config()`.
 - **Arrow functions work** — `() => {}` is fine for `describe`/`it`/`beforeEach`.
 
 ## Test Models
@@ -144,7 +144,7 @@ for (const b of j.bundleStats) {
 "
 ```
 
-**Why node instead of jq?** The Wheels TestBox JSON response contains unquoted `true`/`false` booleans that break strict JSON parsers. Node's `JSON.parse` handles them.
+**Why node instead of jq?** The WheelsTest JSON response contains unquoted `true`/`false` booleans that break strict JSON parsers. Node's `JSON.parse` handles them.
 
 ## Common Gotchas
 
@@ -197,4 +197,4 @@ DROP TABLE IF EXISTS c_o_r_e_authors <!--- parent --->
 
 ### 5. Pre-existing Test Failures
 
-The `vendor/wheels/rocketunit_tests/` legacy RocketUnit suite has some pre-existing failures (e.g., in `model.errors`). Don't chase these — they're known issues in the legacy suite. The RocketUnit test files have been removed; only infrastructure (Test.cfc, populate.cfm, _assets/) remains for backwards compatibility. Focus on making your TestBox specs green.
+The `vendor/wheels/rocketunit_tests/` legacy RocketUnit suite has some pre-existing failures (e.g., in `model.errors`). Don't chase these — they're known issues in the legacy suite. The RocketUnit test files have been removed; only infrastructure (Test.cfc, populate.cfm, _assets/) remains for backwards compatibility. Focus on making your WheelsTest specs green.

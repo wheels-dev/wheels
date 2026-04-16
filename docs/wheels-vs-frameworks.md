@@ -213,7 +213,7 @@ Only Wheels and Laravel have full DI containers. Wheels uses explicit `map/bind`
 
 | Capability | Wheels | Rails | Laravel | Django |
 |---|---|---|---|---|
-| Test framework | TestBox (BDD) | Minitest/RSpec | PHPUnit/Pest | pytest/unittest |
+| Test framework | WheelsTest (BDD) | Minitest/RSpec | PHPUnit/Pest | pytest/unittest |
 | BDD syntax | `describe/it/expect` | RSpec `describe/it/expect` | Pest `describe/it/expect` | pytest style |
 | Fixtures/Factories | Test models + populate.cfm | Fixtures + FactoryBot | Factories (Eloquent) | Fixtures + factory_boy |
 | HTTP/integration testing | Built-in `TestClient` (`visit/get/post`, `assertOk/assertSee/assertJson/...`) | Integration tests + Capybara | HTTP tests + Dusk | Client + Selenium |

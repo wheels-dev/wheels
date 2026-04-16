@@ -79,7 +79,7 @@ The scanner detects these patterns and provides guidance:
 | `renderPageToString()` | Critical | All files | Must be replaced |
 | `this.version =` | Warning | `plugins/` only | Plugin version — move to package.json |
 | `this.dependency =` | Warning | `plugins/` only | Plugin deps — move to package.json |
-| `extends="wheels.Test"` | Warning | All files | Use `wheels.WheelsTest` for TestBox |
+| `extends="wheels.Test"` | Warning | All files | Use `wheels.WheelsTest` (BDD) |
 | `application.wheels.*` access | Info | All files | Consider DI container |
 | `extends="Model"` (short) | Info | All files | Future-proof to full path |
 | `extends="Controller"` (short) | Info | All files | Future-proof to full path |
