@@ -4,10 +4,10 @@ component extends="Controller" {
     }
 
     function create() {
-        if (application.$wheels.environment != "testing") {
+        if (!listFindNoCase("testing,development", application.$wheels.environment)) {
             throw(
                 type="Wheels.BrowserTestSecurityError",
-                message="loginAs endpoint is only available in testing environment"
+                message="loginAs endpoint is only available in testing/development environments"
             );
         }
 
