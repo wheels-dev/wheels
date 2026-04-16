@@ -37,6 +37,7 @@ component extends="wheels.WheelsTest" {
 
     this.browserEngine = "chromium";
     this.browserViewport = "";  // empty = Playwright default; "mobile"/"tablet"/"desktop" or {width:N, height:N}
+    this.browserScreenshotOnFailure = true;
     this.browser = "";
     this.browserTestSkipped = false;
 
@@ -93,6 +94,20 @@ component extends="wheels.WheelsTest" {
 
         describe(arguments.title, function() {
             beforeEach(function() { me.$startBrowserContext(); });
+
+            aroundEach(function(spec, suite) {
+                if (me.browserTestSkipped) {
+                    arguments.spec.body();
+                    return;
+                }
+                try {
+                    arguments.spec.body();
+                } catch (any e) {
+                    me.$captureFailureArtifacts(arguments.spec);
+                    rethrow;
+                }
+            });
+
             afterEach(function() { me.$endBrowserContext(); });
             innerBody();
         });
@@ -205,6 +220,37 @@ component extends="wheels.WheelsTest" {
             // clearly rather than silently using the wrong URL.
         }
         return "http://localhost:8080";
+    }
+
+    /**
+     * Best-effort capture of screenshot + HTML on test failure.
+     * Called from aroundEach catch block. Swallows all errors to avoid
+     * masking the real test failure.
+     */
+    public void function $captureFailureArtifacts(required any spec) {
+        if (!(this.browserScreenshotOnFailure ?: true)) return;
+        if (!isObject(this.browser) || this.browserTestSkipped) return;
+
+        try {
+            var artifactDir = this.browserArtifactPath
+                ?: expandPath("/tests/_output/browser");
+
+            if (!directoryExists(artifactDir)) {
+                directoryCreate(artifactDir, true);
+            }
+
+            var rawName = arguments.spec.name ?: "unknown_spec";
+            var safeName = reReplace(rawName, "[^a-zA-Z0-9_\-]", "_", "all");
+            if (len(safeName) > 80) safeName = left(safeName, 80);
+            var ts = dateFormat(now(), "yyyymmdd") & "_" & timeFormat(now(), "HHmmss");
+            var baseName = safeName & "-" & ts;
+
+            this.browser.screenshot(path=artifactDir & "/" & baseName & ".png");
+            fileWrite(artifactDir & "/" & baseName & ".html", this.browser.pageSource());
+        } catch (any e) {
+            // Best-effort: page may have crashed, context may be closed.
+            // Swallow to avoid masking the real test failure.
+        }
     }
 
     /**
