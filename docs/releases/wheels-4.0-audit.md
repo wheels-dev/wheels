@@ -115,7 +115,7 @@
 - **Browser testing via Playwright Java** (#2113, #2115, #2116, #2121, #2122) — `BrowserTest` base class with fluent DSL wrapping Playwright Java. Methods: navigation (`visit`, `visitRoute`, `back`, `forward`), interaction (`click`, `fill`, `type`, `select`, `check`, `attach`, `dragAndDrop`), keyboard (`keys`, `pressEnter`, `pressTab`, `pressEscape`), waiting (`waitFor`, `waitForText`, `waitForUrl`), scoping (`within`), cookies (`setCookie`, `cookie`, `clearCookies`), auth (`loginAs`, `logout`), dialogs (`acceptDialog`, `dismissDialog`, `dialogMessage`), viewport (`resize`, `resizeToMobile`, `resizeToTablet`, `resizeToDesktop`), script (`script`, `pause`), screenshots, full assertion suite. `wheels browser:install` downloads JARs + Chromium (~370MB). CI workflow runs browser specs across pr.yml and snapshot.yml.
 - **`testbox` → `wheelstest` namespace rename** (#1889) — `extends="wheels.WheelsTest"` replaces `extends="wheels.Test"` (legacy still works during 4.0).
 - **`tests/specs/functions/` → `tests/specs/functional/` rename** (#1872).
-- **Legacy RocketUnit removal** (#1925) — TestBox BDD is the only supported style for new tests in 4.0. Existing RocketUnit specs continue to run; no new ones.
+- **Legacy RocketUnit removal** (#1925) — WheelsTest (BDD syntax) is the only supported style for new tests in 4.0. Existing RocketUnit specs continue to run; no new ones.
 - **RocketUnit wildcard filter** (#1857) — improves test selection for the remaining legacy specs.
 
 ### 13. CLI (Wheels CLI) + LuCLI
@@ -134,7 +134,7 @@
 - **Phase 2 service layer, generators, MCP annotations** (#1941).
 - **LuCLI-native CI pipeline** (#2032) — Lucee 7 + SQLite in CI, matching local inner loop.
 - **LuCLI module distribution via wheels-cli-lucli repo** (#2018).
-- **Tier 1 commands ported to LuCLI** (#2092) + TestBox test suite for the module (#2093).
+- **Tier 1 commands ported to LuCLI** (#2092) + WheelsTest test suite for the module (#2093).
 
 **CLI security hardening:**
 
@@ -233,7 +233,7 @@ Items that require migration notes for users upgrading from 3.x. These should ha
 2. **CFWheels → Wheels rebrand in active code** (#2064) — callers referencing old namespaces (e.g., `cfwheels.*`) must update. Most user code unaffected; internal reference.
 3. **`testbox` → `wheelstest` namespace** (#1889) — test CFCs should extend `wheels.WheelsTest` (old `wheels.Test` continues to work but is legacy).
 4. **Tests directory `tests/specs/functions/` → `tests/specs/functional/`** (#1872).
-5. **Legacy RocketUnit removed from core** (#1925) — existing RocketUnit specs in app repos continue to run; TestBox BDD is mandatory for new tests.
+5. **Legacy RocketUnit removed from core** (#1925) — existing RocketUnit specs in app repos continue to run; WheelsTest (BDD syntax) is mandatory for new tests.
 6. **CORS default: wildcard → deny-all** (#2039) — apps relying on the wildcard default must explicitly configure `allowOrigins`.
 7. **`allowEnvironmentSwitchViaUrl` default: true → false in production** (#2076) — and reload password must be non-empty for env switching in production (#2082).
 

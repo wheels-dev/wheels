@@ -85,7 +85,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - LuCLI Phase 2: service layer, generators, MCP annotations (#1941)
 - LuCLI Phase 3–4: scaffold, seed, in-process services (#2065)
 - LuCLI-native Lucee 7 + SQLite CI pipeline (#2032)
-- LuCLI tier 1 commands module + TestBox test suite (#2092, #2093)
+- LuCLI tier 1 commands module + WheelsTest test suite (#2092, #2093)
 - Playwright CLI commands for browser testing (#2013, #2021)
 
 **Configuration & developer experience**
@@ -106,7 +106,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - **Breaking:** RateLimiter `trustProxy` default changed from `true` to `false` (#2024)
 - **Breaking:** RateLimiter proxy strategy default changed to `last` (#2088)
 - **Breaking:** `wheels snippets` CLI command renamed to `wheels code` (#1852)
-- **Breaking:** TestBox test base class namespace renamed: new tests extend `wheels.WheelsTest` (old `wheels.Test` preserved during 4.0 as a deprecation path) (#1889)
+- **Breaking:** Test base class namespace renamed: new tests extend `wheels.WheelsTest` (old `wheels.Test` preserved during 4.0 as a deprecation path) (#1889)
 - **Breaking:** Tests directory `tests/specs/functions/` renamed to `tests/specs/functional/` (#1872)
 - **Breaking:** `application.wirebox` renamed to `application.wheelsdi` (#1888)
 - CFWheels branding removed from active code and metadata (continuation of the 3.0 rebrand) (#2064)
@@ -120,7 +120,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ### Deprecated
 
 - Legacy `plugins/` folder — superseded by the new `packages/` → `vendor/` activation model. Plugins still load, with a deprecation warning. (#1995)
-- RocketUnit test style for new tests — TestBox BDD is required going forward. Existing RocketUnit specs continue to run. (#1925)
+- RocketUnit test style for new tests — BDD syntax (via WheelsTest) is required going forward. Existing RocketUnit specs continue to run. (#1925)
 - `wheels.Test` test base class — extend `wheels.WheelsTest` instead (#1889)
 
 ### Removed
