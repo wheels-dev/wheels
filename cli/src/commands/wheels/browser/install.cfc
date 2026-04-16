@@ -10,7 +10,7 @@
  *   wheels browser:install --force
  *   wheels browser:install --browser=firefox
  */
-component aliases="wheels browser:install, wheels browser install" extends="../../base" {
+component aliases="wheels browser:install, wheels browser install" extends="../base" {
 
 	property name="browserService" inject="BrowserService@wheels-cli";
 

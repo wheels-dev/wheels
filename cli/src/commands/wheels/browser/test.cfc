@@ -9,7 +9,7 @@
  *   wheels browser:test --verbose
  *   wheels browser:test --format=json
  */
-component aliases="wheels browser:test, wheels browser test" extends="../../base" {
+component aliases="wheels browser:test, wheels browser test" extends="../base" {
 
 	property name="browserService" inject="BrowserService@wheels-cli";
 
