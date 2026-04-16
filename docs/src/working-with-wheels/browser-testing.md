@@ -231,7 +231,7 @@ wheels browser:test --verbose
 |---|---|---|
 | Language | CFML (`.cfc` files) | TypeScript/JavaScript (`.spec.ts`) |
 | Setup | `wheels browser:install` | `npm install && npx playwright install` |
-| Test runner | TestBox (runs in Wheels) | Playwright Test (runs in Node.js) |
+| Test runner | WheelsTest (runs in Wheels) | Playwright Test (runs in Node.js) |
 | Best for | Framework tests, CFML-centric teams | Frontend-heavy apps, JS-centric teams |
 | Browser support | Chromium only | Chromium, Firefox, WebKit |
 
@@ -239,7 +239,7 @@ Both approaches are valid. Use native CFML if you want tests alongside your mode
 
 ## See Also
 
-- [Testing Your Application](testing-your-application.md) — Unit and integration testing with TestBox
+- [Testing Your Application](testing-your-application.md) — Unit and integration testing with WheelsTest
 - [End-to-End Testing](end-to-end-testing.md) — Node.js/TypeScript Playwright approach
 - [`wheels browser:install`](../command-line-tools/commands/browser/browser-install.md) — CLI command reference
 - [`wheels browser:test`](../command-line-tools/commands/browser/browser-test.md) — CLI command reference

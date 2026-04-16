@@ -1,6 +1,6 @@
-# Testing Views with TestBox BDD
+# Testing Views with WheelsTest BDD
 
-## Modern View Testing with TestBox 5
+## Modern View Testing with WheelsTest
 
 ### BDD View Testing Structure
 
@@ -339,7 +339,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-## TestBox BDD Best Practices for View Testing
+## WheelsTest BDD Best Practices for View Testing
 
 ### 1. Test Isolation with BDD Lifecycle
 
@@ -558,13 +558,13 @@ curl -s http://localhost:8080/posts | grep -c '<article' && echo "posts displaye
 
 **Without content verification, this error goes undetected!**
 
-## Modern TestBox Resources
+## BDD Reference — Upstream TestBox Docs
 
-For comprehensive TestBox 5 documentation:
-- [TestBox BDD Documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer)
-- [TestBox Expectations](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations)
-- [MockBox Documentation](https://testbox.ortusbooks.com/v6.x/mocking/mockbox)
-- [TestBox Life-cycle Methods](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods)
+WheelsTest inherits the BDD syntax from upstream Ortus TestBox. For comprehensive BDD, expectation, and lifecycle reference:
+- [BDD Primer](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer)
+- [Expectations](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations)
+- [MockBox](https://testbox.ortusbooks.com/v6.x/mocking/mockbox)
+- [Life-cycle Methods](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods)
 
 ## Related Documentation
 - [View Architecture](./architecture.md)

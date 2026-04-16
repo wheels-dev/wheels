@@ -1,11 +1,11 @@
 # Model Testing
 
 ## Description
-Comprehensive guide to testing Wheels models using TestBox 5 with modern BDD (Behavior Driven Development) syntax. This guide covers validation testing, association testing, business logic testing, and callback testing using `describe()`, `it()`, and `expect()` patterns.
+Comprehensive guide to testing Wheels models using WheelsTest with modern BDD (Behavior Driven Development) syntax. This guide covers validation testing, association testing, business logic testing, and callback testing using `describe()`, `it()`, and `expect()` patterns.
 
-## TestBox BDD Model Test Structure
+## WheelsTest BDD Model Test Structure
 
-### Modern Test Template (TestBox 5)
+### Modern Test Template (WheelsTest)
 ```cfm
 /**
  * UserModelSpec - Test User model functionality using BDD
@@ -38,7 +38,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-### TestBox BDD Test Organization
+### WheelsTest BDD Test Organization
 ```
 tests/
 ├── specs/
@@ -637,7 +637,7 @@ function test_account_locking_after_failed_attempts() {
 }
 ```
 
-## TestBox BDD Test Utilities and Helpers
+## WheelsTest BDD Test Utilities and Helpers
 
 ### BDD Test Data Factory
 ```cfm
@@ -746,7 +746,7 @@ function test_eager_loading_performance() {
 }
 ```
 
-## TestBox BDD Test Organization Best Practices
+## WheelsTest BDD Test Organization Best Practices
 
 ### 1. Use Descriptive BDD Structure
 ```cfm
@@ -802,13 +802,13 @@ beforeEach(() => {
 - Use clear, readable expectations
 - Group related functionality with nested describe blocks
 
-## Modern TestBox Resources
+## BDD Reference — Upstream TestBox Docs
 
-For comprehensive TestBox 5 documentation:
-- [TestBox BDD Documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer)
-- [TestBox Expectations](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations)
-- [MockBox Documentation](https://testbox.ortusbooks.com/v6.x/mocking/mockbox)
-- [TestBox Life-cycle Methods](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods)
+WheelsTest inherits the BDD syntax from upstream Ortus TestBox. For comprehensive BDD, expectation, and lifecycle reference:
+- [BDD Primer](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer)
+- [Expectations](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations)
+- [MockBox](https://testbox.ortusbooks.com/v6.x/mocking/mockbox)
+- [Life-cycle Methods](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods)
 
 ## Related Documentation
 - [Model Architecture](./architecture.md)

@@ -4,7 +4,7 @@ Comprehensive guide to testing in Wheels applications using the CLI.
 
 ## Overview
 
-Wheels CLI provides robust testing capabilities through TestBox integration, offering:
+Wheels CLI provides robust testing capabilities through WheelsTest integration, offering:
 - Unit and integration testing
 - BDD-style test writing
 - Watch mode for continuous testing
@@ -403,7 +403,7 @@ component {
     };
     this.datasource = "test";
 
-    // TestBox settings
+    // WheelsTest settings (preserves the Application.cfc `this.testbox` convention for back-compat)
     this.testbox = {
         bundles: ["tests"],
         recurse: true,
@@ -753,4 +753,4 @@ wheels test run --db=oracle
 
 - [wheels test run](../commands/test/test-run.md) - Test execution command
 - [wheels test advanced](../commands/test/test-advanced.md) - Advanced test options
-- [TestBox Documentation](https://testbox.ortusbooks.com/) - Complete TestBox guide
+- [BDD syntax reference (upstream TestBox docs)](https://testbox.ortusbooks.com/) — WheelsTest inherits the BDD syntax from upstream Ortus TestBox
