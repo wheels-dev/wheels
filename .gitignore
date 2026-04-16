@@ -34,11 +34,13 @@ node_modules/
 cli/tests/*
 !cli/tests/specs/
 test-output/
+tests/_output/
 .worktrees/
 .grove/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+.claude/launch.json
 .DS_Store
 .superpowers/
 
