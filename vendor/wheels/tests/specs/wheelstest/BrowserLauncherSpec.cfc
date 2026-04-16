@@ -195,5 +195,143 @@ component extends="wheels.WheelsTest" {
                     .toThrow(type="Wheels.BrowserLauncherReflectionError");
             });
         });
+
+        describe("$findSetter", () => {
+
+            it("finds a one-arg setter by name on a JDK class", () => {
+                // java.util.Date has setTime(long) — one-arg setter
+                var klass = createObject("java", "java.util.Date").getClass();
+                var method = launcher.$findSetter(klass=klass, name="setTime");
+                expect(method.getName()).toBe("setTime");
+                expect(arrayLen(method.getParameterTypes())).toBe(1);
+            });
+
+            it("throws BrowserOptionError for nonexistent setter", () => {
+                var klass = createObject("java", "java.util.Date").getClass();
+                expect(() => {
+                    launcher.$findSetter(klass=klass, name="setNonexistent");
+                }).toThrow("Wheels.BrowserOptionError");
+            });
+
+        });
+
+        describe("$castForParam", () => {
+
+            it("casts numeric to java.lang.Double for double param type", () => {
+                var paramType = createObject("java", "java.lang.Double").TYPE;
+                var result = launcher.$castForParam(value=5000, paramType=paramType);
+                expect(result.getClass().getName()).toBe("java.lang.Double");
+            });
+
+            it("casts numeric to java.lang.Integer for int param type", () => {
+                var paramType = createObject("java", "java.lang.Integer").TYPE;
+                var result = launcher.$castForParam(value=42, paramType=paramType);
+                expect(result.getClass().getName()).toBe("java.lang.Integer");
+            });
+
+            it("passes Java objects through unchanged", () => {
+                var obj = createObject("java", "java.util.Date").init();
+                var paramType = createObject("java", "java.util.Date").getClass();
+                var result = launcher.$castForParam(value=obj, paramType=paramType);
+                expect(result).toBe(obj);
+            });
+
+        });
+
+        describe("$buildOption", () => {
+
+            it("throws BrowserOptionError when classloader not initialized", () => {
+                var freshLauncher = new wheels.wheelstest.BrowserLauncher();
+                expect(() => {
+                    freshLauncher.$buildOption(className="java.util.Date");
+                }).toThrow("Wheels.BrowserOptionError");
+            });
+
+            it("builds a zero-arg Playwright option with setters", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    var opts = l.$buildOption(
+                        className="com.microsoft.playwright.Locator$WaitForOptions",
+                        setterMap={setTimeout: 5000}
+                    );
+                    expect(isObject(opts)).toBeTrue();
+                } finally {
+                    l.release();
+                }
+            });
+
+            it("builds an option with constructor args", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    var viewport = l.$buildOption(
+                        className="com.microsoft.playwright.options.ViewportSize",
+                        constructorArgs=[375, 667]
+                    );
+                    expect(isObject(viewport)).toBeTrue();
+                    expect(viewport.width).toBe(375);
+                    expect(viewport.height).toBe(667);
+                } finally {
+                    l.release();
+                }
+            });
+
+            it("builds an option with constructor args AND setters", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    // WaitForOptions has a zero-arg constructor; build it then
+                    // apply setTimeout as a setter. ViewportSize covers the
+                    // constructor-args-only path; this covers zero-arg + setter.
+                    // Cookie's constructor varies across Playwright versions so
+                    // we avoid it for portability.
+                    var opts = l.$buildOption(
+                        className="com.microsoft.playwright.Locator$WaitForOptions",
+                        setterMap={setTimeout: 5000}
+                    );
+                    expect(isObject(opts)).toBeTrue();
+                    // Verify the setter took effect by reading the public field
+                    expect(opts.timeout).toBe(5000);
+                } finally {
+                    l.release();
+                }
+            });
+
+            it("passes nested Java objects through setters", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    var viewport = l.$buildOption(
+                        className="com.microsoft.playwright.options.ViewportSize",
+                        constructorArgs=[375, 667]
+                    );
+                    var contextOpts = l.$buildOption(
+                        className="com.microsoft.playwright.Browser$NewContextOptions",
+                        setterMap={setViewportSize: viewport}
+                    );
+                    expect(isObject(contextOpts)).toBeTrue();
+                } finally {
+                    l.release();
+                }
+            });
+
+        });
     }
 }
