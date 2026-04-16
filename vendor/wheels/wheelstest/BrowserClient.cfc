@@ -13,6 +13,11 @@ component {
     variables.context = "";
     variables.baseUrl = "";
     variables.$launcher = "";
+    variables.$pendingDialogAction = "";
+    variables.$lastDialogMessage = "";
+    variables.$dialogProxy = "";
+    variables.$dialogState = "";
+    variables.$dialogSupported = "";
 
     public BrowserClient function init(
         any page = "",
@@ -56,10 +61,55 @@ component {
         return this;
     }
 
+    // ─── Route Navigation ───────────────────────────────────────────
+
+    /**
+     * Navigates to a named route by resolving it through application.wo.URLFor().
+     * Requires the Wheels app to be running (routes must be loaded).
+     *
+     *     this.browser.visitRoute(route="browserTestDashboard")
+     *     this.browser.visitRoute(route="user", key=42)
+     */
+    public BrowserClient function visitRoute(
+        required string route,
+        any key = "",
+        string params = ""
+    ) {
+        var path = $resolveRoute(argumentCollection=arguments);
+        return visit(path);
+    }
+
+    /**
+     * Asserts that the current page URL matches the given named route.
+     * Compares path portions only (ignores protocol, host, port).
+     *
+     *     this.browser.visitRoute(route="browserTestDashboard")
+     *                 .assertRouteIs(route="browserTestDashboard")
+     */
+    public BrowserClient function assertRouteIs(
+        required string route,
+        any key = "",
+        string params = ""
+    ) {
+        var expectedPath = $resolveRoute(argumentCollection=arguments);
+        var actualPath = $pathFromUrl(currentUrl());
+        if (actualPath != expectedPath) {
+            $assertFail("Expected route '" & arguments.route & "' (" & expectedPath
+                & ") but was at " & actualPath);
+        }
+        return this;
+    }
+
     // ─── Interaction ─────────────────────────────────────────────────
 
     public BrowserClient function click(required string selector) {
-        $locator(arguments.selector).click();
+        var hasDialog = isStruct(variables.$pendingDialogAction);
+        if (hasDialog) $registerDialogListener();
+        try {
+            $locator(arguments.selector).click();
+        } finally {
+            if (hasDialog) $clearDialogListener();
+        }
         return this;
     }
 
@@ -70,7 +120,13 @@ component {
      * only, ignoring headings), use click("button:has-text('...')") instead.
      */
     public BrowserClient function press(required string buttonText) {
-        variables.page.getByText(arguments.buttonText).first().click();
+        var hasDialog = isStruct(variables.$pendingDialogAction);
+        if (hasDialog) $registerDialogListener();
+        try {
+            variables.page.getByText(arguments.buttonText).first().click();
+        } finally {
+            if (hasDialog) $clearDialogListener();
+        }
         return this;
     }
 
@@ -147,7 +203,13 @@ component {
         required string selector,
         required string key
     ) {
-        $locator(arguments.selector).press(arguments.key);
+        var hasDialog = isStruct(variables.$pendingDialogAction);
+        if (hasDialog) $registerDialogListener();
+        try {
+            $locator(arguments.selector).press(arguments.key);
+        } finally {
+            if (hasDialog) $clearDialogListener();
+        }
         return this;
     }
 
@@ -430,6 +492,82 @@ component {
             }
         }
         $assertFail("Cookie '" & arguments.name & "' not found");
+    }
+
+    // ─── Dialogs ─────────────────────────────────────────────────────
+
+    /**
+     * Registers intent to accept the next JavaScript dialog (alert, confirm,
+     * prompt). Must be called BEFORE the interaction that triggers the dialog.
+     * The optional `text` argument provides input for prompt() dialogs.
+     *
+     *     this.browser.acceptDialog().click("##delete-btn")
+     *     this.browser.acceptDialog(text="yes").click("##confirm-btn")
+     */
+    public BrowserClient function acceptDialog(string text = "") {
+        $requireDialogSupport();
+        variables.$pendingDialogAction = {type: "accept", text: arguments.text};
+        return this;
+    }
+
+    /**
+     * Registers intent to dismiss the next JavaScript dialog. Must be called
+     * BEFORE the interaction that triggers the dialog.
+     *
+     *     this.browser.dismissDialog().click("##cancel-btn")
+     */
+    public BrowserClient function dismissDialog() {
+        $requireDialogSupport();
+        variables.$pendingDialogAction = {type: "dismiss", text: ""};
+        return this;
+    }
+
+    /**
+     * Returns the message text from the last dialog that was handled by
+     * acceptDialog() or dismissDialog(). Terminal — not chainable.
+     *
+     *     this.browser.acceptDialog().click("##alert-btn");
+     *     var msg = this.browser.dialogMessage();
+     */
+    public string function dialogMessage() {
+        return variables.$lastDialogMessage;
+    }
+
+    // ─── Auth ────────────────────────────────────────────────────────
+
+    /**
+     * Logs in as the given identifier by navigating to the test-only
+     * /_browser/login-as endpoint. Sets session.userId and session.userEmail
+     * on the server side. Only available when the Wheels app is in testing mode.
+     *
+     *     this.browser.loginAs("alice@example.com")
+     *                 .visit("/_browser/dashboard")
+     *                 .assertSee("alice@example.com");
+     */
+    public BrowserClient function loginAs(required string identifier) {
+        visit("/_browser/login-as?identifier=" & encodeForURL(arguments.identifier));
+        return this;
+    }
+
+    /**
+     * Logs out by clearing all cookies on the browser context and navigating
+     * to the fixture home page to reset page state. For testing the logout UI
+     * flow (click button, see redirect), use click()/press() directly instead.
+     */
+    public BrowserClient function logout() {
+        variables.context.clearCookies();
+        visit("/_browser/home");
+        return this;
+    }
+
+    /**
+     * Clears all cookies on the browser context. Unlike deleteCookie(name)
+     * which targets a single cookie, this removes everything — session,
+     * tracking, etc.
+     */
+    public BrowserClient function clearCookies() {
+        variables.context.clearCookies();
+        return this;
     }
 
     // ─── Assertions: text + visibility + presence ────────────────────
@@ -743,6 +881,102 @@ component {
             }
         }
         return result;
+    }
+
+    /**
+     * Resolves a named route to a URL path using application.wo.URLFor().
+     * Ensures request.wheels.urlForCache exists (required by URLFor internals).
+     */
+    private string function $resolveRoute(
+        required string route,
+        any key = "",
+        string params = ""
+    ) {
+        if (!structKeyExists(request, "wheels") || !structKeyExists(request.wheels, "urlForCache")) {
+            if (!structKeyExists(request, "wheels")) {
+                request.wheels = {};
+            }
+            request.wheels.urlForCache = {};
+        }
+        return application.wo.URLFor(
+            route=arguments.route,
+            key=arguments.key,
+            params=arguments.params,
+            onlyPath=true
+        );
+    }
+
+    /**
+     * Checks that the current engine supports createDynamicProxy (Lucee-only).
+     * Caches the result so the check only runs once per BrowserClient instance.
+     */
+    private void function $requireDialogSupport() {
+        if (isBoolean(variables.$dialogSupported) && variables.$dialogSupported) return;
+        if (isBoolean(variables.$dialogSupported) && !variables.$dialogSupported) {
+            throw(
+                type="Wheels.BrowserDialogNotSupported",
+                message="Dialog handling requires Lucee. This engine does not support createDynamicProxy."
+            );
+        }
+        try {
+            createDynamicProxy(
+                {accept: function(x) {}},
+                ["java.lang.Runnable"]
+            );
+            variables.$dialogSupported = true;
+        } catch (any e) {
+            variables.$dialogSupported = false;
+            throw(
+                type="Wheels.BrowserDialogNotSupported",
+                message="Dialog handling requires Lucee. This engine does not support createDynamicProxy."
+            );
+        }
+    }
+
+    /**
+     * Registers a one-shot Consumer<Dialog> listener on the page. Called
+     * by dialog-aware interaction methods (click, press, keys) when
+     * $pendingDialogAction is set.
+     */
+    public void function $registerDialogListener() {
+        if (!isStruct(variables.$pendingDialogAction)) return;
+
+        var action = variables.$pendingDialogAction;
+        var state = {lastMessage: "", handled: false};
+        variables.$dialogState = state;
+
+        var handler = {
+            accept: function(dialog) {
+                state.lastMessage = dialog.message();
+                state.handled = true;
+                if (action.type == "accept") {
+                    if (len(action.text)) {
+                        dialog.accept(action.text);
+                    } else {
+                        dialog.accept();
+                    }
+                } else {
+                    dialog.dismiss();
+                }
+            }
+        };
+
+        variables.$dialogProxy = createDynamicProxy(handler, ["java.util.function.Consumer"]);
+        variables.page.onDialog(variables.$dialogProxy);
+    }
+
+    /**
+     * Cleans up after a dialog interaction. Copies the dialog message to
+     * $lastDialogMessage and resets pending state. Called by dialog-aware
+     * interaction methods after the Playwright action completes.
+     */
+    public void function $clearDialogListener() {
+        if (isStruct(variables.$dialogState)) {
+            variables.$lastDialogMessage = variables.$dialogState.lastMessage ?: "";
+        }
+        variables.$pendingDialogAction = "";
+        variables.$dialogProxy = "";
+        variables.$dialogState = "";
     }
 
 }

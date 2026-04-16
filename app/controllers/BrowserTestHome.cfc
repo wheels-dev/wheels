@@ -8,12 +8,12 @@ component extends="Controller" {
     }
 
     function dashboard() {
-        user = { email: session.userEmail ?: "" };
+        user = {email: session.userEmail ?: ""};
     }
 
     private function $requireLogin() {
         if (!structKeyExists(session, "userId")) {
-            redirectTo(route="login");
+            redirectTo(route="browserTestLogin");
         }
     }
 }

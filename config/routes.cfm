@@ -7,6 +7,16 @@
 	mapper()
 		// CLI-Appends-Here
 
+		// Browser test fixture routes (loginAs endpoint is env-gated in controller)
+		.scope(path="/_browser")
+			.get(name="browserTestHome", pattern="/home", to="BrowserTestHome##index")
+			.get(name="browserTestLogin", pattern="/login", to="BrowserTestSessions##new")
+			.post(name="browserTestAuthenticate", pattern="/login", to="BrowserTestSessions##create")
+			.get(name="browserTestDashboard", pattern="/dashboard", to="BrowserTestHome##dashboard")
+			.post(name="browserTestLogout", pattern="/logout", to="BrowserTestSessions##destroy")
+			.get(name="browserTestLoginAs", pattern="/login-as", to="BrowserTestLogin##create")
+		.end()
+
 		// The "wildcard" call below enables automatic mapping of "controller/action" type routes.
 		// This way you don't need to explicitly add a route every time you create a new action in a controller.
 		.wildcard()

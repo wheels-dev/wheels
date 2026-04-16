@@ -8,15 +8,15 @@ component extends="Controller" {
         if (params.email == "alice@example.com" && params.password == "secret") {
             session.userId = 1;
             session.userEmail = params.email;
-            redirectTo(route="dashboard");
+            redirectTo(route="browserTestDashboard");
         } else {
             flashInsert(error="Invalid credentials");
-            redirectTo(route="login");
+            redirectTo(route="browserTestLogin");
         }
     }
 
     function destroy() {
         structClear(session);
-        redirectTo(route="login");
+        redirectTo(route="browserTestLogin");
     }
 }
