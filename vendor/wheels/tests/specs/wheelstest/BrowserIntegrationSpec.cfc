@@ -286,6 +286,36 @@ component extends="wheels.WheelsTest" {
             });
         });
 
+        describe("BrowserClient — waitForUrl", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("resolves immediately when URL already matches", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Here</h1>");
+                variables.bc.waitForUrl("data:text/html,*", 5);
+            });
+
+            it("throws on timeout when URL does not match", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Here</h1>");
+                expect(() => {
+                    variables.bc.waitForUrl("http://will-never-match.example.com/**", 1);
+                }).toThrow();
+            });
+        });
+
         describe("BrowserClient — viewport + script", () => {
 
             beforeEach(() => {

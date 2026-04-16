@@ -228,6 +228,26 @@ component {
         return this;
     }
 
+    /**
+     * Waits for the page URL to match the given pattern. Supports exact
+     * strings and glob patterns (Playwright native).
+     */
+    public BrowserClient function waitForUrl(
+        required string url,
+        numeric seconds = 30
+    ) {
+        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Page$WaitForURLOptions",
+                setterMap={setTimeout: arguments.seconds * 1000}
+            );
+            variables.page.waitForURL(arguments.url, opts);
+        } else {
+            variables.page.waitForURL(arguments.url);
+        }
+        return this;
+    }
+
     // ─── Viewport ────────────────────────────────────────────────────
 
     /**
