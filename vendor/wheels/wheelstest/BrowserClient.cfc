@@ -103,12 +103,12 @@ component {
     // ─── Interaction ─────────────────────────────────────────────────
 
     public BrowserClient function click(required string selector) {
-        if (isStruct(variables.$pendingDialogAction)) {
-            $registerDialogListener();
-        }
-        $locator(arguments.selector).click();
-        if (isStruct(variables.$pendingDialogAction)) {
-            $clearDialogListener();
+        var hasDialog = isStruct(variables.$pendingDialogAction);
+        if (hasDialog) $registerDialogListener();
+        try {
+            $locator(arguments.selector).click();
+        } finally {
+            if (hasDialog) $clearDialogListener();
         }
         return this;
     }
@@ -120,12 +120,12 @@ component {
      * only, ignoring headings), use click("button:has-text('...')") instead.
      */
     public BrowserClient function press(required string buttonText) {
-        if (isStruct(variables.$pendingDialogAction)) {
-            $registerDialogListener();
-        }
-        variables.page.getByText(arguments.buttonText).first().click();
-        if (isStruct(variables.$pendingDialogAction)) {
-            $clearDialogListener();
+        var hasDialog = isStruct(variables.$pendingDialogAction);
+        if (hasDialog) $registerDialogListener();
+        try {
+            variables.page.getByText(arguments.buttonText).first().click();
+        } finally {
+            if (hasDialog) $clearDialogListener();
         }
         return this;
     }
@@ -203,12 +203,12 @@ component {
         required string selector,
         required string key
     ) {
-        if (isStruct(variables.$pendingDialogAction)) {
-            $registerDialogListener();
-        }
-        $locator(arguments.selector).press(arguments.key);
-        if (isStruct(variables.$pendingDialogAction)) {
-            $clearDialogListener();
+        var hasDialog = isStruct(variables.$pendingDialogAction);
+        if (hasDialog) $registerDialogListener();
+        try {
+            $locator(arguments.selector).press(arguments.key);
+        } finally {
+            if (hasDialog) $clearDialogListener();
         }
         return this;
     }

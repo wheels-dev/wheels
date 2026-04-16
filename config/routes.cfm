@@ -7,7 +7,7 @@
 	mapper()
 		// CLI-Appends-Here
 
-		// Browser test fixture routes — only available in testing environment
+		// Browser test fixture routes (loginAs endpoint is env-gated in controller)
 		.scope(path="/_browser")
 			.get(name="browserTestHome", pattern="/home", to="BrowserTestHome##index")
 			.get(name="browserTestLogin", pattern="/login", to="BrowserTestSessions##new")

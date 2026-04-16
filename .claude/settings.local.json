@@ -96,8 +96,7 @@
       "Bash(git merge-tree --write-tree origin/develop origin/feat/v3.1-internal-refactor 2>&1 | head -60)",
       "Bash(git merge origin/develop --no-commit 2>&1)",
       "Bash(git log:*)",
-      "Bash(git diff:*)",
-      "Bash(lucli server:*)"
+      "Bash(git diff:*)"
     ],
     "deny": []
   }
