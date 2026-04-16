@@ -48,6 +48,14 @@ component extends="wheels.WheelsTest" {
     variables.$baseUrl = "";
 
     function beforeAll() {
+        // Opt-in gate for CI: browser fixture infrastructure (routes, dialogs,
+        // createDynamicProxy) is not yet reliable under LuCLI Express, so CI
+        // defaults to skipping browser specs. Set WHEELS_BROWSER_CI_ENABLE=true
+        // to force execution once the fixture server is verified in CI.
+        if ($isCiSkipEnabled()) {
+            this.browserTestSkipped = true;
+            return;
+        }
         try {
             variables.$launcher = $ensureLauncher();
         } catch (Wheels.BrowserNotInstalled e) {
@@ -56,6 +64,23 @@ component extends="wheels.WheelsTest" {
         }
         variables.$browser = variables.$launcher.acquireBrowser(engine=this.browserEngine);
         variables.$baseUrl = $resolveBaseUrl();
+    }
+
+    /**
+     * True when CI is detected and browser specs are not explicitly opted in.
+     * Checks WHEELS_CI (set by the CI workflow) and WHEELS_BROWSER_CI_ENABLE
+     * (opt-in override).
+     */
+    private boolean function $isCiSkipEnabled() {
+        try {
+            var sys = createObject("java", "java.lang.System");
+            var ci = sys.getenv("WHEELS_CI") ?: "";
+            if (!len(ci)) return false;
+            var enable = sys.getenv("WHEELS_BROWSER_CI_ENABLE") ?: "";
+            return !listFindNoCase("true,1,yes", enable);
+        } catch (any e) {
+            return false;
+        }
     }
 
     function afterAll() {

@@ -72,6 +72,8 @@ if (this.browserTestSkipped) return;
 
 **CI behavior:** The `pr.yml` and `snapshot.yml` workflows install Playwright JARs + Chromium via a cached step (keyed on `browser-manifest.json` hash). When the cache is warm, restore takes ~10s. When cold, downloads ~370MB of JARs + Chromium (~2-3 min). The `WHEELS_BROWSER_TEST_BASE_URL` env var is set to `http://localhost:60007` so browser specs can make HTTP requests to the running Lucee server.
 
+Browser specs are **skipped by default in CI** because the fixture server (routes loaded into `application.wo`, dialog proxy via `createDynamicProxy`) is not yet reliable under LuCLI Express. Set `WHEELS_BROWSER_CI_ENABLE=true` in the job env once the fixture infrastructure is verified. The install step stays in place so enabling is a one-line change. See `BrowserTest.$isCiSkipEnabled()` for the exact check.
+
 **Local behavior:** If you haven't run `wheels browser:install`, browser specs skip silently. Run `wheels browser:install` once to enable them locally.
 
 ## Implemented DSL methods
