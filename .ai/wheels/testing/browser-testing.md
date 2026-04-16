@@ -8,19 +8,28 @@ This PR lands the plumbing. CLI, dogfood specs, and CI matrix integration come i
 
 **What works:** navigation, interaction, keyboard, waiting (default timeout), scoping, viewport, script evaluation, most assertions, most terminals, lifecycle via `browserDescribe`.
 
-**What's deferred:** `loginAs`/`logout` (needs test-only route + fixture server), dialogs, cookies, configurable timeouts, auto-screenshot-on-failure, viewport at `BrowserTest` level. All share one root blocker: Playwright's Java API uses inner classes (`Page$GetByRoleOptions`, `Locator$WaitForOptions`, `Browser$NewContextOptions`, `Cookie`, …) that Lucee's `createObject("java", ...)` path can't build when those classes live inside a URLClassLoader. A reflection-based helper (planned follow-up) unblocks all of them.
+**What's deferred:** `loginAs`/`logout` (needs test-only route + fixture server), dialogs (needs `createDynamicProxy`), `visitRoute`/`assertRouteIs` (needs `urlFor` outside controller), fixture app integration.
 
 ## Installation
 
-Before first use:
-
 ```bash
-bash tools/install-playwright.sh
+wheels browser:install              # recommended (LuCLI or CommandBox)
+bash tools/install-playwright.sh    # legacy fallback (deprecated)
 ```
 
 Idempotent. Downloads seven JARs totalling ~192 MB (client + driver + driver-bundle + gson + Java-WebSocket + slf4j-api + slf4j-simple) from Maven Central, SHA-verifies each, then runs `playwright install chromium` which drops ~170 MB of Chromium under `~/Library/Caches/ms-playwright/` (macOS) or `~/.cache/ms-playwright/` (Linux). Re-running is a no-op once the SHAs match.
 
-**PR 2 replaces this with `wheels browser:install`.**
+## CLI Commands
+
+```bash
+wheels browser:install              # download JARs + browser binaries
+wheels browser:install --force      # re-download even if SHAs match
+wheels browser:install --browser=firefox
+
+wheels browser:test                 # run browser test suite
+wheels browser:test --verbose       # show full spec names
+wheels browser:test --format=json   # JSON output for CI
+```
 
 ## Architecture
 
@@ -117,10 +126,10 @@ this.browser
 ```cfm
 this.browser
     .waitFor("##late-loaded-element")   // waits up to Playwright's default (30s)
-    .waitForText("Loading complete");
+    .waitFor("##late-element", 5)       // custom timeout in seconds
+    .waitForText("Loading complete")
+    .waitForUrl("**/dashboard", 5);     // glob pattern + timeout
 ```
-
-`waitForUrl` and configurable timeouts are **deferred** (need URLClassLoader-constructed option objects).
 
 ### Scoping
 
@@ -185,6 +194,59 @@ this.browser.value("##email");       // input/textarea/select value
 this.browser.screenshot("/tmp/x.png"); // writes PNG; returns this for chaining
 ```
 
+### Cookies
+
+```cfm
+this.browser
+    .setCookie(name="session", value="abc123", url="http://localhost:8080")
+    .deleteCookie("session");
+
+var c = this.browser.cookie("session");  // returns struct {name, value, domain, ...}
+```
+
+Cookies require a real HTTP origin — `data:` URLs are opaque origins.
+
+### Configurable Timeouts
+
+```cfm
+this.browser
+    .waitFor("##late-element", 5)      // 5-second timeout (default: 30)
+    .waitForText("Loaded", 10)
+    .waitForUrl("**/dashboard", 5);
+```
+
+### Screenshot Options
+
+```cfm
+this.browser.screenshot("/tmp/page.png");                           // basic
+this.browser.screenshot(path="/tmp/full.png", fullPage=true);       // full page
+this.browser.screenshot(path="/tmp/q.png", quality=80);             // JPEG quality
+```
+
+### Viewport Config (BrowserTest Level)
+
+```cfm
+component extends="wheels.wheelstest.BrowserTest" {
+    this.browserViewport = "mobile";           // preset: mobile/tablet/desktop
+    // or: this.browserViewport = {width: 1024, height: 768};
+}
+```
+
+Presets: `"mobile"` (375x667), `"tablet"` (768x1024), `"desktop"` (1440x900).
+
+### Auto-Screenshot on Failure
+
+When a browser test fails, a screenshot and HTML dump are automatically saved to `tests/_output/browser/`. Disable per-spec:
+
+```cfm
+this.browserScreenshotOnFailure = false;
+```
+
+Configure artifact directory:
+```cfm
+this.browserArtifactPath = expandPath("/custom/path");
+```
+
 ## Gotchas (keep these in working memory when writing browser specs)
 
 ### `##` in CFML strings
@@ -222,22 +284,14 @@ Playwright's `DriverJar.getDriverResourceURI()` uses `Thread.currentThread().get
 
 ## Deferred functionality
 
-Tracked as follow-ups to this PR:
+Tracked as follow-ups:
 
 | Category | What's missing | Unblocked by |
 |---|---|---|
 | Auth | `loginAs(identifier)`, `logout()`, `keepSignedInAs` | Test-only route (`POST /_browser/login-as`) + running fixture server |
 | Dialogs | `acceptDialog`, `dismissDialog`, `typeInDialog` | `createDynamicProxy` → `Consumer<Dialog>` via URLClassLoader |
-| Cookies | `setCookie`, `deleteCookie`, `cookie` | Cookie option object |
-| Timeouts | Configurable timeout on `waitFor` / `waitForText` | `Locator$WaitForOptions` |
 | Routes | `visitRoute`, `assertRouteIs` | Wheels `urlFor()` outside controller context |
-| URL waiting | `waitForUrl` | `Page$WaitForURLOptions` + baseUrl wiring |
-| Viewport config | `this.browserViewport = "mobile"` on `BrowserTest` | `ViewportSize` + `Browser$NewContextOptions` |
-| Screenshot options | `clip`, `fullPage`, `quality` | `Page$ScreenshotOptions` |
-| Auto-artifact dump | screenshot + HTML on failure | TestBox `aroundEach` hook + failure detection |
 | Fixture app integration | End-to-end flow through Wheels HTTP pipeline | Dedicated fixture-server bootstrap |
-
-Most share the same root blocker (URLClassLoader + OSGi bundle resolver). A single `$buildOption(className, …)` reflection helper unblocks cookies, dialogs, timeouts, waitForUrl, viewport config, and screenshot options in one shot.
 
 ## PR roadmap
 

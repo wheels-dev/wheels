@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+echo ""
+echo "NOTE: This script is replaced by 'wheels browser:install'."
+echo "      This script still works but will be removed in a future release."
+echo ""
 # Temporary bootstrap for browser testing. Replaced by `wheels browser:install`
 # once PR 2 lands. Reads vendor/wheels/browser-manifest.json for pinned versions.
 #
