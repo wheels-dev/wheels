@@ -6,6 +6,10 @@ description: A comprehensive guide to end-to-end testing your Wheels application
 
 This guide covers how to install, configure, and run Playwright end-to-end (E2E) tests for your Wheels application. Playwright enables you to test your application from a user's perspective, simulating real browser interactions across multiple browsers.
 
+{% hint style="info" %}
+This guide covers the **Node.js/TypeScript Playwright** approach. For native CFML browser testing that runs inside TestBox, see [Browser Testing](browser-testing.md).
+{% endhint %}
+
 ## Overview
 
 Playwright is a modern end-to-end testing framework that allows you to:

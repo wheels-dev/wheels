@@ -60,6 +60,9 @@
   * Playwright Commands
     * [wheels playwright:init](command-line-tools/commands/playwright/playwright-init.md)
     * [wheels playwright:install](command-line-tools/commands/playwright/playwright-install.md)
+  * Browser Commands
+    * [wheels browser:install](command-line-tools/commands/browser/browser-install.md)
+    * [wheels browser:test](command-line-tools/commands/browser/browser-test.md)
   * Environment Management
     * [wheels env setup](command-line-tools/commands/environment/env-setup.md)
     * [wheels env list](command-line-tools/commands/environment/env-list.md)
@@ -122,6 +125,7 @@
 * [Switching Environments](working-with-wheels/switching-environments.md)
 * [Testing Your Application](working-with-wheels/testing-your-application.md)
 * [End-to-End Testing](working-with-wheels/end-to-end-testing.md)
+* [Browser Testing](working-with-wheels/browser-testing.md)
 * [Using the Test Environment](working-with-wheels/using-the-test-environment.md)
 * [Overriding Core Methods](working-with-wheels/overriding-core-methods.md)
 * [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
