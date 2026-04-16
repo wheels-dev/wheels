@@ -216,6 +216,7 @@ component {
         // Playwright's DriverJar uses TCCL to find bundled driver resources, and
         // default TCCL (AppClassLoader) doesn't have driver-bundle.jar.
         var previousTCCL = $pushTCCL();
+        var browser = "";
         try {
             if (!isObject(variables.$playwright)) {
                 // Playwright.create() via reflection: Lucee's varargs bridge can't
@@ -230,10 +231,36 @@ component {
             // LaunchOptions via reflection through URLClassLoader is fragile;
             // zero-arg launch() defaults to headless=true, which is what we want.
             var launchMethod = $findZeroArgMethod(klass=browserType.getClass(), name="launch");
-            var browser = launchMethod.invoke(browserType, javaCast("Object[]", []));
-        } finally {
+            browser = launchMethod.invoke(browserType, javaCast("Object[]", []));
+        } catch (any e) {
             $popTCCL(previousLoader=previousTCCL);
+            // Re-throw errors that are already Wheels-typed (e.g.,
+            // BrowserEngineInvalid from $getBrowserType, ReflectionError
+            // from $findZeroArgMethod). Only wrap unknown/Java errors.
+            if (findNoCase("Wheels.", e.type ?: "")) {
+                rethrow;
+            }
+            // Most likely cause: Chromium binary missing/corrupt under
+            // ~/Library/Caches/ms-playwright/. The reflection layer surfaces
+            // this as InvocationTargetException wrapping a PlaywrightException;
+            // strip the wrapper so callers see something actionable.
+            var rootCause = e.message;
+            try {
+                if (structKeyExists(e, "cause") && isObject(e.cause)) {
+                    rootCause = e.cause.getMessage();
+                }
+            } catch (any inner) {
+                // best-effort: if cause unwrapping itself fails, fall back to
+                // e.message above. Don't mask the original error.
+            }
+            throw(
+                type="Wheels.BrowserLaunchFailed",
+                message="Failed to launch " & arguments.engine & ": " & rootCause
+                    & ". If Playwright is not installed, run: bash tools/install-playwright.sh",
+                detail=e.detail ?: ""
+            );
         }
+        $popTCCL(previousLoader=previousTCCL);
 
         variables.$browsers[arguments.engine] = browser;
         return browser;
@@ -243,8 +270,12 @@ component {
      * Finds the zero-argument method with the given name on the given class.
      * Workaround for Lucee's Java-varargs bridge which can't reliably express
      * an empty `Class<?>[]` to `Class.getMethod(String, Class<?>...)`.
+     *
+     * Public (with $ prefix indicating "internal but accessible") so callers
+     * needing reflection access through our URLClassLoader — and tests of
+     * the reflection error path — can use it directly.
      */
-    private any function $findZeroArgMethod(required any klass, required string name) {
+    public any function $findZeroArgMethod(required any klass, required string name) {
         var methods = arguments.klass.getMethods();
         for (var i = 1; i <= arrayLen(methods); i++) {
             if (methods[i].getName() == arguments.name && arrayLen(methods[i].getParameterTypes()) == 0) {
@@ -275,15 +306,19 @@ component {
     }
 
     /**
-     * Closes all acquired browsers and the Playwright instance. Call once per
-     * test run (not per spec CFC).
+     * Closes all acquired browsers, the Playwright instance, and the
+     * URLClassLoader (which holds native file handles on the seven JARs).
+     * Call once per test run, not per spec CFC.
      */
     public void function release() {
         for (var engine in variables.$browsers) {
             try {
                 variables.$browsers[engine].close();
             } catch (any e) {
-                // best-effort cleanup
+                // Best-effort: browser close can fail if the node-driver
+                // process already exited (timeout, crash). Safe to swallow —
+                // the JVM exit will reap any orphaned handles. Other browsers
+                // in this loop should still get a chance to close.
             }
         }
         variables.$browsers = {};
@@ -292,8 +327,25 @@ component {
             try {
                 variables.$playwright.close();
             } catch (any e) {
+                // Best-effort: same rationale as the per-browser close above.
+                // Continuing on to URLClassLoader release.
             }
             variables.$playwright = "";
+        }
+
+        // Close the URLClassLoader so its native file handles on the seven
+        // pinned JARs are released. Important on Windows (would prevent JAR
+        // replacement) and prevents FD exhaustion if release() + new launcher
+        // cycles happen in a long-running process.
+        if (structKeyExists(variables, "$classLoader")) {
+            try {
+                variables.$classLoader.close();
+            } catch (any e) {
+                // Best-effort: close can fail if the loader is already closed
+                // (idempotent release()) or if a child class is mid-use. JVM
+                // exit cleans up regardless.
+            }
+            structDelete(variables, "$classLoader");
         }
 
         variables.$state = "shut-down";

@@ -25,12 +25,14 @@ mkdir -p "$LIB_DIR"
 # Avoids bash-4 `mapfile` so the script works with macOS's default bash 3.2.
 ENTRIES_FILE=$(mktemp)
 trap 'rm -f "$ENTRIES_FILE"' EXIT
+# Pass MANIFEST as argv[1] so paths with apostrophes don't break the
+# Python single-quoted string. Paranoid for vendor/wheels/ but free.
 python3 -c "
-import json
-m = json.load(open('$MANIFEST'))
+import json, sys
+m = json.load(open(sys.argv[1]))
 for e in m['classpath']:
     print(e['filename'] + '\t' + e['url'] + '\t' + e['sha256'])
-" > "$ENTRIES_FILE"
+" "$MANIFEST" > "$ENTRIES_FILE"
 
 ENTRY_COUNT=$(wc -l < "$ENTRIES_FILE" | tr -d ' ')
 if [[ "$ENTRY_COUNT" -eq 0 ]]; then

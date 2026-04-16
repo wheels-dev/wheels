@@ -1,6 +1,6 @@
 component extends="Controller" {
 
-    function init() {
+    function config() {
         filters(through="$requireLogin", except="index");
     }
 

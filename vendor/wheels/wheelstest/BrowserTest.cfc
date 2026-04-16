@@ -119,7 +119,15 @@ component extends="wheels.WheelsTest" {
     public void function $endBrowserContext() {
         if (this.browserTestSkipped) return;
         if (isObject(variables.$context)) {
-            try { variables.$context.close(); } catch (any e) {}
+            try {
+                variables.$context.close();
+            } catch (any e) {
+                // Best-effort: context.close() can fail if the page crashed
+                // (bad data: URL, JS unhandled error). Test assertions ran
+                // before this, so swallowing here doesn't hide test results.
+                // Continuing to clear refs prevents leaked Page/Context
+                // references between `it` blocks.
+            }
             variables.$context = "";
             variables.$page = "";
             this.browser = "";
@@ -138,9 +146,22 @@ component extends="wheels.WheelsTest" {
      *
      * Throws Wheels.BrowserNotInstalled if any classpath JAR is missing —
      * callers catch this and skip browser tests gracefully.
+     *
+     * Wrapped in cflock to guard the check-then-act on application scope
+     * against parallel beforeAll invocations (relevant if ParallelRunner or
+     * multi-bundle parallelism is ever used; sequential TestBox makes this
+     * a no-op today).
      */
     private any function $ensureLauncher() {
-        if (!structKeyExists(application, "$wheelsBrowserLauncher")) {
+        if (structKeyExists(application, "$wheelsBrowserLauncher")) {
+            return application.$wheelsBrowserLauncher;
+        }
+        lock name="wheelsBrowserLauncherInit" type="exclusive" timeout="60" {
+            // Re-check inside the lock — another thread may have initialized
+            // while we were waiting.
+            if (structKeyExists(application, "$wheelsBrowserLauncher")) {
+                return application.$wheelsBrowserLauncher;
+            }
             var l = new wheels.wheelstest.BrowserLauncher();
             var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
             for (var p in paths) {
@@ -169,7 +190,13 @@ component extends="wheels.WheelsTest" {
             var env = createObject("java", "java.lang.System")
                 .getenv("WHEELS_BROWSER_TEST_BASE_URL");
             if (!isNull(env) && len(env)) return env;
-        } catch (any e) {}
+        } catch (any e) {
+            // Best-effort: SecurityManager could deny env access. Falling
+            // back to the localhost default is correct — if the user actually
+            // configured a different URL but we can't read it, their tests
+            // will fail with connection-refused, surfacing the problem
+            // clearly rather than silently using the wrong URL.
+        }
         return "http://localhost:8080";
     }
 

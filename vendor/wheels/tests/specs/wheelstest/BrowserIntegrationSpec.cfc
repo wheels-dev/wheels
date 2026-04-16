@@ -4,15 +4,23 @@ component extends="wheels.WheelsTest" {
     // beforeEach creates a fresh BrowserContext for isolation between `it`s.
 
     function beforeAll() {
-        variables.skipBrowserTests = true;
         variables.launcher = new wheels.wheelstest.BrowserLauncher();
         var paths = variables.launcher.$classpathJarPaths(installDir=variables.launcher.resolveInstallDir());
+        // Check JAR presence explicitly. Distinguishes "not installed"
+        // (legitimate skip) from "installed but launcher crashed" (loud
+        // failure that should propagate). Mirrors BrowserTest.cfc's
+        // catch-specific pattern.
         for (var p in paths) {
-            if (!fileExists(p)) return;
+            if (!fileExists(p)) {
+                variables.skipBrowserTests = true;
+                return;
+            }
         }
-        variables.launcher.$loadJars(jarPaths=paths);
-        variables.browser = variables.launcher.acquireBrowser(engine="chromium");
         variables.skipBrowserTests = false;
+        variables.launcher.$loadJars(jarPaths=paths);
+        // If acquireBrowser throws (Wheels.BrowserLaunchFailed, etc), let it
+        // propagate — those are real failures that should surface, not skip.
+        variables.browser = variables.launcher.acquireBrowser(engine="chromium");
     }
 
     function afterAll() {
@@ -468,7 +476,7 @@ component extends="wheels.WheelsTest" {
                 expect(variables.bc.value("##e")).toBe("preset");
             });
 
-            it("screenshot(path) writes a non-empty PNG file", () => {
+            it("screenshot(path) writes a valid PNG (magic bytes verified)", () => {
                 if (variables.skipBrowserTests) return;
                 variables.bc.visitUrl("data:text/html,<h1>Snap</h1>");
                 var tmpPath = getTempDirectory() & "wheels-bc-" & createUUID() & ".png";
@@ -476,9 +484,113 @@ component extends="wheels.WheelsTest" {
                     variables.bc.screenshot(tmpPath);
                     expect(fileExists(tmpPath)).toBeTrue();
                     expect(getFileInfo(tmpPath).size).toBeGT(0);
+                    // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A. Verifying these
+                    // catches binary-encoding regressions where fileWrite turns
+                    // the byte[] into a text-encoded blob.
+                    var bytes = fileReadBinary(tmpPath);
+                    expect(bytes[1]).toBe(-119);  // 0x89 as signed byte
+                    expect(bytes[2]).toBe(80);    // P
+                    expect(bytes[3]).toBe(78);    // N
+                    expect(bytes[4]).toBe(71);    // G
                 } finally {
                     if (fileExists(tmpPath)) fileDelete(tmpPath);
                 }
+            });
+        });
+
+        describe("BrowserClient — additional negative-path + coverage gaps", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            // assertUrlIs — the most complex assertion; previously untested
+            it("assertUrlIs with full URL passes when current URL matches exactly", () => {
+                if (variables.skipBrowserTests) return;
+                var dataUrl = "data:text/html,<h1>x</h1>";
+                variables.bc.visitUrl(dataUrl);
+                variables.bc.assertUrlIs(variables.bc.currentUrl());
+            });
+
+            it("assertUrlIs with full URL throws on mismatch", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>a</h1>");
+                expect(() => variables.bc.assertUrlIs("data:text/html,<h1>b</h1>"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertUrlIs with leading-slash arg compares path only", () => {
+                if (variables.skipBrowserTests) return;
+                // Use page.evaluate to push a synthetic history entry so we
+                // can test path extraction without a real HTTP server.
+                variables.bc.visitUrl("data:text/html,<h1>x</h1>");
+                // currentUrl() will be the data: URL — assertUrlIs("/path")
+                // would extract the "path" from a data: URL and compare.
+                // For data: URLs $pathFromUrl returns the full URL, so the
+                // compare fails. That's correct behavior; verify it throws:
+                expect(() => variables.bc.assertUrlIs("/some-path"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            // Negative paths on assertions that previously had positive-only tests
+            it("assertDontSee throws when text IS on page", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Welcome</h1>");
+                expect(() => variables.bc.assertDontSee("Welcome"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertVisible throws when selector matches no visible elements", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='hidden' style='display:none'>");
+                expect(() => variables.bc.assertVisible("##hidden"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertMissing throws when selector matches at least one element", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='here'>");
+                expect(() => variables.bc.assertMissing("##here"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertInputValue throws on mismatch", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='e' value='actual'>");
+                expect(() => variables.bc.assertInputValue("##e", "wrong"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertChecked throws when checkbox is unchecked", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<input id='cb' type='checkbox'>");
+                expect(() => variables.bc.assertChecked("##cb"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            it("assertQueryStringHas throws when key missing", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>x</h1>");
+                expect(() => variables.bc.assertQueryStringHas("nope"))
+                    .toThrow(type="Wheels.BrowserAssertionFailed");
+            });
+
+            // Previously untested method: pressEscape
+            it("pressEscape(selector) dispatches Escape keypress", () => {
+                if (variables.skipBrowserTests) return;
+                var html = "<input id='i' onkeydown=""if(event.key==='Escape') document.getElementById('o').textContent='ESC'""><div id='o'></div>";
+                variables.bc.visitUrl("data:text/html," & html);
+                variables.bc.pressEscape("##i");
+                expect(variables.pg.locator("##o").textContent()).toBe("ESC");
             });
         });
     }

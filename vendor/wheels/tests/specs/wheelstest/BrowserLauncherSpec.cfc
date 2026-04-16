@@ -143,6 +143,57 @@ component extends="wheels.WheelsTest" {
                     l.release();
                 }
             });
+
+            it("$loadJars() is idempotent — second call after ready stays ready", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                expect(l.getState()).toBe("ready");
+                l.$loadJars(jarPaths=paths);  // should be no-op
+                expect(l.getState()).toBe("ready");
+                l.release();
+            });
+
+            it("acquireBrowser() throws BrowserLauncherNotReady after release()", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                l.release();
+                expect(l.getState()).toBe("shut-down");
+                expect(() => l.acquireBrowser(engine="chromium"))
+                    .toThrow(type="Wheels.BrowserLauncherNotReady");
+            });
+
+            it("acquireBrowser() throws BrowserEngineInvalid for unknown engine", () => {
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    expect(() => l.acquireBrowser(engine="opera"))
+                        .toThrow(type="Wheels.BrowserEngineInvalid");
+                } finally {
+                    l.release();
+                }
+            });
+
+            it("$findZeroArgMethod throws BrowserLauncherReflectionError when method missing", () => {
+                // Pure reflection helper — testable on any Java class without
+                // needing Playwright JARs loaded. Use String which has no
+                // 'thisDoesNotExist' method.
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var stringClass = createObject("java", "java.lang.String").getClass();
+                expect(() => l.$findZeroArgMethod(klass=stringClass, name="thisDoesNotExistOnString"))
+                    .toThrow(type="Wheels.BrowserLauncherReflectionError");
+            });
         });
     }
 }

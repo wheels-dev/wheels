@@ -267,10 +267,25 @@ component {
         try {
             envOff = (createObject("java", "java.lang.System")
                 .getenv("BROWSER_TEST_PAUSE_WARNING") ?: "on") == "off";
-        } catch (any e) {}
+        } catch (any e) {
+            // Best-effort: SecurityManager could deny env access. If the read
+            // fails we err on the side of warning the user (envOff stays false).
+        }
         if (!envOff) {
-            writeOutput("⚠ BrowserClient.pause() called for " & arguments.milliseconds
-                & "ms. Remove before committing or set BROWSER_TEST_PAUSE_WARNING=off." & chr(10));
+            // Use System.err rather than writeOutput because TestBox's JSON
+            // reporter (the primary CI/LuCLI runner format) discards
+            // writeOutput. System.err shows up in the server console
+            // regardless of reporter — visibility is the whole point of the
+            // warning, so prefer the channel that won't be silenced.
+            try {
+                createObject("java", "java.lang.System").err.println(
+                    "[WARN] BrowserClient.pause() called for " & arguments.milliseconds
+                    & "ms. Remove before committing or set BROWSER_TEST_PAUSE_WARNING=off."
+                );
+            } catch (any e) {
+                // Best-effort: if even System.err is unreachable, silently
+                // proceed to the sleep. Nothing else useful to do.
+            }
         }
         sleep(arguments.milliseconds);
         return this;
