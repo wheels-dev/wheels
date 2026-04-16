@@ -54,6 +54,17 @@ component extends="wheels.WheelsTest" {
             });
         });
 
+        describe("BrowserClient — launcher wiring", () => {
+
+            it("exposes launcher via getLauncher()", () => {
+                if (variables.skipBrowserTests) return;
+                var bc = new wheels.wheelstest.BrowserClient()
+                    .init(baseUrl="", launcher=variables.launcher);
+                expect(isObject(bc.getLauncher())).toBeTrue();
+                expect(bc.getLauncher().getState()).toBe("ready");
+            });
+        });
+
         describe("BrowserClient — navigation against real Chromium (data: URLs)", () => {
 
             // data: URLs avoid needing a fixture server; still exercises real
@@ -116,7 +127,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -189,7 +200,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -244,6 +255,22 @@ component extends="wheels.WheelsTest" {
                 expect(variables.pg.locator("##root").textContent()).toBe("Delayed Text");
             });
 
+            it("waitFor honors custom timeout (short timeout fails on missing element)", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>No target here</h1>");
+                expect(() => {
+                    variables.bc.waitFor("##never-exists", 1);
+                }).toThrow();
+            });
+
+            it("waitForText honors custom timeout (short timeout fails on missing text)", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Hello</h1>");
+                expect(() => {
+                    variables.bc.waitForText("never appears", 1);
+                }).toThrow();
+            });
+
             it("within(selector, callback) scopes interactions to a subtree", () => {
                 if (variables.skipBrowserTests) return;
                 // Two forms with same-id inputs. within() should restrict
@@ -259,6 +286,39 @@ component extends="wheels.WheelsTest" {
             });
         });
 
+        describe("BrowserClient — waitForUrl", () => {
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("resolves immediately when URL already matches", () => {
+                if (variables.skipBrowserTests) return;
+                var targetUrl = "data:text/html,<h1>Here</h1>";
+                variables.bc.visitUrl(targetUrl);
+                // Use the exact URL rather than a glob — data: URLs don't
+                // follow path-based glob conventions.
+                variables.bc.waitForUrl(variables.bc.currentUrl(), 5);
+            });
+
+            it("throws on timeout when URL does not match", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Here</h1>");
+                expect(() => {
+                    variables.bc.waitForUrl("http://will-never-match.example.com/**", 1);
+                }).toThrow();
+            });
+        });
+
         describe("BrowserClient — viewport + script", () => {
 
             beforeEach(() => {
@@ -266,7 +326,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -318,7 +378,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -375,7 +435,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -421,7 +481,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -496,6 +556,19 @@ component extends="wheels.WheelsTest" {
                     if (fileExists(tmpPath)) fileDelete(tmpPath);
                 }
             });
+
+            it("screenshot with fullPage option writes a PNG file", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<div style='height:2000px'>Tall page</div>");
+                var tmpPath = getTempDirectory() & "wheels-bc-fullpage-" & createUUID() & ".png";
+                try {
+                    variables.bc.screenshot(path=tmpPath, fullPage=true);
+                    expect(fileExists(tmpPath)).toBeTrue();
+                    expect(getFileInfo(tmpPath).size).toBeGT(0);
+                } finally {
+                    if (fileExists(tmpPath)) fileDelete(tmpPath);
+                }
+            });
         });
 
         describe("BrowserClient — additional negative-path + coverage gaps", () => {
@@ -505,7 +578,7 @@ component extends="wheels.WheelsTest" {
                 variables.ctx = variables.browser.newContext();
                 variables.pg = variables.ctx.newPage();
                 variables.bc = new wheels.wheelstest.BrowserClient()
-                    .init(page=variables.pg, context=variables.ctx, baseUrl="");
+                    .init(page=variables.pg, context=variables.ctx, baseUrl="", launcher=variables.launcher);
             });
 
             afterEach(() => {
@@ -591,6 +664,76 @@ component extends="wheels.WheelsTest" {
                 variables.bc.visitUrl("data:text/html," & html);
                 variables.bc.pressEscape("##i");
                 expect(variables.pg.locator("##o").textContent()).toBe("ESC");
+            });
+        });
+
+        describe("BrowserClient — cookies", () => {
+
+            // Cookie operations require a real HTTP origin — data: URLs do not
+            // support cookies. We detect the test server at http://localhost and
+            // the port from CGI or default to 8080. Tests skip if no server is
+            // reachable.
+
+            beforeEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx = variables.browser.newContext();
+                variables.pg = variables.ctx.newPage();
+                // Detect the test server port from CGI (the request that runs
+                // this spec is itself served by the test server).
+                var testPort = cgi.server_port ?: "8080";
+                variables.testBaseUrl = "http://localhost:" & testPort;
+                variables.bc = new wheels.wheelstest.BrowserClient()
+                    .init(page=variables.pg, context=variables.ctx, baseUrl=variables.testBaseUrl, launcher=variables.launcher);
+            });
+
+            afterEach(() => {
+                if (variables.skipBrowserTests) return;
+                variables.ctx.close();
+            });
+
+            it("setCookie sets a cookie and cookie() reads it back", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                variables.bc.setCookie(name="testCookie", value="hello123", url=testUrl);
+                var c = variables.bc.cookie("testCookie");
+                expect(c.name).toBe("testCookie");
+                expect(c.value).toBe("hello123");
+            });
+
+            it("deleteCookie removes a specific cookie", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                variables.bc.setCookie(name="toDelete", value="bye", url=testUrl);
+                var c = variables.bc.cookie("toDelete");
+                expect(c.value).toBe("bye");
+                variables.bc.deleteCookie("toDelete");
+                expect(() => {
+                    variables.bc.cookie("toDelete");
+                }).toThrow("Wheels.BrowserAssertionFailed");
+            });
+
+            it("cookie() throws when cookie not found", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                expect(() => {
+                    variables.bc.cookie("nonexistent_cookie_xyz");
+                }).toThrow("Wheels.BrowserAssertionFailed");
+            });
+
+            it("setCookie is chainable", () => {
+                if (variables.skipBrowserTests) return;
+                var testUrl = variables.bc.getBaseUrl();
+                if (!len(testUrl)) return;
+                variables.bc.visitUrl(testUrl);
+                var result = variables.bc.setCookie(name="chain1", value="a", url=testUrl)
+                    .setCookie(name="chain2", value="b", url=testUrl);
+                expect(result).toBeInstanceOf("wheels.wheelstest.BrowserClient");
             });
         });
     }

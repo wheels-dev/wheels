@@ -43,5 +43,89 @@ component extends="wheels.wheelstest.BrowserTest" {
                 expect(launcher.getState()).toBe("ready");
             });
         });
+
+        browserDescribe("viewport config", () => {
+
+            it("applies mobile viewport preset when this.browserViewport is set", () => {
+                if (this.browserTestSkipped) return;
+                var original = this.browserViewport ?: "";
+                this.browserViewport = "mobile";
+
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+
+                this.browser.visitUrl("data:text/html,<h1>Test</h1>");
+                var width = this.browser.script("() => window.innerWidth");
+                expect(width).toBe(375);
+
+                this.browserViewport = original;
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+            });
+
+            it("applies custom viewport dimensions from struct", () => {
+                if (this.browserTestSkipped) return;
+                var original = this.browserViewport ?: "";
+                this.browserViewport = {width: 800, height: 600};
+
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+
+                this.browser.visitUrl("data:text/html,<h1>Test</h1>");
+                var width = this.browser.script("() => window.innerWidth");
+                expect(width).toBe(800);
+
+                this.browserViewport = original;
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+            });
+
+        });
+
+        browserDescribe("auto-screenshot on failure", () => {
+
+            it("$captureFailureArtifacts writes screenshot and HTML", () => {
+                if (this.browserTestSkipped) return;
+                this.browser.visitUrl("data:text/html,<h1>Capture Me</h1>");
+
+                var testDir = expandPath("/tests/_output/browser_capture_test");
+                this.browserArtifactPath = testDir;
+
+                var fakeSpec = {name: "test_capture_verification"};
+                this.$captureFailureArtifacts(fakeSpec);
+
+                expect(directoryExists(testDir)).toBeTrue();
+                var files = directoryList(testDir, false, "name");
+                var hasPng = false;
+                var hasHtml = false;
+                for (var f in files) {
+                    if (findNoCase(".png", f)) hasPng = true;
+                    if (findNoCase(".html", f)) hasHtml = true;
+                }
+                expect(hasPng).toBeTrue();
+                expect(hasHtml).toBeTrue();
+
+                directoryDelete(testDir, true);
+                structDelete(this, "browserArtifactPath");
+            });
+
+            it("respects browserScreenshotOnFailure=false", () => {
+                if (this.browserTestSkipped) return;
+                this.browser.visitUrl("data:text/html,<h1>No Capture</h1>");
+
+                var testDir = expandPath("/tests/_output/browser_optout_test");
+                this.browserArtifactPath = testDir;
+                this.browserScreenshotOnFailure = false;
+
+                var fakeSpec = {name: "test_optout"};
+                this.$captureFailureArtifacts(fakeSpec);
+
+                expect(directoryExists(testDir)).toBeFalse();
+
+                this.browserScreenshotOnFailure = true;
+                structDelete(this, "browserArtifactPath");
+            });
+
+        });
     }
 }

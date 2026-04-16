@@ -288,6 +288,180 @@ component {
         );
     }
 
+    /**
+     * Finds a one-argument method with the given name on the given class.
+     * Used to locate fluent setters on Playwright option objects.
+     */
+    public any function $findSetter(required any klass, required string name) {
+        var methods = arguments.klass.getMethods();
+        for (var i = 1; i <= arrayLen(methods); i++) {
+            if (
+                methods[i].getName() == arguments.name
+                && arrayLen(methods[i].getParameterTypes()) == 1
+            ) {
+                return methods[i];
+            }
+        }
+        throw(
+            type="Wheels.BrowserOptionError",
+            message="No one-arg method named '" & arguments.name
+                & "' on class " & arguments.klass.getName()
+        );
+    }
+
+    /**
+     * Cast a CFML value to the Java type expected by a method parameter.
+     * Reads the parameter's declared type and applies the appropriate javaCast.
+     * Java objects (e.g., nested option objects from $buildOption) pass through.
+     */
+    public any function $castForParam(required any value, required any paramType) {
+        var typeName = arguments.paramType.getName();
+        switch (typeName) {
+            case "double":
+            case "java.lang.Double":
+                return javaCast("double", arguments.value);
+            case "int":
+            case "java.lang.Integer":
+                return javaCast("int", arguments.value);
+            case "long":
+            case "java.lang.Long":
+                return javaCast("long", arguments.value);
+            case "boolean":
+            case "java.lang.Boolean":
+                return javaCast("boolean", arguments.value);
+            case "java.lang.String":
+                return javaCast("string", arguments.value);
+            default:
+                return arguments.value;
+        }
+    }
+
+    /**
+     * Construct a Playwright option object via reflection through our URLClassLoader.
+     *
+     * Lucee's createObject("java", "InnerClass") fails when the class lives in a
+     * URLClassLoader — it tries to resolve via OSGi bundles. This helper bypasses
+     * that by using loadClass() + reflection directly.
+     *
+     * @className   Fully-qualified Java class name (use $ for inner classes)
+     * @setterMap   Struct of setter-name => value. Values auto-cast to match parameter type.
+     * @constructorArgs  Array of constructor arguments. Matched by arity; auto-cast per param type.
+     */
+    public any function $buildOption(
+        required string className,
+        struct setterMap = {},
+        array constructorArgs = []
+    ) {
+        if (!structKeyExists(variables, "$classLoader")) {
+            throw(
+                type="Wheels.BrowserOptionError",
+                message="Cannot build option: classloader not initialized. Call $loadJars() first."
+            );
+        }
+
+        var klass = "";
+        try {
+            klass = variables.$classLoader.loadClass(arguments.className);
+        } catch (any e) {
+            throw(
+                type="Wheels.BrowserOptionError",
+                message="Class not found: " & arguments.className & ". " & e.message
+            );
+        }
+
+        // Construct instance
+        var instance = "";
+        if (arrayLen(arguments.constructorArgs)) {
+            instance = $constructWithArgs(klass=klass, args=arguments.constructorArgs);
+        } else {
+            // Lucee's varargs bridge can't call getDeclaredConstructor() with
+            // zero args (same issue as getMethod). Find the zero-arg constructor
+            // by iterating getDeclaredConstructors().
+            instance = $constructZeroArg(klass=klass, className=arguments.className);
+        }
+
+        // Apply setters
+        for (var setterName in arguments.setterMap) {
+            var value = arguments.setterMap[setterName];
+            try {
+                var setter = $findSetter(klass=klass, name=setterName);
+                var paramType = setter.getParameterTypes()[1];
+                var castedValue = $castForParam(value=value, paramType=paramType);
+                setter.invoke(instance, javaCast("Object[]", [castedValue]));
+            } catch (any e) {
+                if (findNoCase("Wheels.", e.type ?: "")) rethrow;
+                throw(
+                    type="Wheels.BrowserOptionError",
+                    message="Failed to call " & setterName & " on "
+                        & arguments.className & ": " & e.message
+                );
+            }
+        }
+
+        return instance;
+    }
+
+    /**
+     * Construct an instance using the zero-arg constructor found by iterating
+     * getDeclaredConstructors(). Workaround for Lucee's varargs bridge which
+     * can't call getDeclaredConstructor() with zero args.
+     */
+    private any function $constructZeroArg(required any klass, required string className) {
+        var constructors = arguments.klass.getDeclaredConstructors();
+        for (var i = 1; i <= arrayLen(constructors); i++) {
+            if (arrayLen(constructors[i].getParameterTypes()) == 0) {
+                try {
+                    return constructors[i].newInstance(javaCast("Object[]", []));
+                } catch (any e) {
+                    throw(
+                        type="Wheels.BrowserOptionError",
+                        message="Failed to construct " & arguments.className
+                            & " with zero-arg constructor: " & e.message
+                    );
+                }
+            }
+        }
+        throw(
+            type="Wheels.BrowserOptionError",
+            message="No zero-arg constructor found on " & arguments.className
+        );
+    }
+
+    /**
+     * Construct an instance using a constructor matched by argument count.
+     * Tries each constructor with matching arity until one succeeds.
+     */
+    private any function $constructWithArgs(required any klass, required array args) {
+        var constructors = arguments.klass.getDeclaredConstructors();
+        var targetArity = arrayLen(arguments.args);
+        var lastError = "";
+
+        for (var i = 1; i <= arrayLen(constructors); i++) {
+            var paramTypes = constructors[i].getParameterTypes();
+            if (arrayLen(paramTypes) != targetArity) continue;
+
+            try {
+                var castedArgs = [];
+                for (var j = 1; j <= targetArity; j++) {
+                    arrayAppend(castedArgs, $castForParam(
+                        value=arguments.args[j],
+                        paramType=paramTypes[j]
+                    ));
+                }
+                return constructors[i].newInstance(javaCast("Object[]", castedArgs));
+            } catch (any e) {
+                lastError = e.message;
+            }
+        }
+
+        throw(
+            type="Wheels.BrowserOptionError",
+            message="No constructor with " & targetArity & " arg(s) succeeded on "
+                & arguments.klass.getName()
+                & (len(lastError) ? ". Last error: " & lastError : "")
+        );
+    }
+
     private any function $getBrowserType(required string engine) {
         switch (arguments.engine) {
             case "chromium":

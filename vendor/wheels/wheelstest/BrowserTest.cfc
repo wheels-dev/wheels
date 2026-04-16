@@ -28,16 +28,16 @@
  * well-isolated without managing Playwright plumbing themselves.
  *
  * Deferred (per the browser testing foundation PR scope):
- *   - viewport / keepSignedInAs / storageState replay — require building
- *     Playwright option objects (Browser$NewContextOptions, ViewportSize)
- *     through the URLClassLoader, which hits Lucee's OSGi bundle resolver.
- *     Resolving that is a reflection-helper pass planned for a follow-up.
+ *   - keepSignedInAs / storageState replay — require building additional
+ *     Playwright option objects through the URLClassLoader.
  *     Specs needing these can drop down to the raw Playwright objects via
  *     getBrowserLauncher() / this.browser.getContext() / getPage().
  */
 component extends="wheels.WheelsTest" {
 
     this.browserEngine = "chromium";
+    this.browserViewport = "";  // empty = Playwright default; "mobile"/"tablet"/"desktop" or {width:N, height:N}
+    this.browserScreenshotOnFailure = true;
     this.browser = "";
     this.browserTestSkipped = false;
 
@@ -94,6 +94,20 @@ component extends="wheels.WheelsTest" {
 
         describe(arguments.title, function() {
             beforeEach(function() { me.$startBrowserContext(); });
+
+            aroundEach(function(spec, suite) {
+                if (me.browserTestSkipped) {
+                    arguments.spec.body();
+                    return;
+                }
+                try {
+                    arguments.spec.body();
+                } catch (any e) {
+                    me.$captureFailureArtifacts(arguments.spec);
+                    rethrow;
+                }
+            });
+
             afterEach(function() { me.$endBrowserContext(); });
             innerBody();
         });
@@ -106,13 +120,21 @@ component extends="wheels.WheelsTest" {
      */
     public void function $startBrowserContext() {
         if (this.browserTestSkipped) return;
-        variables.$context = variables.$browser.newContext();
+
+        var contextOpts = $buildContextOptions();
+
+        if (isObject(contextOpts)) {
+            variables.$context = variables.$browser.newContext(contextOpts);
+        } else {
+            variables.$context = variables.$browser.newContext();
+        }
         variables.$page = variables.$context.newPage();
         this.browser = new wheels.wheelstest.BrowserClient()
             .init(
                 page=variables.$page,
                 context=variables.$context,
-                baseUrl=variables.$baseUrl
+                baseUrl=variables.$baseUrl,
+                launcher=variables.$launcher
             );
     }
 
@@ -198,6 +220,85 @@ component extends="wheels.WheelsTest" {
             // clearly rather than silently using the wrong URL.
         }
         return "http://localhost:8080";
+    }
+
+    /**
+     * Best-effort capture of screenshot + HTML on test failure.
+     * Called from aroundEach catch block. Swallows all errors to avoid
+     * masking the real test failure.
+     */
+    public void function $captureFailureArtifacts(required any spec) {
+        if (!(this.browserScreenshotOnFailure ?: true)) return;
+        if (!isObject(this.browser) || this.browserTestSkipped) return;
+
+        try {
+            var artifactDir = this.browserArtifactPath
+                ?: expandPath("/tests/_output/browser");
+
+            if (!directoryExists(artifactDir)) {
+                directoryCreate(artifactDir, true);
+            }
+
+            var rawName = arguments.spec.name ?: "unknown_spec";
+            var safeName = reReplace(rawName, "[^a-zA-Z0-9_\-]", "_", "all");
+            if (len(safeName) > 80) safeName = left(safeName, 80);
+            var ts = dateFormat(now(), "yyyymmdd") & "_" & timeFormat(now(), "HHmmss");
+            var baseName = safeName & "-" & ts;
+
+            this.browser.screenshot(path=artifactDir & "/" & baseName & ".png");
+            fileWrite(artifactDir & "/" & baseName & ".html", this.browser.pageSource());
+        } catch (any e) {
+            // Best-effort: page may have crashed, context may be closed.
+            // Swallow to avoid masking the real test failure.
+        }
+    }
+
+    /**
+     * Builds Browser$NewContextOptions if viewport config is set.
+     * Returns the options object, or empty string if no config.
+     */
+    private any function $buildContextOptions() {
+        if (!structKeyExists(this, "browserViewport") || !len(this.browserViewport ?: "")) {
+            return "";
+        }
+
+        var dims = $resolveViewportDims(this.browserViewport);
+
+        var viewport = variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.options.ViewportSize",
+            constructorArgs=[dims.width, dims.height]
+        );
+
+        return variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.Browser$NewContextOptions",
+            setterMap={setViewportSize: viewport}
+        );
+    }
+
+    /**
+     * Resolve viewport config to {width, height} struct.
+     */
+    private struct function $resolveViewportDims(required any viewport) {
+        if (isSimpleValue(arguments.viewport)) {
+            switch (lCase(arguments.viewport)) {
+                case "mobile":
+                    return {width: 375, height: 667};
+                case "tablet":
+                    return {width: 768, height: 1024};
+                case "desktop":
+                    return {width: 1440, height: 900};
+                default:
+                    throw(
+                        type="Wheels.BrowserViewportInvalid",
+                        message="Unknown viewport preset: " & arguments.viewport
+                            & ". Valid: mobile, tablet, desktop"
+                    );
+            }
+        }
+        return {
+            width: arguments.viewport.width ?: 1440,
+            height: arguments.viewport.height ?: 900
+        };
     }
 
 }

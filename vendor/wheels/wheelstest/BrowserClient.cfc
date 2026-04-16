@@ -12,15 +12,18 @@ component {
     variables.page = "";
     variables.context = "";
     variables.baseUrl = "";
+    variables.$launcher = "";
 
     public BrowserClient function init(
         any page = "",
         any context = "",
-        string baseUrl = ""
+        string baseUrl = "",
+        any launcher = ""
     ) {
         variables.page = arguments.page;
         variables.context = arguments.context;
         variables.baseUrl = arguments.baseUrl;
+        variables.$launcher = arguments.launcher;
         return this;
     }
 
@@ -180,30 +183,68 @@ component {
     // ─── Waiting ─────────────────────────────────────────────────────
 
     /**
-     * Waits for a selector to become visible. Uses Playwright's default
-     * timeout (30s). seconds param is accepted for API compatibility with
-     * the plan, but not currently honored — configurable timeout requires
-     * building Locator$WaitForOptions through the URLClassLoader, which is
-     * fragile (see Task 7 press() commentary). Uses .first() so selectors
+     * Waits for a selector to become visible. Default timeout is 30s
+     * (Playwright's default). When a non-default timeout is specified and
+     * a launcher is available, builds Locator$WaitForOptions via
+     * $buildOption to honor the custom timeout. Uses .first() so selectors
      * that match multiple elements resolve to the first one.
      */
     public BrowserClient function waitFor(
         required string selector,
         numeric seconds = 30
     ) {
-        $locator(arguments.selector).first().waitFor();
+        var loc = $locator(arguments.selector).first();
+        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Locator$WaitForOptions",
+                setterMap={setTimeout: arguments.seconds * 1000}
+            );
+            loc.waitFor(opts);
+        } else {
+            loc.waitFor();
+        }
         return this;
     }
 
     /**
-     * Waits for visible text to appear anywhere on the page. Same timeout
-     * caveat as waitFor().
+     * Waits for visible text to appear anywhere on the page. Default timeout
+     * is 30s. When a non-default timeout is specified and a launcher is
+     * available, builds Locator$WaitForOptions via $buildOption.
      */
     public BrowserClient function waitForText(
         required string text,
         numeric seconds = 30
     ) {
-        variables.page.getByText(arguments.text).first().waitFor();
+        var loc = variables.page.getByText(arguments.text).first();
+        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Locator$WaitForOptions",
+                setterMap={setTimeout: arguments.seconds * 1000}
+            );
+            loc.waitFor(opts);
+        } else {
+            loc.waitFor();
+        }
+        return this;
+    }
+
+    /**
+     * Waits for the page URL to match the given pattern. Supports exact
+     * strings and glob patterns (Playwright native).
+     */
+    public BrowserClient function waitForUrl(
+        required string url,
+        numeric seconds = 30
+    ) {
+        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Page$WaitForURLOptions",
+                setterMap={setTimeout: arguments.seconds * 1000}
+            );
+            variables.page.waitForURL(arguments.url, opts);
+        } else {
+            variables.page.waitForURL(arguments.url);
+        }
         return this;
     }
 
@@ -311,7 +352,8 @@ component {
             .init(
                 page=variables.page,
                 context=variables.context,
-                baseUrl=variables.baseUrl
+                baseUrl=variables.baseUrl,
+                launcher=variables.$launcher
             );
         scoped.$setScope(variables.page.locator(arguments.selector).first());
         arguments.callback(scoped);
@@ -324,6 +366,70 @@ component {
      */
     public void function $setScope(required any rootLocator) {
         variables.$scope = arguments.rootLocator;
+    }
+
+    // ─── Cookies ─────────────────────────────────────────────────────
+
+    /**
+     * Set a cookie on the current browser context. Requires the page to
+     * have been navigated to a real HTTP origin (not data: URLs).
+     */
+    public BrowserClient function setCookie(
+        required string name,
+        required string value,
+        required string url
+    ) {
+        var cookieObj = variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.options.Cookie",
+            constructorArgs=[arguments.name, arguments.value],
+            setterMap={setUrl: arguments.url}
+        );
+        var cookieList = createObject("java", "java.util.Collections")
+            .singletonList(cookieObj);
+        variables.context.addCookies(cookieList);
+        return this;
+    }
+
+    /**
+     * Delete a specific cookie by name from the browser context.
+     * Constructs ClearCookiesOptions and sets the public `name` field
+     * directly (bypassing the overloaded setter) to avoid reflection
+     * ambiguity between setName(String) and setName(Pattern).
+     */
+    public BrowserClient function deleteCookie(required string name) {
+        var opts = variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.BrowserContext$ClearCookiesOptions"
+        );
+        // Set the public `name` field directly rather than calling the
+        // overloaded setName() setter. The field type is Object, so a
+        // CFML string assignment works without type-mismatch issues.
+        opts.name = arguments.name;
+        variables.context.clearCookies(opts);
+        return this;
+    }
+
+    /**
+     * Read a cookie by name from the browser context. Returns a struct
+     * with name, value, domain, path, expires, httpOnly, secure.
+     * Throws BrowserAssertionFailed if cookie not found.
+     */
+    public struct function cookie(required string name) {
+        var cookies = variables.context.cookies();
+        for (var i = 0; i < cookies.size(); i++) {
+            var c = cookies.get(javaCast("int", i));
+            if (c.name == arguments.name) {
+                return {
+                    name: c.name,
+                    value: c.value,
+                    domain: c.domain ?: "",
+                    path: c.path ?: "",
+                    expires: c.expires ?: -1,
+                    httpOnly: c.httpOnly ?: false,
+                    secure: c.secure ?: false
+                };
+            }
+        }
+        $assertFail("Cookie '" & arguments.name & "' not found");
     }
 
     // ─── Assertions: text + visibility + presence ────────────────────
@@ -508,14 +614,35 @@ component {
     }
 
     /**
-     * Screenshot to `path`. Uses the no-arg screenshot() → byte[] overload
-     * rather than Page$ScreenshotOptions, since building the options class
-     * through the URLClassLoader hits Lucee's OSGi-bundle resolver (same
-     * trap documented on press() / waitFor() earlier in this file).
+     * Screenshot to `path`. When fullPage or quality are specified, builds
+     * Page$ScreenshotOptions via $buildOption. Otherwise uses the fast path
+     * (no-arg screenshot → byte[] → fileWrite).
      */
-    public BrowserClient function screenshot(required string path) {
-        var bytes = variables.page.screenshot();
-        fileWrite(arguments.path, bytes);
+    public BrowserClient function screenshot(
+        required string path,
+        boolean fullPage = false,
+        numeric quality = 0
+    ) {
+        if ((arguments.fullPage || arguments.quality > 0) && isObject(variables.$launcher)) {
+            var emptyStringArr = javaCast("String[]", []);
+            var pathObj = createObject("java", "java.nio.file.Paths")
+                .get(arguments.path, emptyStringArr);
+            var setters = {setPath: pathObj};
+            if (arguments.fullPage) {
+                setters["setFullPage"] = true;
+            }
+            if (arguments.quality > 0) {
+                setters["setQuality"] = arguments.quality;
+            }
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Page$ScreenshotOptions",
+                setterMap=setters
+            );
+            variables.page.screenshot(opts);
+        } else {
+            var bytes = variables.page.screenshot();
+            fileWrite(arguments.path, bytes);
+        }
         return this;
     }
 
@@ -531,6 +658,10 @@ component {
 
     public string function getBaseUrl() {
         return variables.baseUrl;
+    }
+
+    public any function getLauncher() {
+        return variables.$launcher;
     }
 
     // ─── Internal helpers ────────────────────────────────────────────
