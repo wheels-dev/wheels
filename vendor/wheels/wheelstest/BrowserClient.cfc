@@ -550,13 +550,35 @@ component {
     }
 
     /**
-     * Screenshot to `path`. Uses the no-arg screenshot() → byte[] overload
-     * rather than Page$ScreenshotOptions, since building the options class
-     * through the URLClassLoader hits Lucee's OSGi-bundle resolver.
+     * Screenshot to `path`. When fullPage or quality are specified, builds
+     * Page$ScreenshotOptions via $buildOption. Otherwise uses the fast path
+     * (no-arg screenshot → byte[] → fileWrite).
      */
-    public BrowserClient function screenshot(required string path) {
-        var bytes = variables.page.screenshot();
-        fileWrite(arguments.path, bytes);
+    public BrowserClient function screenshot(
+        required string path,
+        boolean fullPage = false,
+        numeric quality = 0
+    ) {
+        if ((arguments.fullPage || arguments.quality > 0) && isObject(variables.$launcher)) {
+            var emptyStringArr = javaCast("String[]", []);
+            var pathObj = createObject("java", "java.nio.file.Paths")
+                .get(arguments.path, emptyStringArr);
+            var setters = {setPath: pathObj};
+            if (arguments.fullPage) {
+                setters["setFullPage"] = true;
+            }
+            if (arguments.quality > 0) {
+                setters["setQuality"] = arguments.quality;
+            }
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Page$ScreenshotOptions",
+                setterMap=setters
+            );
+            variables.page.screenshot(opts);
+        } else {
+            var bytes = variables.page.screenshot();
+            fileWrite(arguments.path, bytes);
+        }
         return this;
     }
 

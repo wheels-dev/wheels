@@ -553,6 +553,19 @@ component extends="wheels.WheelsTest" {
                     if (fileExists(tmpPath)) fileDelete(tmpPath);
                 }
             });
+
+            it("screenshot with fullPage option writes a PNG file", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<div style='height:2000px'>Tall page</div>");
+                var tmpPath = getTempDirectory() & "wheels-bc-fullpage-" & createUUID() & ".png";
+                try {
+                    variables.bc.screenshot(path=tmpPath, fullPage=true);
+                    expect(fileExists(tmpPath)).toBeTrue();
+                    expect(getFileInfo(tmpPath).size).toBeGT(0);
+                } finally {
+                    if (fileExists(tmpPath)) fileDelete(tmpPath);
+                }
+            });
         });
 
         describe("BrowserClient — additional negative-path + coverage gaps", () => {
