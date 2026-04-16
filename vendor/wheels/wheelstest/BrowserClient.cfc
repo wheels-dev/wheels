@@ -432,6 +432,43 @@ component {
         $assertFail("Cookie '" & arguments.name & "' not found");
     }
 
+    // ─── Auth ────────────────────────────────────────────────────────
+
+    /**
+     * Logs in as the given identifier by navigating to the test-only
+     * /_browser/login-as endpoint. Sets session.userId and session.userEmail
+     * on the server side. Only available when the Wheels app is in testing mode.
+     *
+     *     this.browser.loginAs("alice@example.com")
+     *                 .visit("/_browser/dashboard")
+     *                 .assertSee("alice@example.com");
+     */
+    public BrowserClient function loginAs(required string identifier) {
+        visit("/_browser/login-as?identifier=" & encodeForURL(arguments.identifier));
+        return this;
+    }
+
+    /**
+     * Logs out by clearing all cookies on the browser context and navigating
+     * to the fixture home page to reset page state. For testing the logout UI
+     * flow (click button, see redirect), use click()/press() directly instead.
+     */
+    public BrowserClient function logout() {
+        variables.context.clearCookies();
+        visit("/_browser/home");
+        return this;
+    }
+
+    /**
+     * Clears all cookies on the browser context. Unlike deleteCookie(name)
+     * which targets a single cookie, this removes everything — session,
+     * tracking, etc.
+     */
+    public BrowserClient function clearCookies() {
+        variables.context.clearCookies();
+        return this;
+    }
+
     // ─── Assertions: text + visibility + presence ────────────────────
 
     public BrowserClient function assertSee(required string text) {
