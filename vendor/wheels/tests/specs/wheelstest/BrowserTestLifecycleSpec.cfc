@@ -43,5 +43,43 @@ component extends="wheels.wheelstest.BrowserTest" {
                 expect(launcher.getState()).toBe("ready");
             });
         });
+
+        browserDescribe("viewport config", () => {
+
+            it("applies mobile viewport preset when this.browserViewport is set", () => {
+                if (this.browserTestSkipped) return;
+                var original = this.browserViewport ?: "";
+                this.browserViewport = "mobile";
+
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+
+                this.browser.visitUrl("data:text/html,<h1>Test</h1>");
+                var width = this.browser.script("() => window.innerWidth");
+                expect(width).toBe(375);
+
+                this.browserViewport = original;
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+            });
+
+            it("applies custom viewport dimensions from struct", () => {
+                if (this.browserTestSkipped) return;
+                var original = this.browserViewport ?: "";
+                this.browserViewport = {width: 800, height: 600};
+
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+
+                this.browser.visitUrl("data:text/html,<h1>Test</h1>");
+                var width = this.browser.script("() => window.innerWidth");
+                expect(width).toBe(800);
+
+                this.browserViewport = original;
+                this.$endBrowserContext();
+                this.$startBrowserContext();
+            });
+
+        });
     }
 }

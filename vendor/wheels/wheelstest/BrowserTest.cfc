@@ -28,16 +28,15 @@
  * well-isolated without managing Playwright plumbing themselves.
  *
  * Deferred (per the browser testing foundation PR scope):
- *   - viewport / keepSignedInAs / storageState replay — require building
- *     Playwright option objects (Browser$NewContextOptions, ViewportSize)
- *     through the URLClassLoader, which hits Lucee's OSGi bundle resolver.
- *     Resolving that is a reflection-helper pass planned for a follow-up.
+ *   - keepSignedInAs / storageState replay — require building additional
+ *     Playwright option objects through the URLClassLoader.
  *     Specs needing these can drop down to the raw Playwright objects via
  *     getBrowserLauncher() / this.browser.getContext() / getPage().
  */
 component extends="wheels.WheelsTest" {
 
     this.browserEngine = "chromium";
+    this.browserViewport = "";  // empty = Playwright default; "mobile"/"tablet"/"desktop" or {width:N, height:N}
     this.browser = "";
     this.browserTestSkipped = false;
 
@@ -106,7 +105,14 @@ component extends="wheels.WheelsTest" {
      */
     public void function $startBrowserContext() {
         if (this.browserTestSkipped) return;
-        variables.$context = variables.$browser.newContext();
+
+        var contextOpts = $buildContextOptions();
+
+        if (isObject(contextOpts)) {
+            variables.$context = variables.$browser.newContext(contextOpts);
+        } else {
+            variables.$context = variables.$browser.newContext();
+        }
         variables.$page = variables.$context.newPage();
         this.browser = new wheels.wheelstest.BrowserClient()
             .init(
@@ -199,6 +205,54 @@ component extends="wheels.WheelsTest" {
             // clearly rather than silently using the wrong URL.
         }
         return "http://localhost:8080";
+    }
+
+    /**
+     * Builds Browser$NewContextOptions if viewport config is set.
+     * Returns the options object, or empty string if no config.
+     */
+    private any function $buildContextOptions() {
+        if (!structKeyExists(this, "browserViewport") || !len(this.browserViewport ?: "")) {
+            return "";
+        }
+
+        var dims = $resolveViewportDims(this.browserViewport);
+
+        var viewport = variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.options.ViewportSize",
+            constructorArgs=[dims.width, dims.height]
+        );
+
+        return variables.$launcher.$buildOption(
+            className="com.microsoft.playwright.Browser$NewContextOptions",
+            setterMap={setViewportSize: viewport}
+        );
+    }
+
+    /**
+     * Resolve viewport config to {width, height} struct.
+     */
+    private struct function $resolveViewportDims(required any viewport) {
+        if (isSimpleValue(arguments.viewport)) {
+            switch (lCase(arguments.viewport)) {
+                case "mobile":
+                    return {width: 375, height: 667};
+                case "tablet":
+                    return {width: 768, height: 1024};
+                case "desktop":
+                    return {width: 1440, height: 900};
+                default:
+                    throw(
+                        type="Wheels.BrowserViewportInvalid",
+                        message="Unknown viewport preset: " & arguments.viewport
+                            & ". Valid: mobile, tablet, desktop"
+                    );
+            }
+        }
+        return {
+            width: arguments.viewport.width ?: 1440,
+            height: arguments.viewport.height ?: 900
+        };
     }
 
 }
