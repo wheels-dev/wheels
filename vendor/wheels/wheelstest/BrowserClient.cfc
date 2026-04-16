@@ -183,30 +183,48 @@ component {
     // ─── Waiting ─────────────────────────────────────────────────────
 
     /**
-     * Waits for a selector to become visible. Uses Playwright's default
-     * timeout (30s). seconds param is accepted for API compatibility with
-     * the plan, but not currently honored — configurable timeout requires
-     * building Locator$WaitForOptions through the URLClassLoader, which is
-     * fragile (see Task 7 press() commentary). Uses .first() so selectors
+     * Waits for a selector to become visible. Default timeout is 30s
+     * (Playwright's default). When a non-default timeout is specified and
+     * a launcher is available, builds Locator$WaitForOptions via
+     * $buildOption to honor the custom timeout. Uses .first() so selectors
      * that match multiple elements resolve to the first one.
      */
     public BrowserClient function waitFor(
         required string selector,
         numeric seconds = 30
     ) {
-        $locator(arguments.selector).first().waitFor();
+        var loc = $locator(arguments.selector).first();
+        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Locator$WaitForOptions",
+                setterMap={setTimeout: arguments.seconds * 1000}
+            );
+            loc.waitFor(opts);
+        } else {
+            loc.waitFor();
+        }
         return this;
     }
 
     /**
-     * Waits for visible text to appear anywhere on the page. Same timeout
-     * caveat as waitFor().
+     * Waits for visible text to appear anywhere on the page. Default timeout
+     * is 30s. When a non-default timeout is specified and a launcher is
+     * available, builds Locator$WaitForOptions via $buildOption.
      */
     public BrowserClient function waitForText(
         required string text,
         numeric seconds = 30
     ) {
-        variables.page.getByText(arguments.text).first().waitFor();
+        var loc = variables.page.getByText(arguments.text).first();
+        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
+            var opts = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.Locator$WaitForOptions",
+                setterMap={setTimeout: arguments.seconds * 1000}
+            );
+            loc.waitFor(opts);
+        } else {
+            loc.waitFor();
+        }
         return this;
     }
 
@@ -514,8 +532,7 @@ component {
     /**
      * Screenshot to `path`. Uses the no-arg screenshot() → byte[] overload
      * rather than Page$ScreenshotOptions, since building the options class
-     * through the URLClassLoader hits Lucee's OSGi-bundle resolver (same
-     * trap documented on press() / waitFor() earlier in this file).
+     * through the URLClassLoader hits Lucee's OSGi-bundle resolver.
      */
     public BrowserClient function screenshot(required string path) {
         var bytes = variables.page.screenshot();

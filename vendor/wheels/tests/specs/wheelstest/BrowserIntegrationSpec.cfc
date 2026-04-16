@@ -255,6 +255,22 @@ component extends="wheels.WheelsTest" {
                 expect(variables.pg.locator("##root").textContent()).toBe("Delayed Text");
             });
 
+            it("waitFor honors custom timeout (short timeout fails on missing element)", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>No target here</h1>");
+                expect(() => {
+                    variables.bc.waitFor("##never-exists", 1);
+                }).toThrow();
+            });
+
+            it("waitForText honors custom timeout (short timeout fails on missing text)", () => {
+                if (variables.skipBrowserTests) return;
+                variables.bc.visitUrl("data:text/html,<h1>Hello</h1>");
+                expect(() => {
+                    variables.bc.waitForText("never appears", 1);
+                }).toThrow();
+            });
+
             it("within(selector, callback) scopes interactions to a subtree", () => {
                 if (variables.skipBrowserTests) return;
                 // Two forms with same-id inputs. within() should restrict
