@@ -90,7 +90,7 @@ component {
 	}
 
 	/**
-	 * Generate a <script> tag that creates an EventSource for a channel.
+	 * Generate a 'script' tag that creates an EventSource for a channel.
 	 * Convenience view helper for quickly wiring up SSE in templates.
 	 *
 	 * @channel The channel name.

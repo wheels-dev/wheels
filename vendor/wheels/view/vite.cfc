@@ -28,7 +28,7 @@ component {
 	}
 
 	/**
-	 * Returns `<script>` tags for a Vite JS entrypoint. In development, also injects the Vite
+	 * Returns 'script' tags for a Vite JS entrypoint. In development, also injects the Vite
 	 * client for Hot Module Replacement (HMR). In production, includes any associated CSS files
 	 * from the manifest as `<link>` tags.
 	 *
