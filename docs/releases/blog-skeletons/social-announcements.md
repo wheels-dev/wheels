@@ -9,6 +9,8 @@
 
 **Framing:** 4.0 is *in the works* — release candidate, not GA. Phrasing throughout uses "coming" / "on the way" / "preview" rather than "shipped." Swap to present tense on GA day.
 
+**X thread numbering convention:** hero tweet is unnumbered and stands alone. Reply tweets in the thread are prefixed `1/`, `2/`, `3/` — no total denominator (threads can grow, and open-ended numbering is the prevailing convention). Keep the hero readable/quotable on its own even if you never post the replies.
+
 **Links (use absolute URLs — these docs are not on GitBook):**
 - Parity doc: https://github.com/wheels-dev/wheels/blob/develop/docs/wheels-vs-frameworks.md
 - Full audit: https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-4.0-audit.md
@@ -60,36 +62,30 @@ https://github.com/wheels-dev/wheels/blob/develop/docs/wheels-vs-frameworks.md
 
 ### X / Twitter
 
-**Hero tweet (280 chars):**
+**Hero tweet (unnumbered):**
 ```
 Wheels 4.0 is on the way.
 
 Updated the parity doc vs Rails 8 / Laravel 12 / Django 5 — most of the rows that said "No" for CFWheels now say "Yes" for Wheels 4.0.
 
 Bulk upsert, polymorphic assocs, advisory locks, middleware pipeline, browser testing, multi-tenancy…
-
-(1/3)
 ```
 
-**Tweet 2:**
+**Reply 1:**
 ```
-Honest "where we still trail":
+1/ Honest "where we still trail":
 
 • Ecosystem size — smaller than Rails/Laravel/Django
 • Bidirectional WebSocket — intentional non-goal; SSE is our cross-engine primitive
 • Asset-pipeline maturity — Vite integration is newer than Rails'/Laravel's
-
-(2/3)
 ```
 
-**Tweet 3:**
+**Reply 2:**
 ```
-Full comparison:
+2/ Full comparison:
 https://github.com/wheels-dev/wheels/blob/develop/docs/wheels-vs-frameworks.md
 
 If you last evaluated Wheels and it didn't clear the bar, worth another look before 4.0 ships.
-
-(3/3)
 ```
 
 ### GitHub Discussions
@@ -173,7 +169,7 @@ https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-4.0-audit
 
 ### X / Twitter
 
-**Hero tweet (280 chars):**
+**Hero tweet (unnumbered; stands alone or leads a thread):**
 ```
 Wheels 4.0 by the numbers:
 
@@ -187,9 +183,9 @@ Full audit with PR-level receipts:
 https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-4.0-audit.md
 ```
 
-**(Optional follow-up tweet if going as a thread):**
+**Reply 1 (optional — extend into a thread):**
 ```
-Security-hardening breakdown:
+1/ Security-hardening breakdown:
 
 • SQL injection — QueryBuilder + scope handlers + $quoteValue + index hints
 • Path traversal — partials, guideImage, MCP docs, encoded-bypass
@@ -198,8 +194,6 @@ Security-hardening breakdown:
 • Rate limiter
 • MCP
 • XSS
-
-(2/2)
 ```
 
 ### GitHub Discussions
@@ -289,7 +283,7 @@ https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-3.0-vs-4.
 
 ### X / Twitter
 
-**Hero tweet (280 chars):**
+**Hero tweet (unnumbered; stands alone or leads a thread):**
 ```
 On Wheels 3.x and weighing a 4.0 upgrade?
 
@@ -298,9 +292,9 @@ Published a row-by-row before/after comparison — only rows that actually chang
 https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-3.0-vs-4.0.md
 ```
 
-**(Optional follow-up as a thread):**
+**Reply 1 (optional — extend into a thread):**
 ```
-Headline numbers:
+1/ Headline numbers:
 
 • ~35 new capabilities
 • ~10 formalized (partial precedent → production-ready)
@@ -308,8 +302,6 @@ Headline numbers:
 • 4 legacy surfaces removed
 
 Pairs with the upgrade guide for the actual migration steps.
-
-(2/2)
 ```
 
 ### GitHub Discussions
