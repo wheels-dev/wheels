@@ -13,7 +13,6 @@ excerpt: Today sees a security release for the 2.x series.
 coverImage: null
 legacyId: '103'
 ---
-
 Today sees a security release for the 2.x series.
 
 It is strongly recommended to update to CFWheels 2.0.2 if you are running either 2.0.0 or 2.0.1. This issue does **not** affect 1.x releases. This release introduces a potentially breaking change, so you are encouraged to test your application appropriately before deploying. Thanks to Bryan Welter for bringing it to our attention.
@@ -22,4 +21,4 @@ It is strongly recommended to update to CFWheels 2.0.2 if you are running either
 
 ### Potential Breaking Changes
 
-- Blank strings in SQL are no longer converted to null
+-   Blank strings in SQL are no longer converted to null

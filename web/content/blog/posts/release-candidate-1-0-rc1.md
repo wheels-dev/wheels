@@ -15,8 +15,7 @@ excerpt: >-
 coverImage: null
 legacyId: '4'
 ---
-
-We've been [talking](https://cfwheels.org/blog/index.cfm/2008/10/28/Wheels-083-Our-Final-Beta-Release 'Wheels 0.8.3: Our Final Beta Release?') [about](https://cfwheels.org/blog/index.cfm/2009/3/4/Wheels-09-The-Final-Final-Beta-Cycle 'Wheels 0.9: The Final Final Beta Cycle') getting to 1.0 for quite some time now, and the first release candidate is here. [Download ColdFusion on Wheels 1.0 RC1](https://cfwheels.org/download)
+We've been [talking](https://cfwheels.org/blog/index.cfm/2008/10/28/Wheels-083-Our-Final-Beta-Release "Wheels 0.8.3: Our Final Beta Release?") [about](https://cfwheels.org/blog/index.cfm/2009/3/4/Wheels-09-The-Final-Final-Beta-Cycle "Wheels 0.9: The Final Final Beta Cycle") getting to 1.0 for quite some time now, and the first release candidate is here. [Download ColdFusion on Wheels 1.0 RC1](https://cfwheels.org/download)
 
 ## New Features
 

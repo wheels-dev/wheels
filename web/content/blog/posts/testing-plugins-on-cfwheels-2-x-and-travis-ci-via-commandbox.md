@@ -16,7 +16,6 @@ excerpt: >-
 coverImage: null
 legacyId: '90'
 ---
-
 One of the nicest things about CFWheels 2.x is the tighter integration with command-line tools such as Commandbox. We can take advantage of the new testing suite JSON return type and the new CFWheels CLI in Commandbox 2.x to easily build a Travis CI test. It's perhaps easiest to just show the `.travis.yml` file - this goes in the root of your gitHub plugin repository, and once you've turned on testing under Travis.org, will run your test suite on every commit. [https://gist.github.com/neokoenig/504ce0108a1caf0f19d54e87c1a8193c](https://gist.github.com/neokoenig/504ce0108a1caf0f19d54e87c1a8193c) In sum, this:
 
 1.  Installs Commandbox

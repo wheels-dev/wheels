@@ -14,7 +14,6 @@ excerpt: >-
 coverImage: null
 legacyId: '5'
 ---
-
 Mike Henke and Clarke Bishop have been writing some great how-to series on using ColdFusion on Wheels. Both do a nice job of showing the steps involved with building simple sample applications.
 
 [So you want to create a CFWheels application?](http://henke.ws/page.cfm/cfwheels-series) (6+1 parts)

@@ -17,9 +17,7 @@ excerpt: >-
 coverImage: null
 legacyId: '1157791657974759425'
 ---
-
 # Introduction
-
 So far in this series, we’ve explored how the Wheels CLI in 3.x helps you manage your application key points and main aspects. Now we are discussing one of the strengths of Wheels, which has always been its extensibility. With Wheels 3.x, plugin management has evolved into a complete lifecycle experience within the CLI. In earlier versions of Wheels, we already had plugin-related commands such as:
 
 `wheels plugin list`
@@ -27,12 +25,11 @@ So far in this series, we’ve explored how the Wheels CLI in 3.x helps you mana
 This allowed developers to quickly see which plugins were installed inside an application and verify their presence. However, installation and management were still largely manual processes.
 
 Plugins allow you to:
-
-- Add reusable functionality
-- Share common solutions across project
-- Integrate third-party services
-- Extend framework behavior
-- Standardize patterns across teams
+* Add reusable functionality
+* Share common solutions across project
+* Integrate third-party services
+* Extend framework behavior
+* Standardize patterns across teams
 
 The framework now provides structured commands to discover, install, remove, and even scaffold plugins — all without leaving your terminal.
 The CLI now supports:
@@ -45,88 +42,77 @@ wheels plugins init
 ```
 
 This shift brings several advantages:
-
-- Centralized plugin discovery
-- Consistent installation across teams
-- Clean and safe removal
-- Faster onboarding for new developers
-- Ability to scaffold reusable internal plugins
-- Reduced manual file handling errors
+* Centralized plugin discovery
+* Consistent installation across teams
+* Clean and safe removal
+* Faster onboarding for new developers
+* Ability to scaffold reusable internal plugins
+* Reduced manual file handling errors
 
 Instead of manually downloading, copying, and configuring plugin folders, everything can now be managed directly from the CLI.
 
 What used to be a manual setup task is now a structured, repeatable workflow — aligned with modern development practices.
 
 # Why Plugin CLI Commands Matter
-
 Traditionally, managing plugins meant:
-
-- Searching documentation or GitHub manually
-- Downloading zip files
-- Copying folders into /plugins
-- Managing dependencies manually
-- Removing plugins by deleting directories
+* Searching documentation or GitHub manually
+* Downloading zip files
+* Copying folders into /plugins
+* Managing dependencies manually
+* Removing plugins by deleting directories
 
 This process was:
-
-- Inconsistent
-- Error-prone
-- Hard to standardize across teams
+* Inconsistent
+* Error-prone
+* Hard to standardize across teams
 
 The new CLI plugin commands bring:
-
-- Discoverability
-- Automation
-- Clean installation
-- Safe removal
-- Scaffolding for new plugins
+* Discoverability
+* Automation
+* Clean installation
+* Safe removal
+* Scaffolding for new plugins
 
 It makes plugin management modern and developer-friendly.
 
 # wheels plugins search
-
 **Discover Available Plugins**
 
 `wheels plugins search authenticateThis`
 
 This command lets you search for available plugins by keyword. Instead of browsing repositories manually, you can:
-
-- Search by functionality
-- Explore plugin descriptions
-- See available versions
-- Identify compatible plugins
+* Search by functionality
+* Explore plugin descriptions
+* See available versions
+* Identify compatible plugins
 
 **When to Use It**
-
-- Looking for caching solutions
-- Searching for authentication helpers
-- Exploring logging enhancements
-- Finding integrations (payment, email, etc.)
+* Looking for caching solutions
+* Searching for authentication helpers
+* Exploring logging enhancements
+* Finding integrations (payment, email, etc.)
 
 It turns plugin discovery into a quick CLI action instead of a research task.
 
 # wheels plugins install
-
 **Install Plugins Cleanly**
 
 `wheels plugins install authenticateThis`
 
 This command:
-
-- Downloads the plugin
-- Places it in the correct directory
-- Handles necessary setup steps
-- Registers it properly within the app
+* Downloads the plugin
+* Places it in the correct directory
+* Handles necessary setup steps
+* Registers it properly within the app
 
 No manual folder copying.
 No guesswork.
 
 **Benefits**
-
-- Standardized installation
-- Reduced setup errors
-- Faster onboarding
-- Clear version control
+* Standardized installation
+* Reduced setup errors
+* Faster onboarding
+* Clear version control
 
 For teams, this is huge. Instead of sending plugin files manually, you simply say:
 
@@ -135,23 +121,20 @@ For teams, this is huge. Instead of sending plugin files manually, you simply sa
 Consistent. Repeatable. Clean.
 
 # wheels plugins remove
-
 **Remove Plugins Safely**
 
 `wheels plugins remove authenticateThis`
 
 Instead of manually deleting plugin directories and hoping nothing breaks, this command:
-
-- Removes the plugin cleanly
-- Updates internal references
-- Keeps the application structure organized
+* Removes the plugin cleanly
+* Updates internal references
+* Keeps the application structure organized
 
 **Why This Matters**
 Manual removal can leave:
-
-- Unused config entries
-- Stray files
-- Broken dependencies
+* Unused config entries
+* Stray files
+* Broken dependencies
 
 The CLI ensures a structured uninstall process.
 
@@ -159,33 +142,29 @@ Cleaner codebase.
 Less technical debt.
 
 # wheels plugins init
-
 **Scaffold Your Own Plugin**
 
 `wheels plugins init myCustomPlugin`
 
 This command creates the basic structure for a new plugin.
 It generates:
-
-- Required directories
-- Boilerplate files
-- Plugin configuration
-- Proper structure following Wheels conventions
+* Required directories
+* Boilerplate files
+* Plugin configuration
+* Proper structure following Wheels conventions
 
 **Why This Is Powerful**
 If your team builds reusable features across multiple apps:
-
-- Custom validation logic
-- Shared integrations
-- Common business utilities
-- Internal framework extensions
+* Custom validation logic
+* Shared integrations
+* Common business utilities
+* Internal framework extensions
 
 You can now package them as plugins easily.
 
 Instead of copying code between projects, you create a proper plugin once — and reuse it everywhere.
 
 # Real-World Workflow Example
-
 **Discover a Plugin**
 
 `wheels plugins search i18n`
@@ -209,14 +188,12 @@ Instead of copying code between projects, you create a proper plugin once — an
 Everything stays structured and reproducible.
 
 # Team & CI/CD Benefits
-
 These commands support:
-
-- Faster onboarding
-- Standardized project setup
-- Automated plugin installation in pipelines
-- Cleaner version control
-- Reduced manual steps
+* Faster onboarding
+* Standardized project setup
+* Automated plugin installation in pipelines
+* Cleaner version control
+* Reduced manual steps
 
 For example, in CI:
 
@@ -225,43 +202,37 @@ For example, in CI:
 The environment is ready instantly.
 
 # The Bigger Evolution of Wheels CLI
-
 In older versions, plugin management was mostly manual, with only listing support available. Wheels 3.x expands that capability into:
-
-- Plugin discovery
-- Automated installation
-- Structured removal
-- Plugin scaffolding
+* Plugin discovery
+* Automated installation
+* Structured removal
+* Plugin scaffolding
 
 This reflects a broader philosophy shift:
 The CLI is no longer just for generating controllers and models. It’s becoming:
-
-- A project manager
-- A dependency manager
-- An automation tool
-- A development assistant
+* A project manager
+* A dependency manager
+* An automation tool
+* A development assistant
 
 # What This Means for Wheels Developers
-
 With search, install, remove, init, and plugin list, you gain:
-
-- Faster project setup
-- Cleaner dependency management
-- Better reusability
-- Stronger team consistency
-- Simplified maintenance
+* Faster project setup
+* Cleaner dependency management
+* Better reusability
+* Stronger team consistency
+* Simplified maintenance
 
 Plugins are no longer “extra files.” They are first-class components of your application architecture. And the CLI treats them that way.
 
 # Conclusion
-
 The Wheels CLI plugin commands in 3.x modernize how developers extend their applications.
 
-- `plugins search` → Discover functionality
-- `plugins install` → Add it cleanly
-- `plugins remove` → Remove it safely
-- `plugins init` → Build your own
-- `plugin list` → Track what’s installed
+* `plugins search` → Discover functionality
+* `plugins install` → Add it cleanly
+* `plugins remove` → Remove it safely
+* `plugins init` → Build your own
+* `plugin list` → Track what’s installed
 
 If database commands help you manage data…
 If testing commands help you ensure quality…

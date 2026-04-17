@@ -15,7 +15,6 @@ excerpt: >-
 coverImage: null
 legacyId: '91'
 ---
-
 Hands up if you've ever found a bug in your application.. Upgrades, feature enhancements and bug fixes are all part of the development lifecycle, but quite often with deadlines, it's difficult to manually test the entire functionality of your application with every change you make. What if there were an automated way of checking if that change you're making is going to break something?
 
 ### Enter the CFWheels test framework!

@@ -14,7 +14,6 @@ excerpt: >-
 coverImage: null
 legacyId: '18'
 ---
-
 Right now is a pretty good time to be learning ColdFusion on Wheels. You can review the documentation that's been written and learn as we write new chapters. So far, I'm guessing that it would be pretty easy to keep up with us! If you haven't been keeping up with the conversation in the [discussion group](http://groups.google.com/group/cfwheels), we've been producing some great new material. Up in the [Docs](https://cfwheels.org/docs) are 2 new videos and 2 new written chapters.
 
 ## New Getting Started Tutorials

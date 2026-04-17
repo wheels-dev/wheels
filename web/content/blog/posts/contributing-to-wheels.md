@@ -14,10 +14,9 @@ excerpt: >-
 coverImage: null
 legacyId: '16'
 ---
-
 As the project has been transitioning to "one guy doing all the work" to a true community effort, we've had a slight amount of growing pains. Of course, this is a great problem to have. But obviously, we need a little bit of structure. In light of this, I've posted the first version of our process and guidelines for contributing to Wheels:
 
-- [Coding Guidelines](https://cfwheels.org/docs/chapter/coding-guidelines)
-- [Documentation Guidelines](https://cfwheels.org/docs/chapter/documentation-guidelines)
+-   [Coding Guidelines](https://cfwheels.org/docs/chapter/coding-guidelines)
+-   [Documentation Guidelines](https://cfwheels.org/docs/chapter/documentation-guidelines)
 
 That said, we have some exciting features coming up in the next 0.8 release, and we need your help. We'll announce more details here soon.

@@ -18,7 +18,6 @@ excerpt: >-
 coverImage: null
 legacyId: '113'
 ---
-
 As you may know, many years ago CFWheels embraced the distribution of Plugins via ForgeBox packages instead of maintaining our own directory. But the framework itself remains illusive. There was some work done in the last few months to put up packages for the framework but those packages were being maintained by hand which made them a show stopper for a long term solution.
 
 Well, thanks to a new CI workflow based on GitHub Actions we now have the building and publishing of the packages fully automated. Giving credit where credit is due, the new workflow borrows heavily from the ColdBox workflow. It used GitHub Actions, Ant, and CommandBox to automate the process.

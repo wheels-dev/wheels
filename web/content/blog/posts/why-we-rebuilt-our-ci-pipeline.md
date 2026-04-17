@@ -14,10 +14,9 @@ excerpt: >-
 coverImage: null
 legacyId: '1165378763664687105'
 ---
-
 # Why We Rebuilt Our CI Pipeline From 40 Minutes to 82 Seconds
 
-_April 9, 2026 — Peter Amiri, Wheels Core Team_
+*April 9, 2026 — Peter Amiri, Wheels Core Team*
 
 ---
 
@@ -31,14 +30,14 @@ This post explains the reasoning behind the change, what we learned, and why we 
 
 Our previous CI pipeline tested every push to `develop` against this matrix:
 
-|                | MySQL | PostgreSQL | SQL Server | H2  | CockroachDB | Oracle | SQLite |
-| -------------- | ----- | ---------- | ---------- | --- | ----------- | ------ | ------ |
-| **Lucee 5**    |       |            |            |     |             |        |        |
-| **Lucee 6**    |       |            |            |     |             |        |        |
-| **Lucee 7**    |       |            |            |     |             |        |        |
-| **Adobe 2023** |       |            |            |     |             |        |        |
-| **Adobe 2025** |       |            |            |     |             |        |        |
-| **BoxLang**    |       |            |            |     |             |        |        |
+| | MySQL | PostgreSQL | SQL Server | H2 | CockroachDB | Oracle | SQLite |
+|---|---|---|---|---|---|---|---|
+| **Lucee 5** | | | | | | | |
+| **Lucee 6** | | | | | | | |
+| **Lucee 7** | | | | | | | |
+| **Adobe 2023** | | | | | | | |
+| **Adobe 2025** | | | | | | | |
+| **BoxLang** | | | | | | | |
 
 That's up to 42 engine-database combinations. Each engine needed a Docker image built from `ortussolutions/commandbox`, which downloads CommandBox, installs Lucee or Adobe CF, warms up the server, installs dependencies, and then starts. The database containers needed their own startup time — Oracle alone takes 2-3 minutes to accept connections.
 
@@ -114,7 +113,6 @@ The snapshot release to ForgeBox only happens if the fast test passes. This is t
 The full 5-engine x 7-database Docker Compose matrix now runs on a weekly schedule (Sunday 02:00 UTC) and via manual dispatch. It uses the exact same `tests.yml` workflow that was previously the primary CI. Nothing was deleted — it was relocated.
 
 This gives us:
-
 - **Early drift detection**: If Adobe CF 2025 breaks on a Wheels change, we'll know within a week.
 - **No noise on every push**: Developers don't see red badges for BoxLang compilation issues they can't fix.
 - **On-demand deep testing**: Before a release, anyone can trigger the full matrix manually.
@@ -183,4 +181,4 @@ The goal is a development experience where the distance between idea and verifie
 
 ---
 
-_The CI pipeline changes are in [PR #2032](https://github.com/wheels-dev/wheels/pull/2032). The compatibility matrix runs weekly and is available via manual dispatch at [Actions > Wheels Compatibility Matrix](https://github.com/wheels-dev/wheels/actions/workflows/compat-matrix.yml)._
+*The CI pipeline changes are in [PR #2032](https://github.com/wheels-dev/wheels/pull/2032). The compatibility matrix runs weekly and is available via manual dispatch at [Actions > Wheels Compatibility Matrix](https://github.com/wheels-dev/wheels/actions/workflows/compat-matrix.yml).*

@@ -14,12 +14,11 @@ excerpt: >-
 coverImage: null
 legacyId: '62'
 ---
-
 Representatives from the ColdFusion on Wheels community are mingling around at [CFUnited 2010](http://cfunited.com/2010/), which was just kicked off by Adobe's keynote. If you're around at the conference, come say hi to myself, [Mike Henke](https://cfwheels.org/user/profile/25), and [Chaz Chumley](https://cfwheels.org/user/profile/123). The 3 of us will be giving 3 different presentations about Wheels on Thursday afternoon:
 
-- [ColdFusion on Wheels - Convention Over Configuration](http://cfunited.com/2010/topics/388-coldfusion-on-wheels--convention-over-configuration)
-- [Simplifying Database Code with the ColdFusion on Wheels ORM](http://cfunited.com/2010/topics/428-simplify-database-code-with-the-coldfusion-on-wheels-orm)
-- [BOF: CFWheels - Finally, a Framework for the Rest of Us](http://cfunited.com/2010/topics/445-bof-cfwheels--finally-a-framework-for-the-rest-of-us)
+-   [ColdFusion on Wheels - Convention Over Configuration](http://cfunited.com/2010/topics/388-coldfusion-on-wheels--convention-over-configuration)
+-   [Simplifying Database Code with the ColdFusion on Wheels ORM](http://cfunited.com/2010/topics/428-simplify-database-code-with-the-coldfusion-on-wheels-orm)
+-   [BOF: CFWheels - Finally, a Framework for the Rest of Us](http://cfunited.com/2010/topics/445-bof-cfwheels--finally-a-framework-for-the-rest-of-us)
 
 If you run across us, we're giving out some awesome t-shirts designed by Raul Riera and his dev shop, [Hipervinculo](http://www.hipervinculo.net/).
 

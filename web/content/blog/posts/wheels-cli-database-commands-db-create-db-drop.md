@@ -17,35 +17,30 @@ excerpt: >-
 coverImage: null
 legacyId: '1155515146896900099'
 ---
-
 # Introduction
-
 So far in this series, we’ve explored how the Wheels CLI in 3.x helps you inspect your application, manage configuration, and control environments safely. Now we’re moving into something even more foundational: **database lifecycle management**.
 
 Your application might have clean code and perfectly aligned environments — but without a properly provisioned database, nothing works. In a Wheels application, the database is not just storage. It powers:
-
-- Migrations
-- Application data
-- Session handling
-- Background jobs
-- Automated tests
-- API responses
+* Migrations
+* Application data
+* Session handling
+* Background jobs
+* Automated tests
+* API responses
 
 It’s core infrastructure. And whether you're:
-
-- Setting up a new project
-- Onboarding a teammate
-- Preparing a staging server
-- Resetting a development database
-- Cleaning up after automated CI tests
+* Setting up a new project
+* Onboarding a teammate
+* Preparing a staging server
+* Resetting a development database
+* Cleaning up after automated CI tests
 
 You’ll eventually need to create or drop a database. Traditionally, this meant:
-
-- Logging into the database server manually
-- Running raw SQL commands
-- Managing permissions
-- Double-checking you weren’t targeting production
-- Repeating the same setup steps across environments
+* Logging into the database server manually
+* Running raw SQL commands
+* Managing permissions
+* Double-checking you weren’t targeting production
+* Repeating the same setup steps across environments
 
 It was manual.
 It was inconsistent.
@@ -64,50 +59,43 @@ Simple in appearance.
 Powerful in impact.
 
 # Why Database CLI Commands Matter
-
 Traditionally, creating or dropping databases meant:
-
-- Logging into SQL Server / MySQL / PostgreSQL manually
-- Running SQL scripts
-- Managing permissions
-- Copying credentials
-- Risking mistakes
+* Logging into SQL Server / MySQL / PostgreSQL manually
+* Running SQL scripts
+* Managing permissions
+* Copying credentials
+* Risking mistakes
 
 In team environments, this creates friction:
-
-- “What’s the correct database name?”
-- “Which server do I connect to?”
-- “Is this staging or production?”
-- “Did I just drop the wrong database?”
+* “What’s the correct database name?”
+* “Which server do I connect to?”
+* “Is this staging or production?”
+* “Did I just drop the wrong database?”
 
 The Wheels CLI eliminates this confusion by using your existing environment configuration.
 It knows:
-
-- Your datasource
-- Your database name
-- Your environment
-- Your credentials
+* Your datasource
+* Your database name
+* Your environment
+* Your credentials
 
 And it acts accordingly.
 
 # wheels db create
-
 Create a Database Instantly
 `wheels db create`
 
 This command creates the configured database for your active environment.
 It reads:
-
-- Environment settings
-- Datasource configuration
-- Database name
-- Connection credentials
+* Environment settings
+* Datasource configuration
+* Database name
+* Connection credentials
 
 Then it provisions the database automatically.
 
 **When to Use db create**
 New Project Setup:
-
 ```
 wheels environment show
 wheels db create
@@ -118,7 +106,7 @@ Your local database is ready — no manual SQL required.
 Onboarding a Team Member:
 Instead of sending setup documentation with SQL instructions:
 
-_“Just run wheels db create.”_
+*“Just run wheels db create.”*
 
 It standardizes project setup.
 
@@ -131,7 +119,6 @@ The database is created dynamically for testing. After tests complete, it can be
 
 **What Happens Behind the Scenes:**
 The command:
-
 1. Connects to your DB server
 2. Checks whether the database exists
 3. Creates it if missing
@@ -147,7 +134,6 @@ If you are in staging → It creates the staging DB.
 No cross-environment confusion.
 
 # wheels db drop
-
 Drops the configured database. This command permanently deletes a database. This is a destructive operation that cannot be undone.
 
 `wheels db drop`
@@ -195,13 +181,11 @@ Before running db drop, always confirm your environment:
 
 Dropping a production database accidentally is catastrophic.
 That’s why best practice is:
-
 1. Confirm environment
 2. Validate settings
 3. Then execute database commands
 
 # Example Safe Workflow
-
 Step 1 – Confirm Environment
 `wheels environment show`
 
@@ -217,7 +201,6 @@ Step 4 – Recreate
 This structured process prevents irreversible mistakes.
 
 # Real-World Development Scenarios
-
 **Scenario 1: Local Development Reset**
 You’ve been experimenting with schema changes. Your database is messy. Instead of manually cleaning tables:
 
@@ -254,55 +237,47 @@ Fully automated lifecycle.
 No manual intervention.
 
 # How These Commands Improve Team Workflows
-
 They:
-
-- Standardize database setup
-- Reduce onboarding friction
-- Eliminate manual SQL steps
-- Prevent configuration mismatches
-- Support automated pipelines
-- Encourage safe environment practices
+* Standardize database setup
+* Reduce onboarding friction
+* Eliminate manual SQL steps
+* Prevent configuration mismatches
+* Support automated pipelines
+* Encourage safe environment practices
 
 In modern development, repeatability matters. These commands make database setup repeatable.
 
 # The Bigger Philosophy
-
 Earlier CLI tools focused on scaffolding code. Wheels 3.x CLI is evolving into:
-
-- An environment manager
-- A configuration validator
-- A deployment assistant
-- A database lifecycle controller
+* An environment manager
+* A configuration validator
+* A deployment assistant
+* A database lifecycle controller
 
 Applications aren’t just code. They are infrastructure + configuration + environments + data. Managing databases via CLI is a natural evolution.
 
 # Important Best Practices
-
 Before using database commands:
-
-- Always confirm environment
-- Never drop production unless intentional
-- Use validation commands
-- Automate in CI when possible
-- Keep credentials secure
+* Always confirm environment
+* Never drop production unless intentional
+* Use validation commands
+* Automate in CI when possible
+* Keep credentials secure
 
 Treat database commands with respect. They’re powerful by design.
 
 # Conclusion
-
 The new database commands in Wheels CLI 3.x simplify one of the most critical parts of application management.
 
 `wheels db create` → Instantly provision databases
 `wheels db drop` → Cleanly remove databases
 
 Together, they:
-
-- Speed up development
-- Simplify onboarding
-- Enable automation
-- Support safe workflows
-- Reduce manual SQL tasks
+* Speed up development
+* Simplify onboarding
+* Enable automation
+* Support safe workflows
+* Reduce manual SQL tasks
 
 If scaffolding commands help you build faster…
 

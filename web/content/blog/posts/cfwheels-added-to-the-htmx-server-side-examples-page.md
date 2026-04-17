@@ -14,7 +14,6 @@ excerpt: >-
 coverImage: null
 legacyId: '121'
 ---
-
 Back in March we published an example app where we took the [TodoMVC spec](https://github.com/tastejs/todomvc) and built a reference implementation of the app with [CFWheels and htmx](https://github.com/bpamiri/cfwheels-todomvc-htmx). Here is a quick graphic of the UI of the app.
 
 [![](https://cfwheels.org/blog/wp-content/uploads/2022/03/cfwheels-todomvc-htmx.gif)](https://cfwheels.org/blog/wp-content/uploads/2022/03/cfwheels-todomvc-htmx.gif)

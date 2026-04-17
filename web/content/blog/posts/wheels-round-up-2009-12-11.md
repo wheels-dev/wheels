@@ -11,7 +11,6 @@ excerpt: Thanks
 coverImage: null
 legacyId: '1'
 ---
-
 ## Thanks
 
 I would like a couple hat-tips to Sean Corfield for mentioning Wheels in his blog entry about [Hal Helms leaving CFML](http://corfield.org/blog/index.cfm/do/blog.entry/entry/On_Hal_Helms_Ruby_on_Rails_and_the_Death_of_ColdFusion_and_Fusebox). And to [ColdFusion Open-Source Update](http://www.remotesynthesis.com/archives.cfm/category/open-source-cf) by Brian Rinaldi who regularly mentions Wheels along with all sorts of other CF Open Source news. Finally, Thanks to Ben Forta, yes Mr. ColdFusion himself. He [mentions Wheels 1.0 Release](http://forta.com/blog/index.cfm/2009/12/10/ColdFusion-on-Wheels-10-Released).
@@ -30,8 +29,8 @@ The [CFHour podcast](http://www.cfhour.com/detail.cfm?entry=5D6782E4-E373-8A75-4
 
 Here are some interesting Google Group threads going on in the [Wheels group](http://groups.google.com/group/cfwheels).
 
-- [Textmate bundle updates](http://groups.google.com/group/cfwheels/browse_thread/thread/625e5ee6d8fc5189)
-- [Sharing Filters Between Controllers Needs to be Redesigned](http://groups.google.com/group/cfwheels/browse_thread/thread/10fe0cab576b2148)
-- [Printable Reference Guide](http://groups.google.com/group/cfwheels/browse_thread/thread/0d1200d981424016)
-- [Anyone know how to hack this?](http://groups.google.com/group/cfwheels/browse_thread/thread/3e813748ef8be602)
-- [Printable Reference Guide](http://groups.google.com/group/cfwheels/browse_thread/thread/d1200d981424016/832093f032108aac)
+-   [Textmate bundle updates](http://groups.google.com/group/cfwheels/browse_thread/thread/625e5ee6d8fc5189)
+-   [Sharing Filters Between Controllers Needs to be Redesigned](http://groups.google.com/group/cfwheels/browse_thread/thread/10fe0cab576b2148)
+-   [Printable Reference Guide](http://groups.google.com/group/cfwheels/browse_thread/thread/0d1200d981424016)
+-   [Anyone know how to hack this?](http://groups.google.com/group/cfwheels/browse_thread/thread/3e813748ef8be602)
+-   [Printable Reference Guide](http://groups.google.com/group/cfwheels/browse_thread/thread/d1200d981424016/832093f032108aac)

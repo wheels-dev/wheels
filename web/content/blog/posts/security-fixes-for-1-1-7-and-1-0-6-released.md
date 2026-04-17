@@ -14,5 +14,4 @@ excerpt: >-
 coverImage: null
 legacyId: '73'
 ---
-
 A security vulnerability has been identified in both the 1.1.x and 1.0.x versions of Wheels. In response, the Wheels team is releasing patches for both the current and legacy versions. Version 1.1.7 is to address current version and version 1.0.6 is to address legacy versions. At this time, we encourage all users of the framework to upgrade as soon as possible. These new versions contain only the patches necessary to close the security vulnerability. No new bug fixes or enhancement features are contained. The Wheels team would like to thank Pete Freitag of [foundeo.com](http://foundeo.com/) for reporting and helping to patch the security vulnerability. [Download versions 1.1.7 and 1.0.6](https://cfwheels.org/download)
