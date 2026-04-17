@@ -15,4 +15,5 @@ excerpt: >-
 coverImage: null
 legacyId: '74'
 ---
+
 Today, we're releasing [version 1.1.8](https://cfwheels.org/download) of the ColdFusion on Wheels framework. The new version includes bug fixes and minor enhancements. Upgrade today for a more stable application. To upgrade from version 1.1.x, simply download the zip file and replace your application's wheels folder with the new one. For a list of fixes, see the [CHANGELOG](https://github.com/cfwheels/cfwheels/blob/1.1-release/wheels/CHANGELOG).

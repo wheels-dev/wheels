@@ -14,27 +14,28 @@ excerpt: >-
 coverImage: null
 legacyId: '2'
 ---
+
 Well, my first blog post for Wheels. I am [Mike Henke](http://www.henke.ws/). I fell in love with Wheels after I asked my friend [Ryan Stille](http://www.stillnetstudios.com/) what ColdFusion framework he thought looked interesting and would like to learn. I always wanted to implement a CF framework at work, but business constraints (time, complexity, learning curve, priority) never worked until I found Wheels. In this entry, I will be providing some surprising and interesting stats showing how Wheels has grown over the past couple years. Here are a couple to start with: CFWheels.org had a spike of over **_500_** unique visitors and **_42 downloads_** in one day last month. ![Number of visits is starting to show an exponential trend.](https://cfwheels.org/images/blog/2009/12/9/google-analytics.png) _Traffic from past couple years (Google Analytics)_
 
 ## Here Are the (Surprising) Stats
 
 I mentioned the entry would be about stats. [Alexa data](http://www.alexa.com/siteinfo/cfwheels.org) as of 12/08/2009:
 
-|  | Alexa Traffic Ranking | Traffic Ranking in US |
-| --- | --- | --- |
-| **cfwheels.org** | **320,490** | **61,182** |
-| mach-ii.com | n/a | 1,578,535 |
-| coldboxframework.com | 744,890 | 332,231 |
-| model-glue.com | 664,797 | 652,353 |
+|                      | Alexa Traffic Ranking | Traffic Ranking in US |
+| -------------------- | --------------------- | --------------------- |
+| **cfwheels.org**     | **320,490**           | **61,182**            |
+| mach-ii.com          | n/a                   | 1,578,535             |
+| coldboxframework.com | 744,890               | 332,231               |
+| model-glue.com       | 664,797               | 652,353               |
 
 Here are definitions of these metrics in case you aren't familiar:
 
 > Alexa Traffic Rank
-> 
+>
 > A measure of a website's popularity. The rank is calculated using a combinatino of average daily visitors and pageviews over the past 3 months. The site with the highest combination of visitors and pageviews is ranked #1. Updated Daily.
-> 
+>
 > Traffic Rank in Country
-> 
+>
 > A measure of a website's popularity in a specific country. The rank by country is calculated using a combination of average daily visitors and pageviews from users from that country over the past 3 months. The site with the highest combination of visitors and pageviews is ranked #1 in that country. Updated Daily.
 
 ## Take Away

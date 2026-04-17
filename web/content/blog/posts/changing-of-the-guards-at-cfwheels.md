@@ -11,6 +11,7 @@ excerpt: 'Hello everyone,'
 coverImage: null
 legacyId: '109'
 ---
+
 Hello everyone,
 
 I was waiting to have more of my thoughts and plans ironed out before posting this message, but due to the intense interest from the community I’ve decided to post what I have, however premature.

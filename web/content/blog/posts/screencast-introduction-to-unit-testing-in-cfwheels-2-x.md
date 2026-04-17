@@ -12,8 +12,5 @@ excerpt: 'Update: (2nd part on controllers)'
 coverImage: null
 legacyId: '100'
 ---
-  
-
-  
 
 ## Update: (2nd part on controllers)
