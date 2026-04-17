@@ -1,0 +1,18 @@
+---
+title: Another great cf.Objective() is over - Wheels
+slug: another-great-cf-objective-is-over-wheels
+publishedAt: '2010-12-27T00:59:44.000Z'
+updatedAt: '2025-05-19T22:32:02.000Z'
+author: Mike Henke
+tags: []
+categories:
+  - Community
+excerpt: >-
+  Well, another great cf.Objective()(http://cfobjective.com/) is over. I am
+  still in overdrive, so it is perfect time to post about the Wheels
+  presentation. The first part focused on the ideas behind...
+coverImage: null
+legacyId: '52'
+---
+
+Well, another great [cf.Objective()](http://cfobjective.com/) is over.  I am still in overdrive, so it is perfect time to post about the Wheels presentation. The first part focused on the ideas behind Wheels.  [Convention Over Configuration](http://en.wikipedia.org/wiki/Convention_over_configuration) (CoC), [Don't Repeat Yourself](http://en.wikipedia.org/wiki/Don't_repeat_yourself) (DRY), and [Model View Controller](http://en.wikipedia.org/wiki/Model–view–controller) (MVC), and Simplicity. The second part, went over how Wheels works, server request are handled, understanding the Operation Trail (URL), and the File Structure.  This part we started by creating the normal, say controller, hello action but starting from the view, then working to the controller.  This was done to show how easy prototyping can be accomplished. The next part, we worked on the Controller, View, and Model aspects of Wheels. This was helped by the [scaffolding plugin](https://cfwheels.org/plugins/listing/9).  We showed [findOne()](https://cfwheels.org/docs/function/findone) vs [findAll()](https://cfwheels.org/docs/function/findall), and how to use their attributes to generate more complex sql. For the View, we modified some of the views like deleting id field from the index.cfm and talked about [helpers](https://cfwheels.org/docs/chapter/date-media-text-helpers). For the last part, we covered [Associations](https://cfwheels.org/docs/chapter/associations) and [Validation](https://cfwheels.org/docs/chapter/object-validation) in the model. The audience asked great questions which is expected from cf.Objective.  It was great to see faces like [Sean Corfield](http://corfield.org) (creator of [fw1](http://fw1.riaforge.org/)), [Mark Mandel](http://www.compoundtheory.com) (creator of [Transfer](http://www.transfer-orm.com/)), [John Mason](http://www.codfusion.com/blog/), [Andy Mathews](http://www.andymatthews.net/) (I am pretty sure he was in the far back), and [Dan Wilson](http://www.nodans.com) (managing director of [model glue](http://www.model-glue.com/)) in the crowd learning about Wheels.  I think it is really great other cf frameworks can gleam ideas from each other and maybe even help each other out. Like mentioned at the beginning of the presentation, I haven't contributed any code to the Wheels project except for a couple plugins.  I can't take credit for any their hard work.  I am someone who found a framework that works for  me after a long journey of trying cf frameworks.  Kudos to the [Core Wheels](https://cfwheels.org/community/core-team) development team and any others who have submitted code. As for the [free t-shirts](https://cfwheels.org/blog/wheels-blog-badges-wallpaper-t-shirts/), we gave them all away but have had requests for more so we maybe able to work something out. I'll post the code links later. Slides - [http://bit.ly/9nvTA1](<http://bit.ly/9nvTA1 >) (has recent speaker notes) [](<http://bit.ly/9nvTA1 >)Outline - [http://bit.ly/cngIZQ](http://bit.ly/cngIZQ) [](http://bit.ly/cngIZQ)Speaker Notes - [http://bit.ly/bGEl82](http://bit.ly/bGEl82) (speaker notes not recent) Final Code Examples: [http://bit.ly/dlbnJv](http://bit.ly/dlbnJv)

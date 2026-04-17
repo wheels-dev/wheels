@@ -1,6 +1,7 @@
 ---
 import Header from '@wheels-dev/ui/components/Header.astro';
 import Footer from '@wheels-dev/ui/components/Footer.astro';
+import NewsletterSignup from '../components/NewsletterSignup.astro';
 import '@wheels-dev/ui/styles/tokens.css';
 
 interface Props {
@@ -23,6 +24,7 @@ const { title, description = 'News, tutorials, and release announcements for Whe
 	<body>
 		<Header current="blog" />
 		<main><slot /></main>
+		<NewsletterSignup />
 		<Footer />
 
 		<style is:global>

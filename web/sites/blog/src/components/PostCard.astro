@@ -1,0 +1,81 @@
+---
+import { formatDate } from '../utils/posts.ts';
+import type { Post } from '../utils/posts.ts';
+
+interface Props {
+	post: Post;
+}
+const { post } = Astro.props;
+const { data } = post;
+---
+
+<article class="card">
+	<h2 class="card__title">
+		<a href={`/posts/${data.slug}/`}>{data.title}</a>
+	</h2>
+	<p class="card__meta">
+		<span>{data.author}</span>
+		<span aria-hidden="true"> · </span>
+		<time datetime={data.publishedAt.toISOString()}>
+			{formatDate(data.publishedAt)}
+		</time>
+	</p>
+	{data.excerpt && <p class="card__excerpt">{data.excerpt}</p>}
+	{
+		data.tags.length > 0 && (
+			<ul class="card__tags">
+				{data.tags.slice(0, 4).map((t) => (
+					<li>
+						<a href={`/tags/${t}/`}>#{t}</a>
+					</li>
+				))}
+			</ul>
+		)
+	}
+</article>
+
+<style>
+	.card {
+		padding: 1.5rem 0;
+		border-bottom: 1px solid var(--color-border);
+	}
+	.card:last-child {
+		border-bottom: none;
+	}
+	.card__title {
+		font-size: 1.5rem;
+		margin: 0 0 0.5rem;
+	}
+	.card__title a {
+		color: var(--color-fg);
+		text-decoration: none;
+	}
+	.card__title a:hover {
+		color: var(--color-accent);
+	}
+	.card__meta {
+		color: var(--color-muted);
+		font-size: 0.875rem;
+		margin: 0 0 0.75rem;
+	}
+	.card__excerpt {
+		margin: 0 0 0.75rem;
+		color: var(--color-fg);
+	}
+	.card__tags {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.card__tags a {
+		color: var(--color-muted);
+		text-decoration: none;
+		font-size: 0.8rem;
+	}
+	.card__tags a:hover {
+		color: var(--color-accent);
+	}
+</style>

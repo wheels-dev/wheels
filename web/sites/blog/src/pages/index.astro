@@ -1,8 +1,41 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { getAllPosts } from '../utils/posts.ts';
+
+const posts = await getAllPosts();
+const pageSize = 10;
+const pagePosts = posts.slice(0, pageSize);
+const totalPages = Math.ceil(posts.length / pageSize);
 ---
 
-<BaseLayout title="Wheels Blog">
+<BaseLayout
+	title="Wheels Blog"
+	description="News, tutorials, and release announcements for Wheels."
+>
 	<h1>Wheels Blog</h1>
-	<p>Coming soon — release notes, tutorials, and community news.</p>
+	<p class="lede">News, tutorials, and release announcements for the Wheels CFML MVC framework.</p>
+	{pagePosts.map((post) => <PostCard post={post} />)}
+	{
+		totalPages > 1 && (
+			<nav class="pager" aria-label="Pagination">
+				<a href="/page/2/">Older posts →</a>
+			</nav>
+		)
+	}
+	<style>
+		.lede {
+			color: var(--color-muted);
+			margin-bottom: 2rem;
+		}
+		.pager {
+			margin-top: 2rem;
+			display: flex;
+			justify-content: space-between;
+		}
+		.pager a {
+			color: var(--color-accent);
+			text-decoration: none;
+		}
+	</style>
 </BaseLayout>

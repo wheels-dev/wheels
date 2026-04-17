@@ -1,0 +1,95 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import { formatDate } from '../utils/posts.ts';
+import type { Post } from '../utils/posts.ts';
+import Giscus from '../components/Giscus.astro';
+
+interface Props {
+	post: Post;
+}
+const { post } = Astro.props;
+const { data } = post;
+---
+
+<BaseLayout title={`${data.title} | Wheels Blog`} description={data.excerpt}>
+	<article class="post">
+		<header class="post__header">
+			<h1 class="post__title">{data.title}</h1>
+			<p class="post__meta">
+				<span>{data.author}</span>
+				<span aria-hidden="true"> · </span>
+				<time datetime={data.publishedAt.toISOString()}>
+					{formatDate(data.publishedAt)}
+				</time>
+			</p>
+			{
+				data.tags.length > 0 && (
+					<ul class="post__tags">
+						{data.tags.map((t) => (
+							<li>
+								<a href={`/tags/${t}/`}>#{t}</a>
+							</li>
+						))}
+					</ul>
+				)
+			}
+		</header>
+		{data.coverImage && <img class="post__cover" src={data.coverImage} alt="" />}
+		<div class="post__body">
+			<slot />
+		</div>
+	</article>
+
+	<Giscus />
+
+	<style>
+		.post {
+			max-width: 720px;
+			margin: 0 auto;
+		}
+		.post__header {
+			margin-bottom: 2rem;
+		}
+		.post__title {
+			font-size: 2.25rem;
+			line-height: 1.2;
+			margin: 0 0 0.5rem;
+		}
+		.post__meta {
+			color: var(--color-muted);
+			font-size: 0.95rem;
+			margin: 0 0 1rem;
+		}
+		.post__tags {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+			display: flex;
+			gap: 0.5rem;
+			flex-wrap: wrap;
+		}
+		.post__tags a {
+			color: var(--color-accent);
+			text-decoration: none;
+			font-size: 0.875rem;
+		}
+		.post__cover {
+			width: 100%;
+			border-radius: var(--radius);
+			margin-bottom: 2rem;
+		}
+		.post__body :global(h2) {
+			margin-top: 2rem;
+		}
+		.post__body :global(pre) {
+			background: var(--color-border);
+			padding: 1rem;
+			border-radius: var(--radius);
+			overflow-x: auto;
+		}
+		.post__body :global(img) {
+			max-width: 100%;
+			height: auto;
+		}
+	</style>
+</BaseLayout>

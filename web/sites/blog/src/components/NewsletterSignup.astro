@@ -1,0 +1,74 @@
+---
+// Buttondown embed for wheels blog newsletter.
+const username = 'wheelsdev';
+const action = `https://buttondown.com/api/emails/embed-subscribe/${username}`;
+---
+
+<section class="newsletter" aria-label="Newsletter signup">
+	<h2>Newsletter</h2>
+	<p>Release notes and new posts, once a month. No spam.</p>
+	<form
+		action={action}
+		method="post"
+		target="popupwindow"
+		onsubmit={`window.open('https://buttondown.com/${username}', 'popupwindow')`}
+		class="newsletter__form"
+	>
+		<label class="sr-only" for="bd-email">Email</label>
+		<input type="email" id="bd-email" name="email" placeholder="you@example.com" required />
+		<button type="submit">Subscribe</button>
+	</form>
+</section>
+
+<style>
+	.newsletter {
+		max-width: 720px;
+		margin: 3rem auto;
+		padding: 1.5rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		background: var(--color-bg);
+	}
+	.newsletter h2 {
+		font-size: 1.1rem;
+		margin: 0 0 0.5rem;
+	}
+	.newsletter p {
+		color: var(--color-muted);
+		margin: 0 0 1rem;
+	}
+	.newsletter__form {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.newsletter__form input {
+		flex: 1 1 220px;
+		padding: 0.5rem 0.75rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		font: inherit;
+		background: var(--color-bg);
+		color: var(--color-fg);
+	}
+	.newsletter__form button {
+		padding: 0.5rem 1rem;
+		border: none;
+		border-radius: var(--radius);
+		background: var(--color-accent);
+		color: white;
+		font: inherit;
+		cursor: pointer;
+	}
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+</style>
