@@ -12,14 +12,13 @@ on:
       - 'web/**'
       - '.github/workflows/web-deploy.yml'
 
-concurrency:
-  group: web-deploy-${{ matrix.site }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   deploy:
     name: Deploy ${{ matrix.site }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: web-deploy-${{ matrix.site }}-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
       deployments: write

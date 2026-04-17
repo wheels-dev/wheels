@@ -32,7 +32,15 @@ export default {
         'plugin',
         'sse',
         'seed',
-        'docs'
+        'docs',
+        // Static-site monorepo under web/ (wheels.dev sites)
+        'web',
+        'web/ui',
+        'web/landing',
+        'web/blog',
+        'web/guides',
+        'web/api',
+        'web/starlight'
       ]
     ],
     // Allow empty scope (scope is optional)
