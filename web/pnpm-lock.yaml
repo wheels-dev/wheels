@@ -51,6 +51,9 @@ importers:
       '@astrojs/rss':
         specifier: ^4.0.18
         version: 4.0.18
+      '@astrojs/sitemap':
+        specifier: ^3.7.2
+        version: 3.7.2
       '@wheels-dev/ui':
         specifier: workspace:*
         version: link:../../packages/ui
