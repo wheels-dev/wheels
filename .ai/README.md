@@ -23,6 +23,10 @@ Searchable reference for CFML language and Wheels framework patterns.
 - `cli/` — Generators, server management
 - `communication/` — Email sending
 - `files/` — File uploads and downloads
+- `jobs/` — Background job processing
+- `mcp/` — AI agent integration via LuCLI stdio MCP
+- `middleware/` — Request pipeline (rate limiting, tenant resolver, pipeline structure)
+- `packages/` — First-party packages (sentry, hotwire, basecoat) and activation model
 - `security/` — CSRF, authentication, authorization
 - `patterns/` — Common development patterns, validation templates
 - `snippets/` — Code examples for all component types

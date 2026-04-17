@@ -832,14 +832,23 @@ Full reference: `.ai/wheels/testing/browser-testing.md`.
 
 Deeper documentation lives in `.ai/` — Claude will search it automatically when needed:
 - `.ai/wheels/cross-engine-compatibility.md` — **Start here** for Lucee/Adobe cross-engine gotchas
-- `.ai/cfml/` — CFML language reference (syntax, data types, components)
-- `.ai/wheels/models/` — ORM details, associations, validations, scopes, enums
-- `.ai/wheels/controllers/` — filters, rendering, security
-- `.ai/wheels/views/` — layouts, partials, form helpers (including HTML5), link helpers
-- `.ai/wheels/database/` — migrations, queries, seeding, advanced operations
-- `.ai/wheels/cli/` — generators (including admin generator)
-- `.ai/wheels/testing/` — unit testing with WheelsTest, test infrastructure, common gotchas
-- `.ai/wheels/configuration/` — routing, environments, settings, DI container
+- `.ai/cfml/` — CFML language reference (syntax, data types, components, control flow, best practices)
+- `.ai/wheels/core-concepts/` — MVC architecture, ORM mapping, routing conventions, Rails comparison
+- `.ai/wheels/models/` — ORM details, associations, validations, scopes, enums, batch processing
+- `.ai/wheels/controllers/` — actions, filters, rendering (JSON/views/redirects), security, SSE, parameter verification
+- `.ai/wheels/views/` — layouts, partials, form helpers (including HTML5), link helpers, pagination, forms
+- `.ai/wheels/database/` — migrations, queries, associations, validations, seeding
+- `.ai/wheels/configuration/` — routing, environments, settings, DI container, multi-tenancy, security
+- `.ai/wheels/middleware/` — pipeline structure, rate limiting, tenant resolver
+- `.ai/wheels/jobs/` — background job queue, retries, priority queues
+- `.ai/wheels/mcp/` — AI agent integration via LuCLI stdio MCP (setup, tool reference, auto-discovery)
+- `.ai/wheels/packages/` — first-party packages (sentry, hotwire, basecoat) + activation model
+- `.ai/wheels/cli/` — generators (model, controller, scaffold, admin, migrations)
+- `.ai/wheels/testing/` — WheelsTest BDD, browser testing, browser automation patterns
+- `.ai/wheels/security/` — CSRF protection, HTTPS detection
+- `.ai/wheels/patterns/` — authentication, CRUD, validation templates
+- `.ai/wheels/snippets/` — copy-paste model + controller examples
+- `.ai/wheels/troubleshooting/` — common errors, form helper errors
 
 ## Commit Message Conventions
 
