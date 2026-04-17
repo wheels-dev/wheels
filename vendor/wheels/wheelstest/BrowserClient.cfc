@@ -919,16 +919,24 @@ component {
             );
         }
         try {
-            createDynamicProxy(
-                {accept: function(x) {}},
-                ["java.lang.Runnable"]
+            // Probe with the same shape used for real handling: a CFC
+            // instance exposing accept(dialog), proxied as
+            // java.util.function.Consumer. Lucee 7 tightened
+            // createDynamicProxy to require a Component — a struct with
+            // inline closures fails with "Can't cast Struct to String"
+            // as Lucee tries the CFC-path string overload.
+            var probeConsumer = new wheels.wheelstest.DialogConsumer(
+                state={lastMessage: "", handled: false},
+                action={type: "dismiss", text: ""}
             );
+            createDynamicProxy(probeConsumer, ["java.util.function.Consumer"]);
             variables.$dialogSupported = true;
         } catch (any e) {
             variables.$dialogSupported = false;
             throw(
                 type="Wheels.BrowserDialogNotSupported",
-                message="Dialog handling requires Lucee. This engine does not support createDynamicProxy."
+                message="Dialog handling requires Lucee. This engine does not support createDynamicProxy.",
+                extendedInfo="Underlying error: #e.type# — #e.message#"
             );
         }
     }
@@ -945,23 +953,11 @@ component {
         var state = {lastMessage: "", handled: false};
         variables.$dialogState = state;
 
-        var handler = {
-            accept: function(dialog) {
-                state.lastMessage = dialog.message();
-                state.handled = true;
-                if (action.type == "accept") {
-                    if (len(action.text)) {
-                        dialog.accept(action.text);
-                    } else {
-                        dialog.accept();
-                    }
-                } else {
-                    dialog.dismiss();
-                }
-            }
-        };
-
-        variables.$dialogProxy = createDynamicProxy(handler, ["java.util.function.Consumer"]);
+        // Lucee 7 rejects struct-based createDynamicProxy targets — the
+        // handler must be a CFC instance so Lucee can resolve the
+        // interface-method-to-CFC-function mapping cleanly.
+        var consumer = new wheels.wheelstest.DialogConsumer(state=state, action=action);
+        variables.$dialogProxy = createDynamicProxy(consumer, ["java.util.function.Consumer"]);
         variables.page.onDialog(variables.$dialogProxy);
     }
 

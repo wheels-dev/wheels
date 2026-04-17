@@ -92,6 +92,39 @@ application.$wheels.myNewSetting = "value";
 application.wheels.myNewSetting = "value";
 ```
 
+### `createDynamicProxy` Requires a CFC on Lucee 7
+
+Lucee 6 accepted a CFML struct with named function entries as the first argument to `createDynamicProxy` — Lucee wired struct keys to interface methods. Lucee 7 tightened the signature to require a Component instance. Passing a struct fails with a misleading error: `"Can't cast Complex Object Type Struct to String"` — Lucee 7 is trying the CFC-path-string overload and choking on the struct argument.
+
+```cfm
+// WRONG — works on Lucee 6, fails on Lucee 7
+var handler = {
+    accept: function(dialog) {
+        dialog.accept();
+    }
+};
+createDynamicProxy(handler, ["java.util.function.Consumer"]);
+
+// RIGHT — CFC instance, works on Lucee 6 AND Lucee 7
+component MyConsumer {
+    public any function init(required struct state) {
+        variables.state = arguments.state;
+        return this;
+    }
+    public void function accept(required any dialog) {
+        variables.state.value = dialog.message();
+        dialog.accept();
+    }
+}
+
+var consumer = new MyConsumer(state={value: ""});
+createDynamicProxy(consumer, ["java.util.function.Consumer"]);
+```
+
+**Why**: Lucee 7 adds overload dispatch prefers the `createDynamicProxy(cfcPathString, interfaces)` signature and rejects struct arguments at the cast step. The struct-argument legacy path was removed.
+
+**Reference example**: [`vendor/wheels/wheelstest/DialogConsumer.cfc`](../../vendor/wheels/wheelstest/DialogConsumer.cfc) shows the CFC-based pattern used by `BrowserClient` to proxy Playwright's `Consumer<Dialog>`. The probe in `$requireDialogSupport` mirrors the real call shape so engine compatibility is verified on the same code path.
+
 ### Private View Helpers Not Integrated
 
 `$integrateComponents()` only copies `public` methods into controllers. Private helper functions in view CFCs are never available.

@@ -12,6 +12,14 @@
 #   bash tools/test-local.sh security     # run security tests only
 #   PORT=9090 bash tools/test-local.sh    # use custom port
 #
+# Browser-test behavior:
+#   Browser specs (BrowserDialog/Login/Route) run against the local
+#   LuCLI server via Playwright. Requires Playwright JARs installed in
+#   ~/.wheels/browser/lib/ — run `wheels browser:install` once if not.
+#   WHEELS_BROWSER_TEST_BASE_URL is auto-set to match the local PORT so
+#   specs hit the right server; CI sets its own override before invoking
+#   this script so the ${VAR:-default} preserves it.
+#
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,6 +28,11 @@ FILTER="${1:-}"
 DB="${DB:-sqlite}"
 PASSWORD="wheels"
 RESULT_FILE="/tmp/wheels-local-test-results.json"
+
+# Browser specs call back into the local LuCLI server — point Playwright
+# at the right port. CI sets this explicitly before invoking the script;
+# the ${VAR:-default} preserves the CI override.
+export WHEELS_BROWSER_TEST_BASE_URL="${WHEELS_BROWSER_TEST_BASE_URL:-http://localhost:${PORT}}"
 
 cd "$PROJECT_ROOT"
 
