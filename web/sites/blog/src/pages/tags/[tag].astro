@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { getAllTags, getPostsByTag } from '../../utils/posts.ts';
+
+export async function getStaticPaths() {
+  const tagMap = await getAllTags();
+  const entries = [];
+  for (const [tag] of tagMap) {
+    const posts = await getPostsByTag(tag);
+    entries.push({ params: { tag }, props: { tag, posts } });
+  }
+  return entries;
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<BaseLayout title={`#${tag} | Wheels Blog`} description={`Posts tagged ${tag}.`}>
+  <p class="crumbs"><a href="/tags/">All tags</a> / #{tag}</p>
+  <h1>#{tag}</h1>
+  <p class="lede">{posts.length} post{posts.length === 1 ? '' : 's'}</p>
+  {posts.map((post) => <PostCard post={post} />)}
+  <style>
+    .crumbs { color: var(--color-muted); font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .crumbs a { color: var(--color-muted); text-decoration: none; }
+    .lede { color: var(--color-muted); margin-bottom: 2rem; }
+  </style>
+</BaseLayout>
