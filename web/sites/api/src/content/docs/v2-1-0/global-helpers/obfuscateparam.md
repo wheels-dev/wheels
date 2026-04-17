@@ -1,0 +1,31 @@
+---
+title: obfuscateParam()
+description: "Obfuscates a value. Typically used for hiding primary key values when passed along in the URL."
+sidebar:
+  label: obfuscateParam()
+  order: 0
+---
+
+## Signature
+
+`obfuscateParam()` — returns `string`
+
+**Available in:** `controller`, `model`, `migrator`, `migration`, `tabledefinition`
+**Category:** Miscellaneous Functions
+
+## Description
+
+Obfuscates a value. Typically used for hiding primary key values when passed along in the URL.
+
+
+
+## Parameters
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `param` | `any` | yes | — | The value to obfuscate. |
+
+## Examples
+
+<pre><code class='javascript'>// Obfuscate the primary key value `99`
+newValue = obfuscateParam(99);</code></pre>

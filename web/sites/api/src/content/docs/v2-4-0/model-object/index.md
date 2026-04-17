@@ -1,0 +1,33 @@
+---
+title: Model Object
+description: "28 Model Object functions in Wheels 2.4.0."
+---
+
+- [`addError()`](/v2-4-0/model-object/adderror/) — Adds an error on a specific property.
+- [`addErrorToBase()`](/v2-4-0/model-object/adderrortobase/) — Adds an error on a specific property.
+- [`allChanges()`](/v2-4-0/model-object/allchanges/) — Returns a struct detailing all changes that have been made on the object but not yet saved to the database.
+- [`allErrors()`](/v2-4-0/model-object/allerrors/) — Returns an array of all the errors on the object.
+- [`changedFrom()`](/v2-4-0/model-object/changedfrom/) — Returns the previous value of a property that has changed.
+- [`changedProperties()`](/v2-4-0/model-object/changedproperties/) — Returns a list of the object properties that have been changed but not yet saved to the database.
+- [`clearChangeInformation()`](/v2-4-0/model-object/clearchangeinformation/) — Clears all internal knowledge of the current state of the object.
+- [`clearErrors()`](/v2-4-0/model-object/clearerrors/) — Clears out all errors set on the object or only the ones set for a specific property or name.
+- [`compareTo()`](/v2-4-0/model-object/compareto/) — Pass in another model object to see if the two objects are the same.
+- [`delete()`](/v2-4-0/model-object/delete/) — Deletes the object, which means the row is deleted from the database (unless prevented by a <code>beforeDelete</code> ca
+- [`errorCount()`](/v2-4-0/model-object/errorcount/) — Returns the number of errors this object has associated with it.
+- [`errorsOn()`](/v2-4-0/model-object/errorson/) — Returns an array of all errors associated with the supplied property (and error name if passed in).
+- [`errorsOnBase()`](/v2-4-0/model-object/errorsonbase/) — Returns an array of all errors associated with the object as a whole (not related to any specific property).
+- [`hasChanged()`](/v2-4-0/model-object/haschanged/) — Returns <code>true</code> if the specified property (or any if none was passed in) has been changed but not yet saved to
+- [`hasErrors()`](/v2-4-0/model-object/haserrors/) — Returns <code>true</code> if the object has any errors.
+- [`hasProperty()`](/v2-4-0/model-object/hasproperty/) — Returns <code>true</code> if the specified property name exists on the model.
+- [`isNew()`](/v2-4-0/model-object/isnew/) — Returns <code>true</code> if this object hasn't been saved yet (in other words, no matching record exists in the databas
+- [`isPersisted()`](/v2-4-0/model-object/ispersisted/) — Returns <code>true</code> if this object has been persisted to the database or was loaded from the database via a finder
+- [`key()`](/v2-4-0/model-object/key/) — Returns the value of the primary key for the object.
+- [`properties()`](/v2-4-0/model-object/properties/) — Returns a structure of all the properties with their names as keys and the values of the property as values.
+- [`propertyIsBlank()`](/v2-4-0/model-object/propertyisblank/) — Returns <code>true</code> if the specified property doesn't exist on the model or is an empty string.
+- [`propertyIsPresent()`](/v2-4-0/model-object/propertyispresent/) — Returns <code>true</code> if the specified property exists on the model and is not a blank string.
+- [`reload()`](/v2-4-0/model-object/reload/) — Reloads the property values of this object from the database.
+- [`setProperties()`](/v2-4-0/model-object/setproperties/) — Allows you to set all the properties of an object at once by passing in a structure with keys matching the property name
+- [`toggle()`](/v2-4-0/model-object/toggle/) — Assigns to the property specified the opposite of the property's current boolean value.
+- [`update()`](/v2-4-0/model-object/update/) — Updates the object with the supplied <code>properties</code> and saves it to the database.
+- [`updateProperty()`](/v2-4-0/model-object/updateproperty/) — Updates a single <code>property</code> and saves the record without going through the normal validation procedure.
+- [`valid()`](/v2-4-0/model-object/valid/) — Runs the validation on the object and returns <code>true</code> if it passes it.

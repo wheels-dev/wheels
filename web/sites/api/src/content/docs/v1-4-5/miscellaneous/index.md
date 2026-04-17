@@ -1,0 +1,224 @@
+---
+title: Miscellaneous
+description: "219 Miscellaneous functions in Wheels 1.4.5."
+---
+
+- [`accessibleProperties()`](/v1-4-5/miscellaneous/accessibleproperties/) — Use this method to specify which properties can be set through mass assignment.
+- [`addDefaultRoutes()`](/v1-4-5/miscellaneous/adddefaultroutes/) — Adds the default CFWheels routes (for example, [controller]/[action]/[key], etc.) to your application. Only use this met
+- [`addError()`](/v1-4-5/miscellaneous/adderror/) — Adds an error on a specific property.
+- [`addErrorToBase()`](/v1-4-5/miscellaneous/adderrortobase/) — Adds an error on a specific property.
+- [`addFormat()`](/v1-4-5/miscellaneous/addformat/) — Adds a new MIME format to your Wheels application for use with responding to multiple formats.
+- [`addRoute()`](/v1-4-5/miscellaneous/addroute/) — Adds a new route to your application.
+- [`afterCreate()`](/v1-4-5/miscellaneous/aftercreate/) — Registers method(s) that should be called after a new object is created.
+- [`afterDelete()`](/v1-4-5/miscellaneous/afterdelete/) — Registers method(s) that should be called after an object is deleted.
+- [`afterFind()`](/v1-4-5/miscellaneous/afterfind/) — Registers method(s) that should be called after an existing object has been initialized (which is usually done with the 
+- [`afterInitialization()`](/v1-4-5/miscellaneous/afterinitialization/) — Registers method(s) that should be called after an object has been initialized.
+- [`afterNew()`](/v1-4-5/miscellaneous/afternew/) — Registers method(s) that should be called after a new object has been initialized (which is usually done with the new me
+- [`afterSave()`](/v1-4-5/miscellaneous/aftersave/) — Registers method(s) that should be called after an object is saved.
+- [`afterUpdate()`](/v1-4-5/miscellaneous/afterupdate/) — Registers method(s) that should be called after an existing object is updated.
+- [`afterValidation()`](/v1-4-5/miscellaneous/aftervalidation/) — Registers method(s) that should be called after an object is validated.
+- [`afterValidationOnCreate()`](/v1-4-5/miscellaneous/aftervalidationoncreate/) — Registers method(s) that should be called after a new object is validated.
+- [`afterValidationOnUpdate()`](/v1-4-5/miscellaneous/aftervalidationonupdate/) — Registers method(s) that should be called after an existing object is validated.
+- [`allChanges()`](/v1-4-5/miscellaneous/allchanges/) — Returns a struct detailing all changes that have been made on the object but not yet saved to the database.
+- [`allErrors()`](/v1-4-5/miscellaneous/allerrors/) — Returns an array of all the errors on the object.
+- [`autoLink()`](/v1-4-5/miscellaneous/autolink/) — Turns all URLs and email addresses into hyperlinks.
+- [`automaticValidations()`](/v1-4-5/miscellaneous/automaticvalidations/) — Whether or not to enable default validations for this model.
+- [`average()`](/v1-4-5/miscellaneous/average/) — Calculates the average value for a given property. Uses the SQL function AVG. If no records can be found to perform the 
+- [`beforeCreate()`](/v1-4-5/miscellaneous/beforecreate/) — Registers method(s) that should be called before a new object is created.
+- [`beforeDelete()`](/v1-4-5/miscellaneous/beforedelete/) — Registers method(s) that should be called before an object is deleted.
+- [`beforeSave()`](/v1-4-5/miscellaneous/beforesave/) — Registers method(s) that should be called before an object is saved.
+- [`beforeUpdate()`](/v1-4-5/miscellaneous/beforeupdate/) — Registers method(s) that should be called before an existing object is updated.
+- [`beforeValidation()`](/v1-4-5/miscellaneous/beforevalidation/) — Registers method(s) that should be called before an object is validated.
+- [`beforeValidationOnCreate()`](/v1-4-5/miscellaneous/beforevalidationoncreate/) — Registers method(s) that should be called before a new object is validated.
+- [`beforeValidationOnUpdate()`](/v1-4-5/miscellaneous/beforevalidationonupdate/) — Registers method(s) that should be called before an existing object is validated.
+- [`belongsTo()`](/v1-4-5/miscellaneous/belongsto/) — Sets up a belongsTo association between this model and the specified one. Use this association when this model contains 
+- [`buttonTag()`](/v1-4-5/miscellaneous/buttontag/) — Builds and returns a string containing a button form control.
+- [`buttonTo()`](/v1-4-5/miscellaneous/buttonto/) — Creates a form containing a single button that submits to the URL. The URL is built the same way as the linkTo function.
+- [`caches()`](/v1-4-5/miscellaneous/caches/) — Tells CFWheels to cache one or more actions.
+- [`capitalize()`](/v1-4-5/miscellaneous/capitalize/) — Returns the text with the first character converted to uppercase.
+- [`changedFrom()`](/v1-4-5/miscellaneous/changedfrom/) — Returns the previous value of a property that has changed. Returns an empty string if no previous value exists. Wheels w
+- [`changedProperties()`](/v1-4-5/miscellaneous/changedproperties/) — Returns a list of the object properties that have been changed but not yet saved to the database.
+- [`checkBox()`](/v1-4-5/miscellaneous/checkbox/) — Builds and returns a string containing a check box form control based on the supplied objectName and property. In most c
+- [`checkBoxTag()`](/v1-4-5/miscellaneous/checkboxtag/) — Builds and returns a string containing a check box form control based on the supplied name. Note: Pass any additional ar
+- [`clearChangeInformation()`](/v1-4-5/miscellaneous/clearchangeinformation/) — Clears all internal knowledge of the current state of the object.
+- [`clearErrors()`](/v1-4-5/miscellaneous/clearerrors/) — Clears out all errors set on the object or only the ones set for a specific property or name.
+- [`columnDataForProperty()`](/v1-4-5/miscellaneous/columndataforproperty/) — Returns a struct with data for the named property.
+- [`columnForProperty()`](/v1-4-5/miscellaneous/columnforproperty/) — Returns the column name mapped for the named model property.
+- [`columnNames()`](/v1-4-5/miscellaneous/columnnames/) — Returns a list of column names in the table mapped to this model. The list is ordered according to the columns' ordinal 
+- [`columns()`](/v1-4-5/miscellaneous/columns/) — Returns an array of columns names for the table associated with this class. Does not include calculated properties that 
+- [`compareTo()`](/v1-4-5/miscellaneous/compareto/) — Pass in another Wheels model object to see if the two objects are the same.
+- [`contentFor()`](/v1-4-5/miscellaneous/contentfor/) — Used to store a section's output for rendering within a layout. This content store acts as a stack, so you can store mul
+- [`contentForLayout()`](/v1-4-5/miscellaneous/contentforlayout/) — Includes content for the body section, which equates to the output generated by the view template run by the request.
+- [`controller()`](/v1-4-5/miscellaneous/controller/) — Creates and returns a controller object with your own custom name and params. Used primarily for testing purposes.
+- [`count()`](/v1-4-5/miscellaneous/count/) — Returns the number of rows that match the arguments (or all rows if no arguments are passed in). Uses the SQL function C
+- [`create()`](/v1-4-5/miscellaneous/create/) — Creates a new object, saves it to the database (if the validation permits it), and returns it. If the validation fails, 
+- [`cycle()`](/v1-4-5/miscellaneous/cycle/) — Cycles through list values every time it is called.
+- [`dataSource()`](/v1-4-5/miscellaneous/datasource/) — Use this method to override the data source connection information for this model.
+- [`dateSelect()`](/v1-4-5/miscellaneous/dateselect/) — Builds and returns a string containing three select form controls for month, day, and year based on the supplied objectN
+- [`dateSelectTags()`](/v1-4-5/miscellaneous/dateselecttags/) — Builds and returns a string containing three select form controls (month, day, and year) based on a name and value.
+- [`dateTimeSelect()`](/v1-4-5/miscellaneous/datetimeselect/) — Builds and returns a string containing six select form controls (three for date selection and the remaining three for ti
+- [`dateTimeSelectTags()`](/v1-4-5/miscellaneous/datetimeselecttags/) — Builds and returns a string containing six select form controls (three for date selection and the remaining three for ti
+- [`daySelectTag()`](/v1-4-5/miscellaneous/dayselecttag/) — Builds and returns a string containing a select form control for the days of the week based on the supplied name.
+- [`delete()`](/v1-4-5/miscellaneous/delete/) — Deletes the object, which means the row is deleted from the database (unless prevented by a beforeDelete callback). Retu
+- [`deleteAll()`](/v1-4-5/miscellaneous/deleteall/) — Deletes all records that match the where argument. By default, objects will not be instantiated and therefore callbacks 
+- [`deleteByKey()`](/v1-4-5/miscellaneous/deletebykey/) — Finds the record with the supplied key and deletes it. Returns true on successful deletion of the row, false otherwise.
+- [`deleteOne()`](/v1-4-5/miscellaneous/deleteone/) — Gets an object based on conditions and deletes it.
+- [`deobfuscateParam()`](/v1-4-5/miscellaneous/deobfuscateparam/) — Deobfuscates a value.
+- [`distanceOfTimeInWords()`](/v1-4-5/miscellaneous/distanceoftimeinwords/) — Pass in two dates to this method, and it will return a string describing the difference between them.
+- [`endFormTag()`](/v1-4-5/miscellaneous/endformtag/) — Builds and returns a string containing the closing form tag.
+- [`errorCount()`](/v1-4-5/miscellaneous/errorcount/) — Returns the number of errors this object has associated with it. Specify property or name if you wish to count only spec
+- [`errorMessageOn()`](/v1-4-5/miscellaneous/errormessageon/) — Returns the error message, if one exists, on the object's property. If multiple error messages exist, the first one is r
+- [`errorMessagesFor()`](/v1-4-5/miscellaneous/errormessagesfor/) — Builds and returns a list (ul tag with a default class of errorMessages) containing all the error messages for all the p
+- [`errorsOn()`](/v1-4-5/miscellaneous/errorson/) — Returns an array of all errors associated with the supplied property (and error name if passed in).
+- [`errorsOnBase()`](/v1-4-5/miscellaneous/errorsonbase/) — Returns an array of all errors associated with the object as a whole (not related to any specific property).
+- [`excerpt()`](/v1-4-5/miscellaneous/excerpt/) — Extracts an excerpt from text that matches the first instance of a given phrase.
+- [`exists()`](/v1-4-5/miscellaneous/exists/) — Checks if a record exists in the table. You can pass in either a primary key value to the key argument or a string to th
+- [`fileField()`](/v1-4-5/miscellaneous/filefield/) — Builds and returns a string containing a file field form control based on the supplied objectName and property. Note: Pa
+- [`fileFieldTag()`](/v1-4-5/miscellaneous/filefieldtag/) — Builds and returns a string containing a file form control based on the supplied name. Note: Pass any additional argumen
+- [`filterChain()`](/v1-4-5/miscellaneous/filterchain/) — Returns an array of all the filters set on this controller in the order in which they will be executed.
+- [`filters()`](/v1-4-5/miscellaneous/filters/) — Tells CFWheels to run a function before an action is run or after an action has been run. You can also specify multiple 
+- [`findAll()`](/v1-4-5/miscellaneous/findall/) — Returns records from the database table mapped to this model according to the arguments passed in (use the where argumen
+- [`findAllKeys()`](/v1-4-5/miscellaneous/findallkeys/) — Returns all primary key values in a list. In addition to quoted and delimiter you can pass in any argument that findAll(
+- [`findByKey()`](/v1-4-5/miscellaneous/findbykey/) — Fetches the requested record by primary key and returns it as an object. Returns false if no record is found. You can ov
+- [`findFirst()`](/v1-4-5/miscellaneous/findfirst/) — Fetches the first record ordered by primary key value. Use the property argument to order by something else. Returns a m
+- [`findLast()`](/v1-4-5/miscellaneous/findlast/) — Fetches the last record ordered by primary key value. Use the property argument to order by something else. Returns a mo
+- [`findOne()`](/v1-4-5/miscellaneous/findone/) — Fetches the first record found based on the WHERE and ORDER BY clauses. With the default settings (i.e. the returnAs arg
+- [`findOrCreateBy[Property]()`](/v1-4-5/miscellaneous/findorcreateby-property/) — Returns the object or creates a new one if it wasn't found.
+- [`flash()`](/v1-4-5/miscellaneous/flash/) — Returns the value of a specific key in the Flash (or the entire Flash as a struct if no key is passed in).
+- [`flashClear()`](/v1-4-5/miscellaneous/flashclear/) — Deletes everything from the Flash.
+- [`flashCount()`](/v1-4-5/miscellaneous/flashcount/) — Returns how many keys exist in the Flash.
+- [`flashDelete()`](/v1-4-5/miscellaneous/flashdelete/) — Deletes a specific key from the Flash. Returns true if the key exists.
+- [`flashInsert()`](/v1-4-5/miscellaneous/flashinsert/) — Inserts a new key / value into the Flash.
+- [`flashIsEmpty()`](/v1-4-5/miscellaneous/flashisempty/) — Returns whether or not the Flash is empty.
+- [`flashKeep()`](/v1-4-5/miscellaneous/flashkeep/) — Make the entire Flash or specific key in it stick around for one more request.
+- [`flashKeyExists()`](/v1-4-5/miscellaneous/flashkeyexists/) — Checks if a specific key exists in the Flash.
+- [`flashMessages()`](/v1-4-5/miscellaneous/flashmessages/) — Displays a marked-up listing of messages that exist in the Flash.
+- [`get()`](/v1-4-5/miscellaneous/get/) — Returns the current setting for the supplied Wheels setting or the current default for the supplied Wheels function argu
+- [`getTableNamePrefix()`](/v1-4-5/miscellaneous/gettablenameprefix/) — Returns the table name prefix set for the table.
+- [`hasChanged()`](/v1-4-5/miscellaneous/haschanged/) — Returns true if the specified property (or any if none was passed in) has been changed but not yet saved to the database
+- [`hasErrors()`](/v1-4-5/miscellaneous/haserrors/) — Returns true if the object has any errors. You can also limit to only check a specific property or name for errors.
+- [`hasMany()`](/v1-4-5/miscellaneous/hasmany/) — Sets up a hasMany association between this model and the specified one.
+- [`hasManyCheckBox()`](/v1-4-5/miscellaneous/hasmanycheckbox/) — Used as a shortcut to output the proper form elements for an association. Note: Pass any additional arguments like class
+- [`hasManyRadioButton()`](/v1-4-5/miscellaneous/hasmanyradiobutton/) — Used as a shortcut to output the proper form elements for an association. Note: Pass any additional arguments like class
+- [`hasOne()`](/v1-4-5/miscellaneous/hasone/) — Sets up a hasOne association between this model and the specified one.
+- [`hasProperty()`](/v1-4-5/miscellaneous/hasproperty/) — Returns true if the specified property name exists on the model.
+- [`hiddenField()`](/v1-4-5/miscellaneous/hiddenfield/) — Builds and returns a string containing a hidden field form control based on the supplied objectName and property. Note: 
+- [`hiddenFieldTag()`](/v1-4-5/miscellaneous/hiddenfieldtag/) — Builds and returns a string containing a hidden field form control based on the supplied name. Note: Pass any additional
+- [`highlight()`](/v1-4-5/miscellaneous/highlight/) — Highlights the phrase(s) everywhere in the text if found by wrapping it in a span tag.
+- [`hourSelectTag()`](/v1-4-5/miscellaneous/hourselecttag/) — Builds and returns a string containing one select form control for the hours of the day based on the supplied name.
+- [`humanize()`](/v1-4-5/miscellaneous/humanize/) — Returns readable text by capitalizing and converting camel casing to multiple words.
+- [`hyphenize()`](/v1-4-5/miscellaneous/hyphenize/) — Converts camelCase strings to lowercase strings with hyphens as word delimiters instead. Example: myVariable becomes my-
+- [`imageTag()`](/v1-4-5/miscellaneous/imagetag/) — Returns an img tag. If the image is stored in the local images folder, the tag will also set the width, height, and alt 
+- [`includeContent()`](/v1-4-5/miscellaneous/includecontent/) — Used to output the content for a particular section in a layout.
+- [`includedInObject()`](/v1-4-5/miscellaneous/includedinobject/) — Used as a shortcut to check if the specified IDs are a part of the main form object. This method should only be used for
+- [`includeLayout()`](/v1-4-5/miscellaneous/includelayout/) — Includes the contents of another layout file. This is usually used to include a parent layout from within a child layout
+- [`includePartial()`](/v1-4-5/miscellaneous/includepartial/) — Includes the specified partial file in the view. Similar to using cfinclude but with the ability to cache the result and
+- [`invokeWithTransaction()`](/v1-4-5/miscellaneous/invokewithtransaction/) — Runs the specified method within a single database transaction.
+- [`isAjax()`](/v1-4-5/miscellaneous/isajax/) — Returns whether the page was called from JavaScript or not.
+- [`isClass()`](/v1-4-5/miscellaneous/isclass/) — Use this method within a model's method to check whether you are currently in a class-level object.
+- [`isGet()`](/v1-4-5/miscellaneous/isget/) — Returns whether the request was a normal GET request or not.
+- [`isInstance()`](/v1-4-5/miscellaneous/isinstance/) — Use this method to check whether you are currently in an instance object.
+- [`isNew()`](/v1-4-5/miscellaneous/isnew/) — Returns true if this object hasn't been saved yet. (In other words, no matching record exists in the database yet.) Retu
+- [`isPost()`](/v1-4-5/miscellaneous/ispost/) — Returns whether the request came from a form POST submission or not.
+- [`isSecure()`](/v1-4-5/miscellaneous/issecure/) — Returns whether CFWheels is communicating over a secure port.
+- [`javaScriptIncludeTag()`](/v1-4-5/miscellaneous/javascriptincludetag/) — Returns a script tag for a JavaScript file (or several) based on the supplied arguments.
+- [`key()`](/v1-4-5/miscellaneous/key/) — Returns the value of the primary key for the object. If you have a single primary key named id, then someObject.key() is
+- [`linkTo()`](/v1-4-5/miscellaneous/linkto/) — Creates a link to another page in your application. Pass in the name of a route to use your configured routes or a contr
+- [`mailTo()`](/v1-4-5/miscellaneous/mailto/) — Creates a mailto link tag to the specified email address, which is also used as the name of the link unless name is spec
+- [`maximum()`](/v1-4-5/miscellaneous/maximum/) — Calculates the maximum value for a given property. Uses the SQL function MAX. If no records can be found to perform the 
+- [`mimeTypes()`](/v1-4-5/miscellaneous/mimetypes/) — Returns an associated MIME type based on a file extension.
+- [`minimum()`](/v1-4-5/miscellaneous/minimum/) — Calculates the minimum value for a given property. Uses the SQL function MIN. If no records can be found to perform the 
+- [`minuteSelectTag()`](/v1-4-5/miscellaneous/minuteselecttag/) — Builds and returns a string containing one select form control for the minutes of an hour based on the supplied name.
+- [`model()`](/v1-4-5/miscellaneous/model/) — Returns a reference to the requested model so that class level methods can be called on it.
+- [`monthSelectTag()`](/v1-4-5/miscellaneous/monthselecttag/) — Builds and returns a string containing a select form control for the months of the year based on the supplied name.
+- [`nestedProperties()`](/v1-4-5/miscellaneous/nestedproperties/) — Allows for nested objects, structs, and arrays to be set from params and other generated data.
+- [`new()`](/v1-4-5/miscellaneous/new/) — Creates a new object based on supplied properties and returns it. The object is not saved to the database; it only exist
+- [`obfuscateParam()`](/v1-4-5/miscellaneous/obfuscateparam/) — Obfuscates a value. Typically used for hiding primary key values when passed along in the URL.
+- [`onlyProvides()`](/v1-4-5/miscellaneous/onlyprovides/) — Use this in an individual controller action to define which formats the action will respond with. This can be used to de
+- [`pagination()`](/v1-4-5/miscellaneous/pagination/) — Returns a struct with information about the specificed paginated query. The keys that will be included in the struct are
+- [`paginationLinks()`](/v1-4-5/miscellaneous/paginationlinks/) — Builds and returns a string containing links to pages based on a paginated query. Uses linkTo() internally to build the 
+- [`passwordField()`](/v1-4-5/miscellaneous/passwordfield/) — Builds and returns a string containing a password field form control based on the supplied objectName and property. Note
+- [`passwordFieldTag()`](/v1-4-5/miscellaneous/passwordfieldtag/) — Builds and returns a string containing a password field form control based on the supplied name. Note: Pass any addition
+- [`pluginNames()`](/v1-4-5/miscellaneous/pluginnames/) — Returns a list of all installed plugins' names.
+- [`pluralize()`](/v1-4-5/miscellaneous/pluralize/) — Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the count argument.
+- [`primaryKey()`](/v1-4-5/miscellaneous/primarykey/) — Returns the name of the primary key for this model's table. This is determined through database introspection. If compos
+- [`primaryKeys()`](/v1-4-5/miscellaneous/primarykeys/) — Alias for primaryKey(). Use this for better readability when you're accessing multiple primary keys.
+- [`properties()`](/v1-4-5/miscellaneous/properties/) — Returns a structure of all the properties with their names as keys and the values of the property as values.
+- [`property()`](/v1-4-5/miscellaneous/property/) — Use this method to map an object property to either a table column with a different name than the property or to a SQL e
+- [`propertyIsPresent()`](/v1-4-5/miscellaneous/propertyispresent/) — Returns true if the specified property exists on the model and is not a blank string.
+- [`propertyNames()`](/v1-4-5/miscellaneous/propertynames/) — Returns a list of property names ordered by their respective column's ordinal position in the database table. Also inclu
+- [`protectedProperties()`](/v1-4-5/miscellaneous/protectedproperties/) — Use this method to specify which properties cannot be set through mass assignment.
+- [`provides()`](/v1-4-5/miscellaneous/provides/) — Defines formats that the controller will respond with upon request. The format can be requested through a URL variable c
+- [`radioButton()`](/v1-4-5/miscellaneous/radiobutton/) — Builds and returns a string containing a radio button form control based on the supplied objectName and property. Note: 
+- [`radioButtonTag()`](/v1-4-5/miscellaneous/radiobuttontag/) — Builds and returns a string containing a radio button form control based on the supplied name. Note: Pass any additional
+- [`redirectTo()`](/v1-4-5/miscellaneous/redirectto/) — Redirects the browser to the supplied controller/action/key, route or back to the referring page. Internally, this funct
+- [`reload()`](/v1-4-5/miscellaneous/reload/) — Reloads the property values of this object from the database.
+- [`renderNothing()`](/v1-4-5/miscellaneous/rendernothing/) — Instructs the controller to render an empty string when it's finished processing the action. This is very similar to cal
+- [`renderPage()`](/v1-4-5/miscellaneous/renderpage/) — Instructs the controller which view template and layout to render when it's finished processing the action. Note that wh
+- [`renderPartial()`](/v1-4-5/miscellaneous/renderpartial/) — Instructs the controller to render a partial when it's finished processing the action.
+- [`renderText()`](/v1-4-5/miscellaneous/rendertext/) — Instructs the controller to render specified text when it's finished processing the action.
+- [`renderWith()`](/v1-4-5/miscellaneous/renderwith/) — Instructs the controller to render the data passed in to the format that is requested. If the format requested is json o
+- [`resetCycle()`](/v1-4-5/miscellaneous/resetcycle/) — Resets a cycle so that it starts from the first list value the next time it is called.
+- [`response()`](/v1-4-5/miscellaneous/response/) — Returns content that CFWheels will send to the client in response to the request.
+- [`save()`](/v1-4-5/miscellaneous/save/) — Saves the object if it passes validation and callbacks. Returns true if the object was saved successfully to the databas
+- [`secondSelectTag()`](/v1-4-5/miscellaneous/secondselecttag/) — Builds and returns a string containing one select form control for the seconds of a minute based on the supplied name.
+- [`select()`](/v1-4-5/miscellaneous/select/) — Builds and returns a string containing a select form control based on the supplied objectName and property. Note: Pass a
+- [`selectTag()`](/v1-4-5/miscellaneous/selecttag/) — Builds and returns a string containing a select form control based on the supplied name and options. Note: Pass any addi
+- [`sendEmail()`](/v1-4-5/miscellaneous/sendemail/) — Sends an email using a template and an optional layout to wrap it in. Besides the CFWheels-specific arguments documented
+- [`sendFile()`](/v1-4-5/miscellaneous/sendfile/) — Sends a file to the user (from the files folder or a path relative to it by default).
+- [`set()`](/v1-4-5/miscellaneous/set/) — Use to configure a global setting or set a default for a function.
+- [`setFilterChain()`](/v1-4-5/miscellaneous/setfilterchain/) — Use this function if you need a more low level way of setting the entire filter chain for a controller.
+- [`setPagination()`](/v1-4-5/miscellaneous/setpagination/) — Allows you to set a pagination handle for a custom query so you can perform pagination on it in your view with paginatio
+- [`setPrimaryKey()`](/v1-4-5/miscellaneous/setprimarykey/) — Allows you to pass in the name(s) of the property(s) that should be used as the primary key(s). Pass as a list if defini
+- [`setPrimaryKeys()`](/v1-4-5/miscellaneous/setprimarykeys/) — Alias for setPrimaryKey(). Use this for better readability when you're setting multiple properties as the primary key.
+- [`setProperties()`](/v1-4-5/miscellaneous/setproperties/) — Allows you to set all the properties of an object at once by passing in a structure with keys matching the property name
+- [`setResponse()`](/v1-4-5/miscellaneous/setresponse/) — Sets content that CFWheels will send to the client in response to the request.
+- [`setTableNamePrefix()`](/v1-4-5/miscellaneous/settablenameprefix/) — Sets a prefix to prepend to the table name when this model runs SQL queries.
+- [`setVerificationChain()`](/v1-4-5/miscellaneous/setverificationchain/) — Use this function if you need a more low level way of setting the entire verification chain for a controller.
+- [`simpleFormat()`](/v1-4-5/miscellaneous/simpleformat/) — Replaces single newline characters with HTML break tags and double newline characters with HTML paragraph tags (properly
+- [`singularize()`](/v1-4-5/miscellaneous/singularize/) — Returns the singular form of the passed in word.
+- [`startFormTag()`](/v1-4-5/miscellaneous/startformtag/) — Builds and returns a string containing the opening form tag. The form's action will be built according to the same rules
+- [`stripLinks()`](/v1-4-5/miscellaneous/striplinks/) — Removes all links from an HTML string, leaving just the link text.
+- [`stripTags()`](/v1-4-5/miscellaneous/striptags/) — Removes all HTML tags from a string.
+- [`styleSheetLinkTag()`](/v1-4-5/miscellaneous/stylesheetlinktag/) — Returns a link tag for a stylesheet (or several) based on the supplied arguments.
+- [`submitTag()`](/v1-4-5/miscellaneous/submittag/) — Builds and returns a string containing a submit button form control. Note: Pass any additional arguments like class, rel
+- [`sum()`](/v1-4-5/miscellaneous/sum/) — Calculates the sum of values for a given property. Uses the SQL function SUM. If no records can be found to perform the 
+- [`table()`](/v1-4-5/miscellaneous/table/) — Use this method to tell Wheels what database table to connect to for this model. You only need to use this method when y
+- [`tableName()`](/v1-4-5/miscellaneous/tablename/) — Returns the name of the database table that this model is mapped to.
+- [`textArea()`](/v1-4-5/miscellaneous/textarea/) — Builds and returns a string containing a text area field form control based on the supplied objectName and property. Not
+- [`textAreaTag()`](/v1-4-5/miscellaneous/textareatag/) — Builds and returns a string containing a text area form control based on the supplied name. Note: Pass any additional ar
+- [`textField()`](/v1-4-5/miscellaneous/textfield/) — Builds and returns a string containing a text field form control based on the supplied objectName and property. Note: Pa
+- [`textFieldTag()`](/v1-4-5/miscellaneous/textfieldtag/) — Builds and returns a string containing a text field form control based on the supplied name. Note: Pass any additional a
+- [`timeAgoInWords()`](/v1-4-5/miscellaneous/timeagoinwords/) — Pass in a date to this method, and it will return a string describing the approximate time difference between that date 
+- [`timeSelect()`](/v1-4-5/miscellaneous/timeselect/) — Builds and returns a string containing three select form controls for hour, minute, and second based on the supplied obj
+- [`timeSelectTags()`](/v1-4-5/miscellaneous/timeselecttags/) — Builds and returns a string containing three select form controls for hour, minute, and second based on name.
+- [`timeUntilInWords()`](/v1-4-5/miscellaneous/timeuntilinwords/) — Pass in a date to this method, and it will return a string describing the approximate time difference between the curren
+- [`titleize()`](/v1-4-5/miscellaneous/titleize/) — Capitalizes all words in the text to create a nicer looking title.
+- [`toggle()`](/v1-4-5/miscellaneous/toggle/) — Assigns to the property specified the opposite of the property's current boolean value. Throws an error if the property 
+- [`toXHTML()`](/v1-4-5/miscellaneous/toxhtml/) — Returns an XHTML-compliant string.
+- [`truncate()`](/v1-4-5/miscellaneous/truncate/) — Truncates text to the specified length and replaces the last characters with the specified truncate string (which defaul
+- [`update()`](/v1-4-5/miscellaneous/update/) — Updates the object with the supplied properties and saves it to the database. Returns true if the object was saved succe
+- [`updateAll()`](/v1-4-5/miscellaneous/updateall/) — Updates all properties for the records that match the where argument. Property names and values can be passed in either 
+- [`updateByKey()`](/v1-4-5/miscellaneous/updatebykey/) — Finds the object with the supplied key and saves it (if validation permits it) with the supplied properties and/or named
+- [`updateOne()`](/v1-4-5/miscellaneous/updateone/) — Gets an object based on the arguments used and updates it with the supplied properties. Returns true if an object was fo
+- [`updateProperties()`](/v1-4-5/miscellaneous/updateproperties/) — Updates all the properties from the properties argument or other named arguments. If the object is invalid, the save wil
+- [`updateProperty()`](/v1-4-5/miscellaneous/updateproperty/) — Updates a single property and saves the record without going through the normal validation procedure. This is especially
+- [`urlFor()`](/v1-4-5/miscellaneous/urlfor/) — Creates an internal URL based on supplied arguments.
+- [`usesLayout()`](/v1-4-5/miscellaneous/useslayout/) — Used within a controller's init() function to specify controller- or action-specific layouts.
+- [`valid()`](/v1-4-5/miscellaneous/valid/) — Runs the validation on the object and returns true if it passes it. Wheels will run the validation process automatically
+- [`validate()`](/v1-4-5/miscellaneous/validate/) — Registers method(s) that should be called to validate objects before they are saved.
+- [`validateOnCreate()`](/v1-4-5/miscellaneous/validateoncreate/) — Registers method(s) that should be called to validate new objects before they are inserted.
+- [`validateOnUpdate()`](/v1-4-5/miscellaneous/validateonupdate/) — Registers method(s) that should be called to validate existing objects before they are updated.
+- [`validatesConfirmationOf()`](/v1-4-5/miscellaneous/validatesconfirmationof/) — Validates that the value of the specified property also has an identical confirmation value. (This is common when having
+- [`validatesExclusionOf()`](/v1-4-5/miscellaneous/validatesexclusionof/) — Validates that the value of the specified property does not exist in the supplied list.
+- [`validatesFormatOf()`](/v1-4-5/miscellaneous/validatesformatof/) — Validates that the value of the specified property is formatted correctly by matching it against a regular expression us
+- [`validatesInclusionOf()`](/v1-4-5/miscellaneous/validatesinclusionof/) — Validates that the value of the specified property exists in the supplied list.
+- [`validatesLengthOf()`](/v1-4-5/miscellaneous/validateslengthof/) — Validates that the value of the specified property matches the length requirements supplied. Use the exactly, maximum, m
+- [`validatesNumericalityOf()`](/v1-4-5/miscellaneous/validatesnumericalityof/) — Validates that the value of the specified property is numeric.
+- [`validatesPresenceOf()`](/v1-4-5/miscellaneous/validatespresenceof/) — Validates that the specified property exists and that its value is not blank.
+- [`validatesUniquenessOf()`](/v1-4-5/miscellaneous/validatesuniquenessof/) — Validates that the value of the specified property is unique in the database table. Useful for ensuring that two users c
+- [`validationTypeForProperty()`](/v1-4-5/miscellaneous/validationtypeforproperty/) — Returns the validation type for the property
+- [`verificationChain()`](/v1-4-5/miscellaneous/verificationchain/) — Returns an array of all the verifications set on this controller in the order in which they will be executed.
+- [`verifies()`](/v1-4-5/miscellaneous/verifies/) — Instructs CFWheels to verify that some specific criterias are met before running an action. Note that all undeclared arg
+- [`wordTruncate()`](/v1-4-5/miscellaneous/wordtruncate/) — Truncates text to the specified length of words and replaces the remaining characters with the specified truncate string
+- [`yearSelectTag()`](/v1-4-5/miscellaneous/yearselecttag/) — Builds and returns a string containing a select form control for a range of years based on the supplied name.

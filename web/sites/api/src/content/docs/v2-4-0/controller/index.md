@@ -1,0 +1,51 @@
+---
+title: Controller
+description: "46 Controller functions in Wheels 2.4.0."
+---
+
+- [`authenticityToken()`](/v2-4-0/controller/authenticitytoken/) — Returns the raw CSRF authenticity token
+- [`caches()`](/v2-4-0/controller/caches/) — Tells CFWheels to cache one or more actions.
+- [`filterChain()`](/v2-4-0/controller/filterchain/) — Returns an array of all the filters set on current controller in the order in which they will be executed.
+- [`filters()`](/v2-4-0/controller/filters/) — Tells CFWheels to run a function before an action is run or after an action has been run.
+- [`flash()`](/v2-4-0/controller/flash/) — Returns the value of a specific key in the Flash (or the entire Flash as a struct if no key is passed in).
+- [`flashClear()`](/v2-4-0/controller/flashclear/) — Deletes everything from the Flash.
+- [`flashCount()`](/v2-4-0/controller/flashcount/) — Returns how many keys exist in the Flash.
+- [`flashDelete()`](/v2-4-0/controller/flashdelete/) — Deletes a specific key from the Flash.
+- [`flashInsert()`](/v2-4-0/controller/flashinsert/) — Inserts a new key / value into the Flash.
+- [`flashIsEmpty()`](/v2-4-0/controller/flashisempty/) — Returns whether or not the Flash is empty.
+- [`flashKeep()`](/v2-4-0/controller/flashkeep/) — Make the entire Flash or specific key in it stick around for one more request.
+- [`flashKeyExists()`](/v2-4-0/controller/flashkeyexists/) — Checks if a specific key exists in the Flash.
+- [`getEmails()`](/v2-4-0/controller/getemails/) — Primarily used for testing to get information about emails sent during the request.
+- [`getFiles()`](/v2-4-0/controller/getfiles/) — Primarily used for testing to get information about files sent during the request.
+- [`getRedirect()`](/v2-4-0/controller/getredirect/) — Primarily used for testing to establish whether the current request has performed a redirect.
+- [`isAjax()`](/v2-4-0/controller/isajax/) — Returns whether the page was called from JavaScript or not.
+- [`isDelete()`](/v2-4-0/controller/isdelete/) — Returns whether the request was a <code>DELETE</code> request or not.
+- [`isGet()`](/v2-4-0/controller/isget/) — Returns whether the request was a normal <code>GET</code> request or not.
+- [`isHead()`](/v2-4-0/controller/ishead/) — Returns whether the request was a <code>HEAD</code> request or not.
+- [`isOptions()`](/v2-4-0/controller/isoptions/) — Returns whether the request was an <code>OPTIONS</code> request or not.
+- [`isPatch()`](/v2-4-0/controller/ispatch/) — Returns whether the request was a <code>PATCH</code> request or not.
+- [`isPost()`](/v2-4-0/controller/ispost/) — Returns whether the request came from a form <code>POST</code> submission or not.
+- [`isPut()`](/v2-4-0/controller/isput/) — Returns whether the request was a <code>PUT</code> request or not.
+- [`isSecure()`](/v2-4-0/controller/issecure/) — Returns whether CFWheels is communicating over a secure port.
+- [`onlyProvides()`](/v2-4-0/controller/onlyprovides/) — Use this in an individual controller action to define which formats the action will respond with.
+- [`pagination()`](/v2-4-0/controller/pagination/) — Returns a struct with information about the specificed paginated query.
+- [`processAction()`](/v2-4-0/controller/processaction/) — Process the specified action of the controller.
+- [`processRequest()`](/v2-4-0/controller/processrequest/) — Creates a controller and calls an action on it.
+- [`protectsFromForgery()`](/v2-4-0/controller/protectsfromforgery/) — Tells CFWheels to protect <code>POST</code>ed requests from CSRF vulnerabilities.
+- [`provides()`](/v2-4-0/controller/provides/) — Defines formats that the controller will respond with upon request.
+- [`redirectTo()`](/v2-4-0/controller/redirectto/) — Redirects the browser to the supplied controller/action/key, route or back to the referring page.
+- [`renderNothing()`](/v2-4-0/controller/rendernothing/) — Instructs the controller to render an empty string when it's finished processing the action.
+- [`renderPartial()`](/v2-4-0/controller/renderpartial/) — Instructs the controller to render a partial when it's finished processing the action.
+- [`renderText()`](/v2-4-0/controller/rendertext/) — Instructs the controller to render specified text when it's finished processing the action.
+- [`renderView()`](/v2-4-0/controller/renderview/) — Instructs the controller which view template and layout to render when it's finished processing the action.
+- [`renderWith()`](/v2-4-0/controller/renderwith/) — Instructs the controller to render the data passed in to the format that is requested.
+- [`response()`](/v2-4-0/controller/response/) — Returns content that CFWheels will send to the client in response to the request.
+- [`sendEmail()`](/v2-4-0/controller/sendemail/) — Sends an email using a template and an optional layout to wrap it in.
+- [`sendFile()`](/v2-4-0/controller/sendfile/) — Sends a file to the user (from the <code>files</code> folder or a path relative to it by default).
+- [`setFilterChain()`](/v2-4-0/controller/setfilterchain/) — Use this function if you need a more low level way of setting the entire filter chain for a controller.
+- [`setPagination()`](/v2-4-0/controller/setpagination/) — Allows you to set a pagination handle for a custom query so you can perform pagination on it in your view with <code>pag
+- [`setResponse()`](/v2-4-0/controller/setresponse/) — Sets content that CFWheels will send to the client in response to the request.
+- [`setVerificationChain()`](/v2-4-0/controller/setverificationchain/) — Use this function if you need a more low level way of setting the entire verification chain for a controller.
+- [`usesLayout()`](/v2-4-0/controller/useslayout/) — Used within a controller's <code>config()</code> function to specify controller- or action-specific layouts.
+- [`verificationChain()`](/v2-4-0/controller/verificationchain/) — Returns an array of all the verifications set on this controller in the order in which they will be executed.
+- [`verifies()`](/v2-4-0/controller/verifies/) — Instructs CFWheels to verify that some specific criterias are met before running an action.

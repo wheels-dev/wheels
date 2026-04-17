@@ -8,9 +8,16 @@ from the framework's inline documentation annotations.
 
 ## Available versions
 
-- **[v3.0.0](/v3-0-0/)** — current release, 309 functions
-
-Older versions are being migrated from the legacy API reference site.
+| Version | Functions | Status |
+| ------- | --------- | ------ |
+| **[v3.0.0](/v3-0-0/)** | 309 | current release |
+| [v2.5.0](/v2-5-0/) | 309 | |
+| [v2.4.0](/v2-4-0/) | 298 | |
+| [v2.3.0](/v2-3-0/) | 298 | |
+| [v2.2.0](/v2-2-0/) | 298 | |
+| [v2.1.0](/v2-1-0/) | 298 | |
+| [v2.0.0](/v2-0-0/) | 254 | |
+| [v1.4.5](/v1-4-5/) | 219 | |
 
 ## How to use
 
@@ -22,5 +29,5 @@ Every function page includes:
 - **Parameters** — each parameter's name, type, whether required, default, and description
 - **Examples** — when present in the source annotations
 
-Use the sidebar to browse by section, or the search bar (top right) to
-find a specific function across all versions.
+Use the sidebar to browse by version and section, or the search bar
+(top right) to find a specific function across all versions.

@@ -1,0 +1,49 @@
+---
+title: verifies()
+description: "Instructs CFWheels to verify that some specific criterias are met before running an action. Note that all undeclared arguments will be passed to redirectTo() ca"
+sidebar:
+  label: verifies()
+  order: 0
+---
+
+## Signature
+
+`verifies()` — returns `any`
+
+
+
+
+## Description
+
+Instructs CFWheels to verify that some specific criterias are met before running an action. Note that all undeclared arguments will be passed to redirectTo() call if a handler is not specified.
+
+## Parameters
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `only` | `string` | yes | — | List of action names to limit this verification to. |
+| `except` | `string` | yes | — | List of action names to exclude this verification from. |
+| `post` | `any` | yes | — | Set to true to verify that this is a POST request. |
+| `get` | `any` | yes | — | Set to true to verify that this is a GET request. |
+| `ajax` | `any` | yes | — | Set to true to verify that this is an AJAX request. |
+| `cookie` | `string` | yes | — | Verify that the passed in variable name exists in the cookie scope. |
+| `session` | `string` | yes | — | Verify that the passed in variable name exists in the session scope. |
+| `params` | `string` | yes | — | Verify that the passed in variable name exists in the params struct. |
+| `handler` | `string` | yes | — | Pass in the name of a function that should handle failed verifications. The default is to just abort the request when a verification fails. |
+| `cookieTypes` | `string` | yes | — | List of types to check each listed cookie value against (will be passed through to your CFML engine's IsValid function). |
+| `sessionTypes` | `string` | yes | — | List of types to check each list session value against (will be passed through to your CFML engine's IsValid function). |
+| `paramsTypes` | `string` | yes | — | List of types to check each params value against (will be passed through to your CFML engine's IsValid function). |
+
+## Examples
+
+<pre>// Tell CFWheels to verify that the `handleForm` action is always a `POST` request when executed
+verifies(only=&quot;handleForm&quot;, post=true);
+
+// Make sure that the edit action is a `GET` request, that `userId` exists in the `params` struct, and that it''s an integer
+verifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;);
+
+// Just like above, only this time we want to invoke a custom function in our controller to handle the request when it is invalid
+verifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, handler=&quot;myCustomFunction&quot;);
+
+// Just like above, only this time instead of specifying a handler, we want to `redirect` the visitor to the index action of the controller and show an error in The Flash when the request is invalid
+verifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, action=&quot;index&quot;, error=&quot;Invalid userId&quot;);</pre>

@@ -1,0 +1,31 @@
+---
+title: decimal()
+description: "adds decimal columns to table definition"
+sidebar:
+  label: decimal()
+  order: 0
+---
+
+## Signature
+
+`decimal()` — returns `any`
+
+**Available in:** `tabledefinition`
+**Category:** Table Definition Functions
+
+## Description
+
+adds decimal columns to table definition
+
+
+
+## Parameters
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `columnNames` | `string` | no | — |  |
+| `default` | `string` | no | — |  |
+| `null` | `boolean` | no | — |  |
+| `precision` | `numeric` | no | — |  |
+| `scale` | `numeric` | no | — |  |
+
