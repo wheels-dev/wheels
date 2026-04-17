@@ -1,0 +1,33 @@
+---
+import Header from '@wheels-dev/ui/components/Header.astro';
+import Footer from '@wheels-dev/ui/components/Footer.astro';
+import '@wheels-dev/ui/styles/tokens.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = 'News, tutorials, and release announcements for Wheels.' } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+  </head>
+  <body>
+    <Header current="blog" />
+    <main><slot /></main>
+    <Footer />
+
+    <style is:global>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-sans); }
+      main { max-width: var(--max-width); margin: 0 auto; padding: 2rem 1.5rem; min-height: 60vh; }
+      a { color: var(--color-accent); }
+    </style>
+  </body>
+</html>

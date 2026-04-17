@@ -24,6 +24,22 @@ importers:
         specifier: ^5.0.0
         version: 5.18.1(rollup@4.60.1)(typescript@5.9.3)(yaml@2.8.3)
 
+  sites/blog:
+    dependencies:
+      '@wheels-dev/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      astro:
+        specifier: ^5.1.0
+        version: 5.18.1(rollup@4.60.1)(typescript@5.9.3)(yaml@2.8.3)
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.4
+        version: 0.9.8(prettier-plugin-astro@0.14.1)(prettier@3.8.3)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   sites/landing:
     dependencies:
       '@wheels-dev/ui':
