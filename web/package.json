@@ -1,0 +1,24 @@
+{
+  "name": "@wheels-dev/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "wheels.dev static sites monorepo",
+  "packageManager": "pnpm@10.23.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter './sites/*' build",
+    "dev:landing": "pnpm --filter @wheels-dev/site-landing dev",
+    "dev:blog": "pnpm --filter @wheels-dev/site-blog dev",
+    "dev:guides": "pnpm --filter @wheels-dev/site-guides dev",
+    "dev:api": "pnpm --filter @wheels-dev/site-api dev",
+    "format": "prettier --write \"**/*.{astro,ts,tsx,md,json,css}\"",
+    "format:check": "prettier --check \"**/*.{astro,ts,tsx,md,json,css}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "prettier-plugin-astro": "^0.14.1",
+    "typescript": "^5.7.2"
+  }
+}
