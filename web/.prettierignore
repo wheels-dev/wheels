@@ -9,5 +9,10 @@
 # Formatting these would mean a prettier pass after every regen for no benefit.
 sites/api/src/content/docs/v*/
 
+# Generated guides content + sidebar manifests (produced by
+# web/scripts/generate-guides.mjs).
+sites/guides/src/content/docs/v*/
+sites/guides/src/sidebars/
+
 # Lockfiles and binaries
 *.svg
