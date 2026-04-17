@@ -1,0 +1,35 @@
+---
+title: renderText()
+description: "Instructs the controller to render specified text when it's finished processing the action."
+sidebar:
+  label: renderText()
+  order: 0
+---
+
+## Signature
+
+`renderText()` — returns `void`
+
+**Available in:** `controller`
+**Category:** Rendering Functions
+
+## Description
+
+Instructs the controller to render specified text when it's finished processing the action.
+
+
+
+## Parameters
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `text` | `any` | yes | — | The text to render. |
+
+## Examples
+
+<pre>// Render just the text &quot;Done!&quot; to the client
+renderText(&quot;Done!&quot;);
+
+// Render serialized product data to the client
+products = model(&quot;product&quot;).findAll();
+renderText(SerializeJson(products));</pre>

@@ -1,0 +1,32 @@
+---
+title: Configuration
+description: "27 Configuration functions in Wheels 2.0.0."
+---
+
+- [`addFormat()`](/v2-0-0/configuration/addformat/) — Adds a new MIME type to your CFWheels application for use with responding to multiple formats.
+- [`collection()`](/v2-0-0/configuration/collection/) — 
+- [`constraints()`](/v2-0-0/configuration/constraints/) — Set variable patterns to use for matching.
+- [`controller()`](/v2-0-0/configuration/controller/) — 
+- [`createMigration()`](/v2-0-0/configuration/createmigration/) — Creates a migration file. Whilst you can use this in your application, the recommended useage is via either the CLI or t
+- [`delete()`](/v2-0-0/configuration/delete/) — Create a route that matches a URL requiring an HTTP <code>DELETE</code> method. We recommend using this matcher to expos
+- [`end()`](/v2-0-0/configuration/end/) — Call this to end a nested routing block or the entire route configuration. This method is chained on a sequence of routi
+- [`get()`](/v2-0-0/configuration/get/) — Create a route that matches a URL requiring an HTTML <code>GET</code> method. We recommend only using this matcher to ex
+- [`get()`](/v2-0-0/configuration/get/) — Returns the current setting for the supplied CFWheels setting or the current default for the supplied CFWheels function 
+- [`getAvailableMigrations()`](/v2-0-0/configuration/getavailablemigrations/) — Searches db/migrate folder for migrations. Whilst you can use this in your application, the recommended useage is via ei
+- [`getCurrentMigrationVersion()`](/v2-0-0/configuration/getcurrentmigrationversion/) — Returns current database version. Whilst you can use this in your application, the recommended useage is via either the 
+- [`mapper()`](/v2-0-0/configuration/mapper/) — Returns the mapper object used to configure your application's routes. Usually you will use this method in <code>config/
+- [`member()`](/v2-0-0/configuration/member/) — 
+- [`migrateTo()`](/v2-0-0/configuration/migrateto/) — Migrates database to a specified version. Whilst you can use this in your application, the recommended useage is via eit
+- [`migrateToLatest()`](/v2-0-0/configuration/migratetolatest/) — Shortcut function to migrate to the latest version
+- [`namespace()`](/v2-0-0/configuration/namespace/) — Scopes any the controllers for any routes configured within this block to a subfolder (package) and also adds the packag
+- [`package()`](/v2-0-0/configuration/package/) — Scopes any the controllers for any routes configured within this block to a subfolder (package) without adding the packa
+- [`patch()`](/v2-0-0/configuration/patch/) — Create a route that matches a URL requiring an HTTP <code>PATCH</code> method. We recommend using this matcher to expose
+- [`post()`](/v2-0-0/configuration/post/) — Create a route that matches a URL requiring an HTTP <code>POST</code> method. We recommend using this matcher to expose 
+- [`put()`](/v2-0-0/configuration/put/) — Create a route that matches a URL requiring an HTTP <code>PUT</code> method. We recommend using this matcher to expose a
+- [`redoMigration()`](/v2-0-0/configuration/redomigration/) — Reruns the specified migration version. Whilst you can use this in your application, the recommended useage is via eithe
+- [`resource()`](/v2-0-0/configuration/resource/) — Create a group of routes that exposes actions for manipulating a singular resource. A singular resource exposes URL patt
+- [`resources()`](/v2-0-0/configuration/resources/) — Create a group of routes that exposes actions for manipulating a collection of resources. A plural resource exposes URL 
+- [`root()`](/v2-0-0/configuration/root/) — Create a route that matches the root of its current context. This mapper can be used for the application's web root (or 
+- [`scope()`](/v2-0-0/configuration/scope/) — Set any number of parameters to be inherited by mappers called within this matcher's block. For example, set a package o
+- [`set()`](/v2-0-0/configuration/set/) — Use to configure a global setting or set a default for a function.
+- [`wildcard()`](/v2-0-0/configuration/wildcard/) — Special wildcard matching generates routes with `

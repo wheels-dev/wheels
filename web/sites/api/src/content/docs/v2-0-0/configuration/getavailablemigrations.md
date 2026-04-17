@@ -1,0 +1,38 @@
+---
+title: getAvailableMigrations()
+description: "Searches db/migrate folder for migrations. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interfa"
+sidebar:
+  label: getAvailableMigrations()
+  order: 0
+---
+
+## Signature
+
+`getAvailableMigrations()` — returns `array`
+
+**Available in:** `migrator`
+**Category:** Database Migrations
+
+## Description
+
+Searches db/migrate folder for migrations. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface
+
+
+
+## Parameters
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `path` | `string` | no | `[runtime expression]` | Path to Migration Files: defaults to /migrator/migrations/ |
+
+## Examples
+
+<pre>// Get array of available migrations
+migrations = application.wheels.migrator.getAvailableMigrations();
+
+if(ArrayLen(migrations)){
+	 latestVersion = migrations[ArrayLen(migrations)].version;
+} else {
+	 latestVersion = 0;
+}
+</pre>
