@@ -306,13 +306,32 @@ If you're building another URLClassLoader-backed Java library on top of the mani
 
 Playwright's `DriverJar.getDriverResourceURI()` uses `Thread.currentThread().getContextClassLoader()` to locate the bundled Node runtime inside `driver-bundle.jar`. Default TCCL is the AppClassLoader, which doesn't see our JARs — so the lookup returns null and `Playwright.create()` fails with an NPE that Lucee swallows silently (looks like a hang — it's not). `BrowserLauncher.acquireBrowser()` swaps TCCL to our URLClassLoader for the duration of the Playwright call chain. If you call Playwright methods outside the DSL (directly via `this.browser.getPage()`), you may need `$pushTCCL()` / `$popTCCL()` manually.
 
-### `createDynamicProxy` for Java interface implementation (Lucee-only)
+### `createDynamicProxy` requires a CFC instance on Lucee 7
 
-Dialog handling requires implementing Playwright's `Consumer<Dialog>` Java interface. Lucee's `createDynamicProxy` creates a Java proxy from a CFML struct of handler functions. This is Lucee-specific — Adobe CF and BoxLang don't support it. Browser specs that test dialogs should check `server.lucee` or wrap in try/catch with engine-aware skip logic.
+Dialog handling implements Playwright's `Consumer<Dialog>` Java interface via `createDynamicProxy`. Two constraints:
 
-### Fixture routes must mount before `.wildcard()`
+1. **Engine support**: Lucee only. Adobe CF and BoxLang don't support `createDynamicProxy`. `BrowserClient.$requireDialogSupport()` probes the engine on first use and throws `Wheels.BrowserDialogNotSupported` on unsupported engines; specs can check `server.lucee` or rely on that probe.
 
-The `/_browser/*` fixture routes (login-as, logout, login form, protected page) are mounted by the framework in test mode. They must come before `.wildcard()` in `config/routes.cfm` or the wildcard catches them first. The framework handles this automatically, but custom route files that override the default order should be aware.
+2. **Lucee 7 tightened the first-argument type**: Lucee 6 accepted a struct of handler functions; Lucee 7 requires a Component instance. Passing a struct fails with the misleading error `"Can't cast Complex Object Type Struct to String"` as Lucee 7 tries the CFC-path-string overload. Fix: wrap the handler logic in a CFC with an `init()` that captures shared state via variables. See [`vendor/wheels/wheelstest/DialogConsumer.cfc`](../../../vendor/wheels/wheelstest/DialogConsumer.cfc) for the canonical pattern. Both the probe and the real call now pass a CFC instance so compatibility is verified on the same code path. See also the cross-engine-compatibility doc's entry on this.
+
+### Fixture routes: two places, both required
+
+The `/_browser/*` fixture routes (home, login, login-as, dashboard, authenticate, logout) must be registered in BOTH:
+
+- **`config/routes.cfm`** — for app-level tests (`/wheels/app/tests`) and any time the app is run in a dev/test environment without the core test runner. Must come before `.wildcard()` or the wildcard catches them first.
+- **`vendor/wheels/tests/routes.cfm`** — for core tests (`/wheels/core/tests`). The core test runner swaps the route table when `$_setTestboxEnv()` runs, so app-level route declarations are not visible. Without this, `BrowserRouteSpec` throws `"Could not find the browserTestHome route"`.
+
+The fixture **controllers + views** likewise live in two places:
+- `app/controllers/BrowserTestHome.cfc` + `app/views/browsertesthome/*.cfm` for app tests.
+- `vendor/wheels/tests/_assets/controllers/BrowserTestHome.cfc` + `vendor/wheels/tests/_assets/views/browsertesthome/*.cfm` for core tests (the test runner sets `controllerPath` / `viewPath` to the `_assets` tree).
+
+Both sets must be kept in sync when the fixture surface changes.
+
+### Sibling specs wipe routes without restoring
+
+Several specs (`mapperSpec`, `security/PaginationXssSpec`, `view/linksSpec`, `view/formsSpec`) legitimately call `$clearRoutes()` in their `beforeEach` / `beforeAll` to test route-registration behavior. They do **not** restore the route table afterwards. Because bundles run alphabetically, any spec that depends on named routes and runs after these will find an empty `application.wheels.namedRoutePositions`.
+
+Defensive fix for route-dependent specs: re-include `/wheels/tests/routes.cfm` and call `$setNamedRoutePositions()` in your own `beforeAll`. `BrowserTest.beforeAll` already does this — new route-dependent specs should follow the same pattern.
 
 ### Fat arrow closures in WheelsTest suites
 
