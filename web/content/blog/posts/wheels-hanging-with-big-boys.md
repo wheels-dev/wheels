@@ -14,7 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '2'
 ---
-Well, my first blog post for Wheels. I am [Mike Henke](http://www.henke.ws/). I fell in love with Wheels after I asked my friend [Ryan Stille](http://www.stillnetstudios.com/) what ColdFusion framework he thought looked interesting and would like to learn. I always wanted to implement a CF framework at work, but business constraints (time, complexity, learning curve, priority) never worked until I found Wheels. In this entry, I will be providing some surprising and interesting stats showing how Wheels has grown over the past couple years. Here are a couple to start with: CFWheels.org had a spike of over **_500_** unique visitors and **_42 downloads_** in one day last month. ![Number of visits is starting to show an exponential trend.](https://cfwheels.org/images/blog/2009/12/9/google-analytics.png) _Traffic from past couple years (Google Analytics)_
+Well, my first blog post for Wheels. I am [Mike Henke](http://www.henke.ws/). I fell in love with Wheels after I asked my friend [Ryan Stille](http://www.stillnetstudios.com/) what ColdFusion framework he thought looked interesting and would like to learn. I always wanted to implement a CF framework at work, but business constraints (time, complexity, learning curve, priority) never worked until I found Wheels. In this entry, I will be providing some surprising and interesting stats showing how Wheels has grown over the past couple years. Here are a couple to start with: CFWheels.org had a spike of over **_500_** unique visitors and **_42 downloads_** in one day last month. ![Number of visits is starting to show an exponential trend.](/blog-images/5e052e3d82d9.png) _Traffic from past couple years (Google Analytics)_
 
 ## Here Are the (Surprising) Stats
 

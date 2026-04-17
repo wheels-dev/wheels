@@ -58,3 +58,9 @@ web/**/dist/
 web/**/.wrangler/
 web/**/.turbo/
 web/.pnpm-store/
+
+# Wayback recovery run log (resumes across runs, not meaningful for review)
+web/scripts/.wayback-log.json
+
+# Local wrangler state (from local runs of wrangler pages deploy)
+.wrangler/
