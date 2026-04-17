@@ -1,53 +1,56 @@
 ---
 description: >-
-  Configure Wheels MCP tools for Claude Code, Cursor, and VS Code. Covers both
-  LuCLI stdio transport and HTTP server transport with auto-discovered tools.
+  Configure Wheels MCP tools for Claude Code, Cursor, OpenCode, and other
+  AI-enabled editors using the canonical LuCLI stdio transport.
 ---
 
 # MCP Configuration Guide
 
 ## Overview
 
-Wheels exposes its development tools through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), giving AI coding assistants direct access to code generation, database migrations, testing, project analysis, and framework documentation. This guide covers configuring MCP for the three most popular AI-enabled editors.
+Wheels exposes its development tools through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), giving AI coding assistants direct access to code generation, database migrations, testing, project analysis, and framework documentation.
 
-### Two Transport Modes
+### Transport: stdio (canonical)
 
-Wheels supports two MCP transports. Choose the one that fits your setup:
+The Wheels CLI (`brew install wheels`) is a renamed LuCLI that includes a built-in MCP server. Your AI IDE launches `wheels mcp wheels` as a stdio subprocess — no port, no running dev server, no HTTP transport to manage. Tools are auto-discovered from `cli/lucli/Module.cfc` and prefixed with the module name (`wheels_generate`, `wheels_migrate`, etc.).
 
-| Transport | Command | Requires Running Server | Best For |
-|-----------|---------|------------------------|----------|
-| **stdio (LuCLI)** | `lucli mcp wheels` | No (for tool discovery) | LuCLI users, simpler config |
-| **HTTP** | `http://localhost:[port]/wheels/mcp` | Yes | CommandBox users, existing setups |
+| Aspect | Value |
+|-----------|-------|
+| Transport | stdio (JSON-RPC) |
+| Command | `wheels mcp wheels` |
+| Requires running server | No |
+| Requires installed `wheels` CLI | Yes (`brew install wheels` or equivalent) |
 
-**stdio (recommended)**: LuCLI auto-discovers every public command in the Wheels module as an MCP tool. The AI assistant launches `lucli` as a subprocess — no separate server process to manage.
-
-**HTTP**: The Wheels application includes a native CFML MCP server. Your development server must be running for the AI assistant to connect.
+> **Deprecated (Wheels 4.0+):** The previous HTTP MCP endpoint at `http://localhost:<port>/wheels/mcp` emits a deprecation warning and will be removed. Existing projects should run `wheels mcp setup --force` to migrate to stdio configs.
 
 ## Quick Start
 
-### Option A: LuCLI stdio (recommended)
-
 ```bash
-# Install LuCLI and the Wheels module
-brew install lucli
-lucli modules install wheels
+# Install the Wheels CLI (renamed LuCLI)
+brew install wheels
 
-# Verify MCP tools are discoverable
-lucli mcp wheels
-```
-
-Then add the configuration for your IDE (see sections below).
-
-### Option B: HTTP server
-
-```bash
-# From your Wheels project root
+# From your Wheels project root, generate IDE configs
 wheels mcp setup
 
-# This creates .mcp.json and .opencode.json in your project
+# This creates .mcp.json and .opencode.json with the stdio config.
+# Restart your AI IDE to pick them up.
 ```
 
-Or start your server and point your IDE at the endpoint:
+If you prefer to configure manually, add the following to `.mcp.json` (Claude Code, Cursor, Continue, Windsurf):
+
+```json
+{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
+```
+
+Or for OpenCode, to `.opencode.json`:
+
+```json
+{"$schema":"https://opencode.ai/config.json","mcp":{"wheels":{"type":"local","command":["wheels","mcp","wheels"],"enabled":true}}}
+```
+
+## Legacy HTTP Transport (deprecated)
+
+The pre-4.0 HTTP endpoint is still mounted at `/wheels/mcp` for compatibility but emits a deprecation warning on every session. To continue using it, start your dev server and point your IDE at:
 ```
 http://localhost:[port]/wheels/mcp
 ```

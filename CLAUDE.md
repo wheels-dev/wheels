@@ -857,6 +857,16 @@ The project name is **Wheels** (not "CFWheels"). The rebrand happened at v3.0. A
 
 ## MCP Server
 
-Endpoint: `/wheels/mcp` (routes must come before `.wildcard()` in routes.cfm).
+**Canonical surface (Wheels 4.0+):** LuCLI stdio MCP at `wheels mcp wheels`. Configure your AI IDE with:
 
-Tools: `wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_server`, `wheels_reload`, `wheels_analyze`, `wheels_validate`.
+```json
+{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
+```
+
+Or run `wheels mcp setup` to generate `.mcp.json` + `.opencode.json` automatically.
+
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions, prefixed with the module name (`wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_reload`, `wheels_seed`, `wheels_analyze`, `wheels_validate`, `wheels_routes`, `wheels_info`, `wheels_destroy`, `wheels_doctor`, `wheels_stats`, `wheels_notes`, `wheels_db`, `wheels_upgrade`, `wheels_create`). CLI-only tools (`mcp`, `d`, `new`, `console`, `start`, `stop`, `browser`) are hidden from MCP `tools/list` via `mcpHiddenTools()`.
+
+Workflow orchestration (multi-step planning, feature development) is not a framework concern — use your preferred Claude Code plugin (Superpowers, feature-dev, etc.). The framework ships deterministic Wheels operations via MCP; the model orchestrates.
+
+**Deprecated:** The in-dev-server HTTP endpoint at `/wheels/mcp` (routed from `vendor/wheels/public/views/mcp.cfm`). Emits a deprecation notice and warning log on first request. Scheduled for removal in a future release — migrate to the stdio surface. See `docs/command-line-tools/commands/mcp/mcp-configuration-guide.md`.
