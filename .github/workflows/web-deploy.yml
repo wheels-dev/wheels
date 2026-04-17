@@ -53,11 +53,15 @@ jobs:
         run: pnpm --filter @wheels-dev/site-${{ matrix.site }} build
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        working-directory: web
         env:
-          # Untrusted inputs — pass via env to prevent command injection
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Routed via env to keep untrusted branch names out of the command string.
           DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy web/sites/${{ matrix.site }}/dist --project-name=wheels-${{ matrix.site }} --branch="$DEPLOY_BRANCH" --commit-hash="$GITHUB_SHA"
+          SITE: ${{ matrix.site }}
+        run: |
+          pnpm dlx wrangler@4.78.0 pages deploy "sites/${SITE}/dist" \
+            --project-name="wheels-${SITE}" \
+            --branch="${DEPLOY_BRANCH}" \
+            --commit-hash="${GITHUB_SHA}"
