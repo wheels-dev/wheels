@@ -54,6 +54,9 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Composable pagination view helpers: `paginationInfo()`, `previousPageLink()`, `nextPageLink()`, `firstPageLink()`, `lastPageLink()`, `pageNumberLinks()`, and `paginationNav()` for building custom pagination UIs (#1930)
 - XSS helpers formalized: `h()`, `hAttr()`, `stripTags()`, `stripLinks()` (#2097)
 - Redesigned v4.0 congratulations page for scaffolded apps (#2098)
+- `vitePreloadTag()` view helper emits `<link rel="modulepreload">` for a Vite entrypoint and its transitive chunk imports, suitable for Turbo Drive hover-preload patterns
+- `viteScriptTag()` and `viteStyleTag()` now resolve transitive chunk imports from the Vite manifest: modulepreload links for JS chunks are emitted into `<head>`, and CSS from transitive chunks is included in the stylesheet tags (brings parity with Rails/Laravel Vite integrations)
+- `viteStrictManifest` setting (default `true`) — missing manifest entries now throw `Wheels.ViteAssetNotFound` in production. Set to `false` to restore 3.x silent behavior.
 
 **Background jobs & real-time**
 - Job worker daemon with CLI commands (`wheels jobs work/status/retry/purge/monitor`) for persistent background job processing with optimistic locking, timeout recovery, and live monitoring (#1934)
