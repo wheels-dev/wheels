@@ -1,0 +1,360 @@
+[
+  {
+    "label": "INTRODUCTION",
+    "items": [
+      {
+        "label": "Getting Started",
+        "link": "/v2-5-0/",
+        "items": [
+          {
+            "label": "Running Local Development servers",
+            "link": "/v2-5-0/introduction/getting-started/running-local-development-servers/"
+          },
+          {
+            "label": "Beginner Tutorial: Hello World",
+            "link": "/v2-5-0/introduction/getting-started/beginner-tutorial-hello-world/"
+          },
+          {
+            "label": "Beginner Tutorial: Hello Database",
+            "link": "/v2-5-0/introduction/getting-started/beginner-tutorial-hello-database/"
+          },
+          {
+            "label": "Tutorial: CFWheels, AJAX, and You",
+            "link": "/v2-5-0/introduction/getting-started/tutorial-cfwheels-ajax-and-you/"
+          }
+        ]
+      },
+      {
+        "label": "Frameworks and CFWheels",
+        "link": "/v2-5-0/introduction/frameworks-and-cfwheels/"
+      },
+      {
+        "label": "Requirements",
+        "link": "/v2-5-0/introduction/requirements/"
+      },
+      {
+        "label": "Manual Installation",
+        "link": "/v2-5-0/introduction/manual-installation/"
+      },
+      {
+        "label": "Upgrading",
+        "link": "/v2-5-0/introduction/upgrading/"
+      },
+      {
+        "label": "Screencasts",
+        "link": "/v2-5-0/introduction/screencasts/"
+      }
+    ]
+  },
+  {
+    "label": "Command Line Tools",
+    "items": [
+      {
+        "label": "CLI Commands",
+        "link": "/v2-5-0/command-line-tools/cli-commands/"
+      },
+      {
+        "label": "wheels - commands",
+        "link": "/v2-5-0/command-line-tools/wheels-commands/"
+      },
+      {
+        "label": "wheels generate - commands",
+        "link": "/v2-5-0/command-line-tools/wheels-generate-commands/"
+      },
+      {
+        "label": "wheels dbmigrate - commands",
+        "link": "/v2-5-0/command-line-tools/wheels-dbmigrate-commands/"
+      },
+      {
+        "label": "wheels plugins - commands",
+        "link": "/v2-5-0/command-line-tools/wheels-plugins-commands/"
+      }
+    ]
+  },
+  {
+    "label": "Working with CFWheels",
+    "items": [
+      {
+        "label": "Conventions",
+        "link": "/v2-5-0/working-with-cfwheels/conventions/"
+      },
+      {
+        "label": "Configuration and Defaults",
+        "link": "/v2-5-0/working-with-cfwheels/configuration-and-defaults/"
+      },
+      {
+        "label": "Directory Structure",
+        "link": "/v2-5-0/working-with-cfwheels/directory-structure/"
+      },
+      {
+        "label": "Switching Environments",
+        "link": "/v2-5-0/working-with-cfwheels/switching-environments/"
+      },
+      {
+        "label": "Testing Your Application",
+        "link": "/v2-5-0/working-with-cfwheels/testing-your-application/"
+      },
+      {
+        "label": "Contributing to CFWheels",
+        "link": "/v2-5-0/working-with-cfwheels/contributing-to-cfwheels/"
+      },
+      {
+        "label": "Documenting your Code",
+        "link": "/v2-5-0/working-with-cfwheels/documenting-your-code/"
+      }
+    ]
+  },
+  {
+    "label": "Handling Requests with Controllers",
+    "items": [
+      {
+        "label": "Request Handling",
+        "link": "/v2-5-0/handling-requests-with-controllers/request-handling/"
+      },
+      {
+        "label": "Rendering Content",
+        "link": "/v2-5-0/handling-requests-with-controllers/rendering-content/"
+      },
+      {
+        "label": "Redirecting Users",
+        "link": "/v2-5-0/handling-requests-with-controllers/redirecting-users/"
+      },
+      {
+        "label": "Sending Files",
+        "link": "/v2-5-0/handling-requests-with-controllers/sending-files/"
+      },
+      {
+        "label": "Sending Email",
+        "link": "/v2-5-0/handling-requests-with-controllers/sending-email/"
+      },
+      {
+        "label": "Responding with Multiple Formats",
+        "link": "/v2-5-0/handling-requests-with-controllers/responding-with-multiple-formats/"
+      },
+      {
+        "label": "Using the Flash",
+        "link": "/v2-5-0/handling-requests-with-controllers/using-the-flash/"
+      },
+      {
+        "label": "Using Filters",
+        "link": "/v2-5-0/handling-requests-with-controllers/using-filters/"
+      },
+      {
+        "label": "Verification",
+        "link": "/v2-5-0/handling-requests-with-controllers/verification/"
+      },
+      {
+        "label": "Event Handlers",
+        "link": "/v2-5-0/handling-requests-with-controllers/event-handlers/"
+      },
+      {
+        "label": "Routing",
+        "link": "/v2-5-0/handling-requests-with-controllers/routing/"
+      },
+      {
+        "label": "URL Rewriting",
+        "link": "/v2-5-0/handling-requests-with-controllers/url-rewriting/",
+        "items": [
+          {
+            "label": "Apache",
+            "link": "/v2-5-0/handling-requests-with-controllers/url-rewriting/apache/"
+          },
+          {
+            "label": "IIS",
+            "link": "/v2-5-0/handling-requests-with-controllers/url-rewriting/iis/"
+          },
+          {
+            "label": "Tomcat",
+            "link": "/v2-5-0/handling-requests-with-controllers/url-rewriting/tomcat/"
+          },
+          {
+            "label": "Nginx",
+            "link": "/v2-5-0/handling-requests-with-controllers/url-rewriting/nginx/"
+          }
+        ]
+      },
+      {
+        "label": "Obfuscating URLs",
+        "link": "/v2-5-0/handling-requests-with-controllers/obfuscating-urls/"
+      },
+      {
+        "label": "Caching",
+        "link": "/v2-5-0/handling-requests-with-controllers/caching/"
+      },
+      {
+        "label": "Nesting Controllers",
+        "link": "/v2-5-0/handling-requests-with-controllers/nesting-controllers/"
+      },
+      {
+        "label": "CORS Requests",
+        "link": "/v2-5-0/handling-requests-with-controllers/cors-requests/"
+      }
+    ]
+  },
+  {
+    "label": "Displaying Views to Users",
+    "items": [
+      {
+        "label": "Pages",
+        "link": "/v2-5-0/displaying-views-to-users/pages/"
+      },
+      {
+        "label": "Partials",
+        "link": "/v2-5-0/displaying-views-to-users/partials/"
+      },
+      {
+        "label": "Linking Pages",
+        "link": "/v2-5-0/displaying-views-to-users/linking-pages/"
+      },
+      {
+        "label": "Layouts",
+        "link": "/v2-5-0/displaying-views-to-users/layouts/"
+      },
+      {
+        "label": "Form Helpers and Showing Errors",
+        "link": "/v2-5-0/displaying-views-to-users/form-helpers-and-showing-errors/"
+      },
+      {
+        "label": "Displaying Links for Pagination",
+        "link": "/v2-5-0/displaying-views-to-users/displaying-links-for-pagination/"
+      },
+      {
+        "label": "Date, Media, and Text Helpers",
+        "link": "/v2-5-0/displaying-views-to-users/date-media-and-text-helpers/"
+      },
+      {
+        "label": "Creating Custom View Helpers",
+        "link": "/v2-5-0/displaying-views-to-users/creating-custom-view-helpers/"
+      },
+      {
+        "label": "Localization",
+        "link": "/v2-5-0/displaying-views-to-users/localization/"
+      }
+    ]
+  },
+  {
+    "label": "Database Interaction Through Models",
+    "items": [
+      {
+        "label": "Object Relational Mapping",
+        "link": "/v2-5-0/database-interaction-through-models/object-relational-mapping/"
+      },
+      {
+        "label": "Creating Records",
+        "link": "/v2-5-0/database-interaction-through-models/creating-records/"
+      },
+      {
+        "label": "Reading Records",
+        "link": "/v2-5-0/database-interaction-through-models/reading-records/"
+      },
+      {
+        "label": "Updating Records",
+        "link": "/v2-5-0/database-interaction-through-models/updating-records/"
+      },
+      {
+        "label": "Deleting Records",
+        "link": "/v2-5-0/database-interaction-through-models/deleting-records/"
+      },
+      {
+        "label": "Column Statistics",
+        "link": "/v2-5-0/database-interaction-through-models/column-statistics/"
+      },
+      {
+        "label": "Dynamic Finders",
+        "link": "/v2-5-0/database-interaction-through-models/dynamic-finders/"
+      },
+      {
+        "label": "Getting Paginated Data",
+        "link": "/v2-5-0/database-interaction-through-models/getting-paginated-data/"
+      },
+      {
+        "label": "Associations",
+        "link": "/v2-5-0/database-interaction-through-models/associations/"
+      },
+      {
+        "label": "Nested Properties",
+        "link": "/v2-5-0/database-interaction-through-models/nested-properties/"
+      },
+      {
+        "label": "Object Validation",
+        "link": "/v2-5-0/database-interaction-through-models/object-validation/"
+      },
+      {
+        "label": "Object Callbacks",
+        "link": "/v2-5-0/database-interaction-through-models/object-callbacks/"
+      },
+      {
+        "label": "Calculated Properties",
+        "link": "/v2-5-0/database-interaction-through-models/calculated-properties/"
+      },
+      {
+        "label": "Transactions",
+        "link": "/v2-5-0/database-interaction-through-models/transactions/"
+      },
+      {
+        "label": "Dirty Records",
+        "link": "/v2-5-0/database-interaction-through-models/dirty-records/"
+      },
+      {
+        "label": "Soft Delete",
+        "link": "/v2-5-0/database-interaction-through-models/soft-delete/"
+      },
+      {
+        "label": "Automatic Time Stamps",
+        "link": "/v2-5-0/database-interaction-through-models/automatic-time-stamps/"
+      },
+      {
+        "label": "Database Migrations",
+        "link": "/v2-5-0/database-interaction-through-models/database-migrations/",
+        "items": [
+          {
+            "label": "Migrations In Production",
+            "link": "/v2-5-0/database-interaction-through-models/database-migrations/migrations-in-production/"
+          }
+        ]
+      },
+      {
+        "label": "Using Multiple Data Sources",
+        "link": "/v2-5-0/database-interaction-through-models/using-multiple-data-sources/"
+      }
+    ]
+  },
+  {
+    "label": "Plugins",
+    "items": [
+      {
+        "label": "Installing and Using Plugins",
+        "link": "/v2-5-0/plugins/installing-and-using-plugins/"
+      },
+      {
+        "label": "Developing Plugins",
+        "link": "/v2-5-0/plugins/developing-plugins/"
+      },
+      {
+        "label": "Publishing Plugins",
+        "link": "/v2-5-0/plugins/publishing-plugins/"
+      }
+    ]
+  },
+  {
+    "label": "External Links",
+    "items": [
+      {
+        "label": "Source Code",
+        "link": "/v2-5-0/https:/github.com/cfwheels/cfwheels/"
+      },
+      {
+        "label": "Issue Tracker",
+        "link": "/v2-5-0/https:/github.com/cfwheels/cfwheels/issues/"
+      },
+      {
+        "label": "Sponsor Us",
+        "link": "/v2-5-0/https:/opencollective.com/cfwheels/"
+      },
+      {
+        "label": "Community",
+        "link": "/v2-5-0/https:/github.com/cfwheels/cfwheels/discussions/"
+      }
+    ]
+  }
+]

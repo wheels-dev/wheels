@@ -14,4 +14,5 @@ excerpt: >-
 coverImage: null
 legacyId: '34'
 ---
+
 Per gets down and dirty with a new chapter in the Documentation called [Dirty Records](https://cfwheels.org/docs/chapter/dirty-records). Really it's all about tracking change to your database records dynamically. [Give it a read](https://cfwheels.org/docs/chapter/dirty-records) and learn about the power of methods like hasChanged(), XXXHasChanged(), XXXChangedFrom(), changedProperties(), allChanges(), and more.

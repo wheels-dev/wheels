@@ -24,7 +24,8 @@ excerpt: >-
 coverImage: null
 legacyId: '1151027108231184385'
 ---
-Most framework documentation tells you *how* to build something. The Wheels community site at wheels.dev is something different -- it's a production application built with Wheels 3.0 that you can actually look at, poke around, and learn from. We've made the source public, and this article walks through how the site is built, how it's deployed, and how it comes to life inside a Docker Swarm.
+
+Most framework documentation tells you _how_ to build something. The Wheels community site at wheels.dev is something different -- it's a production application built with Wheels 3.0 that you can actually look at, poke around, and learn from. We've made the source public, and this article walks through how the site is built, how it's deployed, and how it comes to life inside a Docker Swarm.
 
 ## Why Make the Site Public?
 

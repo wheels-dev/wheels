@@ -14,6 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '23'
 ---
+
 Here are two 5 minute screencasts to help you get started for the [Wheels Litepost Learning Contest](https://cfwheels.org/blog/index.cfm/2010/1/25/Wheels-LitePost-Contest--win-Amazon-Gift-Card).
 
 ### Getting Started Outline
@@ -26,13 +27,13 @@ Here are two 5 minute screencasts to help you get started for the [Wheels Litepo
 6.  Create a controller to call the model
 7.  Create a view
 
- [Getting Started Screencast link](http://www.screencast.com/t/Y2MyYjllO)
+[Getting Started Screencast link](http://www.screencast.com/t/Y2MyYjllO)
 
 ### Getting Started Notes
 
--   Really, the first step is done to get the create tables sql script so we can create our Litepost tables and so you can review other frameworks implementation of Litepost. You could grab [blogTables.sql](http://litepost.googlecode.com/svn/trunk/db/blogTables.sql) and run it.
--   I skipped showing setting up a ColdFusion instance and creating the Litepost datasource for time purposes.
--   The [scaffolding plugin](https://cfwheels.org/plugins/listing/9) will generate the create, read, update, and delete (CRUD) functionality for you in a few seconds.
+- Really, the first step is done to get the create tables sql script so we can create our Litepost tables and so you can review other frameworks implementation of Litepost. You could grab [blogTables.sql](http://litepost.googlecode.com/svn/trunk/db/blogTables.sql) and run it.
+- I skipped showing setting up a ColdFusion instance and creating the Litepost datasource for time purposes.
+- The [scaffolding plugin](https://cfwheels.org/plugins/listing/9) will generate the create, read, update, and delete (CRUD) functionality for you in a few seconds.
 
 ### Creating CRUD in a few seconds Outline
 
@@ -42,12 +43,12 @@ Here are two 5 minute screencasts to help you get started for the [Wheels Litepo
 4.  Review Model code generated
 5.  Review Controller code generated
 
- [Creating CRUD in a few seconds Screencast link](http://www.screencast.com/t/NTlhYzZj)
+[Creating CRUD in a few seconds Screencast link](http://www.screencast.com/t/NTlhYzZj)
 
 ### Creating CRUD in a few seconds Notes
 
--   You will have to repeat the scaffolding plugin code generation for each table needing CRUD.
--   Finish the [other requirements](https://cfwheels.org/blog/index.cfm/2010/1/25/Wheels-LitePost-Contest--win-Amazon-Gift-Card#Rule)
+- You will have to repeat the scaffolding plugin code generation for each table needing CRUD.
+- Finish the [other requirements](https://cfwheels.org/blog/index.cfm/2010/1/25/Wheels-LitePost-Contest--win-Amazon-Gift-Card#Rule)
 
 ### Submissions
 

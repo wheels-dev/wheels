@@ -14,6 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '66'
 ---
+
   If you're attending [cf.Objective() 2011](http://www.cfobjective.com/), you'll have a couple opportunities to learn more about ColdFusion on Wheels. You'll also have access to a couple prominent members of the Wheels community at the conference, so be sure to say hi!
 
 ## Wheels Events Scheduled for cf.Objective() 2011
@@ -26,10 +27,10 @@ Speaker: [Chris Peters](https://cfwheels.org/user/profile/1) If you're new to t
 
 Speaker: [Mike Henke](https://cfwheels.org/user/profile/25) You’ll spend the two days working through a single concept by creating a simple blog system and learning the basics of ColdFusion On Wheels including:
 
--   Models, Views, and Controllers
--   Data Structures & Relationships
--   Routing
--   Migrations
--   Views with forms, partials, and helpers
--   RESTful design
--   Using Wheels plugins
+- Models, Views, and Controllers
+- Data Structures & Relationships
+- Routing
+- Migrations
+- Views with forms, partials, and helpers
+- RESTful design
+- Using Wheels plugins

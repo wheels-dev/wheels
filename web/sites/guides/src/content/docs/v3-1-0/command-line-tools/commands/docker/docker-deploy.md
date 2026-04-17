@@ -1,0 +1,130 @@
+---
+title: wheels docker deploy
+---
+# wheels docker deploy
+
+Unified Docker deployment command for Wheels apps. Deploys applications locally or to remote servers with support for Blue/Green deployment.
+
+## Synopsis
+
+```bash
+wheels docker deploy [options]
+```
+
+## Description
+
+The `wheels docker deploy` command manages the deployment lifecycle of your Dockerized application. It can start containers locally for development or testing, and perform robust deployments to remote servers, including zero-downtime Blue/Green deployments.
+
+**Centralized Configuration**:
+- **Source of Truth**: This command prioritizes settings from `config/deploy.yml` for server lists and target environments.
+- **Interactive Versioning**: When multiple images or tags are detected, the command provides an interactive picker to choose exactly which version to deploy.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--local` | Deploy to local Docker environment | `true` |
+| `--remote` | Deploy to remote server(s) | `false` |
+| `--serversFile` | Server configuration file (defaults to `config/deploy.yml`) | `""` |
+| `--skipDockerCheck` | Skip Docker installation check on remote servers | `false` |
+| `--blueGreen` | Enable Blue/Green deployment strategy (zero downtime) - for remote deployment | `false` |
+
+**Note**: If neither `--local` nor `--remote` is specified, `--local` is used by default.
+
+## Detailed Examples
+
+### Local Deployment
+
+**Quick Start (Production Mode)**
+Starts the application locally, mimicking a production environment (optimized settings, no hot-reload).
+```bash
+wheels docker deploy --local
+```
+
+### Remote Deployment
+
+**Standard Deployment**
+Deploys to all servers defined in your configuration (starting with `config/deploy.yml`). This stops the existing container, pulls/builds the new one, and starts it.
+```bash
+wheels docker deploy --remote
+```
+
+**Zero-Downtime Blue/Green Deployment**
+Uses a Blue/Green strategy to ensure no downtime. Requires Nginx (automatically handled).
+```bash
+wheels docker deploy --remote --blueGreen
+```
+
+**Deploy to Specific Servers**
+Uses an override server list file for deployment.
+```bash
+wheels docker deploy --remote --serversFile=staging-servers.yml
+```
+
+**Skip Docker Checks**
+Speeds up deployment if you know Docker is already installed and configured on the remote servers.
+```bash
+wheels docker deploy --remote --skipDockerCheck
+```
+
+## Deployment Strategies Explained
+
+### 1. Standard Remote Deployment
+This is the default strategy when `--remote` is used.
+1.  **Upload**: Tars and uploads your project source code to the remote server.
+2.  **Build/Compose**:
+    *   If `docker-compose.yml` exists: Runs `docker compose down` followed by `docker compose up -d --build`.
+    *   If `Dockerfile` exists: Builds the image, stops/removes the old container, and runs the new one.
+3.  **Downtime**: There is a short period (seconds to minutes) where the service is unavailable while the container restarts.
+
+### 2. Blue/Green Deployment (`--blueGreen`)
+This strategy is designed for zero-downtime updates.
+1.  **State Detection**: The script checks which "color" (Blue or Green) is currently active.
+2.  **Parallel Deployment**: It spins up the *new* version (e.g., Green) alongside the *old* version (Blue).
+3.  **Health Check**: It waits for the new container to initialize.
+4.  **Traffic Switch**: It updates an Nginx proxy to point traffic to the new container.
+5.  **Cleanup**: The old container is stopped and removed.
+*   **Requirement**: This strategy automatically sets up an `nginx-proxy` container on the remote server if one doesn't exist.
+
+## Troubleshooting
+
+**"User requires passwordless sudo access"**
+If the remote user is not part of the `docker` group, the CLI tries to use `sudo`. If `sudo` requires a password, deployment will fail.
+*   **Fix**: SSH into the server and run `sudo usermod -aG docker $USER`, then log out and back in. Or configure passwordless sudo.
+
+**"SSH connection failed"**
+*   **Fix**: Ensure your SSH keys are correctly loaded (`ssh-add -l`) and you can manually SSH into the server (`ssh user@host`).
+
+**"Deployment script failed"**
+*   **Fix**: Run with verbose output or check the logs on the remote server. Ensure the remote server has enough disk space.
+
+## Server Configuration
+
+See [wheels docker build](/v3-1-0/command-line-tools/commands/docker/docker-build/#server-configuration) for details on `deploy-servers.txt` and `deploy-servers.json`.
+
+## Security Notes
+
+1. **SSH Keys**: Use SSH key authentication instead of passwords
+2. **Sudo Access**: Configure minimal sudo permissions for production
+3. **Firewall**: Ensure proper firewall rules are in place
+4. **Docker Socket**: The deployment sets permissions on `/var/run/docker.sock` for convenience; review for production security
+
+## Best Practices
+
+1. **Test Locally First**: Always test deployments locally before remote deployment
+2. **Use Blue/Green for Production**: Minimize downtime with `--blueGreen` flag
+3. **Version Control**: Keep `Dockerfile` and `docker-compose.yml` in version control
+4. **Environment-Specific Configs**: Use different configuration files for staging/production
+5. **Monitor Resources**: Keep track of Docker resource usage on remote servers
+6. **Backup Data**: Always backup databases before major deployments
+7. **Rollback Plan**: Keep previous images for quick rollback if needed
+
+## Related Commands
+
+- [wheels docker init](/v3-1-0/command-line-tools/commands/docker/docker-init/) - Initialize Docker configuration files
+- [wheels docker build](/v3-1-0/command-line-tools/commands/docker/docker-build/) - Build Docker images
+- [wheels docker logs](/v3-1-0/command-line-tools/commands/docker/docker-logs/) - View container logs
+- [wheels docker exec](/v3-1-0/command-line-tools/commands/docker/docker-exec/) - Execute commands in containers
+- [wheels docker stop](/v3-1-0/command-line-tools/commands/docker/docker-stop/) - Stop Docker containers
+
+**Note**: This command is part of the Wheels CLI tool suite for Docker management.

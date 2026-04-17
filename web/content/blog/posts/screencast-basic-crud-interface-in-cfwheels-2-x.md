@@ -12,4 +12,3 @@ excerpt: ''
 coverImage: null
 legacyId: '96'
 ---
-

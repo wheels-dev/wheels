@@ -14,6 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '46'
 ---
+
 ColdFusion On Wheels is announcing a contest to create an example of [LitePost](http://en.wikipedia.org/wiki/LitePost_%28blogging_application%29) using Wheels The LitePost project is hosted [here](http://code.google.com/p/litepost/). It is a simple blogging application to compare different ColdFusion frameworks. A sql script for the tables and other framework examples are [available](http://litepost.googlecode.com/svn/trunk/).
 
 ### Goal
@@ -30,14 +31,14 @@ Only one rule for the contest - create a LitePost example using Wheels philosoph
 
 ### Requirements
 
--   [Download](https://cfwheels.org/download) and use the Wheels framework
--   Login/Logout
--   Entries (Create, Read, Update, and Delete)
--   Comments (Create, Read, Update, and Delete)
--   Categories (Create, Read, Update, and Delete)
--   Bookmarks (Create, Read, Update, and Delete)
--   Use Wheels Object Validation on above items
--   RSS feed (Bonus)
+- [Download](https://cfwheels.org/download) and use the Wheels framework
+- Login/Logout
+- Entries (Create, Read, Update, and Delete)
+- Comments (Create, Read, Update, and Delete)
+- Categories (Create, Read, Update, and Delete)
+- Bookmarks (Create, Read, Update, and Delete)
+- Use Wheels Object Validation on above items
+- RSS feed (Bonus)
 
 Contest ends on **February 19, 2010**. Winners will be picked by me (Mike Henke). I will be taking bribes and will be partial to newbies :-)
 

@@ -15,4 +15,5 @@ excerpt: >-
 coverImage: null
 legacyId: '36'
 ---
+
 As a follow-up to the [Hello World](http://www.cfwheels.org/docs/chapter/beginner-tutorial:-hello-world) tutorial, we've just released a tutorial called [Hello Database](http://www.cfwheels.org/docs/chapter/beginner-tutorial:-hello-database). As its name suggests, the point of this new tutorial is to help you get a jump start on learning about Wheels's ORM functionality. This is not an exhaustive walk-through but rather a taste so you can dip your toe into the pool. If you've been on the fence on whether you'd like to try ColdFusion on Wheels, [give the tutorial a read](http://www.cfwheels.org/docs/chapter/beginner-tutorial:-hello-database).

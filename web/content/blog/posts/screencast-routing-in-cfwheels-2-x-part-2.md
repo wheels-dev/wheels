@@ -12,8 +12,5 @@ excerpt: 'Covers constraints, wildcard segments and shallow resources.'
 coverImage: null
 legacyId: '98'
 ---
-  
-
-  
 
 Covers constraints, wildcard segments and shallow resources.
