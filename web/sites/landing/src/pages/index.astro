@@ -2,12 +2,254 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="Wheels — a CFML MVC framework">
-	<h1>Wheels</h1>
-	<p>A Rails-inspired MVC framework for CFML. This site is being rebuilt — check back soon.</p>
-	<p>
-		In the meantime, the framework source and docs live on <a
-			href="https://github.com/wheels-dev/wheels">GitHub</a
-		>.
-	</p>
+<BaseLayout
+	title="Wheels — A Rails-inspired CFML MVC framework"
+	description="Wheels is an open-source web application framework inspired by Ruby on Rails. Build CFML applications fast, with convention over configuration, an expressive ORM, and a modern CLI."
+>
+	<section class="hero">
+		<div class="hero__inner">
+			<h1 class="hero__title">Build CFML applications, <span>fast</span>.</h1>
+			<p class="hero__subtitle">
+				Wheels is an open-source MVC framework for CFML. Rails-inspired conventions, a powerful ORM,
+				database migrations, and a modern CLI — so you spend less time wiring things up and more
+				time shipping.
+			</p>
+			<div class="hero__cta">
+				<a class="btn btn--primary" href="https://guides.wheels.dev/v3-1-0/">Get started</a>
+				<a class="btn btn--secondary" href="https://github.com/wheels-dev/wheels">View on GitHub</a>
+			</div>
+			<pre
+				class="hero__install"><code>box install wheels-cli
+box wheels generate app MyApp</code></pre>
+		</div>
+	</section>
+
+	<section class="features">
+		<h2 class="features__heading">What you get out of the box</h2>
+		<ul class="features__grid">
+			<li>
+				<h3>MVC, done right</h3>
+				<p>
+					Clear separation between routes, controllers, models, and views. Convention over
+					configuration so you write less boilerplate.
+				</p>
+			</li>
+			<li>
+				<h3>Expressive ORM</h3>
+				<p>
+					Model classes map directly to database tables. Associations, validations, callbacks, and
+					scopes read like plain English.
+				</p>
+			</li>
+			<li>
+				<h3>Database migrations</h3>
+				<p>
+					Version your schema. <code>wheels dbmigrate latest</code> on one side and
+					<code>wheels dbmigrate down</code> on the other — always reversible.
+				</p>
+			</li>
+			<li>
+				<h3>Modern CLI</h3>
+				<p>
+					<code>wheels generate</code>, <code>wheels test</code>, <code>wheels server</code> — a first-class
+					command-line workflow for every step of development.
+				</p>
+			</li>
+			<li>
+				<h3>Multi-engine support</h3>
+				<p>
+					Runs on Lucee 5/6/7, Adobe ColdFusion 2023/2025, and BoxLang. Primary development target
+					is Lucee 7.
+				</p>
+			</li>
+			<li>
+				<h3>20 years strong</h3>
+				<p>
+					Started in 2006. Production-ready since 1.0 in 2009. Still actively developed, now as
+					Wheels 3.x with modern tooling.
+				</p>
+			</li>
+		</ul>
+	</section>
+
+	<section class="resources">
+		<h2 class="resources__heading">Where to go next</h2>
+		<div class="resources__grid">
+			<a class="resource" href="https://guides.wheels.dev/v3-1-0/">
+				<h3>Guides</h3>
+				<p>
+					Step-by-step guides from installation through deployment. v3.1, v3.0, and v2.5 all
+					available.
+				</p>
+				<span class="resource__link">guides.wheels.dev →</span>
+			</a>
+			<a class="resource" href="https://api.wheels.dev/v3-0-0/">
+				<h3>API reference</h3>
+				<p>Every function, parameter, and return type. Searchable across 8 framework versions.</p>
+				<span class="resource__link">api.wheels.dev →</span>
+			</a>
+			<a class="resource" href="https://blog.wheels.dev/">
+				<h3>Blog</h3>
+				<p>Release notes, tutorials, and community news from the Wheels core team.</p>
+				<span class="resource__link">blog.wheels.dev →</span>
+			</a>
+			<a class="resource" href="https://github.com/wheels-dev/wheels">
+				<h3>Source on GitHub</h3>
+				<p>Code, issues, discussions, and contribution guidelines. MIT licensed.</p>
+				<span class="resource__link">github.com/wheels-dev/wheels →</span>
+			</a>
+		</div>
+	</section>
 </BaseLayout>
+
+<style>
+	.hero {
+		padding: 4rem 1.5rem 3rem;
+		text-align: center;
+	}
+	.hero__inner {
+		max-width: 900px;
+		margin: 0 auto;
+	}
+	.hero__title {
+		font-size: clamp(2rem, 5vw, 3.5rem);
+		line-height: 1.1;
+		margin: 0 0 1rem;
+	}
+	.hero__title span {
+		color: var(--color-accent);
+	}
+	.hero__subtitle {
+		font-size: 1.125rem;
+		line-height: 1.6;
+		color: var(--color-muted);
+		max-width: 640px;
+		margin: 0 auto 2rem;
+	}
+	.hero__cta {
+		display: flex;
+		gap: 0.75rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-bottom: 2rem;
+	}
+	.btn {
+		display: inline-block;
+		padding: 0.75rem 1.5rem;
+		border-radius: var(--radius);
+		text-decoration: none;
+		font-weight: 600;
+		font-size: 1rem;
+		transition: transform 0.1s;
+	}
+	.btn:hover {
+		transform: translateY(-1px);
+	}
+	.btn--primary {
+		background: var(--color-accent);
+		color: white;
+	}
+	.btn--secondary {
+		background: transparent;
+		color: var(--color-fg);
+		border: 1px solid var(--color-border);
+	}
+	.hero__install {
+		display: inline-block;
+		text-align: left;
+		background: var(--color-fg);
+		color: var(--color-bg);
+		padding: 1rem 1.5rem;
+		border-radius: var(--radius);
+		font-family: var(--font-mono);
+		font-size: 0.9rem;
+		line-height: 1.6;
+		margin: 0;
+	}
+
+	.features {
+		max-width: var(--max-width);
+		margin: 4rem auto;
+		padding: 0 1.5rem;
+	}
+	.features__heading {
+		font-size: 1.75rem;
+		text-align: center;
+		margin: 0 0 2rem;
+	}
+	.features__grid {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		gap: 1.5rem;
+	}
+	.features__grid li {
+		padding: 1.5rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+	}
+	.features__grid h3 {
+		font-size: 1.1rem;
+		margin: 0 0 0.5rem;
+	}
+	.features__grid p {
+		color: var(--color-muted);
+		line-height: 1.6;
+		margin: 0;
+	}
+	.features__grid code {
+		font-family: var(--font-mono);
+		font-size: 0.875em;
+		padding: 0.1rem 0.35rem;
+		background: var(--color-border);
+		border-radius: 0.25rem;
+	}
+
+	.resources {
+		background: var(--color-border);
+		padding: 4rem 1.5rem;
+		margin-top: 4rem;
+	}
+	.resources__heading {
+		max-width: var(--max-width);
+		margin: 0 auto 2rem;
+		font-size: 1.75rem;
+		text-align: center;
+	}
+	.resources__grid {
+		max-width: var(--max-width);
+		margin: 0 auto;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		gap: 1rem;
+	}
+	.resource {
+		display: block;
+		padding: 1.5rem;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		text-decoration: none;
+		color: inherit;
+		transition: border-color 0.1s;
+	}
+	.resource:hover {
+		border-color: var(--color-accent);
+	}
+	.resource h3 {
+		font-size: 1.1rem;
+		margin: 0 0 0.5rem;
+	}
+	.resource p {
+		color: var(--color-muted);
+		margin: 0 0 0.75rem;
+		line-height: 1.5;
+	}
+	.resource__link {
+		color: var(--color-accent);
+		font-size: 0.875rem;
+		font-weight: 600;
+	}
+</style>
