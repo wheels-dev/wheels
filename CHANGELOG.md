@@ -119,6 +119,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Architecture hardening: XSS helpers consolidated, error hooks added, interface verification (#2097)
 - CSRF cookie encryption key auto-generated when empty (apps should still set their own for stable cross-deploy cookies) (#2054)
 - CI engine testing restructured: 42 jobs reduced to 8 via engine-grouped testing (#1939)
+- `wheels mcp wheels` MCP surface curated — 7 CLI-only commands (`mcp`, `d`, `new`, `console`, `start`, `stop`, `browser`) hidden from MCP `tools/list` via the `mcpHiddenTools()` convention (requires LuCLI 0.3.4+). All remain reachable as CLI subcommands. Tool count drops from 23 to 16 for agent consumers.
 
 ### Deprecated
 
@@ -132,11 +133,13 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Railo compatibility workaround from `$initializeMixins` — Railo is no longer a target (#1987)
 - `server.cfc` file (#1902)
 - Stale monorepo artifacts after repository flatten (#1988)
+- `cli/lucli/services/MCP.cfc` parallel schema registry — never wired into LuCLI's MCP discovery, drifted out of sync with `Module.cfc`. Rich parameter schemas will return via typed parameters directly on Module.cfc functions in a follow-up PR.
 
 ### Fixed
 
 - View lookup after `renderText()` / `renderWith()` no longer breaks subsequent partial rendering (#1991)
 - Scaffolded apps from `wheels new` now boot correctly (#2096)
+- `wheels stats` crash on Lucee 7 — private `sprintf()` helper called `Left(result, 0)` when the format string started with a placeholder. Lucee 7 throws where Lucee 6 returned empty silently. Added a ternary guard per the project's cross-engine compatibility pattern.
 - CockroachDB primary key uses `unique_rowid()` instead of `SERIAL` (#1986)
 - CockroachDB SQL generation fixes and soft-fail removed from test matrix (#1999)
 - CockroachDB `RETURNING` clause identity select (#1993)

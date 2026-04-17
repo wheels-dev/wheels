@@ -95,6 +95,31 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  MCP framework convention — hide CLI-only commands
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Declare public functions to hide from MCP tools/list.
+	 *
+	 * These remain reachable as CLI subcommands. Hidden because they are
+	 * stateful (start/stop), destructive (new scaffolds a whole project),
+	 * interactive (console), meta (mcp), alias (d), or don't translate to
+	 * single-call MCP semantics (browser). Read by LuCLI >= 0.3.4 per the
+	 * mcpHiddenTools() convention.
+	 */
+	public array function mcpHiddenTools() {
+		return [
+			"mcp",      // meta command — prints MCP setup instructions
+			"d",        // alias for destroy
+			"new",      // scaffolds a whole new Wheels project
+			"console",  // interactive CFML REPL — not usable over stdio
+			"start",    // dev server lifecycle (stateful)
+			"stop",     // dev server lifecycle (stateful)
+			"browser"   // multi-step browser testing flow
+		];
+	}
+
+	// ─────────────────────────────────────────────────
 	//  generate — Code generation
 	// ─────────────────────────────────────────────────
 
@@ -3778,7 +3803,9 @@ component extends="modules.BaseModule" {
 			} else {
 				value = repeatString(" ", max(0, width - len(value))) & value;
 			}
-			result = left(result, match.pos[1] - 1) & value & mid(result, match.pos[1] + match.len[1], len(result));
+			// Guard: Left(str, 0) throws on Lucee 7 ("parameter 2 cannot be 0")
+			var prefix = match.pos[1] > 1 ? left(result, match.pos[1] - 1) : "";
+			result = prefix & value & mid(result, match.pos[1] + match.len[1], len(result));
 			argIndex++;
 		}
 		return result;

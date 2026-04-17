@@ -42,6 +42,18 @@ component extends="testbox.system.BaseSpec" {
 			"validate"
 		];
 
+		// Public functions deliberately hidden from MCP tools/list via
+		// mcpHiddenTools(). They remain callable as CLI subcommands.
+		variables.expectedHiddenTools = [
+			"mcp",      // meta command
+			"d",        // alias for destroy
+			"new",      // scaffolds whole project
+			"console",  // interactive REPL
+			"start",    // dev server lifecycle
+			"stop",     // dev server lifecycle
+			"browser"   // multi-step browser flow
+		];
+
 		// Create a temp project directory for tool invocation tests
 		variables.testDir = getTempDirectory() & "wheels_e2e_mcp_" & createUUID();
 		directoryCreate(variables.testDir);
@@ -172,6 +184,21 @@ component extends="testbox.system.BaseSpec" {
 				for (var tool in variables.expectedTools) {
 					expect(arrayFindNoCase(actualPublicFunctions, tool)).toBeGT(0,
 						"Expected tool '#tool#' not found as public function in Module.cfc"
+					);
+				}
+			});
+
+			it("declares mcpHiddenTools() to curate the MCP tool surface", function() {
+				// The function must exist as a public function returning an array
+				expect(variables.moduleSource contains "public array function mcpHiddenTools").toBeTrue(
+					"Module.cfc must declare mcpHiddenTools() to hide CLI-only commands from MCP tools/list"
+				);
+
+				// And it must name every tool we expect to hide
+				for (var hidden in variables.expectedHiddenTools) {
+					var pattern = '"' & hidden & '"';
+					expect(variables.moduleSource contains pattern).toBeTrue(
+						"mcpHiddenTools() must include '" & hidden & "' — check the returned array"
 					);
 				}
 			});
