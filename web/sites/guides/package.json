@@ -1,22 +1,22 @@
 {
-  "name": "@wheels-dev/site-guides",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "astro dev --port 4323",
-    "build": "astro build",
-    "preview": "astro preview",
-    "check": "astro check"
-  },
-  "dependencies": {
-    "astro": "^5.1.0",
-    "@astrojs/starlight": "^0.34.0",
-    "@wheels-dev/ui": "workspace:*",
-    "sharp": "^0.33.5"
-  },
-  "devDependencies": {
-    "@astrojs/check": "^0.9.4",
-    "typescript": "^5.7.2"
-  }
+	"name": "@wheels-dev/site-guides",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "astro dev --port 4323",
+		"build": "astro build",
+		"preview": "astro preview",
+		"check": "astro check"
+	},
+	"dependencies": {
+		"astro": "^5.1.0",
+		"@astrojs/starlight": "^0.34.0",
+		"@wheels-dev/ui": "workspace:*",
+		"sharp": "^0.33.5"
+	},
+	"devDependencies": {
+		"@astrojs/check": "^0.9.4",
+		"typescript": "^5.7.2"
+	}
 }

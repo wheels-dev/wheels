@@ -2,12 +2,12 @@
 
 Monorepo for the four static sites served under the `wheels.dev` apex and subdomains:
 
-| Site       | Path                   | Domain                |
-|------------|------------------------|-----------------------|
-| Landing    | `sites/landing/`       | `wheels.dev`          |
-| Guides     | `sites/guides/`        | `guides.wheels.dev`   |
-| API        | `sites/api/`           | `api.wheels.dev`      |
-| Blog       | `sites/blog/`          | `blog.wheels.dev`     |
+| Site    | Path             | Domain              |
+| ------- | ---------------- | ------------------- |
+| Landing | `sites/landing/` | `wheels.dev`        |
+| Guides  | `sites/guides/`  | `guides.wheels.dev` |
+| API     | `sites/api/`     | `api.wheels.dev`    |
+| Blog    | `sites/blog/`    | `blog.wheels.dev`   |
 
 Shared UI lives in `packages/ui/` (imported as `@wheels-dev/ui`).
 
