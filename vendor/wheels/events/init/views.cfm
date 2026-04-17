@@ -27,6 +27,7 @@
 		application.$wheels.viteBuildPath = "build";
 		application.$wheels.viteManifestFile = ".vite/manifest.json";
 		application.$wheels.viteDevMode = (application.$wheels.environment == "development");
+		application.$wheels.viteStrictManifest = true;
 
 		// Test framework settings.
 		application.$wheels.validateTestPackageMetaData = true;

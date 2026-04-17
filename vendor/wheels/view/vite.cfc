@@ -15,13 +15,7 @@ component {
 		}
 		local.manifest = $viteManifest();
 		if (!StructKeyExists(local.manifest, arguments.entrypoint)) {
-			if ($get("showErrorInformation")) {
-				Throw(
-					type="Wheels.ViteAssetNotFound",
-					message="Vite entrypoint '#arguments.entrypoint#' not found in manifest.",
-					extendedInfo="Available entrypoints: #StructKeyList(local.manifest)#. Run your Vite build to generate the manifest."
-				);
-			}
+			$viteMissingEntry(arguments.entrypoint, local.manifest);
 			return arguments.entrypoint;
 		}
 		return $get("webPath") & $get("viteBuildPath") & "/" & local.manifest[arguments.entrypoint].file;
@@ -46,32 +40,27 @@ component {
 			local.rv = '<script type="module" src="#local.devUrl#/@vite/client"></script>' & Chr(10);
 			local.rv &= '<script type="module" src="#$viteDevUrl(arguments.entrypoint)#"></script>' & Chr(10);
 		} else {
-			local.manifest = $viteManifest();
-			if (!StructKeyExists(local.manifest, arguments.entrypoint)) {
-				if ($get("showErrorInformation")) {
-					Throw(
-						type="Wheels.ViteAssetNotFound",
-						message="Vite entrypoint '#arguments.entrypoint#' not found in manifest.",
-						extendedInfo="Available entrypoints: #StructKeyList(local.manifest)#. Run your Vite build to generate the manifest."
-					);
-				}
+			local.resolved = $viteResolveAssets(arguments.entrypoint);
+			if (!ArrayLen(local.resolved.scripts)) {
 				return "";
 			}
-			local.entry = local.manifest[arguments.entrypoint];
 			local.buildPath = $get("webPath") & $get("viteBuildPath");
 
-			// Emit <link> tags for associated CSS files
-			if (StructKeyExists(local.entry, "css") && IsArray(local.entry.css)) {
-				for (local.cssFile in local.entry.css) {
-					local.rv &= '<link rel="stylesheet" href="#local.buildPath#/#local.cssFile#" />' & Chr(10);
-				}
+			for (local.cssFile in local.resolved.styles) {
+				local.rv &= '<link rel="stylesheet" href="#local.buildPath#/#local.cssFile#" />' & Chr(10);
 			}
 
-			local.rv &= '<script type="module" src="#local.buildPath#/#local.entry.file#"></script>' & Chr(10);
+			local.rv &= '<script type="module" src="#local.buildPath#/#local.resolved.scripts[1]#"></script>' & Chr(10);
+
+			// Modulepreload for transitive import chunks — always emitted into <head>
+			// regardless of the `head` arg, since preloads placed in <body> are useless.
+			for (local.chunkFile in local.resolved.preloads) {
+				$viteHtmlHead(text='<link rel="modulepreload" href="#local.buildPath#/#local.chunkFile#" />' & Chr(10));
+			}
 		}
 
 		if (arguments.head) {
-			$htmlhead(text=local.rv);
+			$viteHtmlHead(text=local.rv);
 			return "";
 		}
 		return local.rv;
@@ -93,24 +82,56 @@ component {
 			return "";
 		}
 
-		local.manifest = $viteManifest();
-		if (!StructKeyExists(local.manifest, arguments.entrypoint)) {
-			if ($get("showErrorInformation")) {
-				Throw(
-					type="Wheels.ViteAssetNotFound",
-					message="Vite entrypoint '#arguments.entrypoint#' not found in manifest.",
-					extendedInfo="Available entrypoints: #StructKeyList(local.manifest)#. Run your Vite build to generate the manifest."
-				);
-			}
+		local.resolved = $viteResolveAssets(arguments.entrypoint);
+		if (!ArrayLen(local.resolved.scripts)) {
+			return "";
+		}
+		local.buildPath = $get("webPath") & $get("viteBuildPath");
+		local.rv = '<link rel="stylesheet" href="#local.buildPath#/#local.resolved.scripts[1]#" />' & Chr(10);
+		for (local.cssFile in local.resolved.styles) {
+			local.rv &= '<link rel="stylesheet" href="#local.buildPath#/#local.cssFile#" />' & Chr(10);
+		}
+
+		if (arguments.head) {
+			$viteHtmlHead(text=local.rv);
+			return "";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Returns `<link rel="modulepreload">` tags for a Vite entrypoint and its transitive
+	 * chunk imports. Useful for Turbo Drive hover-preload patterns or for explicitly warming
+	 * assets a subsequent navigation will need.
+	 *
+	 * In development mode, returns an empty string — Vite handles module resolution
+	 * dynamically and modulepreload is unnecessary.
+	 *
+	 * [section: View Helpers]
+	 * [category: Asset Functions]
+	 *
+	 * @entrypoint The source entrypoint path (e.g. "src/main.js").
+	 * @head Set to `false` to return the markup for inline placement; default `true`
+	 *       emits via `$viteHtmlHead()` so tags land in `<head>`.
+	 */
+	public string function vitePreloadTag(required string entrypoint, boolean head = true) {
+		if ($viteDevMode()) {
 			return "";
 		}
 
-		local.entry = local.manifest[arguments.entrypoint];
+		local.resolved = $viteResolveAssets(arguments.entrypoint);
+		if (!ArrayLen(local.resolved.scripts)) {
+			return "";
+		}
+
 		local.buildPath = $get("webPath") & $get("viteBuildPath");
-		local.rv = '<link rel="stylesheet" href="#local.buildPath#/#local.entry.file#" />' & Chr(10);
+		local.rv = '<link rel="modulepreload" href="#local.buildPath#/#local.resolved.scripts[1]#" />' & Chr(10);
+		for (local.chunkFile in local.resolved.preloads) {
+			local.rv &= '<link rel="modulepreload" href="#local.buildPath#/#local.chunkFile#" />' & Chr(10);
+		}
 
 		if (arguments.head) {
-			$htmlhead(text=local.rv);
+			$viteHtmlHead(text=local.rv);
 			return "";
 		}
 		return local.rv;
@@ -165,6 +186,120 @@ component {
 	 */
 	public boolean function $viteDevMode() {
 		return $get("viteDevMode");
+	}
+
+	/**
+	 * Walks the Vite manifest for a single entrypoint and returns its resolved
+	 * script, styles, and modulepreload chunks. Follows transitive imports
+	 * depth-first, dedupes visited chunks, and terminates on cycles.
+	 *
+	 * Returns a struct with three array keys:
+	 *   - scripts:  [entry.file]            (the main JS file)
+	 *   - styles:   [entry.css..., chunk.css...]  (entry CSS + all transitive chunk CSS)
+	 *   - preloads: [chunk.file, ...]        (each transitive import chunk)
+	 *
+	 * Behavior on missing entry is delegated to `$viteMissingEntry` (strict-mode
+	 * gate). Returns an empty resolved set in non-strict mode.
+	 */
+	public struct function $viteResolveAssets(required string entrypoint) {
+		local.manifest = $viteManifest();
+		local.rv = {scripts: [], styles: [], preloads: []};
+
+		if (!StructKeyExists(local.manifest, arguments.entrypoint)) {
+			$viteMissingEntry(arguments.entrypoint, local.manifest);
+			return local.rv;
+		}
+
+		local.entry = local.manifest[arguments.entrypoint];
+		ArrayAppend(local.rv.scripts, local.entry.file);
+		if (StructKeyExists(local.entry, "css") && IsArray(local.entry.css)) {
+			for (local.cssFile in local.entry.css) {
+				ArrayAppend(local.rv.styles, local.cssFile);
+			}
+		}
+
+		local.visited = {};
+		local.visited[arguments.entrypoint] = true;
+		if (StructKeyExists(local.entry, "imports") && IsArray(local.entry.imports)) {
+			$viteWalkImports(
+				importKeys=local.entry.imports,
+				manifest=local.manifest,
+				visited=local.visited,
+				preloads=local.rv.preloads,
+				styles=local.rv.styles
+			);
+		}
+
+		return local.rv;
+	}
+
+	/**
+	 * Depth-first walks a list of chunk import keys, mutating the passed-in
+	 * preloads and styles arrays as it visits each chunk. The visited struct
+	 * prevents cycles and dedupes diamond dependencies.
+	 */
+	public void function $viteWalkImports(
+		required array importKeys,
+		required struct manifest,
+		required struct visited,
+		required array preloads,
+		required array styles
+	) {
+		for (local.key in arguments.importKeys) {
+			if (StructKeyExists(arguments.visited, local.key)) {
+				continue;
+			}
+			arguments.visited[local.key] = true;
+			if (!StructKeyExists(arguments.manifest, local.key)) {
+				continue;
+			}
+			local.chunk = arguments.manifest[local.key];
+			ArrayAppend(arguments.preloads, local.chunk.file);
+			if (StructKeyExists(local.chunk, "css") && IsArray(local.chunk.css)) {
+				for (local.cssFile in local.chunk.css) {
+					ArrayAppend(arguments.styles, local.cssFile);
+				}
+			}
+			if (StructKeyExists(local.chunk, "imports") && IsArray(local.chunk.imports)) {
+				$viteWalkImports(
+					importKeys=local.chunk.imports,
+					manifest=arguments.manifest,
+					visited=arguments.visited,
+					preloads=arguments.preloads,
+					styles=arguments.styles
+				);
+			}
+		}
+	}
+
+	/**
+	 * Thin wrapper around `$htmlhead` that also records the text into a
+	 * request-scoped capture array when one is present. Tests initialize
+	 * `request.$viteHeadCapture = []` to inspect what was emitted to <head>;
+	 * production code paths never set the capture and behavior is unchanged.
+	 */
+	public void function $viteHtmlHead(required string text) {
+		if (StructKeyExists(request, "$viteHeadCapture") && IsArray(request.$viteHeadCapture)) {
+			ArrayAppend(request.$viteHeadCapture, arguments.text);
+		}
+		$htmlhead(text=arguments.text);
+	}
+
+	/**
+	 * Handles a missing manifest entry. Throws `Wheels.ViteAssetNotFound` when
+	 * strict-manifest mode is enabled (default) or when `showErrorInformation`
+	 * is true. Otherwise returns silently, preserving 3.x behavior for apps that
+	 * opt out via `set(viteStrictManifest=false)`.
+	 */
+	public void function $viteMissingEntry(required string entrypoint, struct manifest = {}) {
+		local.strict = $get("viteStrictManifest");
+		if (local.strict || $get("showErrorInformation")) {
+			Throw(
+				type="Wheels.ViteAssetNotFound",
+				message="Vite entrypoint '#arguments.entrypoint#' not found in manifest.",
+				extendedInfo="Available entrypoints: #StructKeyList(arguments.manifest)#. Run your Vite build to generate the manifest, or set(viteStrictManifest=false) to silence this error."
+			);
+		}
 	}
 
 	/**

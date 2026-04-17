@@ -31,6 +31,7 @@ If every row in this table looks fine for your app, your upgrade is probably str
 | 8 | Test base `wheels.Test` → `wheels.WheelsTest` | Required for new tests only; old base still works for existing tests |
 | 9 | `tests/specs/functions/` → `tests/specs/functional/` (framework) | Apps that mirrored the old layout can rename for consistency |
 | 10 | `application.wirebox` → `application.wheelsdi` | Prefer the `service()` global helper instead of direct scope access |
+| 11 | Vite `viteStrictManifest=true` default — missing manifest entries throw | Run `vite build`, or `set(viteStrictManifest=false)` |
 
 ## Breaking changes — detailed
 
@@ -364,6 +365,25 @@ var emailer = application.wheelsdi.getInstance("EmailService");
 **Opt-out**
 
 None — this is a straight rename. Apps rarely touch this directly in practice; the `service()` helper (available since 4.0) is the idiomatic replacement.
+
+### 11. Vite asset pipeline — strict manifest default
+
+**What changed.** Missing Vite manifest entries now throw `Wheels.ViteAssetNotFound` in production, controlled by the new `viteStrictManifest` setting (default `true`). In 3.x, a missing entry silently returned the raw entrypoint path or an empty string when `showErrorInformation=false`. This turned a deploy-time misconfiguration into a runtime 404 mystery — links to `/build/src/main.js` loaded as 404s with no useful error.
+
+**How to detect.** If your production deploy has previously tolerated a missing Vite entry (because `vite build` wasn't run, or the manifest file moved), the error surfaces immediately on the first request that calls `viteAsset()`, `viteScriptTag()`, `viteStyleTag()`, or `vitePreloadTag()`.
+
+**How to fix.** Run your Vite build to (re)generate `manifest.json` at the configured `viteBuildPath`, or correct the `viteManifestFile` setting. This is the recommended fix — the strict default is deliberately loud so deploys surface the bug instead of 404-ing end users.
+
+**Opt out.** Apps that genuinely want the 3.x silent behavior can:
+
+```cfm
+// config/settings.cfm
+set(viteStrictManifest=false);
+```
+
+With strict off, missing entries throw only when `showErrorInformation=true` (development), matching 3.x behavior.
+
+**Bonus.** 4.0 also adds transitive-imports resolution to `viteScriptTag()` and `viteStyleTag()` (automatic `<link rel="modulepreload">` and chunk-CSS injection) and a new `vitePreloadTag()` view helper for Turbo Drive hover-preload patterns. No action required — these are additive and on by default.
 
 ### Security-hardening defaults — quick reference
 
