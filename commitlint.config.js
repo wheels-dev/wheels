@@ -50,6 +50,9 @@ export default {
     // Type must not be empty
     'type-empty': [2, 'never'],
     // Max header length
-    'header-max-length': [2, 'always', 100]
+    'header-max-length': [2, 'always', 100],
+    // Allow sentence-case, pascal-case, start-case subjects (for proper nouns like
+    // "Giscus", "Buttondown", "CockroachDB"). Only reject ALL-CAPS ("SHOUTING").
+    'subject-case': [2, 'never', ['upper-case']]
   }
 };
