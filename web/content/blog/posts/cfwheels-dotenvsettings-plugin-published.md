@@ -16,6 +16,7 @@ excerpt: >-
 coverImage: null
 legacyId: '119'
 ---
+
 A new plugin was published to provide support for .env settings files in a production environment. This plugin is based on Eric Peterson's CommandBox module and allows the use of .env or similarly named files to store your application secrets so they can be kept out of source control.
 
 ## LICENSE
@@ -24,9 +25,9 @@ Apache License, Version 2.0.
 
 ## SYSTEM REQUIREMENTS
 
--   Lucee 5+
--   ColdFusion 9+
--   CFWheels 2+
+- Lucee 5+
+- ColdFusion 9+
+- CFWheels 2+
 
 # Instructions
 

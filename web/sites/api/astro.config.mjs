@@ -9,7 +9,12 @@ export default defineConfig({
       description: 'Function reference for the Wheels CFML MVC framework.',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/wheels-dev/wheels' }],
       sidebar: [
-        { label: 'Coming soon', link: '/' },
+        { label: 'Overview', link: '/' },
+        {
+          label: 'v3.0.0 (current)',
+          autogenerate: { directory: 'v3-0-0' },
+          collapsed: false,
+        },
       ],
     }),
   ],

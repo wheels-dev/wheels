@@ -14,6 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '111'
 ---
+
 Have you looked at the CFWheels Example App lately? If you're wondering, wait, there is an example app?, you're not alone. Tom has done a great job putting the CFWheels Example App together but historically getting it up and running was somewhat difficult. It requires a database to be setup, a datasource to be defined, and migrations to be run.
 
 With the help of our new templating structure and some improvements to the CFWheels-CLI commands, getting the Example application is a piece of cake. All you need to do is issue three commands inside a CommandBox shell and the app magically opens up in your browser.

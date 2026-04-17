@@ -14,6 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '123'
 ---
+
 A few weeks ago I published a [Todo app](/blog/todomvc-implementation-with-cfwheels-and-htmx/) using CFWheels on the backend and HTMX to provide the interactivity on the front end to make the app look and feel like a full blown SPA app. As I was developing that app I ran into a few things that I wish we had to make development with HTMX a little easier. But I'm getting ahead of myself.
 
 ### What is HTMX
@@ -106,8 +107,6 @@ hx-confirm="Are you sure?">
 Delete
 
 </button>
-
-  
 
 // imagine this code in your action
 

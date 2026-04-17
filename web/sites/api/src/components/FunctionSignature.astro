@@ -1,0 +1,62 @@
+---
+interface Param {
+	name: string;
+	type?: string;
+	required?: boolean;
+	default?: string;
+}
+interface Props {
+	name: string;
+	returntype?: string;
+	availableIn?: string[];
+	parameters?: Param[];
+}
+const { name, returntype = 'any', availableIn = [], parameters = [] } = Astro.props;
+---
+
+<pre
+	class="sig"><code>{name}({parameters.map((p, i) => (
+  <>{i > 0 ? ', ' : ''}<span class:list={['param', { 'is-required': p.required }]}>
+    {p.name}{p.type ? `: ${p.type}` : ''}
+  </span></>
+))}) → {returntype}</code></pre>
+
+{
+	availableIn.length > 0 && (
+		<p class="availability">
+			<strong>Available in:</strong>
+			{availableIn.map((x) => (
+				<code>{x}</code>
+			))}
+		</p>
+	)
+}
+
+<style>
+	.sig {
+		background: var(--sl-color-gray-6, #222);
+		color: var(--sl-color-white, #fff);
+		padding: 0.75rem 1rem;
+		border-radius: 0.375rem;
+		overflow-x: auto;
+		font-family: var(--sl-font-mono, monospace);
+		font-size: 0.9rem;
+		margin: 1rem 0;
+	}
+	.sig .param {
+		color: var(--sl-color-orange, #f9a030);
+	}
+	.sig .param.is-required {
+		font-weight: 700;
+	}
+	.availability {
+		font-size: 0.875rem;
+		margin: 0.5rem 0 1rem;
+	}
+	.availability code {
+		margin-left: 0.25rem;
+		padding: 0.1rem 0.35rem;
+		background: var(--sl-color-gray-6, #2a2a2a);
+		border-radius: 0.25rem;
+	}
+</style>

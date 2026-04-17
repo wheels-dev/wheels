@@ -5,5 +5,9 @@
 **/pnpm-lock.yaml
 **/pagefind/
 
+# Generated API reference markdown (produced by web/scripts/generate-api-docs.mjs).
+# Formatting these would mean a prettier pass after every regen for no benefit.
+sites/api/src/content/docs/v*/
+
 # Lockfiles and binaries
 *.svg

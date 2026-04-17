@@ -14,6 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '11'
 ---
+
 Today, I released a chapter in the [Documentation](http://www.cfwheels.com/docs) called [Using Routes](http://www.cfwheels.com/docs/chapter/using-routes). Routes are a pretty cool feature of Wheels because they let you step outside of the URL convention that can sometimes feel like shackles. As I outline in the new chapter, you can create a URL like this: http://www.domain.com /user/johndoe With this line of code in your config/routes.cfm file:
 
 <cfset addRoute(name="userProfile", pattern="user/\[username\]", controller="user", action="profile")>

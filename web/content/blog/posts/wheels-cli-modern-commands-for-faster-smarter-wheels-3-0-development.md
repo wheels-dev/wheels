@@ -19,6 +19,7 @@ excerpt: >-
 coverImage: null
 legacyId: '1151033207156506627'
 ---
+
 # Introduction
 
 In our previous article, we explored the classic Wheels CLI commands that have supported Wheels developers for years and continue to work in Wheels 3.x. Those commands helped developers scaffold faster, manage resources, and speed up everyday development.
@@ -32,7 +33,6 @@ Instead of being just a scaffolding helper, the Wheels CLI is evolving into a co
 This article is not a deep dive into every command yet. Think of it as a preview of what’s coming and how it will change the way you work with Wheels.
 
 In upcoming articles, we’ll cover each area in detail — step by step.
-
 
 # Why This Matters for Modern Development
 
@@ -58,7 +58,6 @@ The goal is simple:
 
 less manual work, fewer surprises, and more confidence in every stage of development.
 
-
 # What’s Changing in Wheels CLI 3.x
 
 The new CLI commands are being designed around key areas like:
@@ -76,7 +75,6 @@ The new CLI commands are being designed around key areas like:
 - Code analysis and performance insights
 
 Rather than learning everything at once, we’ll explore these in focused articles. Each module deserves its own spotlight and practical examples.
-
 
 # What’s Next
 
@@ -101,7 +99,6 @@ In the next articles, we’ll go module by module and explore:
 - Advanced plugin tooling
 
 Each guide will include real-world usage, tips, and scenarios where these commands shine.
-
 
 # Closing Note
 

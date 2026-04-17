@@ -1,0 +1,33 @@
+---
+title: Model Object
+description: "28 Model Object functions in Wheels 3.0.0."
+---
+
+- [`addError()`](/v3-0-0/model-object/adderror/) — Adds a custom error to a model instance. This is useful when built-in validations don’t fully cover your business rules,
+- [`addErrorToBase()`](/v3-0-0/model-object/adderrortobase/) — Adds an error directly on the model object itself, not tied to a specific property. This is useful when the error applie
+- [`allChanges()`](/v3-0-0/model-object/allchanges/) — Returns a struct containing all unsaved changes made to an object since it was last loaded or saved. Each entry in the s
+- [`allErrors()`](/v3-0-0/model-object/allerrors/) — Returns an array of all the errors on the object.
+- [`changedFrom()`](/v3-0-0/model-object/changedfrom/) — Returns the previous value of a property that has been modified on a model object. Wheels tracks changes to object prope
+- [`changedProperties()`](/v3-0-0/model-object/changedproperties/) — Returns a list of property names that have been modified on a model object but not yet saved to the database. This is us
+- [`clearChangeInformation()`](/v3-0-0/model-object/clearchangeinformation/) — Clears all internal tracking information that Wheels maintains about an object’s properties. This does not undo changes 
+- [`clearErrors()`](/v3-0-0/model-object/clearerrors/) — Clears all validation or manual errors stored on a model object. You can clear all errors, or target specific errors eit
+- [`compareTo()`](/v3-0-0/model-object/compareto/) — Compares the current model object with another model object to determine if they are effectively the same. This is usefu
+- [`delete()`](/v3-0-0/model-object/delete/) — Deletes the object, which means the row is deleted from the database (unless prevented by a <code>beforeDelete</code> ca
+- [`errorCount()`](/v3-0-0/model-object/errorcount/) — Returns the number of errors this object has associated with it.
+- [`errorsOn()`](/v3-0-0/model-object/errorson/) — errorsOn() returns an array of all errors associated with a specific property of a model object. You can also filter by 
+- [`errorsOnBase()`](/v3-0-0/model-object/errorsonbase/) — errorsOnBase() returns an array of all errors associated with the object as a whole, not tied to any specific property. 
+- [`hasChanged()`](/v3-0-0/model-object/haschanged/) — Returns <code>true</code> if the specified property (or any if none was passed in) has been changed but not yet saved to
+- [`hasErrors()`](/v3-0-0/model-object/haserrors/) — Checks whether a model object has any validation or other errors. It returns true if the object contains errors, or if a
+- [`hasProperty()`](/v3-0-0/model-object/hasproperty/) — Checks if a given property exists on a model object. It’s useful for safely validating whether a field is defined before
+- [`isNew()`](/v3-0-0/model-object/isnew/) — Returns <code>true</code> if this object hasn't been saved yet (in other words, no matching record exists in the databas
+- [`isPersisted()`](/v3-0-0/model-object/ispersisted/) — Returns <code>true</code> if this object has been persisted to the database or was loaded from the database via a finder
+- [`key()`](/v3-0-0/model-object/key/) — Returns the value of the primary key for the object.
+- [`properties()`](/v3-0-0/model-object/properties/) — Returns a structure containing all the properties of a model object, where the keys are the property (column) names and 
+- [`propertyIsBlank()`](/v3-0-0/model-object/propertyisblank/) — Returns <code>true</code> if the specified property doesn't exist on the model or is an empty string.
+- [`propertyIsPresent()`](/v3-0-0/model-object/propertyispresent/) — Returns <code>true</code> if the specified property exists on the model and is not a blank string. This is the inverse o
+- [`reload()`](/v3-0-0/model-object/reload/) — Refreshes the property values of a model object from the database. This is useful when an object’s values might have cha
+- [`setProperties()`](/v3-0-0/model-object/setproperties/) — Allows you to set multiple properties of a model object at once. It is useful when you want to update a model with a str
+- [`toggle()`](/v3-0-0/model-object/toggle/) — Assigns to the property specified the opposite of the property's current boolean value.
+- [`update()`](/v3-0-0/model-object/update/) — Updates an existing model object with the supplied properties and saves the changes to the database. It returns true if 
+- [`updateProperty()`](/v3-0-0/model-object/updateproperty/) — Updates a single property on a model object and saves the record immediately without running the normal validation proce
+- [`valid()`](/v3-0-0/model-object/valid/) — Runs the validation on the object and returns <code>true</code> if it passes it.

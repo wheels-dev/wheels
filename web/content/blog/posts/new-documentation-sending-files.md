@@ -15,4 +15,5 @@ excerpt: >-
 coverImage: null
 legacyId: '9'
 ---
+
 Per whipped up a quick chapter on [Sending Files](http://www.cfwheels.com/docs/chapter/sending-files) with Wheels's sendFile() function. You may feel that sending non-HTML files to the browser is a trivial task, but this functionality makes securing those files dead simple. Thanks, Per!
