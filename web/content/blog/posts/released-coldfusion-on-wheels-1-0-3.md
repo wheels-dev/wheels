@@ -15,4 +15,5 @@ excerpt: >-
 coverImage: null
 legacyId: '41'
 ---
+
 Another maintenance release has been put up, including 13 bug fixes and improvements. [Download ColdFusion on Wheels 1.0.3](https://cfwheels.org/download) to add more stability to your code base. As always, if you're already using Wheels 1.0.x, then the upgrade path is simple. All you need to do is replace the wheels folder and reload your application. Testing before pushing live probably isn't a bad idea either. ;) Thanks to the community for continuing to work together to build the best framework for CFML, period.

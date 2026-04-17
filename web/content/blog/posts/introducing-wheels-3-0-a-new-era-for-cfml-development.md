@@ -15,27 +15,28 @@ excerpt: >-
 coverImage: null
 legacyId: '134'
 ---
+
 Today, we're thrilled to announce the release of Wheels 3.0 — the most significant update in the framework's history. This release marks not just a version bump, but a complete evolution of the project, including a rebrand from CFWheels to simply Wheels.
 
 # A Fresh Identity
 
 With version 3.0, we've embraced a new identity:
 
-  * New Name: CFWheels → Wheels
-  * New Domain: https://wheels.dev (from cfwheels.org)
-  * New Home: https://github.com/wheels-dev/wheels
+- New Name: CFWheels → Wheels
+- New Domain: https://wheels.dev (from cfwheels.org)
+- New Home: https://github.com/wheels-dev/wheels
 
 This rebrand reflects our commitment to modernization while honoring our Rails-inspired heritage. Wheels continues to be the convention-over-configuration MVC framework that makes CFML development a joy.
 
 **What's New in 3.0**
 
-*Modernized Architecture*
+_Modernized Architecture_
 
 The project structure has been completely redesigned for cleaner separation of concerns:
 
-  * Core Outside App Root: Wheels core now lives in /vendor/wheels, keeping your application code cleanly separated from framework internals
-  * Updated Mappings: Simplified Application.cfm configuration
-  * Modular Design: Better support for modern dependency management
+- Core Outside App Root: Wheels core now lives in /vendor/wheels, keeping your application code cleanly separated from framework internals
+- Updated Mappings: Simplified Application.cfm configuration
+- Modular Design: Better support for modern dependency management
 
 # Powerful New CLI
 
@@ -61,9 +62,9 @@ wheels g scaffold Post properties="title:string,content:text,published:boolean"
 **Expanded Database Support**
 Wheels 3.0 runs on more databases than ever:
 
-  * Oracle: Full support in CLI and ORM
-  * SQLite: New adapter with automatic datetime handling
-  * MySQL, PostgreSQL, SQL Server, H2: Updated to latest versions
+- Oracle: Full support in CLI and ORM
+- SQLite: New adapter with automatic datetime handling
+- MySQL, PostgreSQL, SQL Server, H2: Updated to latest versions
 
 **BoxLang Compatibility**
 
@@ -71,26 +72,26 @@ Looking to the future? Wheels 3.0 is compatible with https://boxlang.io, the nex
 
 **Enhanced Model Layer**
 
-  * ignoreColumns(): New method to exclude specific columns from ORM mapping
-  * Race Condition Handling: Improved model initialization with automatic recovery
-  * Performance Boost: Significant findAll() optimizations
-  * Native Query Support: Better returnType handling
+- ignoreColumns(): New method to exclude specific columns from ORM mapping
+- Race Condition Handling: Improved model initialization with automatic recovery
+- Performance Boost: Significant findAll() optimizations
+- Native Query Support: Better returnType handling
 
 **Modern Testing Infrastructure**
 
-  * Rewritten TestUI: Beautiful Vue-based test runner interface
-  * TestBox 6.0: Updated to the latest TestBox with full BDD support
-  * Expanded Matrix: Tested on Lucee 5/6/7, Adobe ColdFusion 2021/2023/2025, and BoxLang
+- Rewritten TestUI: Beautiful Vue-based test runner interface
+- TestBox 6.0: Updated to the latest TestBox with full BDD support
+- Expanded Matrix: Tested on Lucee 5/6/7, Adobe ColdFusion 2021/2023/2025, and BoxLang
 
 **Developer Experience**
 
-  * VSCode Extension: New extension with IntelliSense, snippets, and API documentation
-  * macOS Installer: One-click installation for Mac developers
-  * MCP Integration: AI-assisted development with Model Context Protocol support
+- VSCode Extension: New extension with IntelliSense, snippets, and API documentation
+- macOS Installer: One-click installation for Mac developers
+- MCP Integration: AI-assisted development with Model Context Protocol support
 
 # Getting Started
 
-*New Projects*
+_New Projects_
 
 **Install the CLI**
 box install wheels-cli
@@ -114,19 +115,19 @@ See our https://wheels.dev/3.0.0/guides/introduction/upgrading for detailed inst
 
 Wheels 3.0 represents months of work from our incredible community. Special thanks to:
 
-* Zain Ul Abideen for the tireless CLI development, BoxLang compatibility, Oracle support, and countless improvements
-* Peter Amiri for architecture redesign, release infrastructure, and MCP integration
-* Adam Chapman for the ignoreColumns() feature and model enhancements
-* MvdO79 for documentation improvements and beginner tutorials
-* All our contributors, testers, and community members
+- Zain Ul Abideen for the tireless CLI development, BoxLang compatibility, Oracle support, and countless improvements
+- Peter Amiri for architecture redesign, release infrastructure, and MCP integration
+- Adam Chapman for the ignoreColumns() feature and model enhancements
+- MvdO79 for documentation improvements and beginner tutorials
+- All our contributors, testers, and community members
 
 Links
 
-* Website: https://wheels.dev
-* GitHub: https://github.com/wheels-dev/wheels
-* Documentation: https://wheels.dev/guides
-* Release Notes: https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md
-* ForgeBox: box install wheels
+- Website: https://wheels.dev
+- GitHub: https://github.com/wheels-dev/wheels
+- Documentation: https://wheels.dev/guides
+- Release Notes: https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md
+- ForgeBox: box install wheels
 
 What's Next
 
@@ -134,4 +135,4 @@ We're already planning Wheels 3.1 with more features and improvements. Join our 
 
 Happy coding!
 
-*The Wheels Team*
+_The Wheels Team_

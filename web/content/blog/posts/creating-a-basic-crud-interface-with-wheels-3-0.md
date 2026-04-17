@@ -16,13 +16,12 @@ excerpt: Accompanying Video
 coverImage: null
 legacyId: '131'
 ---
+
 ## Accompanying Video
 
 This blog post has an accompanying video posted to [YouTube](https://youtu.be/paUjKmYZnrU).
 
-  
-
-##   
+##
 
 Welcome to the next installment in our Wheels 3.0 tutorial series! Today, we’ll guide you through creating a basic CRUD (Create, Read, Update, Delete) interface using the Wheels CLI. If you're just joining us and don't have the Wheels CLI installed yet, be sure to catch up with our previous video detailing the setup of your development environment.
 

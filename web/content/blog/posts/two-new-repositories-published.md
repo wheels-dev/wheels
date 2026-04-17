@@ -18,6 +18,7 @@ excerpt: >-
 coverImage: null
 legacyId: '120'
 ---
+
 We have published two new repositories named `[cfwheels/cfwheels-www](https://github.com/cfwheels/cfwheels-www)` and `[cfwheels/cfwheels-api](https://github.com/cfwheels/cfwheels-api)` which handle the **_CFWheels.org_** landing page site and the **_api.cfwheels.org_** API documentation site respectively.
 
 The `cfwheels-api` repository is a good example of how you can structure your own projects and keep sensitive information and the core framework files out of your project's source control repository. The project used a `.gitignore` file that keeps these files out of the repo. It also uses a `box.json` file to specify some dependencies to pull the required files back in.

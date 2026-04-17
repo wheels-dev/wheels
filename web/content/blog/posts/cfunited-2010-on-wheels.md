@@ -15,6 +15,7 @@ excerpt: >-
 coverImage: null
 legacyId: '39'
 ---
+
 As I [posted earlier](https://cfwheels.org/blog/tshirt-hosting-giveaways-cfunited/), ColdFusion on Wheels had some community presence at [CFUnited 2010](http://cfunited.com/2010/), the final year for the conference. There were a lot of great moments during the conference, a few of which I'll highlight in this post.
 
 ## Wheels Highlighted in Adobe Keynote
@@ -31,7 +32,7 @@ One of my favorite parts of the event was running into current Wheels users. I w
 
 ## Presentations
 
-Thursday was the big day for ColdFusion on Wheels. Our birds of a feather session was well-attended, with both current Wheels users and new people interested in what the framework could do for them. Thanks Chaz and Mike for helping host it. Embedded below is the rehearsed version of the presentation that I gave about the Wheels ORM. It's a high level demo of Wheels and what it's like to work with the framework.  Mike Henke also presented about Wheels and Convention over Configuration. You can download [Mike's presentation and code](http://henke.ws/post.cfm/cfunited-coldfusion-on-wheels-presentation-wrapup) on his website.
+Thursday was the big day for ColdFusion on Wheels. Our birds of a feather session was well-attended, with both current Wheels users and new people interested in what the framework could do for them. Thanks Chaz and Mike for helping host it. Embedded below is the rehearsed version of the presentation that I gave about the Wheels ORM. It's a high level demo of Wheels and what it's like to work with the framework. Mike Henke also presented about Wheels and Convention over Configuration. You can download [Mike's presentation and code](http://henke.ws/post.cfm/cfunited-coldfusion-on-wheels-presentation-wrapup) on his website.
 
 ## A Final Thank You
 

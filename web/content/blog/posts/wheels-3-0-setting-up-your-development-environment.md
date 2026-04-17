@@ -16,11 +16,10 @@ excerpt: Accompanying Video
 coverImage: null
 legacyId: '130'
 ---
+
 ## Accompanying Video
 
 This blog post has an accompanying video posted to [YouTube](https://youtu.be/-76Z_N27siE).
-
-  
 
 ## Introduction
 

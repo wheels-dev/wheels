@@ -24,6 +24,7 @@ excerpt: >-
 coverImage: null
 legacyId: '1151026256903536642'
 ---
+
 When a developer opens a pull request against the Wheels framework, it kicks off one of the most comprehensive CI/CD pipelines you'll find in any open-source project. Whether you're a first-time contributor fixing a typo or a core maintainer shipping a new feature, the moment your PR hits the `develop` branch, the same gauntlet runs: dozens of engine and database combinations are tested, four distinct packages are built and published to a package registry, documentation is synced, container images are built, and a production Docker Swarm deployment rolls out -- all without a single manual intervention.
 
 You don't need commit access to trigger this. You just need a pull request.
