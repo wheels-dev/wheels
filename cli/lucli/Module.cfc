@@ -3803,7 +3803,9 @@ component extends="modules.BaseModule" {
 			} else {
 				value = repeatString(" ", max(0, width - len(value))) & value;
 			}
-			result = left(result, match.pos[1] - 1) & value & mid(result, match.pos[1] + match.len[1], len(result));
+			// Guard: Left(str, 0) throws on Lucee 7 ("parameter 2 cannot be 0")
+			var prefix = match.pos[1] > 1 ? left(result, match.pos[1] - 1) : "";
+			result = prefix & value & mid(result, match.pos[1] + match.len[1], len(result));
 			argIndex++;
 		}
 		return result;
