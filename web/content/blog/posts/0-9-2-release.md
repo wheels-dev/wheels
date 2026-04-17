@@ -14,5 +14,4 @@ excerpt: >-
 coverImage: null
 legacyId: '35'
 ---
-
 We've released ColdFusion on Wheels 0.9.2 into the wild this evening. No new features really, but quite a few bug fixes. [Download version 0.9.2](http://www.cfwheels.org/download) and bring your Wheels app that much closer to 1.0. (We're getting really close.)

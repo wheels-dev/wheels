@@ -15,7 +15,6 @@ excerpt: >-
 coverImage: null
 legacyId: '116'
 ---
-
 This is the official v2.3.0 release. It is dropping a little over a week from Release Candidate 1. We simply wanted to make sure the new CI/CD workflow was functioning before calling the release final. We feel confident that we're good to mark this release as final. There are no new enhancement or bug fixes in this release from 2.3.0.rc.1.
 
 [Download Zip](https://github.com/cfwheels/cfwheels/releases/download/v2.3.0/cfwheels-variants.zip)

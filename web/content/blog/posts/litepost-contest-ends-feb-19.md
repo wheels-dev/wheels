@@ -14,8 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '44'
 ---
-
-The [Learning Wheels LitePost Contest](https://cfwheels.org/blog/index.cfm/2010/1/25/Wheels-LitePost-Contest--win-Amazon-Gift-Card 'Wheels LitePost Contest - Win Amazon Gift Card') is wrapping up on Feb 19th. It is meant for a quick and simple intro into Wheels.
+The [Learning Wheels LitePost Contest](https://cfwheels.org/blog/index.cfm/2010/1/25/Wheels-LitePost-Contest--win-Amazon-Gift-Card "Wheels LitePost Contest - Win Amazon Gift Card") is wrapping up on Feb 19th. It is meant for a quick and simple intro into Wheels.
 
 ### Prize
 
@@ -27,4 +26,4 @@ Please email entries to henke.mike@gmail.com include your name and your Wheels/L
 
 ### Getting Started
 
-Here are two 5 minute [screencasts](https://cfwheels.org/blog/index.cfm/2010/2/3/Wheels-LitePost-Contest-screencasts 'Wheels LitePost Learning Contest Screencasts') to help you get started. Also a [blog entry](http://www.stillnetstudios.com/playing-with-cfwheels) by Ryan Stille on experience with the contest.
+Here are two 5 minute [screencasts](https://cfwheels.org/blog/index.cfm/2010/2/3/Wheels-LitePost-Contest-screencasts "Wheels LitePost Learning Contest Screencasts") to help you get started. Also a [blog entry](http://www.stillnetstudios.com/playing-with-cfwheels) by Ryan Stille on experience with the contest.

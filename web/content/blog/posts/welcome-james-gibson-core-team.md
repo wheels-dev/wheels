@@ -15,5 +15,4 @@ excerpt: >-
 coverImage: null
 legacyId: '29'
 ---
-
 We're happy to announce the addition of [James Gibson](http://iamjamesgibson.com/) to the Wheels core team. The core team leads the development and community efforts of the framework. James has been actively submitting patches to the Google Code site for a while now. He finds a problem and immediately gets to work on fixing it himself. That's a guy that we need on the team! Please join me in congratulating James. We all look forward to our project getting that much better with him on board.

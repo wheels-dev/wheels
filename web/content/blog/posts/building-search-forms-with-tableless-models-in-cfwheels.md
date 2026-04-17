@@ -18,7 +18,6 @@ excerpt: >-
 coverImage: null
 legacyId: '128'
 ---
-
 > This blog article was originally posted on Chris' personal blog and is republished here with his permission.
 
 In this post, I hope to persuade you that you will rarely ever need the `Tag`\-based form helpers (`textFieldTag`, `selectTag`, etc.) in your CFWheels apps ever again.
@@ -71,19 +70,19 @@ component extends="Controller" {
   function index() {
     param name="params.startDate" default="";
     param name="params.endDate" default="";
-
+    
     local.where = [];
-
+    
     if (IsDate(params.startDate)) {
       ArrayAppend(local.where, "createdAt >= '#params.startDate#'");
     }
-
+    
     if (IsDate(params.endDate)) {
       local.nextDay = DateAdd("d", 1, params.endDate);
       local.nextDay = DateFormat(local.nextDay, "m/d/yyyy");
       ArrayAppend(local.where, "createdAt < '#local.nextDay#'");
     }
-
+    
     invoices = model("invoice").findAll(where=ArrayToList(local.where, " AND "));
   }
 }
@@ -96,24 +95,24 @@ component extends="Controller" {
   function index() {
     param name="params.startDate" default="";
     param name="params.endDate" default="";
-
+    
     local.where = [];
-
+    
     // Let's make sure the start date and end date jive.
     if (IsDate(params.startDate) && IsDate(params.endDate) && params.startDate > params.endDate) {
       flashInsert(error="The start date must be on or before the end date.");
     }
-
+    
     if (IsDate(params.startDate)) {
       ArrayAppend(local.where, "createdAt >= '#params.startDate#'");
     }
-
+    
     if (IsDate(params.endDate)) {
       local.nextDay = DateAdd("d", 1, params.endDate);
       local.nextDay = DateFormat(local.nextDay, "m/d/yyyy");
       ArrayAppend(local.where, "createdAt < '#local.nextDay#'");
     }
-
+    
     invoices = model("invoice").findAll(where=ArrayToList(local.where, " AND "));
   }
 }
@@ -138,36 +137,36 @@ component extends="Model" {
   function config() {
     // Make it tableless
     table(false);
-
+    
     // Validations
     validatesFormatOf(properties="startDate,endDate", type="date", allowBlank=true);
     validate("startDateBeforeEndDateValidation");
   }
-
+  
   boolean function run() {
     // Run validations and abort if failed.
     if (!this.valid()) {
       this.results = QueryNew("");
       return false;
     }
-
+    
     // Continue with query if validation passed.
     local.where = [];
-
+    
     if (IsDate(this.startDate)) {
       ArrayAppend(local.where, "createdAt >= '#this.startDate#'");
     }
-
+    
     if (IsDate(this.endDate)) {
       local.nextDay = DateAdd("d", 1, this.endDate);
       local.nextDay = DateFormat(local.nextDay, "m/d/yyyy");
       ArrayAppend(local.where, "createdAt < '#local.nextDay#'");
     }
-
+    
     this.results = model("invoice").findAll(where=ArrayToList(local.where, " AND "));
     return true;
   }
-
+  
   private function startDateBeforeEndDateValidation() {
     if (IsDate(this.startDate) && IsDate(this.endDate) && this.startDate > this.endDate) {
       this.addError("startDate", "Start Date must be on or before End Date");
@@ -189,11 +188,11 @@ component extends="Controller" {
     // `params` struct slightly.
     param name="params.search.startDate" default="";
     param name="params.search.endDate" default="";
-
+    
     // We pass the `params.search` struct in as properties on the search form
     // object.
     search = model("invoiceSearchForm").new(argumentCollection=params.search);
-
+    
     // This runs the search and adds an error message if validation fails.
     if (!search.run()) {
       flashInsert(error="There was an error with your search filters");
@@ -212,10 +211,10 @@ This methodology also improves the view because we can now use `textField` ins
 #startFormTag(route="invoices", method="get")#
   #textField(objectName="search", property="startDate")#
   #errorMessageOn(objectName="search", property="startDate")#
-
+  
   #textField(objectName="search", property="endDate")#
   #errorMessageOn(objectName="search", property="endDate")#
-
+  
   #submitTag(value="Filter Invoices")#
 #endFormTag()#
 
@@ -247,11 +246,11 @@ As a bonus, our `InvoiceSearchForm` model allows us to do things like set the 
 component extends="Model" {
   function config() {
     table(false);
-
+    
     // Set property labels for form fields and related error messages.
     property(name="startDate", label="Start");
     property(name="endDate", label="End");
-
+    
     //...
   }
 

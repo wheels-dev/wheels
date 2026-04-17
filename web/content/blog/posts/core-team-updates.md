@@ -11,7 +11,6 @@ excerpt: Thanks to Per & Chris
 coverImage: null
 legacyId: '101'
 ---
-
 ## Thanks to Per & Chris
 
 Over the past ten years we've been very lucky to have some great developers being part of the CFWheels core team. Unfortunately every now and then, we have to let people move on to other things as their jobs or circumstances change, and sadly we've had to say goodbye to Per Djurner ([@perdjurner](https://twitter.com/perdjurner)) and Chris Peters ([@chrisdpeters](https://twitter.com/chrisdpeters)) recently.

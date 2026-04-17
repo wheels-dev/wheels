@@ -16,7 +16,6 @@ excerpt: >-
 coverImage: null
 legacyId: '117'
 ---
-
 We are happy to launch a new program that we hope will lead to a more stable framework for all of us. Effective immediately we are launching our Bug Bounty program. When we first conceived of the bounty program we were looking at programs from [IssueHunt](https://issuehunt.io/issues) and [BountySource](https://bountysource.com/) and the main goal was to widen the field of contributors to the CFWheels project as well as crush some of the long standing bugs in the framework.
 
 Most of these bugs are edge cases that don’t effect the core functionality of the framework and for the most part users have found work arounds for. In the past it’s been difficult to dedicate our limited resources towards some of these bugs but now that we have a growing list of monthly sponsors we would like to launch out bounty program to compensate contributors who are willing to tackle some of these.

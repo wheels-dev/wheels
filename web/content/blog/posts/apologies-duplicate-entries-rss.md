@@ -14,5 +14,4 @@ excerpt: >-
 coverImage: null
 legacyId: '38'
 ---
-
 I switched the domain for CFWheels.com to CFWheels.org yesterday (We're not trying to make money from you, after all.) As a result of this URL switch, FeedBurner reposted the last 10 blog entries as new posts. You may safely ignore the flood of "new" posts if you would like. Sorry for the confusion that I may have caused. Blunder alert!

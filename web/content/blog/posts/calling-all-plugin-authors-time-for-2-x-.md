@@ -15,7 +15,6 @@ excerpt: >-
 coverImage: null
 legacyId: '89'
 ---
-
 With CFWheels 2.0 beta around the corner, it's time to have a cold hard look at the CFWheels plugin ecosystem. With 2.x, we've taken the opportunity to modernise how we deal with plugins. If you're a plugin author who has previously released something for 1.x, you'll be pleased to hear there aren't that many changes required to get your plugins playing nicely with 2.x, but it's definitely a good time to revisit what you've got out there.
 
 ### Introducing Forgebox.io

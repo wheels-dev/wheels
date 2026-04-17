@@ -13,7 +13,6 @@ excerpt: The Issue
 coverImage: null
 legacyId: '105'
 ---
-
 ## The Issue
 
 Shortly after the release of CFWheels 2.0, we started to get reports of slower running requests under certain conditions. For instance, a page which might have had 1000 calls to \`linkTo()\` could take anything from 1-2ms to 5-6ms a call, which, after 1000 iterations, is one hell of a performance bottle neck. In 1.x, the same call would be between 0-1ms, usually with a total execution time of sub 200ms. 

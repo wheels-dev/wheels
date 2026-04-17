@@ -14,7 +14,6 @@ excerpt: >-
 coverImage: null
 legacyId: '61'
 ---
-
 ColdFusion on Wheels will be giving away a limited number of **How's My Coding?** t-shirts at [cf.Objective](http://www.cfobjective.com/). In the spirit of upcoming conferences and love for Wheels, [Chaz Chumley](https://cfwheels.org/user/profile/123) has made **How's My Coding?** wallpaper and blog images. cf.Objective(), April 22-24, and [CFUnited](http://cfunited.com/), July 28-31, will have Wheels sessions so register, attend our sessions, and say Hi.
 
 ### Blog Badges
@@ -23,7 +22,7 @@ We have [several variations to choose from](http://github.com/chaz-chumley/cfwhe
 
 <a href="[http://www.cfwheels.org](http://www.cfwheels.org/)"> <img src="[http://github.com/mhenke/cfwheels-extras/raw/master/badges/wheels\_visit\_small\_logo-badge.jpg](http://github.com/mhenke/cfwheels-extras/raw/master/badges/wheels_visit_small_logo-badge.jpg)" width="125" height ="125" border="0" /></a>
 
-<a href="[http://www.cfwheels.org](http://www.cfwheels.org/)"><img src="[http://github.com/mhenke/cfwheels-extras/raw/master/badges/wheels_call_big_logo-badge.jpg](http://github.com/mhenke/cfwheels-extras/raw/master/badges/wheels_call_big_logo-badge.jpg)"" width="125" border="0" /></a>
+<a href="[http://www.cfwheels.org](http://www.cfwheels.org/)"><img src="[http://github.com/mhenke/cfwheels-extras/raw/master/badges/wheels\_call\_big\_logo-badge.jpg](http://github.com/mhenke/cfwheels-extras/raw/master/badges/wheels_call_big_logo-badge.jpg)"" width="125" border="0" /></a>
 
 ### Wallpaper
 

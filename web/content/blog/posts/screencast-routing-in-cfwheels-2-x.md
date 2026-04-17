@@ -12,5 +12,4 @@ excerpt: A quick overview of routing in Wheels 2.x
 coverImage: null
 legacyId: '97'
 ---
-
 # A quick  overview of routing in Wheels 2.x
