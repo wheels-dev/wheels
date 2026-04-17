@@ -120,12 +120,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - CSRF cookie encryption key auto-generated when empty (apps should still set their own for stable cross-deploy cookies) (#2054)
 - CI engine testing restructured: 42 jobs reduced to 8 via engine-grouped testing (#1939)
 - `wheels mcp wheels` MCP surface curated — 7 CLI-only commands (`mcp`, `d`, `new`, `console`, `start`, `stop`, `browser`) hidden from MCP `tools/list` via the `mcpHiddenTools()` convention (requires LuCLI 0.3.4+). All remain reachable as CLI subcommands. Tool count drops from 23 to 16 for agent consumers.
+- LuCLI stdio MCP (`wheels mcp wheels`) is now the canonical AI-agent surface for Wheels. `wheels mcp setup` generates `.mcp.json` and `.opencode.json` pointing at the stdio transport. No port or running dev server required. Updated templates: `cli/src/templates/McpConfig.json`, `app/snippets/McpConfig.json`, `tools/build/base/.mcp.json`, `tools/build/base/.opencode.json`.
 
 ### Deprecated
 
 - Legacy `plugins/` folder — superseded by the new `packages/` → `vendor/` activation model. Plugins still load, with a deprecation warning. (#1995)
 - RocketUnit test style for new tests — BDD syntax (via WheelsTest) is required going forward. Existing RocketUnit specs continue to run. (#1925)
 - `wheels.Test` test base class — extend `wheels.WheelsTest` instead (#1889)
+- In-dev-server HTTP MCP endpoint at `/wheels/mcp` — superseded by the LuCLI stdio MCP server (`wheels mcp wheels`). Emits a deprecation warning to the `wheels_mcp` log on first request and advertises `deprecated: true` in the `serverInfo` handshake. Scheduled for removal in a future release. Migrate existing projects with `wheels mcp setup --force`.
 
 ### Removed
 
