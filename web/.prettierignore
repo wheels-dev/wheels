@@ -1,0 +1,9 @@
+# Generated output — never format
+**/dist/
+**/.astro/
+**/node_modules/
+**/pnpm-lock.yaml
+**/pagefind/
+
+# Lockfiles and binaries
+*.svg

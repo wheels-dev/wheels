@@ -50,3 +50,11 @@ tests/_output/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Node / Astro (web/)
+web/**/node_modules/
+web/**/.astro/
+web/**/dist/
+web/**/.wrangler/
+web/**/.turbo/
+web/.pnpm-store/

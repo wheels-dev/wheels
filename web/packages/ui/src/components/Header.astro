@@ -1,0 +1,56 @@
+---
+interface Props {
+	current?: 'landing' | 'guides' | 'api' | 'blog';
+}
+const { current } = Astro.props;
+const links = [
+	{ label: 'Home', href: 'https://wheels.dev/', key: 'landing' },
+	{ label: 'Guides', href: 'https://guides.wheels.dev/', key: 'guides' },
+	{ label: 'API', href: 'https://api.wheels.dev/', key: 'api' },
+	{ label: 'Blog', href: 'https://blog.wheels.dev/', key: 'blog' },
+];
+---
+
+<header class="wd-header">
+	<a class="wd-header__brand" href="https://wheels.dev/">Wheels</a>
+	<nav class="wd-header__nav">
+		{
+			links.map((l) => (
+				<a href={l.href} class:list={['wd-header__link', { 'is-current': current === l.key }]}>
+					{l.label}
+				</a>
+			))
+		}
+	</nav>
+</header>
+
+<style>
+	.wd-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1rem 1.5rem;
+		border-bottom: 1px solid var(--color-border);
+		background: var(--color-bg);
+		font-family: var(--font-sans);
+	}
+	.wd-header__brand {
+		font-weight: 700;
+		font-size: 1.25rem;
+		color: var(--color-fg);
+		text-decoration: none;
+	}
+	.wd-header__nav {
+		display: flex;
+		gap: 1.5rem;
+	}
+	.wd-header__link {
+		color: var(--color-muted);
+		text-decoration: none;
+		font-size: 0.95rem;
+	}
+	.wd-header__link:hover,
+	.wd-header__link.is-current {
+		color: var(--color-fg);
+	}
+</style>
