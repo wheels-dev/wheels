@@ -16,6 +16,7 @@ excerpt: >-
 coverImage: null
 legacyId: '88'
 ---
+
 One of a developer's biggest time sinks is coming up with and writing accurate and engaging documentation. Even if it's an internal project with.. well, just you... it's still incredibly valuable to have: coming back to projects a few months or even years later can often lead to a bit of head scratching and screams of "why?", especially with your own code. Whilst we're not promising that CFWheels will write all your documentation for you, we have put some tools in place to hopefully make the process a little less painful. With a small amount of adjustment in how you document your core functions, documentation doesn't necessarily have to be such a time consuming process.
 
 ### Browse the Core API

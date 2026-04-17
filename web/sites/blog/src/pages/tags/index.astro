@@ -7,19 +7,38 @@ const tags = [...tagMap.entries()].sort((a, b) => b[1] - a[1]);
 ---
 
 <BaseLayout title="Tags | Wheels Blog" description="Browse posts by tag.">
-  <h1>Tags</h1>
-  <ul class="tags">
-    {tags.map(([tag, count]) => (
-      <li>
-        <a href={`/tags/${tag}/`}>#{tag}</a>
-        <span class="count">{count}</span>
-      </li>
-    ))}
-  </ul>
-  <style>
-    .tags { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.75rem; }
-    .tags li { display: flex; align-items: baseline; gap: 0.25rem; }
-    .tags a { color: var(--color-accent); text-decoration: none; font-size: 1.05rem; }
-    .count { color: var(--color-muted); font-size: 0.875rem; }
-  </style>
+	<h1>Tags</h1>
+	<ul class="tags">
+		{
+			tags.map(([tag, count]) => (
+				<li>
+					<a href={`/tags/${tag}/`}>#{tag}</a>
+					<span class="count">{count}</span>
+				</li>
+			))
+		}
+	</ul>
+	<style>
+		.tags {
+			list-style: none;
+			padding: 0;
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.75rem;
+		}
+		.tags li {
+			display: flex;
+			align-items: baseline;
+			gap: 0.25rem;
+		}
+		.tags a {
+			color: var(--color-accent);
+			text-decoration: none;
+			font-size: 1.05rem;
+		}
+		.count {
+			color: var(--color-muted);
+			font-size: 0.875rem;
+		}
+	</style>
 </BaseLayout>

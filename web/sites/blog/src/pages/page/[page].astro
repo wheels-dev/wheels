@@ -4,22 +4,22 @@ import PostCard from '../../components/PostCard.astro';
 import { getAllPosts } from '../../utils/posts.ts';
 
 export async function getStaticPaths() {
-  const posts = await getAllPosts();
-  const pageSize = 10;
-  const totalPages = Math.ceil(posts.length / pageSize);
-  // Pages 2..N — page 1 is / (index.astro)
-  return Array.from({ length: Math.max(totalPages - 1, 0) }, (_, i) => {
-    const pageNum = i + 2;
-    const start = (pageNum - 1) * pageSize;
-    return {
-      params: { page: String(pageNum) },
-      props: {
-        posts: posts.slice(start, start + pageSize),
-        pageNum,
-        totalPages,
-      },
-    };
-  });
+	const posts = await getAllPosts();
+	const pageSize = 10;
+	const totalPages = Math.ceil(posts.length / pageSize);
+	// Pages 2..N — page 1 is / (index.astro)
+	return Array.from({ length: Math.max(totalPages - 1, 0) }, (_, i) => {
+		const pageNum = i + 2;
+		const start = (pageNum - 1) * pageSize;
+		return {
+			params: { page: String(pageNum) },
+			props: {
+				posts: posts.slice(start, start + pageSize),
+				pageNum,
+				totalPages,
+			},
+		};
+	});
 }
 
 const { posts, pageNum, totalPages } = Astro.props;
@@ -27,17 +27,30 @@ const prevHref = pageNum === 2 ? '/' : `/page/${pageNum - 1}/`;
 const nextHref = pageNum < totalPages ? `/page/${pageNum + 1}/` : null;
 ---
 
-<BaseLayout title={`Wheels Blog — page ${pageNum}`} description="News, tutorials, and release announcements for Wheels.">
-  <h1>Wheels Blog</h1>
-  <p class="lede">Page {pageNum} of {totalPages}</p>
-  {posts.map((post) => <PostCard post={post} />)}
-  <nav class="pager" aria-label="Pagination">
-    <a href={prevHref}>← Newer posts</a>
-    {nextHref && <a href={nextHref}>Older posts →</a>}
-  </nav>
-  <style>
-    .lede { color: var(--color-muted); margin-bottom: 2rem; }
-    .pager { margin-top: 2rem; display: flex; justify-content: space-between; }
-    .pager a { color: var(--color-accent); text-decoration: none; }
-  </style>
+<BaseLayout
+	title={`Wheels Blog — page ${pageNum}`}
+	description="News, tutorials, and release announcements for Wheels."
+>
+	<h1>Wheels Blog</h1>
+	<p class="lede">Page {pageNum} of {totalPages}</p>
+	{posts.map((post) => <PostCard post={post} />)}
+	<nav class="pager" aria-label="Pagination">
+		<a href={prevHref}>← Newer posts</a>
+		{nextHref && <a href={nextHref}>Older posts →</a>}
+	</nav>
+	<style>
+		.lede {
+			color: var(--color-muted);
+			margin-bottom: 2rem;
+		}
+		.pager {
+			margin-top: 2rem;
+			display: flex;
+			justify-content: space-between;
+		}
+		.pager a {
+			color: var(--color-accent);
+			text-decoration: none;
+		}
+	</style>
 </BaseLayout>

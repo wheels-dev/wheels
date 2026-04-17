@@ -14,6 +14,7 @@ excerpt: >-
 coverImage: null
 legacyId: '42'
 ---
+
 We announced a [Wheels LitePost Learning Contest](https://cfwheels.org/blog/index.cfm/2010/1/25/Wheels-LitePost-Contest--win-Amazon-Gift-Card) on January 25. The contest consisted of creating a simple [LitePost](http://code.google.com/p/litepost/) blogging application using Wheels. In addition to the prizes listed below, everyone also was granted a one-year Mini Hosting Plan at [Alurium Hosting](http://alurium.com/) (over $40 value).
 
 ### Grand Prize Winner - $100 Amazon Gift Cart
