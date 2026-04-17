@@ -1,6 +1,34 @@
 <cfscript>
 // MCP (Model Context Protocol) Server Implementation
 // Implements Streamable HTTP transport with JSON-RPC 2.0
+//
+// ⚠️ DEPRECATED as of Wheels 4.0. Use the LuCLI stdio MCP server instead:
+//
+//     wheels mcp wheels
+//
+// Configure in your AI IDE's .mcp.json:
+//     {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
+//
+// The LuCLI stdio MCP is the canonical surface for Wheels AI integration.
+// It auto-discovers tools from cli/lucli/Module.cfc, respects mcpHiddenTools(),
+// and doesn't require a running dev server for file-based operations
+// (generate, migrate, stats, etc.). This HTTP endpoint will be removed in
+// a future release. See:
+//   docs/command-line-tools/commands/mcp/mcp-configuration-guide.md
+
+// Log one-time deprecation warning per JVM
+if (!structKeyExists(application, "mcpHttpDeprecationLogged")) {
+	try {
+		writeLog(
+			file="wheels_mcp",
+			type="warning",
+			text="The in-dev-server MCP endpoint at /wheels/mcp is deprecated. "
+				& "Use 'wheels mcp wheels' (LuCLI stdio MCP) instead. "
+				& "See docs/command-line-tools/commands/mcp/mcp-configuration-guide.md"
+		);
+	} catch (any ignored) { /* logging is best-effort */ }
+	application.mcpHttpDeprecationLogged = true;
+}
 
 // ── Security: development mode only ─────────────
 if (

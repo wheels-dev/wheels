@@ -6,7 +6,9 @@ component output="false" displayName="MCP Server" {
 	public any function init() {
 		variables.serverInfo = {
 			"name": "wheels-mcp-server",
-			"version": "1.0.0"
+			"version": "1.0.0",
+			"deprecated": true,
+			"deprecationNotice": "The in-dev-server MCP endpoint at /wheels/mcp is deprecated as of Wheels 4.0. Use the LuCLI stdio MCP server instead: configure your AI IDE with {command: 'wheels', args: ['mcp', 'wheels']} and see docs/command-line-tools/commands/mcp/mcp-configuration-guide.md for details."
 		};
 
 		variables.capabilities = {
