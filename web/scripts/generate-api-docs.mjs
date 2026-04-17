@@ -27,7 +27,11 @@ if (!existsSync(jsonPath)) {
   process.exit(1);
 }
 
-const outRoot = join(REPO_ROOT, 'web/sites/api/src/content/docs', `v${version}`);
+// Astro/Starlight strips dots from URL slugs, so 'v3.0.0' directory would
+// resolve to '/v300/' URLs. Use dashes in the directory/URL and keep the
+// dotted version in user-facing titles/labels only.
+const versionSlug = version.replace(/\./g, '-');
+const outRoot = join(REPO_ROOT, 'web/sites/api/src/content/docs', `v${versionSlug}`);
 
 // Clean previous output for this version only (never other versions or unrelated files).
 if (existsSync(outRoot)) {
@@ -103,7 +107,7 @@ const versionIndex = [
   '',
   ...[...sections.entries()].map(
     ([section, fns]) =>
-      `- [${section}](/${`v${version}/${slugify(section)}/`}) — ${fns.length} function${fns.length === 1 ? '' : 's'}`
+      `- [${section}](/${`v${versionSlug}/${slugify(section)}/`}) — ${fns.length} function${fns.length === 1 ? '' : 's'}`
   ),
   '',
 ].join('\n');
@@ -123,7 +127,7 @@ for (const [section, fns] of sections) {
     '',
     ...fns
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((fn) => `- [\`${fn.name}()\`](/${`v${version}/${sectionSlug}/${slugify(fn.name)}/`}) — ${(fn.hint || '').split('\n')[0].slice(0, 120)}`),
+      .map((fn) => `- [\`${fn.name}()\`](/${`v${versionSlug}/${sectionSlug}/${slugify(fn.name)}/`}) — ${(fn.hint || '').split('\n')[0].slice(0, 120)}`),
     '',
   ].join('\n');
   writeFileSync(join(sectionDir, 'index.md'), sectionIndex);

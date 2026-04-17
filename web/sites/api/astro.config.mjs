@@ -12,7 +12,7 @@ export default defineConfig({
         { label: 'Overview', link: '/' },
         {
           label: 'v3.0.0 (current)',
-          autogenerate: { directory: 'v3.0.0' },
+          autogenerate: { directory: 'v3-0-0' },
           collapsed: false,
         },
       ],

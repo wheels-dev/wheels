@@ -8,7 +8,7 @@ from the framework's inline documentation annotations.
 
 ## Available versions
 
-- **[v3.0.0](/v3.0.0/)** — current release, 309 functions
+- **[v3.0.0](/v3-0-0/)** — current release, 309 functions
 
 Older versions are being migrated from the legacy API reference site.
 
