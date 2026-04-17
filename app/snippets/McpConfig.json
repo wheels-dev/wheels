@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "wheels": {
-      "url": "http://localhost:{PORT}/wheels/mcp",
-      "type": "http"
+      "command": "wheels",
+      "args": ["mcp", "wheels"]
     },
     "browsermcp": {
       "command": "npx",

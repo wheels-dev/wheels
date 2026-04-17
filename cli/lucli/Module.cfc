@@ -615,14 +615,19 @@ component extends="modules.BaseModule" {
 	 * hint: Show MCP server configuration instructions
 	 */
 	public string function mcp() {
-		out("MCP is built into LuCLI. Run:", "bold");
-		out("  lucli mcp wheels");
+		out("MCP is built into the Wheels CLI. Run:", "bold");
+		out("  wheels mcp wheels");
 		out("");
-		out("Configure in Claude Code (.claude/claude_project_config.json):", "bold");
-		out('  {"mcpServers":{"wheels":{"command":"lucli","args":["mcp","wheels"]}}}');
+		out("Configure in Claude Code (.mcp.json):", "bold");
+		out('  {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}');
+		out("");
+		out("For OpenCode, Cursor, and other AI IDEs, see:");
+		out("  docs/command-line-tools/commands/mcp/mcp-configuration-guide.md");
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
 		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");
+		out("Stateful/interactive commands (start, stop, new, console, ...) are hidden");
+		out("from MCP tools/list via mcpHiddenTools() — they remain CLI-only.");
 		return "";
 	}
 
