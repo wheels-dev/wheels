@@ -1,0 +1,44 @@
+---
+const year = new Date().getFullYear();
+---
+<footer class="wd-footer">
+  <div class="wd-footer__inner">
+    <p>&copy; {year} Wheels contributors. MIT licensed.</p>
+    <nav class="wd-footer__nav">
+      <a href="https://github.com/wheels-dev/wheels">GitHub</a>
+      <a href="https://guides.wheels.dev/">Guides</a>
+      <a href="https://api.wheels.dev/">API</a>
+    </nav>
+  </div>
+</footer>
+
+<style>
+  .wd-footer {
+    border-top: 1px solid var(--color-border);
+    padding: 2rem 1.5rem;
+    background: var(--color-bg);
+    color: var(--color-muted);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+  .wd-footer__inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .wd-footer__nav {
+    display: flex;
+    gap: 1rem;
+  }
+  .wd-footer__nav a {
+    color: var(--color-muted);
+    text-decoration: none;
+  }
+  .wd-footer__nav a:hover {
+    color: var(--color-fg);
+  }
+</style>
