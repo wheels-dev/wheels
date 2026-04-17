@@ -34,7 +34,7 @@ You'll initially see the installation verification screen.
 
 Once you click on the Reload button, the application will reload and launch the Example App.
 
-[![](https://cfwheels.org/blog/wp-content/uploads/2022/03/Screen-Shot-2022-03-30-at-11.49.16-AM-1024x614.png)](https://cfwheels.org/blog/wp-content/uploads/2022/03/Screen-Shot-2022-03-30-at-11.49.16-AM.png)
+[![](/blog-images/d182f0d5f176.png)](https://cfwheels.org/blog/wp-content/uploads/2022/03/Screen-Shot-2022-03-30-at-11.49.16-AM.png)
 
 At this point you can login using one of the default user ID listed below.
 
