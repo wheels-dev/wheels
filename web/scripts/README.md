@@ -15,6 +15,7 @@ node web/scripts/generate-api-docs.mjs 3.0.0
 ```
 
 Output structure:
+
 ```
 web/sites/api/src/content/docs/v3.0.0/
 ├── index.md                               # version overview
