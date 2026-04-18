@@ -1,14 +1,27 @@
-# Wheels CLI commands for CommandBox
+# Wheels CLI
 
-This is a basic port of the Rails command line;
-Skips things like `rails server` which are provided by CommandBox already.
+The `wheels` command is a Rails-inspired CLI for scaffolding and running Wheels applications. In 4.0 it is distributed as a Homebrew / Chocolatey formula that bundles [LuCLI](https://github.com/cybersonic/LuCLI), so no CommandBox installation is required.
 
 ## Install
 
-Simply run `install wheels-cli` from CommandBox to install the latest release.
+**macOS / Linux (Homebrew):**
+
+```bash
+brew tap wheels-dev/wheels
+brew install wheels
+```
+
+**Windows (Chocolatey):**
+
+```powershell
+choco install wheels
+```
+
+Both installers depend only on Java 21, which is pulled in automatically.
 
 ## Commands
-See [the CLI command guides](https://guides.wheels.dev/wheels-guides/3.1.0-snapshot/command-line-tools/cli-commands) or use `help wheels` in Commandbox.
+
+See [the CLI command guides](https://guides.wheels.dev/v4-0-0-snapshot/command-line-tools/) or run `wheels --help` in your terminal.
 
 ## Template Customization
 
@@ -25,4 +38,4 @@ To customize a template:
 2. Modify it to match your needs
 3. The CLI will automatically use your custom template
 
-See the [Template System Guide](https://guides.wheels.dev/wheels-guides/3.1.0-snapshot/command-line-tools/cli-guides/template-system) for detailed documentation.
+See the [Template System Guide](https://guides.wheels.dev/v4-0-0-snapshot/command-line-tools/) for detailed documentation.

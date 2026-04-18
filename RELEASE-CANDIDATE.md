@@ -97,12 +97,19 @@ Once pushed, GitHub Actions will automatically:
 
 ### Installation
 
-Users can install the RC from ForgeBox:
+Testers install the RC by tapping the release-candidate formula or by
+pinning to the RC tag in the main formula. Example using the current
+Homebrew tap:
 
 ```bash
-box install wheels@3.1.0-rc.1
-box install wheels-core@3.1.0-rc.1
+brew tap wheels-dev/wheels
+brew install wheels@4.0.0-rc.1      # if an RC-specific formula is published
+# or download the tagged release directly:
+#   https://github.com/wheels-dev/wheels/releases/tag/v4.0.0-rc.1
 ```
+
+Users on the `develop` snapshot channel can also run `wheels upgrade` to
+pick up the RC once it has been published.
 
 ### Testing Checklist
 
@@ -211,11 +218,12 @@ Post announcement in:
 
 Example announcement:
 ```
-🎉 Wheels 3.1.0-rc.1 is now available for testing!
+🎉 Wheels 4.0.0-rc.1 is now available for testing!
 
 We need your help testing this major release before final publication.
 
-Install: box install wheels@3.1.0-rc.1
+Install: brew install wheels-dev/wheels/wheels@4.0.0-rc.1
+(or grab the tagged release from GitHub)
 
 Please report issues: https://github.com/wheels-dev/wheels/issues
 
