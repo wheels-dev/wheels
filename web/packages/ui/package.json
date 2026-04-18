@@ -8,6 +8,7 @@
 		"./components/Footer.astro": "./src/components/Footer.astro",
 		"./components/Logo.astro": "./src/components/Logo.astro",
 		"./components/RssPill.astro": "./src/components/RssPill.astro",
+		"./components/starlight/Header.astro": "./src/components/starlight/Header.astro",
 		"./styles/tokens.css": "./src/styles/tokens.css",
 		"./styles/base.css": "./src/styles/base.css",
 		"./styles/starlight-theme.css": "./src/styles/starlight-theme.css",

@@ -1,0 +1,15 @@
+---
+import Header from '../Header.astro';
+
+// Starlight passes route data via Astro.locals.starlightRoute.
+// We infer which Wheels site we're on from the `site` URL, falling back to the
+// directory name so this override works both on guides.wheels.dev and
+// api.wheels.dev without per-site customization.
+const site = Astro.site?.hostname ?? '';
+let current: 'landing' | 'guides' | 'api' | 'blog' = 'landing';
+if (site.startsWith('guides')) current = 'guides';
+else if (site.startsWith('api')) current = 'api';
+else if (site.startsWith('blog')) current = 'blog';
+---
+
+<Header current={current} />
