@@ -1,7 +1,22 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const contentRoot = resolve(__dirname, 'src/content/docs');
+
+// Snapshot content is generated in CI from the running Wheels server and is
+// NOT committed. Include it in the sidebar only when the directory actually
+// exists, so local `pnpm build` without a prior generate step still succeeds.
+const snapshotSlug = 'v4-0-0-snapshot';
+const hasSnapshot = existsSync(resolve(contentRoot, snapshotSlug));
 
 const versions = [
+	...(hasSnapshot
+		? [{ slug: snapshotSlug, label: 'v4.0.0 (snapshot)', collapsed: true }]
+		: []),
 	{ slug: 'v3-0-0', label: 'v3.0.0 (current)', collapsed: false },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true },
 	{ slug: 'v2-4-0', label: 'v2.4.0', collapsed: true },

@@ -68,3 +68,8 @@ web/tests/visual-diffs/
 
 # Local wrangler state (from local runs of wrangler pages deploy)
 .wrangler/
+
+# API docs snapshot artifacts — generated fresh from the running Wheels server
+# on every develop CI run, then used to build the api site. Never committed.
+/docs/api/v*-snapshot.json
+/web/sites/api/src/content/docs/v*-snapshot/

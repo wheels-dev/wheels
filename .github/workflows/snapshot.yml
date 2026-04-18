@@ -165,6 +165,31 @@ jobs:
           path: /tmp/junit-results/
           if-no-files-found: warn
 
+      - name: Generate API docs JSON (snapshot)
+        run: |
+          mkdir -p docs/api
+          VERSION=$(jq -r '.version' box.json)
+          # Lowercase "-snapshot" matches the URL slug convention used by
+          # web/scripts/generate-api-docs.mjs (version.replace(/\./g, '-')).
+          SNAPSHOT_FILE="docs/api/v${VERSION}-snapshot.json"
+          curl -sf --max-time 60 \
+            "http://localhost:60007/wheels/api?format=json&type=core" \
+            -o "$SNAPSHOT_FILE"
+          if ! jq -e '.functions and .sections' "$SNAPSHOT_FILE" > /dev/null 2>&1; then
+            echo "::error::API docs JSON invalid or empty"
+            head -c 500 "$SNAPSHOT_FILE" || true
+            exit 1
+          fi
+          echo "Generated $SNAPSHOT_FILE ($(wc -c < "$SNAPSHOT_FILE") bytes)"
+
+      - name: Upload API docs snapshot
+        uses: actions/upload-artifact@v6
+        with:
+          name: api-docs-snapshot
+          path: docs/api/v*-snapshot.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Debug server logs
         if: failure()
         run: cat /tmp/lucli-server.log 2>/dev/null || true
@@ -187,6 +212,69 @@ jobs:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       FORGEBOX_API_TOKEN: ${{ secrets.FORGEBOX_API_TOKEN }}
       FORGEBOX_PASS: ${{ secrets.FORGEBOX_PASS }}
+
+  #############################################
+  # Deploy API docs snapshot to Cloudflare Pages
+  #############################################
+  # Regenerates the v{version}-snapshot markdown from the JSON produced by
+  # fast-test, builds the Starlight api site, and deploys to the wheels-api
+  # Cloudflare Pages project. Runs on every develop push so the snapshot
+  # version on api.wheels.dev tracks the current framework state.
+  deploy-api-snapshot:
+    needs: fast-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: deploy-api-snapshot-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download API docs snapshot artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: api-docs-snapshot
+          path: docs/api/
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate snapshot markdown from JSON
+        run: |
+          VERSION=$(jq -r '.version' box.json)
+          node web/scripts/generate-api-docs.mjs "${VERSION}-snapshot"
+
+      - name: Build api site
+        working-directory: web
+        run: pnpm --filter @wheels-dev/site-api build
+
+      - name: Deploy to Cloudflare Pages
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+        run: |
+          pnpm dlx wrangler@4.78.0 pages deploy "sites/api/dist" \
+            --project-name="wheels-api" \
+            --branch="${DEPLOY_BRANCH}" \
+            --commit-hash="${GITHUB_SHA}"
 
   #############################################
   # Sync Docs in Wheels.dev
