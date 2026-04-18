@@ -68,6 +68,15 @@ export default defineConfig({
 				Header: '@wheels-dev/ui/components/starlight/Header.astro',
 				Footer: '@wheels-dev/ui/components/starlight/Footer.astro',
 				SocialIcons: '@wheels-dev/ui/components/starlight/SocialIcons.astro',
+				PageTitle: '@wheels-dev/ui/components/starlight/PageTitle.astro',
+				EditLink: '@wheels-dev/ui/components/starlight/EditLink.astro',
+			},
+			editLink: {
+				// Our EditLink override computes its own target (strips the version
+				// slug and points at docs/src/*.md), so the value here is mostly
+				// vestigial — but Starlight only renders EditLink when editLink is
+				// configured, so we still need this.
+				baseUrl: 'https://github.com/wheels-dev/wheels/edit/develop/docs/src/',
 			},
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/wheels-dev/wheels' }],
 			sidebar: [{ label: 'Overview', link: '/' }, ...versions.map(buildSidebarForVersion)],

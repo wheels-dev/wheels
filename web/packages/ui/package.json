@@ -11,6 +11,8 @@
 		"./components/starlight/Header.astro": "./src/components/starlight/Header.astro",
 		"./components/starlight/Footer.astro": "./src/components/starlight/Footer.astro",
 		"./components/starlight/SocialIcons.astro": "./src/components/starlight/SocialIcons.astro",
+		"./components/starlight/PageTitle.astro": "./src/components/starlight/PageTitle.astro",
+		"./components/starlight/EditLink.astro": "./src/components/starlight/EditLink.astro",
 		"./styles/tokens.css": "./src/styles/tokens.css",
 		"./styles/base.css": "./src/styles/base.css",
 		"./styles/starlight-theme.css": "./src/styles/starlight-theme.css",

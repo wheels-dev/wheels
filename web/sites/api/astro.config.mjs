@@ -27,6 +27,14 @@ export default defineConfig({
 				Header: '@wheels-dev/ui/components/starlight/Header.astro',
 				Footer: '@wheels-dev/ui/components/starlight/Footer.astro',
 				SocialIcons: '@wheels-dev/ui/components/starlight/SocialIcons.astro',
+				PageTitle: '@wheels-dev/ui/components/starlight/PageTitle.astro',
+				EditLink: '@wheels-dev/ui/components/starlight/EditLink.astro',
+			},
+			editLink: {
+				// Vestigial — our EditLink override composes a GitHub code-search
+				// URL from the function name in frontmatter. Setting baseUrl so
+				// Starlight renders the EditLink component at all.
+				baseUrl: 'https://github.com/wheels-dev/wheels/edit/develop/docs/api/',
 			},
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/wheels-dev/wheels' }],
 			sidebar: [

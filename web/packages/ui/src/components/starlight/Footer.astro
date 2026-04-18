@@ -1,5 +1,49 @@
 ---
+// Starlight Footer override.
+//
+// Two jobs, stacked vertically:
+//
+// 1. DOCS FOOTER (in-content) — Starlight's default Footer slot is the
+//    meta row beneath every docs page: EditLink + LastUpdated +
+//    Pagination (prev/next). If we just substitute our brand footer
+//    here, those controls disappear — which is what happened through
+//    Phase 2. Re-render them explicitly.
+//
+// 2. BRAND FOOTER (site-wide) — the same three-column wd-footer that
+//    landing and blog use, so guides + api match the rest of the site.
+
+import EditLink from 'virtual:starlight/components/EditLink';
+import LastUpdated from 'virtual:starlight/components/LastUpdated';
+import Pagination from 'virtual:starlight/components/Pagination';
 import Footer from '../Footer.astro';
 ---
 
+<div class="wd-docs-footer">
+	<div class="wd-docs-footer__meta">
+		<EditLink />
+		<LastUpdated />
+	</div>
+	<Pagination />
+</div>
+
 <Footer />
+
+<style>
+	.wd-docs-footer {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		margin-top: var(--space-7);
+		padding-top: var(--space-5);
+		border-top: 1px solid var(--color-border);
+	}
+
+	.wd-docs-footer__meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-3) var(--space-5);
+		justify-content: space-between;
+		color: var(--color-fg-muted);
+		font-size: var(--text-sm);
+	}
+</style>
