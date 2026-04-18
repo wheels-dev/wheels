@@ -1,0 +1,201 @@
+/*
+ * Wheels base stylesheet — element resets, buttons, and prose.
+ * Depends on tokens.css; import both in site layouts.
+ */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--color-bg);
+	color: var(--color-fg);
+	font-family: var(--font-sans);
+	font-size: var(--text-base);
+	line-height: var(--leading-normal);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+a {
+	color: var(--color-brand);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+img,
+svg,
+video {
+	max-width: 100%;
+	display: block;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-3) var(--space-5);
+	border-radius: var(--radius-pill);
+	font-family: var(--font-sans);
+	font-weight: 600;
+	font-size: var(--text-sm);
+	line-height: 1;
+	text-decoration: none;
+	border: 1px solid transparent;
+	cursor: pointer;
+	transition:
+		transform 0.1s,
+		box-shadow 0.1s,
+		background 0.15s;
+}
+
+.btn:hover {
+	text-decoration: none;
+	transform: translateY(-1px);
+}
+
+.btn--primary {
+	background: var(--color-brand);
+	color: #fff;
+	box-shadow: var(--shadow-sm);
+}
+
+.btn--primary:hover {
+	background: var(--color-brand-hover);
+	box-shadow: var(--shadow);
+}
+
+.btn--secondary {
+	background: transparent;
+	color: var(--color-brand);
+	border-color: var(--color-brand);
+}
+
+.btn--secondary:hover {
+	background: var(--color-brand-soft);
+}
+
+.btn--ghost {
+	background: transparent;
+	color: var(--color-fg);
+	border-color: var(--color-border);
+}
+
+.btn--ghost:hover {
+	background: var(--color-surface);
+}
+
+/* ── Prose (long-form reading) ───────────────────────────── */
+
+.prose {
+	max-width: var(--max-width-prose);
+	font-size: var(--text-base);
+	line-height: var(--leading-relaxed);
+	color: var(--color-fg);
+}
+
+.prose > * + * {
+	margin-top: var(--space-4);
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+	font-family: var(--font-display);
+	letter-spacing: var(--tracking-tight);
+	line-height: var(--leading-tight);
+	margin-top: var(--space-7);
+	margin-bottom: var(--space-3);
+}
+
+.prose h1 {
+	font-size: var(--text-4xl);
+	font-weight: 700;
+}
+
+.prose h2 {
+	font-size: var(--text-3xl);
+	font-weight: 700;
+}
+
+.prose h3 {
+	font-size: var(--text-xl);
+	font-weight: 600;
+}
+
+.prose h4 {
+	font-size: var(--text-lg);
+	font-weight: 600;
+}
+
+.prose a {
+	color: var(--color-brand);
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+.prose blockquote {
+	margin: var(--space-5) 0;
+	padding: var(--space-4) var(--space-5);
+	border-left: 3px solid var(--color-brand);
+	background: var(--color-surface-2);
+	border-radius: 0 var(--radius) var(--radius) 0;
+	color: var(--color-fg-muted);
+}
+
+.prose code {
+	font-family: var(--font-mono);
+	font-size: 0.875em;
+	padding: 0.1em 0.35em;
+	background: var(--color-surface-2);
+	border-radius: var(--radius-sm);
+}
+
+.prose pre {
+	background: #111;
+	color: #e5e5e5;
+	padding: var(--space-4) var(--space-5);
+	border-radius: var(--radius-lg);
+	overflow-x: auto;
+	font-family: var(--font-mono);
+	font-size: var(--text-sm);
+	line-height: var(--leading-normal);
+}
+
+.prose pre code {
+	background: transparent;
+	color: inherit;
+	padding: 0;
+	font-size: inherit;
+}
+
+.prose ul,
+.prose ol {
+	padding-left: var(--space-5);
+}
+
+.prose li + li {
+	margin-top: var(--space-2);
+}
+
+.prose img {
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+}
+
+.prose hr {
+	border: none;
+	border-top: 1px solid var(--color-border);
+	margin: var(--space-7) 0;
+}

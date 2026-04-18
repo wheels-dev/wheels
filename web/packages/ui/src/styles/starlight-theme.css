@@ -1,0 +1,63 @@
+/*
+ * Starlight theme bridge for Wheels.
+ * Maps Starlight's internal --sl-* tokens onto our --color-* / --font-* tokens.
+ * Not imported in PR 1 — consumed by guides + api in PR 2 via `customCss`.
+ */
+
+:root {
+	/* Accents */
+	--sl-color-accent: var(--color-brand);
+	--sl-color-accent-low: var(--color-brand-soft);
+	--sl-color-accent-high: var(--color-brand-ink);
+
+	/* Text (Starlight uses "white" as strongest text in dark mode naming) */
+	--sl-color-white: var(--color-fg);
+	--sl-color-gray-1: var(--color-fg-muted);
+	--sl-color-gray-2: var(--color-fg-subtle);
+	--sl-color-gray-3: var(--color-border-strong);
+	--sl-color-gray-4: var(--color-border);
+	--sl-color-gray-5: var(--color-surface-2);
+	--sl-color-gray-6: var(--color-surface);
+	--sl-color-gray-7: var(--color-bg);
+
+	/* Surfaces */
+	--sl-color-bg: var(--color-bg);
+	--sl-color-bg-nav: var(--color-bg);
+	--sl-color-bg-sidebar: var(--color-surface);
+
+	/* Typography */
+	--sl-font: var(--font-sans);
+	--sl-font-mono: var(--font-mono);
+	--sl-text-code: var(--text-sm);
+
+	/* Radii */
+	--sl-radius-small: var(--radius-sm);
+	--sl-radius-medium: var(--radius);
+	--sl-radius-large: var(--radius-lg);
+
+	/* Layout */
+	--sl-sidebar-width: 18rem;
+	--sl-content-width: 45rem;
+}
+
+/* Custom prose-like tweaks to Starlight content area */
+:root[data-has-toc] .sl-markdown-content {
+	font-size: var(--text-base);
+	line-height: var(--leading-relaxed);
+}
+
+/* Code block styling — match hero install block on landing */
+.sl-markdown-content :not(pre) > code {
+	background: var(--color-surface-2);
+	border-radius: var(--radius-sm);
+	padding: 0.1em 0.35em;
+	font-family: var(--font-mono);
+	font-size: 0.875em;
+}
+
+.sl-markdown-content pre {
+	background: #111;
+	color: #e5e5e5;
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+}

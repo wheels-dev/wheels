@@ -2,6 +2,7 @@
 import Header from '@wheels-dev/ui/components/Header.astro';
 import Footer from '@wheels-dev/ui/components/Footer.astro';
 import '@wheels-dev/ui/styles/tokens.css';
+import '@wheels-dev/ui/styles/base.css';
 
 interface Props {
 	title: string;
@@ -26,25 +27,11 @@ const { title, description = 'Wheels — a CFML MVC framework.', current = 'land
 		<Footer />
 
 		<style is:global>
-			* {
-				box-sizing: border-box;
-			}
-			html,
-			body {
-				margin: 0;
-				padding: 0;
-				background: var(--color-bg);
-				color: var(--color-fg);
-				font-family: var(--font-sans);
-			}
 			main {
 				max-width: var(--max-width);
 				margin: 0 auto;
 				padding: 2rem 1.5rem;
 				min-height: 60vh;
-			}
-			a {
-				color: var(--color-accent);
 			}
 		</style>
 	</body>
