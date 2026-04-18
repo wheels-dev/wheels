@@ -15,9 +15,12 @@ const links = [
 ---
 
 <header class="wd-header" data-current={current ?? 'landing'}>
-	<a class="wd-header__brand" href="https://wheels.dev/" aria-label="wheels.dev home">
-		<Logo variant="lockup" size="md" />
-	</a>
+	<div class="wd-header__lockup">
+		<a class="wd-header__brand" href="https://wheels.dev/" aria-label="wheels.dev home">
+			<Logo variant="lockup" size="md" />
+		</a>
+		<slot name="after-brand" />
+	</div>
 
 	<button
 		class="wd-header__toggle"
@@ -93,6 +96,12 @@ const links = [
 	.wd-header.is-scrolled {
 		border-bottom-color: var(--color-border);
 		box-shadow: var(--shadow-sm);
+	}
+
+	.wd-header__lockup {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-3);
 	}
 
 	.wd-header__brand {
