@@ -6,7 +6,11 @@
 	"exports": {
 		"./components/Header.astro": "./src/components/Header.astro",
 		"./components/Footer.astro": "./src/components/Footer.astro",
-		"./styles/tokens.css": "./src/styles/tokens.css"
+		"./components/Logo.astro": "./src/components/Logo.astro",
+		"./styles/tokens.css": "./src/styles/tokens.css",
+		"./styles/base.css": "./src/styles/base.css",
+		"./styles/starlight-theme.css": "./src/styles/starlight-theme.css",
+		"./assets/*": "./src/assets/*"
 	},
 	"peerDependencies": {
 		"astro": "^5.0.0"
