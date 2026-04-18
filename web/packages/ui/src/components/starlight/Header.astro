@@ -1,5 +1,6 @@
 ---
 import Header from '../Header.astro';
+import VersionSwitcher from './VersionSwitcher.astro';
 
 // Starlight passes route data via Astro.locals.starlightRoute.
 // We infer which Wheels site we're on from the `site` URL, falling back to the
@@ -12,4 +13,6 @@ else if (site.startsWith('api')) current = 'api';
 else if (site.startsWith('blog')) current = 'blog';
 ---
 
-<Header current={current} />
+<Header current={current}>
+	<VersionSwitcher slot="after-brand" />
+</Header>
