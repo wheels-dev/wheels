@@ -153,31 +153,40 @@ box wheels generate app MyApp</code></pre>
 	</section>
 
 	<section class="resources">
-		<h2 class="resources__heading">Where to go next</h2>
-		<div class="resources__grid">
-			<a class="resource" href="https://guides.wheels.dev/v3-0-0/">
-				<h3>Guides</h3>
-				<p>
-					Step-by-step guides from installation through deployment. v4.0-SNAPSHOT, v3.0, and v2.5
-					all available.
-				</p>
-				<span class="resource__link">guides.wheels.dev →</span>
-			</a>
-			<a class="resource" href="https://api.wheels.dev/v3-0-0/">
-				<h3>API reference</h3>
-				<p>Every function, parameter, and return type. Searchable across 8 framework versions.</p>
-				<span class="resource__link">api.wheels.dev →</span>
-			</a>
-			<a class="resource" href="https://blog.wheels.dev/">
-				<h3>Blog</h3>
-				<p>Release notes, tutorials, and community news from the Wheels core team.</p>
-				<span class="resource__link">blog.wheels.dev →</span>
-			</a>
-			<a class="resource" href="https://github.com/wheels-dev/wheels">
-				<h3>Source on GitHub</h3>
-				<p>Code, issues, discussions, and contribution guidelines. MIT licensed.</p>
-				<span class="resource__link">github.com/wheels-dev/wheels →</span>
-			</a>
+		<div class="resources__inner">
+			<h2 class="resources__heading">Where to go next</h2>
+			<p class="resources__lede">
+				The docs are split across subdomains. Pick where you need to land.
+			</p>
+			<div class="resources__grid">
+				<a class="resource" href="https://guides.wheels.dev/v3-0-0/">
+					<span class="resource__domain">guides.wheels.dev</span>
+					<h3>Guides</h3>
+					<p>
+						Step-by-step guides from installation through deployment. v4.0-SNAPSHOT, v3.0, and v2.5
+						all available.
+					</p>
+					<span class="resource__link">Open →</span>
+				</a>
+				<a class="resource" href="https://api.wheels.dev/v3-0-0/">
+					<span class="resource__domain">api.wheels.dev</span>
+					<h3>API reference</h3>
+					<p>Every function, parameter, and return type. Searchable across 8 framework versions.</p>
+					<span class="resource__link">Open →</span>
+				</a>
+				<a class="resource" href="https://blog.wheels.dev/">
+					<span class="resource__domain">blog.wheels.dev</span>
+					<h3>Blog</h3>
+					<p>Release notes, tutorials, and community news from the Wheels core team.</p>
+					<span class="resource__link">Open →</span>
+				</a>
+				<a class="resource" href="https://github.com/wheels-dev/wheels">
+					<span class="resource__domain">github.com/wheels-dev</span>
+					<h3>Source on GitHub</h3>
+					<p>Code, issues, discussions, and contribution guidelines. MIT licensed.</p>
+					<span class="resource__link">Open →</span>
+				</a>
+			</div>
 		</div>
 	</section>
 </BaseLayout>
@@ -300,48 +309,70 @@ box wheels generate app MyApp</code></pre>
 	}
 
 	.resources {
-		background: var(--color-border);
+		background: var(--color-surface);
 		padding: 4rem 1.5rem;
 		margin-top: 4rem;
 	}
-	.resources__heading {
-		max-width: var(--max-width);
-		margin: 0 auto 2rem;
-		font-size: 1.75rem;
-		text-align: center;
-	}
-	.resources__grid {
+	.resources__inner {
 		max-width: var(--max-width);
 		margin: 0 auto;
+	}
+	.resources__heading {
+		font-size: var(--text-3xl);
+		text-align: center;
+		margin: 0 0 var(--space-3);
+		letter-spacing: var(--tracking-tight);
+	}
+	.resources__lede {
+		text-align: center;
+		color: var(--color-fg-muted);
+		margin: 0 0 var(--space-6);
+	}
+	.resources__grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-		gap: 1rem;
+		gap: var(--space-4);
 	}
 	.resource {
 		display: block;
-		padding: 1.5rem;
+		padding: var(--space-5);
 		background: var(--color-bg);
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius);
+		border-radius: var(--radius-lg);
 		text-decoration: none;
 		color: inherit;
-		transition: border-color 0.1s;
+		box-shadow: var(--shadow-sm);
+		transition:
+			box-shadow 0.15s,
+			border-color 0.15s,
+			transform 0.1s;
 	}
 	.resource:hover {
-		border-color: var(--color-accent);
+		box-shadow: var(--shadow);
+		border-color: var(--color-brand);
+		transform: translateY(-2px);
+		text-decoration: none;
+	}
+	.resource__domain {
+		display: block;
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--color-fg-subtle);
+		margin-bottom: var(--space-2);
 	}
 	.resource h3 {
-		font-size: 1.1rem;
-		margin: 0 0 0.5rem;
+		font-size: var(--text-lg);
+		margin: 0 0 var(--space-2);
+		font-weight: 600;
 	}
 	.resource p {
-		color: var(--color-muted);
-		margin: 0 0 0.75rem;
-		line-height: 1.5;
+		color: var(--color-fg-muted);
+		margin: 0 0 var(--space-3);
+		line-height: var(--leading-relaxed);
 	}
 	.resource__link {
-		color: var(--color-accent);
-		font-size: 0.875rem;
+		color: var(--color-brand);
+		font-size: var(--text-sm);
 		font-weight: 600;
 	}
 </style>
