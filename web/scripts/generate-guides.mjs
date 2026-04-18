@@ -32,15 +32,62 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../..');
 
-const [, , srcArg, versionSlug, labelArg] = process.argv;
-if (!srcArg || !versionSlug) {
-  console.error('Usage: node generate-guides.mjs <source-dir> <version-slug> [label]');
-  console.error('Example: node generate-guides.mjs docs/src v3-1-0 "v3.1.0 (latest)"');
+const [, , srcArg, versionArg, labelArg] = process.argv;
+if (!srcArg) {
+  console.error('Usage: node generate-guides.mjs <source-dir> [version-slug] [label]');
+  console.error('');
+  console.error('  <source-dir>  Path to a GitBook-style docs directory containing SUMMARY.md.');
+  console.error('                Use "docs/src" to consume the repo root box.json version.');
+  console.error('  [version-slug] Override the version slug (e.g. "v3-0-0"). If omitted and');
+  console.error('                 source is docs/src, reads version from {repo}/box.json and');
+  console.error('                 uses "v{version}-snapshot" (develop is pre-release by convention).');
+  console.error('  [label]       Sidebar/UI label. Defaults to a humanized version slug.');
+  console.error('');
+  console.error('Examples:');
+  console.error('  node generate-guides.mjs docs/src                            # auto from box.json');
+  console.error('  node generate-guides.mjs docs/src v4-0-0-snapshot "dev"      # override both');
+  console.error('  node generate-guides.mjs /abs/path/to/frozen/guides v3-0-0   # frozen');
   process.exit(1);
 }
 
 const srcDir = resolve(srcArg);
-const label = labelArg || versionSlug;
+
+function readBoxJsonVersion() {
+  const boxPath = join(REPO_ROOT, 'box.json');
+  if (!existsSync(boxPath)) return null;
+  try {
+    const json = JSON.parse(readFileSync(boxPath, 'utf8'));
+    return typeof json.version === 'string' ? json.version : null;
+  } catch {
+    return null;
+  }
+}
+
+function deriveVersion() {
+  if (versionArg) {
+    return { slug: versionArg, label: labelArg || versionArg };
+  }
+  // No explicit version — try box.json. Only valid for docs/src (the repo's own
+  // guides source); frozen sources from other directories MUST pass an explicit slug.
+  const isRepoGuides =
+    srcDir === join(REPO_ROOT, 'docs/src') ||
+    srcDir === join(REPO_ROOT, 'docs', 'src');
+  if (!isRepoGuides) {
+    console.error(`No version slug and source '${srcArg}' is not docs/src — pass explicit slug.`);
+    process.exit(1);
+  }
+  const raw = readBoxJsonVersion();
+  if (!raw) {
+    console.error('No version slug and could not read box.json — pass explicit slug.');
+    process.exit(1);
+  }
+  const slug = `v${raw.replace(/\./g, '-')}-snapshot`;
+  const labelAuto = labelArg || `v${raw}-SNAPSHOT (dev)`;
+  console.error(`Auto-detected version from box.json: ${raw} → slug=${slug}`);
+  return { slug, label: labelAuto };
+}
+
+const { slug: versionSlug, label } = deriveVersion();
 
 if (!existsSync(join(srcDir, 'SUMMARY.md'))) {
   console.error(`Missing SUMMARY.md in ${srcDir}`);

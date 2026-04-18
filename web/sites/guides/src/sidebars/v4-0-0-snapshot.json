@@ -1,0 +1,863 @@
+[
+  {
+    "label": "INTRODUCTION",
+    "items": [
+      {
+        "label": "Getting Started",
+        "link": "/v4-0-0-snapshot/",
+        "items": [
+          {
+            "label": "Running Local Development Servers",
+            "link": "/v4-0-0-snapshot/introduction/readme/running-local-development-servers/"
+          },
+          {
+            "label": "Beginner Tutorial: Hello World",
+            "link": "/v4-0-0-snapshot/introduction/readme/beginner-tutorial-hello-world/"
+          },
+          {
+            "label": "Beginner Tutorial: Hello Database",
+            "link": "/v4-0-0-snapshot/introduction/readme/beginner-tutorial-hello-database/"
+          },
+          {
+            "label": "Tutorial: Wheels, AJAX, and You",
+            "link": "/v4-0-0-snapshot/introduction/readme/tutorial-wheels-ajax-and-you/"
+          },
+          {
+            "label": "Boxlang Support",
+            "link": "/v4-0-0-snapshot/introduction/readme/boxlang-support/"
+          }
+        ]
+      },
+      {
+        "label": "Frameworks and Wheels",
+        "link": "/v4-0-0-snapshot/introduction/frameworks-and-wheels/"
+      },
+      {
+        "label": "Requirements",
+        "link": "/v4-0-0-snapshot/introduction/requirements/"
+      },
+      {
+        "label": "Manual Installation",
+        "link": "/v4-0-0-snapshot/introduction/manual-installation/"
+      },
+      {
+        "label": "Upgrading",
+        "link": "/v4-0-0-snapshot/introduction/upgrading/",
+        "items": [
+          {
+            "label": "Upgrading to Wheels 4.0",
+            "link": "/v4-0-0-snapshot/introduction/upgrading-to-4.0/"
+          }
+        ]
+      },
+      {
+        "label": "Screencasts",
+        "link": "/v4-0-0-snapshot/introduction/screencasts/"
+      }
+    ]
+  },
+  {
+    "label": "Command Line Tools",
+    "items": [
+      {
+        "label": "CLI Overview",
+        "link": "/v4-0-0-snapshot/command-line-tools/cli-overview/"
+      },
+      {
+        "label": "Quick Start Guide",
+        "link": "/v4-0-0-snapshot/command-line-tools/quick-start/"
+      },
+      {
+        "label": "Command Reference",
+        "link": "/v4-0-0-snapshot/command-line-tools/commands/",
+        "items": [
+          {
+            "label": "Core Commands",
+            "items": [
+              {
+                "label": "wheels init",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/core/init/"
+              },
+              {
+                "label": "wheels info",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/core/info/"
+              },
+              {
+                "label": "wheels about",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/application-utilities/about/"
+              },
+              {
+                "label": "wheels reload",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/core/reload/"
+              },
+              {
+                "label": "wheels deps",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/core/deps/"
+              },
+              {
+                "label": "wheels destroy",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/core/destroy/"
+              }
+            ]
+          },
+          {
+            "label": "Code Generation",
+            "items": [
+              {
+                "label": "wheels generate app",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/app/"
+              },
+              {
+                "label": "wheels generate app-wizard",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/app-wizard/"
+              },
+              {
+                "label": "wheels generate controller",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/controller/"
+              },
+              {
+                "label": "wheels generate model",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/model/"
+              },
+              {
+                "label": "wheels generate view",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/view/"
+              },
+              {
+                "label": "wheels generate helper",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/helper/"
+              },
+              {
+                "label": "wheels generate migration",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/migration/"
+              },
+              {
+                "label": "wheels generate property",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/property/"
+              },
+              {
+                "label": "wheels generate route",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/route/"
+              },
+              {
+                "label": "wheels generate test",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/test/"
+              },
+              {
+                "label": "wheels generate snippets",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/snippets/"
+              },
+              {
+                "label": "wheels generate code",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/code/"
+              },
+              {
+                "label": "wheels generate scaffold",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/scaffold/"
+              },
+              {
+                "label": "wheels generate api-resource",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/generate/api-resource/"
+              }
+            ]
+          },
+          {
+            "label": "Database Commands",
+            "items": [
+              {
+                "label": "Database Operations",
+                "items": [
+                  {
+                    "label": "wheels db create",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/db-create/"
+                  },
+                  {
+                    "label": "wheels db drop",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/db-drop/"
+                  }
+                ]
+              },
+              {
+                "label": "Migration Commands",
+                "items": [
+                  {
+                    "label": "wheels dbmigrate info",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-info/"
+                  },
+                  {
+                    "label": "wheels dbmigrate latest",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-latest/"
+                  },
+                  {
+                    "label": "wheels dbmigrate up",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-up/"
+                  },
+                  {
+                    "label": "wheels dbmigrate down",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-down/"
+                  },
+                  {
+                    "label": "wheels dbmigrate reset",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-reset/"
+                  },
+                  {
+                    "label": "wheels dbmigrate exec",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-exec/"
+                  },
+                  {
+                    "label": "wheels dbmigrate create blank",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-create-blank/"
+                  },
+                  {
+                    "label": "wheels dbmigrate create table",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-create-table/"
+                  },
+                  {
+                    "label": "wheels dbmigrate create column",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-create-column/"
+                  },
+                  {
+                    "label": "wheels dbmigrate remove table",
+                    "link": "/v4-0-0-snapshot/command-line-tools/commands/database/dbmigrate-remove-table/"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "label": "Testing Commands",
+            "items": [
+              {
+                "label": "wheels test run",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/test/test-run/"
+              },
+              {
+                "label": "wheels advanced testing",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/test/test-advanced/"
+              }
+            ]
+          },
+          {
+            "label": "Playwright Commands",
+            "items": [
+              {
+                "label": "wheels playwright:init",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/playwright/playwright-init/"
+              },
+              {
+                "label": "wheels playwright:install",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/playwright/playwright-install/"
+              }
+            ]
+          },
+          {
+            "label": "Browser Commands",
+            "items": [
+              {
+                "label": "wheels browser:install",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/browser/browser-install/"
+              },
+              {
+                "label": "wheels browser:test",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/browser/browser-test/"
+              }
+            ]
+          },
+          {
+            "label": "Environment Management",
+            "items": [
+              {
+                "label": "wheels env setup",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/environment/env-setup/"
+              },
+              {
+                "label": "wheels env list",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/environment/env-list/"
+              },
+              {
+                "label": "wheels env merge",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/environment/env-merge/"
+              },
+              {
+                "label": "wheels env set",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/environment/env-set/"
+              },
+              {
+                "label": "wheels env show",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/environment/env-show/"
+              },
+              {
+                "label": "wheels env switch",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/environment/env-switch/"
+              },
+              {
+                "label": "wheels env validate",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/environment/env-validate/"
+              }
+            ]
+          },
+          {
+            "label": "Code Analysis",
+            "items": [
+              {
+                "label": "wheels analyze code",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/analysis/analyze-code/"
+              },
+              {
+                "label": "wheels analyze performance",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/analysis/analyze-performance/"
+              }
+            ]
+          },
+          {
+            "label": "Config",
+            "items": [
+              {
+                "label": "wheels config check",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/config/config-check/"
+              },
+              {
+                "label": "wheels config diff",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/config/config-diff/"
+              },
+              {
+                "label": "wheels config dump",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/config/config-dump/"
+              }
+            ]
+          },
+          {
+            "label": "Docker Commands",
+            "items": [
+              {
+                "label": "wheels docker init",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docker/docker-init/"
+              },
+              {
+                "label": "wheels docker build",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docker/docker-build/"
+              },
+              {
+                "label": "wheels docker deploy",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docker/docker-deploy/"
+              },
+              {
+                "label": "wheels docker logs",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docker/docker-logs/"
+              },
+              {
+                "label": "wheels docker exec",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docker/docker-exec/"
+              },
+              {
+                "label": "wheels docker stop",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docker/docker-stop/"
+              }
+            ]
+          },
+          {
+            "label": "Get Commands",
+            "items": [
+              {
+                "label": "wheels get environment",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/get/get-environment/"
+              },
+              {
+                "label": "wheels get settings",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/get/get-settings/"
+              }
+            ]
+          },
+          {
+            "label": "Documentation",
+            "items": [
+              {
+                "label": "wheels docs generate",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docs/docs-generate/"
+              },
+              {
+                "label": "wheels docs serve",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/docs/docs-serve/"
+              }
+            ]
+          },
+          {
+            "label": "Plugins",
+            "items": [
+              {
+                "label": "wheels plugin install",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-install/"
+              },
+              {
+                "label": "wheels plugin list",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-list/"
+              },
+              {
+                "label": "wheels plugin search",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-search/"
+              },
+              {
+                "label": "wheels plugin info",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-info/"
+              },
+              {
+                "label": "wheels plugin outdated",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-outdated/"
+              },
+              {
+                "label": "wheels plugin update",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-update/"
+              },
+              {
+                "label": "wheels plugin update:all",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-update-all/"
+              },
+              {
+                "label": "wheels plugin remove",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-remove/"
+              },
+              {
+                "label": "wheels plugin init",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/plugins/plugins-init/"
+              }
+            ]
+          },
+          {
+            "label": "Asset Management",
+            "items": [
+              {
+                "label": "asset management commands",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/assets-cache-management/"
+              }
+            ]
+          },
+          {
+            "label": "Job Commands",
+            "items": [
+              {
+                "label": "wheels jobs work",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/jobs/jobs-work/"
+              },
+              {
+                "label": "wheels jobs status",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/jobs/jobs-status/"
+              },
+              {
+                "label": "wheels jobs retry",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/jobs/jobs-retry/"
+              },
+              {
+                "label": "wheels jobs purge",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/jobs/jobs-purge/"
+              },
+              {
+                "label": "wheels jobs monitor",
+                "link": "/v4-0-0-snapshot/command-line-tools/commands/jobs/jobs-monitor/"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "label": "CLI Development Guides",
+        "items": [
+          {
+            "label": "Configuration Management",
+            "link": "/v4-0-0-snapshot/command-line-tools/configuration/"
+          },
+          {
+            "label": "Creating Commands",
+            "link": "/v4-0-0-snapshot/command-line-tools/cli-guides/creating-commands/"
+          },
+          {
+            "label": "Service Architecture",
+            "link": "/v4-0-0-snapshot/command-line-tools/cli-guides/service-architecture/"
+          },
+          {
+            "label": "Migrations Guide",
+            "link": "/v4-0-0-snapshot/command-line-tools/cli-guides/migrations/"
+          },
+          {
+            "label": "Testing Guide",
+            "link": "/v4-0-0-snapshot/command-line-tools/cli-guides/testing/"
+          },
+          {
+            "label": "lucee.json Reference",
+            "link": "/v4-0-0-snapshot/command-line-tools/cli-guides/lucee-json-reference/"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "Working with Wheels",
+    "items": [
+      {
+        "label": "Conventions",
+        "link": "/v4-0-0-snapshot/working-with-wheels/conventions/"
+      },
+      {
+        "label": "Configuration and Defaults",
+        "link": "/v4-0-0-snapshot/working-with-wheels/configuration-and-defaults/"
+      },
+      {
+        "label": "Directory Structure",
+        "link": "/v4-0-0-snapshot/working-with-wheels/directory-structure/"
+      },
+      {
+        "label": "Switching Environments",
+        "link": "/v4-0-0-snapshot/working-with-wheels/switching-environments/"
+      },
+      {
+        "label": "Testing Your Application",
+        "link": "/v4-0-0-snapshot/working-with-wheels/testing-your-application/"
+      },
+      {
+        "label": "End-to-End Testing",
+        "link": "/v4-0-0-snapshot/working-with-wheels/end-to-end-testing/"
+      },
+      {
+        "label": "Browser Testing",
+        "link": "/v4-0-0-snapshot/working-with-wheels/browser-testing/"
+      },
+      {
+        "label": "Using the Test Environment",
+        "link": "/v4-0-0-snapshot/working-with-wheels/using-the-test-environment/"
+      },
+      {
+        "label": "Overriding Core Methods",
+        "link": "/v4-0-0-snapshot/working-with-wheels/overriding-core-methods/"
+      },
+      {
+        "label": "Contributing to Wheels",
+        "link": "/v4-0-0-snapshot/working-with-wheels/contributing-to-wheels/"
+      },
+      {
+        "label": "Contributing to Wheels VS Code Extension",
+        "link": "/v4-0-0-snapshot/working-with-wheels/contributing-to-wheels-vscode-extension/"
+      },
+      {
+        "label": "Contributing to Wheels Windows Installer",
+        "link": "/v4-0-0-snapshot/working-with-wheels/contributing-to-wheels-windows-installer/"
+      },
+      {
+        "label": "Contributing to Wheels macOS Installer",
+        "link": "/v4-0-0-snapshot/working-with-wheels/contributing-to-wheels-macos-installer/"
+      },
+      {
+        "label": "Background Jobs",
+        "link": "/v4-0-0-snapshot/working-with-wheels/background-jobs/"
+      },
+      {
+        "label": "Dependency Injection",
+        "link": "/v4-0-0-snapshot/working-with-wheels/dependency-injection/"
+      },
+      {
+        "label": "Submitting Pull Requests",
+        "link": "/v4-0-0-snapshot/working-with-wheels/submitting-pull-requests/"
+      },
+      {
+        "label": "Documenting your Code",
+        "link": "/v4-0-0-snapshot/working-with-wheels/documenting-your-code/"
+      }
+    ]
+  },
+  {
+    "label": "Handling Requests with Controllers",
+    "items": [
+      {
+        "label": "Request Handling",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/request-handling/"
+      },
+      {
+        "label": "Rendering Content",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/rendering-content/"
+      },
+      {
+        "label": "Redirecting Users",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/redirecting-users/"
+      },
+      {
+        "label": "Sending Files",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/sending-files/"
+      },
+      {
+        "label": "Sending Email",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/sending-email/"
+      },
+      {
+        "label": "Responding with Multiple Formats",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/responding-with-multiple-formats/"
+      },
+      {
+        "label": "Using the Flash",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/using-the-flash/"
+      },
+      {
+        "label": "Middleware",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/middleware/"
+      },
+      {
+        "label": "Rate Limiting",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/rate-limiting/"
+      },
+      {
+        "label": "Route Model Binding",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/route-model-binding/"
+      },
+      {
+        "label": "Using Filters",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/using-filters/"
+      },
+      {
+        "label": "Verification",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/verification/"
+      },
+      {
+        "label": "Event Handlers",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/event-handlers/"
+      },
+      {
+        "label": "Routing",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/routing/"
+      },
+      {
+        "label": "URL Rewriting",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/url-rewriting/",
+        "items": [
+          {
+            "label": "Apache",
+            "link": "/v4-0-0-snapshot/handling-requests-with-controllers/url-rewriting/apache/"
+          },
+          {
+            "label": "IIS",
+            "link": "/v4-0-0-snapshot/handling-requests-with-controllers/url-rewriting/iis/"
+          },
+          {
+            "label": "Tomcat",
+            "link": "/v4-0-0-snapshot/handling-requests-with-controllers/url-rewriting/tomcat/"
+          },
+          {
+            "label": "Nginx",
+            "link": "/v4-0-0-snapshot/handling-requests-with-controllers/url-rewriting/nginx/"
+          }
+        ]
+      },
+      {
+        "label": "Obfuscating URLs",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/obfuscating-urls/"
+      },
+      {
+        "label": "Caching",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/caching/"
+      },
+      {
+        "label": "Server-Sent Events",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/server-sent-events/"
+      },
+      {
+        "label": "Nesting Controllers",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/nesting-controllers/"
+      },
+      {
+        "label": "CORS Requests",
+        "link": "/v4-0-0-snapshot/handling-requests-with-controllers/cors-requests/"
+      }
+    ]
+  },
+  {
+    "label": "Displaying Views to Users",
+    "items": [
+      {
+        "label": "Pages",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/pages/"
+      },
+      {
+        "label": "Partials",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/partials/"
+      },
+      {
+        "label": "Linking Pages",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/linking-pages/"
+      },
+      {
+        "label": "Layouts",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/layouts/"
+      },
+      {
+        "label": "Form Helpers and Showing Errors",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors/"
+      },
+      {
+        "label": "Displaying Links for Pagination",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/displaying-links-for-pagination/"
+      },
+      {
+        "label": "Pagination Helpers",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/pagination-helpers/"
+      },
+      {
+        "label": "Date, Media, and Text Helpers",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/date-media-and-text-helpers/"
+      },
+      {
+        "label": "Creating Custom View Helpers",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/creating-custom-view-helpers/"
+      },
+      {
+        "label": "Localization",
+        "link": "/v4-0-0-snapshot/displaying-views-to-users/localization/"
+      }
+    ]
+  },
+  {
+    "label": "Database Interaction Through Models",
+    "items": [
+      {
+        "label": "Object Relational Mapping",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/object-relational-mapping/"
+      },
+      {
+        "label": "Creating Records",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/creating-records/"
+      },
+      {
+        "label": "Reading Records",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/reading-records/"
+      },
+      {
+        "label": "Updating Records",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/updating-records/"
+      },
+      {
+        "label": "Deleting Records",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/deleting-records/"
+      },
+      {
+        "label": "Column Statistics",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/column-statistics/"
+      },
+      {
+        "label": "Dynamic Finders",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/dynamic-finders/"
+      },
+      {
+        "label": "Getting Paginated Data",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/getting-paginated-data/"
+      },
+      {
+        "label": "Associations",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/associations/"
+      },
+      {
+        "label": "Nested Properties",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/nested-properties/"
+      },
+      {
+        "label": "Object Validation",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/object-validation/"
+      },
+      {
+        "label": "Object Callbacks",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/object-callbacks/"
+      },
+      {
+        "label": "Calculated Properties",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/calculated-properties/"
+      },
+      {
+        "label": "Transactions",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/transactions/"
+      },
+      {
+        "label": "Dirty Records",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/dirty-records/"
+      },
+      {
+        "label": "Soft Delete",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/soft-delete/"
+      },
+      {
+        "label": "Query Builder",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/query-builder/"
+      },
+      {
+        "label": "Enums",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/enums/"
+      },
+      {
+        "label": "Query Scopes",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/query-scopes/"
+      },
+      {
+        "label": "Batch Processing",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/batch-processing/"
+      },
+      {
+        "label": "Automatic Time Stamps",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/automatic-time-stamps/"
+      },
+      {
+        "label": "Database Migrations",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/database-migrations/",
+        "items": [
+          {
+            "label": "Migrations in Production",
+            "link": "/v4-0-0-snapshot/database-interaction-through-models/database-migrations/migrations-in-production/"
+          }
+        ]
+      },
+      {
+        "label": "Using Multiple Data Sources",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/using-multiple-data-sources/"
+      },
+      {
+        "label": "Using SQLite",
+        "link": "/v4-0-0-snapshot/database-interaction-through-models/using-sqlite/"
+      }
+    ]
+  },
+  {
+    "label": "Project Documentation",
+    "items": [
+      {
+        "label": "Overview",
+        "link": "/v4-0-0-snapshot/project-documentation/overview/"
+      }
+    ]
+  },
+  {
+    "label": "External Links",
+    "items": [
+      {
+        "label": "Source Code",
+        "link": "/v4-0-0-snapshot/https:/github.com/wheels-dev/wheels/"
+      },
+      {
+        "label": "Issue Tracker",
+        "link": "/v4-0-0-snapshot/https:/github.com/wheels-dev/wheels/issues/"
+      },
+      {
+        "label": "Community",
+        "link": "/v4-0-0-snapshot/https:/github.com/wheels-dev/wheels/discussions/"
+      }
+    ]
+  },
+  {
+    "label": "Plugins",
+    "items": [
+      {
+        "label": "Installing and Using Plugins",
+        "link": "/v4-0-0-snapshot/plugins/installing-and-using-plugins/"
+      },
+      {
+        "label": "Developing Plugins",
+        "link": "/v4-0-0-snapshot/plugins/developing-plugins/"
+      },
+      {
+        "label": "Publishing Plugins",
+        "link": "/v4-0-0-snapshot/plugins/publishing-plugins/"
+      }
+    ]
+  }
+]

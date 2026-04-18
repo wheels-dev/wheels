@@ -13,8 +13,8 @@ function loadSidebar(version) {
 }
 
 const versions = [
-  { slug: 'v3-1-0', label: 'v3.1.0 (current)', collapsed: false },
-  { slug: 'v3-0-0', label: 'v3.0.0', collapsed: true },
+  { slug: 'v4-0-0-snapshot', label: 'v4.0.0-SNAPSHOT (dev)', collapsed: false },
+  { slug: 'v3-0-0', label: 'v3.0.0 (current)', collapsed: true },
   { slug: 'v2-5-0', label: 'v2.5.0', collapsed: true },
 ];
 
