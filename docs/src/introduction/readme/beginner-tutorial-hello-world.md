@@ -8,7 +8,7 @@ description: >-
 
 ### Testing Your Install
 
-Let's make sure we're all on the same page. I'm going to assume that you've followed the [Getting Started](https://app.gitbook.com/o/ZCJLW1aBatPAwpmEV7ux/s/bJHOVUkiNubRJ8g5VX0E/) guide and have CommandBox all setup. If you haven't done that, stop and read that guide get everything setup. It's okay, this web page will wait for you.
+Let's make sure we're all on the same page. I'm going to assume that you've followed the [Getting Started](../../README.md) guide, installed the Wheels CLI via Homebrew or Chocolatey, and have Wheels set up. If you haven't done that, stop and read that guide to get everything installed. It's okay, this web page will wait for you.
 
 Okay, so you have Wheels installed and can see the Wheels "Congratulations!" page as shown below. That wasn't that hard now, was it?
 
@@ -35,7 +35,7 @@ component extends="Controller"{
 
 Congratulations, you just created your first Wheels controller! What does this controller do, you might ask? Well, to be honest, not much. It has no methods defined, so it doesn't add any new functionality to our application. But because it extends the base `Controller` component, it inherits quite a bit of powerful functionality and is now tied into our Wheels application.
 
-So what happens if we try to call our new controller right now? Lets take a look. Open your browser and point your browser to the new controller. Because my local server is installed on port 60000, my URL is `http://127.0.0.1:60000/say`. You may need to enter a different URL, depending on how your web server is configured. In my case, I'm using [CommandBox](https://www.ortussolutions.com/products/commandbox).
+So what happens if we try to call our new controller right now? Let's take a look. Open your browser and point it at the new controller. When you run `wheels server start`, the dev server listens on port 8080 by default, so the URL is `http://127.0.0.1:8080/say`. You may need a different URL depending on how your server is configured.
 
 ![Figure 2: Wheels error after setting up your blank say controller](/wheels/guides-assets/660aaf3-wheels-tutorial\_0005\_2.png)
 

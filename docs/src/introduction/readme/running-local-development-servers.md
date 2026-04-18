@@ -5,10 +5,18 @@ Wheels uses a Docker-based development environment that provides consistent, con
 ### Prerequisites
 
 1. **Docker**: Install Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
-2. **Wheels CLI**: Install the Wheels CommandBox module:
+2. **Wheels CLI**: Install via Homebrew (macOS/Linux) or Chocolatey (Windows):
+
    ```bash
-   box install wheels-cli
+   # macOS / Linux
+   brew tap wheels-dev/wheels
+   brew install wheels
+
+   # Windows
+   choco install wheels
    ```
+
+   (If you're on CommandBox, `box install wheels-cli` still works as the legacy install path.)
 
 ### Setting up Docker Development Environment
 
