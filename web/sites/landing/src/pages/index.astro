@@ -8,6 +8,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 >
 	<section class="hero">
 		<div class="hero__inner">
+			<p class="hero__eyebrow">A Rails-inspired framework for CFML</p>
 			<h1 class="hero__title">Build CFML applications, <span>fast</span>.</h1>
 			<p class="hero__subtitle">
 				Wheels is an open-source MVC framework for CFML. Rails-inspired conventions, a powerful ORM,
@@ -19,8 +20,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 				<a class="btn btn--secondary" href="https://github.com/wheels-dev/wheels">View on GitHub</a>
 			</div>
 			<pre
-				class="hero__install"><code>box install wheels-cli
-box wheels generate app MyApp</code></pre>
+				class="hero__install"><code>brew tap wheels-dev/wheels
+brew install wheels
+wheels new myapp</code></pre>
+			<p class="hero__engines">Runs on Lucee 7, Adobe ColdFusion 2023/2025, and BoxLang.</p>
 		</div>
 	</section>
 
@@ -28,6 +31,19 @@ box wheels generate app MyApp</code></pre>
 		<h2 class="features__heading">What you get out of the box</h2>
 		<ul class="features__grid">
 			<li>
+				<svg
+					class="feature-icon"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					aria-hidden="true"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"
+					></path></svg
+				>
 				<h3>MVC, done right</h3>
 				<p>
 					Clear separation between routes, controllers, models, and views. Convention over
@@ -35,6 +51,19 @@ box wheels generate app MyApp</code></pre>
 				</p>
 			</li>
 			<li>
+				<svg
+					class="feature-icon"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					aria-hidden="true"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+					></path></svg
+				>
 				<h3>Expressive ORM</h3>
 				<p>
 					Model classes map directly to database tables. Associations, validations, callbacks, and
@@ -42,6 +71,19 @@ box wheels generate app MyApp</code></pre>
 				</p>
 			</li>
 			<li>
+				<svg
+					class="feature-icon"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					aria-hidden="true"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+					></path></svg
+				>
 				<h3>Database migrations</h3>
 				<p>
 					Version your schema. <code>wheels dbmigrate latest</code> on one side and
@@ -49,6 +91,19 @@ box wheels generate app MyApp</code></pre>
 				</p>
 			</li>
 			<li>
+				<svg
+					class="feature-icon"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					aria-hidden="true"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z"
+					></path></svg
+				>
 				<h3>Modern CLI</h3>
 				<p>
 					<code>wheels generate</code>, <code>wheels test</code>, <code>wheels server</code> — a first-class
@@ -56,6 +111,19 @@ box wheels generate app MyApp</code></pre>
 				</p>
 			</li>
 			<li>
+				<svg
+					class="feature-icon"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					aria-hidden="true"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Zm.75-12h9v9h-9v-9Z"
+					></path></svg
+				>
 				<h3>Multi-engine support</h3>
 				<p>
 					Runs on Lucee 5/6/7, Adobe ColdFusion 2023/2025, and BoxLang. Primary development target
@@ -63,41 +131,63 @@ box wheels generate app MyApp</code></pre>
 				</p>
 			</li>
 			<li>
+				<svg
+					class="feature-icon"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					aria-hidden="true"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"
+					></path></svg
+				>
 				<h3>20 years strong</h3>
 				<p>
 					Started in 2006. Production-ready since 1.0 in 2009. Still actively developed, now as
-					Wheels 3.x with modern tooling.
+					Wheels 4.x with modern tooling.
 				</p>
 			</li>
 		</ul>
 	</section>
 
 	<section class="resources">
-		<h2 class="resources__heading">Where to go next</h2>
-		<div class="resources__grid">
-			<a class="resource" href="https://guides.wheels.dev/v3-0-0/">
-				<h3>Guides</h3>
-				<p>
-					Step-by-step guides from installation through deployment. v4.0-SNAPSHOT, v3.0, and v2.5
-					all available.
-				</p>
-				<span class="resource__link">guides.wheels.dev →</span>
-			</a>
-			<a class="resource" href="https://api.wheels.dev/v3-0-0/">
-				<h3>API reference</h3>
-				<p>Every function, parameter, and return type. Searchable across 8 framework versions.</p>
-				<span class="resource__link">api.wheels.dev →</span>
-			</a>
-			<a class="resource" href="https://blog.wheels.dev/">
-				<h3>Blog</h3>
-				<p>Release notes, tutorials, and community news from the Wheels core team.</p>
-				<span class="resource__link">blog.wheels.dev →</span>
-			</a>
-			<a class="resource" href="https://github.com/wheels-dev/wheels">
-				<h3>Source on GitHub</h3>
-				<p>Code, issues, discussions, and contribution guidelines. MIT licensed.</p>
-				<span class="resource__link">github.com/wheels-dev/wheels →</span>
-			</a>
+		<div class="resources__inner">
+			<h2 class="resources__heading">Where to go next</h2>
+			<p class="resources__lede">
+				The docs are split across subdomains. Pick where you need to land.
+			</p>
+			<div class="resources__grid">
+				<a class="resource" href="https://guides.wheels.dev/v3-0-0/">
+					<span class="resource__domain">guides.wheels.dev</span>
+					<h3>Guides</h3>
+					<p>
+						Step-by-step guides from installation through deployment. v4.0-SNAPSHOT, v3.0, and v2.5
+						all available.
+					</p>
+					<span class="resource__link">Open →</span>
+				</a>
+				<a class="resource" href="https://api.wheels.dev/v3-0-0/">
+					<span class="resource__domain">api.wheels.dev</span>
+					<h3>API reference</h3>
+					<p>Every function, parameter, and return type. Searchable across 8 framework versions.</p>
+					<span class="resource__link">Open →</span>
+				</a>
+				<a class="resource" href="https://blog.wheels.dev/">
+					<span class="resource__domain">blog.wheels.dev</span>
+					<h3>Blog</h3>
+					<p>Release notes, tutorials, and community news from the Wheels core team.</p>
+					<span class="resource__link">Open →</span>
+				</a>
+				<a class="resource" href="https://github.com/wheels-dev/wheels">
+					<span class="resource__domain">github.com/wheels-dev</span>
+					<h3>Source on GitHub</h3>
+					<p>Code, issues, discussions, and contribution guidelines. MIT licensed.</p>
+					<span class="resource__link">Open →</span>
+				</a>
+			</div>
 		</div>
 	</section>
 </BaseLayout>
@@ -106,76 +196,72 @@ box wheels generate app MyApp</code></pre>
 	.hero {
 		padding: 4rem 1.5rem 3rem;
 		text-align: center;
+		background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-brand-soft) 100%);
 	}
 	.hero__inner {
 		max-width: 900px;
 		margin: 0 auto;
 	}
+	.hero__eyebrow {
+		font-size: var(--text-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-brand);
+		margin: 0 0 var(--space-4);
+	}
 	.hero__title {
-		font-size: clamp(2rem, 5vw, 3.5rem);
-		line-height: 1.1;
-		margin: 0 0 1rem;
+		font-size: var(--text-5xl);
+		line-height: var(--leading-tight);
+		letter-spacing: var(--tracking-tight);
+		margin: 0 0 var(--space-4);
 	}
 	.hero__title span {
-		color: var(--color-accent);
+		color: var(--color-brand);
 	}
 	.hero__subtitle {
-		font-size: 1.125rem;
-		line-height: 1.6;
-		color: var(--color-muted);
+		font-size: var(--text-lg);
+		line-height: var(--leading-relaxed);
+		color: var(--color-fg-muted);
 		max-width: 640px;
-		margin: 0 auto 2rem;
+		margin: 0 auto var(--space-6);
 	}
 	.hero__cta {
 		display: flex;
-		gap: 0.75rem;
+		gap: var(--space-3);
 		justify-content: center;
 		flex-wrap: wrap;
-		margin-bottom: 2rem;
-	}
-	.btn {
-		display: inline-block;
-		padding: 0.75rem 1.5rem;
-		border-radius: var(--radius);
-		text-decoration: none;
-		font-weight: 600;
-		font-size: 1rem;
-		transition: transform 0.1s;
-	}
-	.btn:hover {
-		transform: translateY(-1px);
-	}
-	.btn--primary {
-		background: var(--color-accent);
-		color: white;
-	}
-	.btn--secondary {
-		background: transparent;
-		color: var(--color-fg);
-		border: 1px solid var(--color-border);
+		margin-bottom: var(--space-6);
 	}
 	.hero__install {
 		display: inline-block;
 		text-align: left;
 		background: var(--color-fg);
 		color: var(--color-bg);
-		padding: 1rem 1.5rem;
-		border-radius: var(--radius);
+		padding: var(--space-4) var(--space-5);
+		border-radius: var(--radius-lg);
 		font-family: var(--font-mono);
-		font-size: 0.9rem;
-		line-height: 1.6;
+		font-size: var(--text-sm);
+		line-height: var(--leading-relaxed);
+		margin: 0 0 var(--space-4);
+		box-shadow: var(--shadow);
+	}
+	.hero__engines {
+		font-size: var(--text-sm);
+		color: var(--color-fg-subtle);
 		margin: 0;
 	}
 
 	.features {
 		max-width: var(--max-width);
-		margin: 4rem auto;
+		margin: 5rem auto 4rem;
 		padding: 0 1.5rem;
 	}
 	.features__heading {
-		font-size: 1.75rem;
+		font-size: var(--text-3xl);
 		text-align: center;
-		margin: 0 0 2rem;
+		margin: 0 0 var(--space-6);
+		letter-spacing: var(--tracking-tight);
 	}
 	.features__grid {
 		list-style: none;
@@ -183,73 +269,111 @@ box wheels generate app MyApp</code></pre>
 		margin: 0;
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-		gap: 1.5rem;
+		gap: var(--space-5);
 	}
 	.features__grid li {
-		padding: 1.5rem;
+		padding: var(--space-5);
+		background: var(--color-bg);
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-sm);
+		transition:
+			box-shadow 0.15s,
+			transform 0.1s;
+	}
+	.features__grid li:hover {
+		box-shadow: var(--shadow);
+		transform: translateY(-2px);
+	}
+	.feature-icon {
+		width: 24px;
+		height: 24px;
+		color: var(--color-brand);
+		margin-bottom: var(--space-3);
 	}
 	.features__grid h3 {
-		font-size: 1.1rem;
-		margin: 0 0 0.5rem;
+		font-size: var(--text-lg);
+		margin: 0 0 var(--space-2);
+		font-weight: 600;
 	}
 	.features__grid p {
-		color: var(--color-muted);
-		line-height: 1.6;
+		color: var(--color-fg-muted);
+		line-height: var(--leading-relaxed);
 		margin: 0;
 	}
 	.features__grid code {
 		font-family: var(--font-mono);
 		font-size: 0.875em;
 		padding: 0.1rem 0.35rem;
-		background: var(--color-border);
-		border-radius: 0.25rem;
+		background: var(--color-surface-2);
+		border-radius: var(--radius-sm);
 	}
 
 	.resources {
-		background: var(--color-border);
+		background: var(--color-surface);
 		padding: 4rem 1.5rem;
 		margin-top: 4rem;
 	}
-	.resources__heading {
-		max-width: var(--max-width);
-		margin: 0 auto 2rem;
-		font-size: 1.75rem;
-		text-align: center;
-	}
-	.resources__grid {
+	.resources__inner {
 		max-width: var(--max-width);
 		margin: 0 auto;
+	}
+	.resources__heading {
+		font-size: var(--text-3xl);
+		text-align: center;
+		margin: 0 0 var(--space-3);
+		letter-spacing: var(--tracking-tight);
+	}
+	.resources__lede {
+		text-align: center;
+		color: var(--color-fg-muted);
+		margin: 0 0 var(--space-6);
+	}
+	.resources__grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-		gap: 1rem;
+		gap: var(--space-4);
 	}
 	.resource {
 		display: block;
-		padding: 1.5rem;
+		padding: var(--space-5);
 		background: var(--color-bg);
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius);
+		border-radius: var(--radius-lg);
 		text-decoration: none;
 		color: inherit;
-		transition: border-color 0.1s;
+		box-shadow: var(--shadow-sm);
+		transition:
+			box-shadow 0.15s,
+			border-color 0.15s,
+			transform 0.1s;
 	}
 	.resource:hover {
-		border-color: var(--color-accent);
+		box-shadow: var(--shadow);
+		border-color: var(--color-brand);
+		transform: translateY(-2px);
+		text-decoration: none;
+	}
+	.resource__domain {
+		display: block;
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--color-fg-subtle);
+		margin-bottom: var(--space-2);
 	}
 	.resource h3 {
-		font-size: 1.1rem;
-		margin: 0 0 0.5rem;
+		font-size: var(--text-lg);
+		margin: 0 0 var(--space-2);
+		font-weight: 600;
 	}
 	.resource p {
-		color: var(--color-muted);
-		margin: 0 0 0.75rem;
-		line-height: 1.5;
+		color: var(--color-fg-muted);
+		margin: 0 0 var(--space-3);
+		line-height: var(--leading-relaxed);
 	}
 	.resource__link {
-		color: var(--color-accent);
-		font-size: 0.875rem;
+		color: var(--color-brand);
+		font-size: var(--text-sm);
 		font-weight: 600;
 	}
 </style>

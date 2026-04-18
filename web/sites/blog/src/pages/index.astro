@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostCard from '../components/PostCard.astro';
+import RssPill from '@wheels-dev/ui/components/RssPill.astro';
 import { getAllPosts } from '../utils/posts.ts';
 
 const posts = await getAllPosts();
@@ -13,9 +14,18 @@ const totalPages = Math.ceil(posts.length / pageSize);
 	title="Wheels Blog"
 	description="News, tutorials, and release announcements for Wheels."
 >
-	<h1>Wheels Blog</h1>
-	<p class="lede">News, tutorials, and release announcements for the Wheels CFML MVC framework.</p>
+	<header class="blog-header">
+		<div>
+			<h1>Wheels Blog</h1>
+			<p class="lede">
+				News, tutorials, and release announcements for the Wheels CFML MVC framework.
+			</p>
+		</div>
+		<RssPill href="/rss.xml" label="RSS" />
+	</header>
+
 	{pagePosts.map((post) => <PostCard post={post} />)}
+
 	{
 		totalPages > 1 && (
 			<nav class="pager" aria-label="Pagination">
@@ -23,19 +33,33 @@ const totalPages = Math.ceil(posts.length / pageSize);
 			</nav>
 		)
 	}
+
 	<style>
+		.blog-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: var(--space-4);
+			flex-wrap: wrap;
+			margin-bottom: var(--space-6);
+		}
+		.blog-header h1 {
+			margin: 0 0 var(--space-2);
+			letter-spacing: var(--tracking-tight);
+		}
 		.lede {
-			color: var(--color-muted);
-			margin-bottom: 2rem;
+			color: var(--color-fg-muted);
+			margin: 0;
 		}
 		.pager {
-			margin-top: 2rem;
+			margin-top: var(--space-6);
 			display: flex;
 			justify-content: space-between;
 		}
 		.pager a {
-			color: var(--color-accent);
+			color: var(--color-brand);
 			text-decoration: none;
+			font-weight: 600;
 		}
 	</style>
 </BaseLayout>
