@@ -1,6 +1,8 @@
 ---
+import { getCollection } from 'astro:content';
 import Header from '../Header.astro';
 import VersionSwitcher from './VersionSwitcher.astro';
+import { computeVersionOptions } from '@wheels-dev/ui/data/versions';
 
 // Starlight passes route data via Astro.locals.starlightRoute.
 // We infer which Wheels site we're on from the `site` URL, falling back to the
@@ -11,8 +13,29 @@ let current: 'landing' | 'guides' | 'api' | 'blog' = 'landing';
 if (site.startsWith('guides')) current = 'guides';
 else if (site.startsWith('api')) current = 'api';
 else if (site.startsWith('blog')) current = 'blog';
+
+// Compute version options once per page so the inline desktop pill and
+// the mobile drawer list share the same data. Walking the docs
+// collection is cheap at build time; doing it twice wouldn't break
+// anything, but it's wasted work.
+const entryId = Astro.locals.starlightRoute?.entry?.id ?? '';
+const entries = await getCollection('docs');
+const computed = computeVersionOptions(entries, entryId, site);
+const options = computed?.options ?? [];
+const currentVersion = computed?.currentVersion ?? null;
 ---
 
 <Header current={current}>
-	<VersionSwitcher slot="after-brand" />
+	<VersionSwitcher
+		slot="after-brand"
+		variant="inline"
+		options={options}
+		currentVersion={currentVersion}
+	/>
+	<VersionSwitcher
+		slot="in-nav-drawer"
+		variant="drawer"
+		options={options}
+		currentVersion={currentVersion}
+	/>
 </Header>

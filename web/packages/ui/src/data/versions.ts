@@ -98,3 +98,64 @@ export function findEquivalentPath(
 	// 4. No match
 	return null;
 }
+
+/**
+ * Version option enriched with per-page navigation info. Produced by
+ * computeVersionOptions() and consumed by the VersionSwitcher component.
+ */
+export interface VersionOption extends VersionMeta {
+	url: string;
+	isCurrent: boolean;
+}
+
+interface CollectionEntry {
+	id: string;
+}
+
+/**
+ * Compute the list of version options for the current page. Walks the
+ * Starlight docs collection, groups entries by version slug, then for
+ * each version computes the equivalent URL using findEquivalentPath().
+ *
+ * Caller provides `entries` from `await getCollection('docs')` so this
+ * function stays framework-agnostic and testable. `entryId` is the
+ * current route's entry id (e.g., 'v4-0-0-snapshot/introduction/readme/
+ * beginner-tutorial-hello-world').
+ *
+ * Returns { options, currentVersion } or null if we couldn't resolve
+ * (non-Starlight site or no version metadata for this hostname).
+ */
+export function computeVersionOptions(
+	entries: CollectionEntry[],
+	entryId: string,
+	hostname: string | undefined
+): { options: VersionOption[]; currentVersion: VersionOption | null } | null {
+	const versions = versionsForHostname(hostname);
+	if (versions.length === 0 || !entryId) return null;
+
+	const [currentSlug, ...rest] = entryId.split('/');
+	const currentRelativePath = rest.join('/');
+
+	// Group entries by version for O(1) set lookups during fuzzy match.
+	const entriesByVersion = new Map<string, Set<string>>();
+	for (const entry of entries) {
+		const [v, ...p] = entry.id.split('/');
+		if (!v) continue;
+		if (!entriesByVersion.has(v)) entriesByVersion.set(v, new Set<string>());
+		const pathWithinVersion = p.join('/');
+		if (pathWithinVersion) entriesByVersion.get(v)!.add(pathWithinVersion);
+	}
+
+	const options: VersionOption[] = versions.map((v) => {
+		const isCurrent = v.slug === currentSlug;
+		const targetEntries = entriesByVersion.get(v.slug) ?? new Set<string>();
+		const equivalent = isCurrent
+			? currentRelativePath
+			: (findEquivalentPath(currentRelativePath, targetEntries) ?? null);
+		const url = equivalent ? `/${v.slug}/${equivalent}/` : `/${v.slug}/`;
+		return { ...v, url, isCurrent };
+	});
+
+	const currentVersion = options.find((o) => o.isCurrent) ?? null;
+	return { options, currentVersion };
+}
