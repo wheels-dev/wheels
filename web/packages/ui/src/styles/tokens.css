@@ -1,20 +1,95 @@
 :root {
+	/* ── Brand ─────────────────────────────────────────────── */
+	--color-brand: #e63946;
+	--color-brand-hover: #d12d3a;
+	--color-brand-soft: #fef2f2;
+	--color-brand-ink: #7a1820;
+
+	/* ── Surface (light) ──────────────────────────────────── */
 	--color-bg: #ffffff;
+	--color-surface: #fafaf7;
+	--color-surface-2: #f3f1ec;
+	--color-border: #e8e5df;
+	--color-border-strong: #d4d0c6;
+
+	/* ── Text (light) ─────────────────────────────────────── */
 	--color-fg: #1a1a1a;
-	--color-muted: #6b7280;
-	--color-accent: #e63946;
-	--color-border: #e5e7eb;
-	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--color-fg-muted: #6b6b68;
+	--color-fg-subtle: #9a9893;
+
+	/* ── Feedback ─────────────────────────────────────────── */
+	--color-success: #2f855a;
+	--color-warning: #b45309;
+	--color-danger: var(--color-brand);
+
+	/* ── Legacy alias (do not remove until all sites migrated) ── */
+	--color-accent: var(--color-brand);
+	--color-muted: var(--color-fg-muted);
+
+	/* ── Type ─────────────────────────────────────────────── */
+	--font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 	--font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+	--font-display: var(--font-sans);
+
+	--text-xs: 0.75rem;
+	--text-sm: 0.875rem;
+	--text-base: 1rem;
+	--text-lg: 1.125rem;
+	--text-xl: 1.25rem;
+	--text-2xl: 1.5rem;
+	--text-3xl: 1.875rem;
+	--text-4xl: 2.25rem;
+	--text-5xl: clamp(2.5rem, 5vw, 3.75rem);
+
+	--leading-tight: 1.15;
+	--leading-normal: 1.55;
+	--leading-relaxed: 1.7;
+	--tracking-tight: -0.02em;
+	--tracking-normal: 0;
+
+	/* ── Space (4px base) ─────────────────────────────────── */
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.5rem;
+	--space-6: 2rem;
+	--space-7: 3rem;
+	--space-8: 4rem;
+	--space-9: 6rem;
+
+	/* ── Radius ───────────────────────────────────────────── */
+	--radius-sm: 0.25rem;
+	--radius: 0.5rem;
+	--radius-lg: 0.75rem;
+	--radius-xl: 1rem;
+	--radius-pill: 999px;
+
+	/* ── Shadow ───────────────────────────────────────────── */
+	--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
+	--shadow: 0 4px 12px rgb(0 0 0 / 0.06);
+	--shadow-lg: 0 12px 32px rgb(0 0 0 / 0.08);
+
+	/* ── Layout ───────────────────────────────────────────── */
 	--max-width: 1200px;
-	--radius: 0.375rem;
+	--max-width-prose: 68ch;
+	--header-height: 64px;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--color-bg: #0f0f0f;
-		--color-fg: #f5f5f5;
-		--color-muted: #9ca3af;
-		--color-border: #262626;
+		--color-bg: #0f0f0e;
+		--color-surface: #181816;
+		--color-surface-2: #222220;
+		--color-border: #2a2a27;
+		--color-border-strong: #3a3a35;
+		--color-fg: #f5f5f3;
+		--color-fg-muted: #a8a6a1;
+		--color-fg-subtle: #6a6864;
+		--color-brand-soft: #2a1416;
+		--color-brand-ink: #ffb5bc;
+		--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+		--shadow: 0 4px 12px rgb(0 0 0 / 0.4);
+		--shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
 	}
 }
