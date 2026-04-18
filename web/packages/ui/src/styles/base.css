@@ -64,6 +64,22 @@ video {
 	transform: translateY(-1px);
 }
 
+.btn:focus-visible {
+	outline: 2px solid var(--color-brand);
+	outline-offset: 2px;
+}
+
+.btn:active {
+	transform: translateY(0);
+}
+
+.btn[disabled],
+.btn[aria-disabled='true'] {
+	opacity: 0.55;
+	cursor: not-allowed;
+	pointer-events: none;
+}
+
 .btn--primary {
 	background: var(--color-brand);
 	color: #fff;
