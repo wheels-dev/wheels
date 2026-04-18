@@ -1,77 +1,39 @@
 ---
-// VersionSwitcher — inline dropdown pill in the Starlight header.
+// VersionSwitcher — renders the current version selector.
 //
-// Locked UX (see docs/superpowers/specs/2026-04-18-starlight-phase-3-design.md):
-//   - Anchor: inline pill next to the wheels.dev wordmark (desktop).
-//     Folds into the hamburger drawer at <720px.
-//   - Indicator: colored badge (current/snapshot/archived) alongside the
-//     version label, always visible at rest.
-//   - Slug fallback: exact → fuzzy on final 2 segments → fuzzy on final
-//     1 segment → target version root. Computed at build time.
-//   - a11y: <details>/<summary> progressive-enhancement base. Client
-//     script upgrades to an ARIA listbox with arrow/enter/escape.
+// Two variants, same data:
+//   variant="inline"  (default) — desktop dropdown pill shown next to
+//                                 the wordmark. Hides at <720px.
+//   variant="drawer"            — mobile list folded into the hamburger
+//                                 drawer. Hides at >=720px.
+//
+// Data is computed once per page in starlight/Header.astro via
+// computeVersionOptions() and passed in as props so we don't walk the
+// docs collection twice per render.
 
-import { getCollection } from 'astro:content';
-import {
-	versionsForHostname,
-	findEquivalentPath,
-	type VersionMeta,
-} from '@wheels-dev/ui/data/versions';
+import type { VersionOption } from '@wheels-dev/ui/data/versions';
 
-const route = Astro.locals.starlightRoute;
-const entryId = route?.entry?.id ?? '';
-const hostname = Astro.site?.hostname;
-
-const versions = versionsForHostname(hostname);
-
-interface VersionOption extends VersionMeta {
-	url: string;
-	isCurrent: boolean;
+interface Props {
+	options: VersionOption[];
+	currentVersion: VersionOption | null;
+	variant?: 'inline' | 'drawer';
 }
 
-let options: VersionOption[] = [];
-let currentVersion: VersionOption | null = null;
-
-if (versions.length > 0 && entryId) {
-	// entry.id looks like 'v4-0-0-snapshot/introduction/readme/beginner-tutorial-hello-world'.
-	const [currentSlug, ...rest] = entryId.split('/');
-	const currentRelativePath = rest.join('/');
-
-	// Build a per-version set of within-version paths so fuzzy-match lookups
-	// are O(1)/O(n) depending on fallback stage. Only runs at build time.
-	const entries = await getCollection('docs');
-	const entriesByVersion = new Map<string, Set<string>>();
-	for (const entry of entries) {
-		const [v, ...p] = entry.id.split('/');
-		if (!v) continue;
-		if (!entriesByVersion.has(v)) entriesByVersion.set(v, new Set<string>());
-		const pathWithinVersion = p.join('/');
-		if (pathWithinVersion) entriesByVersion.get(v)!.add(pathWithinVersion);
-	}
-
-	options = versions.map((v) => {
-		const isCurrent = v.slug === currentSlug;
-		const targetEntries = entriesByVersion.get(v.slug) ?? new Set<string>();
-		const equivalent = isCurrent
-			? currentRelativePath
-			: (findEquivalentPath(currentRelativePath, targetEntries) ?? null);
-		const url = equivalent ? `/${v.slug}/${equivalent}/` : `/${v.slug}/`;
-		return { ...v, url, isCurrent };
-	});
-
-	currentVersion = options.find((o) => o.isCurrent) ?? null;
-}
+const { options, currentVersion, variant = 'inline' } = Astro.props;
 
 const statusLabel: Record<string, string> = {
 	current: 'current',
 	snapshot: 'snapshot',
 	archived: 'archived',
 };
+
+const isInline = variant === 'inline';
+const isDrawer = variant === 'drawer';
 ---
 
 {
-	options.length > 0 && currentVersion && (
-		<div class="wd-version-switcher" data-wd-version-switcher>
+	options.length > 0 && currentVersion && isInline && (
+		<div class="wd-version-switcher wd-version-switcher--inline" data-wd-version-switcher>
 			<details class="wd-version-switcher__details">
 				<summary class="wd-version-switcher__trigger" aria-haspopup="listbox">
 					<span class="wd-version-switcher__label">{currentVersion.label}</span>
@@ -131,25 +93,62 @@ const statusLabel: Record<string, string> = {
 	)
 }
 
+{
+	options.length > 0 && currentVersion && isDrawer && (
+		<section
+			class="wd-version-switcher wd-version-switcher--drawer"
+			aria-label="Documentation version"
+		>
+			<h3 class="wd-version-switcher__drawer-heading">Switch version</h3>
+			<ul class="wd-version-switcher__drawer-list" role="list">
+				{options.map((option) => (
+					<li>
+						<a
+							href={option.url}
+							class:list={[
+								'wd-version-switcher__drawer-option',
+								{ 'is-current': option.isCurrent },
+							]}
+							aria-current={option.isCurrent ? 'page' : undefined}
+						>
+							<span class="wd-version-switcher__label">{option.label}</span>
+							<span
+								class:list={[
+									'wd-version-switcher__badge',
+									`wd-version-switcher__badge--${option.status}`,
+								]}
+							>
+								{statusLabel[option.status] ?? option.status}
+							</span>
+						</a>
+					</li>
+				))}
+			</ul>
+		</section>
+	)
+}
+
 <script>
-	// Progressive enhancement: upgrade <details>/<summary> to a real
-	// ARIA listbox with keyboard navigation. If JS fails or hasn't
-	// loaded yet, the <details> disclosure still opens/closes and the
-	// <a> elements still navigate.
+	// Progressive enhancement for the inline variant: upgrade
+	// <details>/<summary> to a real ARIA listbox with keyboard
+	// navigation. If JS fails or hasn't loaded, the <details>
+	// disclosure still opens/closes and <a> elements still navigate.
+	// The drawer variant renders as plain anchors — no script upgrade
+	// needed, mobile browsers handle tap-to-navigate natively.
 	for (const root of document.querySelectorAll<HTMLElement>('[data-wd-version-switcher]')) {
 		const details = root.querySelector<HTMLDetailsElement>('details');
 		const listbox = root.querySelector<HTMLElement>('[role="listbox"]');
-		const options = listbox
+		const opts = listbox
 			? Array.from(listbox.querySelectorAll<HTMLAnchorElement>('[role="option"]'))
 			: [];
-		if (!details || !listbox || options.length === 0) continue;
+		if (!details || !listbox || opts.length === 0) continue;
 
-		const current = options.findIndex((o) => o.getAttribute('aria-selected') === 'true');
-		let highlightedIndex = current >= 0 ? current : 0;
+		const currentIdx = opts.findIndex((o) => o.getAttribute('aria-selected') === 'true');
+		let highlightedIndex = currentIdx >= 0 ? currentIdx : 0;
 
 		const highlight = (i: number) => {
-			highlightedIndex = (i + options.length) % options.length;
-			options.forEach((option, idx) => {
+			highlightedIndex = (i + opts.length) % opts.length;
+			opts.forEach((option, idx) => {
 				if (idx === highlightedIndex) {
 					option.setAttribute('tabindex', '0');
 					option.focus();
@@ -169,8 +168,7 @@ const statusLabel: Record<string, string> = {
 
 		details.addEventListener('toggle', () => {
 			if (details.open) {
-				// First option tab-stop opens the keyboard loop.
-				options.forEach((o, i) => o.setAttribute('tabindex', i === highlightedIndex ? '0' : '-1'));
+				opts.forEach((o, i) => o.setAttribute('tabindex', i === highlightedIndex ? '0' : '-1'));
 			}
 		});
 
@@ -190,7 +188,7 @@ const statusLabel: Record<string, string> = {
 					break;
 				case 'End':
 					event.preventDefault();
-					highlight(options.length - 1);
+					highlight(opts.length - 1);
 					break;
 				case 'Escape':
 					event.preventDefault();
@@ -199,14 +197,13 @@ const statusLabel: Record<string, string> = {
 				case 'Enter':
 				case ' ': {
 					event.preventDefault();
-					const link = options[highlightedIndex];
+					const link = opts[highlightedIndex];
 					if (link) window.location.href = link.href;
 					break;
 				}
 			}
 		});
 
-		// Click outside to close.
 		document.addEventListener('click', (event) => {
 			if (!details.open) return;
 			if (!(event.target instanceof Node)) return;
@@ -216,10 +213,39 @@ const statusLabel: Record<string, string> = {
 </script>
 
 <style>
+	/* ── Shared bits (both variants) ──────────────────────────────── */
+
 	.wd-version-switcher {
+		font-family: var(--font-sans);
+	}
+
+	.wd-version-switcher__badge {
+		display: inline-block;
+		padding: 1px 6px;
+		border-radius: 3px;
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		white-space: nowrap;
+		color: #fff;
+	}
+
+	.wd-version-switcher__badge--current {
+		background: var(--color-success);
+	}
+	.wd-version-switcher__badge--snapshot {
+		background: var(--color-warning);
+	}
+	.wd-version-switcher__badge--archived {
+		background: var(--color-fg-subtle);
+	}
+
+	/* ── Inline variant (desktop dropdown) ────────────────────────── */
+
+	.wd-version-switcher--inline {
 		position: relative;
 		display: inline-flex;
-		font-family: var(--font-sans);
 	}
 
 	.wd-version-switcher__details {
@@ -307,32 +333,68 @@ const statusLabel: Record<string, string> = {
 		font-weight: 600;
 	}
 
-	.wd-version-switcher__badge {
-		display: inline-block;
-		padding: 1px 6px;
-		border-radius: 3px;
-		font-size: 9px;
+	/* ── Drawer variant (mobile hamburger) ─────────────────────────── */
+
+	.wd-version-switcher--drawer {
+		display: block;
+		width: 100%;
+		margin-top: var(--space-3);
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--color-border);
+	}
+
+	.wd-version-switcher__drawer-heading {
+		font-size: var(--text-xs);
 		font-weight: 700;
-		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		white-space: nowrap;
-		color: #fff;
+		letter-spacing: 0.08em;
+		color: var(--color-fg-subtle);
+		margin: 0 0 var(--space-2);
 	}
 
-	.wd-version-switcher__badge--current {
-		background: var(--color-success);
+	.wd-version-switcher__drawer-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
 	}
 
-	.wd-version-switcher__badge--snapshot {
-		background: var(--color-warning);
+	.wd-version-switcher__drawer-option {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: 6px 10px;
+		border-radius: var(--radius);
+		text-decoration: none;
+		font-size: var(--text-sm);
+		color: var(--color-fg-muted);
 	}
 
-	.wd-version-switcher__badge--archived {
-		background: var(--color-fg-subtle);
+	.wd-version-switcher__drawer-option:hover,
+	.wd-version-switcher__drawer-option:focus {
+		background: var(--color-surface);
+		color: var(--color-fg);
 	}
+
+	.wd-version-switcher__drawer-option.is-current {
+		background: var(--color-brand-soft);
+		color: var(--color-brand-ink);
+		font-weight: 600;
+	}
+
+	/* ── Responsive toggle ─────────────────────────────────────────── */
 
 	@media (max-width: 720px) {
-		.wd-version-switcher {
+		.wd-version-switcher--inline {
+			display: none;
+		}
+	}
+
+	@media (min-width: 721px) {
+		.wd-version-switcher--drawer {
 			display: none;
 		}
 	}
