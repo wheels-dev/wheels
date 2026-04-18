@@ -1,45 +1,127 @@
 ---
+import Logo from './Logo.astro';
+
 const year = new Date().getFullYear();
 ---
 
 <footer class="wd-footer">
 	<div class="wd-footer__inner">
-		<p>&copy; {year} Wheels contributors. MIT licensed.</p>
-		<nav class="wd-footer__nav">
-			<a href="https://github.com/wheels-dev/wheels">GitHub</a>
-			<a href="https://guides.wheels.dev/">Guides</a>
-			<a href="https://api.wheels.dev/">API</a>
-		</nav>
+		<div class="wd-footer__brand">
+			<a href="https://wheels.dev/" aria-label="wheels.dev home">
+				<Logo variant="lockup" size="md" />
+			</a>
+			<p class="wd-footer__tagline">
+				A Rails-inspired MVC framework for CFML. Conventions, ORM, migrations, CLI.
+			</p>
+		</div>
+
+		<div class="wd-footer__col">
+			<h3 class="wd-footer__heading">Docs</h3>
+			<ul>
+				<li><a href="https://guides.wheels.dev/">Guides</a></li>
+				<li><a href="https://api.wheels.dev/">API reference</a></li>
+				<li><a href="https://blog.wheels.dev/">Blog</a></li>
+				<li><a href="https://blog.wheels.dev/rss.xml">RSS feed</a></li>
+			</ul>
+		</div>
+
+		<div class="wd-footer__col">
+			<h3 class="wd-footer__heading">Community</h3>
+			<ul>
+				<li><a href="https://github.com/wheels-dev/wheels">GitHub</a></li>
+				<li><a href="https://github.com/wheels-dev/wheels/discussions">Discussions</a></li>
+				<li><a href="https://github.com/wheels-dev/wheels/issues">Issues</a></li>
+				<li>
+					<a href="https://github.com/wheels-dev/wheels/security/policy">Security policy</a>
+				</li>
+			</ul>
+		</div>
+	</div>
+
+	<div class="wd-footer__bottom">
+		<span>&copy; {year} Wheels contributors</span>
+		<span class="wd-footer__sep">·</span>
+		<span>MIT licensed</span>
 	</div>
 </footer>
 
 <style>
 	.wd-footer {
+		background: var(--color-surface);
 		border-top: 1px solid var(--color-border);
-		padding: 2rem 1.5rem;
-		background: var(--color-bg);
-		color: var(--color-muted);
+		color: var(--color-fg-muted);
 		font-family: var(--font-sans);
-		font-size: 0.875rem;
+		font-size: var(--text-sm);
 	}
+
 	.wd-footer__inner {
 		max-width: var(--max-width);
 		margin: 0 auto;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 1rem;
-		flex-wrap: wrap;
+		padding: var(--space-7) var(--space-5) var(--space-5);
+		display: grid;
+		grid-template-columns: 2fr 1fr 1fr;
+		gap: var(--space-6);
 	}
-	.wd-footer__nav {
-		display: flex;
-		gap: 1rem;
+
+	.wd-footer__brand :global(.wd-logo) {
+		margin-bottom: var(--space-3);
 	}
-	.wd-footer__nav a {
-		color: var(--color-muted);
+
+	.wd-footer__tagline {
+		margin: 0;
+		max-width: 34ch;
+		line-height: var(--leading-normal);
+	}
+
+	.wd-footer__heading {
+		margin: 0 0 var(--space-3);
+		font-size: var(--text-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-fg);
+	}
+
+	.wd-footer__col ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.wd-footer__col a {
+		color: var(--color-fg-muted);
 		text-decoration: none;
 	}
-	.wd-footer__nav a:hover {
-		color: var(--color-fg);
+
+	.wd-footer__col a:hover {
+		color: var(--color-brand);
+		text-decoration: underline;
+	}
+
+	.wd-footer__bottom {
+		max-width: var(--max-width);
+		margin: 0 auto;
+		padding: var(--space-4) var(--space-5);
+		border-top: 1px solid var(--color-border);
+		color: var(--color-fg-subtle);
+		font-size: var(--text-xs);
+		display: flex;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.wd-footer__sep {
+		color: var(--color-border-strong);
+	}
+
+	@media (max-width: 720px) {
+		.wd-footer__inner {
+			grid-template-columns: 1fr;
+			gap: var(--space-5);
+		}
 	}
 </style>
