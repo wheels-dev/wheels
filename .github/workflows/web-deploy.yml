@@ -65,3 +65,62 @@ jobs:
             --project-name="wheels-${SITE}" \
             --branch="${DEPLOY_BRANCH}" \
             --commit-hash="${GITHUB_SHA}"
+
+  visual-regression:
+    name: Visual regression
+    # Soft-fail phase: don't block merges while baselines stabilize.
+    # Drop continue-on-error once the check is trusted as a hard gate.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build all sites
+        working-directory: web
+        run: pnpm build
+
+      - name: Run visual regression
+        working-directory: web
+        run: pnpm visual:test
+
+      - name: Upload diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-diffs
+          path: |
+            web/tests/visual-diffs/*.png
+            web/tests/visual-baselines/*.png
+          if-no-files-found: ignore
+          retention-days: 14

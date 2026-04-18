@@ -62,5 +62,9 @@ web/.pnpm-store/
 # Wayback recovery run log (resumes across runs, not meaningful for review)
 web/scripts/.wayback-log.json
 
+# Visual regression artifacts: diffs + captured actuals are produced on failure
+# runs and aren't source. Baselines at web/tests/visual-baselines/ ARE tracked.
+web/tests/visual-diffs/
+
 # Local wrangler state (from local runs of wrangler pages deploy)
 .wrangler/
