@@ -268,8 +268,21 @@ async function runCheck({ update, siteFilter }) {
 
 	if (anyFailed) {
 		console.error('\nVisual regression failures detected.');
-		console.error('If the changes are intentional, refresh baselines:');
-		console.error('  pnpm visual:baseline');
+		console.error('');
+		if (process.env.CI) {
+			console.error('Next steps:');
+			console.error('  1. Download the `visual-regression-diffs` artifact from this CI run.');
+			console.error('  2. Inspect the *.diff.png images to see what changed.');
+			console.error('  3. If the change is intentional: copy each *.actual.png over the matching');
+			console.error('     web/tests/visual-baselines/*.png, commit, and push.');
+			console.error('  4. If the change is unintentional: debug the regression on the PR branch.');
+		} else {
+			console.error('If the changes are intentional, refresh baselines:');
+			console.error('  pnpm visual:baseline');
+			console.error('');
+			console.error('Note: baselines are CI-captured (Linux font rendering). Local refreshes');
+			console.error('may still diff against CI — prefer pulling the CI artifact for final baselines.');
+		}
 		process.exit(1);
 	}
 	console.log('\nAll visual checks passed.');
