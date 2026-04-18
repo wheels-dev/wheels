@@ -23,7 +23,7 @@ Reloading Wheels is required when installing/uninstalling. (Issue a `reload=true
 {% hint style="info" %}
 **Installing Wheels CLI**
 
-Before working with plugins through CommandBox, make sure you have the Wheels CLI installed by running `box install wheels-cli`.
+Before working with plugins, make sure you have the Wheels CLI installed. On macOS / Linux: `brew tap wheels-dev/wheels && brew install wheels`. On Windows: `choco install wheels`. (If you're on CommandBox, `box install wheels-cli` still works as the legacy install path.)
 {% endhint %}
 
 With the Wheels CLI installed, you can just do:

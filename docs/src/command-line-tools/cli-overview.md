@@ -4,7 +4,7 @@ Welcome to the comprehensive documentation for the Wheels CLI - a powerful comma
 
 ## What is Wheels CLI?
 
-Wheels CLI is a CommandBox module that provides a comprehensive set of tools for developing Wheels applications. It offers:
+Wheels CLI is the command-line tool for developing Wheels applications. In 4.0 it ships as a Homebrew / Chocolatey formula that bundles [LuCLI](https://github.com/cybersonic/LuCLI) — no CommandBox required. The same CLI also works as a CommandBox module for teams already invested in that toolchain. It offers:
 
 - **Code Generation** - Quickly scaffold models, controllers, views, and complete CRUD operations
 - **Database Migrations** - Manage database schema changes with version control
@@ -118,27 +118,25 @@ wheels security scan
 
 ## Getting Started
 
-### Option A: LuCLI (Recommended)
+### Option A: Homebrew / Chocolatey (Recommended)
 
-1. **Install LuCLI**:
+1. **Install the Wheels CLI** — LuCLI and the Wheels module are bundled:
+
    ```bash
-   # macOS
-   brew install lucli
+   # macOS / Linux
+   brew tap wheels-dev/wheels
+   brew install wheels
 
    # Windows
-   choco install lucli
+   choco install wheels
    ```
 
-2. **Install Wheels module**:
-   ```bash
-   lucli modules install wheels
-   ```
+2. **Create Your First App**:
 
-3. **Create Your First App**:
    ```bash
    wheels new myapp
    cd myapp
-   wheels start
+   wheels server start
    ```
 
 ### Option B: CommandBox
