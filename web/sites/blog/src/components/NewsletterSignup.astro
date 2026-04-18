@@ -1,12 +1,11 @@
 ---
-// Buttondown embed for wheels blog newsletter.
 const username = 'wheelsdev';
 const action = `https://buttondown.com/api/emails/embed-subscribe/${username}`;
 ---
 
 <section class="newsletter" aria-label="Newsletter signup">
 	<h2>Newsletter</h2>
-	<p>Release notes and new posts, once a month. No spam.</p>
+	<p class="newsletter__lede">Release notes and new posts, once a month. No spam.</p>
 	<form
 		action={action}
 		method="post"
@@ -16,49 +15,57 @@ const action = `https://buttondown.com/api/emails/embed-subscribe/${username}`;
 	>
 		<label class="sr-only" for="bd-email">Email</label>
 		<input type="email" id="bd-email" name="email" placeholder="you@example.com" required />
-		<button type="submit">Subscribe</button>
+		<button type="submit" class="btn btn--primary">Subscribe</button>
 	</form>
+	<p class="newsletter__rss">
+		Prefer RSS? <a href="/rss.xml">Subscribe to the feed →</a>
+	</p>
 </section>
 
 <style>
 	.newsletter {
 		max-width: 720px;
-		margin: 3rem auto;
-		padding: 1.5rem;
+		margin: var(--space-7) auto;
+		padding: var(--space-6);
+		background: var(--color-surface);
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius);
-		background: var(--color-bg);
+		border-radius: var(--radius-lg);
 	}
 	.newsletter h2 {
-		font-size: 1.1rem;
-		margin: 0 0 0.5rem;
+		font-size: var(--text-xl);
+		margin: 0 0 var(--space-2);
 	}
-	.newsletter p {
-		color: var(--color-muted);
-		margin: 0 0 1rem;
+	.newsletter__lede {
+		color: var(--color-fg-muted);
+		margin: 0 0 var(--space-4);
 	}
 	.newsletter__form {
 		display: flex;
-		gap: 0.5rem;
+		gap: var(--space-2);
 		flex-wrap: wrap;
 	}
 	.newsletter__form input {
-		flex: 1 1 220px;
-		padding: 0.5rem 0.75rem;
+		flex: 1 1 240px;
+		padding: var(--space-3) var(--space-4);
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius);
+		border-radius: var(--radius-pill);
 		font: inherit;
 		background: var(--color-bg);
 		color: var(--color-fg);
 	}
-	.newsletter__form button {
-		padding: 0.5rem 1rem;
-		border: none;
-		border-radius: var(--radius);
-		background: var(--color-accent);
-		color: white;
-		font: inherit;
-		cursor: pointer;
+	.newsletter__form input:focus {
+		outline: none;
+		border-color: var(--color-brand);
+		box-shadow: 0 0 0 3px var(--color-brand-soft);
+	}
+	.newsletter__rss {
+		margin: var(--space-4) 0 0;
+		font-size: var(--text-sm);
+		color: var(--color-fg-muted);
+	}
+	.newsletter__rss a {
+		color: var(--color-brand);
+		font-weight: 600;
 	}
 	.sr-only {
 		position: absolute;
