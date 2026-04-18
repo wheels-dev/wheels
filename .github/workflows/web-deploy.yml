@@ -68,9 +68,12 @@ jobs:
 
   visual-regression:
     name: Visual regression
-    # Soft-fail phase: don't block merges while baselines stabilize.
-    # Drop continue-on-error once the check is trusted as a hard gate.
-    continue-on-error: true
+    # Hard gate as of 2026-04. Baselines soaked through the initial
+    # Phase 3 rollout (#2158, #2159, #2160, #2161, #2162). If this job
+    # fails on your PR and the change is intentional, download the
+    # `visual-regression-diffs` artifact and copy each `*.actual.png`
+    # over the matching `web/tests/visual-baselines/*.png`, commit,
+    # and push.
     runs-on: ubuntu-latest
     permissions:
       contents: read
