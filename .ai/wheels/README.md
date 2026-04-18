@@ -63,6 +63,24 @@ Background job processing:
 - Job creation, enqueueing, and processing
 - Queue statistics and management
 
+### [MCP](./mcp/)
+AI agent integration via Model Context Protocol:
+- LuCLI stdio MCP architecture and tool surface
+- Per-IDE setup (.mcp.json / .opencode.json)
+- Tool reference for the 16 MCP-exposed commands
+
+### [Middleware](./middleware/)
+Request-pipeline middleware:
+- Middleware pipeline structure (global + route-scoped)
+- Rate limiting (fixed window, sliding window, token bucket)
+- Tenant resolver for multi-tenant apps
+
+### [Packages](./packages/)
+First-party optional modules (replacing the legacy plugins/):
+- Package manifest format (package.json)
+- Activation model (packages/ → vendor/)
+- First-party packages: sentry, hotwire, basecoat
+
 ### [Patterns](./patterns/)
 Common development patterns in Wheels:
 - Design patterns and best practices
