@@ -8,8 +8,8 @@ or use the search bar (top right) to find a topic across all versions.
 
 ## Available versions
 
-- **[v3.1.0 (current)](/v3-1-0/)** — latest guides for Wheels 3.x
-- [v3.0.0](/v3-0-0/) — frozen snapshot for the 3.0 release
+- **[v4.0.0-SNAPSHOT (dev)](/v4-0-0-snapshot/)** — in-progress guides, synced from the `develop` branch
+- [v3.0.0 (current release)](/v3-0-0/) — stable guides for the Wheels 3.0 release
 - [v2.5.0](/v2-5-0/) — frozen snapshot for the 2.5 release
 
 ## What's in a guide
