@@ -14,9 +14,14 @@
 		"dev:guides": "pnpm --filter @wheels-dev/site-guides dev",
 		"dev:api": "pnpm --filter @wheels-dev/site-api dev",
 		"format": "prettier --write \"**/*.{astro,ts,tsx,md,json,css}\"",
-		"format:check": "prettier --check \"**/*.{astro,ts,tsx,md,json,css}\""
+		"format:check": "prettier --check \"**/*.{astro,ts,tsx,md,json,css}\"",
+		"visual:test": "node scripts/visual-regression.mjs",
+		"visual:baseline": "node scripts/visual-regression.mjs --update"
 	},
 	"devDependencies": {
+		"pixelmatch": "^7.1.0",
+		"playwright": "^1.59.1",
+		"pngjs": "^7.0.0",
 		"prettier": "^3.4.2",
 		"prettier-plugin-astro": "^0.14.1",
 		"typescript": "^5.7.2"
