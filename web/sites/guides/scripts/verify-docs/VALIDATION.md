@@ -4,13 +4,20 @@ Every non-illustrative code block in the v4 guides carries a `{test:*}` meta
 string the harness uses to validate it. Three flavors. The harness ignores
 any fenced code block that does not carry a `{test:*}` meta flag.
 
-**Driver status:** Phase 1 ships drivers for `{test:cli}` and `{test:tutorial}`.
-`{test:compile}` is still deferred (needs a `wheels check <file>` CLI subcommand).
+**Driver status:** Phase 1 ships drivers for `{test:cli}`, `{test:tutorial}`,
+and `{test:compile}`.
 
 ## `{test:compile}`
 
-The block is written to a temp file and compiled against Lucee 7 via the
-`wheels` CLI. Pass if compilation succeeds.
+The body is handed to `wheels cfml <body>`. Pass if exit code 0. Fail if
+non-zero. Requires [LuCLI PR #1](https://github.com/lucee/LuCLI) which
+makes `wheels cfml` exit non-zero on execution failures.
+
+On older LuCLI versions (where `wheels cfml` always exits 0 regardless
+of CFML errors), the driver falls back to a pattern-match validator —
+currently only a bracket-balance check. The mode is detected once per
+harness run via a probe (`wheels cfml 'throw()'` — if it exits 0,
+fallback; if non-zero, native).
 
 ```cfm {test:compile}
 component extends="Model" {
@@ -19,6 +26,13 @@ component extends="Model" {
   }
 }
 ```
+
+**Fallback-mode caveat:** The bracket check catches obvious typos but
+does NOT validate CFML syntax or semantics. A block like
+`hasMany("comments", dependent="delete")` (mixed positional + named
+args — a real Wheels anti-pattern) passes the fallback but would fail
+a real parse. This is acceptable: fallback buys you typo detection
+while we wait for PR #1 to land.
 
 ## `{test:cli cmd="..."}`
 

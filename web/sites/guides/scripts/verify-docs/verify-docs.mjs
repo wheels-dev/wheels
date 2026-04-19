@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { extractExamples } from './lib/extract.mjs';
 import { printReport } from './lib/report.mjs';
 import { runCli } from './drivers/cli.mjs';
+import { runCompile } from './drivers/compile.mjs';
 import { TutorialSession } from './drivers/tutorial.mjs';
 import { enrichWithSidebarOrder, partitionAndOrder } from './lib/orchestrator.mjs';
 
@@ -46,6 +47,7 @@ async function main() {
 
   const perBlockResults = await Promise.all(perBlock.map(async (ex) => {
     if (ex.kind === 'cli') return { ...ex, ...(await runCli(ex)) };
+    if (ex.kind === 'compile') return { ...ex, ...(await runCompile(ex)) };
     return { ...ex, ok: false, message: `no driver for kind "${ex.kind}"` };
   }));
 

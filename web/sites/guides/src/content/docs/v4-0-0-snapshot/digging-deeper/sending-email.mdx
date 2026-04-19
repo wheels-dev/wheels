@@ -24,7 +24,7 @@ This page shows you how to send email from a Wheels app. You'll configure SMTP, 
 
 Open `config/settings.cfm` and set your SMTP credentials:
 
-```cfm title="config/settings.cfm"
+```cfm {test:compile}
 set(mailerSettings = {
     server: "smtp.example.com",
     port: 587,
@@ -45,7 +45,7 @@ Creates `app/mailers/WelcomeMailer.cfc` and `app/views/welcomemailer/welcome.cfm
 
 ## Write the mailer
 
-```cfm title="app/mailers/WelcomeMailer.cfc"
+```cfm {test:compile}
 component extends="Mailer" {
     function welcome(required struct user) {
         this.from = "no-reply@example.com";
@@ -68,7 +68,7 @@ The function sets headers and hands off rendering to the view.
 
 ## Send it from a controller
 
-```cfm title="app/controllers/Users.cfc"
+```cfm {test:compile}
 component extends="Controller" {
     function create() {
         user = model("User").create(params.user);

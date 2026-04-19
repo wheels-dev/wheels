@@ -26,12 +26,11 @@ function runEntry(args) {
 
 test('verify-docs reports pass/fail counts', { timeout: 300_000 }, async () => {
   const { code, stdout } = await runEntry([fixture]);
-  // Phase 1 drivers: cli + tutorial. Fixture has compile + cli + tutorial.
-  // cli + tutorial pass, compile still reports "no driver" → exit 1.
-  assert.equal(code, 1);
+  // Phase 1 drivers: cli + tutorial + compile. Fixture has compile + cli +
+  // tutorial; all three pass (compile falls back to bracket-check when
+  // LuCLI PR #1 isn't installed, which still accepts the balanced sample).
+  assert.equal(code, 0);
   assert.match(stdout, /passed/);
-  assert.match(stdout, /failed/);
-  assert.match(stdout, /no driver for kind "compile"/);
 });
 
 test('verify-docs exits 2 when no files match', async () => {

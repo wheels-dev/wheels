@@ -101,7 +101,7 @@ Three directories matter right now:
 
 2. Add a new line before `.wildcard()`:
 
-   ```cfm title="config/routes.cfm — your edit"
+   ```cfm {test:compile}
    mapper()
        .root(to="home##index", method="get")
        .get(name="hello", pattern="/hello", to="home##hello")
@@ -113,7 +113,7 @@ Three directories matter right now:
 
 3. Open `app/controllers/Home.cfc`. Add a `hello` action:
 
-   ```cfm title="app/controllers/Home.cfc"
+   ```cfm {test:compile}
    component extends="Controller" {
        function index() {}
        function hello() {}
