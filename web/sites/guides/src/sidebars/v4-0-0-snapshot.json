@@ -1,0 +1,69 @@
+[
+  {
+    "label": "Start Here",
+    "link": "/v4-0-0-snapshot/start-here/",
+    "items": [
+      { "label": "Welcome to Wheels", "link": "/v4-0-0-snapshot/start-here/welcome/" },
+      { "label": "Why Wheels?", "link": "/v4-0-0-snapshot/start-here/why-wheels/" },
+      { "label": "Installing Wheels", "link": "/v4-0-0-snapshot/start-here/installing/" },
+      { "label": "Your First 15 Minutes", "link": "/v4-0-0-snapshot/start-here/first-15-minutes/" },
+      {
+        "label": "Tutorial: Build a Blog",
+        "link": "/v4-0-0-snapshot/start-here/tutorial/",
+        "items": [
+          { "label": "1. Hello, Wheels", "link": "/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/" }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "Core Concepts",
+    "link": "/v4-0-0-snapshot/core-concepts/",
+    "items": [
+      { "label": "The Request Lifecycle", "link": "/v4-0-0-snapshot/core-concepts/request-lifecycle/" }
+    ]
+  },
+  {
+    "label": "The Basics",
+    "link": "/v4-0-0-snapshot/basics/",
+    "items": []
+  },
+  {
+    "label": "Digging Deeper",
+    "link": "/v4-0-0-snapshot/digging-deeper/",
+    "items": [
+      { "label": "Sending Email", "link": "/v4-0-0-snapshot/digging-deeper/sending-email/" }
+    ]
+  },
+  {
+    "label": "Testing",
+    "link": "/v4-0-0-snapshot/testing/",
+    "items": []
+  },
+  {
+    "label": "Deployment & Operations",
+    "link": "/v4-0-0-snapshot/deployment/",
+    "items": []
+  },
+  {
+    "label": "CLI Reference",
+    "link": "/v4-0-0-snapshot/cli-reference/",
+    "items": [
+      { "label": "wheels dbmigrate latest", "link": "/v4-0-0-snapshot/cli-reference/dbmigrate-latest/" }
+    ]
+  },
+  {
+    "label": "Contributing & Project",
+    "link": "/v4-0-0-snapshot/contributing/",
+    "items": []
+  },
+  {
+    "label": "Upgrading",
+    "link": "/v4-0-0-snapshot/upgrading/",
+    "items": []
+  },
+  {
+    "label": "Glossary",
+    "link": "/v4-0-0-snapshot/glossary/"
+  }
+]
