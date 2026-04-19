@@ -1,7 +1,12 @@
 # verify-docs — Metadata Reference
 
 Every non-illustrative code block in the v4 guides carries a `{test:*}` meta
-string the harness uses to validate it. Three flavors.
+string the harness uses to validate it. Three flavors. The harness ignores
+any fenced code block that does not carry a `{test:*}` meta flag.
+
+**Driver status:** Phase 0 ships drivers for `{test:compile}` and `{test:cli}`.
+`{test:tutorial}` is documented below but its driver lands in Phase 1 —
+content authored now with `{test:tutorial}` will fail until Phase 1 ships.
 
 ## `{test:compile}`
 
@@ -52,5 +57,3 @@ Blocks that cannot or should not compile:
 ```cfm title="illustrative — do not type"
 someAPI.callThat.doesntExistYet();
 ```
-
-The harness ignores blocks without a `{test:*}` meta flag.

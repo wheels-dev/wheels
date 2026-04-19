@@ -10,8 +10,19 @@ import { spawn } from 'node:child_process';
  * pre-tokenize into program + args.
  */
 export function runExec(program, args = [], opts = {}) {
+  // Whitelist the spawn options we actually need. Anything else (especially
+  // `shell`) is dropped — we must never let a caller re-enable shell execution.
+  const { cwd, env, timeout } = opts;
+  const spawnOpts = {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+  };
+  if (cwd !== undefined) spawnOpts.cwd = cwd;
+  if (env !== undefined) spawnOpts.env = env;
+  if (timeout !== undefined) spawnOpts.timeout = timeout;
+
   return new Promise((resolve) => {
-    const proc = spawn(program, args, { ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
+    const proc = spawn(program, args, spawnOpts);
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', (d) => (stdout += d.toString()));
@@ -27,9 +38,9 @@ export function runExec(program, args = [], opts = {}) {
  * who need those must restructure the command or mark it illustrative.
  */
 export function tokenize(command) {
-  const parts = command.trim().split(/\s+/);
-  if (parts.length === 0 || parts[0] === '') {
+  const trimmed = command.trim();
+  if (trimmed === '') {
     throw new Error('empty command');
   }
-  return parts;
+  return trimmed.split(/\s+/);
 }
