@@ -1,12 +1,14 @@
 import { runExec } from '../lib/exec.mjs';
 
-let _mode = null;
+// Cache the *promise*, not the resolved value, so concurrent callers
+// (e.g. Promise.all over many compile blocks) share one probe.
+let _modePromise = null;
 
-export async function detectMode() {
-  if (_mode) return _mode;
-  const probe = await runExec('wheels', ['cfml', 'throw(message="probe")']);
-  _mode = probe.code === 0 ? 'fallback' : 'native';
-  return _mode;
+export function detectMode() {
+  if (_modePromise) return _modePromise;
+  _modePromise = runExec('wheels', ['cfml', 'throw(message="probe")'])
+    .then((probe) => (probe.code === 0 ? 'fallback' : 'native'));
+  return _modePromise;
 }
 
 function balanced(body) {
