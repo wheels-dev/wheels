@@ -1,5 +1,6 @@
 import { runExec, tokenize } from '../lib/exec.mjs';
 import { createFixture, destroyFixture } from '../lib/fixtures.mjs';
+import { assertCliResult } from '../lib/cli-assert.mjs';
 
 /**
  * Runs a `wheels` command in a fresh fixture app and asserts output + exit.
@@ -20,14 +21,6 @@ export async function runCli(example) {
   const cmd = example.attrs.cmd;
   if (!cmd) return { ok: false, message: 'missing required attr: cmd' };
 
-  const expectedExit =
-    example.attrs['asserts-exit'] !== undefined
-      ? Number(example.attrs['asserts-exit'])
-      : 0;
-  const expectedStdout = example.attrs['asserts-stdout'];
-  const expectedStderr = example.attrs['asserts-stderr'];
-  const expectedOutput = example.attrs['asserts-output'];
-
   let tokens;
   try {
     tokens = tokenize(cmd);
@@ -39,34 +32,7 @@ export async function runCli(example) {
   const fixture = await createFixture();
   try {
     const result = await runExec(program, args, { cwd: fixture });
-    if (result.code !== expectedExit) {
-      return {
-        ok: false,
-        message: `expected exit ${expectedExit}, got ${result.code}\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`,
-      };
-    }
-    if (expectedStdout !== undefined && !result.stdout.includes(expectedStdout)) {
-      return {
-        ok: false,
-        message: `stdout missing expected text "${expectedStdout}"\n--- stdout ---\n${result.stdout}`,
-      };
-    }
-    if (expectedStderr !== undefined && !result.stderr.includes(expectedStderr)) {
-      return {
-        ok: false,
-        message: `stderr missing expected text "${expectedStderr}"\n--- stderr ---\n${result.stderr}`,
-      };
-    }
-    if (
-      expectedOutput !== undefined &&
-      !(result.stdout.includes(expectedOutput) || result.stderr.includes(expectedOutput))
-    ) {
-      return {
-        ok: false,
-        message: `combined output missing expected text "${expectedOutput}"\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`,
-      };
-    }
-    return { ok: true };
+    return assertCliResult(result, example.attrs);
   } finally {
     await destroyFixture(fixture);
   }

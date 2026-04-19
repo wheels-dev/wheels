@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -8,16 +9,36 @@ import {
   runInFixture,
   fixturePath,
 } from '../lib/tutorial-fixture.mjs';
-import { runCli } from './cli.mjs';
+import { assertCliResult } from '../lib/cli-assert.mjs';
+
+function findFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.unref();
+    srv.on('error', reject);
+    srv.listen(0, () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
 
 async function rewriteLuceePorts(port, shutdownPort) {
-  const p = join(fixturePath(), 'lucee.json');
-  const raw = await readFile(p, 'utf8');
+  const cfgPath = join(fixturePath(), 'lucee.json');
+  let raw;
+  try {
+    raw = await readFile(cfgPath, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new Error(`lucee.json not found in fixture at ${cfgPath} — wheels new may have changed its layout`);
+    }
+    throw err;
+  }
   const cfg = JSON.parse(raw);
   cfg.port = port;
   cfg.shutdownPort = shutdownPort;
   cfg.openBrowser = false;
-  await writeFile(p, JSON.stringify(cfg, null, 2), 'utf8');
+  await writeFile(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
 }
 
 const HTTP_ASSERT_RE = /^(GET|POST|PUT|PATCH|DELETE)\s+(\S+)\s*(?:→|->)\s*(\d+)(?:\s+"([^"]+)")?\s*$/;
@@ -59,15 +80,20 @@ export class TutorialSession {
 
   async ensureServer() {
     if (this.server) return this.server;
-    // Random free port. Avoids 8080/8081 which are commonly held on
-    // developer machines (Docker etc.). Also updates lucee.json so the
-    // lucli-driven Tomcat actually binds there.
-    const port = 9000 + Math.floor(Math.random() * 500);
-    const shutdownPort = port + 1;
+    // Ask the OS for a free port so we don't collide with random services.
+    // Tiny TOCTOU window between close+bind is acceptable in practice; if CI
+    // ever sees flakes, wrap this in a bounded retry loop.
+    const port = await findFreePort();
+    const shutdownPort = await findFreePort();
     await rewriteLuceePorts(port, shutdownPort);
+    // stdio is fully ignored: nothing here consumes the pipes, and leaving
+    // them as 'pipe' risks Lucee's boot logs filling the ~64KB pipe buffer
+    // and deadlocking the child (which would surface as a spurious
+    // waitForListening timeout). The timeout error message alone is
+    // diagnostic enough; add an env-gated log capture later if needed.
     const proc = spawn('wheels', ['start'], {
       cwd: fixturePath(),
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'ignore', 'ignore'],
       shell: false,
     });
     try {
@@ -139,23 +165,7 @@ async function runCliInFixture(ex) {
     return { ok: false, message: `cumulative cli examples must use 'wheels', got '${program}'` };
   }
   const result = await runInFixture(args);
-  const expectedExit = ex.attrs['asserts-exit'] !== undefined ? Number(ex.attrs['asserts-exit']) : 0;
-  if (result.code !== expectedExit) {
-    return { ok: false, message: `expected exit ${expectedExit}, got ${result.code}\n${result.stderr || result.stdout}` };
-  }
-  const stdoutAssert = ex.attrs['asserts-stdout'];
-  const stderrAssert = ex.attrs['asserts-stderr'];
-  const outputAssert = ex.attrs['asserts-output'];
-  if (stdoutAssert && !result.stdout.includes(stdoutAssert)) {
-    return { ok: false, message: `stdout missing "${stdoutAssert}"\n${result.stdout}` };
-  }
-  if (stderrAssert && !result.stderr.includes(stderrAssert)) {
-    return { ok: false, message: `stderr missing "${stderrAssert}"\n${result.stderr}` };
-  }
-  if (outputAssert && !(result.stdout.includes(outputAssert) || result.stderr.includes(outputAssert))) {
-    return { ok: false, message: `output missing "${outputAssert}"\n${result.stdout}\n${result.stderr}` };
-  }
-  return { ok: true };
+  return assertCliResult(result, ex.attrs);
 }
 
 async function countRows(table) {
@@ -177,10 +187,4 @@ async function waitForListening(port, timeoutMs) {
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`wheels server did not listen on port ${port} within ${timeoutMs}ms`);
-}
-
-export async function runTutorial(example, session) {
-  if (example.kind === 'tutorial') return await session.applyTutorialExample(example);
-  if (example.kind === 'cli') return await session.applyCliExample(example);
-  return { ok: false, message: `tutorial driver received unexpected kind: ${example.kind}` };
 }

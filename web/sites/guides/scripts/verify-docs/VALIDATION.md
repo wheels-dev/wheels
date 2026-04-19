@@ -70,6 +70,10 @@ Optional attrs:
 - `asserts-db-rows="table1=N,table2=M"` — after the file is written, assert
   `SELECT COUNT(*)` equals N for each table.
 
+**Note:** `asserts-db-rows` is implemented but not exercised by any sample
+page yet. First use may reveal adjustments needed in the `wheels cfml`
+invocation. File a bug if it misbehaves.
+
 Ordering across files is by (frontmatter sidebar.order, step, file line).
 
 ```mdx
