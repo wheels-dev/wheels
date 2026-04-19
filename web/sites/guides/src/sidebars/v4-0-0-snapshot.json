@@ -49,7 +49,7 @@
     "label": "CLI Reference",
     "link": "/v4-0-0-snapshot/cli-reference/",
     "items": [
-      { "label": "wheels dbmigrate latest", "link": "/v4-0-0-snapshot/cli-reference/dbmigrate-latest/" }
+      { "label": "wheels info", "link": "/v4-0-0-snapshot/cli-reference/info/" }
     ]
   },
   {

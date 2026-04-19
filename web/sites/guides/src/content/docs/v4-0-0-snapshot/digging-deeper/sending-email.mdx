@@ -1,0 +1,92 @@
+---
+title: Sending Email
+description: Send transactional email from a Wheels controller or mailer.
+type: howto
+sidebar:
+  order: 1
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to send email from a Wheels app. You'll configure SMTP, write a mailer, and send a welcome message after signup.
+
+**You'll learn:**
+
+- How to configure SMTP in `config/settings.cfm`
+- How to define a mailer in `app/mailers/`
+- How to send mail from a controller action
+
+<Aside type="note">
+  You should already know: basic Wheels controllers, generators, and the `params` struct. Finish the [tutorial](/v4-0-0-snapshot/start-here/tutorial/) first.
+</Aside>
+
+## Configure SMTP
+
+Open `config/settings.cfm` and set your SMTP credentials:
+
+```cfm title="config/settings.cfm"
+set(mailerSettings = {
+    server: "smtp.example.com",
+    port: 587,
+    username: "you@example.com",
+    password: application.wo.env("SMTP_PASSWORD")
+});
+```
+
+Use an environment variable loader for secrets — don't commit passwords to source.
+
+## Generate a mailer
+
+```bash title="your shell"
+wheels generate mailer WelcomeMailer welcome
+```
+
+Creates `app/mailers/WelcomeMailer.cfc` and `app/views/welcomemailer/welcome.cfm`.
+
+## Write the mailer
+
+```cfm title="app/mailers/WelcomeMailer.cfc"
+component extends="Mailer" {
+    function welcome(required struct user) {
+        this.from = "no-reply@example.com";
+        this.to = arguments.user.email;
+        this.subject = "Welcome to #arguments.user.firstName#!";
+    }
+}
+```
+
+The function sets headers and hands off rendering to the view.
+
+## Write the template
+
+```cfm title="app/views/welcomemailer/welcome.cfm"
+<cfoutput>
+<p>Hi #user.firstName#,</p>
+<p>Welcome to the blog. Log in any time at #linkTo(route='login')#.</p>
+</cfoutput>
+```
+
+## Send it from a controller
+
+```cfm title="app/controllers/Users.cfc"
+component extends="Controller" {
+    function create() {
+        user = model("User").create(params.user);
+        if (user.hasErrors()) {
+            renderView(action="new");
+            return;
+        }
+        sendMail(mailer="WelcomeMailer", method="welcome", user=user);
+        redirectTo(route="login", success="Welcome! Please log in.");
+    }
+}
+```
+
+`sendMail()` runs synchronously by default. For production, enqueue it as a background job so the request returns fast.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Background Jobs" href="/v4-0-0-snapshot/digging-deeper/" description="Send mail in the background." />
+  <LinkCard title="Configuration and Secrets" href="/v4-0-0-snapshot/core-concepts/" description="How Wheels loads environment-specific settings." />
+</CardGrid>

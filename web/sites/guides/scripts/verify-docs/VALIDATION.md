@@ -27,8 +27,15 @@ The `cmd` is tokenized on whitespace and executed in a fresh fixture app.
 Optional attrs:
 
 - `asserts-stdout="text"` — stdout must contain `text`.
+- `asserts-stderr="text"` — stderr must contain `text`.
+- `asserts-output="text"` — stdout *or* stderr must contain `text` (forgiving default when the author doesn't care which stream).
 - `asserts-exit=N` — process must exit with code `N` (default 0).
 - `step=N` — cumulative ordering within a file.
+
+The `wheels` CLI writes user-facing reports to stderr for some commands
+(e.g. `wheels info`) and stdout for others (e.g. `wheels --version`).
+Reach for `asserts-output` when you don't want your test coupled to that
+stream distinction.
 
 ```bash {test:cli cmd="wheels dbmigrate latest" asserts-stdout="Migrating up"}
 wheels dbmigrate latest

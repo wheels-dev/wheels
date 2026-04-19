@@ -1,0 +1,163 @@
+---
+title: "Part 1: Hello, Wheels"
+description: Install Wheels, create your first app, and render a page. No concepts yet — just get something running in 20 minutes.
+type: tutorial
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps, FileTree } from '@astrojs/starlight/components';
+
+You'll install the Wheels CLI, create a new app called `blog`, start the dev server, and render a custom page. By the end, `curl localhost:8080/hello` returns "Hello, World."
+
+**You'll learn:**
+
+- How to install Wheels on your machine
+- What `wheels new` scaffolds
+- How to add a route, controller, and view
+
+<Aside type="note">
+  This is Part 1 of the [Build a Blog tutorial](/v4-0-0-snapshot/start-here/tutorial/). You don't need any Wheels or CFML experience — just general programming.
+</Aside>
+
+## Install the Wheels CLI
+
+If you haven't installed Wheels yet, see [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) for macOS, Windows, and Linux.
+
+Verify your install:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+You should see a Wheels version number. If not, revisit the install guide.
+
+## Create the app
+
+<Steps>
+
+1. Create a new app called `blog`:
+
+   ```bash title="run in a fresh directory"
+   wheels new blog
+   ```
+
+   This scaffolds a Wheels 4.0 app with Turbo and Basecoat pre-activated.
+
+2. Move into the new directory:
+
+   ```bash title="your shell"
+   cd blog
+   ```
+
+3. Start the dev server:
+
+   ```bash title="your shell"
+   wheels server start
+   ```
+
+   You'll see `Wheels server running at http://localhost:8080`.
+
+</Steps>
+
+Open `http://localhost:8080` in your browser. You'll see the Wheels welcome page.
+
+## What got created?
+
+<FileTree>
+- blog
+  - app
+    - controllers/
+    - models/
+    - views/
+  - config
+    - routes.cfm
+    - settings.cfm
+  - vendor
+    - wheels/
+    - hotwire/
+    - basecoat/
+  - box.json
+</FileTree>
+
+Three directories matter right now:
+
+- `app/controllers/` — request-handling code
+- `app/views/` — templates
+- `config/routes.cfm` — URL-to-controller mapping
+
+## Add a `/hello` route
+
+<Steps>
+
+1. Open `config/routes.cfm`. You'll see:
+
+   ```cfm title="config/routes.cfm — illustrative"
+   mapper()
+       .root(to="home##index", method="get")
+       .wildcard()
+   .end();
+   ```
+
+2. Add a new line before `.wildcard()`:
+
+   ```cfm title="config/routes.cfm — your edit"
+   mapper()
+       .root(to="home##index", method="get")
+       .get(name="hello", pattern="/hello", to="home##hello")
+       .wildcard()
+   .end();
+   ```
+
+   `.get(...)` declares: when a GET hits `/hello`, run the `hello` action on the `Home` controller.
+
+3. Open `app/controllers/Home.cfc`. Add a `hello` action:
+
+   ```cfm title="app/controllers/Home.cfc"
+   component extends="Controller" {
+       function index() {}
+       function hello() {}
+   }
+   ```
+
+   Wheels renders the view at `app/views/home/hello.cfm`.
+
+4. Create `app/views/home/hello.cfm`:
+
+   ```cfm title="app/views/home/hello.cfm"
+   <h1>Hello, World</h1>
+   ```
+
+5. Reload the app so it sees your changes:
+
+   ```bash title="your shell"
+   wheels reload
+   ```
+
+</Steps>
+
+## Checkpoint
+
+Your app should now respond to `/hello`:
+
+```bash title="verify"
+curl -s http://localhost:8080/hello
+```
+
+Expected: `<h1>Hello, World</h1>` in the response.
+
+<Aside type="tip">
+  Click between the welcome page and `/hello`. No page flash — that's Turbo Drive handling page transitions without a reload.
+</Aside>
+
+## Troubleshooting
+
+**`wheels: command not found`** — PATH doesn't see the CLI. See [Installing Wheels](/v4-0-0-snapshot/start-here/installing/).
+
+**`Route '/hello' not found`** — you added the route but didn't reload. Run `wheels reload`.
+
+**Blank page at `/hello`** — the view file is in the wrong place. It must be at `app/views/home/hello.cfm` (lowercase `home`).
+
+## What's next
+
+In Part 2 (lands in Phase 1), you'll add your first model, run a migration, and seed real data.

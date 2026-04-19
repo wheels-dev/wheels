@@ -1,0 +1,74 @@
+---
+title: The Request Lifecycle
+description: What Wheels does between an incoming HTTP request and the response your user sees.
+type: concept
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+When a request arrives at your Wheels app, it flows through five stages before your controller action runs — and three more before the response goes back. Understanding this pipeline tells you where to put code for every problem: auth goes in middleware, request-shape changes go in filters, view decoration goes in helpers.
+
+**You should already know:** what a controller action is, what a filter is. If not, finish the [tutorial](/v4-0-0-snapshot/start-here/tutorial/) first.
+
+## The pipeline
+
+```text
+HTTP request
+    │
+    ▼
+(1) Middleware              — before controller exists
+    │
+    ▼
+(2) Dispatch + route match  — pick controller + action
+    │
+    ▼
+(3) Controller instantiation — config() runs, filters registered
+    │
+    ▼
+(4) beforeAction filters    — load records, enforce ownership
+    │
+    ▼
+(5) Controller action       — your code
+    │
+    ▼
+(6) afterAction filters
+    │
+    ▼
+(7) View rendering          — layouts, partials, helpers
+    │
+    ▼
+(8) Response sent
+```
+
+## Why this order matters
+
+**Middleware runs before the controller exists.** That's why rate limiting and auth go there — they can short-circuit without paying the cost of instantiating a controller.
+
+**`beforeAction` filters run after `config()`.** That's why they can rely on injected services (`this.emailService`) — the DI container has already resolved them.
+
+**View rendering is inside the controller's request.** Helpers called from views access the same `params`, `flash`, and `session` that the action saw. The view is not a separate process.
+
+## A concrete request
+
+An authenticated user posts a new comment:
+
+1. **Middleware.** RequestId stamps a correlation ID. Cors validates the Origin. SecurityHeaders prepares response headers.
+2. **Dispatch.** `POST /posts/42/comments` matches `comments#create`.
+3. **Instantiation.** `Comments.cfc` instantiated; `config()` registers `authenticate` filter, injects `commentService`.
+4. **Filter.** `authenticate` checks the session; user is logged in, does nothing.
+5. **Action.** `create()` reads `params.comment`, builds a Comment, saves it.
+6. **afterAction.** A filter logs the event.
+7. **Rendering.** `redirectTo(post)` short-circuits rendering, returns a 302.
+8. **Response.** Correlation ID + CORS + security headers from step 1 applied.
+
+<Aside type="tip">
+  When deciding where to put new code, picture this pipeline and ask: when does this need to run? Before the controller exists? Middleware. Before every action in a controller? `beforeAction`. Once for a specific action? Action code.
+</Aside>
+
+## See also
+
+- [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/) — writing your own middleware
+- [MVC in Wheels](/v4-0-0-snapshot/core-concepts/) — where each layer lives
+- [How Routing Works](/v4-0-0-snapshot/core-concepts/) — step 2 in depth
