@@ -8,10 +8,14 @@ function parseMeta(meta) {
   const kind = m[1];
   const rest = m[2].trim();
   const attrs = {};
-  const ATTR_RE = /(\w[\w-]*)=(?:"([^"]*)"|(\S+))/g;
+  // Value forms:
+  //   "..."  — quoted; supports backslash escapes for quotes and backslashes
+  //   bare   — non-whitespace run
+  const ATTR_RE = /(\w[\w-]*)=(?:"((?:\\.|[^"\\])*)"|(\S+))/g;
   let am;
   while ((am = ATTR_RE.exec(rest)) !== null) {
-    attrs[am[1]] = am[2] !== undefined ? am[2] : am[3];
+    const raw = am[2] !== undefined ? am[2] : am[3];
+    attrs[am[1]] = am[2] !== undefined ? raw.replace(/\\(["\\])/g, '$1') : raw;
   }
   return { kind, attrs };
 }

@@ -4,9 +4,8 @@ Every non-illustrative code block in the v4 guides carries a `{test:*}` meta
 string the harness uses to validate it. Three flavors. The harness ignores
 any fenced code block that does not carry a `{test:*}` meta flag.
 
-**Driver status:** Phase 0 ships drivers for `{test:compile}` and `{test:cli}`.
-`{test:tutorial}` is documented below but its driver lands in Phase 1 —
-content authored now with `{test:tutorial}` will fail until Phase 1 ships.
+**Driver status:** Phase 1 ships drivers for `{test:cli}` and `{test:tutorial}`.
+`{test:compile}` is still deferred (needs a `wheels check <file>` CLI subcommand).
 
 ## `{test:compile}`
 
@@ -45,12 +44,41 @@ wheels dbmigrate latest
 with spaces. The harness spawns the program directly. Authors who need
 shell features must restructure the example or mark it illustrative.
 
-## `{test:tutorial step=N file="path"}` — lands in Phase 1
+## `{test:tutorial step=N file="path" [mode="write|append"] [asserts-http="..."] [asserts-db-rows="..."]}`
 
-Contents of the block are written to `file` inside the tutorial's fixture
-app at step N. Follow-up CLI commands (`{test:cli step=N}`) see this state.
-Phase 0 does not implement this driver; documented here so Phase 0 sample
-content can forward-reference it.
+The block body is written to `file` inside the tutorial's shared fixture app
+at step N. The fixture is one long-lived `blog-tutorial` app reset at the
+start of each harness run; all tutorial blocks (from all tutorial files) and
+all `{test:cli step=N}` blocks see the same fixture state in cumulative
+step order.
+
+Required attrs:
+
+- `step=N` — integer ordinal. Lower N runs first within a file; tie-break by
+  file line.
+- `file="relative/path"` — path inside the fixture (relative to the app
+  root). Paths that escape the fixture root are rejected.
+
+Optional attrs:
+
+- `mode="write"` (default) — write the body, clobbering any existing file.
+- `mode="append"` — append the body to the existing file.
+- `asserts-http="METHOD PATH → STATUS"` — after the file is written, boot the
+  app server (once per run) and hit this URL, asserting the status code.
+- `asserts-http="METHOD PATH → STATUS \"body substring\""` — also asserts the
+  response body contains the substring.
+- `asserts-db-rows="table1=N,table2=M"` — after the file is written, assert
+  `SELECT COUNT(*)` equals N for each table.
+
+Ordering across files is by (frontmatter sidebar.order, step, file line).
+
+```mdx
+```cfm {test:tutorial step=2 file="app/controllers/Posts.cfc" asserts-http="GET /posts → 200"}
+component extends="Controller" {
+    function index() { posts = model("Post").findAll(); }
+}
+```
+```
 
 ## Shared attrs
 

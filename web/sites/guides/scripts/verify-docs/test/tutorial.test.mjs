@@ -95,3 +95,45 @@ test('readSidebarOrder returns 999 when frontmatter missing order', async () => 
   assert.equal(order, 999);
   await rm(tmp);
 });
+
+test('parseHttpAssert reads METHOD PATH → STATUS', async () => {
+  const { parseHttpAssert } = await import('../drivers/tutorial.mjs');
+  assert.deepEqual(
+    parseHttpAssert('GET /posts → 200'),
+    { method: 'GET', path: '/posts', status: 200, bodyIncludes: null },
+  );
+  assert.deepEqual(
+    parseHttpAssert('POST /posts → 302 "Location: /posts/1"'),
+    { method: 'POST', path: '/posts', status: 302, bodyIncludes: 'Location: /posts/1' },
+  );
+});
+
+test('parseHttpAssert rejects malformed strings', async () => {
+  const { parseHttpAssert } = await import('../drivers/tutorial.mjs');
+  assert.throws(() => parseHttpAssert('bogus'), /malformed/);
+  assert.throws(() => parseHttpAssert('GET /posts 200'), /arrow/);
+});
+
+test('tutorial driver walks mini-tutorial end to end', { timeout: 300_000 }, async () => {
+  const { TutorialSession } = await import('../drivers/tutorial.mjs');
+  const { extractExamples } = await import('../lib/extract.mjs');
+  const { partitionAndOrder, enrichWithSidebarOrder } = await import('../lib/orchestrator.mjs');
+
+  const dir = join(here, 'fixtures', 'mini-tutorial');
+  const files = [join(dir, 'step-1.mdx'), join(dir, 'step-2.mdx')];
+  const examples = await extractExamples(files);
+  await enrichWithSidebarOrder(examples);
+  const { cumulative } = partitionAndOrder(examples);
+
+  const session = new TutorialSession();
+  try {
+    for (const ex of cumulative) {
+      const result = ex.kind === 'tutorial'
+        ? await session.applyTutorialExample(ex)
+        : await session.applyCliExample(ex);
+      assert.equal(result.ok, true, `example at ${ex.file}:${ex.line} failed: ${result.message ?? ''}`);
+    }
+  } finally {
+    await session.stopServer();
+  }
+});

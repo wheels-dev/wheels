@@ -9,7 +9,7 @@
 		"preview": "astro preview",
 		"check": "astro check",
 		"verify:docs": "node scripts/verify-docs/verify-docs.mjs",
-		"test:docs-harness": "node --test scripts/verify-docs/test/*.test.mjs"
+		"test:docs-harness": "node --test --test-concurrency=1 scripts/verify-docs/test/*.test.mjs"
 	},
 	"dependencies": {
 		"astro": "^5.1.0",
