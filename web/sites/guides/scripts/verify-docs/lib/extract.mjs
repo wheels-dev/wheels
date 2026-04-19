@@ -1,6 +1,10 @@
 import { readFile } from 'node:fs/promises';
 
-const FENCE_RE = /^```(\w+)([^\n]*)\n([\s\S]*?)\n```$/gm;
+// Fence regex: optional leading whitespace (capture in group 1), opening ```<lang>
+// followed by meta, newline, body, newline, and closing fence at the same indent.
+// The backreference \1 ensures we don't cross fence boundaries when fences are
+// at different indent levels.
+const FENCE_RE = /^([ \t]*)```(\w+)([^\n]*)\n([\s\S]*?)\n\1```$/gm;
 
 function parseMeta(meta) {
   const m = meta.match(/\{test:(\w+)\s*([^}]*)\}/);
@@ -28,6 +32,19 @@ function lineAt(content, offset) {
   return line;
 }
 
+/**
+ * Strips the fence's leading indent from every line of the body.
+ * Lines that don't start with the indent (e.g., blank lines with no leading
+ * whitespace) are left alone — MDX allows this inside a list-item fence.
+ */
+function stripIndent(body, indent) {
+  if (indent === '') return body;
+  return body
+    .split('\n')
+    .map((line) => (line.startsWith(indent) ? line.slice(indent.length) : line))
+    .join('\n');
+}
+
 export async function extractExamples(files) {
   const out = [];
   for (const file of files) {
@@ -35,7 +52,7 @@ export async function extractExamples(files) {
     FENCE_RE.lastIndex = 0;
     let m;
     while ((m = FENCE_RE.exec(content)) !== null) {
-      const [, language, meta, body] = m;
+      const [, indent, language, meta, rawBody] = m;
       const parsed = parseMeta(meta);
       if (!parsed) continue;
       out.push({
@@ -44,7 +61,7 @@ export async function extractExamples(files) {
         language,
         kind: parsed.kind,
         attrs: parsed.attrs,
-        body,
+        body: stripIndent(rawBody, indent),
       });
     }
   }
