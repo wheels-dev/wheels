@@ -7,7 +7,9 @@
 		"dev": "astro dev --port 4323",
 		"build": "astro build",
 		"preview": "astro preview",
-		"check": "astro check"
+		"check": "astro check",
+		"verify:docs": "node scripts/verify-docs/verify-docs.mjs",
+		"test:docs-harness": "node --test scripts/verify-docs/test/"
 	},
 	"dependencies": {
 		"astro": "^5.1.0",
