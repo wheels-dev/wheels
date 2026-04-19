@@ -1,0 +1,61 @@
+name: Verify docs
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'web/sites/guides/src/content/docs/v4-0-0-snapshot/**'
+      - 'web/sites/guides/scripts/verify-docs/**'
+      - 'web/sites/guides/package.json'
+      - 'web/sites/guides/src/sidebars/v4-0-0-snapshot.json'
+      - '.github/workflows/docs-verify.yml'
+
+jobs:
+  verify:
+    # macos-latest because the Wheels CLI is distributed via Homebrew; CI
+    # installs it through `brew install wheels`. If/when a Linux install
+    # path lands, this can move to ubuntu-latest.
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install Node deps
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Wheels CLI
+        # Placeholder: adjust once the canonical CI install path is confirmed.
+        # Homebrew tap expected per project convention (wheels-dev/homebrew-wheels).
+        run: |
+          brew tap wheels-dev/wheels || true
+          brew install wheels
+
+      - name: Smoke-test the CLI
+        run: wheels --version
+
+      - name: Run harness unit tests
+        working-directory: web/sites/guides
+        run: pnpm test:docs-harness
+
+      - name: Verify v4 docs
+        working-directory: web/sites/guides
+        run: pnpm verify:docs
+
+      - name: Build guides site
+        working-directory: web/sites/guides
+        run: pnpm build
