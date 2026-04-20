@@ -8,9 +8,27 @@
 
 ---
 
+## Shipped (2026-04-20 batch)
+
+First batch of fixes landed on branches `claude/framework-gaps-batch-1` in both wheels and LuCLI repos.
+
+| # | Item | Commit | Repo |
+|---|------|--------|------|
+| 3 | `wheels cfml` exit code | `dc3e20d` | LuCLI |
+| 12 | `JAVA_HOME` preflight detection | `0d5b0ca` | LuCLI |
+| 9 | Stale `wheels server start` in CLI output | `2827c61f2` | wheels |
+| 8 | READMEs in empty scaffold directories | `584f04d48` | wheels |
+| 1 | Snippet templates bundled into `wheels new` | `b9b165731` | wheels |
+| 5 | Route model binding dev-mode warning | `875639f59` | wheels |
+| 13 | `data-auto-id` dual emission on form helpers | `7fc905a79` | wheels |
+
+Remaining items below stay open for future batches.
+
+---
+
 ## P0 — Blocks the tutorial for real users
 
-### [ ] 1. `wheels generate` fails on fresh apps — snippet templates not bundled
+### [x] 1. `wheels generate` fails on fresh apps — snippet templates not bundled — **shipped in `b9b165731`**
 
 **Problem.** On a fresh `wheels new <app>`, `wheels generate model|controller|scaffold|migration` errors with `Template not found: ModelContent.txt` (or equivalent for other commands). The generators look in `app/snippets/*.txt` but the scaffolder creates an empty `app/snippets/` directory.
 
@@ -86,7 +104,7 @@ ls vendor/              # wheels/ only
 
 ---
 
-### [ ] 3. `wheels cfml` exits 0 when CFML execution fails
+### [x] 3. `wheels cfml` exits 0 when CFML execution fails — **shipped in LuCLI `dc3e20d`**
 
 **Status.** Patch ready. See [docs/superpowers/artifacts/lucli-pr-1/](../artifacts/lucli-pr-1/).
 
@@ -147,7 +165,7 @@ Recommend A+B together. C is overkill.
 
 ---
 
-### [ ] 5. Route model binding requires explicit `binding=true` but failure is silent
+### [x] 5. Route model binding requires explicit `binding=true` but failure is silent — **shipped in `875639f59`** (dev warning; default stays false)
 
 **Problem.** `.resources(name="posts")` does NOT enable route model binding by default. Readers who write `post = params.post;` in show/edit/update/delete get `params.post is undefined`. The framework doesn't warn or error — it just silently passes a missing variable.
 
@@ -228,7 +246,7 @@ Recommend both.
 
 ---
 
-### [ ] 8. Empty `app/snippets/` and `app/plugins/` directories in fresh apps
+### [x] 8. Empty `app/snippets/` and `app/plugins/` directories in fresh apps — **shipped in `584f04d48`** (also covers `mailers/`, `lib/`, `jobs/`)
 
 **Problem.** Fresh `wheels new` creates these directories with no README, no example, no indication of purpose. Users see empty folders and wonder if they should delete them.
 
@@ -246,7 +264,7 @@ Or, per #1, `app/snippets/` gets populated with default templates at `wheels new
 
 ---
 
-### [ ] 9. `wheels migrate` error message uses old command name
+### [x] 9. `wheels migrate` error message uses old command name — **shipped in `2827c61f2`**
 
 **Problem.** Running `wheels migrate latest` without a running server prints:
 ```
@@ -312,7 +330,7 @@ Rerunning passes. Appears to be a LuCLI engine init race when multiple JVM insta
 
 ---
 
-### [ ] 12. `wheels start` silently fails when `JAVA_HOME` is unset
+### [x] 12. `wheels start` silently fails when `JAVA_HOME` is unset — **shipped in LuCLI `0d5b0ca`**
 
 **Problem.** Without `JAVA_HOME` exported, `wheels start` spawns a child that exits before binding. The main process stderr shows a misleading error:
 ```
@@ -336,7 +354,7 @@ Then: export JAVA_HOME=/path/to/jdk-21
 
 ---
 
-### [ ] 13. Form-helper id convention (`post-title` with dash) is non-obvious
+### [x] 13. Form-helper id convention (`post-title` with dash) is non-obvious — **shipped in `7fc905a79`** (Option C: dual `data-auto-id` emission; default on)
 
 **Problem.** `textField(objectName="post", property="title")` emits `id="post-title"` (joined with a dash). Conventions in Rails (`post_title`), Laravel, Django, and HTML-form tutorials elsewhere uniformly use underscore. Browser specs written against `#post_title` silently fail.
 
