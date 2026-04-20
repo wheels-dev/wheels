@@ -1828,8 +1828,14 @@ component output="false" {
 				Throw(type = "Wheels.InvalidTimeStampMode", message = "Timestamp mode #arguments.timeStampMode# is invalid");
 		}
 
+		// Ensure adapterName is set (may not be if no model has been called yet)
+		if (!StructKeyExists(application[$appKey()], "adapterName")) {
+			local.dbType = $getDBType();
+			$set(adapterName = "#local.dbType#Model");
+		}
+
 		// Handle SQLite (TEXT storage)
-		if (get("adapterName") == "SQLiteModel") {
+		if ($get("adapterName") == "SQLiteModel") {
 			// Store as quoted ISO 8601 string (standard for SQLite)
 			if (IsDate(local.rv)) {
 				local.rv = "'#DateFormat(local.rv, 'yyyy-mm-dd')# #TimeFormat(local.rv, 'HH:mm:ss')#'";
