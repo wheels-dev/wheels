@@ -22,14 +22,16 @@ Wheels ships a single BDD test runner — **WheelsTest** — that covers every l
 
 Every test in a Wheels app is a CFC under `tests/specs/`, grouped by what it exercises. The runner treats them identically — the split is organizational, for you and your CI.
 
-| Category | Runner | File location | Typical scope |
-|----------|--------|---------------|---------------|
-| Model tests | WheelsTest | `tests/specs/models/` | One model — validations, callbacks, scopes, custom methods |
-| Controller tests | WheelsTest | `tests/specs/controllers/` | Action dispatch via `processRequest`, response assertions |
-| Functional tests | WheelsTest | `tests/specs/functional/` | Cross-controller workflows, end-to-end request paths |
-| Browser tests | WheelsTest + Playwright | `tests/specs/browser/` | Full UI flows — click-through, form submission, redirects |
+| Category | File location | Typical scope |
+|----------|---------------|---------------|
+| Model tests | `tests/specs/models/` | One model — validations, callbacks, scopes, custom methods |
+| Controller tests | `tests/specs/controllers/` | One action — response status, redirects, filters, params |
+| View & form tests | `tests/specs/view/` | Rendered HTML assertions, form-helper output, `data-auto-id` selectors |
+| Integration tests | `tests/specs/functional/` | Multi-step user journeys across controllers and requests |
+| Functional tests | `tests/specs/functional/` | Single-feature end-to-end — middleware + route + filter + action + view |
+| Browser tests | `tests/specs/browser/` | Full UI flows driven by Playwright — JavaScript, Turbo, form submission |
 
-Model and controller tests are the bulk of a healthy suite. Functional tests cover flows that span several controllers (checkout, signup → activation → first login). Browser tests cover behavior that only exists in the browser — JavaScript-driven UI, Turbo Frame updates, anything where the server's response alone doesn't tell you whether the feature works.
+Model and controller tests are the bulk of a healthy suite. Integration tests cover journeys that span multiple actions and users. Functional tests verify one feature end-to-end through the full request pipeline. Browser tests cover what only exists in the browser — JavaScript-driven UI, Turbo Frame updates, anything where the server's response alone doesn't tell you whether the feature works.
 
 ## What a WheelsTest spec looks like
 
@@ -53,7 +55,8 @@ Key points:
 
 - Extend `wheels.WheelsTest` — not `wheels.Test`. The latter is the legacy RocketUnit base and doesn't have `describe`, `it`, or `expect`.
 - `describe` and `it` take arrow-function callbacks. CFML closures work fine here.
-- Common matchers: `toBeTrue`, `toBeFalse`, `toBeTruthy`, `toEqual`, `toBeArray`, `toBeStruct`, `toInclude`.
+- Common matchers: `toBe`, `toBeTrue`, `toBeFalse`, `toBeArray`, `toBeStruct`, `toBeQuery`, `toInclude`, `toContain`, `toHaveKey`, `toHaveLength`.
+- **Phantom matchers that look plausible but don't ship:** `toEqual`, `toBeTruthy`, `toBeFalsy`. Use `toBe` (which deep-compares structs and arrays via `isEqual`), `toBeTrue`/`toBeFalse`, or the specific type matchers instead.
 - Specs can nest `describe` blocks as deep as you want. Shared setup goes in `beforeEach` / `afterEach` inside the `describe`.
 
 The detail pages for each category (below) walk through fixtures, matchers, and the patterns specific to that layer.
@@ -68,7 +71,7 @@ Wheels 4.0 core tests run against **Lucee 7 + SQLite**. That's the baseline you 
 
 ## Running tests
 
-The CLI driver is `wheels test run`. It expects a running server — the runner boots your app in test mode, executes the specs, and reports pass/fail. You don't need to have the server already running; the CLI will spawn one if needed.
+The CLI driver is `wheels test run`. It expects a running server — the runner boots your app in test mode, executes the specs, and reports pass/fail.
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
 wheels --version
@@ -78,9 +81,9 @@ Common invocations:
 
 - `wheels test run` — execute the entire suite.
 - `wheels test run --filter=models` — a single directory or keyword.
-- `wheels test run --format=json` — machine-readable output for CI.
+- `wheels test run --ci` — CI mode (browser specs gate on `WHEELS_BROWSER_CI_ENABLE`).
 
-As an alternative, the runner exposes an HTTP endpoint at `/wheels/app/tests` you can hit directly. A URL like `/wheels/app/tests?format=json&directory=tests.specs.models` runs just the model specs and returns JSON. This is useful for dev-loop iteration — keep the server up, change a spec, refresh the URL.
+The runner also exposes an HTTP endpoint at `/wheels/core/tests` you can hit directly. A URL like `/wheels/core/tests?format=json&directory=tests.specs.model` runs just the model specs and returns JSON. This is useful for dev-loop iteration — keep the server up, change a spec, refresh the URL. See [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/) for the full invocation surface including Docker-based cross-engine runs.
 
 ## Setup files that matter
 
@@ -89,21 +92,62 @@ Four files drive your test setup. Knowing what each one does saves a lot of head
 | File | What it does |
 |------|--------------|
 | `tests/TestRunner.cfc` | Sets up shared state. Runs before and after the whole suite. |
-| `tests/populate.cfm` | Seeds test data before each spec. Idempotent. |
-| `tests/_assets/models/` | Test-only models, often using `table()` to map to test tables. |
+| `tests/populate.cfm` | Seeds test data. Runs **once per test run**, not per spec. |
+| `tests/_assets/models/` | Test-only models, often using `tableName()` to map to test tables. |
 | `tests/specs/<category>/` | Where your actual specs live. |
 
-`populate.cfm` typically drops and recreates the test schema before each run — it's not the same concept as your production `app/db/seeds.cfm`. The goal is a clean slate: every spec sees the same starting data, no matter which spec ran before it.
+`populate.cfm` typically drops and recreates the test schema — it's idempotent by construction but runs exactly once per `wheels test run` invocation (or when you hit the runner URL with `?populate=true`). This is a deliberate departure from Rails/Laravel-style per-spec rollback: the framework default is `transactionMode = "none"`, so writes persist across specs unless you explicitly wrap them in `transaction { ... transaction action="rollback"; }`. [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) walks through the real lifecycle and the per-spec isolation pattern.
 
 ## CI integration
 
-The Wheels repo ships with a GitHub Actions workflow that runs the full engine × database matrix on every PR. Your app's CI doesn't need to be nearly that heavy. A single job that runs `wheels test run --format=json` against one engine and one database is usually enough — parse the JSON for pass/fail counts, fail the build if anything errored. The Phase 2b CI Integration page has drop-in templates for GitHub Actions, CircleCI, and GitLab CI.
+The Wheels repo ships with GitHub Actions workflows that run the full engine × database matrix on every PR. Your app's CI doesn't need to be nearly that heavy. A single job that runs `wheels test run --ci` against one engine and one database is usually enough. See [CI Integration](/v4-0-0-snapshot/testing/ci-integration/) for drop-in templates, cross-engine matrix patterns, browser-test gating, and soft-fail database handling.
 
 ## Where to go next
 
 <CardGrid>
-  <LinkCard title="Model Tests" href="/v4-0-0-snapshot/testing/model-tests/" description="Validations, callbacks, scopes, custom methods — the bulk of a healthy suite." />
-  <LinkCard title="Controller Tests" href="/v4-0-0-snapshot/testing/controller-tests/" description="processRequest, response assertions, params and session fixtures." />
-  <LinkCard title="Browser Tests" href="/v4-0-0-snapshot/testing/browser-tests/" description="Driving a real Chromium through your rendered pages with Playwright." />
-  <LinkCard title="Running Tests Locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="Fast inner loop, engine matrices, the HTTP runner, and debugging failures." />
+  <LinkCard
+    title="Model Tests"
+    href="/v4-0-0-snapshot/testing/model-tests/"
+    description="Validations, callbacks, scopes, custom methods — the bulk of a healthy suite."
+  />
+  <LinkCard
+    title="Controller Tests"
+    href="/v4-0-0-snapshot/testing/controller-tests/"
+    description="TestClient patterns — response assertions, redirects, filters, session and auth."
+  />
+  <LinkCard
+    title="View & Form Tests"
+    href="/v4-0-0-snapshot/testing/view-and-form-tests/"
+    description="Asserting on rendered output, form-helper ids, and the data-auto-id selector convention."
+  />
+  <LinkCard
+    title="Integration Tests"
+    href="/v4-0-0-snapshot/testing/integration-tests/"
+    description="Multi-step user journeys spanning controllers, requests, and users."
+  />
+  <LinkCard
+    title="Functional Tests"
+    href="/v4-0-0-snapshot/testing/functional-tests/"
+    description="Single-feature end-to-end — full pipeline from middleware to view render."
+  />
+  <LinkCard
+    title="Browser Tests"
+    href="/v4-0-0-snapshot/testing/browser-tests/"
+    description="Playwright-driven UI tests — fluent DSL, fixtures, cross-engine caveats."
+  />
+  <LinkCard
+    title="Fixtures & Test Data"
+    href="/v4-0-0-snapshot/testing/fixtures-and-test-data/"
+    description="populate.cfm conventions, test-only models, factory patterns, and isolation."
+  />
+  <LinkCard
+    title="Running Tests Locally"
+    href="/v4-0-0-snapshot/testing/running-tests-locally/"
+    description="wheels test CLI, tools/test-local.sh, and the Docker cross-engine matrix."
+  />
+  <LinkCard
+    title="CI Integration"
+    href="/v4-0-0-snapshot/testing/ci-integration/"
+    description="GitHub Actions templates, JUnit output, browser CI gating, soft-fail databases."
+  />
 </CardGrid>

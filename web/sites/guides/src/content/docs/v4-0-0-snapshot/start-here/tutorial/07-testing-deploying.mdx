@@ -77,10 +77,11 @@ Every spec is a CFC that extends `wheels.WheelsTest`. The `run()` method contain
 
 - `expect(x).toBeTrue()` — exact boolean `true`
 - `expect(x).toBeFalse()` — exact boolean `false`
-- `expect(x).toBeTruthy()` — any non-empty / non-zero value
-- `expect(x).toEqual(y)` — deep equality
+- `expect(x).toBe(y)` — equality, deep-comparing structs and arrays
+- `expect(x).toBeArray()` / `toBeStruct()` / `toBeQuery()` — type checks
+- `expect(x).toInclude(substring)` / `toHaveKey(name)` / `toHaveLength(n)` — content checks
 
-That's enough vocabulary to cover the first hundred specs you'll write.
+That's enough vocabulary to cover the first hundred specs you'll write. See [Testing](/v4-0-0-snapshot/testing/) for the full matcher list.
 
 <Aside type="caution">
   A spec CFC must extend `wheels.WheelsTest`, not `wheels.Test`. The latter is the legacy RocketUnit base — it doesn't have `describe`, `it`, or `expect`. If you see "toBeTrue is not a function," that's the cause.
@@ -101,7 +102,7 @@ Start with the `Post` model. You added four validation rules in Part 4: `title` 
                it("requires a title", () => {
                    var post = model("Post").new(body="some body");
                    expect(post.valid()).toBeFalse();
-                   expect(post.errorsOn("title")).toBeTruthy();
+                   expect(post.errorsOn("title")).toBeArray();
                });
                it("requires a body", () => {
                    var post = model("Post").new(title="some title");
@@ -111,7 +112,7 @@ Start with the `Post` model. You added four validation rules in Part 4: `title` 
                it("rejects titles over 120 characters", () => {
                    var post = model("Post").new(title=RepeatString("x", 121), body="body");
                    expect(post.valid()).toBeFalse();
-                   expect(post.errorsOn("title")).toBeTruthy();
+                   expect(post.errorsOn("title")).toBeArray();
                });
                it("accepts valid input", () => {
                    var post = model("Post").new(title="OK", body="body", status="draft");
@@ -143,8 +144,7 @@ For Phase 1 of the tutorial, one smoke-test spec is enough: verify that `GET /po
        function run() {
            describe("PostsController", () => {
                it("loads posts for the index page", () => {
-                   var result = processRequest(params={controller="posts", action="index"}, returnAs="struct");
-                   expect(result.status).toEqual(200);
+                   $testClient().get("/posts").assertOk();
                });
            });
        }
