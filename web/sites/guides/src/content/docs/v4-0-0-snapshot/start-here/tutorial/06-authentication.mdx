@@ -328,6 +328,68 @@ The filter is `private`. This is critical: **public filter methods become routab
 
 `addColumn` generates the right `ALTER TABLE` for whatever database you're on — no need to hand-write DDL.
 
+### Wire up the Post ↔ User association
+
+The migration adds the `userId` column, but the models don't yet know about each other. Add the association so `post.user()` and `user.posts()` work, and so `User.delete` cascades to that user's posts.
+
+<Steps>
+
+1. Update `app/models/Post.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Model" {
+       function config() {
+           enum(property="status", values="draft,published,archived");
+           hasMany(name="comments", dependent="delete");
+           belongsTo(name="user");
+           validatesPresenceOf("title,body");
+           validatesLengthOf(property="title", maximum=120);
+       }
+   }
+   ```
+
+2. Update `app/models/User.cfc` to declare the reverse:
+
+   ```cfm {test:compile}
+   component extends="Model" {
+       function config() {
+           hasMany(name="posts", dependent="delete");
+           validatesPresenceOf("email");
+           validatesUniquenessOf(property="email");
+           beforeValidation("normalizeEmail");
+           beforeSave("hashPassword");
+       }
+
+       private function normalizeEmail() {
+           if (StructKeyExists(this, "email")) {
+               this.email = Trim(LCase(this.email));
+           }
+       }
+
+       private function hashPassword() {
+           if (StructKeyExists(this, "password") && Len(this.password)) {
+               if (!StructKeyExists(this, "passwordSalt") || !Len(this.passwordSalt ?: "")) {
+                   this.passwordSalt = generateSecretKey("AES");
+               }
+               this.passwordHash = Hash(this.password & this.passwordSalt, "SHA-256");
+               StructDelete(this, "password");
+           }
+       }
+
+       public boolean function authenticate(required string password) {
+           if (!Len(this.passwordHash ?: "") || !Len(this.passwordSalt ?: "")) {
+               return false;
+           }
+           var candidate = Hash(arguments.password & this.passwordSalt, "SHA-256");
+           return (candidate == this.passwordHash);
+       }
+   }
+   ```
+
+</Steps>
+
+With the association in place, `post.user()` returns the author, `user.posts()` returns their posts, and deleting a user drops their posts transparently.
+
 ### Signup, login, and logout routes
 
 <Steps>
@@ -336,7 +398,7 @@ The filter is `private`. This is critical: **public filter methods become routab
 
    ```cfm {test:compile}
    mapper()
-       .resources(name="posts", callback=function(map) {
+       .resources(name="posts", binding=true, callback=function(map) {
            map.resources(name="comments", only="create");
        })
        .get(name="signup", pattern="/signup", to="users##new")
@@ -492,6 +554,37 @@ On a cold reload this registers the strategy exactly once. The `hasStrategy` che
 Same public behavior. Under the hood, `sessionStrategy.login({id, email})` stores a principal struct at the configured session key (default: `session.wheels.auth`). `logout()` clears it. Your controller no longer talks to the `session` scope directly — which means a future swap to JWT touches the strategy registration, not the controllers.
 
 The principal is any struct you pick. `{id, email}` is a reasonable baseline; a larger app might store `{id, email, roles, displayName}`. The strategy doesn't care about the shape — it round-trips whatever you hand it.
+
+### Rewrite the Users controller to match
+
+6a's `Users.create` set `session.userId = user.id` directly after signup. 6b needs to go through the same strategy as the Sessions controller — otherwise newly signed-up users aren't recognized by the authenticator on the next request, and every protected page redirects them to `/login`.
+
+<Steps>
+
+1. Replace `app/controllers/Users.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Controller" {
+       function new() {
+           user = model("User").new();
+       }
+
+       function create() {
+           user = model("User").new(params.user);
+           if (user.save()) {
+               var sessionStrategy = application.wo.service("sessionStrategy");
+               sessionStrategy.login(principal={id: user.id, email: user.email});
+               redirectTo(route="posts", success="Welcome! You're signed up and logged in.");
+           } else {
+               renderView(action="new");
+           }
+       }
+   }
+   ```
+
+</Steps>
+
+One change from 6a: the post-save `session.userId = user.id;` line is replaced with a `sessionStrategy.login({id, email})` call. Everything else is identical.
 
 ### Rewrite the Posts filter
 

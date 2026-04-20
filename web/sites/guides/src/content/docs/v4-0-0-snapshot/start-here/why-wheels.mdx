@@ -79,7 +79,7 @@ Bigger gap. Django is DataMapper (models + views + serializers are separate conc
 | ORM | DataMapper (Django ORM) | ActiveRecord (Wheels `Model`) |
 | URL routing | `urls.py`, explicit patterns | `routes.cfm`, `resources("posts")` + conventions |
 | Admin | Auto-generated `/admin` | `wheels generate admin ModelName` (scaffolded, not auto) |
-| Migrations | `makemigrations` + `migrate` | `wheels generate migration` + `wheels dbmigrate latest` |
+| Migrations | `makemigrations` + `migrate` | `wheels generate migration` + `wheels migrate latest` |
 | Templates | Jinja-like DSL | `.cfm` (inline expressions) |
 | Forms | `forms.py` with Form classes | View helpers (`textField`, `textArea`, etc.) |
 | Auth | `django.contrib.auth` | `wheels.auth` |

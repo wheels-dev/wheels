@@ -167,7 +167,7 @@ The comment form will POST to `/posts/:postKey/comments`. Wheels builds that URL
 
    ```cfm {test:compile}
    mapper()
-       .resources(name="posts", callback=function(map) {
+       .resources(name="posts", binding=true, callback=function(map) {
            map.resources(name="comments", only="create");
        })
        .get(name="hello", pattern="/hello", to="main##hello")
@@ -197,7 +197,7 @@ The generated route's named helper is `postComments` (`urlFor(route="postComment
            post = model("Post").findByKey(params.postKey);
            comment = post.createComment(params.comment);
            if (comment.hasErrors()) {
-               renderPartial(partial="form", post=post, layout=false);
+               renderPartial(partial="form", post=post, comment=comment, layout=false);
            } else {
                renderPartial(partial="comment", comment=comment, layout=false);
            }
@@ -219,6 +219,7 @@ On success, we render the `comment` partial — which, you'll see next, wraps it
 
    ```cfm title="app/views/comments/_form.cfm"
    <cfparam name="post" default="">
+   <cfparam name="comment" default="">
    <cfoutput>
    <turbo-frame id="new_comment">
        #errorMessagesFor("comment")#

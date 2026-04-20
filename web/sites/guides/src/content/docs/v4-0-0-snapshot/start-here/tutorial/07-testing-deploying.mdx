@@ -182,16 +182,16 @@ The installer downloads the JARs into `lib/`, Chromium into `~/Library/Caches` (
 
                    this.browser
                        .visitRoute("signup")
-                       .fill("##user_email", "alice@example.com")
-                       .fill("##user_password", "hunter2")
+                       .fill("input[name='user[email]']", "alice@example.com")
+                       .fill("input[name='user[password]']", "hunter2")
                        .click("button[type=submit]")
                        .assertUrlContains("/posts");
 
                    this.browser
                        .visitRoute("posts")
-                       .click("a[href*=/posts/new]")
-                       .fill("##post_title", "My first post")
-                       .fill("##post_body", "Hello Wheels")
+                       .click("a[href*='/posts/new']")
+                       .fill("##post-title", "My first post")
+                       .fill("##post-body", "Hello Wheels")
                        .click("button[type=submit]")
                        .assertSee("My first post");
 
@@ -211,7 +211,8 @@ The installer downloads the JARs into `lib/`, Chromium into `~/Library/Caches` (
 Four things to notice:
 
 - `browserDescribe` wraps `describe` with a `beforeEach`/`afterEach` pair that creates a fresh Playwright page for every `it`. Without it, one test's navigation state would leak into the next.
-- `##user_email` is CFML escaping a literal `#` inside a string. At runtime the selector is `#user_email` — the CSS id of the email input. Without the double `#`, CFML would try to evaluate `user_email` as an expression and throw.
+- `##post-title` is CFML escaping a literal `#` inside a string. At runtime the selector is `#post-title` — the CSS id the `textField(objectName="post", property="title")` helper emits (Wheels joins object + property with a dash). Without the double `##`, CFML would try to evaluate `post-title` as an expression and throw.
+- The signup form uses plain `<input name="user[email]">` without an id, so the spec targets it by attribute selector instead. Attribute selectors like `input[name='user[email]']` are robust against future form refactors.
 - The fluent DSL chains: `.visitRoute("signup").fill(...).click(...).assertUrlContains("/posts")` is one statement. Each method returns the browser object, so the chain keeps going until you call a terminal like `.assertSee(...)` or let the statement end.
 - `if (this.browserTestSkipped) return;` keeps the spec green on machines without Playwright installed — fresh CI runners before `wheels browser:install`, for example. The flag is set by `beforeAll` when the JARs can't be loaded.
 

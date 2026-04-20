@@ -260,7 +260,7 @@ Part 2 restricted the resource to `only="index,show"`. Drop the restriction so a
 
    ```cfm {test:compile}
    mapper()
-       .resources(name="posts")
+       .resources(name="posts", binding=true)
        .get(name="hello", pattern="/hello", to="main##hello")
        .wildcard()
        .root(to="posts##index", method="get")
@@ -269,7 +269,9 @@ Part 2 restricted the resource to `only="index,show"`. Drop the restriction so a
 
 </Steps>
 
-With `.resources(name="posts")` alone, all seven REST routes activate. The named routes (`post`, `posts`, `newPost`, `editPost`) light up at the same time — that's what the views already reference.
+With `.resources(name="posts", binding=true)` alone, all seven REST routes activate. The named routes (`post`, `posts`, `newPost`, `editPost`) light up at the same time — that's what the views already reference.
+
+The `binding=true` arg turns on **route model binding**. When a request hits `/posts/:key`, Wheels looks up `Post` by that key BEFORE your controller action runs and hands it to you as `params.post`. That's why `show`, `edit`, `update`, and `delete` can use `params.post` directly without calling `findByKey` themselves. Without `binding=true`, `params.post` is undefined on those actions — you'd have to look up the model manually.
 
 ## Packages — the activation model
 

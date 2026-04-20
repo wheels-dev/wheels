@@ -22,16 +22,20 @@ Fifteen minutes. Zero explanations. You run commands, you see results, you know 
 
 ## 1. Create an app (3 min)
 
+First, confirm the CLI is installed:
+
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+Then create a new app:
+
+```bash title="your shell"
 wheels new hello
 cd hello
 ```
 
-This creates a new SQLite-backed Wheels app called `hello` and drops you into its directory. The scaffold takes a couple of seconds.
-
-<Aside type="tip">
-  The `wheels --version` assertion above is how this page validates its own install check — the harness that runs this doc confirms the CLI is actually present. The `wheels new hello` line is illustrative for the reader.
-</Aside>
+This creates a SQLite-backed Wheels app called `hello` and drops you into its directory. The scaffold takes a couple of seconds.
 
 ## 2. Start the server (2 min)
 
