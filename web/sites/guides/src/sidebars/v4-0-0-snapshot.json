@@ -31,7 +31,8 @@
       { "label": "Conventions over Configuration", "link": "/v4-0-0-snapshot/core-concepts/conventions-over-configuration/" },
       { "label": "ORM Philosophy", "link": "/v4-0-0-snapshot/core-concepts/orm-philosophy/" },
       { "label": "The Dependency Injection Container", "link": "/v4-0-0-snapshot/core-concepts/dependency-injection/" },
-      { "label": "Middleware Pipeline", "link": "/v4-0-0-snapshot/core-concepts/middleware-pipeline/" }
+      { "label": "Middleware Pipeline", "link": "/v4-0-0-snapshot/core-concepts/middleware-pipeline/" },
+      { "label": "How Routing Works", "link": "/v4-0-0-snapshot/core-concepts/how-routing-works/" }
     ]
   },
   {
