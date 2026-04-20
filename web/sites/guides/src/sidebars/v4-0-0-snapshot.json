@@ -11,7 +11,13 @@
         "label": "Tutorial: Build a Blog",
         "link": "/v4-0-0-snapshot/start-here/tutorial/",
         "items": [
-          { "label": "1. Hello, Wheels", "link": "/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/" }
+          { "label": "1. Hello, Wheels", "link": "/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/" },
+          { "label": "2. Your First Model", "link": "/v4-0-0-snapshot/start-here/tutorial/02-first-model/" },
+          { "label": "3. CRUD Scaffold", "link": "/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/" },
+          { "label": "4. Validations + Turbo Frames", "link": "/v4-0-0-snapshot/start-here/tutorial/04-validations-frames/" },
+          { "label": "5. Comments + Turbo Streams", "link": "/v4-0-0-snapshot/start-here/tutorial/05-comments-streams/" },
+          { "label": "6. Authentication", "link": "/v4-0-0-snapshot/start-here/tutorial/06-authentication/" },
+          { "label": "7. Testing + Deploying", "link": "/v4-0-0-snapshot/start-here/tutorial/07-testing-deploying/" }
         ]
       }
     ]
