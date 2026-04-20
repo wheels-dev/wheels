@@ -96,10 +96,8 @@
   },
   {
     "label": "CLI Reference",
-    "link": "/v4-0-0-snapshot/cli-reference/",
-    "items": [
-      { "label": "wheels info", "link": "/v4-0-0-snapshot/cli-reference/info/" }
-    ]
+    "link": "/v4-0-0-snapshot/command-line-tools/",
+    "items": []
   },
   {
     "label": "Contributing & Project",
