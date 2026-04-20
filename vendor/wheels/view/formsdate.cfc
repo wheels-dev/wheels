@@ -106,6 +106,10 @@ component {
 		StructDelete(arguments, "combine");
 		local.name = $tagName(arguments.objectName, arguments.property);
 		arguments.$id = $tagId(arguments.objectName, arguments.property);
+		// Mirror $applyAutoId's object-bound check here: the child helpers (year/month/etc.)
+		// receive the derived ids like `user-birthday-month`; only emit companion data-auto-id
+		// when the root was object-bound. The $autoIdBound flag propagates that decision.
+		arguments.$autoIdBound = IsSimpleValue(arguments.objectName) && Len(arguments.objectName);
 
 		// in order to support 12-hour format, we have to enforce some rules
 		// if arguments.twelveHour is true, then order MUST contain ampm
@@ -274,6 +278,13 @@ component {
 		}
 		if (!StructKeyExists(arguments, "id")) {
 			arguments.id = arguments.$id & "-" & arguments.$type;
+			if (
+				$get("formHelperDataAutoId")
+				&& StructKeyExists(arguments, "$autoIdBound")
+				&& arguments.$autoIdBound
+			) {
+				arguments["dataAutoId"] = Replace(arguments.id, "-", "_", "all");
+			}
 		}
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -356,6 +367,13 @@ component {
 		}
 		if (!StructKeyExists(arguments, "id")) {
 			arguments.id = arguments.$id & "-ampm";
+			if (
+				$get("formHelperDataAutoId")
+				&& StructKeyExists(arguments, "$autoIdBound")
+				&& arguments.$autoIdBound
+			) {
+				arguments["dataAutoId"] = Replace(arguments.id, "-", "_", "all");
+			}
 		}
 		local.content = "";
 		local.optionsArray = ListToArray(local.options);

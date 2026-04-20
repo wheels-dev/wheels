@@ -32,4 +32,12 @@
 		// Test framework settings.
 		application.$wheels.validateTestPackageMetaData = true;
 		application.$wheels.restoreTestRunnerApplicationScope = true;
+
+		// Form helper settings.
+		// When true, object-bound form helpers (textField, emailField, select, etc.) also emit a
+		// `data-auto-id` attribute alongside the auto-derived `id`. The `id` uses the historical
+		// dash convention (e.g. `post-title`) and `data-auto-id` uses the underscore convention
+		// (e.g. `post_title`) favored by Rails/Laravel-style browser test selectors. Only emitted
+		// when the id is auto-derived from objectName + property; a user-supplied `id` suppresses it.
+		application.$wheels.formHelperDataAutoId = true;
 </cfscript>

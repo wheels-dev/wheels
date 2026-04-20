@@ -567,15 +567,15 @@ component {
 			// Space added to allow a blank value while still not having the form control checked.
 			arguments.objectName[arguments.name] = " ";
 		}
-		if (!StructKeyExists(arguments, "id")) {
-			local.valueToAppend = LCase(
-				Replace(ReReplaceNoCase(arguments.checkedValue, "[^a-z0-9- ]", "", "all"), " ", "-", "all")
-			);
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-			if (Len(local.valueToAppend)) {
-				arguments.id &= "-" & local.valueToAppend;
-			}
-		}
+		local.valueToAppend = LCase(
+			Replace(ReReplaceNoCase(arguments.checkedValue, "[^a-z0-9- ]", "", "all"), " ", "-", "all")
+		);
+		$applyAutoId(
+			args = arguments,
+			objectName = arguments.objectName,
+			property = arguments.property,
+			valueToAppend = local.valueToAppend
+		);
 		StructDelete(arguments, "name");
 		StructDelete(arguments, "value");
 		StructDelete(arguments, "checked");

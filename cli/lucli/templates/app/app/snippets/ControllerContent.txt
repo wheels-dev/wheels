@@ -1,0 +1,10 @@
+|DescriptionComment|component extends="Controller" {
+
+  /**
+	* Controller config settings
+	**/
+	function config() {
+
+	}
+|Actions|
+}

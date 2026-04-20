@@ -21,6 +21,7 @@
 		application.$wheels.tableNamePrefix = "";
 		application.$wheels.obfuscateURLs = false;
 		application.$wheels.routeModelBinding = false;
+		application.$wheels.suppressRouteBindingWarnings = false;
 		application.$wheels.reloadPassword = "";
 		application.$wheels.redirectAfterReload = false;
 		application.$wheels.softDeleteProperty = "deletedAt";

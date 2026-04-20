@@ -164,13 +164,13 @@ component extends="wheels.WheelsTest" {
 			it("checks when property value equals checkedValue", () => {
 				args.property = "birthdaymonth"
 				args.checkedvalue = "11"
-				e = '<input checked="checked" id="user-birthdaymonth" name="user[birthdaymonth]" type="checkbox" value="11"><input id="user-birthdaymonth-checkbox" name="user[birthdaymonth]($checkbox)" type="hidden" value="0">'
+				e = '<input checked="checked" data-auto-id="user_birthdaymonth" id="user-birthdaymonth" name="user[birthdaymonth]" type="checkbox" value="11"><input data-auto-id="user_birthdaymonth_checkbox" id="user-birthdaymonth-checkbox" name="user[birthdaymonth]($checkbox)" type="hidden" value="0">'
 				r = _controller.checkBox(argumentcollection = args)
 
 				expect(e).toBe(r)
 
 				args.checkedvalue = "12"
-				e = '<input id="user-birthdaymonth" name="user[birthdaymonth]" type="checkbox" value="12"><input id="user-birthdaymonth-checkbox" name="user[birthdaymonth]($checkbox)" type="hidden" value="0">'
+				e = '<input data-auto-id="user_birthdaymonth" id="user-birthdaymonth" name="user[birthdaymonth]" type="checkbox" value="12"><input data-auto-id="user_birthdaymonth_checkbox" id="user-birthdaymonth-checkbox" name="user[birthdaymonth]($checkbox)" type="hidden" value="0">'
 				r = _controller.checkBox(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -251,7 +251,7 @@ component extends="wheels.WheelsTest" {
 				_controller = g.controller(name = "ControllerWithModel")
 
 				e = _controller.fileField(objectName = "user", property = "firstname")
-				r = '<label for="user-firstname">Firstname<input id="user-firstname" name="user&##x5b;firstname&##x5d;" type="file"></label>'
+				r = '<label for="user-firstname">Firstname<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="file"></label>'
 
 				expect(e).toBe(r)
 			})
@@ -275,7 +275,7 @@ component extends="wheels.WheelsTest" {
 				_controller = g.controller(name = "ControllerWithModel")
 
 				e = _controller.hiddenField(objectName = "user", property = "firstname")
-				r = '<input id="user-firstname" name="user&##x5b;firstname&##x5d;" type="hidden" value="Tony">'
+				r = '<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="hidden" value="Tony">'
 
 				expect(e).toBe(r)
 			})
@@ -284,7 +284,7 @@ component extends="wheels.WheelsTest" {
 				_controller = g.controller(name = "ControllerWithModel")
 
 				e = _controller.hiddenField(objectName = "user", property = "firstname", encode = "false")
-				r = '<input id="user-firstname" name="user[firstname]" type="hidden" value="Tony">'
+				r = '<input data-auto-id="user_firstname" id="user-firstname" name="user[firstname]" type="hidden" value="Tony">'
 
 				expect(e).toBe(r)
 			})
@@ -459,7 +459,7 @@ component extends="wheels.WheelsTest" {
 
 			it("adds custom label on object helper", () => {
 				actual = c.textField(objectName = "user", property = "username", label = "The Label:")
-				expected = '<label for="user-username">The Label:<input id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp"></label>'
+				expected = '<label for="user-username">The Label:<input data-auto-id="user_username" id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp"></label>'
 
 				expect(actual).toBe(expected)
 			})
@@ -473,35 +473,35 @@ component extends="wheels.WheelsTest" {
 
 			it("adds blank label on object helpers", () => {
 				actual = c.textField(objectName = "user", property = "username", label = "")
-				expected = '<input id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp">'
+				expected = '<input data-auto-id="user_username" id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp">'
 
 				expect(actual).toBe(expected)
 			})
 
 			it("adds automatic label on object helpers with around placement", () => {
 				actual = c.textField(objectName = "user", property = "username", labelPlacement = "around")
-				expected = '<label for="user-username">Username<input id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp"></label>'
+				expected = '<label for="user-username">Username<input data-auto-id="user_username" id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp"></label>'
 
 				expect(actual).toBe(expected)
 			})
 
 			it("adds automatic label on object helpers with before placement", () => {
 				actual = c.textField(objectName = "user", property = "username", labelPlacement = "before")
-				expected = '<label for="user-username">Username</label><input id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp">'
+				expected = '<label for="user-username">Username</label><input data-auto-id="user_username" id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp">'
 
 				expect(actual).toBe(expected)
 			})
 
 			it("adds automatic label on object helpers with after placement", () => {
 				actual = c.textField(objectName = "user", property = "username", labelPlacement = "after")
-				expected = '<input id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp"><label for="user-username">Username</label>'
+				expected = '<input data-auto-id="user_username" id="user-username" maxlength="50" name="user[username]" type="text" value="tonyp"><label for="user-username">Username</label>'
 
 				expect(actual).toBe(expected)
 			})
 
 			it("adds automatic label on object helpers with non persisted property", () => {
 				actual = c.textField(objectName = "user", property = "virtual")
-				expected = '<label for="user-virtual">Virtual property<input id="user-virtual" name="user[virtual]" type="text" value=""></label>'
+				expected = '<label for="user-virtual">Virtual property<input data-auto-id="user_virtual" id="user-virtual" name="user[virtual]" type="text" value=""></label>'
 
 				expect(actual).toBe(expected)
 			})
@@ -532,7 +532,7 @@ component extends="wheels.WheelsTest" {
 			it("is valid", () => {
 				_controller = g.controller(name = "ControllerWithModel")
 				e = _controller.passwordField(objectName = "User", property = "password")
-				r = '<label for="User-password">Password<input id="User-password" maxlength="50" name="User&##x5b;password&##x5d;" type="password" value="tonyp123"></label>'
+				r = '<label for="User-password">Password<input data-auto-id="User_password" id="User-password" maxlength="50" name="User&##x5b;password&##x5d;" type="password" value="tonyp123"></label>'
 
 				expect(e).toBe(r)
 			})
@@ -554,7 +554,7 @@ component extends="wheels.WheelsTest" {
 			it("is valid", () => {
 				_controller = g.controller(name = "ControllerWithModel")
 				e = _controller.radioButton(objectName = "user", property = "gender", tagValue = "m", label = "Male")
-				r = '<label for="user-gender-m">Male<input id="user-gender-m" name="user&##x5b;gender&##x5d;" type="radio" value="m"></label>'
+				r = '<label for="user-gender-m">Male<input data-auto-id="user_gender_m" id="user-gender-m" name="user&##x5b;gender&##x5d;" type="radio" value="m"></label>'
 
 				expect(e).toBe(r)
 			})
@@ -603,7 +603,7 @@ component extends="wheels.WheelsTest" {
 			it("works with list as options", () => {
 				options = "Opt1,Opt2"
 				r = _controller.select(objectName = "user", property = "firstname", options = options, label = false)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="Opt1">Opt1</option><option value="Opt2">Opt2</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="Opt1">Opt1</option><option value="Opt2">Opt2</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -614,7 +614,7 @@ component extends="wheels.WheelsTest" {
 				options[2] = "Opt2"
 				options[3] = "Opt3"
 				r = _controller.select(objectName = "user", property = "firstname", options = options, label = false)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="Opt1">Opt1</option><option value="Opt2">Opt2</option><option value="Opt3">Opt3</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="Opt1">Opt1</option><option value="Opt2">Opt2</option><option value="Opt3">Opt3</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -624,7 +624,7 @@ component extends="wheels.WheelsTest" {
 				options.x = "xVal"
 				options.y = "yVal"
 				r = _controller.select(objectName = "user", property = "firstname", options = options, label = false)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="x">xVal</option><option value="y">yVal</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="x">xVal</option><option value="y">yVal</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -639,7 +639,7 @@ component extends="wheels.WheelsTest" {
 					textField = "firstName",
 					label = false
 				)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="#users[1].id#">Tony</option><option value="#users[2].id#">Chris</option><option value="#users[3].id#">Per</option><option value="#users[4].id#">Raul</option><option value="#users[5].id#">Joe</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="#users[1].id#">Tony</option><option value="#users[2].id#">Chris</option><option value="#users[3].id#">Per</option><option value="#users[4].id#">Raul</option><option value="#users[5].id#">Joe</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -647,7 +647,7 @@ component extends="wheels.WheelsTest" {
 			it("first non numeric property defaults text field on query", () => {
 				users = user.findAll(returnAs = "query", order = "id")
 				r = _controller.select(objectName = "user", property = "firstname", options = users, label = false)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="#users["id"][1]#">tonyp</option><option value="#users["id"][2]#">chrisp</option><option value="#users["id"][3]#">perd</option><option value="#users["id"][4]#">raulr</option><option value="#users["id"][5]#">joeb</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="#users["id"][1]#">tonyp</option><option value="#users["id"][2]#">chrisp</option><option value="#users["id"][3]#">perd</option><option value="#users["id"][4]#">raulr</option><option value="#users["id"][5]#">joeb</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -655,7 +655,7 @@ component extends="wheels.WheelsTest" {
 			it("first non numeric property defaults text field on objects", () => {
 				users = user.findAll(returnAs = "objects", order = "id")
 				r = _controller.select(objectName = "user", property = "firstname", options = users, label = false)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="#users[1].id#">tonyp</option><option value="#users[2].id#">chrisp</option><option value="#users[3].id#">perd</option><option value="#users[4].id#">raulr</option><option value="#users[5].id#">joeb</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="#users[1].id#">tonyp</option><option value="#users[2].id#">chrisp</option><option value="#users[3].id#">perd</option><option value="#users[4].id#">raulr</option><option value="#users[5].id#">joeb</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -667,7 +667,7 @@ component extends="wheels.WheelsTest" {
 				options[2] = {}
 				options[2].pd = "per djurner"
 				r = _controller.select(objectName = "user", property = "firstname", options = options, label = false)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="tp">tony petruzzi</option><option value="pd">per djurner</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="tp">tony petruzzi</option><option value="pd">per djurner</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -686,7 +686,7 @@ component extends="wheels.WheelsTest" {
 					textField = "name",
 					label = false
 				)
-				e = '<select id="user-firstname" name="user[firstname]"><option value="petruzzi">tony</option><option value="djurner">per</option></select>'
+				e = '<select data-auto-id="user_firstname" id="user-firstname" name="user[firstname]"><option value="petruzzi">tony</option><option value="djurner">per</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -1027,7 +1027,7 @@ component extends="wheels.WheelsTest" {
 			it("is valid", () => {
 				_controller = g.controller(name = "ControllerWithModel")
 				e = _controller.textArea(objectName = "user", property = "firstname")
-				r = '<label for="user-firstname">Firstname<textarea id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;">Tony</textarea></label>'
+				r = '<label for="user-firstname">Firstname<textarea data-auto-id="user_firstname" id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;">Tony</textarea></label>'
 
 				expect(e).toBe(r)
 			})
@@ -1203,7 +1203,7 @@ component extends="wheels.WheelsTest" {
 				args.startyear = "1980"
 				args.endyear = "1990"
 				e = _controller.dateSelect(argumentCollection = args)
-				r = '<select id="user-birthday-year" name="user[birthday]($year)"><option selected="selected" value="1975">1975</option><option value="1976">1976</option><option value="1977">1977</option><option value="1978">1978</option><option value="1979">1979</option><option value="1980">1980</option><option value="1981">1981</option><option value="1982">1982</option><option value="1983">1983</option><option value="1984">1984</option><option value="1985">1985</option><option value="1986">1986</option><option value="1987">1987</option><option value="1988">1988</option><option value="1989">1989</option><option value="1990">1990</option></select>';
+				r = '<select data-auto-id="user_birthday_year" id="user-birthday-year" name="user[birthday]($year)"><option selected="selected" value="1975">1975</option><option value="1976">1976</option><option value="1977">1977</option><option value="1978">1978</option><option value="1979">1979</option><option value="1980">1980</option><option value="1981">1981</option><option value="1982">1982</option><option value="1983">1983</option><option value="1984">1984</option><option value="1985">1985</option><option value="1986">1986</option><option value="1987">1987</option><option value="1988">1988</option><option value="1989">1989</option><option value="1990">1990</option></select>';
 
 				expect(e).toBe(r)
 			})
@@ -1213,7 +1213,7 @@ component extends="wheels.WheelsTest" {
 				args.startyear = "1980"
 				args.endyear = "1990"
 				r = _controller.dateSelect(argumentCollection = args)
-				e = '<select id="user-birthday-year" name="user[birthday]($year)"><option value="1980">1980</option><option value="1981">1981</option><option value="1982">1982</option><option value="1983">1983</option><option value="1984">1984</option><option value="1985">1985</option><option value="1986">1986</option><option value="1987">1987</option><option value="1988">1988</option><option value="1989">1989</option><option value="1990">1990</option></select>'
+				e = '<select data-auto-id="user_birthday_year" id="user-birthday-year" name="user[birthday]($year)"><option value="1980">1980</option><option value="1981">1981</option><option value="1982">1982</option><option value="1983">1983</option><option value="1984">1984</option><option value="1985">1985</option><option value="1986">1986</option><option value="1987">1987</option><option value="1988">1988</option><option value="1989">1989</option><option value="1990">1990</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -1222,7 +1222,7 @@ component extends="wheels.WheelsTest" {
 				args.startyear = "1990"
 				args.endyear = "1980"
 				e = _controller.dateSelect(argumentCollection = args)
-				r = '<select id="user-birthday-year" name="user[birthday]($year)"><option value="1990">1990</option><option value="1989">1989</option><option value="1988">1988</option><option value="1987">1987</option><option value="1986">1986</option><option value="1985">1985</option><option value="1984">1984</option><option value="1983">1983</option><option value="1982">1982</option><option value="1981">1981</option><option value="1980">1980</option><option value="1979">1979</option><option value="1978">1978</option><option value="1977">1977</option><option value="1976">1976</option><option selected="selected" value="1975">1975</option></select>'
+				r = '<select data-auto-id="user_birthday_year" id="user-birthday-year" name="user[birthday]($year)"><option value="1990">1990</option><option value="1989">1989</option><option value="1988">1988</option><option value="1987">1987</option><option value="1986">1986</option><option value="1985">1985</option><option value="1984">1984</option><option value="1983">1983</option><option value="1982">1982</option><option value="1981">1981</option><option value="1980">1980</option><option value="1979">1979</option><option value="1978">1978</option><option value="1977">1977</option><option value="1976">1976</option><option selected="selected" value="1975">1975</option></select>'
 
 				expect(e).toBe(r)
 			})
@@ -1232,7 +1232,7 @@ component extends="wheels.WheelsTest" {
 				args.startyear = "1990"
 				args.endyear = "1980"
 				e = _controller.dateSelect(argumentCollection = args)
-				r = '<select id="user-birthday-year" name="user[birthday]($year)"><option value="1990">1990</option><option value="1989">1989</option><option value="1988">1988</option><option value="1987">1987</option><option value="1986">1986</option><option value="1985">1985</option><option value="1984">1984</option><option value="1983">1983</option><option value="1982">1982</option><option value="1981">1981</option><option value="1980">1980</option></select>'
+				r = '<select data-auto-id="user_birthday_year" id="user-birthday-year" name="user[birthday]($year)"><option value="1990">1990</option><option value="1989">1989</option><option value="1988">1988</option><option value="1987">1987</option><option value="1986">1986</option><option value="1985">1985</option><option value="1984">1984</option><option value="1983">1983</option><option value="1982">1982</option><option value="1981">1981</option><option value="1980">1980</option></select>'
 
 				expect(e).toBe(r)
 			})

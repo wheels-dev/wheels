@@ -2290,7 +2290,7 @@ component extends="modules.BaseModule" {
 		var serverPort = detectServerPort();
 		if (!serverPort) {
 			out("No running Wheels server detected.", "red");
-			out("Migrations require a running server. Start with: wheels server start");
+			out("Migrations require a running server. Start with: wheels start");
 			return "";
 		}
 
@@ -2337,7 +2337,7 @@ component extends="modules.BaseModule" {
 		var serverPort = detectServerPort();
 		if (!serverPort) {
 			out("No running Wheels server detected.", "red");
-			out("Seeding requires a running server. Start with: wheels server start");
+			out("Seeding requires a running server. Start with: wheels start");
 			return "";
 		}
 
@@ -2952,7 +2952,7 @@ component extends="modules.BaseModule" {
 		out("");
 		out("Next steps:", "bold");
 		out("  cd #appName#");
-		out("  wheels server start");
+		out("  wheels start");
 		return "";
 	}
 

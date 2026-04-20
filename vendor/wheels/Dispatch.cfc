@@ -471,6 +471,11 @@ component output="false" extends="wheels.Global"{
 
 		// Skip if disabled or no key parameter exists.
 		if (IsBoolean(local.binding) && !local.binding) {
+			// Binding is off. Emit a dev-mode hint if this route looks like a binding
+			// candidate (has a key and dispatches to a member action). See gap tracker
+			// item #5: silent failure when developers write `params.post` without
+			// setting `binding=true`.
+			$maybeWarnRouteBinding(params = local.rv, route = arguments.route);
 			return local.rv;
 		}
 		if (!StructKeyExists(local.rv, "key")) {
@@ -516,6 +521,83 @@ component output="false" extends="wheels.Global"{
 		local.rv[local.paramKey] = local.instance;
 
 		return local.rv;
+	}
+
+	/**
+	 * Emits a one-time dev-mode log warning when a route looks like a route-model-binding
+	 * candidate but binding is not enabled. The heuristic: params.key is present AND the
+	 * resolved action is one of the member binding-eligible actions (show, edit, update,
+	 * delete). Writes one line per unique controller+action pair per JVM process to avoid
+	 * log spam. Gated behind environment != "production" and suppressRouteBindingWarnings=false.
+	 * The warning points the developer at either the per-resource `binding=true` flag or the
+	 * global `routeModelBinding` setting. Safe to call regardless of state — returns silently
+	 * on any error so it never interferes with dispatch.
+	 */
+	public boolean function $maybeWarnRouteBinding(required struct params, required struct route) {
+		try {
+			// Resolve the settings namespace ($wheels or wheels depending on runtime).
+			local.appKey = $appKey();
+			local.settings = application[local.appKey];
+
+			// Gate: production skips entirely.
+			local.env = StructKeyExists(local.settings, "environment") ? local.settings.environment : "";
+			if (local.env == "production") {
+				return false;
+			}
+
+			// Gate: user opt-out.
+			if (StructKeyExists(local.settings, "suppressRouteBindingWarnings") && local.settings.suppressRouteBindingWarnings) {
+				return false;
+			}
+
+			// Only warn when a key is in the URL (binding wouldn't fire without one).
+			if (!StructKeyExists(arguments.params, "key")) {
+				return false;
+			}
+
+			// Only warn for member binding-eligible actions.
+			local.action = StructKeyExists(arguments.params, "action") ? arguments.params.action : (StructKeyExists(arguments.route, "action") ? arguments.route.action : "");
+			if (!ListFindNoCase("show,edit,update,delete", local.action)) {
+				return false;
+			}
+
+			// Derive controller (for log detail + dedup key).
+			local.controller = StructKeyExists(arguments.params, "controller") ? arguments.params.controller : (StructKeyExists(arguments.route, "controller") ? arguments.route.controller : "");
+			if (!Len(local.controller)) {
+				return false;
+			}
+
+			// Dedup: one warning per controller+action per application lifetime.
+			// Resets on reload (application scope rebuild).
+			if (!StructKeyExists(application, "$wheelsRouteBindingWarnings")) {
+				application.$wheelsRouteBindingWarnings = {};
+			}
+			local.dedupKey = local.controller & "##" & local.action;
+			if (StructKeyExists(application.$wheelsRouteBindingWarnings, local.dedupKey)) {
+				return false;
+			}
+			application.$wheelsRouteBindingWarnings[local.dedupKey] = true;
+
+			// Derive the singular name binding would use (matches $resolveRouteModelBinding logic).
+			local.modelName = capitalize(singularize(local.controller));
+			local.singular = LCase(Left(local.modelName, 1)) & Mid(local.modelName, 2, Len(local.modelName) - 1);
+			local.routeName = StructKeyExists(arguments.route, "name") ? arguments.route.name : "";
+
+			local.msg = "Wheels Route Binding Hint: #UCase(local.action)# on controller '#local.controller#'"
+				& (Len(local.routeName) ? " (route '#local.routeName#')" : "")
+				& " dispatched with params.key but route model binding is not enabled on this resource."
+				& " If you intended params.#local.singular# to be auto-loaded from the #local.modelName# model, add binding=true to the resource:"
+				& "  .resources(name=""#local.controller#"", binding=true)."
+				& " Or enable globally in config/settings.cfm: set(routeModelBinding=true)."
+				& " To silence this hint: set(suppressRouteBindingWarnings=true) in config/settings.cfm."
+				& " (Hint fires in development only.)";
+
+			writeLog(file="wheels", type="warning", text=local.msg);
+			return true;
+		} catch (any ignored) {
+			// Warning emission is best-effort; never block dispatch.
+			return false;
+		}
 	}
 
 	/**
