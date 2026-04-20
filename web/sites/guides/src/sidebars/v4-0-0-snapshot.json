@@ -81,7 +81,8 @@
       { "label": "Model Tests", "link": "/v4-0-0-snapshot/testing/model-tests/" },
       { "label": "Controller Tests", "link": "/v4-0-0-snapshot/testing/controller-tests/" },
       { "label": "View & Form Tests", "link": "/v4-0-0-snapshot/testing/view-and-form-tests/" },
-      { "label": "Integration Tests", "link": "/v4-0-0-snapshot/testing/integration-tests/" }
+      { "label": "Integration Tests", "link": "/v4-0-0-snapshot/testing/integration-tests/" },
+      { "label": "Functional Tests", "link": "/v4-0-0-snapshot/testing/functional-tests/" }
     ]
   },
   {
