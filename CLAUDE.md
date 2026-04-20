@@ -23,10 +23,10 @@ Prefer MCP tools when the Wheels MCP server is available (`mcp__wheels__*`). Fal
 | Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels dbmigrate latest\|up\|down\|info` |
 | Test | `wheels_test()` | `wheels test run` |
 | Reload | `wheels_reload()` | `?reload=true&password=...` |
-| Server | `wheels_server(action="status")` | `wheels server start\|stop\|status` |
+| Server | `wheels_server(action="status")` | `wheels start\|stop\|status` |
 | Analyze | `wheels_analyze(target="all")` | — |
 | Admin | — | `wheels g admin ModelName` |
-| Seed | — | `wheels db:seed` |
+| Seed | — | `wheels seed` (legacy alias: `wheels db:seed`) |
 
 ## Critical Anti-Patterns (Top 10)
 
@@ -115,7 +115,7 @@ Routes are matched first-to-last. Wrong order = wrong matches.
 Order: MCP routes → resources → custom named routes → root → wildcard (last!)
 ```
 
-### 7. timestamps() Includes createdAt and updatedAt
+### 7. timestamps() Includes createdAt, updatedAt, and deletedAt
 Don't also add separate datetime columns for these.
 ```cfm
 // WRONG — duplicates
@@ -123,8 +123,9 @@ t.timestamps();
 t.datetime(columnNames="createdAt");
 
 // RIGHT
-t.timestamps();  // creates both createdAt and updatedAt
+t.timestamps();  // creates createdAt, updatedAt, AND deletedAt (soft-delete)
 ```
+Note: `t.timestamps()` adds three columns, not two — the third is the soft-delete marker. Verified against `vendor/wheels/migrator/TableDefinition.cfc`.
 
 ### 8. Database-Agnostic Dates in Migrations
 Use `NOW()` — it works across MySQL, PostgreSQL, SQL Server, H2, SQLite.
@@ -676,15 +677,15 @@ seedOnce(modelName="User", uniqueProperties="email", properties={
 });
 ```
 
-**CLI:**
+**CLI** (LuCLI canonical form; `wheels db:seed` is the legacy CommandBox alias — prefer the short form):
 ```bash
-wheels db:seed                          # Run convention seeds (auto-detect)
-wheels db:seed --environment=production # Seed for specific environment
-wheels db:seed --generate               # Generate random test data (legacy)
-wheels db:seed --generate --count=10    # Generate 10 records per model
+wheels seed                             # Run convention seeds (auto-detect env)
+wheels seed --environment=production    # Seed for specific environment
+wheels seed --generate                  # Legacy: random test data
 wheels generate seed                    # Create app/db/seeds.cfm
 wheels generate seed --all              # Create seeds.cfm + dev/prod stubs
 ```
+Note: the `--count` / `--models` / `--dataFile` flags on `--generate` only exist on the legacy CommandBox `wheels db:seed` surface; LuCLI's `wheels seed` ignores them.
 
 **`seedOnce()`** — idempotent: checks `uniqueProperties` via `findOne()`, creates only if not found. Re-running seeds is always safe.
 
