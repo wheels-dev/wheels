@@ -705,4 +705,6 @@ Whether you stopped at 6a or continued to 6b, the user-facing behavior should be
 
 ## What's next
 
-Part 7 covers testing and deploying the blog. You'll write your first model spec and controller spec using Wheels' BDD syntax, then add one browser test that drives a real Chromium through the signup flow. The chapter ends with a high-level deployment overview — how Wheels apps go to production and what changes in `config/environments/production.cfm`.
+Part 7 covers testing and deploying the blog. You'll write your first model spec and controller spec using Wheels' BDD syntax, then add one browser test that drives a real Chromium through the signup flow. The chapter ends with a high-level deployment overview — how Wheels apps go to production and what changes in `config/production/settings.cfm`.
+
+The DI container you used to wire `SessionStrategy` in 6b is a core framework feature. See [The Dependency Injection Container](/v4-0-0-snapshot/core-concepts/dependency-injection/) for when to reach for it vs plain `new SomeClass()`.
