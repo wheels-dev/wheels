@@ -64,6 +64,39 @@ jobs:
       - name: Smoke-test the CLI
         run: wheels --version
 
+      - name: Diagnose wrapper (temporary — remove once spawn enoent is root-caused)
+        run: |
+          WRAPPER=/home/linuxbrew/.linuxbrew/bin/wheels
+          echo "=== file ==="
+          file "$WRAPPER"
+          echo "=== readlink -f ==="
+          readlink -f "$WRAPPER"
+          echo "=== stat ==="
+          stat "$WRAPPER"
+          echo "=== head -10 (resolved) ==="
+          head -10 "$(readlink -f "$WRAPPER")"
+          echo "=== strace execve of wheels --version ==="
+          sudo apt-get install -y strace >/dev/null 2>&1 || true
+          strace -f -e trace=execve -s 256 wheels --version 2>&1 | head -60 || true
+          echo "=== node spawnSync (main process, no --test) ==="
+          node -e "const {spawnSync}=require('child_process'); const r=spawnSync('$WRAPPER',['--version'],{encoding:'utf8'}); console.log(JSON.stringify({status:r.status,err:r.error&&r.error.code,stderr:(r.stderr||'').slice(0,300),stdout:(r.stdout||'').slice(0,200)}));"
+          echo "=== node spawn inside --test worker ==="
+          cat > /tmp/spawn-probe.mjs <<'EOF'
+          import { test } from 'node:test';
+          import { spawn } from 'node:child_process';
+          test('probe', async () => {
+            await new Promise((res) => {
+              const p = spawn(process.env.WRAPPER, ['--version']);
+              let out='',err='',spawnErr=null;
+              p.stdout.on('data',d=>out+=d);
+              p.stderr.on('data',d=>err+=d);
+              p.on('error',e=>{spawnErr={code:e.code,msg:e.message,syscall:e.syscall,path:e.path};});
+              p.on('close',code=>{console.error('PROBE',JSON.stringify({code,out:out.slice(0,200),err:err.slice(0,300),spawnErr}));res();});
+            });
+          });
+          EOF
+          WRAPPER="$WRAPPER" node --test --test-concurrency=1 /tmp/spawn-probe.mjs 2>&1 | head -60 || true
+
       - name: Warm up wheels module (first-run copy)
         run: wheels --version >/dev/null
 
