@@ -1,6 +1,6 @@
 ---
 title: The Request Lifecycle
-description: What Wheels does between an incoming HTTP request and the response your user sees.
+description: How a request flows through a Wheels app — from the JVM socket to the rendered response.
 type: concept
 sidebar:
   order: 1
@@ -8,9 +8,18 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-When a request arrives at your Wheels app, it flows through five stages before your controller action runs — and three more before the response goes back. Understanding this pipeline tells you where to put code for every problem: auth goes in middleware, request-shape changes go in filters, view decoration goes in helpers.
+When a request arrives at your Wheels app, it passes through eight stages on the way to a response. Knowing the order tells you where to put code: auth in middleware, record loading in filters, per-action logic in the action itself, display logic in views.
 
-**You should already know:** what a controller action is, what a filter is. If not, finish the [tutorial](/v4-0-0-snapshot/start-here/tutorial/) first.
+**You'll learn:**
+
+- The eight stages a request flows through
+- Where your code hooks into each stage
+- Why the order matters for design decisions
+- How to diagnose failures from symptoms
+
+<Aside type="note">
+  This is the conceptual tour. The [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/) page has the hands-on version — how to write each hook.
+</Aside>
 
 ## The pipeline
 
@@ -18,7 +27,7 @@ When a request arrives at your Wheels app, it flows through five stages before y
 HTTP request
     │
     ▼
-(1) Middleware              — before controller exists
+(1) Middleware              — before any controller exists
     │
     ▼
 (2) Dispatch + route match  — pick controller + action
@@ -27,7 +36,7 @@ HTTP request
 (3) Controller instantiation — config() runs, filters registered
     │
     ▼
-(4) beforeAction filters    — load records, enforce ownership
+(4) beforeAction filters    — load records, enforce auth
     │
     ▼
 (5) Controller action       — your code
@@ -36,39 +45,86 @@ HTTP request
 (6) afterAction filters
     │
     ▼
-(7) View rendering          — layouts, partials, helpers
+(7) View rendering          — layout, partials, helpers
     │
     ▼
 (8) Response sent
 ```
 
-## Why this order matters
+## Stage by stage
 
-**Middleware runs before the controller exists.** That's why rate limiting and auth go there — they can short-circuit without paying the cost of instantiating a controller.
+### 1. Middleware
+
+Runs before the controller is instantiated. Each middleware gets the request struct and a `next` function. It can inspect, mutate, short-circuit, or pass through. Ordering is significant — middleware registered first sees the request first and sees the response last.
+
+Typical uses: rate limiting, CORS, security headers, request IDs, auth gate, logging.
+
+### 2. Dispatch and route match
+
+The router walks `config/routes.cfm` top-to-bottom, first match wins. A match resolves to a controller name, an action name, and a set of route params (including `params.key` from `:key` segments). Route model binding (when `binding=true` on a resource) loads `params.<singular>` from the database here — before your action runs.
+
+### 3. Controller instantiation
+
+Wheels constructs the controller component. Its `config()` method runs once, registering filters and injecting services from the DI container. Anything in `config()` is per-request setup, not per-action.
+
+### 4. beforeAction filters
+
+Registered private methods that run before the action. This is where you put cross-action logic: checking authentication, loading a parent record, enforcing ownership. A filter can call `redirectTo()` to short-circuit — the action never runs.
+
+### 5. Controller action
+
+Your code. Reads params, calls models, orchestrates the response. Sets instance variables that views read.
+
+### 6. afterAction filters
+
+Rare. Use for logging, analytics, cleanup. The response body is already determined by this point.
+
+### 7. View rendering
+
+The default behavior looks up `app/views/<controller>/<action>.cfm` and renders it through `app/views/layout.cfm`. The action can override with `renderView(action="other")` or bypass rendering entirely with `redirectTo(...)`. Helpers called from views access the same `params`, `flash`, and `session` the action saw.
+
+### 8. Response sent
+
+Headers set by middleware on the way out (security headers, CORS, request ID). The response body is written to the socket and the request is done.
+
+## Where your code hooks in
+
+| Hook | File | Runs |
+|------|------|------|
+| Middleware | `app/middleware/*.cfc`, registered in `config/settings.cfm` | Stage 1, every request |
+| Routes | `config/routes.cfm` | Stage 2 (defined once at boot) |
+| DI registration | `config/services.cfm` | Once at boot |
+| Controller filters | `config()` in `app/controllers/*.cfc` | Stage 3, per-request |
+| Filter logic | Private methods in controller | Stages 4 and 6 |
+| Action | Public method in controller | Stage 5 |
+| View | `app/views/<controller>/<action>.cfm` | Stage 7 |
+| Helpers | `app/views/helpers.cfm` and globals | Stage 7 (called from views) |
+
+## Why the order matters
+
+**Middleware runs before the controller exists.** That's why rate limiting and auth checks go there — they can reject a request without paying the cost of instantiating a controller.
 
 **`beforeAction` filters run after `config()`.** That's why they can rely on injected services (`this.emailService`) — the DI container has already resolved them.
 
-**View rendering is inside the controller's request.** Helpers called from views access the same `params`, `flash`, and `session` that the action saw. The view is not a separate process.
+**View rendering is inside the request, not after it.** Helpers and views see the same `params`, `flash`, and `session` the action saw. A view is not a separate subprocess.
 
-## A concrete request
+**`redirectTo()` in a filter skips everything below.** Auth check fails → `redirectTo("login")` → no action, no view, just a 302 response. Filters can short-circuit cleanly.
 
-An authenticated user posts a new comment:
+## When something breaks
 
-1. **Middleware.** RequestId stamps a correlation ID. Cors validates the Origin. SecurityHeaders prepares response headers.
-2. **Dispatch.** `POST /posts/42/comments` matches `comments#create`.
-3. **Instantiation.** `Comments.cfc` instantiated; `config()` registers `authenticate` filter, injects `commentService`.
-4. **Filter.** `authenticate` checks the session; user is logged in, does nothing.
-5. **Action.** `create()` reads `params.comment`, builds a Comment, saves it.
-6. **afterAction.** A filter logs the event.
-7. **Rendering.** `redirectTo(post)` short-circuits rendering, returns a 302.
-8. **Response.** Correlation ID + CORS + security headers from step 1 applied.
+Common symptoms and which stage caused them:
 
-<Aside type="tip">
-  When deciding where to put new code, picture this pipeline and ask: when does this need to run? Before the controller exists? Middleware. Before every action in a controller? `beforeAction`. Once for a specific action? Action code.
-</Aside>
+- **`Route not found`** — stage 2 (dispatch) couldn't match the URL against `routes.cfm`. Check order: resources before root before wildcard.
+- **`Component X has no public method Y`** — stage 5. The action isn't declared on the controller, or the controller wasn't reloaded (`wheels reload`).
+- **`params.post is undefined` in show/edit/update/delete** — stage 2 route model binding wasn't enabled. Set `binding=true` on the resource, or set the global `routeModelBinding=true` in `config/settings.cfm`. Wheels prints a dev-mode warning hinting at this.
+- **Blank page but `curl -I` shows 200** — stage 7 couldn't find the view file. The path is `app/views/<controller>/<action>.cfm` all lowercase.
+- **Redirect happens but you expected a render** — a filter (stage 4) or the action itself called `redirectTo()` and short-circuited. Check the filters list in `config()`.
+- **CORS error in browser, curl works fine** — stage 1 Cors middleware isn't registered, or its `allowOrigins` doesn't include the browser's origin.
 
 ## See also
 
-- [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/) — writing your own middleware
-- [MVC in Wheels](/v4-0-0-snapshot/core-concepts/) — where each layer lives
-- [How Routing Works](/v4-0-0-snapshot/core-concepts/) — step 2 in depth
+- [MVC in Wheels](/v4-0-0-snapshot/core-concepts/mvc-in-wheels/) — where each layer lives and what it owns
+- [How Routing Works](/v4-0-0-snapshot/core-concepts/how-routing-works/) — stage 2 in depth
+- [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/) — stage 1 in depth
+- [The Dependency Injection Container](/v4-0-0-snapshot/core-concepts/dependency-injection/) — what `config()` resolves
+- [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/) — the hands-on how-to for stages 3-6
