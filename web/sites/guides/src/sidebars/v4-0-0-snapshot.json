@@ -39,7 +39,9 @@
   {
     "label": "The Basics",
     "link": "/v4-0-0-snapshot/basics/",
-    "items": []
+    "items": [
+      { "label": "Routing", "link": "/v4-0-0-snapshot/basics/routing/" }
+    ]
   },
   {
     "label": "Digging Deeper",
