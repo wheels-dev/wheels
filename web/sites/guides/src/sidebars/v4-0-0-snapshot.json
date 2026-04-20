@@ -27,7 +27,8 @@
     "link": "/v4-0-0-snapshot/core-concepts/",
     "items": [
       { "label": "The Request Lifecycle", "link": "/v4-0-0-snapshot/core-concepts/request-lifecycle/" },
-      { "label": "MVC in Wheels", "link": "/v4-0-0-snapshot/core-concepts/mvc-in-wheels/" }
+      { "label": "MVC in Wheels", "link": "/v4-0-0-snapshot/core-concepts/mvc-in-wheels/" },
+      { "label": "Conventions over Configuration", "link": "/v4-0-0-snapshot/core-concepts/conventions-over-configuration/" }
     ]
   },
   {
