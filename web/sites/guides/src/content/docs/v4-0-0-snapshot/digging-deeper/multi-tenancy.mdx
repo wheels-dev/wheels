@@ -124,17 +124,25 @@ The strategy determines *when* the resolver fires and what's extracted from the 
 
 If you're running one database with a `tenantId` column on every tenant-owned table, add a `currentTenant` scope to each model and chain it into every finder.
 
+<Aside type="caution">
+  **Use a dynamic scope handler, not a static `where=` string.** Static scope strings are interpolated at `config()` time — before any request exists. A scope like `where="tenantId = ##request.wheels.tenant.id##"` resolves to a fixed `tenantId = 0` forever. Every query would return tenant 0's data. This is a data-leak pitfall; the dynamic-handler form below evaluates per request.
+</Aside>
+
 ```cfm {test:compile} title="app/models/Post.cfc"
 component extends="Model" {
     function config() {
-        scope(
-            name = "currentTenant",
-            where = "tenantId = ##request.wheels.tenant.id ?: 0##"
-        );
+        scope(name="currentTenant", handler="scopeCurrentTenant");
         belongsTo(name="author");
+    }
+
+    private struct function scopeCurrentTenant() {
+        var tenantId = request.wheels.tenant.id ?: 0;
+        return {where: "tenantId = '#tenantId#'"};
     }
 }
 ```
+
+The handler method runs on each call to `.currentTenant()`, so it sees the current request's tenant every time. See [Query Builder and Scopes](/v4-0-0-snapshot/basics/query-builder-and-scopes/#dynamic-scopes) for the full dynamic-scope pattern.
 
 Use it like any other scope:
 
@@ -283,25 +291,26 @@ Tests should exercise the middleware too: hit a protected action with and withou
 
 If you use [caching](/v4-0-0-snapshot/digging-deeper/caching/), every cache key must include the tenant ID. A cache leak across tenants is a classic tenancy vulnerability — user A loads the page, their rendered HTML lands in the cache under a tenant-less key, user B on a different tenant gets user A's HTML.
 
-Use `appendToKey` on controller-level caches and pull `tenant().id` into any manual key you build:
+The `appendToKey` argument on `caches()` reads dot-notation paths from `request`, `arguments`, `application`, `session`, or `variables` — it doesn't invoke private controller methods. Stash the tenant ID into `request` in a `before` filter, then reference it:
 
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {
     function config() {
-        caches(action="index", time=10, appendToKey="tenantScope");
+        filters(through="stashTenantId", type="before");
+        caches(action="index", time=10, appendToKey="request.tenantCacheKey");
     }
 
     function index() {
         posts = model("Post").currentTenant().findAll();
     }
 
-    private function tenantScope() {
-        return tenant().id ?: "default";
+    private function stashTenantId() {
+        request.tenantCacheKey = tenant().id ?: "default";
     }
 }
 ```
 
-For fragment caches and query caches, build the tenant ID into the key yourself: `cache(key="posts-index-##tenant().id##", time=10)`.
+For fragment caches and query caches, build the tenant ID into the key yourself: `cache(key="posts-index-##tenant().id##", time=10)`. Fragment and query cache keys are plain strings — string interpolation at call time picks up the current tenant.
 
 ## Operational concerns
 

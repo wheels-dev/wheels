@@ -174,7 +174,7 @@ component extends="Controller" {
 
     function download() {
         if (variables.invoice.userId != session.userId) {
-            renderNotFound();
+            renderText(text="Not found", status=404);
             return;
         }
 
@@ -187,7 +187,7 @@ component extends="Controller" {
     private function loadInvoice() {
         variables.invoice = model("Invoice").findByKey(key=params.key);
         if (!IsObject(variables.invoice)) {
-            renderNotFound();
+            renderText(text="Not found", status=404);
         }
     }
 }

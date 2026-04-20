@@ -62,7 +62,7 @@ component extends="Controller" {
 
 ### Static pages skip filters
 
-Pass `static=true` and Wheels uses Lucee's `cfcache` server-side cache, which short-circuits the request even earlier — before filters don't run at all. Use this for marketing pages, pricing tables, anything truly public:
+Pass `static=true` and Wheels uses Lucee's `cfcache` server-side cache, which short-circuits the request even earlier — before filters run at all. Use this for marketing pages, pricing tables, anything truly public:
 
 ```cfm {test:compile} title="app/controllers/Marketing.cfc"
 component extends="Controller" {

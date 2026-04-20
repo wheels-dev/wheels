@@ -64,7 +64,7 @@ Both are singletons — one instance per app lifetime. The authenticator holds i
 Wire the session strategy into the authenticator on app init. A cold reload registers it once; the `hasStrategy` check keeps a second reload from stacking duplicates:
 
 ```cfm {test:compile} title="config/app.cfm or equivalent init hook"
-if (StructKeyExists(application, "wo") && application.wo.hasService("authenticator")) {
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
     var auth = service("authenticator");
     var sessionStrategy = service("sessionStrategy");
     if (!auth.hasStrategy("session")) {
@@ -189,7 +189,7 @@ component extends="Model" {
 ### Validator callback (database-backed)
 
 ```cfm {test:compile} title="config/app.cfm or equivalent init hook"
-if (StructKeyExists(application, "wo") && application.wo.hasService("authenticator")) {
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
     var auth = service("authenticator");
 
     if (!auth.hasStrategy("token")) {
@@ -250,7 +250,7 @@ JWTs are self-contained signed tokens — the client holds them, you verify the 
 ### Register the service and strategy
 
 ```cfm {test:compile} title="config/app.cfm or equivalent init hook"
-if (StructKeyExists(application, "wo") && application.wo.hasService("authenticator")) {
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
     var auth = service("authenticator");
 
     if (!auth.hasStrategy("jwt")) {
@@ -318,7 +318,7 @@ On expired tokens `JwtStrategy` returns `error="JWT token has expired"` and `sta
 The registry pattern pays off when one app serves both HTML and JSON. Register session auth for browser routes, JWT for `/api/*`, and the authenticator picks the right one per request based on what the client sends.
 
 ```cfm {test:compile} title="config/app.cfm — register both strategies"
-if (StructKeyExists(application, "wo") && application.wo.hasService("authenticator")) {
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
     var auth = service("authenticator");
 
     if (!auth.hasStrategy("jwt")) {

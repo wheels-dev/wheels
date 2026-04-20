@@ -507,7 +507,7 @@ The design is a registry: an `Authenticator` holds a list of named strategies. O
 Next, wire the session strategy into the authenticator so `authenticate(request)` has something to try. The cleanest place is wherever your app's init hook runs. If your app has a `config/app.cfm` (or equivalent on-init block), add:
 
 ```cfm {test:compile}
-if (StructKeyExists(application, "wo") && application.wo.hasService("authenticator")) {
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
     var auth = application.wo.service("authenticator");
     var sessionStrategy = application.wo.service("sessionStrategy");
     if (!auth.hasStrategy("session")) {
