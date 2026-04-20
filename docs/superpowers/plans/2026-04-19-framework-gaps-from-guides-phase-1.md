@@ -405,13 +405,32 @@ Recommend A at minimum. C is a nice enhancement.
 
 ---
 
+## Additional gaps surfaced during Phase 2b-Advanced (2026-04-20)
+
+### [ ] 17. `cli/lucli/templates/snippets/user-mailer.txt` references nonexistent `wheels.Mailer`
+Anyone running `wheels snippet install user-mailer` gets a template that extends a class that doesn't exist. Delete the stale snippet or rewrite to match the real mailer pattern documented at [digging-deeper/sending-email](../../web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/sending-email.mdx). Surfaced during Task 5 (sending-email rewrite).
+
+### [ ] 18. Promote `wheels-dev/wheels-i18n` plugin to a first-party package
+The `wheels-i18n` plugin exists at [wheels-dev/wheels-i18n](https://github.com/wheels-dev/wheels-i18n) as a 3.x-era drop-in. Works today via `app/plugins/` but should be converted to a 4.0 package alongside `hotwire`, `basecoat`, `sentry`, `legacyadapter`. Once converted, the internationalization guide gets rewritten to treat it as canonical (like auth Patterns treats `SessionStrategy`). Surfaced during Task 8.
+
+### [ ] 19. Route model binding lacks custom binding field (`bindBy=`)
+Binding always uses `findByKey(params.key)` against the primary key. For slug-based URLs (`/posts/my-great-post`), there's no way to say "bind by slug, not id." Candidate addition: `.resources(name="posts", binding=true, bindBy="slug")` that calls `findOne(where="slug='#params.key#'")` instead. Surfaced during Task 11.
+
+### [ ] 20. DI container lacks `toFactory()` registration
+When construction needs custom logic (e.g., read env vars, compose from other services), the current workaround is a plain wrapper CFC with a `build()` method. A first-class `toFactory(function)` on the fluent API would simplify secret-driven registrations (JWT strategy with env-var secret is the canonical example). Surfaced during Task 14.
+
+### [ ] 21. First-class i18n primitives (beyond the plugin-to-package conversion in #18)
+Full i18n support goes beyond repackaging `wheels-i18n`: CLDR-aware pluralization, locale-aware `errorMessagesFor()`, a `LocaleResolver` middleware with built-in session/URL/header precedence, locale-to-Lucee-locale-string mapping. Tracked as the roadmap item the Internationalization guide references.
+
+---
+
 ## What's explicitly not on this list
 
 Items surfaced during Phase 1 that are working-as-intended or out-of-scope:
 
 - The CFML tag-comment (`<!--- --->`) gap in the compile driver's fallback mode. Theoretical; no current content hits it.
 - Occasional flakiness of parallel `wheels verify:docs` runs with multiple cli blocks — same root as #11.
-- The `.ai/` reference docs decision (deferred to end of Phase 2).
+- The `.ai/` reference docs decision (deferred to end of Phase 2c).
 
 ---
 

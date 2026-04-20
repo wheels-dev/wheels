@@ -737,7 +737,7 @@ wheels jobs monitor                        # live dashboard
 
 **Configurable backoff**: `this.baseDelay = 2` and `this.maxDelay = 3600` in job `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`.
 
-Requires migration: `20260221000001_createwheels_jobs_table.cfc`. Run with `wheels dbmigrate latest`.
+The `wheels_jobs` table is auto-created by `Job.cfc::$ensureJobTable()` on first enqueue or processing — no migration needed. (The older `20260221000001_createwheels_jobs_table.cfc` migration is vestigial; Phase 2b drift audit confirmed auto-create is now the path.)
 
 ## Server-Sent Events (SSE) Quick Reference
 
