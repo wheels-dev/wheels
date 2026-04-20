@@ -83,7 +83,8 @@
       { "label": "View & Form Tests", "link": "/v4-0-0-snapshot/testing/view-and-form-tests/" },
       { "label": "Integration Tests", "link": "/v4-0-0-snapshot/testing/integration-tests/" },
       { "label": "Functional Tests", "link": "/v4-0-0-snapshot/testing/functional-tests/" },
-      { "label": "Browser Tests", "link": "/v4-0-0-snapshot/testing/browser-tests/" }
+      { "label": "Browser Tests", "link": "/v4-0-0-snapshot/testing/browser-tests/" },
+      { "label": "Fixtures & Test Data", "link": "/v4-0-0-snapshot/testing/fixtures-and-test-data/" }
     ]
   },
   {
