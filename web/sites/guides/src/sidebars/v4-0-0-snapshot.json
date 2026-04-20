@@ -29,7 +29,8 @@
       { "label": "The Request Lifecycle", "link": "/v4-0-0-snapshot/core-concepts/request-lifecycle/" },
       { "label": "MVC in Wheels", "link": "/v4-0-0-snapshot/core-concepts/mvc-in-wheels/" },
       { "label": "Conventions over Configuration", "link": "/v4-0-0-snapshot/core-concepts/conventions-over-configuration/" },
-      { "label": "ORM Philosophy", "link": "/v4-0-0-snapshot/core-concepts/orm-philosophy/" }
+      { "label": "ORM Philosophy", "link": "/v4-0-0-snapshot/core-concepts/orm-philosophy/" },
+      { "label": "The Dependency Injection Container", "link": "/v4-0-0-snapshot/core-concepts/dependency-injection/" }
     ]
   },
   {
