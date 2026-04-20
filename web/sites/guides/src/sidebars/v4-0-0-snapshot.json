@@ -79,7 +79,8 @@
     "items": [
       { "label": "Overview", "link": "/v4-0-0-snapshot/testing/" },
       { "label": "Model Tests", "link": "/v4-0-0-snapshot/testing/model-tests/" },
-      { "label": "Controller Tests", "link": "/v4-0-0-snapshot/testing/controller-tests/" }
+      { "label": "Controller Tests", "link": "/v4-0-0-snapshot/testing/controller-tests/" },
+      { "label": "View & Form Tests", "link": "/v4-0-0-snapshot/testing/view-and-form-tests/" }
     ]
   },
   {
