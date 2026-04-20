@@ -1,0 +1,336 @@
+---
+title: Multi-tenancy
+description: Serve multiple tenants from one Wheels app — subdomain routing, per-request data isolation, and three tenancy strategies.
+type: howto
+sidebar:
+  order: 9
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to run a single Wheels app that serves many tenants — each with its own data, routed by subdomain, header, or a custom rule you write. You'll pick a tenancy strategy, wire up the `TenantResolver` middleware so every request resolves to the right tenant, isolate tenant data at the model layer, opt specific models out of tenant routing, and key tenant-aware caches correctly.
+
+**You'll learn:**
+
+- The three tenancy strategies (row, schema, database) and how to choose
+- How to wire `TenantResolver` middleware for subdomain, header, or fully custom resolution
+- How per-request datasource switching works automatically — and how to opt out with `sharedModel()`
+- How to test tenant isolation and key caches per tenant
+
+<Aside type="note">
+  You should already know how middleware runs (see [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/)) and how models connect to datasources (see [Database and Multiple Datasources](/v4-0-0-snapshot/basics/database-and-multiple-datasources/)).
+</Aside>
+
+## Three tenancy strategies
+
+Tenancy is a data-layout question before it's a code question. Pick the isolation level that matches your compliance and operational constraints.
+
+| Strategy | Data layout | When to use |
+|----------|-------------|-------------|
+| **Row scoping** | One DB, one schema, `tenantId` column on every tenant-owned table. Every query filters by it. | Simplest to operate. Good for small or medium tenant counts. Weakest isolation — an ORM bug or missing scope leaks data across tenants. |
+| **Schema per tenant** | One DB, one schema per tenant. The app switches the active schema per request. | Medium isolation. Cheap on Postgres. Migrations run per schema. |
+| **Database per tenant** | A separate DB (or datasource) per tenant. The app switches the active datasource per request. | Strongest isolation, costliest to operate. Required when compliance demands physical separation, or when tenants have very different scale profiles. |
+
+Wheels' `TenantResolver` middleware supports all three. It populates `request.wheels.tenant` on every request; the framework reads `request.wheels.tenant.dataSource` in `$performQuery()` and routes model queries there automatically. Row scoping layers on top — add a `currentTenant` scope to your tenant-owned models and chain it into finders.
+
+## TenantResolver — the middleware
+
+`TenantResolver` ships in `vendor/wheels/middleware/TenantResolver.cfc`. Register it globally in `config/settings.cfm` so every request passes through it.
+
+The simplest form: a fully custom resolver that looks up the tenant however you like and returns the tenant struct.
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.TenantResolver(
+        strategy = "custom",
+        resolver = function(req) {
+            local.subdomain = ListFirst(cgi.server_name, ".");
+            local.tenant = model("Tenant").findOne(
+                where = "subdomain='##local.subdomain##'"
+            );
+            if (!IsObject(local.tenant)) {
+                return {};
+            }
+            return {
+                id: local.tenant.id,
+                dataSource: local.tenant.dataSourceName,
+                config: {appName: local.tenant.name}
+            };
+        }
+    )
+]);
+</cfscript>
+```
+
+The resolver receives the middleware request struct and returns a tenant struct. The returned struct must contain `dataSource` (non-empty) for tenant context to activate; `id` and `config` are optional (defaults: `""` and `{}`). Return `{}` for "no tenant matched" — the request then proceeds with the application's default datasource, tenant-free.
+
+`TenantResolver` sets `$locked = true` on the resolved struct so downstream code cannot silently switch tenants mid-request. It also removes `request.wheels.tenant` in a `finally` block after the response, so no state leaks into the next request.
+
+## Header-based strategy
+
+For API-only apps, clients usually send the tenant ID in an HTTP header. The `"header"` strategy reads the configured header, hands the value to your resolver (via `req.$tenantHeaderValue`), and expects it to look up and return the tenant struct.
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.TenantResolver(
+        strategy = "header",
+        headerName = "X-Tenant-ID",
+        resolver = function(req) {
+            local.tenantId = req.$tenantHeaderValue ?: "";
+            local.tenant = model("Tenant").findOne(
+                where = "externalId='##local.tenantId##'"
+            );
+            if (!IsObject(local.tenant)) {
+                return {};
+            }
+            return {id: local.tenant.id, dataSource: local.tenant.dataSourceName};
+        }
+    )
+]);
+</cfscript>
+```
+
+`headerName` defaults to `X-Tenant-ID`. The middleware normalizes the header name to the CGI form (`http_x_tenant_id`) when reading it. If the header is missing or empty, the middleware returns `{}` and the request proceeds tenant-free.
+
+## Subdomain strategy
+
+The `"subdomain"` strategy extracts the first segment of `cgi.server_name` and hands it to your resolver (via `req.$tenantSubdomain`). It requires the hostname to have at least three segments (e.g., `acme.myapp.com`) — anything shorter is treated as "no tenant."
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.TenantResolver(
+        strategy = "subdomain",
+        resolver = function(req) {
+            local.subdomain = req.$tenantSubdomain ?: "";
+            local.tenant = model("Tenant").findOne(
+                where = "subdomain='##local.subdomain##'"
+            );
+            if (!IsObject(local.tenant)) {
+                return {};
+            }
+            return {id: local.tenant.id, dataSource: local.tenant.dataSourceName};
+        }
+    )
+]);
+</cfscript>
+```
+
+The strategy determines *when* the resolver fires and what's extracted from the request; your resolver does the lookup and returns the tenant struct. Without a resolver, `"subdomain"` and `"header"` are no-ops.
+
+## Row-scoping pattern
+
+If you're running one database with a `tenantId` column on every tenant-owned table, add a `currentTenant` scope to each model and chain it into every finder.
+
+```cfm {test:compile} title="app/models/Post.cfc"
+component extends="Model" {
+    function config() {
+        scope(
+            name = "currentTenant",
+            where = "tenantId = ##request.wheels.tenant.id ?: 0##"
+        );
+        belongsTo(name="author");
+    }
+}
+```
+
+Use it like any other scope:
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function index() {
+        posts = model("Post").currentTenant().findAll(order="publishedAt DESC");
+    }
+
+    function create() {
+        post = model("Post").new(params.post);
+        post.tenantId = request.wheels.tenant.id;
+        if (post.save()) {
+            redirectTo(route="posts");
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+Row scoping gives you the simplest deployment (one DB, one migration run), but the isolation is enforced entirely in application code. A missing `.currentTenant()` on a finder is a data leak — lean on code review and a pre-commit grep rule. Schema- or database-per-tenant gives you a second line of defense at the database layer.
+
+## Per-datasource pattern (schema or DB per tenant)
+
+For schema-per-tenant and database-per-tenant layouts, you don't need to touch your model code. When `TenantResolver` sets `request.wheels.tenant.dataSource`, the framework's `$performQuery()` routes every non-shared model's queries to that datasource automatically:
+
+```
+model("Post").findAll()
+  → $performQuery()
+    → sees request.wheels.tenant.dataSource = "acme_ds"
+    → runs the query against acme_ds (instead of the model default)
+```
+
+The override triggers only when the model hasn't opted out (see [Shared models](#shared-models-cross-tenant-data) below), the query uses the model's default datasource, and `request.wheels.tenant.dataSource` is non-empty. Associations do **not** cross datasources: a JOIN uses the calling model's resolved datasource for the entire query. Don't `include` a shared model from a tenant model when the two live in different databases.
+
+## Shared models (cross-tenant data)
+
+Some models are deliberately global — the `Tenant` registry itself, billing plans, currencies, feature flags, system-wide audit logs. These tables live in your application's default datasource, not in each tenant's database. Mark them with `sharedModel()` in `config()` and the framework skips the per-request datasource override for them.
+
+```cfm {test:compile} title="app/models/Tenant.cfc"
+component extends="Model" {
+    function config() {
+        sharedModel();
+        hasMany(name="users");
+        validatesPresenceOf("name,subdomain,dataSourceName");
+        validatesUniquenessOf(property="subdomain");
+    }
+}
+```
+
+```cfm {test:compile} title="app/models/Plan.cfc"
+component extends="Model" {
+    function config() {
+        sharedModel();
+        hasMany(name="tenants");
+        validatesPresenceOf("name,monthlyPrice");
+    }
+}
+```
+
+Rule of thumb: if the table exists in every tenant database, don't share it. If it exists only in the central database, share it. `User` is the classic borderline case — share it if users span tenants (one account, many tenants), scope it per tenant if accounts belong to exactly one tenant.
+
+## Accessing the tenant inside your app
+
+Three helpers are available anywhere you can call framework functions (controllers, models, views, jobs):
+
+- `tenant()` — returns the current tenant struct, or `{}` if no tenant is active
+- `$tenantDataSource()` — returns the active tenant's datasource name, or the app default
+- `switchTenant(tenant, force)` — switches the active tenant mid-request; throws `Wheels.TenantLocked` unless `force=true`
+
+```cfm {test:compile} title="app/controllers/Dashboard.cfc"
+component extends="Controller" {
+    function index() {
+        currentTenant = tenant();
+        if (StructIsEmpty(currentTenant)) {
+            redirectTo(route="tenantSignup");
+            return;
+        }
+        tenantName = currentTenant.config.appName ?: "Dashboard";
+    }
+}
+```
+
+Mid-request switching is almost always wrong — the `$locked` flag exists to make accidents loud. The legitimate use case is admin tooling that operates across tenants (a support console, a cross-tenant report); pass `force=true` there and switch back when done.
+
+## Per-tenant config overrides
+
+The optional `config` key on the tenant struct overrides application settings for the duration of the request. Calls to `get("appName")` during that request return the tenant value instead of the app default.
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.TenantResolver(
+        strategy = "subdomain",
+        resolver = function(req) {
+            local.tenant = model("Tenant").findOne(
+                where = "subdomain='##req.$tenantSubdomain##'"
+            );
+            if (!IsObject(local.tenant)) {
+                return {};
+            }
+            return {
+                id: local.tenant.id,
+                dataSource: local.tenant.dataSourceName,
+                config: {
+                    appName: local.tenant.companyName,
+                    perPage: local.tenant.listingPageSize
+                }
+            };
+        }
+    )
+]);
+</cfscript>
+```
+
+A security denylist blocks settings that would weaken isolation if tenant-controlled: `encryptionAlgorithm`, `encryptionSecretKey`, `encryptionEncoding`, `CSRFProtection`, `csrfStore`, `reloadPassword`, and `obfuscateUrls` cannot be overridden per-tenant. Attempts are silently ignored. Function-scoped settings (e.g., `get(name="perPage", functionName="findAll")`) are also not overridden.
+
+## Route-level tenant scope
+
+If your app embeds the tenant in the URL path instead of the hostname (useful for development or when TLS wildcards are off the table), scope your routes under a tenant segment and read it from `req.params` in the resolver:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .scope(path="/t/:tenantSlug", callback=function(map) {
+        map.resources("posts");
+        map.resources("users");
+    })
+    .wildcard()
+.end();
+</cfscript>
+```
+
+Then in the resolver, read `req.params.tenantSlug` and look up the tenant from there. The resolver runs before controller dispatch, so the params struct is available on the middleware request.
+
+## Testing tenant isolation
+
+Isolation bugs are the most painful class of tenancy bug — they're silent until a customer sees another customer's data. Write tests that prove isolation holds before you ship.
+
+The pattern: seed two tenant fixtures, activate tenant A, create data, activate tenant B, assert tenant B sees none of tenant A's rows. Cover `findAll()`, `findByKey()`, and any custom SQL paths. For row-scoping apps, also assert that a finder without `.currentTenant()` *does* leak — that test guards against accidentally removing the scope.
+
+Tests should exercise the middleware too: hit a protected action with and without a valid tenant header/subdomain, and assert that unmatched tenants get the default-datasource behavior you expect (usually: a 404 from your app code, not from the middleware itself — the middleware deliberately does not 404 on unmatched tenants).
+
+## Caching per tenant
+
+If you use [caching](/v4-0-0-snapshot/digging-deeper/caching/), every cache key must include the tenant ID. A cache leak across tenants is a classic tenancy vulnerability — user A loads the page, their rendered HTML lands in the cache under a tenant-less key, user B on a different tenant gets user A's HTML.
+
+Use `appendToKey` on controller-level caches and pull `tenant().id` into any manual key you build:
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function config() {
+        caches(action="index", time=10, appendToKey="tenantScope");
+    }
+
+    function index() {
+        posts = model("Post").currentTenant().findAll();
+    }
+
+    private function tenantScope() {
+        return tenant().id ?: "default";
+    }
+}
+```
+
+For fragment caches and query caches, build the tenant ID into the key yourself: `cache(key="posts-index-##tenant().id##", time=10)`.
+
+## Operational concerns
+
+- **Migrations**: schema-per-tenant and database-per-tenant layouts require running migrations once per tenant. Wheels ships a `TenantMigrator` (`vendor/wheels/migrator/TenantMigrator.cfc`) that iterates a list of datasources and runs the migrator against each. Wire it into your deploy script so a new migration lands everywhere in one command.
+- **Backups**: database-per-tenant is a clean per-tenant restore story — drop a tenant's DB, restore from a snapshot, done. Row-scoping means restoring involves selective DELETE/INSERT across shared tables; plan this before you ship.
+- **Provisioning**: a new tenant needs a row in your shared `tenants` table, a new datasource (for schema- or DB-per-tenant), the schema or DB created, migrations run, and default seed data inserted. Bake this into a single script or a background job so onboarding a tenant is one button, not seven steps.
+- **Observability**: include `tenant().id` in every log line and error report. When something goes wrong, you want "tenant acme saw a 500" not "some user saw a 500."
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Middleware Pipeline"
+    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+    description="How TenantResolver fits into the middleware chain — and the order middleware runs."
+  />
+  <LinkCard
+    title="Database and Multiple Datasources"
+    href="/v4-0-0-snapshot/basics/database-and-multiple-datasources/"
+    description="Registering datasources, per-model overrides, and connection pooling."
+  />
+  <LinkCard
+    title="Caching"
+    href="/v4-0-0-snapshot/digging-deeper/caching/"
+    description="Cache keys, invalidation, and per-tenant keying."
+  />
+  <LinkCard
+    title="Authentication Patterns"
+    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    description="Tenant-scoped user accounts and session handling."
+  />
+</CardGrid>
