@@ -1,0 +1,152 @@
+---
+title: "Dev Server"
+description: wheels start, wheels stop, and wheels reload — run the Wheels dev server, shut it down cleanly, and apply framework or config changes without restarting the JVM.
+type: reference
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Three commands cover the inner dev loop: `wheels start` brings a development server up, `wheels stop` takes it down, and `wheels reload` reinitializes the running application without restarting the JVM. You'll compose these every day while iterating on a Wheels app.
+
+**You'll use this for:**
+
+- Running your Wheels app locally while you work on it.
+- Stopping the dev server cleanly when you're done — or before switching branches.
+- Reinitializing framework state (routes, settings, DI bindings) after edits that require a full app reload without killing the JVM.
+
+## Overview
+
+`wheels start` is the preferred way to run a Wheels app during development. It wraps LuCLI's lower-level `wheels server start` with Wheels-specific bootstrap — forwarding any extra flags through to the underlying server command so things like `--port` and `--version` still work. `wheels stop` is a thin wrapper around `wheels server stop` for the project directory. `wheels reload` is Wheels-specific: it talks to the running app over HTTP rather than restarting anything.
+
+<Aside type="note" title="Two commands named similarly">
+`wheels start` (Wheels module) and `wheels server start` (LuCLI core) are related but distinct surfaces. `wheels start` is the short, Wheels-aware form you'll reach for 99% of the time. `wheels server` is LuCLI's general-purpose server manager and exposes more subcommands (`status`, `list`, `restart`, `log`, and so on). See the LuCLI [`server`](../../core-commands/server/) reference for the full surface.
+</Aside>
+
+### `wheels start`
+
+Start a Wheels development server for the current project. Delegates to `wheels server start` under the hood and forwards extra flags to it.
+
+#### Synopsis
+
+```
+wheels start [flags]
+```
+
+Any flags you pass are forwarded verbatim to `wheels server start`. The common ones are listed below — see [`wheels server start`](../../core-commands/server/) for the full list.
+
+#### Flags (forwarded to `wheels server start`)
+
+| Flag | Description |
+|---|---|
+| `-p, --port=<port>` | Port number for the server (e.g., `8080`). |
+| `-n, --name=<name>` | Custom name for the server instance. |
+| `-v, --version=<version>` | Lucee version to use (e.g., `6.2.2.91`). |
+| `--env, --environment=<env>` | Environment to use (e.g., `dev`, `staging`, `prod`). |
+| `-c, --config=<file>` | Configuration file to use (defaults to `lucee.json`). |
+| `--disable-open-browser` | Don't open a browser after the server starts. |
+| `--dry-run` | Show the resolved configuration without starting the server. |
+| `--sandbox` | Start a transient background server without writing `lucee.json`. |
+
+#### Example
+
+```bash
+wheels start
+```
+
+Prints `Starting Wheels server...` in cyan and hands control off to `wheels server start` in the current project directory. The server runs in the foreground and occupies the terminal until it exits.
+
+<Aside type="caution" title="Foreground process">
+`wheels start` blocks the terminal. To stop the server, run `wheels stop` from another terminal or press `Ctrl+C` in the terminal that owns the process.
+</Aside>
+
+### `wheels stop`
+
+Stop the running Wheels development server for the current project.
+
+#### Synopsis
+
+```
+wheels stop
+```
+
+Resolves the server instance from the project directory and asks LuCLI to stop it. Under the hood it runs `wheels server stop` scoped to the project root.
+
+#### Example
+
+```bash
+wheels stop
+```
+
+Prints `Stopping Wheels server...` in cyan and delegates to `wheels server stop`. Useful from a second terminal when `wheels start` is blocking the first one.
+
+<Aside type="tip" title="Stopping by name or all at once">
+To stop a server by explicit name or to stop every running Lucee server on the machine, drop down to the core command: `wheels server stop --name=<name>` or `wheels server stop --all`. See the [`server`](../../core-commands/server/) reference.
+</Aside>
+
+### `wheels reload`
+
+Reinitialize the running Wheels application without restarting the JVM. Useful after edits to `config/settings.cfm`, `config/routes.cfm`, `config/services.cfm`, or any file that is only read during framework bootstrap.
+
+#### Synopsis
+
+```
+wheels reload
+```
+
+`wheels reload` detects the running server's port automatically (from `lucee.json`, then `.env`) and hits `http://localhost:<port>/?reload=true&password=<password>` with the reload password it finds in your project config. If no server is running, it prints `No running Wheels server detected. Start one with: wheels start` and exits.
+
+#### Example
+
+```bash
+wheels reload
+```
+
+On success: `Application reloaded successfully.` in green. On failure — most often a password mismatch — it prints `Failed to reload: <message>` and hints at setting `RELOAD_PASSWORD` in `.env` or `config/settings.cfm`.
+
+<Aside type="note" title="When you need reload">
+Most CFML source changes are picked up on the next request without a reload. You need `wheels reload` when you change config that's only read at bootstrap — routes, settings, DI bindings, package manifests — or when you want to force every per-request cache to clear.
+</Aside>
+
+## Dev loop example
+
+The three commands compose into a typical inner loop:
+
+```bash
+# Terminal 1 — bring the server up and leave it running
+wheels start
+
+# Terminal 2 — iterate on your app
+# For most CFML edits: just save the file and hit refresh.
+# For config/routes/services changes, force a reload:
+wheels reload
+
+# When you're done for the day
+wheels stop
+```
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Quick Start"
+    href="../../../getting-started/quick-start/"
+    description="The fastest path from install to a running Wheels app."
+  />
+  <LinkCard
+    title="Creating a Project"
+    href="../creating-a-project/"
+    description="wheels new — scaffolds the project that wheels start boots."
+  />
+  <LinkCard
+    title="LuCLI `server`"
+    href="../../core-commands/server/"
+    description="The lower-level server surface that wheels start and wheels stop wrap."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../../configuration/"
+    description="Environment files, reload passwords, and settings that wheels reload reinitializes."
+  />
+</CardGrid>
