@@ -1,9 +1,100 @@
 ---
 title: Digging Deeper
-description: Advanced features — auth, jobs, caching, mail, uploads, SSE, i18n, multi-tenancy, packages.
-type: section
+description: Advanced features beyond core MVC — authentication, jobs, caching, email, uploads, SSE, i18n, multi-tenancy, packages, and more.
+type: concept
 sidebar:
   order: 4
 ---
 
-Placeholder — content lands in Phase 2.
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The Digging Deeper section covers Wheels' advanced features — the ones you reach for after the tutorial and The Basics have you building working apps. Each page is a task-oriented how-to, not a reference. Pick whichever topic matches what you need right now.
+
+**You'll find:**
+
+- Authentication strategies and authorization filters
+- Background jobs, caching, and email
+- File uploads, server-sent events, internationalization
+- Multi-tenancy, packages, CORS, rate limiting
+- Advanced use of the dependency injection container and route model binding
+
+## All Digging Deeper guides
+
+<CardGrid>
+  <LinkCard
+    title="Authentication Patterns"
+    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    description="Session auth, JWT, and API tokens — rolling your own vs using built-in strategies."
+  />
+  <LinkCard
+    title="Authorization & Filters"
+    href="/v4-0-0-snapshot/digging-deeper/authorization-and-filters/"
+    description="Filters for access control — authentication gates, ownership checks, role rules, policies."
+  />
+  <LinkCard
+    title="Background Jobs"
+    href="/v4-0-0-snapshot/digging-deeper/background-jobs/"
+    description="Queue work for asynchronous processing — retries, priorities, and the worker process."
+  />
+  <LinkCard
+    title="Caching"
+    href="/v4-0-0-snapshot/digging-deeper/caching/"
+    description="Action, fragment, view, and query caching — stores, keys, and invalidation."
+  />
+  <LinkCard
+    title="Sending Email"
+    href="/v4-0-0-snapshot/digging-deeper/sending-email/"
+    description="SMTP config, multi-part bodies, attachments, and async sends via background jobs."
+  />
+  <LinkCard
+    title="File Uploads & Downloads"
+    href="/v4-0-0-snapshot/digging-deeper/file-uploads-and-downloads/"
+    description="Multipart uploads, storage backends, validation, and serving downloads safely."
+  />
+  <LinkCard
+    title="Server-Sent Events"
+    href="/v4-0-0-snapshot/digging-deeper/server-sent-events/"
+    description="Stream updates to the browser over plain HTTP — one-shot responses and long-lived streams."
+  />
+  <LinkCard
+    title="Internationalization"
+    href="/v4-0-0-snapshot/digging-deeper/internationalization/"
+    description="Locale detection, translation files, and formatting — the manual pattern and the roadmap."
+  />
+  <LinkCard
+    title="Multi-tenancy"
+    href="/v4-0-0-snapshot/digging-deeper/multi-tenancy/"
+    description="Serve multiple tenants — three strategies, the TenantResolver middleware, per-request isolation."
+  />
+  <LinkCard
+    title="Packages"
+    href="/v4-0-0-snapshot/digging-deeper/packages/"
+    description="Activating first-party packages, writing your own, and the package.json manifest."
+  />
+  <LinkCard
+    title="Route Model Binding"
+    href="/v4-0-0-snapshot/digging-deeper/route-model-binding/"
+    description="Load records from the URL automatically — opt-in, global, and scope-level."
+  />
+  <LinkCard
+    title="CORS"
+    href="/v4-0-0-snapshot/digging-deeper/cors/"
+    description="Configure cross-origin requests — allowed origins, preflight, credentials, per-route."
+  />
+  <LinkCard
+    title="Rate Limiting"
+    href="/v4-0-0-snapshot/digging-deeper/rate-limiting/"
+    description="Throttle requests — three strategies, memory vs database storage, custom keying."
+  />
+  <LinkCard
+    title="Dependency Injection Usage"
+    href="/v4-0-0-snapshot/digging-deeper/dependency-injection-usage/"
+    description="Practical DI patterns — test-double swapping, per-request resolvers, factories."
+  />
+</CardGrid>
+
+## See also
+
+- [Core Concepts](/v4-0-0-snapshot/core-concepts/) — the explanations behind what these guides show you how to do
+- [The Basics](/v4-0-0-snapshot/basics/) — the prerequisite how-tos for routing, controllers, models, views
+- [Testing](/v4-0-0-snapshot/testing/) — test each of these features
