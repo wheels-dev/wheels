@@ -78,7 +78,8 @@
     "link": "/v4-0-0-snapshot/testing/",
     "items": [
       { "label": "Overview", "link": "/v4-0-0-snapshot/testing/" },
-      { "label": "Model Tests", "link": "/v4-0-0-snapshot/testing/model-tests/" }
+      { "label": "Model Tests", "link": "/v4-0-0-snapshot/testing/model-tests/" },
+      { "label": "Controller Tests", "link": "/v4-0-0-snapshot/testing/controller-tests/" }
     ]
   },
   {
