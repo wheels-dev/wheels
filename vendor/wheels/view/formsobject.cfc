@@ -40,9 +40,7 @@ component {
 	) {
 		$args(name = "textField", reserved = "name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.name = $tagName(arguments.objectName, arguments.property);
@@ -101,9 +99,7 @@ component {
 	) {
 		$args(name = "passwordField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "password";
@@ -163,9 +159,7 @@ component {
 	) {
 		$args(name = "emailField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "email";
@@ -225,9 +219,7 @@ component {
 	) {
 		$args(name = "urlField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "url";
@@ -293,9 +285,7 @@ component {
 	) {
 		$args(name = "numberField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "number";
@@ -351,9 +341,7 @@ component {
 	) {
 		$args(name = "telField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "tel";
@@ -418,9 +406,7 @@ component {
 	) {
 		$args(name = "dateField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "date";
@@ -476,9 +462,7 @@ component {
 	) {
 		$args(name = "colorField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "color";
@@ -540,9 +524,7 @@ component {
 	) {
 		$args(name = "rangeField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "range";
@@ -598,9 +580,7 @@ component {
 	) {
 		$args(name = "searchField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "search";
@@ -646,9 +626,7 @@ component {
 		arguments.objectName = $objectName(argumentCollection = arguments);
 		arguments.type = "hidden";
 		arguments.name = $tagName(arguments.objectName, arguments.property);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		if (!StructKeyExists(arguments, "value") || !Len(arguments.value)) {
 			arguments.value = $formValue(argumentCollection = arguments);
 		}
@@ -705,9 +683,7 @@ component {
 	) {
 		$args(name = "fileField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "file";
@@ -764,9 +740,7 @@ component {
 		if (StructKeyExists(local, "maxLength")) {
 			arguments.maxLength = local.maxLength;
 		}
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.name = $tagName(arguments.objectName, arguments.property);
@@ -822,12 +796,12 @@ component {
 		$args(name = "radioButton", reserved = "type,name,value,checked", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
 		local.valueToAppend = LCase(Replace(ReReplaceNoCase(arguments.tagValue, "[^a-z0-9- ]", "", "all"), " ", "-", "all"));
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-			if (Len(local.valueToAppend)) {
-				arguments.id &= "-" & local.valueToAppend;
-			}
-		}
+		$applyAutoId(
+			args = arguments,
+			objectName = arguments.objectName,
+			property = arguments.property,
+			valueToAppend = local.valueToAppend
+		);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "radio";
@@ -888,9 +862,7 @@ component {
 	) {
 		$args(name = "checkBox", reserved = "type,name,value,checked", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "checkbox";
@@ -923,6 +895,11 @@ component {
 			local.hiddenAttributes.id = arguments.id & "-checkbox";
 			local.hiddenAttributes.name = arguments.name & "($checkbox)";
 			local.hiddenAttributes.value = arguments.uncheckedValue;
+			// Mirror the main checkbox: only emit the data-auto-id companion when the primary
+			// checkbox did (i.e., when the id was auto-derived from an object-bound objectName).
+			if (StructKeyExists(arguments, "dataAutoId")) {
+				local.hiddenAttributes["dataAutoId"] = Replace(local.hiddenAttributes.id, "-", "_", "all");
+			}
 			local.rv &= $tag(name = "input", attributes = local.hiddenAttributes, encode = local.encode);
 		}
 		local.rv &= local.after;
@@ -976,9 +953,7 @@ component {
 	) {
 		$args(name = "select", reserved = "name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
-		if (!StructKeyExists(arguments, "id")) {
-			arguments.id = $tagId(arguments.objectName, arguments.property);
-		}
+		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.name = $tagName(arguments.objectName, arguments.property);

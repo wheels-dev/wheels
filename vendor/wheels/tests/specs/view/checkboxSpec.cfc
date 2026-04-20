@@ -18,7 +18,7 @@ component extends="wheels.WheelsTest" {
 				args.encode = true
 				
 				actual = _controller.checkBox(argumentcollection = args)
-				expected = '<label for="user-firstname">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;<input id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
+				expected = '<label for="user-firstname">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input data-auto-id="user_firstname_checkbox" id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
 				
 				expect(actual).toBe(expected)
 			})
@@ -29,7 +29,7 @@ component extends="wheels.WheelsTest" {
 				args.encode = false
 				
 				actual = _controller.checkBox(argumentcollection = args)
-				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input id="user-firstname" name="user[firstname]" type="checkbox" value="1"><input id="user-firstname-checkbox" name="user[firstname]($checkbox)" type="hidden" value="0"></label>'
+				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input data-auto-id="user_firstname" id="user-firstname" name="user[firstname]" type="checkbox" value="1"><input data-auto-id="user_firstname_checkbox" id="user-firstname-checkbox" name="user[firstname]($checkbox)" type="hidden" value="0"></label>'
 				
 				expect(actual).toBe(expected)
 			})
@@ -41,7 +41,7 @@ component extends="wheels.WheelsTest" {
 				args.encode = "attributes"
 				
 				actual = _controller.checkBox(argumentcollection = args)
-				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input class="form-check&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
+				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input class="form-check&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input data-auto-id="user_firstname_checkbox" id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
 					
 				expect(actual).toBe(expected)
 			})
@@ -52,7 +52,7 @@ component extends="wheels.WheelsTest" {
 				args.encode = true
 				
 				actual = _controller.checkBox(argumentcollection = args)
-				expected = '<label for="user-firstname">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;<input id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
+				expected = '<label for="user-firstname">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;<input data-auto-id="user_firstname" id="user-firstname" name="user&##x5b;firstname&##x5d;" type="checkbox" value="1"><input data-auto-id="user_firstname_checkbox" id="user-firstname-checkbox" name="user&##x5b;firstname&##x5d;&##x28;&##x24;checkbox&##x29;" type="hidden" value="0"></label>'
 				
 				expect(actual).toBe(expected)
 			})

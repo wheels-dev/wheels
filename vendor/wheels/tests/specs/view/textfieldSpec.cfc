@@ -22,7 +22,7 @@ component extends="wheels.WheelsTest" {
 					label = "lastname error with <strong>bold</strong>",
 					encode = true
 				)
-				expected = '<label for="user-firstname">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;<input id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;" type="text" value="Tony"></label>'
+				expected = '<label for="user-firstname">lastname error with &lt;strong&gt;bold&lt;&##x2f;strong&gt;<input data-auto-id="user_firstname" id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;" type="text" value="Tony"></label>'
 
 				expect(textField).toBe(expected)
 			})
@@ -34,7 +34,7 @@ component extends="wheels.WheelsTest" {
 					label = "lastname error with <strong>bold</strong>",
 					encode = false
 				)
-				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input id="user-firstname" maxlength="50" name="user[firstname]" type="text" value="Tony"></label>'
+				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input data-auto-id="user_firstname" id="user-firstname" maxlength="50" name="user[firstname]" type="text" value="Tony"></label>'
 
 				expect(textField).toBe(expected)
 			})
@@ -47,7 +47,7 @@ component extends="wheels.WheelsTest" {
 					class = 'form-control" onclick="alert(\"xss\")',
 					encode = "attributes"
 				)
-				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input class="form-control&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;" type="text" value="Tony"></label>'
+				expected = '<label for="user-firstname">lastname error with <strong>bold</strong><input class="form-control&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" data-auto-id="user_firstname" id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;" type="text" value="Tony"></label>'
 
 				expect(textField).toBe(expected)
 			})
@@ -59,7 +59,7 @@ component extends="wheels.WheelsTest" {
 					label = 'Label with <strong>bold</strong> and <script>alert("XSS")</script>',
 					encode = true
 				)
-				expected = '<label for="user-firstname">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;<input id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;" type="text" value="Tony"></label>'
+				expected = '<label for="user-firstname">Label with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;<input data-auto-id="user_firstname" id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;" type="text" value="Tony"></label>'
 
 				expect(textField).toBe(expected)
 			})

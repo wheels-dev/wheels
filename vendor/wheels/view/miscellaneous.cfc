@@ -580,6 +580,39 @@ component {
 	}
 
 	/**
+	 * Internal function. Sets `args.id` (auto-derived, dash-style) and optionally `args.dataAutoId`
+	 * (underscore-style companion) on a form helper's argument struct when the caller did not
+	 * supply their own `id`. The `dataAutoId` emission is controlled by the `formHelperDataAutoId`
+	 * setting (default true); the `$tag` renderer turns `dataAutoId` into the `data-auto-id`
+	 * attribute during tag assembly. Keeping both labels on the tag lets browser/E2E tests target
+	 * either `##post-title` (historical) or `[data-auto-id='post_title']` (Rails-style).
+	 */
+	public void function $applyAutoId(
+		required struct args,
+		required any objectName,
+		required string property,
+		string valueToAppend = ""
+	) {
+		if (!StructKeyExists(arguments.args, "id")) {
+			arguments.args.id = $tagId(arguments.objectName, arguments.property, arguments.valueToAppend);
+			// Only emit `data-auto-id` for truly object-bound helpers (objectName is a simple,
+			// non-empty string). Tag-style helpers (textFieldTag, selectTag, etc.) use an empty
+			// struct for objectName — those ids are already a plain name with no dash/underscore
+			// ambiguity, so the companion attribute would just be redundant noise.
+			if (
+				$get("formHelperDataAutoId")
+				&& IsSimpleValue(arguments.objectName)
+				&& Len(arguments.objectName)
+			) {
+				// Use bracket notation so Lucee preserves the camelCase key — $tagAttribute
+				// keys off `Left(name, 4) == "data"` and hyphenizes camelCase `dataAutoId`
+				// to `data-auto-id`. A lowercased key (via dot-set on Lucee) skips hyphenize.
+				arguments.args["dataAutoId"] = Replace(arguments.args.id, "-", "_", "all");
+			}
+		}
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public string function $tagName(required any objectName, required string property) {
