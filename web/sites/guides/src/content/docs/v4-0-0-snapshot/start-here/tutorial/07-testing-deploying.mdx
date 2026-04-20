@@ -107,7 +107,7 @@ Start with the `Post` model. You added four validation rules in Part 4: `title` 
                it("requires a body", () => {
                    var post = model("Post").new(title="some title");
                    expect(post.valid()).toBeFalse();
-                   expect(post.errorsOn("body")).toBeTruthy();
+                   expect(post.errorsOn("body")).toBeArray();
                });
                it("rejects titles over 120 characters", () => {
                    var post = model("Post").new(title=RepeatString("x", 121), body="body");
@@ -131,7 +131,7 @@ Four independent cases, four independent assertions. If you later add a `validat
 
 ## Controller spec — Posts#index
 
-Controller specs verify that a request dispatches to the right action and comes back with the right response. The framework's `processRequest()` helper simulates a full dispatch — it runs filters, invokes the action, renders the view, and hands you the response as a struct.
+Controller specs verify that a request dispatches to the right action and comes back with the right response. The framework's `TestClient` drives this — a real HTTP client against your test server. The `$testClient()` helper on `WheelsTest` constructs one; `.get(path)` executes the request; chainable assertions like `.assertOk()` check the response.
 
 For Phase 1 of the tutorial, one smoke-test spec is enough: verify that `GET /posts` comes back with a 200. Deeper patterns (asserting rendered content, stubbing the model, exercising redirects) live in the Testing section.
 
@@ -153,7 +153,7 @@ For Phase 1 of the tutorial, one smoke-test spec is enough: verify that `GET /po
 
 </Steps>
 
-`processRequest(params=..., returnAs="struct")` dispatches like a real HTTP request — the controller is instantiated, `config()` runs, the filter chain fires, `index()` runs, the view renders. The returned struct has `status`, `body`, headers, and enough for richer assertions once you need them.
+`$testClient().get("/posts")` makes a real HTTP request to your test server — the full pipeline fires: middleware, route match, controller instantiation, `config()`, filter chain, `index()` action, view render. `.assertOk()` asserts a 200 response. Chainable assertions cover redirects, response bodies, headers, cookies, and JSON. See [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/) for the full API.
 
 ## Browser spec — full signup to post to comment
 
@@ -162,7 +162,7 @@ Browser specs drive a real Chromium through the rendered HTML. Behind the scenes
 Playwright ships as a set of JARs plus a Chromium binary, ~370MB in total. Install it once:
 
 ```bash title="your shell"
-wheels browser:install
+wheels browser install
 ```
 
 The installer downloads the JARs into `lib/`, Chromium into `~/Library/Caches` (macOS) or `~/.cache` (Linux), and writes a manifest so CI knows what's cached.
@@ -214,7 +214,7 @@ Four things to notice:
 - `##post-title` is CFML escaping a literal `#` inside a string. At runtime the selector is `#post-title` — the CSS id the `textField(objectName="post", property="title")` helper emits (Wheels joins object + property with a dash). Without the double `##`, CFML would try to evaluate `post-title` as an expression and throw.
 - The signup form uses plain `<input name="user[email]">` without an id, so the spec targets it by attribute selector instead. Attribute selectors like `input[name='user[email]']` are robust against future form refactors.
 - The fluent DSL chains: `.visitRoute("signup").fill(...).click(...).assertUrlContains("/posts")` is one statement. Each method returns the browser object, so the chain keeps going until you call a terminal like `.assertSee(...)` or let the statement end.
-- `if (this.browserTestSkipped) return;` keeps the spec green on machines without Playwright installed — fresh CI runners before `wheels browser:install`, for example. The flag is set by `beforeAll` when the JARs can't be loaded.
+- `if (this.browserTestSkipped) return;` keeps the spec green on machines without Playwright installed — fresh CI runners before `wheels browser install`, for example. The flag is set by `beforeAll` when the JARs can't be loaded.
 
 ## Run the tests
 
@@ -278,14 +278,14 @@ wheels --version
 Three things to verify before moving on:
 
 1. `wheels test run` passes both the model spec and the controller spec.
-2. `wheels browser:install` completes without error, and `wheels test run --filter=browser` runs the browser spec green — Chromium launches, the signup-to-post-to-comment flow runs end-to-end.
+2. `wheels browser install` completes without error, and `wheels test run --filter=browser` runs the browser spec green — Chromium launches, the signup-to-post-to-comment flow runs end-to-end.
 3. Click through the running app one more time: sign up, create a post, leave a comment, log out, log back in, try to edit someone else's post and get redirected. Every part of the tutorial still works end-to-end.
 
 ## Troubleshooting
 
-**"Model spec fails with `cannot find Post.cfc`."** The test runner boots a fresh schema from `tests/populate.cfm`, which you haven't set up yet. See [Testing > Fixtures](/v4-0-0-snapshot/testing/) for the standard `populate.cfm` that mirrors your development schema into the test database.
+**"Model spec fails with `cannot find Post.cfc`."** The test runner boots a fresh schema from `tests/populate.cfm`, which you haven't set up yet. See [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) for the standard `populate.cfm` that mirrors your development schema into the test database.
 
-**"Browser spec hangs for thirty seconds, then times out."** Playwright isn't installed. Run `wheels browser:install` — it downloads ~370MB and prints a progress bar. Once it completes, re-run the spec. If it still hangs, check that `this.browserTestSkipped` isn't incorrectly set; the guard clause should short-circuit when the JARs are missing, not when they're present.
+**"Browser spec hangs for thirty seconds, then times out."** Playwright isn't installed. Run `wheels browser install` — it downloads ~370MB and prints a progress bar. Once it completes, re-run the spec. If it still hangs, check that `this.browserTestSkipped` isn't incorrectly set; the guard clause should short-circuit when the JARs are missing, not when they're present.
 
 **"`expect(...).toBeTrue is not a function`."** The spec CFC extends the wrong base. Use `component extends="wheels.WheelsTest"` — with a capital T in `WheelsTest`. The legacy `wheels.Test` is the RocketUnit base and doesn't have the BDD matchers.
 

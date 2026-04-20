@@ -59,7 +59,7 @@ wheels test run --db=mysql
 wheels test run --ci
 ```
 
-The supported flags today are `--filter=<dir>`, `--reporter=<name>`, `--db=<sqlite|mysql|postgres|mssql|h2>`, `--verbose` / `-v`, `--ci`, and `--core` (force framework-core mode when the auto-detect doesn't pick it up). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter; there is no raw `--format=json` or `--reporter=tap` flag on `wheels test run` at the time of writing.
+The supported flags today are `--filter=<dir>`, `--reporter=<name>`, `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>`, `--verbose` / `-v`, `--ci`, and `--core` (force framework-core mode when the auto-detect doesn't pick it up). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter; there is no raw `--format=json` or `--reporter=tap` flag on `wheels test run` at the time of writing.
 
 <Aside type="tip">
   When `vendor/wheels/tests/` exists (you're hacking on framework core), `wheels test run` auto-enables `--core`. Pass `--core` explicitly if you want to force it.
@@ -170,7 +170,7 @@ docker compose up -d lucee7 mysql
 curl -sf "http://localhost:60007/wheels/core/tests?db=mysql&format=json"
 ```
 
-Supported `db` values on the URL: `sqlite` (default for the script and local runs), `h2` (default on some engines), `mysql`, `postgresql`, `mssql`, `cockroachdb`. CockroachDB is currently soft-failed in CI — failures log warnings but don't block the build.
+Supported `db` values on the URL: `sqlite` (default for the script and local runs), `h2` (default on some engines), `mysql`, `postgres`, `sqlserver`, `oracle`, `cockroachdb`. CockroachDB is currently soft-failed in CI — failures log warnings but don't block the build.
 
 ## Cross-engine gotchas
 
@@ -190,7 +190,7 @@ These are the errors you'll actually hit. Fix-ups first, diagnosis second.
 - **`JAVA_HOME` unset** — LuCLI's preflight refuses to start and prints a pointer to Adoptium. Set `JAVA_HOME` in your shell profile and re-source.
 - **Docker daemon not running** — `docker compose up` fails with `Cannot connect to the Docker daemon`. Start Docker Desktop (macOS, Windows) or `systemctl start docker` (Linux).
 - **Port already in use** — `docker compose up` fails with `bind: address already in use` or a local `wheels start` is already on the port. Find the holder with `lsof -i :60007` and stop it.
-- **Playwright JARs missing** — browser specs skip with `this.browserTestSkipped = true` instead of failing, so the suite stays green. Run `wheels browser:install` once to install the JARs and Chromium.
+- **Playwright JARs missing** — browser specs skip with `this.browserTestSkipped = true` instead of failing, so the suite stays green. Run `wheels browser install` once to install the JARs and Chromium.
 - **Populate SQL errors** — read the error. "Table already exists" means a stale table from a previous engine-specific run; add a `DROP TABLE IF EXISTS` first. "Syntax error near CURRENT_TIMESTAMP" means cross-engine SQL drift; use `NOW()` — it works on every supported engine.
 - **Flaky `wheels new` in parallel harness runs** — a known LuCLI race (framework gap tracker #11). Retry once, or serialize the runs until the fix lands.
 - **Server not responding after `compose up`** — engines need 30–90 seconds to cold-start. `curl -I http://localhost:60007/` returns connection-refused until the engine is ready. If it stays down after two minutes, check `docker compose logs <service>`.

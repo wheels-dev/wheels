@@ -24,7 +24,7 @@ Browser tests drive a real Chromium through Playwright. They click buttons, type
 
 ## Install Playwright
 
-Browser tests require Playwright's Java client plus Chromium. The `wheels browser:install` command downloads both (~370MB one-time) and verifies SHA-256 hashes.
+Browser tests require Playwright's Java client plus Chromium. The `wheels browser install` command downloads both (~370MB one-time) and verifies SHA-256 hashes.
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
 wheels --version
@@ -33,7 +33,7 @@ wheels --version
 Then, inside your project:
 
 ```bash title="shell"
-wheels browser:install
+wheels browser install
 ```
 
 The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download, or `--browser=firefox|webkit` to install a different engine (Chromium is the default).

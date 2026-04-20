@@ -245,7 +245,7 @@ If `authenticate` redirects, the chain stops — `ownershipCheck` and `loadCateg
 
 ## Testing filters
 
-Filter methods are `private`, so you can't call them directly from a spec. Exercise them through the controller action and assert on the response — a redirect when access is denied, the rendered view when it's allowed. The [Controller Tests](/v4-0-0-snapshot/testing/) guide walks through the full pattern with `processRequest()` and the `response` struct.
+Filter methods are `private`, so you can't call them directly from a spec. Exercise them through the controller action and assert on the response — a redirect when access is denied, the rendered view when it's allowed. The [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/) guide walks through the full pattern using the `TestClient` — a real HTTP client with chainable assertions.
 
 ## Related guides
 

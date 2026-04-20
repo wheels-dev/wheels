@@ -219,7 +219,7 @@ it("tests a destructive operation in isolation", () => {
 });
 ```
 
-The default transaction mode in the test runner is `none` — writes persist across specs unless you roll them back explicitly. If a spec that passes on its own fails when run with the rest of the suite, look for leftover rows from an earlier spec. The [Fixtures & Test Data](/v4-0-0-snapshot/testing/) guide covers the full setup pattern, `populate.cfm` contents, and strategies for keeping specs independent.
+The default transaction mode in the test runner is `none` — writes persist across specs unless you roll them back explicitly. If a spec that passes on its own fails when run with the rest of the suite, look for leftover rows from an earlier spec. The [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) guide covers the full setup pattern, `populate.cfm` contents, and strategies for keeping specs independent.
 
 ## Common pitfalls
 
