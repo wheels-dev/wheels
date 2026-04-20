@@ -85,7 +85,8 @@
       { "label": "Functional Tests", "link": "/v4-0-0-snapshot/testing/functional-tests/" },
       { "label": "Browser Tests", "link": "/v4-0-0-snapshot/testing/browser-tests/" },
       { "label": "Fixtures & Test Data", "link": "/v4-0-0-snapshot/testing/fixtures-and-test-data/" },
-      { "label": "Running Tests Locally", "link": "/v4-0-0-snapshot/testing/running-tests-locally/" }
+      { "label": "Running Tests Locally", "link": "/v4-0-0-snapshot/testing/running-tests-locally/" },
+      { "label": "CI Integration", "link": "/v4-0-0-snapshot/testing/ci-integration/" }
     ]
   },
   {
