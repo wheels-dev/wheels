@@ -60,6 +60,7 @@
       { "label": "Authentication Patterns", "link": "/v4-0-0-snapshot/digging-deeper/authentication-patterns/" },
       { "label": "Authorization & Filters", "link": "/v4-0-0-snapshot/digging-deeper/authorization-and-filters/" },
       { "label": "Background Jobs", "link": "/v4-0-0-snapshot/digging-deeper/background-jobs/" },
+      { "label": "Caching", "link": "/v4-0-0-snapshot/digging-deeper/caching/" },
       { "label": "Sending Email", "link": "/v4-0-0-snapshot/digging-deeper/sending-email/" }
     ]
   },
