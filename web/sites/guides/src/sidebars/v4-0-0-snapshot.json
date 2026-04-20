@@ -40,7 +40,8 @@
     "label": "The Basics",
     "link": "/v4-0-0-snapshot/basics/",
     "items": [
-      { "label": "Routing", "link": "/v4-0-0-snapshot/basics/routing/" }
+      { "label": "Routing", "link": "/v4-0-0-snapshot/basics/routing/" },
+      { "label": "Controllers and Actions", "link": "/v4-0-0-snapshot/basics/controllers-and-actions/" }
     ]
   },
   {
