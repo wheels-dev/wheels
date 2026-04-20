@@ -1,0 +1,327 @@
+---
+title: "Part 3: CRUD Scaffold"
+description: Throw away Part 2's hand-written code. Let the scaffold generator produce a full CRUD cycle. Activate Hotwire for Turbo Drive page transitions.
+type: tutorial
+sidebar:
+  order: 3
+---
+
+import { Aside, Steps, FileTree } from '@astrojs/starlight/components';
+
+You'll delete the hand-written controller and views from Part 2, regenerate them as a full CRUD scaffold, and learn how Wheels packages activate — with a first look at Hotwire.
+
+**You'll learn:**
+
+- What `wheels generate scaffold` produces — 7 actions, 4 views, one shared form partial
+- How the standard REST actions (`index`/`show`/`new`/`create`/`edit`/`update`/`delete`) fit together
+- How route model binding turns `params.key` into `params.post` automatically
+- What packages are and how the `packages/` → `vendor/` activation model works
+
+Estimated time: 25 minutes.
+
+<Aside type="note">
+  This replaces most of Part 2's hand-written code. Keep `Post.cfc`, the migration, and the seed file — everything else gets rewritten.
+</Aside>
+
+## Where we left off
+
+Part 2 ended with a minimal slice: one model, one migration, one seed file, a two-action controller, and two views.
+
+<FileTree>
+- blog
+  - app
+    - controllers
+      - Controller.cfc
+      - Main.cfc
+      - Posts.cfc
+    - db
+      - seeds.cfm
+    - migrator
+      - migrations
+        - 20260419120000_create_posts_table.cfc
+    - models
+      - Post.cfc
+    - views
+      - layout.cfm
+      - main
+        - index.cfm
+        - hello.cfm
+      - posts
+        - index.cfm
+        - show.cfm
+  - config
+    - routes.cfm
+    - settings.cfm
+  - db
+    - development.sqlite
+</FileTree>
+
+Schema recap: `posts(id, title, body, status, publishedAt, createdAt, updatedAt)` with `status` constrained to `draft`, `published`, or `archived`. `config/routes.cfm` has `.resources(name="posts", only="index,show")`.
+
+## What scaffold does
+
+Scaffolds generate the seven standard REST actions on a controller, views for the four user-facing actions, and a shared form partial. A scaffold for `Post` produces:
+
+- `app/controllers/Posts.cfc` with `index`, `show`, `new`, `create`, `edit`, `update`, `delete`
+- `app/views/posts/index.cfm`, `show.cfm`, `new.cfm`, `edit.cfm`
+- `app/views/posts/_form.cfm` — shared by `new` and `edit`
+
+Because scaffolds follow convention, a plain `.resources("posts")` line in `config/routes.cfm` is all the routing you need. Wheels maps `GET /posts` → `index`, `GET /posts/new` → `new`, `POST /posts` → `create`, `GET /posts/:key` → `show`, `GET /posts/:key/edit` → `edit`, `PATCH /posts/:key` → `update`, and `DELETE /posts/:key` → `delete`.
+
+Route model binding kicks in on the actions that take a key. For `show`, `edit`, `update`, and `delete`, Wheels finds the `Post` matching `params.key` before your action runs and hands it to you as `params.post`. No `findByKey` in the controller.
+
+<Aside type="note">
+  On the `wheels` CLI version this tutorial targets (`0.3.5-SNAPSHOT`), `wheels generate scaffold` needs snippet templates that a fresh `wheels new` doesn't ship with. A future release will bundle them. For now you'll hand-write the files the generator would produce — mechanical, but it cements the shape of a scaffold in your head.
+</Aside>
+
+## Delete Part 2's handiwork
+
+Drop the hand-written controller and views. The model, migration, seed file, and the `resources("posts")` route stay.
+
+```bash title="your shell"
+wheels destroy controller Posts
+```
+
+If your CLI doesn't support `destroy` (same snippet-template gap as `generate`), remove the files directly:
+
+```bash title="your shell"
+rm app/controllers/Posts.cfc
+rm -r app/views/posts
+```
+
+Leave `app/models/Post.cfc`, `app/migrator/migrations/20260419120000_create_posts_table.cfc`, `app/db/seeds.cfm`, and `config/routes.cfm` alone.
+
+## Generate the scaffold
+
+The one-line version — what you'd run on a future CLI with the snippets bundled:
+
+```bash title="your shell"
+wheels generate scaffold Post title:string body:text status:enum
+```
+
+If that errors with `Template not found: ModelContent.txt`, hand-write the files in the sections below. They're what the generator would produce.
+
+### The controller
+
+<Steps>
+
+1. Create `app/controllers/Posts.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Controller" {
+       function index() {
+           posts = model("Post").findAll(order="publishedAt DESC");
+       }
+       function show() {
+           post = params.post;
+       }
+       function new() {
+           post = model("Post").new();
+       }
+       function create() {
+           post = model("Post").new(params.post);
+           if (post.save()) {
+               redirectTo(route="post", key=post.id);
+           } else {
+               renderView(action="new");
+           }
+       }
+       function edit() {
+           post = params.post;
+       }
+       function update() {
+           post = params.post;
+           if (post.update(params.post)) {
+               redirectTo(route="post", key=post.id);
+           } else {
+               renderView(action="edit");
+           }
+       }
+       function delete() {
+           post = params.post;
+           post.delete();
+           redirectTo(route="posts");
+       }
+   }
+   ```
+
+</Steps>
+
+What's going on:
+
+- `params.post` is populated by route model binding — `resources("posts")` asked Wheels to look up a `Post` by `params.key` before each key-scoped action. The action body uses it directly.
+- `create` and `update` follow the same pattern: try to persist, redirect on success, re-render the form on failure. `renderView(action="new")` re-uses the `new` view without redirecting, so `post` keeps its user-typed values and validation errors.
+- `redirectTo(route="post", key=post.id)` generates `/posts/123`. The singular `post` route comes for free from `.resources("posts")`.
+- `delete` calls `post.delete()` then redirects back to the index.
+
+### The form partial
+
+The `new` and `edit` views both render the same form. Put the shared markup in a partial.
+
+<Steps>
+
+1. Create `app/views/posts/_form.cfm`:
+
+   ```cfm title="app/views/posts/_form.cfm"
+   <cfparam name="post" default="">
+   <cfoutput>
+   #errorMessagesFor("post")#
+   #startFormTag(action=IsNumeric(post.id ?: "") ? "update" : "create", key=post.id ?: "")#
+       <label>Title<br>
+           #textField(objectName="post", property="title")#
+       </label>
+       <label>Body<br>
+           #textArea(objectName="post", property="body")#
+       </label>
+       <label>Status<br>
+           #select(objectName="post", property="status", options="draft,published,archived")#
+       </label>
+       <label>Published at<br>
+           #dateTimeField(objectName="post", property="publishedAt")#
+       </label>
+       <button type="submit">Save</button>
+   #endFormTag()#
+   </cfoutput>
+   ```
+
+</Steps>
+
+Notes:
+
+- Partial filenames start with `_`. You reference them as `"form"` (no underscore, no extension) when including.
+- `errorMessagesFor("post")` renders a `<div class="errors">` with any validation errors on the `post` object. When there are none, it renders nothing.
+- `startFormTag` picks the right HTTP method and action URL based on whether `post.id` exists. A new `Post` has no id, so the form posts to `create`; an existing one PATCHes to `update`.
+- `textField`, `textArea`, `select`, `dateTimeField` are object-bound helpers — `objectName="post"` plus `property="title"` becomes `name="post[title]"` with the current value pre-filled.
+
+### The four views
+
+Each view is a thin wrapper. Compile checking here is skipped — these are plain HTML with a handful of helpers.
+
+<Steps>
+
+1. Create `app/views/posts/index.cfm`:
+
+   ```cfm title="app/views/posts/index.cfm"
+   <cfparam name="posts" default="">
+   <cfoutput>
+   <h1>Posts</h1>
+   <p>#linkTo(route="newPost", text="New post")#</p>
+   <cfloop query="posts">
+       <article>
+           <h2>#linkTo(route="post", key=posts.id, text=posts.title)#</h2>
+           <p>#posts.body#</p>
+           <small>status: #posts.status#</small>
+       </article>
+   </cfloop>
+   </cfoutput>
+   ```
+
+2. Create `app/views/posts/show.cfm`:
+
+   ```cfm title="app/views/posts/show.cfm"
+   <cfparam name="post" default="">
+   <cfoutput>
+   <h1>#post.title#</h1>
+   <p>#post.body#</p>
+   <p>status: #post.status#</p>
+   <p>
+       #linkTo(route="editPost", key=post.id, text="Edit")# ·
+       #buttonTo(route="post", key=post.id, text="Delete", method="delete")# ·
+       #linkTo(route="posts", text="← all posts")#
+   </p>
+   </cfoutput>
+   ```
+
+3. Create `app/views/posts/new.cfm`:
+
+   ```cfm title="app/views/posts/new.cfm"
+   <h1>New post</h1>
+   <cfoutput>#includePartial("form")#</cfoutput>
+   ```
+
+4. Create `app/views/posts/edit.cfm`:
+
+   ```cfm title="app/views/posts/edit.cfm"
+   <h1>Edit post</h1>
+   <cfoutput>#includePartial("form")#</cfoutput>
+   ```
+
+</Steps>
+
+`linkTo(route="newPost")`, `linkTo(route="editPost", key=...)`, and `buttonTo(route="post", key=..., method="delete")` all use route names that `.resources("posts")` generated. `buttonTo` emits a small form (because browsers don't issue `DELETE` from links) rather than an anchor tag.
+
+## Update the routes
+
+Part 2 restricted the resource to `only="index,show"`. Drop the restriction so all seven actions route.
+
+<Steps>
+
+1. Replace `config/routes.cfm`:
+
+   ```cfm {test:compile}
+   mapper()
+       .resources(name="posts")
+       .get(name="hello", pattern="/hello", to="main##hello")
+       .wildcard()
+       .root(to="posts##index", method="get")
+   .end();
+   ```
+
+</Steps>
+
+With `.resources(name="posts")` alone, all seven REST routes activate. The named routes (`post`, `posts`, `newPost`, `editPost`) light up at the same time — that's what the views already reference.
+
+## Packages — the activation model
+
+Core Wheels lives in `vendor/wheels/`. Optional features ship as separate packages. In the framework source tree those packages live at `packages/<name>/`. Activating one means copying (or symlinking) it into `vendor/<name>/`. On app boot, `PackageLoader.cfc` walks `vendor/*/package.json` and wires each package's mixins, services, and middleware into the framework.
+
+Three first-party packages ship today:
+
+- **`hotwire`** — Turbo Drive for SPA-like page transitions, Turbo Frames for partial updates, Turbo Streams for server-pushed DOM changes. No app code changes needed for Turbo Drive — activation alone makes link clicks feel instant.
+- **`basecoat`** — Tailwind-based UI components for forms, buttons, and layouts.
+- **`sentry`** — error tracking integration.
+
+Conceptually, activating Hotwire looks like this:
+
+```bash title="illustrative — do not type"
+cp -r packages/hotwire vendor/hotwire
+wheels reload
+```
+
+<Aside type="caution">
+  On a fresh `wheels new` app, the `packages/` directory doesn't exist — it lives in the framework source tree. On this CLI version, you'd copy the package from the framework repo by hand. A future release will add a `wheels package install <name>` command. Part 4 wires Hotwire into the blog for real.
+</Aside>
+
+Once Hotwire is active, clicking any internal link becomes a Turbo Drive visit — the page body swaps in without a full reload, and the browser history is preserved. The magic is invisible: no `<turbo-frame>` markup is required for the baseline experience.
+
+## Smoke test
+
+Confirm your CLI is the version this tutorial targets:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+## Checkpoint
+
+Reload the app and exercise the full CRUD cycle:
+
+```bash title="your shell"
+wheels reload
+```
+
+1. `curl http://localhost:8080/posts` — returns the index with the two seeded posts and a "New post" link.
+2. Visit `http://localhost:8080/posts/1` in a browser — shows one post, with Edit, Delete, and back buttons.
+3. From the index, click "New post", fill the form, submit — a third post appears on the index page.
+
+## Troubleshooting
+
+**`Route 'editPost' not found`** — you dropped `only="index,show"` from `.resources("posts")` but didn't reload. Run `wheels reload`.
+
+**`Component Posts has no public method create`** — the rewritten `Posts.cfc` wasn't reloaded. Run `wheels reload` (or append `?reload=true&password=...` to any URL).
+
+**`params.post is undefined` in `show`/`edit`/`update`/`delete`** — route model binding didn't resolve. Make sure `.resources(name="posts")` is present and that your URL includes a key segment (`/posts/1`, not `/posts`).
+
+## What's next
+
+In [Part 4: Validations + Turbo Frames](/v4-0-0-snapshot/start-here/tutorial/04-validations-turbo-frames/) you'll add `validatesPresenceOf` to the `Post` model, wrap the form in a `<turbo-frame>`, and watch inline validation errors update without a page reload.
