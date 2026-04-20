@@ -57,6 +57,7 @@
     "label": "Digging Deeper",
     "link": "/v4-0-0-snapshot/digging-deeper/",
     "items": [
+      { "label": "Authentication Patterns", "link": "/v4-0-0-snapshot/digging-deeper/authentication-patterns/" },
       { "label": "Sending Email", "link": "/v4-0-0-snapshot/digging-deeper/sending-email/" }
     ]
   },
