@@ -69,7 +69,8 @@
       { "label": "Packages", "link": "/v4-0-0-snapshot/digging-deeper/packages/" },
       { "label": "Route Model Binding", "link": "/v4-0-0-snapshot/digging-deeper/route-model-binding/" },
       { "label": "CORS", "link": "/v4-0-0-snapshot/digging-deeper/cors/" },
-      { "label": "Rate Limiting", "link": "/v4-0-0-snapshot/digging-deeper/rate-limiting/" }
+      { "label": "Rate Limiting", "link": "/v4-0-0-snapshot/digging-deeper/rate-limiting/" },
+      { "label": "Dependency Injection Usage", "link": "/v4-0-0-snapshot/digging-deeper/dependency-injection-usage/" }
     ]
   },
   {
