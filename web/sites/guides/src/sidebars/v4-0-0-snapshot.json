@@ -49,7 +49,8 @@
       { "label": "Associations", "link": "/v4-0-0-snapshot/basics/associations/" },
       { "label": "Migrations", "link": "/v4-0-0-snapshot/basics/migrations/" },
       { "label": "Seeding", "link": "/v4-0-0-snapshot/basics/seeding/" },
-      { "label": "Query Builder and Scopes", "link": "/v4-0-0-snapshot/basics/query-builder-and-scopes/" }
+      { "label": "Query Builder and Scopes", "link": "/v4-0-0-snapshot/basics/query-builder-and-scopes/" },
+      { "label": "Database and Multiple Datasources", "link": "/v4-0-0-snapshot/basics/database-and-multiple-datasources/" }
     ]
   },
   {
