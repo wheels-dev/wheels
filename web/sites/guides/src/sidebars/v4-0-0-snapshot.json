@@ -44,7 +44,8 @@
       { "label": "Controllers and Actions", "link": "/v4-0-0-snapshot/basics/controllers-and-actions/" },
       { "label": "Views, Layouts, Partials", "link": "/v4-0-0-snapshot/basics/views-layouts-partials/" },
       { "label": "Forms and Form Helpers", "link": "/v4-0-0-snapshot/basics/forms-and-form-helpers/" },
-      { "label": "Validation and Error Display", "link": "/v4-0-0-snapshot/basics/validation-and-errors/" }
+      { "label": "Validation and Error Display", "link": "/v4-0-0-snapshot/basics/validation-and-errors/" },
+      { "label": "Models and the ORM", "link": "/v4-0-0-snapshot/basics/models-and-the-orm/" }
     ]
   },
   {
