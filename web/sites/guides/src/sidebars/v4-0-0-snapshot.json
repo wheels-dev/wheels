@@ -63,7 +63,8 @@
       { "label": "Caching", "link": "/v4-0-0-snapshot/digging-deeper/caching/" },
       { "label": "Sending Email", "link": "/v4-0-0-snapshot/digging-deeper/sending-email/" },
       { "label": "File Uploads & Downloads", "link": "/v4-0-0-snapshot/digging-deeper/file-uploads-and-downloads/" },
-      { "label": "Server-Sent Events", "link": "/v4-0-0-snapshot/digging-deeper/server-sent-events/" }
+      { "label": "Server-Sent Events", "link": "/v4-0-0-snapshot/digging-deeper/server-sent-events/" },
+      { "label": "Internationalization", "link": "/v4-0-0-snapshot/digging-deeper/internationalization/" }
     ]
   },
   {

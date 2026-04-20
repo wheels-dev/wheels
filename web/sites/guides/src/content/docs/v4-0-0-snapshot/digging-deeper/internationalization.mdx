@@ -1,0 +1,219 @@
+---
+title: Internationalization
+description: Wheels 4.0 ships no i18n primitives — here's the manual pattern for locale detection, translation files, and formatting.
+type: howto
+sidebar:
+  order: 8
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Wheels 4.0 does not ship i18n primitives — no `t()` helper, no `locales/` convention, no built-in locale resolver. This page shows you the manual pattern you can build in your own app: detect the visitor's locale, load translation files, expose a `t()` view helper, format dates and numbers with Lucee's built-in locale functions, and localize your routes.
+
+**You'll learn:**
+
+- How to detect a request's locale from session, URL, headers, or a default
+- How to load per-locale translation files at app init and look up keys with a custom `t()` helper
+- How to handle simple pluralization and interpolated values
+- How to format dates, numbers, and currency with Lucee's `LSDateFormat`, `LSNumberFormat`, and `LSCurrencyFormat`
+- How to localize routes so URLs look like `/fr/posts` and `/en/posts`
+
+<Aside type="note">
+  Wheels 4.0 doesn't ship i18n primitives. This page documents the pattern you can build in your own app. First-class support is on the roadmap.
+</Aside>
+
+<Aside type="note">
+  You should already know how [middleware](/v4-0-0-snapshot/core-concepts/middleware-pipeline/) and [views](/v4-0-0-snapshot/basics/views-layouts-partials/) work. Translation lookup runs in a view helper; locale detection runs in middleware.
+</Aside>
+
+## Detect the locale
+
+Locale detection is a request-level concern, which makes it a natural fit for middleware. Resolve it once on the way in, stash it on `request.locale`, and every downstream helper can read it without re-parsing headers.
+
+The conventional precedence is:
+
+1. `session.locale` — the visitor's saved preference (set when they click a language switcher)
+2. `params.locale` — a URL segment like `/fr/posts` (see [route localization](#localize-your-routes) below)
+3. `Accept-Language` — the browser's default
+4. Your app default (`"en"`)
+
+```cfm {test:compile} title="app/middleware/LocaleResolver.cfc"
+component implements="wheels.middleware.MiddlewareInterface" {
+    public any function handle(required any request, required any next) {
+        local.locale = arguments.request.session.locale ?: "";
+        if (!Len(local.locale)) {
+            local.locale = arguments.request.params.locale ?: "";
+        }
+        if (!Len(local.locale)) {
+            local.locale = Left(arguments.request.cgi.http_accept_language ?: "en", 2);
+        }
+        arguments.request.locale = Len(local.locale) ? local.locale : "en";
+        return arguments.next(arguments.request);
+    }
+}
+```
+
+Register the middleware globally in `config/settings.cfm` so every request is resolved before any controller runs:
+
+```cfm {test:compile} title="config/settings.cfm"
+set(middleware = [
+    new app.middleware.LocaleResolver()
+]);
+```
+
+Downstream code reads `request.locale` — no more header parsing.
+
+## Load translation files
+
+Keep translations out of CFCs. Per-locale JSON files are the path of least pain: diffable, easy to hand off to a translation service, trivial to hot-reload in dev.
+
+```
+config/
+  locales/
+    en.json
+    fr.json
+    de.json
+```
+
+A flat key/value schema keeps lookups cheap. Dotted keys give you pseudo-namespacing without nesting:
+
+```json title="config/locales/en.json"
+{
+    "welcome.title": "Welcome back",
+    "welcome.subtitle": "Here's what's new since your last visit",
+    "posts.count.one": "1 post",
+    "posts.count.other": "{count} posts",
+    "forms.submit": "Save changes"
+}
+```
+
+Load every locale at app init into `application` scope so the files are read once, not per request:
+
+```cfm {test:compile} title="config/app.cfm"
+application.wheels.translations = {};
+for (var locale in ["en", "fr", "de"]) {
+    local.path = ExpandPath("config/locales/#locale#.json");
+    application.wheels.translations[locale] = DeserializeJSON(FileRead(local.path));
+}
+```
+
+Reload the app (`?reload=true` in dev) after editing a locale file.
+
+## Write a custom `t()` helper
+
+Drop a view helper into `app/views/helpers.cfm` so every template can call `t("welcome.title")` the same way Rails templates call `t(:welcome_title)`.
+
+```cfm {test:compile} title="app/views/helpers.cfm"
+public string function t(required string key, struct values={}) {
+    var locale = request.locale ?: "en";
+    var translations = application.wheels.translations[locale] ?: application.wheels.translations["en"];
+    var value = translations[arguments.key] ?: arguments.key;
+    for (var placeholder in arguments.values) {
+        value = Replace(value, "{#placeholder#}", arguments.values[placeholder], "all");
+    }
+    return value;
+}
+```
+
+The helper does three things: look up the requested locale (falling back to English if that locale wasn't loaded), find the key (falling back to the key itself if missing — a visible "untranslated" signal), and interpolate `{placeholder}` tokens from the `values` struct.
+
+Use it anywhere a view runs:
+
+```cfm title="illustrative — app/views/home/index.cfm"
+<h1>#t("welcome.title")#</h1>
+<p>#t("welcome.subtitle")#</p>
+<button>#t("forms.submit")#</button>
+```
+
+## Pluralization
+
+English has two plural forms (one / other). Most Western European languages are the same. Arabic has six. Russian has three with non-trivial rules. Polish is its own adventure.
+
+For the easy case, branch on count and look up a key variant:
+
+```cfm {test:compile} title="app/views/helpers.cfm"
+public string function tPlural(required string key, required numeric count, struct values={}) {
+    var form = arguments.count == 1 ? "one" : "other";
+    arguments.values.count = arguments.count;
+    return t(arguments.key & "." & form, arguments.values);
+}
+```
+
+With the JSON above, `tPlural("posts.count", 1)` returns `"1 post"` and `tPlural("posts.count", 5)` returns `"5 posts"`.
+
+For languages with three or more plural forms, the one/other branch is wrong. Reach for a CLDR-aware library of your choice rather than hand-rolling the rules — getting Russian plurals right alone is a weekend you don't want to spend.
+
+## Format dates, numbers, and currency
+
+Lucee's `LS*` functions are the locale-aware versions of the standard formatters. They read the current locale from `GetLocale()` and format accordingly — no Wheels wrapper needed.
+
+```cfm {test:compile} title="app/views/helpers.cfm"
+public void function applyRequestLocale() {
+    var localeMap = {en: "en_US", fr: "fr_FR", de: "de_DE"};
+    var lucee = localeMap[request.locale ?: "en"] ?: "en_US";
+    SetLocale(lucee);
+}
+```
+
+Call `applyRequestLocale()` from a `beforeAction` in your base controller, or from a second middleware that runs after `LocaleResolver`. Once set, the `LS*` functions do the rest:
+
+```cfm title="illustrative — inside a view"
+#LSDateFormat(post.publishedAt, "long")#     <!--- mardi 20 avril 2026 --->
+#LSNumberFormat(product.price, ",.99")#       <!--- 1 234,56 --->
+#LSCurrencyFormat(invoice.total, "local")#    <!--- 49,99 € --->
+#LSParseDateTime(params.startsAt)#             <!--- parses using current locale --->
+```
+
+These are Lucee built-ins — nothing Wheels-specific. The two-letter short codes (`en`, `fr`) you use for translation files don't match Lucee's locale strings (`en_US`, `fr_FR`), which is why the `localeMap` above bridges them.
+
+## Localize your routes
+
+If you want `/en/posts` and `/fr/posts` as sibling URL trees, wrap your resources in a `:locale` scope:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .scope(path="/:locale", callback=function(map) {
+        map.resources("posts");
+        map.resources("users");
+        map.root(to="home##index", method="get");
+    })
+    .wildcard()
+.end();
+</cfscript>
+```
+
+Every request now has `params.locale` populated. Your `LocaleResolver` middleware already picks that up as step 2 in the precedence chain, so the rest of the stack stays unchanged. Add a root-level redirect to your default locale if bare `/` requests need to land on `/en/`.
+
+Make sure locale-scoped routes come before `.wildcard()` — see [how route ordering works](/v4-0-0-snapshot/core-concepts/how-routing-works/).
+
+## Forms and validation
+
+Form labels translate cleanly — they're plain strings, so `#t("forms.submit")#` works everywhere a label goes.
+
+Validation error messages are trickier. Wheels generates them with `errorMessagesFor()` using a hard-coded English template. The pragmatic fixes:
+
+- Pass `message` on each validation: `validatesPresenceOf(property="email", message=t("errors.email.required"))`. The string is resolved at validation time using the current request's locale.
+- Override `errorMessagesFor()` in a view helper to look each message up through `t()` before rendering.
+
+Both are workarounds — they leak through whenever core Wheels generates a message you didn't catch. Flag the gap for when first-class i18n lands, and don't build an elaborate abstraction on top of it.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Middleware Pipeline"
+    description="Locale detection runs here — the natural home for request-level concerns that every controller should see resolved."
+    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+  />
+  <LinkCard
+    title="Views, Layouts, Partials"
+    description="Where your t() helper gets called. Helpers in app/views/helpers.cfm are auto-loaded into every view."
+    href="/v4-0-0-snapshot/basics/views-layouts-partials/"
+  />
+  <LinkCard
+    title="Controllers and Actions"
+    description="Set the Lucee locale from a beforeAction filter, or read request.locale to branch on language in an action."
+    href="/v4-0-0-snapshot/basics/controllers-and-actions/"
+  />
+</CardGrid>
