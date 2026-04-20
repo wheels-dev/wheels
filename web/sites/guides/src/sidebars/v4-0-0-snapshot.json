@@ -65,7 +65,8 @@
       { "label": "File Uploads & Downloads", "link": "/v4-0-0-snapshot/digging-deeper/file-uploads-and-downloads/" },
       { "label": "Server-Sent Events", "link": "/v4-0-0-snapshot/digging-deeper/server-sent-events/" },
       { "label": "Internationalization", "link": "/v4-0-0-snapshot/digging-deeper/internationalization/" },
-      { "label": "Multi-tenancy", "link": "/v4-0-0-snapshot/digging-deeper/multi-tenancy/" }
+      { "label": "Multi-tenancy", "link": "/v4-0-0-snapshot/digging-deeper/multi-tenancy/" },
+      { "label": "Packages", "link": "/v4-0-0-snapshot/digging-deeper/packages/" }
     ]
   },
   {
