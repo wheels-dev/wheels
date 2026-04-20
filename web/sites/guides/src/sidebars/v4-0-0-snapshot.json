@@ -47,7 +47,8 @@
       { "label": "Validation and Error Display", "link": "/v4-0-0-snapshot/basics/validation-and-errors/" },
       { "label": "Models and the ORM", "link": "/v4-0-0-snapshot/basics/models-and-the-orm/" },
       { "label": "Associations", "link": "/v4-0-0-snapshot/basics/associations/" },
-      { "label": "Migrations", "link": "/v4-0-0-snapshot/basics/migrations/" }
+      { "label": "Migrations", "link": "/v4-0-0-snapshot/basics/migrations/" },
+      { "label": "Seeding", "link": "/v4-0-0-snapshot/basics/seeding/" }
     ]
   },
   {
