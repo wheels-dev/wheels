@@ -68,7 +68,8 @@
       { "label": "Multi-tenancy", "link": "/v4-0-0-snapshot/digging-deeper/multi-tenancy/" },
       { "label": "Packages", "link": "/v4-0-0-snapshot/digging-deeper/packages/" },
       { "label": "Route Model Binding", "link": "/v4-0-0-snapshot/digging-deeper/route-model-binding/" },
-      { "label": "CORS", "link": "/v4-0-0-snapshot/digging-deeper/cors/" }
+      { "label": "CORS", "link": "/v4-0-0-snapshot/digging-deeper/cors/" },
+      { "label": "Rate Limiting", "link": "/v4-0-0-snapshot/digging-deeper/rate-limiting/" }
     ]
   },
   {
