@@ -69,8 +69,21 @@ export function runExec(program, args = [], opts = {}) {
     }
   }
 
+  // Shebang-script bypass: GHA Linuxbrew + node --test workers return
+  // spawn ENOENT when exec'ing a #!/bin/bash wrapper script via posix_spawn,
+  // even though statSync/accessSync confirm the file is readable + executable.
+  // Working theory: Node/libuv's posix_spawn path doesn't honor shebang
+  // lookup in this specific combo. Invoking bash directly with the script
+  // as argv[1] skips shebang interpreter resolution.
+  let finalProgram = resolvedProgram;
+  let finalArgs = args;
+  if (process.platform === 'linux' && program === 'wheels') {
+    finalProgram = '/bin/bash';
+    finalArgs = [resolvedProgram, ...args];
+  }
+
   return new Promise((resolve) => {
-    const proc = spawn(resolvedProgram, args, spawnOpts);
+    const proc = spawn(finalProgram, finalArgs, spawnOpts);
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', (d) => (stdout += d.toString()));
