@@ -52,7 +52,7 @@ component {
 	/**
 	 * Encodes a value for safe use inside an HTML attribute.
 	 * Use when building attribute values manually:
-	 * `<div title="#hAttr(user.bio)#">`.
+     * &lt;div title="#hAttr(user.bio)#"&gt;.
 	 *
 	 * [section: View Helpers]
 	 * [category: Sanitization Functions]
