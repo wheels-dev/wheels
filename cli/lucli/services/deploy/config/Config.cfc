@@ -106,4 +106,25 @@ component {
 		return prefix & image() & ":" & arguments.version;
 	}
 
+	public array function accessories() {
+		var out = [];
+		var raw = (structKeyExists(variables.raw, "accessories") && isStruct(variables.raw.accessories))
+			? variables.raw.accessories
+			: {};
+		for (var name in raw) {
+			arrayAppend(out, new Accessory(name, raw[name], variables.raw.service));
+		}
+		return out;
+	}
+
+	public any function accessory(required string name) {
+		for (var acc in accessories()) {
+			if (acc.name() == arguments.name) return acc;
+		}
+		throw(
+			type = "DeployConfigError",
+			message = "Unknown accessory: " & arguments.name & " (check deploy.yml accessories block)"
+		);
+	}
+
 }

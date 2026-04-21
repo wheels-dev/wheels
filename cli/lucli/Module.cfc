@@ -1393,6 +1393,29 @@ component extends="modules.BaseModule" {
 					default:
 						throw(message="Unknown wheels deploy registry verb: #registryVerb#");
 				}
+			case "accessory":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy accessory requires a verb");
+				}
+				var accVerb = positional[2];
+				opts.name = arrayLen(positional) >= 3 ? positional[3] : "";
+				var accCli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (accVerb) {
+					case "boot":
+					case "reboot":
+					case "start":
+					case "stop":
+					case "restart":
+					case "details":
+					case "logs":
+					case "remove":
+						invoke(accCli, accVerb, [opts]);
+						return arrayToList(accCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy accessory verb: #accVerb#");
+				}
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}

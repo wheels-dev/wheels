@@ -1,0 +1,22 @@
+service: demo
+image: acme/demo
+servers:
+  - 1.2.3.4
+registry:
+  username: demo
+  password:
+    - REGISTRY_PASSWORD
+accessories:
+  db:
+    image: postgres:16
+    host: 1.2.3.5
+    port: "5432:5432"
+    env:
+      clear:
+        POSTGRES_USER: demo
+    directories:
+      - data:/var/lib/postgresql/data
+  redis:
+    image: redis:7
+    host: 1.2.3.5
+    port: "6379:6379"
