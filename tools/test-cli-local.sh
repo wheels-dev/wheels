@@ -45,6 +45,17 @@ if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${POR
   echo "Using existing server on port ${PORT}"
 else
   echo "Starting LuCLI server on port ${PORT}..."
+
+  # Ensure SQLite JDBC is installed in LuCLI's lib/ext/ — the CLI test
+  # suite includes specs (e.g. TestRunnerSpec) that bring up ephemeral
+  # Lucee servers against SQLite. Same fetch block as tools/test-local.sh.
+  LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
+  if [ -n "$LUCEE_LIB" ] && ! ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
+    echo "Downloading SQLite JDBC driver..."
+    curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \
+      -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
+  fi
+
   nohup lucli server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &
   SERVER_PID=$!
   STARTED_SERVER=true
