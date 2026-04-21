@@ -21,9 +21,13 @@ execute() allows you to run a raw SQL query directly from a migration file. This
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `sql` | `string` | yes | — | Arbitary SQL String |
+
+</div>
 
 ## Examples
 

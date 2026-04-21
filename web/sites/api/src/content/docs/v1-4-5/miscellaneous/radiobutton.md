@@ -19,6 +19,8 @@ Builds and returns a string containing a radio button form control based on the 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | See documentation for textField. |
@@ -34,6 +36,8 @@ Builds and returns a string containing a radio button form control based on the 
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
 | `errorElement` | `string` | yes | `span` | See documentation for textField. |
 | `errorClass` | `string` | yes | `fieldWithErrors` | See documentation for textField. |
+
+</div>
 
 ## Examples
 

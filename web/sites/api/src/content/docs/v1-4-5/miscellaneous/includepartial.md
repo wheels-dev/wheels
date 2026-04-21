@@ -19,6 +19,8 @@ Includes the specified partial file in the view. Similar to using cfinclude but 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `partial` | `any` | yes | — | The name of the partial file to be used. Prefix with a leading slash / if you need to build a path from the root views folder. Do not include the partial filename's underscore and file extension. If you want to have CFWheels display the partial for a single model object, array of model objects, or a query, pass a variable containing that data into this argument. |
@@ -30,6 +32,8 @@ Includes the specified partial file in the view. Similar to using cfinclude but 
 | `query` | `query` | yes | — | If you want to have CFWheels display the partial for each record in a query record set but want to override the name of the file referenced, provide the template file name for partial and pass the query as a separate query argument. |
 | `object` | `component` | yes | — | If you want to have CFWheels display the partial for a model object but want to override the name of the file referenced, provide the template file name for partial and pass the model object as a separate object argument. |
 | `objects` | `array` | yes | — | If you want to have CFWheels display the partial for each model object in an array but want to override the name of the file referenced, provide the template name for partial and pass the query as a separate objects argument. |
+
+</div>
 
 ## Examples
 

@@ -22,6 +22,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | Name of the variable containing the parent object to represent with this form field. |
@@ -32,6 +34,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 | `checkIfBlank` | `boolean` | no | `false` | Whether or not to check this form field as a default if there is a blank value set for the property. |
 | `label` | `string` | no | — | The label text to use in the form control. |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

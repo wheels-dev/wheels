@@ -19,6 +19,8 @@ Sets up a belongsTo association between this model and the specified one. Use th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Gives the association a name that you refer to when working with the association (in the include argument to findAll, to name one example). |
@@ -26,6 +28,8 @@ Sets up a belongsTo association between this model and the specified one. Use th
 | `foreignKey` | `string` | yes | — | Foreign key property name (usually not needed if you follow CFWheels conventions since the foreign key name will be deduced from the name argument). |
 | `joinKey` | `string` | yes | — | Column name to join to if not the primary key (usually not needed if you follow wheels conventions since the join key will be the tables primary key/keys). |
 | `joinType` | `string` | yes | `inner` | Use to set the join type when joining associated tables. Possible values are inner (for INNER JOIN) and outer (for LEFT OUTER JOIN). |
+
+</div>
 
 ## Examples
 

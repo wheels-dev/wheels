@@ -22,6 +22,8 @@ If multiple error messages exist, the first one is returned.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | The variable name of the object to display the error message for. |
@@ -31,4 +33,6 @@ If multiple error messages exist, the first one is returned.
 | `wrapperElement` | `string` | no | `span` | HTML element to wrap the error message in. |
 | `class` | `string` | no | `error-message` | CSS `class` to set on the wrapper element. |
 | `encode` | `boolean` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 

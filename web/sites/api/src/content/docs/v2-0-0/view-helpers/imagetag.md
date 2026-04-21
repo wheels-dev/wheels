@@ -23,6 +23,8 @@ You can pass any additional arguments (e.g. <code>class</code>, <code>rel</code>
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `source` | `string` | yes | — | The file name of the image if it's available in the local file system (i.e. ColdFusion will be able to access it). Provide the full URL if the image is on a remote server. |
@@ -31,6 +33,8 @@ You can pass any additional arguments (e.g. <code>class</code>, <code>rel</code>
 | `protocol` | `string` | no | — |  |
 | `port` | `numeric` | no | `0` |  |
 | `encode` | `boolean` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

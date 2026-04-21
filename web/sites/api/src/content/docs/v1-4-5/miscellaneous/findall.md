@@ -19,6 +19,8 @@ Returns records from the database table mapped to this model according to the ar
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `where` | `string` | yes | — | This argument maps to the WHERE clause of the query. The following operators are supported: =, !=, <>, <, <=, >, >=, LIKE, NOT LIKE, IN, NOT IN, IS NULL, IS NOT NULL, AND, and OR (note that the key words need to be written in upper case). You can also use parentheses to group statements. You do not need to specify the table name(s); CFWheels will do that for you. Instead of using the where argument, you can create cleaner code by making use of a concept called Dynamic Finders. |
@@ -39,6 +41,8 @@ Returns records from the database table mapped to this model according to the ar
 | `returnIncluded` | `boolean` | yes | `true` | When returnAs is set to objects, you can set this argument to false to prevent returning objects fetched from associations specified in the include argument. This is useful when you only need to include associations for use in the WHERE clause only and want to avoid the performance hit that comes with object creation. |
 | `callbacks` | `boolean` | yes | `true` | You can set this argument to false to prevent running the execution of callbacks for a method call. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
+
+</div>
 
 ## Examples
 

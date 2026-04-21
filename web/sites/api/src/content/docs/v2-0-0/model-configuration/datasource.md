@@ -21,11 +21,15 @@ Use this method to override the data source connection information for this mode
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `datasource` | `string` | yes | — | The data source name to connect to. |
 | `username` | `string` | no | — | The username for the data source. |
 | `password` | `string` | no | — | The password for the data source. |
+
+</div>
 
 ## Examples
 

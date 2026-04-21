@@ -21,9 +21,13 @@ Used in migrations to alter an existing table in the database. This function all
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `addColumns` | `boolean` | no | `false` |  |
+
+</div>
 
 ## Examples
 

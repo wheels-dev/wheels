@@ -19,12 +19,16 @@ Registers method(s) that should be called to validate objects before they are sa
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `methods` | `string` | yes | — | Method name or list of method names to call. (Can also be called with the method argument.) |
 | `condition` | `string` | yes | — | See documentation for validatesConfirmationOf. |
 | `unless` | `string` | yes | — | See documentation for validatesConfirmationOf. |
 | `when` | `string` | yes | `onSave` | See documentation for validatesConfirmationOf. |
+
+</div>
 
 ## Examples
 

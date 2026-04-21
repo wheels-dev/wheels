@@ -22,6 +22,8 @@ Note that all undeclared arguments will be passed to <code>redirectTo()</code> c
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `only` | `string` | no | — | List of action names to limit this verification to. |
@@ -36,6 +38,8 @@ Note that all undeclared arguments will be passed to <code>redirectTo()</code> c
 | `cookieTypes` | `string` | no | — | List of types to check each listed cookie value against (will be passed through to your CFML engine's `IsValid` function). |
 | `sessionTypes` | `string` | no | — | List of types to check each list session value against (will be passed through to your CFML engine's `IsValid` function). |
 | `paramsTypes` | `string` | no | — | List of types to check each params value against (will be passed through to your CFML engine's `IsValid` function). |
+
+</div>
 
 ## Examples
 

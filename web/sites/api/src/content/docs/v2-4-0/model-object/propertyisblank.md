@@ -22,7 +22,11 @@ This method is the inverse of <code>propertyIsPresent()</code>.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to inspect. |
+
+</div>
 

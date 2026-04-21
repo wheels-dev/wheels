@@ -22,10 +22,14 @@ Used primarily for testing purposes.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the controller to create. |
 | `params` | `struct` | no | `[runtime expression]` | The params struct (combination of form and URL variables). |
+
+</div>
 
 ## Examples
 

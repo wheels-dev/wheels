@@ -22,10 +22,14 @@ In addition to <code>quoted</code> and <code>delimiter</code> you can pass in an
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `quoted` | `boolean` | no | `false` | Set to `true` to enclose each value in single-quotation marks. |
 | `delimiter` | `string` | no | `,` | The delimiter character to separate the list items with. |
+
+</div>
 
 ## Examples
 

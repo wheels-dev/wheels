@@ -22,6 +22,8 @@ Note that when passing values for controller and / or action, this function does
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `controller` | `string` | no | `[runtime expression]` | Controller to include the view page for. |
@@ -32,6 +34,8 @@ Note that when passing values for controller and / or action, this function does
 | `returnAs` | `string` | no | — | Set to `string` to return the result instead of automatically sending it to the client. |
 | `hideDebugInformation` | `boolean` | no | `false` | Set to `true` to hide the debug information at the end of the output. This is useful, for example, when you're testing XML output in an environment where the global setting for `showDebugInformation` is `true`. |
 | `status` | `string` | no | `[runtime expression]` | Force request to return with specific HTTP status code. |
+
+</div>
 
 ## Examples
 

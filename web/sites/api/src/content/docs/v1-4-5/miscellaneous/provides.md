@@ -19,9 +19,13 @@ Defines formats that the controller will respond with upon request. The format c
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `formats` | `string` | yes | — | Formats to instruct the controller to provide. Valid values are html (the default), xml, json, csv, pdf, and xls. |
+
+</div>
 
 ## Examples
 

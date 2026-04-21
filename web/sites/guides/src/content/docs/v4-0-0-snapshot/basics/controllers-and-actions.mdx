@@ -1,0 +1,258 @@
+---
+title: Controllers and Actions
+description: Writing a controller, the seven REST actions, filters, params, rendering, redirect, and flash.
+type: howto
+sidebar:
+  order: 2
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A controller is the CFC that runs after the router picks a route and before the view renders. Each public function is an action. This page shows you how to write one, how the seven REST actions fit together, how filters run around them, and how to render, redirect, and flash a message on the way out.
+
+**You'll learn:**
+
+- How to write a controller with a single action and matching view
+- How `resources()` maps to seven REST actions and what each one typically does
+- How `config()` registers filters and why filter methods must be `private`
+- Where URL segments and form data land inside `params`
+- How to render a view, a partial, text, or JSON — and how to redirect with a flash message
+
+<Aside type="note">
+  You should already know how routes map to actions. See [How Routing Works](/v4-0-0-snapshot/core-concepts/how-routing-works/). This page picks up on the controller side of that arrow.
+</Aside>
+
+## Write your first controller
+
+A controller lives in `app/controllers/` and extends the framework's `Controller` base class. The filename is plural PascalCase (`Posts.cfc`); the class name matches the file. Each public function is an action the router can dispatch to.
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function index() {}
+}
+```
+
+After the action runs, Wheels automatically renders `app/views/posts/index.cfm` wrapped in `app/views/layout.cfm`. You don't call `render` explicitly unless you want something other than the default.
+
+## The seven REST actions
+
+`.resources(name="posts")` in `config/routes.cfm` wires up seven routes. Each maps to an action you write on the controller. This is the convention the rest of the framework assumes — stick to it unless you have a reason not to.
+
+| Action    | HTTP method and path        | What it does                                 | Typical body                                        |
+|-----------|-----------------------------|----------------------------------------------|-----------------------------------------------------|
+| `index`   | `GET /posts`                | List records                                 | `posts = model("Post").findAll()`                   |
+| `new`     | `GET /posts/new`            | Render an empty form                         | `post = model("Post").new()`                        |
+| `create`  | `POST /posts`               | Persist a new record                         | `model("Post").new(params.post).save()` + redirect  |
+| `show`    | `GET /posts/:key`           | Render one record                            | `post = model("Post").findByKey(params.key)`        |
+| `edit`    | `GET /posts/:key/edit`      | Render an edit form                          | Same load as `show`                                 |
+| `update`  | `PATCH /posts/:key`         | Persist changes to an existing record        | `post.update(params.post)` + redirect               |
+| `delete`  | `DELETE /posts/:key`        | Destroy a record                             | `post.delete()` + redirect                          |
+
+A full scaffold-style controller wires all seven together. With `binding=true` on the resource route, the member actions see `params.post` already loaded as a model instance.
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function index() {
+        posts = model("Post").findAll(order="publishedAt DESC");
+    }
+    function show() {
+        post = params.post;
+    }
+    function new() {
+        post = model("Post").new();
+    }
+    function create() {
+        post = model("Post").new(params.post);
+        if (post.save()) {
+            redirectTo(route="post", key=post.id);
+        } else {
+            renderView(action="new");
+        }
+    }
+    function edit() {
+        post = params.post;
+    }
+    function update() {
+        post = params.post;
+        if (post.update(params.post)) {
+            redirectTo(route="post", key=post.id);
+        } else {
+            renderView(action="edit");
+        }
+    }
+    function delete() {
+        post = params.post;
+        post.delete();
+        redirectTo(route="posts");
+    }
+}
+```
+
+## `config()` and filters
+
+`config()` runs once per controller instantiation — it's where you register filters, verify rules, and any other per-controller setup. Don't put action logic here; it runs before any action is known.
+
+`filters(through="methodName")` binds a private method to run before every action in this controller. Use `only="..."` to restrict it to specific actions or `except="..."` to skip them. Pass `type="after"` to run after the action instead of before.
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function config() {
+        filters(through="authenticate", except="index,show");
+    }
+    function index() {}
+    function new() {}
+    private function authenticate() {
+        if (!StructKeyExists(session, "userId")) {
+            redirectTo(route="login");
+        }
+    }
+}
+```
+
+Filter methods **must** be declared `private`. A public function on a controller is a routable action — if you forget the keyword on `authenticate`, the router will happily accept `GET /posts/authenticate` and call it directly, which is not what you want. The `private` keyword keeps it off the action surface.
+
+## Params
+
+The `params` struct is built by the framework on every request. It merges three sources into one flat struct:
+
+- **URL segments** — `:key` from `/posts/:key` lands in `params.key`.
+- **Query string** — `?page=2` lands in `params.page`.
+- **Form fields** — `<input name="post[title]">` lands in `params.post.title`.
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function show() {
+        post = model("Post").findByKey(params.key);
+    }
+    function create() {
+        post = model("Post").new(params.post);
+        post.save();
+    }
+    function index() {
+        posts = model("Post").findAll(page=params.page, perPage=25);
+    }
+}
+```
+
+How `params.post` gets populated from `<input name="post[firstName]">` is the form helper's job — see [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/).
+
+## Rendering
+
+By default, when your action returns without calling a render function, Wheels renders `app/views/<controllername>/<actionname>.cfm` wrapped in the layout. Call one of the render functions below only when you want something different.
+
+### `renderView` — override the view or layout
+
+Render a different action's view (common when `create` fails and you want the `new` form back with errors), or drop the layout entirely.
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function create() {
+        post = model("Post").new(params.post);
+        if (post.save()) {
+            redirectTo(route="post", key=post.id);
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+### `renderPartial` — render just a partial
+
+The right choice when a Turbo Frame submits a form and you want to swap only the frame's contents. The partial lives at `app/views/<controller>/_<name>.cfm`.
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function create() {
+        post = model("Post").new(params.post);
+        if (post.save()) {
+            redirectTo(route="post", key=post.id);
+        } else {
+            renderPartial(partial="form", post=post, layout=false);
+        }
+    }
+}
+```
+
+### `renderText` — render a plain string
+
+For trivial responses: webhooks, health checks, debug endpoints.
+
+```cfm {test:compile} title="app/controllers/Health.cfc"
+component extends="Controller" {
+    function ping() {
+        renderText(text="ok");
+    }
+}
+```
+
+### `renderWith` — render JSON (or any format)
+
+`renderWith(data=...)` serializes the data struct or query into the format the request asked for. A request with `Accept: application/json` (or a URL ending in `.json`) gets JSON back; add `.xml` and the same action serializes XML. This is the Wheels equivalent of `renderJSON` in other frameworks.
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function show() {
+        post = model("Post").findByKey(params.key);
+        renderWith(data=post);
+    }
+}
+```
+
+## `redirectTo`
+
+`redirectTo` issues a `cflocation` redirect to a named route, a controller/action pair, or an absolute URL. The most common shape passes a route name and the key:
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function create() {
+        post = model("Post").create(params.post);
+        if (post.save()) {
+            redirectTo(route="post", key=post.id, success="Post created");
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+Any extra argument that isn't a known `redirectTo` parameter (like `success` above) is set into the flash for the next request. `redirectTo` doesn't `return` on its own — if more statements follow the redirect, add your own `return`. The common case where the redirect is the last statement just works.
+
+## Flash messages
+
+The flash is a struct that survives exactly one redirect. Write to it during one request, read from it on the next, and it clears automatically.
+
+- `flashInsert(success="Post created")` writes a key for the next request
+- `flashKeyExists("success")` checks if a key is present in the layout/view
+- `flash("success")` returns that key's value (or the whole struct if no key given)
+
+In practice most apps write via the `redirectTo(..., success="...")` shortcut shown above and read from a layout partial that loops over whatever keys it finds.
+
+## Strong params
+
+Never blindly hand `params.post` to a model constructor when the form submits fields the user shouldn't be allowed to set. A user-posted `isAdmin=true` or `userId=42` would get mass-assigned through `model("Post").new(params.post)`. The safe pattern is to name the attributes explicitly:
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function create() {
+        post = model("Post").new(title=params.post.title, body=params.post.body);
+        post.userId = session.userId;
+        if (post.save()) {
+            redirectTo(route="post", key=post.id);
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+Wheels 4.0 also ships an allowlist mechanism on the model itself for the cases where the explicit form gets tedious. The [Security Hardening](/v4-0-0-snapshot/digging-deeper/security-hardening/) page has the deep dive; until then, the explicit-pick pattern above is what every controller in the tutorial uses.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Routing" href="/v4-0-0-snapshot/basics/routing/" description="How URLs become controller#action targets." />
+  <LinkCard title="Views, Layouts, and Partials" href="/v4-0-0-snapshot/basics/views-layouts-partials/" description="What renders after your action finishes." />
+  <LinkCard title="Validation and Errors" href="/v4-0-0-snapshot/basics/validation-and-errors/" description="The errors your controller branches on when save fails." />
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-0-snapshot/basics/forms-and-form-helpers/" description="How input names become nested params." />
+</CardGrid>

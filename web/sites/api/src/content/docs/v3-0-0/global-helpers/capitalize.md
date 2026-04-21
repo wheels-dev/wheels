@@ -21,9 +21,13 @@ Capitalizes the first letter of every word in the provided text, creating a nice
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — |  |
+
+</div>
 
 ## Examples
 

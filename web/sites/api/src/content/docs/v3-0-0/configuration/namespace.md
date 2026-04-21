@@ -21,11 +21,15 @@ The namespace() function in Wheels is used to group controllers and routes under
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name to prepend to child route names. |
 | `package` | `string` | no | `[runtime expression]` | Subfolder (package) to reference for controllers. This defaults to the value provided for `name`. |
 | `path` | `string` | no | `[runtime expression]` | Subfolder path to add to the URL. |
+
+</div>
 
 ## Examples
 

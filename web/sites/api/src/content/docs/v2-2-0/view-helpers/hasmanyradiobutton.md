@@ -22,6 +22,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | Name of the variable containing the parent object to represent with this form field. |
@@ -32,6 +34,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 | `checkIfBlank` | `boolean` | no | `false` | Whether or not to check this form field as a default if there is a blank value set for the property. |
 | `label` | `string` | no | — | The label text to use in the form control. |
 | `encode` | `any` | no | `true` | Use this argument to decide whether the output of the function should be encoded in order to prevent Cross Site Scripting (XSS) attacks. Set it to `true` to encode all relevant output for the specific HTML element in question (e.g. tag content, attribute values, and URLs). For HTML elements that have both tag content and attribute values you can set this argument to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

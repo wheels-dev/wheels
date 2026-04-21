@@ -19,9 +19,13 @@ Assigns to the property specified the opposite of the property's current boolean
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `save` | `boolean` | yes | `true` | Argument to decide whether save the property after it has been toggled. Defaults to true. |
+
+</div>
 
 ## Examples
 

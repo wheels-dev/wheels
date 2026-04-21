@@ -21,12 +21,16 @@ The flashMessages() function generates a formatted HTML output of messages store
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `keys` | `string` | no | — | The key (or list of keys) to show the value for. You can also use the `key` argument instead for better readability when accessing a single key. |
 | `class` | `string` | no | `flash-messages` | HTML `class` to set on the `div` element that contains the messages. |
 | `includeEmptyContainer` | `boolean` | no | `false` | Includes the `div` container even if the Flash is empty. |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
 
 ## Examples
 

@@ -19,9 +19,13 @@ Returns the validation type for the property
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of column to retrieve data for. |
+
+</div>
 
 ## Examples
 

@@ -55,9 +55,17 @@
 	font-size: 0.875em;
 }
 
+/*
+ * Code block container — borrow radius and shadow, but leave background
+ * and text color to the active expressive-code theme. Forcing a fixed
+ * dark background here used to break light mode: expressive-code rendered
+ * GitHub-light token colors (designed for a white background) on the
+ * forced-dark background, producing unreadable blue-on-black and
+ * gray-on-black for keywords and comments.
+ *
+ * See astro.config.mjs `expressiveCode.themes` for the theme pair.
+ */
 .sl-markdown-content pre {
-	background: #111;
-	color: #e5e5e5;
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-sm);
 }
@@ -151,4 +159,53 @@ starlight-toc a[aria-current='true'] {
 
 .wd-page-title {
 	margin-bottom: var(--space-5);
+}
+
+/* ── API parameter tables ────────────────────────────────────────
+ * Emitted by web/scripts/generate-api-docs.mjs. Keep the structural
+ * columns (Name, Type, Required, Default) on a single line so type
+ * identifiers don't break mid-word; let the Description column absorb
+ * the slack. Scoped via .wd-params-table so prose tables elsewhere
+ * are unaffected.
+ */
+/* Wrap in an overflow:auto container so very wide rows can still scroll
+ * horizontally on narrow viewports — mirrors what Starlight does globally
+ * via `display: block; overflow: auto` on markdown tables, but we need to
+ * restore `display: table` on the <table> itself so the column-width
+ * algorithm (required by the width:1% idiom below) works. */
+.sl-markdown-content .wd-params-table {
+	overflow-x: auto;
+}
+
+.sl-markdown-content .wd-params-table table {
+	display: table;
+	table-layout: auto;
+	width: 100%;
+}
+
+.sl-markdown-content .wd-params-table th:nth-child(-n + 4),
+.sl-markdown-content .wd-params-table td:nth-child(-n + 4) {
+	white-space: nowrap;
+	/* width: 1% + nowrap is the canonical "shrink-to-content" idiom for
+	 * auto-layout tables — without it, browsers distribute all columns
+	 * evenly and the Description column ends up at ~1/5 of the width
+	 * instead of absorbing the slack. */
+	width: 1%;
+}
+
+.sl-markdown-content .wd-params-table th:nth-child(5),
+.sl-markdown-content .wd-params-table td:nth-child(5) {
+	width: auto;
+	word-break: break-word;
+}
+
+/* ── Prev/Next page footer ─────────────────────────────────────────
+ * Starlight ships .link-title at 1.5rem which is louder than needed
+ * on function reference pages where names like clearCachableActions()
+ * overflow two lines at 24px. Step it down to text-lg (18px) so the
+ * two cards read as navigation, not billboards.
+ */
+.pagination-links .link-title {
+	font-size: var(--text-lg);
+	font-weight: 600;
 }

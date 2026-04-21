@@ -1,0 +1,127 @@
+---
+title: "Scaffold Cleanup"
+description: wheels destroy — the reverse of wheels generate. Remove scaffolded files, individual artifacts, or recover from a mis-named generate, with the wheels d one-letter alias.
+type: reference
+sidebar:
+  order: 8
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`wheels destroy` is the reverse of `wheels generate`. You hand it the same name you handed `generate` and it removes the files that were written. `wheels d` is a one-letter alias for the same command.
+
+**You'll use this for:**
+
+- Undoing a scaffold you ran against the wrong name and want to redo.
+- Removing an individual generated artifact — a model, a controller, a view directory — without touching the rest of the project.
+- Cleaning up half-generated work when a `generate` run didn't match what you meant to type.
+
+## Overview
+
+`destroy` mirrors a subset of the `generate` surface. For each supported type it removes the files the matching generator wrote, drops the corresponding `.resources()` line from `config/routes.cfm` when relevant, and stamps out a `remove_<table>_table` migration for types that own a schema. Files that weren't generated — or that have already been removed — are reported as skipped, not errors.
+
+`wheels d` is the same function under a shorter name. Every example on this page works with either `destroy` or `d`.
+
+<Aside type="caution" title="Confirmation is required">
+`destroy` always runs in preview mode first. It prints the list of files it would delete and exits without touching anything until you re-run the command with `--force`. There is no interactive prompt — add `--force` to the same command once you've read the preview.
+</Aside>
+
+## Synopsis
+
+```bash
+wheels destroy <name> [type] [--force]
+wheels d <name> [type] [--force]
+```
+
+The first positional argument is the resource name. The second, optional, is the type — `resource` (the default), `model`, `controller`, or `view`. `--force` must be passed for any deletion to actually occur; without it, `destroy` prints the preview and exits.
+
+Running `wheels destroy` with no arguments prints the usage block and supported types.
+
+### Supported types
+
+`destroy` handles four types. This is narrower than `generate` — there is no `destroy scaffold`, `destroy migration`, or `destroy helper`. Use `resource` (the default) for the full CRUD surface that `generate scaffold` writes.
+
+| Type | What it removes |
+|---|---|
+| `resource` (default) | Model CFC, controller CFC, views directory, model spec, controller spec, view-tests directory, `.resources()` route line, plus a new drop-table migration file |
+| `model` | Model CFC, model spec, plus a new drop-table migration file |
+| `controller` | Controller CFC and controller spec |
+| `view` | Entire view directory and its matching view-tests directory — or a single view file if you pass a `controller/action` path |
+
+### Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--force` | off | Required to actually delete. Without `--force`, `destroy` prints the preview and exits. |
+
+### Example
+
+```bash
+wheels destroy Post
+# preview prints; nothing deleted yet
+
+wheels destroy Post --force
+```
+
+The second command removes `app/models/Post.cfc`, `app/controllers/Posts.cfc`, `app/views/posts/`, `tests/specs/models/PostSpec.cfc`, `tests/specs/controllers/PostsSpec.cfc`, `tests/specs/views/posts/`, and the `.resources("posts")` line from `config/routes.cfm`. It also writes a new `<timestamp>_remove_posts_table.cfc` migration into `app/migrator/migrations/` — you still need to run `wheels migrate latest` to actually drop the table from the database.
+
+## Safety notes
+
+<Aside type="caution" title="destroy is destructive">
+- Commit your work before running `destroy`. Deleted files are gone — `destroy` does not move them to a backup directory.
+- Run `destroy` without `--force` first and read the preview. The command always lists what it would delete before doing anything.
+- `destroy model` and `destroy resource` generate a drop-table migration but do **not** execute it. Your database schema is unchanged until you run `wheels migrate latest`. If you want the schema back the way it was, delete the generated migration file before migrating.
+- `destroy` removes whole view directories by default. Pass a `controller/action` path to `destroy view` when you only want a single template deleted.
+- Files not found are reported as skipped, not errors — `destroy` succeeds even if the files you asked about were already gone.
+</Aside>
+
+## Common workflows
+
+### Undo a scaffold
+
+```bash
+wheels destroy Post --force
+wheels migrate latest   # apply the generated drop-table migration
+```
+
+Removes every file `wheels generate scaffold Post` wrote, clears its route, and — after the migrate — drops the `posts` table.
+
+### Clean up aborted work
+
+```bash
+wheels destroy User model --force
+wheels destroy Users controller --force
+```
+
+Useful when you ran `wheels generate model` and `wheels generate controller` separately, realised you named them wrong, and want to back out both without touching anything else. Each invocation is independent and prints its own preview when `--force` is omitted.
+
+### Re-scaffold under a new name
+
+```bash
+wheels destroy Post --force
+wheels migrate latest
+wheels generate scaffold Article title body:text
+wheels migrate latest
+```
+
+Tear down the old resource, apply the drop-table migration, and generate the new one. The two migrate runs keep the schema aligned with the filesystem at each step.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Code Generation"
+    href="../code-generation/"
+    description="wheels generate — the inverse operation. Everything destroy can tear down was built here."
+  />
+  <LinkCard
+    title="Creating a Project"
+    href="../creating-a-project/"
+    description="wheels new — scaffold a fresh project before you generate anything to tear down."
+  />
+  <LinkCard
+    title="Database"
+    href="../database/"
+    description="wheels migrate — apply the drop-table migration that destroy model and destroy resource write."
+  />
+</CardGrid>

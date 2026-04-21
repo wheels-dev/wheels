@@ -21,9 +21,13 @@ Returns a structure of all the properties with their names as keys and the value
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `returnIncluded` | `boolean` | no | `true` | Whether to return nested properties or not. |
+
+</div>
 
 ## Examples
 

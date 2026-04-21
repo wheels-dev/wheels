@@ -19,10 +19,14 @@ Creates a new object based on supplied properties and returns it. The object is 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | yes | — | The properties you want to set on the object (can also be passed in as named arguments). |
 | `callbacks` | `boolean` | yes | `true` | See documentation for save. |
+
+</div>
 
 ## Examples
 

@@ -22,9 +22,13 @@ The keys that will be included in the struct are <code>currentPage</code>, <code
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `handle` | `string` | no | `query` | The handle given to the query to return pagination information for. |
+
+</div>
 
 ## Examples
 

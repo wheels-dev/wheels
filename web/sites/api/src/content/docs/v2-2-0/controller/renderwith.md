@@ -23,6 +23,8 @@ For other formats (or to override the automatic formatting), you can also create
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `data` | `any` | yes | — | Data to format and render. |
@@ -34,6 +36,8 @@ For other formats (or to override the automatic formatting), you can also create
 | `returnAs` | `string` | no | — | Set to `string` to return the result instead of automatically sending it to the client. |
 | `hideDebugInformation` | `boolean` | no | `false` | Set to `true` to hide the debug information at the end of the output. This is useful, for example, when you're testing XML output in an environment where the global setting for `showDebugInformation` is `true`. |
 | `status` | `string` | no | `[runtime expression]` | Force request to return with specific HTTP status code. |
+
+</div>
 
 ## Examples
 

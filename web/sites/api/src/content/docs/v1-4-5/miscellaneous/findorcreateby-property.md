@@ -19,9 +19,13 @@ Returns the object or creates a new one if it wasn't found.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `save` | `boolean` | yes | `true` | Passing in false will create the object without saving it to the database. |
+
+</div>
 
 ## Examples
 

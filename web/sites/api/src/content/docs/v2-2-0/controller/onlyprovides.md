@@ -22,10 +22,14 @@ This can be used to define provides behavior in individual actions or to overrid
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `formats` | `string` | no | — | Formats to instruct the controller to provide. Valid values are `html` (the default), `xml`, `json`, `csv`, `pdf`, and `xls`. |
 | `action` | `string` | no | `[runtime expression]` | Name of action, defaults to current. |
+
+</div>
 
 ## Examples
 

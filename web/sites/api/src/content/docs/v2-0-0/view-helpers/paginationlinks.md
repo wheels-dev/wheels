@@ -24,6 +24,8 @@ If you have paginated more than one query in the controller, you can use the han
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `windowSize` | `numeric` | no | `2` | The number of page links to show around the current page. |
@@ -44,6 +46,8 @@ If you have paginated more than one query in the controller, you can use the han
 | `showSinglePage` | `boolean` | no | `false` | Will show a single page when set to true. (The default behavior is to return an empty string when there is only one page in the pagination). |
 | `pageNumberAsParam` | `boolean` | no | `true` | Decides whether to link the page number as a param or as part of a route. (The default behavior is true). |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

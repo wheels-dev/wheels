@@ -21,11 +21,15 @@ The float() function is used in a table definition during a migration to add one
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `default` | `string` | no | — |  |
 | `allowNull` | `boolean` | no | `true` |  |
+
+</div>
 
 ## Examples
 

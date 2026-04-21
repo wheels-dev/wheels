@@ -24,6 +24,8 @@ To include a file relative from the base <code>views</code> folder, you can star
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `partial` | `any` | yes | — | The name of the partial file to be used. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Do not include the partial filename's underscore and file extension. If you want to have CFWheels display the partial for a single model object, array of model objects, or a query, pass a variable containing that data into this argument. |
@@ -33,6 +35,8 @@ To include a file relative from the base <code>views</code> folder, you can star
 | `spacer` | `string` | no | — | HTML or string to place between partials when called using a query. |
 | `dataFunction` | `any` | no | `true` | Name of controller function to load data from. |
 | `$prependWithUnderscore` | `boolean` | no | `true` |  |
+
+</div>
 
 ## Examples
 

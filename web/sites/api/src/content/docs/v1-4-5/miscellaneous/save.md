@@ -19,6 +19,8 @@ Saves the object if it passes validation and callbacks. Returns true if the obje
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `parameterize` | `any` | yes | `true` | See documentation for findAll. |
@@ -26,6 +28,8 @@ Saves the object if it passes validation and callbacks. Returns true if the obje
 | `validate` | `boolean` | yes | `true` | Set to false to skip validations for this operation. |
 | `transaction` | `string` | yes | — | Set this to commit to update the database when the save has completed, rollback to run all the database queries but not commit them, or none to skip transaction handling altogether. |
 | `callbacks` | `boolean` | yes | `true` | Set to false to disable callbacks for this operation. |
+
+</div>
 
 ## Examples
 

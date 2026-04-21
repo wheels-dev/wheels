@@ -1,0 +1,171 @@
+---
+title: Route Model Binding
+description: Load records from the URL automatically — per-resource opt-in, global default, custom model name, scope-level binding, and the dev-mode warning when it's off.
+type: howto
+sidebar:
+  order: 11
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to stop writing `findByKey(params.key)` at the top of every member action. You'll enable route model binding per-resource, flip the global default, override the model class when the resource name doesn't singularize cleanly, apply binding across an entire URL scope, handle the 404 that fires for missing records, and recognize the dev-mode warning the framework logs when a binding-eligible route has binding turned off.
+
+**You'll learn:**
+
+- How per-resource `binding=true` auto-loads records into `params.<singular>`
+- How `set(routeModelBinding=true)` makes it the default for every resource
+- How `binding="ModelName"` overrides the convention-derived class name
+- How scope-level binding cascades to every nested resource
+- What happens when the record doesn't exist — `Wheels.RecordNotFound` and the 404
+- The dev-mode hint the framework writes to the Wheels log when binding is off but the route looks like a binding candidate
+- Which actions binding affects (and which it doesn't)
+
+<Aside type="note">
+  You should already know how routes map to actions. See [How Routing Works](/v4-0-0-snapshot/core-concepts/how-routing-works/) for the match algorithm and [Routing](/v4-0-0-snapshot/basics/routing/) for the `.resources()` DSL.
+</Aside>
+
+## What route model binding does
+
+Without binding, every member action has to reach for the record itself. You call `findByKey`, check for a missing row, and bail out with a redirect or a 404 before you get to do anything interesting:
+
+```cfm title="app/controllers/Posts.cfc — without binding"
+function show() {
+    post = model("Post").findByKey(params.key);
+    if (!IsObject(post)) {
+        redirectTo(route="posts", error="Not found");
+        return;
+    }
+    // ...the rest of show
+}
+```
+
+With `binding=true` on the resource, the dispatcher runs that lookup before your action does, stores the result under `params.post`, and throws `Wheels.RecordNotFound` (rendering a 404) when the record is missing. The action is reduced to the happy path:
+
+```cfm title="app/controllers/Posts.cfc — with binding"
+function show() {
+    // params.post is already loaded.
+    // A 404 fired before show() ran if the record didn't exist.
+}
+```
+
+The behavior is implemented in `$resolveRouteModelBinding()` on `vendor/wheels/Dispatch.cfc`, which runs after route match and before filters. Filters, verifiers, and the action itself all see the resolved instance.
+
+## Per-resource opt-in
+
+The fastest way in is to add `binding=true` to a single resource. The four member actions (`show`, `edit`, `update`, `delete`) — the ones that receive `params.key` — get an auto-loaded `params.post`:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .resources(name="posts", binding=true)
+    .wildcard()
+.end();
+</cfscript>
+```
+
+The singular model name is derived from the controller name: `posts` (controller) → `Post` (model class) → `params.post` (instance key). Binding is skipped for `index`, `new`, and `create` — those actions have no `params.key` to resolve against.
+
+## Global default
+
+If you want binding turned on everywhere without editing each resource, flip the application-wide default in `config/settings.cfm`:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(routeModelBinding=true);
+</cfscript>
+```
+
+Every `.resources(...)` call without an explicit `binding=` argument now behaves as if you had written `binding=true`. An individual resource can still opt out with `binding=false`:
+
+```cfm {test:compile} title="config/routes.cfm — opt out of the global default"
+<cfscript>
+mapper()
+    .resources("posts")                       // inherits the global default → bound
+    .resources(name="webhooks", binding=false) // explicit opt-out → not bound
+    .wildcard()
+.end();
+</cfscript>
+```
+
+The default value of `routeModelBinding` is `false` — binding is off until you enable it per-resource or globally.
+
+## Custom model class name
+
+The convention is `capitalize(singularize(controllerName))` — `posts` → `Post`, `blog-posts` → `BlogPost`, `users` → `User`. When the controller name doesn't singularize to the class you want to load, pass a model class name instead of `true`:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .resources(name="articles", binding="BlogPost")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+`binding="BlogPost"` resolves the `BlogPost` model and stores the instance under `params.blogPost` (the lowercase-initial form of the class name). The `binding` argument accepts `true`, `false`, or a simple string — any non-boolean string is treated as the model class to load.
+
+<Aside type="tip">
+  If the model class doesn't exist (for example, the resource is routing to a controller that doesn't have a backing model), the dispatcher silently skips binding instead of throwing. This keeps non-model resources — health checks, static pages, API gateways — working without extra configuration.
+</Aside>
+
+## Scope-level binding
+
+Inside a `.scope()` block, `binding=true` cascades to every nested resource. One declaration turns binding on for a whole URL prefix:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .scope(path="/api", binding=true, callback=function(map) {
+        map.resources("users");    // bound → params.user
+        map.resources("posts");    // bound → params.post
+        map.resources("comments"); // bound → params.comment
+    })
+    .wildcard()
+.end();
+</cfscript>
+```
+
+Each nested resource inherits the scope's binding value unless it explicitly overrides it. You can still opt a single resource out with `binding=false` inside the callback — the inheritance is a default, not a lock.
+
+## The 404 behavior
+
+When binding is enabled and `params.key` is present, the dispatcher calls `model(ModelName).findByKey(params.key)`. If that returns `false` — Wheels' "no record" sentinel — the dispatcher raises `Wheels.RecordNotFound` before your action runs, with an extended-info message that includes the failing key (HTML-encoded for safety).
+
+You handle the error the same way you handle any other uncaught exception: wire a custom error page in `config/events/onerror.cfm`, or let Wheels render the framework default 404. Because the throw happens in dispatch, the member action never executes on a missing record. Your `show`, `edit`, `update`, and `delete` bodies can assume `params.<singular>` is a valid, hydrated model instance — no `IsObject()` guards needed.
+
+## The dev-mode warning
+
+When binding is **off** and a route matches a binding-eligible member action with `params.key` set, Wheels writes a one-time warning to the `wheels` log. This catches the silent-failure case where a developer writes `post = params.post;` in a `show` action but forgot to enable binding on the resource:
+
+```text title="logs/wheels.log — example warning"
+Wheels Route Binding Hint: SHOW on controller 'posts' (route 'post') dispatched
+with params.key but route model binding is not enabled on this resource. If you
+intended params.post to be auto-loaded from the Post model, add binding=true to
+the resource:  .resources(name="posts", binding=true). Or enable globally in
+config/settings.cfm: set(routeModelBinding=true). To silence this hint:
+set(suppressRouteBindingWarnings=true) in config/settings.cfm. (Hint fires in
+development only.)
+```
+
+Trigger conditions (all must hold):
+
+- `environment` is not `"production"` — the hint is silent in production
+- `suppressRouteBindingWarnings` is not set to `true` in `config/settings.cfm`
+- The matched route has `params.key` set
+- The resolved action is one of `show`, `edit`, `update`, `delete`
+- No warning for the same controller-plus-action pair has been emitted this app lifetime (dedup resets on reload)
+
+To silence the hint without enabling binding, add `set(suppressRouteBindingWarnings=true)` to `config/settings.cfm`. The emission is wrapped in a try/catch so a logging failure never blocks dispatch.
+
+## Which actions binding affects
+
+Binding resolves against `params.key` — so it only applies to the four member actions that receive a key in the URL: `show`, `edit`, `update`, `delete`. Collection actions (`index`, `new`, `create`) don't have a key to look up, so enabling binding has no effect on them; you still load records yourself with `findAll()`, `new()`, or whatever the action needs.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="How Routing Works" href="/v4-0-0-snapshot/core-concepts/how-routing-works/" description="The match algorithm, resource expansion, and where route model binding sits in the dispatch pipeline." />
+  <LinkCard title="Routing" href="/v4-0-0-snapshot/basics/routing/" description="The .resources() DSL, nested and scoped routes, and where binding=true lives in practice." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="Action patterns, filters, and why binding reduces the boilerplate at the top of member actions." />
+  <LinkCard title="Authorization & Filters" href="/v4-0-0-snapshot/digging-deeper/authorization-and-filters/" description="Ownership checks and policy filters that run against the record binding resolved for you." />
+</CardGrid>

@@ -19,6 +19,8 @@ Builds and returns a string containing one select form control for the hours of 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | See documentation for textFieldTag. |
@@ -31,6 +33,8 @@ Builds and returns a string containing one select form control for the hours of 
 | `prependToLabel` | `string` | yes | — | See documentation for textField. |
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
 | `twelveHour` | `boolean` | yes | `false` | See documentation for timeSelect. |
+
+</div>
 
 ## Examples
 

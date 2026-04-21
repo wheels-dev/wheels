@@ -19,12 +19,16 @@ Adds a new route to your application.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name for the route. This is referenced as the name argument in functions based on URLFor() like linkTo(), startFormTag(), etc. |
 | `pattern` | `string` | yes | — | The URL pattern that the route will match. |
 | `controller` | `string` | yes | — | Controller to call when route matches (unless the controller name exists in the pattern). |
 | `action` | `string` | yes | — | Action to call when route matches (unless the action name exists in the pattern). |
+
+</div>
 
 ## Examples
 

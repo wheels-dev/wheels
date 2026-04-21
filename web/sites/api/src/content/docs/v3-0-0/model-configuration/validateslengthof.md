@@ -22,6 +22,8 @@ Use the <code>exactly</code>, <code>maximum</code>, <code>minimum</code> and <co
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | no | — | Name of property or list of property names to validate against (can also be called with the `property` argument). |
@@ -34,6 +36,8 @@ Use the <code>exactly</code>, <code>maximum</code>, <code>minimum</code> and <co
 | `within` | `string` | no | — | A list of two values (minimum and maximum) that the length of the property value must fall within. |
 | `condition` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `true` validation will run). |
 | `unless` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `false` validation will run). |
+
+</div>
 
 ## Examples
 

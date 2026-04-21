@@ -19,6 +19,8 @@ Highlights the phrase(s) everywhere in the text if found by wrapping it in a spa
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | Text to search. |
@@ -26,6 +28,8 @@ Highlights the phrase(s) everywhere in the text if found by wrapping it in a spa
 | `delimiter` | `string` | yes | `,` | Delimiter to use in phrases argument. |
 | `tag` | `string` | yes | `span` | HTML tag to use to wrap the highlighted phrase(s). |
 | `class` | `string` | yes | `highlight` | Class to use in the tags wrapping highlighted phrase(s). |
+
+</div>
 
 ## Examples
 

@@ -3,6 +3,7 @@ import starlight from '@astrojs/starlight';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { GUIDES_VERSIONS } from '@wheels-dev/ui/data/versions';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -12,11 +13,11 @@ function loadSidebar(version) {
 	return groups;
 }
 
-const versions = [
-	{ slug: 'v4-0-0-snapshot', label: 'v4.0.0-SNAPSHOT (dev)', collapsed: false },
-	{ slug: 'v3-0-0', label: 'v3.0.0 (current)', collapsed: true },
-	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true },
-];
+const versions = GUIDES_VERSIONS.map((v) => ({
+	slug: v.slug,
+	label: v.sidebarLabel ?? v.label,
+	collapsed: v.collapsed,
+}));
 
 // Starlight doesn't support a "linked group" (item with both link + items).
 // Flatten: if a group was also a link in the source, prepend an "Overview"
@@ -45,11 +46,19 @@ function buildSidebarForVersion(version) {
 	return {
 		label: version.label,
 		collapsed: version.collapsed,
-		items: groups.map((g) => ({
-			label: g.label,
-			collapsed: version.collapsed,
-			items: (g.items || []).map(normalizeItem).filter(Boolean),
-		})),
+		items: groups.map((g) => {
+			// Top-level entry with a link and no children → render as a leaf link,
+			// not a collapsible group. Without this, Starlight would wrap it as an
+			// empty group and drop the link entirely (Glossary hit this bug).
+			if (g.link && (!g.items || g.items.length === 0)) {
+				return { label: g.label, link: g.link };
+			}
+			return {
+				label: g.label,
+				collapsed: version.collapsed,
+				items: (g.items || []).map(normalizeItem).filter(Boolean),
+			};
+		}),
 	};
 }
 
@@ -59,6 +68,13 @@ export default defineConfig({
 		starlight({
 			title: 'Wheels Guides',
 			description: 'Official guides for the Wheels CFML MVC framework.',
+			expressiveCode: {
+				// High-contrast theme pair — github-dark-high-contrast (dark) and
+				// github-light (light) both produce WCAG-AA contrast ratios between
+				// every token color and the theme's own background. Starlight picks
+				// the first for `data-theme="dark"` and the second for light mode.
+				themes: ['github-dark-high-contrast', 'github-light'],
+			},
 			customCss: [
 				'@wheels-dev/ui/styles/tokens.css',
 				'@wheels-dev/ui/styles/base.css',

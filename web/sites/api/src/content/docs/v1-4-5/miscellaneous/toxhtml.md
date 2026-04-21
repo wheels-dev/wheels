@@ -19,9 +19,13 @@ Returns an XHTML-compliant string.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | String to make XHTML-compliant. |
+
+</div>
 
 ## Examples
 

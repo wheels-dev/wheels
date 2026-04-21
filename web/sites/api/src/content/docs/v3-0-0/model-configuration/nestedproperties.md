@@ -21,6 +21,8 @@ Allows nested objects, arrays, or structs associated with a model to be automati
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `association` | `string` | no | — | The association (or list of associations) you want to allow to be set through the params. This argument is also aliased as `associations`. |
@@ -28,6 +30,8 @@ Allows nested objects, arrays, or structs associated with a model to be automati
 | `allowDelete` | `boolean` | no | `false` | Set this to `true` to tell Wheels to look for the property `_delete` in your model. If present and set to a value that evaluates to true, the model will be deleted when saving the parent. |
 | `sortProperty` | `string` | no | — | Set this to a property on the object that you would like to sort by. The property should be numeric, should start with 1, and should be consecutive. Only valid with `hasMany` associations. |
 | `rejectIfBlank` | `string` | no | — | A list of properties that should not be blank. If any of the properties are blank, any CRUD operations will be rejected. |
+
+</div>
 
 ## Examples
 

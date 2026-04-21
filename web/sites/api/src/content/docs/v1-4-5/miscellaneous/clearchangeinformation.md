@@ -19,9 +19,13 @@ Clears all internal knowledge of the current state of the object.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to clear information for. |
+
+</div>
 
 ## Examples
 

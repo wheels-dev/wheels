@@ -22,6 +22,8 @@ Returns <code>true</code> on successful deletion of the row, <code>false</code> 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `parameterize` | `any` | no | `true` | Set to `true` to use `cfqueryparam` on all columns, or pass in a list of property names to use `cfqueryparam` on those only. |
@@ -29,6 +31,8 @@ Returns <code>true</code> on successful deletion of the row, <code>false</code> 
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
 | `includeSoftDeletes` | `boolean` | no | `false` | Set to `true` to include soft-deleted records in the queries that this method runs. |
 | `softDelete` | `boolean` | no | `true` | Set to `false` to permanently delete a record, even if it has a soft delete column. |
+
+</div>
 
 ## Examples
 

@@ -19,12 +19,16 @@ Tells CFWheels to cache one or more actions.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `action` | `string` | yes | — | Action(s) to cache. This argument is also aliased as actions. |
 | `time` | `numeric` | yes | `60` | Minutes to cache the action(s) for. |
 | `static` | `boolean` | yes | `false` | Set to true to tell CFWheels that this is a static page and that it can skip running the controller filters (before and after filters set on actions). Please note that the onSessionStart and onRequestStart events still execute though. |
 | `appendToKey` | `string` | yes | — | List of variables to be evaluated at runtime and included in the cache key so that content can be cached separately. |
+
+</div>
 
 ## Examples
 

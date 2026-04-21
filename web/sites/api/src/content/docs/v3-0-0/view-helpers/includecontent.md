@@ -21,10 +21,14 @@ Outputs the content for a specific section in a layout. Works together with cont
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | `body` | Name of layout section to return content for. |
 | `defaultValue` | `string` | no | — | What to display as a default if the section is not defined. |
+
+</div>
 
 ## Examples
 

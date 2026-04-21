@@ -19,6 +19,8 @@ Instructs the controller which view template and layout to render when it's fini
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `controller` | `string` | yes | — | Controller to include the view page for. |
@@ -28,6 +30,8 @@ Instructs the controller which view template and layout to render when it's fini
 | `cache` | `any` | yes | — | Number of minutes to cache the content for. |
 | `returnAs` | `string` | yes | — | Set to string to return the result instead of automatically sending it to the client. |
 | `hideDebugInformation` | `boolean` | yes | `false` | Set to true to hide the debug information at the end of the output. This is useful when you're testing XML output in an environment where the global setting for showDebugInformation is true. |
+
+</div>
 
 ## Examples
 

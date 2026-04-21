@@ -22,10 +22,14 @@ Only available in a migration CFC
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to perform the operation on |
 | `referenceTable` | `string` | yes | — | The reference table name to perform the operation on |
 | `column` | `string` | yes | — | The column name to perform the operation on |
 | `referenceColumn` | `string` | yes | — | The reference column name to perform the operation on |
+
+</div>
 

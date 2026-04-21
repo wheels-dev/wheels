@@ -21,9 +21,13 @@ Allows you to manually set the content that Wheels will send back to the client 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `content` | `string` | yes | — | The content to send to the client. |
+
+</div>
 
 ## Examples
 

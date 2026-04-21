@@ -19,9 +19,13 @@ Fetches the last record ordered by primary key value. Use the property argument 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | See documentation for findFirst. |
+
+</div>
 
 ## Examples
 

@@ -19,11 +19,15 @@ Pass in two dates to this method, and it will return a string describing the dif
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `fromTime` | `date` | yes | — | Date to compare from.. |
 | `toTime` | `date` | yes | `,` | Date to compare to. |
 | `includeSeconds` | `boolean` | yes | `false` | Whether or not to include the number of seconds in the returned string. |
+
+</div>
 
 ## Examples
 

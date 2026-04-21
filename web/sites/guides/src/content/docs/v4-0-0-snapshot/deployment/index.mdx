@@ -1,0 +1,110 @@
+---
+title: Deployment & Operations
+description: How Wheels apps reach production — the two supported models, what the framework provides, and what you provide.
+type: section
+sidebar:
+  order: 6
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A Wheels app in production is a Java webapp running on a CFML engine. That one fact determines everything that follows — your deployment target is anything that can host a JVM process and terminate HTTP in front of it. This page is the map for the Deployment & Operations section. It covers the two models Wheels supports today, the line between what the framework gives you and what you own, and where each detail page lives.
+
+**You'll learn:**
+
+- The two deployment models Wheels supports today and how to choose between them
+- Exactly what the framework ships versus what production infrastructure you provide
+- The current state of the `wheels deploy` CLI and how to deploy without it
+
+## The two models
+
+Every Wheels deployment the authors have seen in the wild fits one of two shapes. Pick the one that matches your team's operational maturity, not the one that looks modern.
+
+| | Containerized (Docker) | Traditional (VM / bare metal) |
+|---|---|---|
+| **Artifact** | OCI image containing Lucee + your app | Directory of app code plus an installed engine |
+| **Runtime** | Container runtime (Docker, Podman, Kubernetes) | systemd service running CommandBox or a servlet container |
+| **Updates** | Build image, push to registry, roll out new image | Pull code, restart service |
+| **Dev/prod parity** | High — same image in both environments | Lower — dev and prod diverge on engine version, JVM flags, OS libs |
+| **Ops burden** | Registry, orchestrator or Compose, image hygiene | Config management (Ansible/Puppet/Chef), package pinning |
+
+### Pick containerized when
+
+- Your team already runs containers for other services. The existing registry, orchestration, and observability stack applies unchanged.
+- You want one artifact you can run identically on a laptop, in CI, and in production.
+- You're comfortable operating a registry and either an orchestrator or a Compose-based host.
+
+### Pick traditional when
+
+- You have existing VM or bare-metal infrastructure with mature config management, and adding a container layer adds cost without reducing risk.
+- Compliance, audit, or network topology constraints make containers harder than they're worth.
+- Your team is small and one long-lived host per environment is simpler than an orchestrator.
+
+Both models are first-class. The detail pages go deep on each.
+
+## What Wheels provides vs. what you provide
+
+The framework is deliberately narrow about production. Wheels gives you a CFML app that boots on any supported engine, configures itself from environment variables, and exposes health and observability hooks. Everything outside the JVM process is yours.
+
+**Wheels provides:**
+
+- A CFML application that runs on Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023/2025, or BoxLang. The 4.0 reference engine for core tests is Lucee 7 on Java 21.
+- Environment-aware configuration (`config/environment.cfm`, `config/environments/*.cfm`) that selects behavior by `WHEELS_ENV`.
+- Secrets loaded from `.env` (dev) or process environment (prod) via `config/settings.cfm`.
+- A migrator (`wheels dbmigrate`) and seeder (`wheels seed`) that run against your production database on deploy.
+- Built-in middleware for request IDs, security headers, CORS, and rate limiting — wired in `config/settings.cfm`.
+- A reload endpoint (`?reload=true&password=...`) and health-check surface your orchestrator or load balancer can poll.
+
+**You provide:**
+
+- The container or VM. Wheels does not ship a canonical base image or bake-a-VM recipe.
+- The CFML engine install and its JVM. A typical production Wheels container runs Lucee 7 on Java 21; a typical VM install uses the same engine under CommandBox or a standalone servlet container.
+- A reverse proxy (nginx, Caddy, Traefik, HAProxy, ALB) to terminate TLS and forward plain HTTP to the engine.
+- TLS certificates and their renewal. Wheels has an `HTTPS detection` helper but does not issue or rotate certificates.
+- Secrets management. The app reads from environment variables; how those variables get populated (1Password Connect, Vault, SSM Parameter Store, Docker secrets, plain `.env` files) is your call.
+- The database, its backups, and its failover story. Migrations run against whatever `WHEELS_DATASOURCE_*` points at — the framework does not provision databases.
+- Logs, metrics, and traces. See [Observability & Logging](/v4-0-0-snapshot/deployment/observability-and-logging/) for the hooks Wheels exposes.
+
+<Aside type="note">
+  This split is deliberate. Wheels runs inside every kind of production environment teams already have — locking the framework to one opinionated stack would exclude most of them. The detail pages show concrete setups for the common cases.
+</Aside>
+
+## The `wheels deploy` CLI
+
+There is no `wheels deploy` command in 4.0 today. Deployment is currently assembled from the pieces your infrastructure gives you — a Dockerfile and a `docker compose` or Kubernetes manifest, or an Ansible playbook and a systemd unit.
+
+A first-party `wheels deploy` is in active development. The design ports the [Kamal](https://kamal-deploy.org/) deploy model — single-binary, zero-downtime rolling deploys from a laptop, with the orchestration state kept on the target hosts — onto the Wheels CLI surface. It targets Docker-based deployments first, and treats the reverse proxy, TLS via Let's Encrypt, and rolling container replacement as built-in rather than user-provided.
+
+{/* TODO(phase-2c): swap this paragraph for a link to the wheels deploy PR/issue once opened */}
+
+Until it ships, everything on the detail pages assumes you are assembling deployment yourself.
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard
+    title="Production Configuration"
+    href="/v4-0-0-snapshot/deployment/production-config/"
+    description="Environment files, secrets, reload passwords, and the settings that differ between dev and prod."
+  />
+  <LinkCard
+    title="Docker Deployment"
+    href="/v4-0-0-snapshot/deployment/docker-deployment/"
+    description="Dockerfile layout, a working Compose setup, registry workflow, and rolling image updates."
+  />
+  <LinkCard
+    title="VM Deployment"
+    href="/v4-0-0-snapshot/deployment/vm-deployment/"
+    description="systemd units, Ansible-style provisioning, reverse proxy configuration, and deploy scripts."
+  />
+  <LinkCard
+    title="Security Hardening"
+    href="/v4-0-0-snapshot/deployment/security-hardening/"
+    description="CSRF, HTTPS detection, security headers, rate limiting, and dropping dev-only surfaces in prod."
+  />
+  <LinkCard
+    title="Observability & Logging"
+    href="/v4-0-0-snapshot/deployment/observability-and-logging/"
+    description="Request IDs, structured logs, health checks, error tracking, and metrics hooks."
+  />
+</CardGrid>

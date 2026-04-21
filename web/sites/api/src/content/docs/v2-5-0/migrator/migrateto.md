@@ -21,9 +21,13 @@ Migrates database to a specified version. Whilst you can use this in your applic
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `version` | `string` | no | — | The Database schema version to migrate to |
+
+</div>
 
 ## Examples
 

@@ -19,6 +19,8 @@ Validates that the value of the specified property does not exist in the supplie
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | See documentation for validatesConfirmationOf. |
@@ -28,6 +30,8 @@ Validates that the value of the specified property does not exist in the supplie
 | `allowBlank` | `boolean` | yes | `false` | If set to true, validation will be skipped if the property value is an empty string or doesn't exist at all. This is useful if you only want to run this validation after it passes the validatesPresenceOf test, thus avoiding duplicate error messages if it doesn't. |
 | `condition` | `string` | yes | — | See documentation for validatesConfirmationOf. |
 | `unless` | `string` | yes | — | See documentation for validatesConfirmationOf. |
+
+</div>
 
 ## Examples
 

@@ -19,6 +19,8 @@ Builds and returns a string containing a file form control based on the supplied
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | See documentation for textFieldTag. |
@@ -28,6 +30,8 @@ Builds and returns a string containing a file form control based on the supplied
 | `append` | `string` | yes | — | See documentation for textField. |
 | `prependToLabel` | `string` | yes | — | See documentation for textField. |
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
+
+</div>
 
 ## Examples
 

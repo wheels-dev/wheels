@@ -21,11 +21,15 @@ Returns a string describing the approximate time difference between the date pas
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `fromTime` | `date` | yes | — | Date to compare from. |
 | `includeSeconds` | `boolean` | no | `false` | Whether or not to include the number of seconds in the returned string. |
 | `toTime` | `date` | no | `[runtime expression]` | Date to compare to. |
+
+</div>
 
 ## Examples
 

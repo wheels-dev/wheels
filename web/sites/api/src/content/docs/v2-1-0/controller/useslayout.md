@@ -21,6 +21,8 @@ Used within a controller's <code>config()</code> function to specify controller-
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `template` | `string` | yes | — | Name of the layout template or function name you want to use. |
@@ -28,6 +30,8 @@ Used within a controller's <code>config()</code> function to specify controller-
 | `except` | `string` | no | — | List of actions that should not get the layout. |
 | `only` | `string` | no | — | List of actions that should only get the layout. |
 | `useDefault` | `boolean` | no | `true` | When specifying conditions or a function, pass in `true` to use the default `layout.cfm` if none of the conditions are met. |
+
+</div>
 
 ## Examples
 

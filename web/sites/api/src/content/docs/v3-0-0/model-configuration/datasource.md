@@ -21,11 +21,15 @@ dataSource() is a model configuration method used to override the default databa
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `datasource` | `string` | yes | — | The data source name to connect to. |
 | `username` | `string` | no | — | The username for the data source. |
 | `password` | `string` | no | — | The password for the data source. |
+
+</div>
 
 ## Examples
 

@@ -24,6 +24,8 @@ When the record is updated, the same check is made but disregarding the record i
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | no | — | Name of property or list of property names to validate against (can also be called with the `property` argument). |
@@ -34,6 +36,8 @@ When the record is updated, the same check is made but disregarding the record i
 | `condition` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `true` validation will run). |
 | `unless` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `false` validation will run). |
 | `includeSoftDeletes` | `boolean` | no | `true` | Set to `true` to include soft-deleted records in the queries that this method runs. |
+
+</div>
 
 ## Examples
 

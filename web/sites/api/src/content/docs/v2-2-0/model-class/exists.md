@@ -23,6 +23,8 @@ If you don't pass in either of those, it will simply check if any record exists 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `any` | no | — | Primary key value(s) of the record. Separate with comma if passing in multiple primary key values. Accepts a string, list, or a numeric value. |
@@ -30,6 +32,8 @@ If you don't pass in either of those, it will simply check if any record exists 
 | `reload` | `boolean` | no | `false` | Set to `true` to force CFWheels to query the database even though an identical query for this model may have been run in the same request. (The default in CFWheels is to get the second query from the model's request-level cache.) |
 | `parameterize` | `any` | no | `true` | Set to `true` to use `cfqueryparam` on all columns, or pass in a list of property names to use `cfqueryparam` on those only. |
 | `includeSoftDeletes` | `boolean` | no | — | Set to `true` to include soft-deleted records in the queries that this method runs. |
+
+</div>
 
 ## Examples
 

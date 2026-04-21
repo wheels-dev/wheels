@@ -1,0 +1,15 @@
+---
+title: Mini Step 2
+sidebar:
+  order: 2
+---
+
+```cfm {test:tutorial step=2 file="config/routes.cfm" mode="write" asserts-http="GET /ping → 200 \"pong\""}
+<cfscript>
+mapper()
+    .get(name="ping", pattern="/ping", to="home##ping")
+    .root(to="home##index", method="get")
+    .wildcard()
+.end();
+</cfscript>
+```

@@ -21,6 +21,8 @@ Returns a <code>script</code> tag for a JavaScript file (or several) based on th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `sources` | `string` | no | — | The name of one or many JavaScript files in the `javascripts` folder, minus the `.js` extension. Pass a full URL to access an external JavaScript file. Can also be called with the `source` argument. |
@@ -28,6 +30,8 @@ Returns a <code>script</code> tag for a JavaScript file (or several) based on th
 | `head` | `boolean` | no | `false` | Set to `true` to place the output in the `head` area of the HTML page instead of the default behavior (which is to place the output where the function is called from). |
 | `delim` | `string` | no | `,` | The delimiter to use for the list of JavaScript files. |
 | `encode` | `boolean` | no | `true` | Use this argument to decide whether the output of the function should be encoded in order to prevent Cross Site Scripting (XSS) attacks. Set it to `true` to encode all relevant output for the specific HTML element in question (e.g. tag content, attribute values, and URLs). For HTML elements that have both tag content and attribute values you can set this argument to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

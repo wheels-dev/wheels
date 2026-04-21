@@ -19,9 +19,13 @@ Fetches the first record ordered by primary key value. Use the property argument
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to order by. This argument is also aliased as properties. |
+
+</div>
 
 ## Examples
 

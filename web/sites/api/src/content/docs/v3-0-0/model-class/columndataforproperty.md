@@ -21,9 +21,13 @@ Returns a struct containing metadata about a specific property in a model. This 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to inspect. |
+
+</div>
 
 ## Examples
 

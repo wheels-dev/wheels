@@ -21,11 +21,15 @@ Used to change the name of an existing column in a database table within a migra
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table containing the column to rename |
 | `columnName` | `string` | yes | — | The column name to rename |
 | `newColumnName` | `string` | yes | — | The new column name |
+
+</div>
 
 ## Examples
 

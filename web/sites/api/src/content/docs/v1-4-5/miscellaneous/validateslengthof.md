@@ -19,6 +19,8 @@ Validates that the value of the specified property matches the length requiremen
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | Name of property or list of property names to validate against (can also be called with the property argument). |
@@ -31,6 +33,8 @@ Validates that the value of the specified property matches the length requiremen
 | `within` | `string` | yes | — | A list of two values (minimum and maximum) that the length of the property value must fall within. |
 | `condition` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns true validation will run). |
 | `unless` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns false validation will run). |
+
+</div>
 
 ## Examples
 

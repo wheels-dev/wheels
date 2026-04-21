@@ -19,6 +19,8 @@ Calculates the average value for a given property. Uses the SQL function AVG. If
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to calculate the average for. |
@@ -29,6 +31,8 @@ Calculates the average value for a given property. Uses the SQL function AVG. If
 | `ifNull` | `any` | yes | — | The value returned if no records are found. Common usage is to set this to 0 to make sure a numeric value is always returned instead of a blank string. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | See documentation for findAll. |
 | `group` | `string` | yes | — | See documentation for findAll. |
+
+</div>
 
 ## Examples
 

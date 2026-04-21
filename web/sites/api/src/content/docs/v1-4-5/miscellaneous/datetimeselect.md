@@ -19,6 +19,8 @@ Builds and returns a string containing six select form controls (three for date 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | The variable name of the object to build the form control for. |
@@ -46,6 +48,8 @@ Builds and returns a string containing six select form controls (three for date 
 | `errorClass` | `string` | yes | `fieldWithErrors` | The class name of the HTML tag that wraps the form control when there are errors. |
 | `combine` | `boolean` | yes | — | Set to false to not combine the select parts into a single DateTime object. |
 | `twelveHour` | `boolean` | yes | `false` | whether to display the hours in 24 or 12 hour format. 12 hour format has AM/PM drop downs |
+
+</div>
 
 ## Examples
 

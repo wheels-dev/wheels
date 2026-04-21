@@ -19,9 +19,13 @@ Instructs the controller to render specified text when it's finished processing 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `any` | yes | — | The text to be rendered. |
+
+</div>
 
 ## Examples
 

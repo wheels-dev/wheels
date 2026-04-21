@@ -21,6 +21,8 @@ Builds and returns a &lt;select&gt; form control for choosing an hour of the day
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name to populate in tag's name attribute. |
@@ -35,6 +37,8 @@ Builds and returns a &lt;select&gt; form control for choosing an hour of the day
 | `twelveHour` | `boolean` | no | `false` | whether to display the hours in 24 or 12 hour format. 12 hour format has AM/PM drop downs |
 | `encode` | `any` | no | `true` | Use this argument to decide whether the output of the function should be encoded in order to prevent Cross Site Scripting (XSS) attacks. Set it to `true` to encode all relevant output for the specific HTML element in question (e.g. tag content, attribute values, and URLs). For HTML elements that have both tag content and attribute values you can set this argument to `attributes` to only encode attribute values and not tag content. |
 | `$now` | `date` | no | `[runtime expression]` |  |
+
+</div>
 
 ## Examples
 

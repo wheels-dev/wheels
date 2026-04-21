@@ -1,0 +1,121 @@
+---
+title: "MCP Integration"
+description: Expose the wheels CLI as an MCP server so AI IDEs like Claude Code, Cursor, and OpenCode can invoke framework commands directly.
+type: reference
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The `wheels` binary can run as a Model Context Protocol (MCP) server over stdio, letting an AI IDE invoke subcommands — `generate`, `migrate`, `test`, `routes`, and so on — as structured tool calls instead of shell strings. The AI gets a typed tool catalog; you skip the quoting and parsing that trips up shell-based automation.
+
+**You'll use this for:**
+
+- Letting Claude Code, Cursor, or another MCP-aware IDE run `wheels` commands directly, with arguments marshalled as JSON rather than parsed out of chat.
+- Avoiding shell-escaping bugs when an agent wants to pass attribute lists (`title:string`, `body:text`) or path arguments.
+- Automating routine work — generating scaffolds, running migrations, seeding databases — from an editor session without copy-pasting commands.
+
+## How it works
+
+LuCLI ships a generic `mcp` subcommand that wraps any installed module's public functions as MCP tools over stdio JSON-RPC. Running `wheels mcp wheels` starts that server bound to the Wheels Module — every public function in `cli/lucli/Module.cfc` becomes a tool named `wheels_<function>` (for example, `wheels_generate`, `wheels_migrate`). The AI IDE spawns `wheels` as a subprocess, speaks newline-delimited JSON-RPC over stdin/stdout, and receives tool results the same way. No network listener is involved.
+
+## Setup
+
+Add an `.mcp.json` file to your project root (or wherever your IDE expects it). Most AI IDEs auto-load this file when the project opens:
+
+```json
+{
+  "mcpServers": {
+    "wheels": {
+      "command": "wheels",
+      "args": ["mcp", "wheels"]
+    }
+  }
+}
+```
+
+That's the whole configuration. The first `wheels` is the binary name; the second is the module name to expose. The IDE launches the subprocess on demand — you don't need to keep `wheels mcp wheels` running yourself, and the server exits when the IDE disconnects.
+
+Running `wheels mcp` on its own (no module name) prints the same snippet and a short pointer to configuration docs. It is a help command, not a setup wizard — there is no generated file today.
+
+<Aside type="note" title="IDE-specific paths">
+Claude Code reads `.mcp.json` from the project root. OpenCode uses `.opencode.json` with the same `mcpServers` shape. Cursor reads from its settings UI. Check your IDE's MCP documentation for the exact location; the server definition itself is identical across clients.
+</Aside>
+
+### Verifying the server responds
+
+Before wiring it into an IDE, you can confirm the server starts and enumerates tools with the built-in `--once` helper:
+
+```bash
+wheels mcp wheels --once tools/list
+```
+
+That runs a single MCP method and exits — useful for smoke-testing without opening a long-lived stdio session. The output is a JSON-RPC response listing every exposed tool with its input schema.
+
+## Tools exposed
+
+Every public function in the Wheels Module is auto-discovered as an MCP tool, prefixed with the module name:
+
+| Tool | Purpose |
+|---|---|
+| `wheels_generate` | Scaffold a model, controller, view, migration, scaffold, route, test, property, or helper. |
+| `wheels_destroy` | Remove a previously generated component and its associated files. |
+| `wheels_migrate` | Run, roll back, or inspect database migrations. |
+| `wheels_seed` | Run convention-based seeds against the configured environment. |
+| `wheels_db` | Database utility operations (schema, reset, status). |
+| `wheels_test` | Run the app or core test suite and return results. |
+| `wheels_reload` | Reload the app via the running dev server. |
+| `wheels_routes` | List registered routes. |
+| `wheels_info` | Print project, framework, and environment info. |
+| `wheels_analyze` | Run the codebase analyzer (conventions, anti-patterns, drift). |
+| `wheels_validate` | Run configuration and schema validation checks. |
+| `wheels_doctor` | Diagnose install, project, and runtime issues. |
+| `wheels_stats` | Count models, controllers, routes, tests, migrations. |
+| `wheels_notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
+| `wheels_create` | Create an application (currently only `wheels create app <name>`; forwards to `wheels new`). |
+| `wheels_upgrade` | Scan the project for breaking changes against a target framework version (read-only). |
+
+### Tools deliberately hidden
+
+A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenTools()` in `Module.cfc`. They stay reachable from the terminal but never appear in an MCP `tools/list`:
+
+- `start`, `stop` — dev server lifecycle. Stateful, long-lived processes don't fit the single-call MCP model.
+- `console` — interactive CFML REPL. Requires a live stdin/stdout loop, which the MCP transport owns.
+- `new` — scaffolds an entire new project. Destructive and requires interactive prompts for project context.
+- `browser` — multi-step browser testing flow with its own subcommand tree.
+- `mcp` — the meta command itself; exposing it would let an agent recursively launch MCP servers.
+- `d` — short alias for `destroy`, excluded to avoid a duplicate tool entry (the canonical `wheels_destroy` is exposed).
+
+If you need one of these behaviours from an AI IDE, invoke it via a shell tool — don't try to expose it as an MCP tool.
+
+## Deprecated HTTP endpoint
+
+Earlier versions of the framework shipped an in-dev-server MCP endpoint at `/wheels/mcp`, implemented as a CFML view that spoke Streamable HTTP JSON-RPC. That endpoint is deprecated as of Wheels 4.0. It still responds for backwards compatibility, but it emits a one-time warning to the `wheels_mcp` log on first use per JVM and will be removed in a future release.
+
+Migrate to the stdio surface by switching your IDE's MCP server definition to the `.mcp.json` shown above. The stdio server covers the same tool set, does not require a running dev server for file-based operations (generate, migrate, stats, and so on), and is the only surface that will be maintained going forward.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Quick Start"
+    href="./quick-start/"
+    description="From a fresh shell to a running Wheels app in under five minutes."
+  />
+  <LinkCard
+    title="Configuration"
+    href="./configuration/"
+    description="lucee.json, environment profiles, global flags, and LUCLI_HOME."
+  />
+  <LinkCard
+    title="Installation"
+    href="./installation/"
+    description="Install wheels via Homebrew, Chocolatey, or a manual JAR download."
+  />
+  <LinkCard
+    title="CLI Reference"
+    href="./"
+    description="The wheels binary — two command surfaces in one install."
+  />
+</CardGrid>

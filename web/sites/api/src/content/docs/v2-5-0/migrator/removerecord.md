@@ -22,8 +22,12 @@ Only available in a migration CFC
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to remove the record from |
 | `where` | `string` | no | — | The where clause, i.e id = 123 |
+
+</div>
 

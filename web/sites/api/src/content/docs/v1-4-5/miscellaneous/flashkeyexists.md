@@ -19,9 +19,13 @@ Checks if a specific key exists in the Flash.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `string` | yes | — | The key to check if it exists. |
+
+</div>
 
 ## Examples
 

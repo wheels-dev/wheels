@@ -21,6 +21,8 @@ Updates a single property on a model object and saves the record immediately wit
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | no | — | Name of the property to update the value for globally. |
@@ -28,6 +30,8 @@ Updates a single property on a model object and saves the record immediately wit
 | `parameterize` | `any` | no | `true` | Set to `true` to use `cfqueryparam` on all columns, or pass in a list of property names to use `cfqueryparam` on those only. |
 | `transaction` | `string` | no | `[runtime expression]` | Set this to `commit` to update the database, `rollback` to run all the database queries but not commit them, or `none` to skip transaction handling altogether. |
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
+
+</div>
 
 ## Examples
 

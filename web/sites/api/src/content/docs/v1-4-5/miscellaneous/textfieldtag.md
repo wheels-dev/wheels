@@ -19,6 +19,8 @@ Builds and returns a string containing a text field form control based on the su
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name to populate in tag's name attribute. |
@@ -30,6 +32,8 @@ Builds and returns a string containing a text field form control based on the su
 | `prependToLabel` | `string` | yes | — | See documentation for textField. |
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
 | `type` | `string` | yes | `text` | See documentation for textField. |
+
+</div>
 
 ## Examples
 

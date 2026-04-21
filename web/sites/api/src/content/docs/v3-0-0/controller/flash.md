@@ -21,9 +21,13 @@ The flash() function is used in controllers to access data stored in the Flash s
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `string` | no | — | The key to get the value for. |
+
+</div>
 
 ## Examples
 

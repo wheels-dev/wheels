@@ -23,6 +23,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | no | — | The text content of the link. |
@@ -38,6 +40,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 | `port` | `numeric` | no | `0` | Set this to override the current port number. |
 | `href` | `string` | no | — | Pass a link to an external site here if you want to bypass the CFWheels routing system altogether and link to an external URL. |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

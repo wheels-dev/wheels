@@ -22,6 +22,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `value` | `string` | no | `Save changes` | Message to display in the button form control. |
@@ -29,6 +31,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 | `prepend` | `string` | no | — | String to prepend to the form control. Useful to wrap the form control with HTML tags. |
 | `append` | `string` | no | — | String to append to the form control. Useful to wrap the form control with HTML tags. |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

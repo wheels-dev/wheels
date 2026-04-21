@@ -21,6 +21,8 @@ Creates an internal URL based on supplied arguments.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `route` | `string` | no | — | Name of a route that you have configured in `config/routes.cfm`. |
@@ -36,6 +38,8 @@ Creates an internal URL based on supplied arguments.
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
 | `$encodeForHtmlAttribute` | `boolean` | no | `false` |  |
 | `$URLRewriting` | `string` | no | `[runtime expression]` |  |
+
+</div>
 
 ## Examples
 

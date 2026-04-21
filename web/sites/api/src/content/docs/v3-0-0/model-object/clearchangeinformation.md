@@ -21,9 +21,13 @@ Clears all internal tracking information that Wheels maintains about an objectâ€
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | no | â€” | string false Name of property to clear information for. |
+
+</div>
 
 ## Examples
 

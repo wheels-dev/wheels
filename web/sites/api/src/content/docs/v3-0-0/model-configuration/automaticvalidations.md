@@ -21,9 +21,13 @@ Controls whether automatic validations should be enabled for a specific model. B
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `value` | `boolean` | yes | — | Set to `true` or `false`. |
+
+</div>
 
 ## Examples
 

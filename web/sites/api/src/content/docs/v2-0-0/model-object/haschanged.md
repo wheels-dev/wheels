@@ -22,9 +22,13 @@ Will also return <code>true</code> if the object is new and no record for it exi
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | no | — | Name of property to check for change. |
+
+</div>
 
 ## Examples
 

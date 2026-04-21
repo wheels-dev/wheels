@@ -19,9 +19,13 @@ Returns true if the specified property exists on the model and is not a blank st
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to inspect. |
+
+</div>
 
 ## Examples
 

@@ -1,0 +1,143 @@
+---
+title: Installation
+description: Install the wheels binary via Homebrew, Chocolatey, or a manual JAR download, and verify your setup.
+type: reference
+sidebar:
+  order: 2
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The `wheels` binary is distributed through three channels: Homebrew for macOS and Linux, Chocolatey for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
+
+**You'll use this for:**
+
+- First-time setup on a new machine.
+- Verifying that `wheels --version` runs before you start work.
+- Upgrading the CLI when a new LuCLI or Wheels Module release lands.
+- Troubleshooting PATH and `JAVA_HOME` issues on macOS Apple Silicon or a stripped-down Linux host.
+
+## Requirements
+
+The CLI runs on Java 21. On macOS and Linux, the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper, so you don't have to wire up a system JDK. If you're installing manually — or on Windows outside the Chocolatey package — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
+
+```bash
+brew install openjdk@21
+java -version
+```
+
+You should see `openjdk version "21.0.x"` in the output. On Apple Silicon macOS, Homebrew's `openjdk@21` isn't symlinked into `/usr/bin/java` by default — the wheels formula handles this by exporting `JAVA_HOME` itself, but if you call `java` directly you'll need to set it manually.
+
+## macOS and Linux (Homebrew)
+
+Tap the formula repository and install:
+
+```bash
+brew tap wheels-dev/wheels
+brew install wheels
+```
+
+The formula (`wheels-dev/wheels`) pins a specific LuCLI release and a matching Wheels Module tarball. At install time, Homebrew downloads both and stages the module under `$(brew --prefix)/opt/wheels/share/wheels/module/`. It does not copy the module into your home directory yet — that happens on first run.
+
+The first time you invoke `wheels`, the wrapper:
+
+1. Compares the staged module version against `~/.wheels/modules/wheels/.module-version`.
+2. If the versions don't match (or the destination doesn't exist), it copies the module into `~/.wheels/modules/wheels/`.
+3. Exports `LUCLI_HOME=$HOME/.wheels` so all runtime state — installed modules, running servers, resolved deps, stored secrets — lives under that directory and stays isolated from any standalone LuCLI install.
+4. Exports `JAVA_HOME` pointing at the Homebrew-installed `openjdk@21`.
+5. Execs the LuCLI launcher with your arguments.
+
+On upgrades (`brew upgrade wheels`), the staged module version bumps; the next `wheels` invocation notices the mismatch and refreshes `~/.wheels/modules/wheels/` in place.
+
+## Windows (Chocolatey)
+
+<Aside type="caution" title="LuCLI-based package is not yet on the Chocolatey community feed">
+The `wheels` package at [community.chocolatey.org/packages/wheels](https://community.chocolatey.org/packages/wheels) is still the v1.x legacy (CommandBox-based) release. The v2.x LuCLI-based package is built and tested in [`wheels-dev/chocolatey-wheels`](https://github.com/wheels-dev/chocolatey-wheels) but has not been pushed to the public feed yet. Until it is, Windows users should install via the manual JAR path below.
+</Aside>
+
+Once the LuCLI-based v2 package ships, installation will be:
+
+```powershell
+choco install wheels
+wheels --version
+```
+
+The Chocolatey install script downloads the LuCLI Windows launcher and the matching Wheels Module tarball from GitHub Releases, extracts the module under the package's `tools/module/` directory, and adds `wheels.cmd` to your `PATH`. Java 21 is declared as a Chocolatey dependency (`openjdk`), so `choco` installs a JDK if one isn't already present.
+
+## Manual JAR install
+
+If Homebrew and Chocolatey don't fit your environment — a locked-down CI host, a Docker image, or a Windows box before the v2 Chocolatey package ships — you can wire the pieces up directly. The install has two independent artifacts:
+
+1. **LuCLI launcher.** Download from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases). Pick the asset matching your OS — `lucli-<version>-macos`, `lucli-<version>-linux`, or `lucli-<version>.bat` on Windows. Rename it to `wheels` (or `wheels.bat`) so LuCLI's binary-name detection activates the Wheels branding, and drop it somewhere on your `PATH`.
+
+2. **Wheels Module.** Download `wheels-module-<version>.tar.gz` (or `.zip` on Windows) from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases). Extract it into `~/.wheels/modules/wheels/`:
+
+   ```bash
+   mkdir -p ~/.wheels/modules/wheels
+   tar -xzf wheels-module-*.tar.gz -C ~/.wheels/modules/wheels/
+   ```
+
+3. **Environment.** Export `JAVA_HOME` to your JDK 21 install and `LUCLI_HOME` to `$HOME/.wheels`:
+
+   ```bash
+   export JAVA_HOME=/path/to/jdk-21
+   export LUCLI_HOME=$HOME/.wheels
+   ```
+
+   Persist these in your shell profile (`~/.zshrc`, `~/.bashrc`, or `$PROFILE` on PowerShell).
+
+Pick LuCLI and Wheels Module versions that are known to be paired — the Homebrew formula's `LUCLI_VERSION` and `MODULE_VERSION` constants in [`Formula/wheels.rb`](https://github.com/wheels-dev/homebrew-wheels/blob/main/Formula/wheels.rb) are the canonical source for "what's currently shipping together."
+
+## Verifying installation
+
+After any of the three paths, confirm the binary resolves and reports a version:
+
+```bash
+wheels --version
+```
+
+You should see something like:
+
+```
+Wheels 4.0.0-SNAPSHOT+1523 (snapshot)
+LuCLI 0.3.7
+Java 21.0.8
+```
+
+The three-line format tells you the Wheels Module version, the underlying LuCLI version, and the JVM the wrapper picked up. If any of those lines is missing or reports an unexpected value, jump to troubleshooting below.
+
+Once the version check passes, `wheels info` inside a Wheels project gives you a deeper sanity check against a real app — datasource connection, environment, route count. See [App Inspection](./wheels-commands/app-inspection/) for the full output and how to read it.
+
+## Troubleshooting
+
+### `JAVA_HOME` not set or points at the wrong JDK
+
+The Homebrew wrapper sets `JAVA_HOME` inside its own process, so a missing or wrong `JAVA_HOME` in your shell doesn't break `wheels`. But if you're calling `java` directly — or running a manual install — the CLI fails fast with a "Java 21 required" message when `JAVA_HOME` isn't pointed at a JDK 21 install. On Apple Silicon macOS, Homebrew stages `openjdk@21` at `/opt/homebrew/Cellar/openjdk@21/<version>/libexec/openjdk.jdk/Contents/Home`; export that path and re-run.
+
+### `wheels: command not found` after `brew install wheels`
+
+Homebrew's shim directory has to be on your `PATH`. On Apple Silicon macOS that's `/opt/homebrew/bin`; on Intel macOS and Linux it's `/usr/local/bin`. Run `brew --prefix` to confirm, check your `PATH`, and add the shim directory if it's missing. A fresh shell (`exec $SHELL -l`) often fixes this without any config change.
+
+### Conflict with a standalone LuCLI install sharing `~/.lucli/`
+
+The wheels formula deliberately isolates runtime state under `~/.wheels/` (via `LUCLI_HOME`) so a standalone `lucli` install — which uses `~/.lucli/` — stays out of the way. If you previously had LuCLI installed directly and see odd module-resolution errors, check that the wrapper set `LUCLI_HOME` correctly (`wheels system env` will dump the resolved environment) and that `~/.wheels/modules/wheels/` contains a current `Module.cfc` and `.module-version` file.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Quick Start"
+    href="./quick-start/"
+    description="From a fresh shell to a running Wheels app in under five minutes."
+  />
+  <LinkCard
+    title="Configuration"
+    href="./configuration/"
+    description="Profiles, environment, module.json — how LuCLI and the Wheels Module are configured."
+  />
+  <LinkCard
+    title="Creating a Project"
+    href="./wheels-commands/creating-a-project/"
+    description="wheels new and wheels create app — scaffolding a fresh Wheels project after install."
+  />
+</CardGrid>

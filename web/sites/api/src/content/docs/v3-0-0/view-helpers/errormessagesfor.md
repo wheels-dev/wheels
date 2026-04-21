@@ -22,6 +22,8 @@ Returns an empty string if no errors exist.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | The variable name of the object to display error messages for. |
@@ -29,6 +31,8 @@ Returns an empty string if no errors exist.
 | `showDuplicates` | `boolean` | no | `true` | Whether or not to show duplicate error messages. |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
 | `includeAssociations` | `boolean` | no | `true` |  |
+
+</div>
 
 ## Examples
 

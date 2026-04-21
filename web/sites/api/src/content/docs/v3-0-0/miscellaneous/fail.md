@@ -21,9 +21,13 @@ Forces a test to fail intentionally. You can call fail() inside a test when you 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `message` | `string` | no | — |  |
+
+</div>
 
 ## Examples
 

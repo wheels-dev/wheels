@@ -21,9 +21,13 @@ Rsets a named cycle, allowing it to start from the first value the next time it 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | `default` | The name of the cycle to reset. |
+
+</div>
 
 ## Examples
 

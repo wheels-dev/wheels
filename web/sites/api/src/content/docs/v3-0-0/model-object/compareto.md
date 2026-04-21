@@ -21,9 +21,13 @@ Compares the current model object with another model object to determine if they
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `object` | `component` | yes | — |  |
+
+</div>
 
 ## Examples
 

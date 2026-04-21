@@ -21,7 +21,11 @@ alters existing table in the database
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `addColumns` | `boolean` | no | `false` |  |
+
+</div>
 

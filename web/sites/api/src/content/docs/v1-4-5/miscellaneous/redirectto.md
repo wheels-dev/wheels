@@ -19,6 +19,8 @@ Redirects the browser to the supplied controller/action/key, route or back to th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `back` | `boolean` | yes | `false` | Set to true to redirect back to the referring page. |
@@ -36,6 +38,8 @@ Redirects the browser to the supplied controller/action/key, route or back to th
 | `port` | `numeric` | yes | `0` | Set this to override the current port number. |
 | `url` | `string` | yes | — | Redirect to an external URL. |
 | `delay` | `boolean` | yes | `false` | Set to true to delay the redirection until after the rest of your action code has executed. |
+
+</div>
 
 ## Examples
 

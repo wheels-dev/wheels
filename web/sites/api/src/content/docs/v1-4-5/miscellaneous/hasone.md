@@ -19,6 +19,8 @@ Sets up a hasOne association between this model and the specified one.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | See documentation for belongsTo. |
@@ -27,6 +29,8 @@ Sets up a hasOne association between this model and the specified one.
 | `joinKey` | `string` | yes | — | See documentation for belongsTo. |
 | `joinType` | `string` | yes | `outer` | See documentation for belongsTo. |
 | `dependent` | `string` | yes | `false` | See documentation for hasMany. |
+
+</div>
 
 ## Examples
 

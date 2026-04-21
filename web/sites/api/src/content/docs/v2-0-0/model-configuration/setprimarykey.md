@@ -23,9 +23,13 @@ This function is also aliased as <code>setPrimaryKeys()</code>.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Property (or list of properties) to set as the primary key. |
+
+</div>
 
 ## Examples
 

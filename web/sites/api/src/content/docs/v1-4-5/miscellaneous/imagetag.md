@@ -19,9 +19,13 @@ Returns an img tag. If the image is stored in the local images folder, the tag w
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `source` | `string` | yes | — | The file name of the image if it's available in the local file system (i.e. ColdFusion will be able to access it). Provide the full URL if the image is on a remote server. |
+
+</div>
 
 ## Examples
 

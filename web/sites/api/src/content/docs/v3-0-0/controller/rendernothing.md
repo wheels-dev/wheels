@@ -21,9 +21,13 @@ Instructs the controller to render an empty response when an action completes. U
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `status` | `string` | no | `[runtime expression]` | Force request to return with specific HTTP status code. |
+
+</div>
 
 ## Examples
 

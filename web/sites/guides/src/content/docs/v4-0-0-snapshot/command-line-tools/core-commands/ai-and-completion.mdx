@@ -1,0 +1,318 @@
+---
+title: "AI & Completion"
+description: wheels ai and wheels completion — drive Lucee-managed AI providers from the CLI and generate bash or zsh shell completion scripts for the wheels binary.
+type: reference
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`wheels ai` and `wheels completion` are two unrelated LuCLI utilities grouped here because neither is part of the day-to-day Wheels inner loop. `ai` is a thin CLI wrapper over Lucee's server-side AI engines (OpenAI, Claude, Gemini, and other OpenAI-compatible providers) that lets you configure endpoints, run one-shot prompts, and manage reusable "skills" from your shell. `completion` emits a shell-completion script you install once so `wheels <TAB>` completes subcommands and flags.
+
+**You'll use this for:**
+
+- Registering AI provider credentials in the local Lucee server and running ad-hoc prompts or skills from the CLI.
+- Installing bash or zsh completion so `wheels`, `wheels server`, `wheels generate` and friends auto-complete.
+
+## `wheels ai`
+
+Drive Lucee-managed AI endpoints from the CLI. LuCLI stores only lightweight local defaults (default endpoint, default model, skill search paths) in `~/.lucli/ai/`. The endpoint credentials themselves live in the Lucee server's `CFConfig.json` — `wheels ai config add` writes to that file on your behalf.
+
+### Synopsis
+
+```bash
+wheels ai <subcommand> [flags]
+```
+
+Calling `wheels ai` without a subcommand prints the help summary and exits.
+
+### Subcommands
+
+| Subcommand | Purpose |
+|---|---|
+| `config` (alias `configure`) | Manage LuCLI AI defaults and Lucee endpoint entries. |
+| `prompt` | Run a one-shot prompt against a configured endpoint. |
+| `list` | List AI providers/endpoints configured in Lucee CFConfig. |
+| `test` | Run a lightweight "pong" prompt to verify an endpoint works. |
+| `skill` | Manage reusable AI skill definitions and skill search paths. |
+
+### `ai config defaults`
+
+View or update the LuCLI-local defaults (stored under `~/.lucli/ai/settings.json`). These tell other `ai` subcommands which endpoint and model to use when you don't pass `--endpoint` or `--model` explicitly.
+
+```bash
+wheels ai config defaults [flags]
+```
+
+| Flag | Description |
+|---|---|
+| `--default-endpoint=<name>` | Set the default Lucee endpoint name. |
+| `--default-model=<model>` | Set the default model hint used by LuCLI prompt templates. |
+| `--show` | Print current defaults. |
+
+### `ai config add`
+
+Add or update an AI endpoint entry via CFConfig import. Writes to the Lucee server's `CFConfig.json` so the endpoint is reachable from both CLI prompts and Lucee code.
+
+```bash
+wheels ai config add [flags]
+```
+
+| Flag | Description |
+|---|---|
+| `--name=<key>` | Endpoint name/key (e.g. `mychatgpt`). |
+| `--type=<type>` | Provider type. One of `openai`, `claude`, `gemini`, `copilot`, `deepseek`, `grok`, `ollama`, `perplexity`, `other`. Default: `openai`. |
+| `--class=<class>` | AI engine class. Defaults by provider type. |
+| `--url=<url>` | Optional custom endpoint URL. |
+| `--secret-key=<value>` | Secret/API key. Supports placeholders like `#env:CHATGPT_SECRET_KEY#`. |
+| `--model=<model>` | Model name (e.g. `gpt-4o`). |
+| `--message=<text>` | System message. Default: `Keep all answers as short as possible`. |
+| `--timeout=<ms>` | Provider timeout in milliseconds. Default: `5000`. |
+| `--default-mode=<mode>` | Default mode for this endpoint entry. Default: `exception`. |
+| `--guided` | Interactive guided setup — walks through the required fields. |
+| `--test-after-save` | Run a lightweight connection test after saving. |
+| `--json` | Print the imported structure as JSON. |
+| `--quiet` | Suppress printing imported config payload (useful for CI). |
+| `--show` | Show full API key values in output (otherwise masked). |
+
+<Aside type="tip" title="Secrets stay out of your shell history">
+Use `#env:VAR#` placeholders instead of passing the raw key on the command line. LuCLI resolves the placeholder at request time against environment variables or the `wheels secrets` store. See [System & Secrets](../system-and-secrets/) for secret storage.
+</Aside>
+
+### `ai config list`
+
+List AI endpoint entries from the Lucee server's CFConfig.
+
+```bash
+wheels ai config list [flags]
+```
+
+| Flag | Description |
+|---|---|
+| `--name=<name>` | Filter by endpoint name (repeatable). |
+| `--json` | Output as JSON. |
+| `--show` | Show full API key values (otherwise masked). |
+
+### `ai list`
+
+Top-level list — same data as `ai config list` but annotated with the current LuCLI default endpoint.
+
+```bash
+wheels ai list [flags]
+```
+
+| Flag | Description |
+|---|---|
+| `--name=<name>` | Filter by endpoint/provider name (repeatable). |
+| `--json` | Output as JSON. |
+| `--show` | Show full API key values (otherwise masked). |
+| `--refresh` | Compatibility flag, currently a no-op. |
+
+### `ai prompt`
+
+Run a one-shot prompt against a Lucee-managed endpoint.
+
+```bash
+wheels ai prompt [flags]
+```
+
+| Flag | Description |
+|---|---|
+| `--text=<text>` | Prompt text. Accepts `@file` to read from a file. |
+| `--image=<path>` | Image file to include (repeatable). |
+| `--rules-file=<path>` | Rules file to attach as instructions (repeatable). |
+| `--rules-folder=<path>` | Folder containing rules files to attach (repeatable). |
+| `--endpoint=<name>` | Lucee endpoint name. Falls back to the LuCLI default. |
+| `--model=<model>` | Model hint (stored in the request context). |
+| `--system=<text>` | High-priority system instructions. Accepts `@file`. |
+| `--temperature=<n>` | Temperature. |
+| `--timeout=<ms>` | Socket timeout in milliseconds. |
+| `--skill=<name\|path>` | Skill name or explicit skill file path. |
+| `--skills-path=<dir>` | Command-local skill search path (repeatable). |
+| `--json` | Output raw JSON when possible. |
+| `--dry-run` | Show the resolved prompt payload and exit without sending. |
+| `--estimate` | Show a rough token/cost estimate and exit without sending. |
+| `--assume-output-tokens=<n>` | Assumed completion tokens used by `--estimate`. Default: `400`. |
+| `--input-price-per-1m=<usd>` | Optional input token USD price per 1M tokens for `--estimate`. |
+| `--output-price-per-1m=<usd>` | Optional output token USD price per 1M tokens for `--estimate`. |
+| `--output-file=<path>` | Write rendered output to file. |
+| `--force` | Overwrite `--output-file` if it already exists. |
+
+### `ai test`
+
+Send a minimal "Respond with the word: pong" prompt to verify an endpoint round-trips correctly.
+
+```bash
+wheels ai test [flags]
+```
+
+| Flag | Description |
+|---|---|
+| `--endpoint=<name>` | Endpoint name. Falls back to the LuCLI default. |
+| `--text=<text>` | Test prompt text. Default: `Respond with the word: pong`. |
+
+### `ai skill`
+
+Manage reusable skill definitions (a skill bundles prompt text, system instructions, model, temperature, and timeout into a single named unit).
+
+```bash
+wheels ai skill <subcommand> [flags]
+```
+
+| Subcommand | Purpose |
+|---|---|
+| `skill list [--skills-path=<dir>] [--json]` | List discoverable skills across effective search paths. |
+| `skill path add <dir>` | Add a global skill search path. |
+| `skill path remove <dir>` | Remove a global skill search path. |
+| `skill path list [--json]` | List configured global skill search paths. |
+
+Global skill paths are stored in `~/.lucli/ai/skill-paths.json`. Pass `--skills-path` on `ai prompt` or `ai skill list` to add command-local overrides for a single invocation.
+
+### Example
+
+```bash
+# Register an OpenAI endpoint using an env-var placeholder for the key
+wheels ai config add \
+  --name=mychatgpt --type=openai --model=gpt-4o \
+  --secret-key='#env:OPENAI_API_KEY#' \
+  --test-after-save
+
+# Make it the default
+wheels ai config defaults --default-endpoint=mychatgpt --default-model=gpt-4o
+
+# Verify
+wheels ai test
+
+# One-shot prompt
+wheels ai prompt --text="Summarize this file in one line." --text=@README.md
+
+# Estimate tokens and cost without sending
+wheels ai prompt --text=@README.md --estimate \
+  --input-price-per-1m=5 --output-price-per-1m=15
+```
+
+<Aside type="note" title="Requires a running Lucee server">
+`ai prompt` and `ai test` execute against the Lucee runtime, which is why the endpoint configuration lives in `CFConfig.json` rather than a LuCLI-local file. See [Configuration](../../configuration/) for how LuCLI boots its Lucee server.
+</Aside>
+
+## `wheels completion`
+
+Generate a shell completion script for the `wheels` (LuCLI) binary. Picocli's standard bash completion generator is used — the script works in both bash and zsh (via `bashcompinit`).
+
+<Aside type="note" title="Hidden from --help">
+`completion` is marked hidden in LuCLI's top-level help, but it's a stable, publicly supported surface. Call it by name.
+</Aside>
+
+### Synopsis
+
+```bash
+wheels completion <bash|zsh|md>
+```
+
+Calling `wheels completion` without a subcommand prints the installation hints and exits zero.
+
+### Subcommands
+
+| Subcommand | Purpose |
+|---|---|
+| `bash` | Generate a bash completion script to stdout. |
+| `zsh` | Generate a zsh completion script to stdout (bash-style script + `bashcompinit` glue). |
+| `md` | Generate a markdown reference of every LuCLI command and flag. |
+
+Each subcommand writes to stdout and takes no flags. Redirect to a file.
+
+### Supported shells
+
+- **bash** — macOS and Linux.
+- **zsh** — macOS and Linux. The generated script is the bash completion script reused through `bashcompinit`, so your zsh config must load `bashcompinit` (all modern zsh distributions include it).
+- **fish** — not supported.
+- **Windows PowerShell** — not supported.
+
+### Installation
+
+**Bash:**
+
+```bash
+# System-wide (requires sudo)
+wheels completion bash | sudo tee /etc/bash_completion.d/wheels
+
+# Per-user
+wheels completion bash > ~/.wheels-completion.bash
+echo 'source ~/.wheels-completion.bash' >> ~/.bashrc
+```
+
+**Zsh:**
+
+```bash
+wheels completion zsh > ~/.zsh/wheels_completion
+echo 'source ~/.zsh/wheels_completion' >> ~/.zshrc
+```
+
+Open a new shell (or `source ~/.bashrc` / `source ~/.zshrc`) and verify:
+
+```bash
+wheels <TAB>
+```
+
+<Aside type="caution" title="Version-list autocomplete requires lucli">
+The generated script includes dynamic completion for `--version` values that invokes `lucli versions-list` under the hood. The `wheels` binary is a symlink over LuCLI, so this generally works, but if you've aliased `wheels` to a non-LuCLI binary, that portion of completion will fall back to empty.
+</Aside>
+
+### Markdown reference (`completion md`)
+
+Not a shell integration — emits a single markdown document describing every LuCLI command, option, and subcommand. Useful for generating a static reference or feeding documentation pipelines.
+
+```bash
+wheels completion md > docs/command-reference.md
+```
+
+## Common workflows
+
+```bash
+# Quick zsh completion bootstrap
+mkdir -p ~/.zsh && \
+  wheels completion zsh > ~/.zsh/wheels_completion && \
+  echo 'source ~/.zsh/wheels_completion' >> ~/.zshrc
+
+# One-off AI prompt using the default endpoint
+wheels ai prompt --text="Why is my test failing? $(wheels test 2>&1 | tail -40)"
+
+# Swap the active AI endpoint without editing files
+wheels ai config defaults --default-endpoint=claude-sonnet
+```
+
+## Skipped commands
+
+A handful of LuCLI subcommands exist but aren't part of the stable documented surface. They're either experimental or exist to support shell-completion infrastructure:
+
+- `wheels versions-list` — internal helper that feeds the dynamic version list in the generated completion script. Not intended for direct use.
+- `wheels parrot` — proof-of-concept command.
+- `wheels xml` — experimental XPath utilities.
+
+Expect these to change or disappear without notice. Don't script against them.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Installation"
+    href="../../installation/"
+    description="Install the wheels binary so completion has something to complete."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../../configuration/"
+    description="lucee.json and environment-layered config, including where Lucee reads CFConfig.json from."
+  />
+  <LinkCard
+    title="MCP Integration"
+    href="../../mcp-integration/"
+    description="The structured AI surface — exposes wheels_* tools to an AI IDE over stdio."
+  />
+  <LinkCard
+    title="System & Secrets"
+    href="../system-and-secrets/"
+    description="wheels secrets for storing AI API keys outside of shell history and source control."
+  />
+</CardGrid>

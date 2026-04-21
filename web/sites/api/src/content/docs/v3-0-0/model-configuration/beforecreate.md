@@ -21,9 +21,13 @@ Registers method(s) that should be called before a new object is created. This a
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `methods` | `string` | no | — | Method name or list of method names that should be called when this callback event occurs in an object's life cycle (can also be called with the `method` argument). |
+
+</div>
 
 ## Examples
 

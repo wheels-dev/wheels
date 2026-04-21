@@ -21,6 +21,8 @@ Changes the definition of an existing column in a database table. This function 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The Name of the table where the column is |
@@ -34,6 +36,8 @@ Changes the definition of an existing column in a database table. This function 
 | `precision` | `numeric` | no | — | (For decimal type) the maximum number of digits allow |
 | `scale` | `numeric` | no | — | (For decimal type) the number of digits to the right of the decimal point |
 | `addColumns` | `boolean` | no | `false` | if true, attempts to add columns and database will likely throw an error if column already exists |
+
+</div>
 
 ## Examples
 

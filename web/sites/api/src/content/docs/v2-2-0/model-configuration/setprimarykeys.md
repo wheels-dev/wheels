@@ -22,9 +22,13 @@ Use this for better readability when you're setting multiple properties as the p
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Property (or list of properties) to set as the primary key. |
+
+</div>
 
 ## Examples
 

@@ -21,6 +21,8 @@ Calculates the minimum value for a specified property in a model using SQL's MIN
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to get the lowest value for (must be a property of a numeric data type). |
@@ -30,6 +32,8 @@ Calculates the minimum value for a specified property in a model using SQL's MIN
 | `ifNull` | `any` | no | — | The value returned if no records are found. Common usage is to set this to `0` to make sure a numeric value is always returned instead of a blank string. |
 | `includeSoftDeletes` | `boolean` | no | `false` | Set to `true` to include soft-deleted records in the queries that this method runs. |
 | `group` | `string` | no | — | Maps to the `GROUP BY` clause of the query. You do not need to specify the table name(s); Wheels will do that for you. |
+
+</div>
 
 ## Examples
 

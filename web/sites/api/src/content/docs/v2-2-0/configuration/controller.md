@@ -21,9 +21,13 @@ Considered deprecated as this doesn't conform to RESTful routing principles; Try
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `controller` | `string` | yes | — |  |
 | `name` | `string` | no | `[runtime expression]` |  |
 | `path` | `string` | no | `[runtime expression]` |  |
+
+</div>
 

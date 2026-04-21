@@ -19,11 +19,15 @@ Pass in a date to this method, and it will return a string describing the approx
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `toTime` | `date` | yes | — | Date to compare to. |
 | `includeSeconds` | `boolean` | yes | `false` | Whether or not to include the number of seconds in the returned string. |
 | `fromTime` | `date` | yes | `[runtime expression]` | Date to compare from. |
+
+</div>
 
 ## Examples
 

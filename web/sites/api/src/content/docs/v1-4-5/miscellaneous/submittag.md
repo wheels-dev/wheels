@@ -19,6 +19,8 @@ Builds and returns a string containing a submit button form control. Note: Pass 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `value` | `string` | yes | `Save changes` | Message to display in the button form control. |
@@ -26,6 +28,8 @@ Builds and returns a string containing a submit button form control. Note: Pass 
 | `disable` | `any` | yes | — | Whether or not to disable the button upon clicking. (prevents double-clicking.) |
 | `prepend` | `string` | yes | — | See documentation for textField |
 | `append` | `string` | yes | — | See documentation for textField |
+
+</div>
 
 ## Examples
 

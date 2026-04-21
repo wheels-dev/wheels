@@ -1,0 +1,213 @@
+---
+title: Rate Limiting
+description: Throttle requests per client — three strategies, memory vs database storage, custom keying, and response headers.
+type: howto
+sidebar:
+  order: 13
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to throttle incoming requests with the built-in `wheels.middleware.RateLimiter`. You'll pick a strategy (fixed window, sliding window, or token bucket), decide between in-memory and database-backed storage, key requests by something other than client IP when needed, understand the `X-RateLimit-*` response headers the middleware writes, and scope strict limits to sensitive routes like `/login`.
+
+**You'll learn:**
+
+- The three throttling strategies and when each one fits
+- How to enable `wheels.middleware.RateLimiter` globally
+- Memory vs database storage — and why multi-node deployments need the latter
+- How to key by API token instead of client IP
+- What response headers the middleware writes (and what clients see on a 429)
+- How to apply tighter limits to individual routes
+
+<Aside type="note">
+  You should already know how middleware runs. See [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/).
+</Aside>
+
+## Three strategies
+
+The `strategy` argument picks the throttling algorithm. All three enforce a budget of `maxRequests` per `windowSeconds`, but they behave differently at boundaries and under bursts.
+
+- **Fixed window** (default, `"fixedWindow"`) — the simplest. Counts requests per discrete `windowSeconds`-long bucket and resets at every boundary. Cheap on memory and trivial to reason about, but a client can burst at the very end of one window and the very start of the next, effectively getting `2 × maxRequests` for a moment.
+- **Sliding window** (`"slidingWindow"`) — smoother. Maintains a timestamp log per client and prunes entries older than `windowSeconds`. Eliminates the boundary-burst problem at the cost of more memory per client (one timestamp per recent request).
+- **Token bucket** (`"tokenBucket"`) — burst-friendly. A bucket holds up to `maxRequests` tokens and refills at `maxRequests / windowSeconds` tokens per second. Each request costs one token. Idle clients accumulate a full bucket and can then burst; sustained high rates starve on the refill rate. Best for APIs where occasional spikes are fine but long-running high rates should throttle.
+
+## Basic config — fixed window
+
+Register the middleware globally in `config/settings.cfm`:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.RateLimiter(
+        maxRequests=60,
+        windowSeconds=60
+    )
+]);
+</cfscript>
+```
+
+With no other arguments you get: `strategy="fixedWindow"`, `storage="memory"`, and keying by client IP. Every client gets 60 requests per 60 seconds.
+
+## Sliding window
+
+Swap the strategy for smoother enforcement:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.RateLimiter(
+        maxRequests=100,
+        windowSeconds=120,
+        strategy="slidingWindow"
+    )
+]);
+</cfscript>
+```
+
+100 requests per 120-second sliding window. A client is throttled whenever 100 requests have been made in the past 120 seconds, regardless of clock boundaries.
+
+## Token bucket
+
+Token bucket allows bursts up to capacity, then throttles to the refill rate:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.RateLimiter(
+        maxRequests=50,
+        windowSeconds=60,
+        strategy="tokenBucket"
+    )
+]);
+</cfscript>
+```
+
+Bucket capacity: 50. Refill rate: `50 / 60 ≈ 0.83` tokens per second. A fresh client can burst 50 requests in a second, then must wait ~1.2 seconds per subsequent request until the bucket refills.
+
+## Storage backends
+
+`storage` defaults to `"memory"` and holds counters in a per-JVM `ConcurrentHashMap`. Fast and requires zero setup — but each Wheels node has its own counters. Behind a load balancer, a client hitting two nodes gets double the limit, because each node throttles against its own map.
+
+For multi-node deployments, use `storage="database"`:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.RateLimiter(
+        maxRequests=100,
+        windowSeconds=60,
+        storage="database"
+    )
+]);
+</cfscript>
+```
+
+The middleware auto-creates a `wheels_rate_limits` table on first use (via `CREATE TABLE IF NOT EXISTS`). All nodes read and write to the same table, so the budget is shared. Database storage is slower per request than memory — use it only when you need shared state.
+
+## Custom key function
+
+By default each client is keyed by IP address. For token-authenticated APIs you usually want to key by the API token so a client behind a shared NAT doesn't share a budget with unrelated traffic:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.RateLimiter(
+        maxRequests=1000,
+        windowSeconds=60,
+        keyFunction=function(req) {
+            return req.cgi.http_x_api_key ?: "anonymous";
+        }
+    )
+]);
+</cfscript>
+```
+
+The closure receives the request struct and returns a unique-per-client string. Fall back to a constant like `"anonymous"` so unauthenticated traffic still hits some limit — otherwise an attacker who omits the header accumulates counter entries under whatever empty-string key your code returns.
+
+<Aside type="tip">
+  Keys longer than `maxKeyLength` (default 128) are auto-replaced with a SHA-256 hash to bound memory. You don't need to truncate keys yourself.
+</Aside>
+
+## Response headers
+
+On every request (allowed or rejected), the middleware writes three headers:
+
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 42
+X-RateLimit-Reset: 1713589200
+```
+
+- `X-RateLimit-Limit` — the `maxRequests` you configured.
+- `X-RateLimit-Remaining` — how many requests this client has left in the current window.
+- `X-RateLimit-Reset` — Unix timestamp when the client's budget refreshes.
+
+The header prefix is configurable via the `headerPrefix` constructor argument (defaults to `"X-RateLimit"`).
+
+When a client exceeds the limit, the middleware returns `429 Too Many Requests` with `Retry-After` added:
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 47
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1713589247
+```
+
+`Retry-After` is the whole-second wait until the budget refreshes, per RFC 7231. Well-behaved clients honor it automatically.
+
+## Per-route rate limiting
+
+Global limits are fine for most traffic, but sensitive endpoints (login, password reset, signup) deserve much stricter budgets. Apply a second `RateLimiter` to a route scope:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .scope(
+        path="/login",
+        middleware=[
+            new wheels.middleware.RateLimiter(
+                maxRequests=5,
+                windowSeconds=60
+            )
+        ],
+        callback=function(map) {
+            map.post(name="authenticate", pattern="/", to="sessions##create");
+        }
+    )
+    .resources("users")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+Global middleware from `config/settings.cfm` still runs — it composes with the scope-level one. The pattern is: a permissive global limit (say 60/min) plus a tight limit on sensitive routes (5/min on login) so a brute-force attempt trips the narrow limit long before the broad one.
+
+## Debugging unexpected rejections
+
+If clients complain about being throttled when they shouldn't be, walk this checklist:
+
+- **Check the server-seen IP vs the real client IP.** Behind a load balancer or reverse proxy, every request looks like it came from the proxy's IP — so all traffic shares one budget. Enable `trustProxy=true` to read `X-Forwarded-For`, but only when your proxy sanitizes that header (otherwise clients can spoof it).
+- **Use a keyFunction that reads the real identity.** For APIs, key by API token. For logged-in users, key by session or user ID. IP-only keying fails badly behind NATs and shared networks.
+- **Inspect `X-RateLimit-Remaining`** in responses to see exactly where the client is in its budget. If it hits zero unexpectedly, either the client is making more requests than you thought or the key is collapsing traffic from multiple clients into one bucket.
+- **Temporarily raise the budget** for debugging: `maxRequests=10000, windowSeconds=1` effectively disables throttling while you isolate the real issue. Remember to put it back.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Middleware Pipeline"
+    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+    description="How middleware runs, composes, and scopes across routes."
+  />
+  <LinkCard
+    title="CORS"
+    href="/v4-0-0-snapshot/digging-deeper/cors/"
+    description="Cross-origin request handling — pair with rate limiting on public APIs."
+  />
+  <LinkCard
+    title="Authentication Patterns"
+    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    description="Rate-limit auth endpoints aggressively to slow brute-force attacks."
+  />
+</CardGrid>

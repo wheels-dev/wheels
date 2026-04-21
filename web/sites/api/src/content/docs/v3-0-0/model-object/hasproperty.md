@@ -21,9 +21,13 @@ Checks if a given property exists on a model object. It’s useful for safely va
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to inspect. |
+
+</div>
 
 ## Examples
 

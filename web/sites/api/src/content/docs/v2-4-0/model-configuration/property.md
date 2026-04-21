@@ -22,6 +22,8 @@ You only need to use this method when you want to override the default object re
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | The name that you want to use for the column or SQL function result in the CFML code. |
@@ -32,6 +34,8 @@ You only need to use this method when you want to override the default object re
 | `select` | `boolean` | no | `true` | Whether to include this property by default in SELECT statements |
 | `dataType` | `string` | no | `char` | Specify the column dataType for this property |
 | `automaticValidations` | `boolean` | no | — | Enable / disable automatic validations for this property. |
+
+</div>
 
 ## Examples
 

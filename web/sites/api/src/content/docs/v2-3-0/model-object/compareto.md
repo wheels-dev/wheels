@@ -21,7 +21,11 @@ Pass in another model object to see if the two objects are the same.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `object` | `component` | yes | — |  |
+
+</div>
 

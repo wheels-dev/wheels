@@ -21,9 +21,13 @@ Inserts a new record into a table. This function is only available inside a migr
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to add the record to |
+
+</div>
 
 ## Examples
 

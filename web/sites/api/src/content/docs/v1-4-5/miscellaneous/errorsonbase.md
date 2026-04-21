@@ -19,9 +19,13 @@ Returns an array of all errors associated with the object as a whole (not relate
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Specify an error name here to only return errors for that error name. |
+
+</div>
 
 ## Examples
 

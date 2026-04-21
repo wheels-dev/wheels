@@ -21,6 +21,8 @@ Lets you customize how model properties map to database columns or SQL expressio
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | The name that you want to use for the column or SQL function result in the CFML code. |
@@ -31,6 +33,8 @@ Lets you customize how model properties map to database columns or SQL expressio
 | `select` | `boolean` | no | `true` | Whether to include this property by default in SELECT statements |
 | `dataType` | `string` | no | `char` | Specify the column dataType for this property |
 | `automaticValidations` | `boolean` | no | — | Enable / disable automatic validations for this property. |
+
+</div>
 
 ## Examples
 

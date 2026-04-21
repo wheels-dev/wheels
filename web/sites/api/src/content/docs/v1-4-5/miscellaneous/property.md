@@ -19,6 +19,8 @@ Use this method to map an object property to either a table column with a differ
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | The name that you want to use for the column or SQL function result in the CFML code. |
@@ -26,6 +28,8 @@ Use this method to map an object property to either a table column with a differ
 | `sql` | `string` | yes | — | A SQL expression to use to calculate the property value. |
 | `label` | `string` | yes | — | A custom label for this property to be referenced in the interface and error messages. |
 | `defaultValue` | `string` | yes | — | A default value for this property. |
+
+</div>
 
 ## Examples
 

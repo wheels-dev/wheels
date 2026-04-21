@@ -1,0 +1,353 @@
+---
+title: Browser Tests
+description: Playwright-driven UI tests — installation, the fluent DSL, fixture helpers, cross-engine caveats.
+type: howto
+sidebar:
+  order: 7
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Browser tests drive a real Chromium through Playwright. They click buttons, type into fields, wait for JavaScript to settle, and assert on the page a user would actually see. The base class `wheels.wheelstest.BrowserTest` wires Playwright's lifecycle into the standard BDD runner, so specs stay short — a few lines of setup, then the fluent DSL takes over.
+
+**You'll learn:**
+
+- How to install Playwright and run your first browser spec
+- The `BrowserTest` base class and the `browserDescribe` wrapper
+- The full `BrowserClient` DSL — navigation, interaction, assertions, terminals
+- How to bypass the login form with the `loginAs` fixture
+- Cross-engine caveats (dialogs are Lucee-only)
+
+<Aside type="note">
+  You should already know BDD basics. See [Model Tests](/v4-0-0-snapshot/testing/model-tests/). For non-browser HTTP tests that don't need JavaScript or Turbo, prefer [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/), [Functional Tests](/v4-0-0-snapshot/testing/functional-tests/), or [View & Form Tests](/v4-0-0-snapshot/testing/view-and-form-tests/).
+</Aside>
+
+## Install Playwright
+
+Browser tests require Playwright's Java client plus Chromium. The `wheels browser install` command downloads both (~370MB one-time) and verifies SHA-256 hashes.
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+Then, inside your project:
+
+```bash title="shell"
+wheels browser install
+```
+
+The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download, or `--browser=firefox|webkit` to install a different engine (Chromium is the default).
+
+If Playwright isn't installed when a spec runs, `BrowserTest.beforeAll` catches the missing-JAR error, sets `this.browserTestSkipped = true`, and the suite stays green. That's the safety net for CI cold starts and fresh dev machines — but every `it` in a browser spec still needs to check the flag.
+
+## A minimal browser spec
+
+```cfm {test:compile} title="tests/specs/browser/HomeBrowserSpec.cfc"
+component extends="wheels.wheelstest.BrowserTest" {
+
+    this.browserEngine = "chromium";
+
+    function run() {
+        browserDescribe("Home page", () => {
+            it("loads the home page", () => {
+                if (this.browserTestSkipped) return;
+                this.browser
+                    .visitUrl("http://localhost:8080/")
+                    .assertTitleContains("My App");
+            });
+        });
+    }
+}
+```
+
+Two things to note in every browser spec:
+
+1. **`extends="wheels.wheelstest.BrowserTest"`** — not `wheels.WheelsTest`. The browser base class adds the Playwright lifecycle hooks on top of BDD.
+2. **`if (this.browserTestSkipped) return;`** — the first line of every `it`. When Playwright JARs aren't installed, or when the CI gate (`WHEELS_CI=true` without `WHEELS_BROWSER_CI_ENABLE=true`) is active, `beforeAll` sets the flag. Without the guard, the spec would crash on the first `this.browser` call instead of staying green.
+
+## `browserDescribe` vs `describe`
+
+Regular `describe()` works inside a `BrowserTest` subclass — but every `it` inside it would share the same browser state, because `beforeEach`/`afterEach` aren't automatically wired. `browserDescribe()` wraps `describe()` with hooks that create a fresh Playwright `BrowserContext` and `Page` per `it`, then tear them down afterwards. Each test gets its own cookies, localStorage, and navigation history.
+
+```cfm {test:compile} title="tests/specs/browser/IsolationSpec.cfc"
+component extends="wheels.wheelstest.BrowserTest" {
+    function run() {
+        browserDescribe("Isolated per-it state", () => {
+            it("starts with no cookies", () => {
+                if (this.browserTestSkipped) return;
+                this.browser.visitUrl("http://localhost:8080/")
+                    .clearCookies()
+                    .assertSee("Sign in");
+            });
+            it("also starts with no cookies", () => {
+                if (this.browserTestSkipped) return;
+                // Fresh context; the previous test's state is gone.
+                this.browser.visitUrl("http://localhost:8080/")
+                    .assertSee("Sign in");
+            });
+        });
+    }
+}
+```
+
+`browserDescribe` also registers an `aroundEach` that captures a screenshot and HTML dump to `tests/_output/browser/` when a spec throws. Override `this.browserArtifactPath` to change the directory, or set `this.browserScreenshotOnFailure = false` to disable capture.
+
+## The DSL — navigation
+
+`this.browser` is a `BrowserClient`. Every method that mutates state returns `this`, so calls chain fluently until you hit a terminal (a method that returns a value — `currentUrl()`, `text()`, etc.).
+
+- `visit(path)` — navigate to a path joined to the base URL (`http://localhost:8080` by default, or `WHEELS_BROWSER_TEST_BASE_URL`). Path must start with `/`.
+- `visitUrl(url)` — navigate to an absolute URL. Use for `data:`, `file:`, or cross-origin tests.
+- `visitRoute(route, key, params)` — resolve a named route via `URLFor()` and navigate there. Requires the Wheels app to be booted.
+- `back()` / `forward()` / `refresh()` — drive the browser history.
+
+```cfm {test:compile} title="tests/specs/browser/NavigationSpec.cfc"
+component extends="wheels.wheelstest.BrowserTest" {
+    function run() {
+        browserDescribe("Navigation", () => {
+            it("follows a route and comes back", () => {
+                if (this.browserTestSkipped) return;
+                this.browser
+                    .visitRoute(route="posts")
+                    .click("a.post-link")
+                    .back()
+                    .assertUrlContains("/posts");
+            });
+        });
+    }
+}
+```
+
+## The DSL — interaction
+
+- `click(selector)` — click the first matching element.
+- `press(buttonText)` — click the first element containing that visible text. Shorthand for buttons and links by label.
+- `fill(selector, value)` — set an input's value in one shot (fires `change` at the end).
+- `type(selector, value)` — type character-by-character. Use when per-keystroke handlers matter (autosuggest, live validation).
+- `clear(selector)` — empty a field.
+- `select(selector, value)` — select an option by value.
+- `check(selector)` / `uncheck(selector)` — checkboxes and radios.
+- `attach(selector, filePath)` — attach a file to a `<input type="file">`.
+- `dragAndDrop(fromSelector, toSelector)` — drag one element onto another.
+
+## The DSL — keyboard
+
+- `keys(selector, key)` — press a keyboard key against the matched element. Key syntax follows Playwright: `"Enter"`, `"Control+A"`, `"Shift+Home"`.
+- `pressEnter(selector?)` / `pressTab(selector?)` / `pressEscape(selector?)` — shortcuts. Omit the selector to send to the currently focused element.
+
+## The DSL — waiting
+
+Explicit waits beat sleeps. All waits default to 30-second timeouts and accept a custom `seconds` override.
+
+- `waitFor(selector, seconds?)` — wait for an element to become visible.
+- `waitForText(text, seconds?)` — wait for visible text to appear anywhere on the page.
+- `waitForUrl(url, seconds?)` — wait for the page URL to match. Supports Playwright's glob patterns.
+
+## The DSL — scoping
+
+`within(selector, callback)` restricts the selectors inside the callback to descendants of the first element matching `selector`. Useful when the same field selector exists in two places (main form and modal, for example).
+
+```cfm {test:compile} title="tests/specs/browser/ScopedSpec.cfc"
+component extends="wheels.wheelstest.BrowserTest" {
+    function run() {
+        browserDescribe("Scoped form", () => {
+            it("fills the signin form, not the signup form", () => {
+                if (this.browserTestSkipped) return;
+                this.browser
+                    .visitUrl("http://localhost:8080/sign-in")
+                    .within("form##signin", (scoped) => {
+                        scoped.fill("##email", "alice@example.com")
+                              .fill("##password", "correct-horse-battery-staple")
+                              .click("button[type=submit]");
+                    })
+                    .assertUrlContains("/dashboard");
+            });
+        });
+    }
+}
+```
+
+## The DSL — cookies and state
+
+- `setCookie(name, value, url)` — add a cookie to the context. Requires the page to have been navigated to a real HTTP origin (`data:` URLs don't take cookies).
+- `deleteCookie(name)` — remove one cookie.
+- `cookie(name)` — read a cookie; returns a struct with `name`, `value`, `domain`, `path`, `expires`, `httpOnly`, `secure`. Throws `BrowserAssertionFailed` if the cookie doesn't exist.
+- `clearCookies()` — wipe all cookies.
+
+## The DSL — auth fixtures
+
+`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode and sets `session.userId` and `session.userEmail` server-side — no real login form, no password hashing, no redirect handshake. Use it when the spec's intent is "what does an authenticated user see", not "what does the login form do".
+
+```cfm {test:compile} title="tests/specs/browser/AuthenticatedSpec.cfc"
+component extends="wheels.wheelstest.BrowserTest" {
+    function run() {
+        browserDescribe("Authenticated dashboard", () => {
+            it("shows the user's posts", () => {
+                if (this.browserTestSkipped) return;
+                this.browser
+                    .loginAs("alice@example.com")
+                    .visitRoute(route="posts")
+                    .assertUrlContains("/posts")
+                    .assertSee("alice@example.com");
+            });
+        });
+    }
+}
+```
+
+`logout()` clears cookies and navigates to the fixture home page. For testing the real logout UI (click button, see redirect), use `click()` or `press()` against the live markup instead.
+
+## The DSL — dialogs (Lucee-only)
+
+`acceptDialog`, `dismissDialog`, and `dialogMessage` handle native JavaScript dialogs (`alert`, `confirm`, `prompt`). They use `createDynamicProxy`, which is Lucee-specific — on Adobe CF and BoxLang the methods throw a clear error. Register intent *before* the interaction that triggers the dialog.
+
+```cfm {test:compile} title="tests/specs/browser/DialogSpec.cfc"
+component extends="wheels.wheelstest.BrowserTest" {
+    function run() {
+        browserDescribe("Delete confirmation", () => {
+            it("accepts the native confirm dialog", () => {
+                if (this.browserTestSkipped) return;
+                this.browser
+                    .visitRoute(route="post", key=42)
+                    .acceptDialog()
+                    .click("button.delete")
+                    .assertUrlContains("/posts");
+            });
+        });
+    }
+}
+```
+
+`dialogMessage()` is a terminal — it returns the text from the last handled dialog, useful for asserting on `confirm("Really delete?")` copy.
+
+## The DSL — viewport
+
+- `resize(width, height)` — set exact viewport dimensions.
+- `resizeToMobile()` — 375 × 667 (iPhone SE).
+- `resizeToTablet()` — 768 × 1024 (iPad portrait).
+- `resizeToDesktop()` — 1440 × 900.
+
+You can also set `this.browserViewport = "mobile"` on the spec class to start every `it` at mobile size.
+
+## The DSL — script and pause
+
+- `script(js)` — evaluate a JavaScript expression in the page context and return the result. Arrow-function syntax required: `script("() => document.title")`.
+- `pause(milliseconds)` — sleep. Prints a warning to `System.err` so stray pauses don't sneak past review. Set `BROWSER_TEST_PAUSE_WARNING=off` to silence. Use for hand-inspecting state during development, never for synchronizing with the page — use `waitFor`/`waitForText`/`waitForUrl` instead.
+
+## Assertions — text, visibility, presence
+
+- `assertSee(text)` / `assertDontSee(text)` — substring match on the full page HTML.
+- `assertSeeIn(selector, text)` — substring match scoped to one element.
+- `assertVisible(selector)` / `assertMissing(selector)` — visibility check (element exists and is rendered vs. does not exist or is hidden).
+- `assertPresent(selector)` / `assertNotPresent(selector)` — DOM presence check (element exists in DOM regardless of visibility).
+
+## Assertions — URL, title, query
+
+- `assertUrlIs(expected)` — exact match. If `expected` starts with `/`, compares path only (strips protocol + host). Otherwise full URL.
+- `assertUrlContains(substring)` — forgiving substring match.
+- `assertTitleContains(text)` — substring match on `<title>`.
+- `assertQueryStringHas(key, value?)` — key must exist; value is optional.
+- `assertQueryStringMissing(key)` — key must not exist.
+- `assertRouteIs(route, key?, params?)` — compare current path against a named route.
+
+## Assertions — form state
+
+- `assertInputValue(selector, value)` — input's current value.
+- `assertChecked(selector)` — checkbox or radio is checked.
+- `assertHasClass(selector, class)` — element has the given class (case-insensitive list match).
+
+## Terminals
+
+These return a value instead of `this`, so they end the chain.
+
+- `currentUrl()` — full URL of the current page.
+- `title()` — `<title>` contents.
+- `pageSource()` — full HTML of the rendered page.
+- `text(selector)` — `textContent` of the first matching element.
+- `value(selector)` — `inputValue` of an input/textarea/select.
+- `screenshot(path, fullPage?, quality?)` — write a PNG to `path`. Returns `this`, so it also chains — treat it as a side effect.
+- `cookie(name)` — struct form described under "cookies and state".
+
+## Targeting form fields with `data-auto-id`
+
+Wheels form helpers emit two selector hooks on every field — a camelCase `id="postTitle"` for browser URL hashes, and an underscored `data-auto-id="post_title"` for test selectors. The underscored form is stable against rename refactors; use it in browser specs.
+
+```cfm {test:compile} title="tests/specs/browser/NewPostSpec.cfc"
+component extends="wheels.wheelstest.BrowserTest" {
+    function run() {
+        browserDescribe("Create a post", () => {
+            it("submits the new-post form", () => {
+                if (this.browserTestSkipped) return;
+                this.browser
+                    .loginAs("alice@example.com")
+                    .visitRoute(route="newPost")
+                    .fill("[data-auto-id=""post_title""]", "My Title")
+                    .fill("[data-auto-id=""post_body""]", "Some body text")
+                    .click("button[type=submit]")
+                    .assertUrlContains("/posts/")
+                    .assertSee("My Title");
+            });
+        });
+    }
+}
+```
+
+See [View & Form Tests](/v4-0-0-snapshot/testing/view-and-form-tests/) for the same `data-auto-id` pattern applied to non-browser tests, and [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/) for how the attribute is generated.
+
+## Cross-engine caveats
+
+Most of the DSL is engine-agnostic — Playwright drives a real Chromium regardless of which CFML engine is running your app. The exceptions:
+
+- **Dialogs** — `acceptDialog`, `dismissDialog`, `dialogMessage` use `createDynamicProxy` to register a listener on Playwright's Java-side `Dialog` interface. That API is Lucee-only. On Adobe CF and BoxLang, calls throw `Wheels.DialogSupportMissing`. Wrap dialog-driven specs in an engine check (`if (server.coldfusion.productname != "Lucee") return;`) if you run the suite across engines.
+- **`loginAs`** — relies on the `/_browser/login-as` fixture route, which is mounted automatically in test mode from `vendor/wheels/tests/routes.cfm`. If your app clears or replaces the route table in another spec, `BrowserTest.beforeAll` re-includes the fixture routes so browser specs stay self-contained.
+
+See the cross-engine notes in [`CLAUDE.md`](https://github.com/cfwheels/cfwheels/blob/develop/CLAUDE.md) for the full list of Lucee/Adobe/BoxLang divergences.
+
+## Debugging failing specs
+
+When a spec fails, the `aroundEach` hook captures a screenshot and HTML dump to `tests/_output/browser/<specName>-<timestamp>.{png,html}`. Open the PNG to see the rendered state at the moment of failure. Beyond that:
+
+- `this.browser.pause(5000)` sleeps for five seconds so you can inspect the browser manually — only useful when Playwright launches in headed mode.
+- `this.browser.screenshot("/tmp/midway.png")` captures a snapshot at any point in the chain.
+- `pageSource()`, `text(selector)`, and `currentUrl()` return inspectable strings — dump them to the test output to see what the page looked like.
+- `getPage()`, `getContext()`, and `getLauncher()` drop you down to the raw Playwright objects for anything the DSL doesn't cover.
+
+## CI integration
+
+The CI workflow sets `WHEELS_CI=true`, which `BrowserTest.beforeAll` interprets as an opt-out from running browser specs (they're skipped via `this.browserTestSkipped = true`). To run browser specs in CI, also set `WHEELS_BROWSER_CI_ENABLE=true` and ensure Playwright is installed on the runner. CI caches the Playwright JARs and Chromium via the `browser-manifest.json` hash; first runs pay the download cost once.
+
+Set `WHEELS_BROWSER_TEST_BASE_URL` so `visit("/path")` resolves to the right origin on the CI runner. For local work, the default `http://localhost:8080` matches `lucli server run --port=8080`. See [CI Integration](/v4-0-0-snapshot/testing/ci-integration/) for the full workflow.
+
+## When to skip browser tests
+
+Browser tests are the slowest layer of the pyramid — every spec boots Chromium, loads the page, and drives real user interactions. Reach for them when the behavior requires JavaScript, Turbo, or real-browser event ordering. For everything else, prefer a faster layer:
+
+- Server-rendered HTML, redirects, status codes → [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/)
+- Rendered markup without JS → [View & Form Tests](/v4-0-0-snapshot/testing/view-and-form-tests/)
+- Multi-controller flows without UI assertions → [Functional Tests](/v4-0-0-snapshot/testing/functional-tests/)
+- Model behavior → [Model Tests](/v4-0-0-snapshot/testing/model-tests/)
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="View & Form Tests"
+    href="/v4-0-0-snapshot/testing/view-and-form-tests/"
+    description="Test rendered HTML without launching a browser — data-auto-id and body assertions."
+  />
+  <LinkCard
+    title="Forms and Form Helpers"
+    href="/v4-0-0-snapshot/basics/forms-and-form-helpers/"
+    description="How Wheels form helpers emit id and data-auto-id attributes."
+  />
+  <LinkCard
+    title="Controller Tests"
+    href="/v4-0-0-snapshot/testing/controller-tests/"
+    description="TestClient-driven request specs — faster than browser for non-JS flows."
+  />
+  <LinkCard
+    title="Model Tests"
+    href="/v4-0-0-snapshot/testing/model-tests/"
+    description="BDD primer — describe, it, matchers, lifecycle hooks."
+  />
+</CardGrid>
