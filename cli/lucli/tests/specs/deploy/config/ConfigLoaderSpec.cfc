@@ -37,6 +37,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(isObject(cfg)).toBeTrue();
 			});
 
+			it("rejects missing required 'service' key", () => {
+				expect(() => new cli.lucli.services.deploy.config.ConfigLoader()
+					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/invalid/missing-service.yml")))
+					.toThrow("DeployConfigError");
+			});
+
+			it("rejects invalid host", () => {
+				expect(() => new cli.lucli.services.deploy.config.ConfigLoader()
+					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/invalid/invalid-host.yml")))
+					.toThrow("DeployConfigError");
+			});
+
+			it("rejects unknown top-level key", () => {
+				expect(() => new cli.lucli.services.deploy.config.ConfigLoader()
+					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/invalid/unknown-key.yml")))
+					.toThrow("DeployConfigError");
+			});
+
 		});
 
 	}
