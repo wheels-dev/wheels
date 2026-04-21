@@ -50,7 +50,7 @@
 | 20 | `687eb5538` | 20 | `cli/core/modules-and-deps` — modules + project deps |
 | 21 | `7f29a0871` | 21 | `cli/core/ai-and-completion` — ai + shell completion |
 | 22 | `ca7036af3` | 22 | cli — sidebar integration (5 top + 10 wheels + 5 core) |
-| 23 | tbd | 23 | cli/.ai — drop cli/ and mcp/ superseded |
+| 23 | `8a958bf0e` | 23 | cli/.ai — drop cli/ and mcp/ superseded |
 
 ---
 
