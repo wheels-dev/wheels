@@ -1,5 +1,7 @@
 {
   "version": 1,
-  "generated": "",
-  "jars": []
+  "generated": "2026-04-21",
+  "jars": [
+    {"name": "jmustache-1.16.jar", "sha256": "3d4b984abd66908f05b38c9c892325cd4785d01ff33922569ff9b90c9ebfc475"}
+  ]
 }
