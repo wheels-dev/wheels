@@ -19,6 +19,8 @@ Fetches the requested record by primary key and returns it as an object. Returns
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `any` | yes | — | Primary key value(s) of the record. Separate with comma if passing in multiple primary key values. Accepts a string, list, or a numeric value. |
@@ -30,6 +32,8 @@ Fetches the requested record by primary key and returns it as an object. Returns
 | `returnAs` | `string` | yes | `objects` | Set this to objects to return an array of objects. Set this to query to return a query result set. |
 | `callbacks` | `boolean` | yes | `true` | You can set this argument to false to prevent running the execution of callbacks for a method call. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
+
+</div>
 
 ## Examples
 

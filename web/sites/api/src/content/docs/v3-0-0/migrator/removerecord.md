@@ -21,10 +21,14 @@ Used to delete specific records from a database table within a migration CFC. Th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to remove the record from |
 | `where` | `string` | no | — | The where clause, i.e id = 123 |
+
+</div>
 
 ## Examples
 

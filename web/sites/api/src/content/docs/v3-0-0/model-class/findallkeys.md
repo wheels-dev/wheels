@@ -21,10 +21,14 @@ The findAllKeys() function retrieves all primary key values for a model’s reco
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `quoted` | `boolean` | no | `false` | Set to `true` to enclose each value in single-quotation marks. |
 | `delimiter` | `string` | no | `,` | The delimiter character to separate the list items with. |
+
+</div>
 
 ## Examples
 

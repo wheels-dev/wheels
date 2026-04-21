@@ -21,9 +21,13 @@ The filterChain() function returns an array of all filters that are set on the c
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `type` | `string` | no | `all` | Use this argument to return only before or after filters. |
+
+</div>
 
 ## Examples
 

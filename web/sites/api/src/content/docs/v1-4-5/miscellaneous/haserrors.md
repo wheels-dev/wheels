@@ -19,10 +19,14 @@ Returns true if the object has any errors. You can also limit to only check a sp
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to check if there are any errors set on. |
 | `name` | `string` | yes | — | Error name to check if there are any errors set with. |
+
+</div>
 
 ## Examples
 

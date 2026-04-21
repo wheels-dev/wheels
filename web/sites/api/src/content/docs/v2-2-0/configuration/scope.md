@@ -21,6 +21,8 @@ Set any number of parameters to be inherited by mappers called within this match
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | — | Name to prepend to child route names for use when building links, forms, and other URLs. |
@@ -32,6 +34,8 @@ Set any number of parameters to be inherited by mappers called within this match
 | `shallowName` | `string` | no | — | Shallow name prefix. |
 | `constraints` | `struct` | no | — | Variable patterns to use for matching. |
 | `$call` | `string` | no | `scope` |  |
+
+</div>
 
 ## Examples
 

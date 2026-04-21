@@ -21,6 +21,8 @@ Builds and returns a string containing three <code>select</code> form controls f
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | no | — | The variable name of the object to build the form control for. |
@@ -43,6 +45,8 @@ Builds and returns a string containing three <code>select</code> form controls f
 | `combine` | `boolean` | no | — | Set to false to not combine the select parts into a single DateTime object. |
 | `twelveHour` | `boolean` | no | `false` | whether to display the hours in 24 or 12 hour format. 12 hour format has AM/PM drop downs |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

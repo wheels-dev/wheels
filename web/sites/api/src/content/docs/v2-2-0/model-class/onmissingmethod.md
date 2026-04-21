@@ -21,8 +21,12 @@ This method is not designed to be called directly from your code, but provides f
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `missingMethodName` | `string` | yes | — |  |
 | `missingMethodArguments` | `struct` | yes | — |  |
+
+</div>
 

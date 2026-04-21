@@ -19,7 +19,11 @@ _(no description)_
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `expression` | `string` | yes | — |  |
+
+</div>
 

@@ -19,10 +19,14 @@ Adds a new MIME format to your Wheels application for use with responding to mul
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `extension` | `string` | yes | — | File extension to add. |
 | `mimeType` | `string` | yes | — | Matching MIME type to associate with the file extension. |
+
+</div>
 
 ## Examples
 

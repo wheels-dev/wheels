@@ -21,10 +21,14 @@ dropReference() is used to remove a foreign key constraint from a table in the d
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to perform the operation on |
 | `referenceName` | `string` | yes | — | the name of the reference to drop |
+
+</div>
 
 ## Examples
 

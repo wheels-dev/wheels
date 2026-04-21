@@ -19,6 +19,8 @@ Builds and returns a string containing a button form control.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `content` | `string` | yes | `Save changes` | Content to display inside the button. |
@@ -28,6 +30,8 @@ Builds and returns a string containing a button form control.
 | `disable` | `any` | yes | — | Whether or not to disable the button upon clicking (prevents double-clicking). |
 | `prepend` | `string` | yes | — | See documentation for textField |
 | `append` | `string` | yes | — | See documentation for textField |
+
+</div>
 
 ## Examples
 

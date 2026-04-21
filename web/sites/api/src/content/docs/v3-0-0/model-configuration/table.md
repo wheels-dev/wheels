@@ -21,9 +21,13 @@ Used to tell Wheels which database table a model should connect to. Normally, Wh
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `any` | yes | — | Name of the table to map this model to. |
+
+</div>
 
 ## Examples
 

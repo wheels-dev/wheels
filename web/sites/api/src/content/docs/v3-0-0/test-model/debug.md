@@ -21,10 +21,14 @@ Used in tests to inspect any expression. It behaves like a cfdump but is tailore
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `expression` | `string` | yes | — | The expression to examine |
 | `display` | `boolean` | no | `true` | Whether to display the debug call. False returns without outputting anything into the buffer. Good when you want to leave the debug command in the test for later purposes, but don't want it to display |
+
+</div>
 
 ## Examples
 

@@ -68,12 +68,20 @@ function renderParameters(params) {
       return `| \`${name}\` | \`${type}\` | ${req} | ${def} | ${hint} |`;
     })
     .join('\n');
+  // Wrap in a scoped div so starlight-theme.css can nowrap the
+  // structural columns (Name, Type, Required, Default) without
+  // affecting prose tables elsewhere. Blank lines around the inner
+  // markdown table are required for CommonMark to parse it.
   return [
     '## Parameters',
+    '',
+    '<div class="wd-params-table">',
     '',
     '| Name | Type | Required | Default | Description |',
     '| ---- | ---- | -------- | ------- | ----------- |',
     rows,
+    '',
+    '</div>',
     '',
   ].join('\n');
 }

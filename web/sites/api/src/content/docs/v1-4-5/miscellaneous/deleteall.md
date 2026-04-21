@@ -19,6 +19,8 @@ Deletes all records that match the where argument. By default, objects will not 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `where` | `string` | yes | — | This argument maps to the WHERE clause of the query. The following operators are supported: =, !=, <>, <, <=, >, >=, LIKE, NOT LIKE, IN, NOT IN, IS NULL, IS NOT NULL, AND, and OR. (Note that the key words need to be written in upper case.) You can also use parentheses to group statements. You do not need to specify the table name(s); Wheels will do that for you. |
@@ -30,6 +32,8 @@ Deletes all records that match the where argument. By default, objects will not 
 | `callbacks` | `boolean` | yes | `true` | Set to false to disable callbacks for this operation. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
 | `softDelete` | `boolean` | yes | `true` | Set to false to permanently delete a record, even if it has a soft delete column. |
+
+</div>
 
 ## Examples
 

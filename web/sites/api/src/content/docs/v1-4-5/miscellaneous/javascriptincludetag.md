@@ -19,12 +19,16 @@ Returns a script tag for a JavaScript file (or several) based on the supplied ar
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `sources` | `string` | yes | — | The name of one or many JavaScript files in the javascripts folder, minus the .js extension. (Can also be called with the source argument.) Pass a full URL to access an external JavaScript file. |
 | `type` | `string` | yes | — | The type attribute for the script tag. |
 | `head` | `string` | yes | — | Set to true to place the output in the head area of the HTML page instead of the default behavior, which is to place the output where the function is called from. |
 | `delim` | `string` | yes | `","` | the delimiter to use for the list of javascripts |
+
+</div>
 
 ## Examples
 

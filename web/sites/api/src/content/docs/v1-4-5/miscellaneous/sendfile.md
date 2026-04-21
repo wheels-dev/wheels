@@ -19,6 +19,8 @@ Sends a file to the user (from the files folder or a path relative to it by defa
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `file` | `string` | yes | — | The file to send to the user. |
@@ -27,6 +29,8 @@ Sends a file to the user (from the files folder or a path relative to it by defa
 | `disposition` | `string` | yes | `attachment` | Set to inline to have the browser handle the opening of the file (possibly inline in the browser) or set to attachment to force a download dialog box. |
 | `directory` | `string` | yes | — | Directory outside of the webroot where the file exists. Must be a full path. |
 | `deleteFile` | `boolean` | yes | `false` | Pass in true to delete the file on the server after sending it. |
+
+</div>
 
 ## Examples
 

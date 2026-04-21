@@ -23,6 +23,8 @@ You can override this behavior to return a <code>cfquery</code> result set inste
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `any` | yes | — | Primary key value(s) of the record. Separate with comma if passing in multiple primary key values. Accepts a string, list, or a numeric value. |
@@ -35,6 +37,8 @@ You can override this behavior to return a <code>cfquery</code> result set inste
 | `returnAs` | `string` | no | `object` | Set to `objects` to return an array of objects, set to `structs` to return an array of structs, or set to `query` to return a query result set. |
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
 | `includeSoftDeletes` | `boolean` | no | `false` | Set to `true` to include soft-deleted records in the queries that this method runs. |
+
+</div>
 
 ## Examples
 

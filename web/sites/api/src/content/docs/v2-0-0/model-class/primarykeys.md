@@ -22,9 +22,13 @@ Use this for better readability when you're accessing multiple primary keys.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `position` | `numeric` | no | `0` | If you are accessing a composite primary key, pass the position of a single key to fetch. |
+
+</div>
 
 ## Examples
 

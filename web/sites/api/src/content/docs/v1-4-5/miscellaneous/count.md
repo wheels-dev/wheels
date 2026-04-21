@@ -19,6 +19,8 @@ Returns the number of rows that match the arguments (or all rows if no arguments
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `where` | `string` | yes | — | This argument maps to the WHERE clause of the query. The following operators are supported: =, !=, <>, <, <=, >, >=, LIKE, NOT LIKE, IN, NOT IN, IS NULL, IS NOT NULL, AND, and OR (note that the key words need to be written in upper case). You can also use parentheses to group statements. You do not need to specify the table name(s); CFWheels will do that for you. Instead of using the where argument, you can create cleaner code by making use of a concept called Dynamic Finders. |
@@ -27,6 +29,8 @@ Returns the number of rows that match the arguments (or all rows if no arguments
 | `parameterize` | `any` | yes | `true` | Set to true to use cfqueryparam on all columns, or pass in a list of property names to use cfqueryparam on those only. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
 | `group` | `string` | yes | — | Maps to the GROUP BY clause of the query. You do not need to specify the table name(s); CFWheels will do that for you. |
+
+</div>
 
 ## Examples
 

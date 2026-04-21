@@ -21,9 +21,13 @@ The setPrimaryKey() function allows you to define which property (or properties)
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Property (or list of properties) to set as the primary key. |
+
+</div>
 
 ## Examples
 

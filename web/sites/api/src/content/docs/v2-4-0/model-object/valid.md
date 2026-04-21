@@ -22,10 +22,14 @@ CFWheels will run the validation process automatically whenever an object is sav
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
 | `validateAssociations` | `boolean` | no | `false` |  |
+
+</div>
 
 ## Examples
 

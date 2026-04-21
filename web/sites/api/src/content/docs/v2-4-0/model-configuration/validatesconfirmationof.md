@@ -25,6 +25,8 @@ Using the password example, to confirm our password property, we would create a 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | no | — | Name of property or list of property names to validate against (can also be called with the `property` argument). |
@@ -33,6 +35,8 @@ Using the password example, to confirm our password property, we would create a 
 | `condition` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `true` validation will run). |
 | `unless` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `false` validation will run). |
 | `caseSensitive` | `boolean` | no | `false` | Ensure the confirmed property comparison is case sensitive |
+
+</div>
 
 ## Examples
 

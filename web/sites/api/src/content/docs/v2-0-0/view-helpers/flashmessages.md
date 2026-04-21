@@ -21,12 +21,16 @@ Displays a marked-up listing of messages that exist in the Flash.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `keys` | `string` | no | — | The key (or list of keys) to show the value for. You can also use the `key` argument instead for better readability when accessing a single key. |
 | `class` | `string` | no | `flash-messages` | HTML `class` to set on the `div` element that contains the messages. |
 | `includeEmptyContainer` | `boolean` | no | `false` | Includes the `div` container even if the Flash is empty. |
 | `encode` | `boolean` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

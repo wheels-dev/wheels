@@ -19,6 +19,8 @@ Validates that the value of the specified property also has an identical confirm
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | Name of property or list of property names to validate against (can also be called with the property argument). |
@@ -26,6 +28,8 @@ Validates that the value of the specified property also has an identical confirm
 | `when` | `string` | yes | `onSave` | Pass in onCreate or onUpdate to limit when this validation occurs (by default validation will occur on both create and update, i.e. onSave). |
 | `condition` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns true validation will run). |
 | `unless` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns false validation will run). |
+
+</div>
 
 ## Examples
 

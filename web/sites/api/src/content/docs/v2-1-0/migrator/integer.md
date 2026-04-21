@@ -21,10 +21,14 @@ adds integer columns to table definition
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `limit` | `numeric` | no | — |  |
 | `default` | `string` | no | — |  |
 | `null` | `boolean` | no | — |  |
+
+</div>
 

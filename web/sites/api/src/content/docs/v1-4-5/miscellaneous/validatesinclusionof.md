@@ -19,6 +19,8 @@ Validates that the value of the specified property exists in the supplied list.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | Name of property or list of property names to validate against (can also be called with the property argument). |
@@ -28,6 +30,8 @@ Validates that the value of the specified property exists in the supplied list.
 | `allowBlank` | `boolean` | yes | `false` | If set to true, validation will be skipped if the property value is an empty string or doesn't exist at all. This is useful if you only want to run this validation after it passes the validatesPresenceOf test, thus avoiding duplicate error messages if it doesn't. |
 | `condition` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns true validation will run). |
 | `unless` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns false validation will run). |
+
+</div>
 
 ## Examples
 

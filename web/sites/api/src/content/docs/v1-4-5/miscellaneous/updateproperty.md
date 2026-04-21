@@ -19,6 +19,8 @@ Updates a single property and saves the record without going through the normal 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to update the value for globally. |
@@ -26,6 +28,8 @@ Updates a single property and saves the record without going through the normal 
 | `parameterize` | `any` | yes | `true` | Set to true to use cfqueryparam on all columns, or pass in a list of property names to use cfqueryparam on those only. |
 | `transaction` | `string` | yes | `[runtime expression]` | Set this to commit to update the database when the save has completed, rollback to run all the database queries but not commit them, or none to skip transaction handling altogether. |
 | `callbacks` | `boolean` | yes | `true` | Set to false to disable callbacks for this operation. |
+
+</div>
 
 ## Examples
 

@@ -19,10 +19,14 @@ Used to store a section's output for rendering within a layout. This content sto
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `position` | `any` | yes | `last` | The position in the section's stack where you want the content placed. Valid values are first, last, or the numeric position. |
 | `overwrite` | `any` | yes | `false` | Whether or not to overwrite any of the content. Valid values are false, true, or all. |
+
+</div>
 
 ## Examples
 

@@ -19,11 +19,15 @@ Runs the specified method within a single database transaction.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `method` | `string` | yes | — | Model method to run. |
 | `transaction` | `string` | yes | `commit` | Set this to commit to update the database when the save has completed, rollback to run all the database queries but not commit them, or none to skip transaction handling altogether. |
 | `isolation` | `string` | yes | `read_committed` | Isolation level to be passed through to the cftransaction tag. See your CFML engine's documentation for more details about cftransaction's isolation attribute. |
+
+</div>
 
 ## Examples
 

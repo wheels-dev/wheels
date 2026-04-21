@@ -21,6 +21,8 @@ Generates one or more &lt;link&gt; tags for including CSS stylesheets in your ap
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `sources` | `string` | no | — | The name of one or many CSS files in the stylesheets folder, minus the `.css` extension. Pass a full URL to generate a tag for an external style sheet. Can also be called with the `source` argument. |
@@ -30,6 +32,8 @@ Generates one or more &lt;link&gt; tags for including CSS stylesheets in your ap
 | `head` | `boolean` | no | `false` | Set to `true` to place the output in the `head` area of the HTML page instead of the default behavior (which is to place the output where the function is called from). |
 | `delim` | `string` | no | `,` | The delimiter to use for the list of CSS files. |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
 
 ## Examples
 

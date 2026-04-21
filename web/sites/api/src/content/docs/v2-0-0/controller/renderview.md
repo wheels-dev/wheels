@@ -22,6 +22,8 @@ Note that when passing values for controller and / or action, this function does
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `controller` | `string` | no | `[runtime expression]` | Controller to include the view page for. |
@@ -31,6 +33,8 @@ Note that when passing values for controller and / or action, this function does
 | `cache` | `any` | no | — | Number of minutes to cache the content for. |
 | `returnAs` | `string` | no | — | Set to `string` to return the result instead of automatically sending it to the client. |
 | `hideDebugInformation` | `boolean` | no | `false` | Set to `true` to hide the debug information at the end of the output. This is useful, for example, when you're testing XML output in an environment where the global setting for `showDebugInformation` is `true`. |
+
+</div>
 
 ## Examples
 

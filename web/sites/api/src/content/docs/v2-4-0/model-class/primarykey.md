@@ -24,9 +24,13 @@ This function is also aliased as <code>primaryKeys()</code>.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `position` | `numeric` | no | `0` | If you are accessing a composite primary key, pass the position of a single key to fetch. |
+
+</div>
 
 ## Examples
 

@@ -21,6 +21,8 @@ Create a group of routes that exposes actions for manipulating a collection of r
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Camel-case name of resource to reference when build links and form actions. This is typically a plural word (e.g., `posts`). |
@@ -36,6 +38,8 @@ Create a group of routes that exposes actions for manipulating a collection of r
 | `shallowName` | `string` | no | — | Shallow name prefix. |
 | `constraints` | `struct` | no | — | Variable patterns to use for matching. |
 | `mapFormat` | `boolean` | no | `[runtime expression]` | Whether or not to add an optional `.[format]` pattern to the end of the generated routes. This is useful for providing formats via URL like `json`, `xml`, `pdf`, etc. |
+
+</div>
 
 ## Examples
 

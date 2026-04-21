@@ -19,9 +19,13 @@ Deletes a specific key from the Flash. Returns true if the key exists.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `string` | yes | — | The key to delete. |
+
+</div>
 
 ## Examples
 

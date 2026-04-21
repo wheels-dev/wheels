@@ -22,6 +22,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | The variable name of the object to build the form control for. |
@@ -38,6 +40,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 | `errorClass` | `string` | no | `field-with-errors` | The class name of the HTML tag that wraps the form control when there are errors. |
 | `type` | `string` | no | `text` | Input type attribute. Common examples in HTML5 and later are text (default), email, tel, and url. |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

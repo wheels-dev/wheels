@@ -21,10 +21,14 @@ Allows you to update an existing record in a database table directly from within
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name where the record is |
 | `where` | `string` | no | — | The where clause, i.e admin = 1 |
+
+</div>
 
 ## Examples
 

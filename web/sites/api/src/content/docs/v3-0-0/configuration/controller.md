@@ -21,9 +21,13 @@ The controller() function in Wheels is used to define routes that point to a spe
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `controller` | `string` | yes | — |  |
 | `name` | `string` | no | `[runtime expression]` |  |
 | `path` | `string` | no | `[runtime expression]` |  |
+
+</div>
 

@@ -21,6 +21,8 @@ The filters() function lets you specify methods in your controller that should r
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `through` | `string` | yes | — | Function(s) to execute before or after the action(s). |
@@ -28,6 +30,8 @@ The filters() function lets you specify methods in your controller that should r
 | `only` | `string` | no | — | Pass in a list of action names (or one action name) to tell Wheels that the filter function(s) should only be run on these actions. |
 | `except` | `string` | no | — | Pass in a list of action names (or one action name) to tell Wheels that the filter function(s) should be run on all actions except the specified ones. |
 | `placement` | `string` | no | `append` | Pass in `prepend` to prepend the function(s) to the filter chain instead of appending. |
+
+</div>
 
 ## Examples
 

@@ -22,6 +22,8 @@ If multiple error messages exist, the first one is returned. If no error exists,
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | The variable name of the object to display the error message for. |
@@ -31,6 +33,8 @@ If multiple error messages exist, the first one is returned. If no error exists,
 | `wrapperElement` | `string` | no | `span` | HTML element to wrap the error message in. |
 | `class` | `string` | no | `error-message` | CSS `class` to set on the wrapper element. |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
 
 ## Examples
 

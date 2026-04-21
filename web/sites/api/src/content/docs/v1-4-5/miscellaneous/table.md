@@ -19,9 +19,13 @@ Use this method to tell Wheels what database table to connect to for this model.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `any` | yes | — | Name of the table to map this model to. |
+
+</div>
 
 ## Examples
 

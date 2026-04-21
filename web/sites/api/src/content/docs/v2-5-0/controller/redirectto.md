@@ -22,6 +22,8 @@ Internally, this function uses the <code>URLFor</code> function to build the lin
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `back` | `boolean` | no | `false` | Set to `true` to redirect back to the referring page. |
@@ -41,6 +43,8 @@ Internally, this function uses the <code>URLFor</code> function to build the lin
 | `url` | `string` | no | — | Redirect to an external URL. |
 | `delay` | `boolean` | no | `false` | Set to `true` to delay the redirection until after the rest of your action code has executed. |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
 
 ## Examples
 

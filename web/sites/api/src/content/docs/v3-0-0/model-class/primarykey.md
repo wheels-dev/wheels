@@ -21,9 +21,13 @@ Returns the name of the primary key column for the table mapped to a given model
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `position` | `numeric` | no | `0` | If you are accessing a composite primary key, pass the position of a single key to fetch. |
+
+</div>
 
 ## Examples
 

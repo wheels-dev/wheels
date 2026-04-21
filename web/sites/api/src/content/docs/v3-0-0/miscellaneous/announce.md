@@ -21,9 +21,13 @@ Outputs a custom message during migration execution. This is useful for logging 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `message` | `string` | yes | — |  |
+
+</div>
 
 ## Examples
 

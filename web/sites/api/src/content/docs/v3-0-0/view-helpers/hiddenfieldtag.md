@@ -22,11 +22,15 @@ Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, a
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name to populate in tag's name attribute. |
 | `value` | `string` | no | — | Value to populate in tag's value attribute. |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
 
 ## Examples
 

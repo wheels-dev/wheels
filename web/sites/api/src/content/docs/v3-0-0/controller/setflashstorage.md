@@ -21,10 +21,14 @@ Dynamically sets the storage mechanism for flash messages during the current req
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `storage` | `string` | no | `session` | Specifies the storage mechanism for flash data. Available options: session or cookie. |
 | `setGlobally` | `boolean` | no | `false` | If set to true, updates both application-level and controller-level flashStorage; otherwise, only the controller-level flashStorage is updated. |
+
+</div>
 
 ## Examples
 

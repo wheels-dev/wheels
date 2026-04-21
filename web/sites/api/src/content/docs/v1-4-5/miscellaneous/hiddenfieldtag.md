@@ -19,10 +19,14 @@ Builds and returns a string containing a hidden field form control based on the 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | See documentation for textFieldTag. |
 | `value` | `string` | yes | — | See documentation for textFieldTag. |
+
+</div>
 
 ## Examples
 

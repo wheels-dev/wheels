@@ -21,9 +21,13 @@ Capitalizes all words in the text to create a nicer looking title.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `word` | `string` | yes | — | The text to turn into a title. |
+
+</div>
 
 ## Examples
 

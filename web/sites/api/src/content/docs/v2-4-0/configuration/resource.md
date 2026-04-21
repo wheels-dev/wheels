@@ -21,6 +21,8 @@ Create a group of routes that exposes actions for manipulating a singular resour
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Camel-case name of resource to reference when build links and form actions. This is typically a singular word (e.g., `profile`). |
@@ -38,6 +40,8 @@ Create a group of routes that exposes actions for manipulating a singular resour
 | `$call` | `string` | no | `resource` |  |
 | `$plural` | `boolean` | no | `false` |  |
 | `mapFormat` | `boolean` | no | `[runtime expression]` | Whether or not to add an optional `.[format]` pattern to the end of the generated routes. This is useful for providing formats via URL like `json`, `xml`, `pdf`, etc. |
+
+</div>
 
 ## Examples
 

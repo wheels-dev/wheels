@@ -22,11 +22,15 @@ This method should only be used for <code>hasMany</code> associations.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | Name of the variable containing the parent object to represent with this form field. |
 | `association` | `string` | yes | — | Name of the association set in the parent object to represent with this form field. |
 | `keys` | `string` | yes | — | Primary keys associated with this form field. Note that these keys should be listed in the order that they appear in the database table. |
+
+</div>
 
 ## Examples
 

@@ -19,10 +19,14 @@ Creates and returns a controller object with your own custom name and params. Us
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the controller to create. |
 | `params` | `struct` | yes | `[runtime expression]` | The params struct (combination of form and URL variables). |
+
+</div>
 
 ## Examples
 

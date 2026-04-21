@@ -23,9 +23,13 @@ Call this method within a controller's <code>config</code> method, preferably th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `with` | `string` | no | `exception` | How to handle invalid authenticity token checks. Valid values are `error` (throws a `Wheels.InvalidAuthenticityToken` error), `abort` (aborts the request silently and sends a blank response to the client), and `ignore` (ignores the check and lets the request proceed). |
 | `only` | `string` | no | — | List of actions that this check should only run on. Leave blank for all. |
 | `except` | `string` | no | — | List of actions that this check should be omitted from running on. Leave blank for no exceptions. |
+
+</div>
 

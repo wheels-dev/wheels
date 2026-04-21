@@ -21,10 +21,14 @@ Checks whether a model object has any validation or other errors. It returns tru
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | no | — | Name of the property to check if there are any errors set on. |
 | `name` | `string` | no | — | Error name to check if there are any errors set with. |
+
+</div>
 
 ## Examples
 

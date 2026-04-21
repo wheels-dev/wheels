@@ -21,10 +21,14 @@ Returns the associated MIME type for a given file extension. Useful when serving
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `extension` | `string` | yes | — | The extension to get the MIME type for. |
 | `fallback` | `string` | no | `application/octet-stream` | The fallback MIME type to return. |
+
+</div>
 
 ## Examples
 

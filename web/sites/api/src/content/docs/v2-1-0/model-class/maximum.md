@@ -23,6 +23,8 @@ If no records can be found to perform the calculation on you can use the <code>i
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to get the highest value for (must be a property of a numeric data type). |
@@ -32,6 +34,8 @@ If no records can be found to perform the calculation on you can use the <code>i
 | `ifNull` | `any` | no | — | The value returned if no records are found. Common usage is to set this to `0` to make sure a numeric value is always returned instead of a blank string. |
 | `includeSoftDeletes` | `boolean` | no | `false` | Set to `true` to include soft-deleted records in the queries that this method runs. |
 | `group` | `string` | no | — | Maps to the `GROUP BY` clause of the query. You do not need to specify the table name(s); CFWheels will do that for you. |
+
+</div>
 
 ## Examples
 

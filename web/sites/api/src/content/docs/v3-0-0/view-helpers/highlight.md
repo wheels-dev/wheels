@@ -21,6 +21,8 @@ Searches the given text for one or more phrases and wraps all matches in an HTML
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | Text to search in. |
@@ -29,6 +31,8 @@ Searches the given text for one or more phrases and wraps all matches in an HTML
 | `tag` | `string` | no | `span` | HTML tag to use to wrap the highlighted phrase(s). |
 | `class` | `string` | no | `highlight` | Class to use in the tags wrapping highlighted phrase(s). |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
 
 ## Examples
 

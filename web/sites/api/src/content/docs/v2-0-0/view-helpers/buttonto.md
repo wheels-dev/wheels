@@ -22,6 +22,8 @@ The URL is built the same way as the <code>linkTo</code> function.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | no | — | The text content of the button. |
@@ -37,6 +39,8 @@ The URL is built the same way as the <code>linkTo</code> function.
 | `protocol` | `string` | no | — | Set this to override the current protocol. |
 | `port` | `numeric` | no | `0` | Set this to override the current port number. |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

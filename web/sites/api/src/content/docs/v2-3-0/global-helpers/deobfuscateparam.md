@@ -21,9 +21,13 @@ Deobfuscates a value.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `param` | `string` | yes | — | The value to deobfuscate. |
+
+</div>
 
 ## Examples
 

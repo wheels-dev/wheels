@@ -19,11 +19,15 @@ Builds and returns a list (ul tag with a default class of errorMessages) contain
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | The variable name of the object to display error messages for. |
 | `class` | `string` | yes | `errorMessage` | CSS class to set on the ul element. |
 | `showDuplicates` | `boolean` | yes | `true` | Whether or not to show duplicate error messages. |
+
+</div>
 
 ## Examples
 

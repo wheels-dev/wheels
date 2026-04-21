@@ -19,6 +19,8 @@ Builds and returns a string containing a check box form control based on the sup
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | See documentation for textFieldTag. |
@@ -31,6 +33,8 @@ Builds and returns a string containing a check box form control based on the sup
 | `append` | `string` | yes | — | See documentation for textField. |
 | `prependToLabel` | `string` | yes | — | See documentation for textField. |
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
+
+</div>
 
 ## Examples
 

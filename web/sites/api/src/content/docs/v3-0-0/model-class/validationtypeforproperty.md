@@ -21,9 +21,13 @@ Returns the type of validation that Wheels would apply for a given property. Thi
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of column to retrieve data for. |
+
+</div>
 
 ## Examples
 

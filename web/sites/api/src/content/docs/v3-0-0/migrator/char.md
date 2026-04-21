@@ -21,12 +21,16 @@ Adds one or more CHAR columns to a table definition in a migration. Use this fun
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `limit` | `any` | no | — |  |
 | `default` | `string` | no | — |  |
 | `allowNull` | `boolean` | no | — |  |
+
+</div>
 
 ## Examples
 

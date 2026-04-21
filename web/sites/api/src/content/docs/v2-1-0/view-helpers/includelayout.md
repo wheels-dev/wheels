@@ -22,9 +22,13 @@ This is usually used to include a parent layout from within a child layout.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | `layout` | Name of the layout file to include. |
+
+</div>
 
 ## Examples
 

@@ -21,10 +21,14 @@ Returns an array of all errors associated with the supplied property (and error 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Specify the property name to return errors for here. |
 | `name` | `string` | no | — | If you want to return only errors on the property set with a specific error name you can specify it here. |
+
+</div>
 
 ## Examples
 

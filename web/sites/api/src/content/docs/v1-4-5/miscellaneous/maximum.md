@@ -19,6 +19,8 @@ Calculates the maximum value for a given property. Uses the SQL function MAX. If
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to get the highest value for (must be a property of a numeric data type). |
@@ -28,6 +30,8 @@ Calculates the maximum value for a given property. Uses the SQL function MAX. If
 | `ifNull` | `any` | yes | — | See documentation for average. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | See documentation for findAll. |
 | `group` | `string` | yes | — | See documentation for findAll. |
+
+</div>
 
 ## Examples
 

@@ -32,7 +32,8 @@ export const GUIDES_VERSIONS: VersionMeta[] = [
 
 /** Wheels API Reference — function-level docs at api.wheels.dev. */
 export const API_VERSIONS: VersionMeta[] = [
-	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: false, status: 'current' },
+	{ slug: 'v4-0-0-snapshot', label: 'v4.0.0-SNAPSHOT', collapsed: false, status: 'snapshot' },
+	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'current' },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-4-0', label: 'v2.4.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-3-0', label: 'v2.3.0', collapsed: true, status: 'archived' },

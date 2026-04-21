@@ -22,6 +22,8 @@ Returns <code>true</code> if the object was saved successfully to the database, 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `parameterize` | `any` | no | `true` | Set to `true` to use `cfqueryparam` on all columns, or pass in a list of property names to use `cfqueryparam` on those only. |
@@ -29,6 +31,8 @@ Returns <code>true</code> if the object was saved successfully to the database, 
 | `validate` | `boolean` | no | `true` | Set to `false` to skip validations for this operation. |
 | `transaction` | `string` | no | `[runtime expression]` | Set this to `commit` to update the database, `rollback` to run all the database queries but not commit them, or `none` to skip transaction handling altogether. |
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
+
+</div>
 
 ## Examples
 

@@ -21,9 +21,13 @@ Returns a structure containing all the properties of a model object, where the k
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `returnIncluded` | `boolean` | no | `true` | Whether to return nested properties or not. |
+
+</div>
 
 ## Examples
 

@@ -160,3 +160,26 @@ starlight-toc a[aria-current='true'] {
 .wd-page-title {
 	margin-bottom: var(--space-5);
 }
+
+/* ── API parameter tables ────────────────────────────────────────
+ * Emitted by web/scripts/generate-api-docs.mjs. Keep the structural
+ * columns (Name, Type, Required, Default) on a single line so type
+ * identifiers don't break mid-word; let the Description column absorb
+ * the slack. Scoped via .wd-params-table so prose tables elsewhere
+ * are unaffected.
+ */
+.sl-markdown-content .wd-params-table table {
+	table-layout: auto;
+	width: 100%;
+}
+
+.sl-markdown-content .wd-params-table th:nth-child(-n + 4),
+.sl-markdown-content .wd-params-table td:nth-child(-n + 4) {
+	white-space: nowrap;
+}
+
+.sl-markdown-content .wd-params-table th:nth-child(5),
+.sl-markdown-content .wd-params-table td:nth-child(5) {
+	width: 100%;
+	word-break: break-word;
+}

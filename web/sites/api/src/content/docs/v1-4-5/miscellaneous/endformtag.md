@@ -19,10 +19,14 @@ Builds and returns a string containing the closing form tag.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `prepend` | `string` | yes | — | See documentation for textField |
 | `append` | `string` | yes | — | See documentation for textField |
+
+</div>
 
 ## Examples
 

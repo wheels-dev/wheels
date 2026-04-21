@@ -19,6 +19,8 @@ Builds and returns a string containing links to pages based on a paginated query
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `windowSize` | `numeric` | yes | `2` | The number of page links to show around the current page. |
@@ -38,6 +40,8 @@ Builds and returns a string containing links to pages based on a paginated query
 | `name` | `string` | yes | `page` | The name of the param that holds the current page number. |
 | `showSinglePage` | `boolean` | yes | `false` | Will show a single page when set to true. (The default behavior is to return an empty string when there is only one page in the pagination). |
 | `pageNumberAsParam` | `boolean` | yes | `true` | Decides whether to link the page number as a param or as part of a route. (The default behavior is true). |
+
+</div>
 
 ## Examples
 

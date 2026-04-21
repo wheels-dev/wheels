@@ -21,6 +21,8 @@ Highlights the phrase(s) everywhere in the text if found by wrapping them in <co
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | Text to search in. |
@@ -29,6 +31,8 @@ Highlights the phrase(s) everywhere in the text if found by wrapping them in <co
 | `tag` | `string` | no | `span` | HTML tag to use to wrap the highlighted phrase(s). |
 | `class` | `string` | no | `highlight` | Class to use in the tags wrapping highlighted phrase(s). |
 | `encode` | `boolean` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

@@ -21,9 +21,13 @@ Used in legacy Wheels testing to catch errors or exceptions raised by a given CF
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `expression` | `string` | yes | — | String containing CFML expression to evaluate |
+
+</div>
 
 ## Examples
 

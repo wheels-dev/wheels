@@ -19,10 +19,14 @@ Replaces single newline characters with HTML break tags and double newline chara
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | The text to format. |
 | `wrap` | `boolean` | yes | `true` | Set to true to wrap the result in a paragraph. |
+
+</div>
 
 ## Examples
 

@@ -21,6 +21,8 @@ adds decimal columns to table definition
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
@@ -28,4 +30,6 @@ adds decimal columns to table definition
 | `null` | `boolean` | no | — |  |
 | `precision` | `numeric` | no | — |  |
 | `scale` | `numeric` | no | — |  |
+
+</div>
 

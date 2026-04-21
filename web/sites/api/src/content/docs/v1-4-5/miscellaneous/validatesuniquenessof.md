@@ -19,6 +19,8 @@ Validates that the value of the specified property is unique in the database tab
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | Name of property or list of property names to validate against (can also be called with the property argument). |
@@ -29,6 +31,8 @@ Validates that the value of the specified property is unique in the database tab
 | `condition` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns true, validation will run). |
 | `unless` | `string` | yes | — | String expression to be evaluated that decides if validation will be run (if the expression returns false, validation will run). |
 | `includeSoftDeletes` | `boolean` | yes | `true` | Whether to take records deleted using "Soft Delete" into account when performing the uniqueness check. |
+
+</div>
 
 ## Examples
 

@@ -21,10 +21,14 @@ Converts a camel-cased or underscored string into more readable, human-friendly 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | Text to humanize. |
 | `except` | `string` | no | — | A list of strings (space separated) to replace within the output. |
+
+</div>
 
 ## Examples
 

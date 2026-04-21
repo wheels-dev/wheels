@@ -19,9 +19,13 @@ Returns a struct with information about the specificed paginated query. The keys
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `handle` | `string` | yes | `query` | The handle given to the query to return pagination information for. |
+
+</div>
 
 ## Examples
 

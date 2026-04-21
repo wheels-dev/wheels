@@ -19,10 +19,14 @@ Returns the number of errors this object has associated with it. Specify propert
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Specify a property name here if you want to count only errors set on a specific property. |
 | `name` | `string` | yes | — | Specify an error name here if you want to count only errors set with a specific error name. |
+
+</div>
 
 ## Examples
 

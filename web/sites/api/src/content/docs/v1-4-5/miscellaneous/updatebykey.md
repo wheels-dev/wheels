@@ -19,6 +19,8 @@ Finds the object with the supplied key and saves it (if validation permits it) w
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `any` | yes | — | Primary key value(s) of the record to fetch. Separate with comma if passing in multiple primary key values. Accepts a string, list, or a numeric value. |
@@ -28,6 +30,8 @@ Finds the object with the supplied key and saves it (if validation permits it) w
 | `transaction` | `string` | yes | `[runtime expression]` | Set this to commit to update the database when the save has completed, rollback to run all the database queries but not commit them, or none to skip transaction handling altogether. |
 | `callbacks` | `boolean` | yes | `true` | Set to false to disable callbacks for this operation. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
+
+</div>
 
 ## Examples
 

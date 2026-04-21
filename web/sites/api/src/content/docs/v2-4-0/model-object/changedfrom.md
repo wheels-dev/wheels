@@ -23,9 +23,13 @@ CFWheels will keep a note of the previous property value until the object is sav
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to get the previous value for. |
+
+</div>
 
 ## Examples
 

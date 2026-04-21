@@ -21,9 +21,13 @@ errorsOnBase() returns an array of all errors associated with the object as a wh
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | — | Specify an error name here to only return errors for that error name. |
+
+</div>
 
 ## Examples
 

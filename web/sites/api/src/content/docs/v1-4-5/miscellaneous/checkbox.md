@@ -19,6 +19,8 @@ Builds and returns a string containing a check box form control based on the sup
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | The variable name of the object to build the form control for. |
@@ -35,6 +37,8 @@ Builds and returns a string containing a check box form control based on the sup
 | `appendToLabel` | `string` | yes | — | String to append to the form control's label. Useful to wrap the form control with HTML tags. |
 | `errorElement` | `string` | yes | `span` | HTML tag to wrap the form control with when the object contains errors. |
 | `errorClass` | `string` | yes | `fieldWithErrors` | The class name of the HTML tag that wraps the form control when there are errors. |
+
+</div>
 
 ## Examples
 

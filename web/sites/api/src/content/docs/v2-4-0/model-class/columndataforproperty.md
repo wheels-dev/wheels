@@ -21,7 +21,11 @@ Returns a struct with data for the named property.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to inspect. |
+
+</div>
 

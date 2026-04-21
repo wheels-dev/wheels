@@ -21,9 +21,13 @@ The flashKeyExists() function checks whether a specific key is present in the Fl
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `string` | yes | — | The key to check. |
+
+</div>
 
 ## Examples
 

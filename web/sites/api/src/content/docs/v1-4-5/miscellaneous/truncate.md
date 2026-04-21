@@ -19,11 +19,15 @@ Truncates text to the specified length and replaces the last characters with the
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | The text to truncate. |
 | `length` | `numeric` | yes | `30` | Length to truncate the text to. |
 | `truncateString` | `string` | yes | `...` | String to replace the last characters with. |
+
+</div>
 
 ## Examples
 

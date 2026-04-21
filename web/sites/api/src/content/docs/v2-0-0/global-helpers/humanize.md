@@ -21,10 +21,14 @@ Returns readable text by capitalizing and converting camel casing to multiple wo
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | Text to humanize. |
 | `except` | `string` | no | — | A list of strings (space separated) to replace within the output. |
+
+</div>
 
 ## Examples
 

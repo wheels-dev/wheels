@@ -21,9 +21,13 @@ Converts camelCase or PascalCase strings into lowercase hyphen-separated strings
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `string` | `string` | yes | — | The string to hyphenize. |
+
+</div>
 
 ## Examples
 

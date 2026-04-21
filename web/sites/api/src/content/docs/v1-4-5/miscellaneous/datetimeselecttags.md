@@ -19,6 +19,8 @@ Builds and returns a string containing six select form controls (three for date 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | See documentation for textFieldTag. |
@@ -44,6 +46,8 @@ Builds and returns a string containing six select form controls (three for date 
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
 | `combine` | `boolean` | yes | — | See documentation for dateSelect. |
 | `twelveHour` | `boolean` | yes | `false` | See documentation for timeSelect. |
+
+</div>
 
 ## Examples
 

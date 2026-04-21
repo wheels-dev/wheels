@@ -21,6 +21,8 @@ Generates &lt;script&gt; tags for including JavaScript files. Can handle local f
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `sources` | `string` | no | — | The name of one or many JavaScript files in the `javascripts` folder, minus the `.js` extension. Pass a full URL to access an external JavaScript file. Can also be called with the `source` argument. |
@@ -28,6 +30,8 @@ Generates &lt;script&gt; tags for including JavaScript files. Can handle local f
 | `head` | `boolean` | no | `false` | Set to `true` to place the output in the `head` area of the HTML page instead of the default behavior (which is to place the output where the function is called from). |
 | `delim` | `string` | no | `,` | The delimiter to use for the list of JavaScript files. |
 | `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
 
 ## Examples
 

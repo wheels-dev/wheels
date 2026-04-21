@@ -24,10 +24,14 @@ Primarily used for testing purposes.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `params` | `struct` | yes | — | The params struct to use in the request (make sure that at least `controller` and `action` are set). |
 | `method` | `string` | no | `get` | The HTTP method to use in the request (`get`, `post` etc). |
 | `returnAs` | `string` | no | — | Pass in `struct` to return all information about the request instead of just the final output (`body`). |
 | `rollback` | `string` | no | `false` | Pass in `true` to roll back all database transactions made during the request. |
+
+</div>
 

@@ -19,9 +19,13 @@ Returns the text with the first character converted to uppercase.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | Text to capitalize. |
+
+</div>
 
 ## Examples
 

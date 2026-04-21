@@ -19,6 +19,8 @@ Calculates the sum of values for a given property. Uses the SQL function SUM. If
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of the property to get the sum for (must be a property of a numeric data type). |
@@ -29,6 +31,8 @@ Calculates the sum of values for a given property. Uses the SQL function SUM. If
 | `ifNull` | `any` | yes | — | The value returned if no records are found. Common usage is to set this to 0 to make sure a numeric value is always returned instead of a blank string. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
 | `group` | `string` | yes | — | Maps to the GROUP BY clause of the query. You do not need to specify the table name(s); CFWheels will do that for you. |
+
+</div>
 
 ## Examples
 

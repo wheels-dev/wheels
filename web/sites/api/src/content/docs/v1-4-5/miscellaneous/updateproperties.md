@@ -19,6 +19,8 @@ Updates all the properties from the properties argument or other named arguments
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | yes | `[runtime expression]` | Struct containing key/value pairs with properties and associated values that need to be updated globally. |
@@ -26,6 +28,8 @@ Updates all the properties from the properties argument or other named arguments
 | `validate` | `boolean` | yes | — | Set to false to skip validations for this operation. |
 | `transaction` | `string` | yes | `[runtime expression]` | Set this to commit to update the database when the save has completed, rollback to run all the database queries but not commit them, or none to skip transaction handling altogether. |
 | `callbacks` | `boolean` | yes | `true` | Set to false to disable callbacks for this operation. |
+
+</div>
 
 ## Examples
 

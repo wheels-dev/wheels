@@ -19,9 +19,13 @@ Returns the value of a specific key in the Flash (or the entire Flash as a struc
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `string` | yes | — | The key to get the value for. |
+
+</div>
 
 ## Examples
 

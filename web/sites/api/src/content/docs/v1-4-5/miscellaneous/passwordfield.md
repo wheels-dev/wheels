@@ -19,6 +19,8 @@ Builds and returns a string containing a password field form control based on th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | See documentation for textField. |
@@ -33,6 +35,8 @@ Builds and returns a string containing a password field form control based on th
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
 | `errorElement` | `string` | yes | `span` | See documentation for textField. |
 | `errorClass` | `string` | yes | `fieldWithErrors` | See documentation for textField. |
+
+</div>
 
 ## Examples
 

@@ -21,9 +21,13 @@ The createView() function is used in migration CFCs to define a new database vie
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the view to change properties on |
+
+</div>
 
 ## Examples
 

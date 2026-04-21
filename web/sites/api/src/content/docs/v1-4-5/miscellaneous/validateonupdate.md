@@ -19,11 +19,15 @@ Registers method(s) that should be called to validate existing objects before th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `methods` | `string` | yes | — | See documentation for validate. |
 | `condition` | `string` | yes | — | See documentation for validatesConfirmationOf. |
 | `unless` | `string` | yes | — | See documentation for validatesConfirmationOf. |
+
+</div>
 
 ## Examples
 

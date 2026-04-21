@@ -19,6 +19,8 @@ Builds and returns a string containing the opening form tag. The form's action w
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `method` | `string` | yes | `post` | The type of method to use in the form tag. get and post are the options. |
@@ -36,6 +38,8 @@ Builds and returns a string containing the opening form tag. The form's action w
 | `port` | `numeric` | yes | `0` | Set this to override the current port number. |
 | `prepend` | `string` | yes | — | String to prepend to the form control. Useful to wrap the form control with HTML tags. |
 | `append` | `string` | yes | — | String to append to the form control. Useful to wrap the form control with HTML tags. |
+
+</div>
 
 ## Examples
 

@@ -21,6 +21,8 @@ Builds and returns a string containing three <code>select</code> form controls (
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name to populate in tag's name attribute. |
@@ -42,6 +44,8 @@ Builds and returns a string containing three <code>select</code> form controls (
 | `combine` | `boolean` | no | — | Set to false to not combine the select parts into a single DateTime object. |
 | `encode` | `any` | no | `true` | Use this argument to decide whether the output of the function should be encoded in order to prevent Cross Site Scripting (XSS) attacks. Set it to `true` to encode all relevant output for the specific HTML element in question (e.g. tag content, attribute values, and URLs). For HTML elements that have both tag content and attribute values you can set this argument to `attributes` to only encode attribute values and not tag content. |
 | `$now` | `date` | no | `[runtime expression]` |  |
+
+</div>
 
 ## Examples
 

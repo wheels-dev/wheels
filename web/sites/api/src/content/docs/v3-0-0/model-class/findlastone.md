@@ -21,9 +21,13 @@ The findLastOne() function fetches the last record from the database table mappe
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | no | — | Name of the property to order by. This argument is also aliased as `properties`. |
+
+</div>
 
 ## Examples
 

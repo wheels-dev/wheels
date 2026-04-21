@@ -19,9 +19,13 @@ Removes one or more actions from the list of cacheable actions in a controller. 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `action` | `string` | no | — | Action(s) to remove from cache. |
+
+</div>
 
 ## Examples
 

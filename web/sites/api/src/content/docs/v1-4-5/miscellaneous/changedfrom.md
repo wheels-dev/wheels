@@ -19,9 +19,13 @@ Returns the previous value of a property that has changed. Returns an empty stri
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to get the previous value for. |
+
+</div>
 
 ## Examples
 

@@ -21,9 +21,13 @@ dropTable() is used to remove a table from the database entirely. This is a dest
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the table to drop |
+
+</div>
 
 ## Examples
 

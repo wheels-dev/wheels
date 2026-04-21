@@ -19,6 +19,8 @@ Builds and returns a string containing three select form controls for month, day
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | The variable name of the object to build the form control for. |
@@ -40,6 +42,8 @@ Builds and returns a string containing three select form controls for month, day
 | `errorElement` | `string` | yes | `span` | HTML tag to wrap the form control with when the object contains errors. |
 | `errorClass` | `string` | yes | `fieldWithErrors` | The class name of the HTML tag that wraps the form control when there are errors. |
 | `combine` | `boolean` | yes | — |  |
+
+</div>
 
 ## Examples
 

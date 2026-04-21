@@ -22,6 +22,8 @@ Only available in a migration CFC
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The Name of the table where the column is |
@@ -35,6 +37,8 @@ Only available in a migration CFC
 | `precision` | `numeric` | no | — | (For decimal type) the maximum number of digits allow |
 | `scale` | `numeric` | no | — | (For decimal type) the number of digits to the right of the decimal point |
 | `addColumns` | `boolean` | no | `false` | if true, attempts to add columns and database will likely throw an error if column already exists |
+
+</div>
 
 ## Examples
 
