@@ -1276,6 +1276,114 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  deploy — Kamal-style production deploys
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Deploy the app to production servers.
+	 *
+	 * Usage:
+	 *   wheels deploy                          - full deploy
+	 *   wheels deploy --dry-run                - print commands, skip execution
+	 *   wheels deploy --destination production - load deploy.production.yml overlay
+	 *   wheels deploy rollback v1              - roll back to version v1
+	 *   wheels deploy config                   - print resolved config as YAML
+	 *   wheels deploy init                     - create config stub
+	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy version                  - show version pinning
+	 */
+	public string function deploy() {
+		var args = getArgs(arguments);
+		var opts = $deployArgsToOptions(args);
+		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
+			opts.configPath = expandPath("config/deploy.yml");
+		}
+
+		var positional = $deployStripFlags(args);
+		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
+
+		var dmc = new cli.lucli.services.deploy.cli.DeployMainCli(
+			new cli.lucli.services.deploy.lib.SshPool()
+		);
+
+		switch (sub) {
+			case "deploy":
+				dmc.deploy(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "redeploy":
+				dmc.redeploy(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "rollback":
+				if (arrayLen(positional) < 2) {
+					throw(message="rollback requires a version argument: wheels deploy rollback <version>");
+				}
+				opts.version = positional[2];
+				dmc.rollback(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "config":
+				return dmc.config(opts);
+			case "init":
+				return dmc.init_stub(opts);
+			case "setup":
+				dmc.setup(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "version":
+				return dmc.version();
+			default:
+				throw(message="Unknown deploy subcommand: #sub#");
+		}
+	}
+
+	private struct function $deployArgsToOptions(required array args) {
+		var opts = {};
+		var n = arrayLen(arguments.args);
+		var i = 1;
+		while (i <= n) {
+			var a = arguments.args[i];
+			if (a == "--dry-run") {
+				opts.dryRun = true;
+			} else if (left(a, 14) == "--destination=") {
+				opts.destination = mid(a, 15, 99999);
+			} else if (a == "--destination" && i < n) {
+				opts.destination = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--version=") {
+				opts.version = mid(a, 11, 99999);
+			} else if (a == "--version" && i < n) {
+				opts.version = arguments.args[i+1];
+				i++;
+			} else if (left(a, 13) == "--configPath=") {
+				opts.configPath = mid(a, 14, 99999);
+			} else if (a == "--configPath" && i < n) {
+				opts.configPath = arguments.args[i+1];
+				i++;
+			}
+			i++;
+		}
+		return opts;
+	}
+
+	private array function $deployStripFlags(required array args) {
+		var out = [];
+		var n = arrayLen(arguments.args);
+		var i = 1;
+		while (i <= n) {
+			var a = arguments.args[i];
+			if (left(a, 2) == "--") {
+				// Space-style flag with a value? Consume the value too.
+				if (!find("=", a) && a != "--dry-run" && i < n && left(arguments.args[i+1], 2) != "--") {
+					i++; // consume value
+				}
+				i++;
+				continue;
+			}
+			arrayAppend(out, a);
+			i++;
+		}
+		return out;
+	}
+
+	// ─────────────────────────────────────────────────
 	//  stats — Code statistics
 	// ─────────────────────────────────────────────────
 
