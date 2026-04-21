@@ -79,6 +79,7 @@ jobs:
         # this override becomes unnecessary.
         run: |
           export LUCLI_HOME="$HOME/.wheels"
+          export VERIFY_DOCS_DEBUG=1
           pnpm test:docs-harness
 
       - name: Verify v4 docs

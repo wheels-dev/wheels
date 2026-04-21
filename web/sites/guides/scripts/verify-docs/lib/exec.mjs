@@ -28,6 +28,12 @@ function resolveWheels() {
 
 const RESOLVED_WHEELS = resolveWheels();
 
+if (process.env.VERIFY_DOCS_DEBUG) {
+  console.error('[exec.mjs] RESOLVED_WHEELS =', RESOLVED_WHEELS);
+  console.error('[exec.mjs] process.pid =', process.pid);
+  console.error('[exec.mjs] process.env.LUCLI_HOME =', process.env.LUCLI_HOME);
+}
+
 /**
  * Launches `program` with the given argv array. Never invokes a shell.
  * Returns `{ code, stdout, stderr }`. `code` is the process exit code, or -1
