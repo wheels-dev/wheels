@@ -77,6 +77,14 @@ component {
 					break;
 				}
 			}
+			// Guard: if reflection didn't locate compiler() (wrong JAR, shaded class),
+			// fail with a clear error instead of a NullPointer/empty-string-invoke trace.
+			if (isSimpleValue(compilerMethod) && !len(compilerMethod)) {
+				throw(
+					type = "Wheels.Deploy.Mustache.CompilerMethodNotFound",
+					message = "Could not locate com.samskivert.mustache.Mustache.compiler() via reflection."
+				);
+			}
 			var compiler = compilerMethod.invoke(javaCast("null", ""), javaCast("Object[]", []));
 
 			if (strict) {

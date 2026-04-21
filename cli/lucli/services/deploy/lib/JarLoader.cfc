@@ -57,6 +57,20 @@ component {
 				return application.$wheelsDeployJarLoaders[key];
 			}
 
+			// Manifest hash changed (or first build) — close any previously cached
+			// URLClassLoaders to release file handles. Realistically there is one
+			// deploy manifest per JVM, so closing all stale entries is correct and
+			// cheaper than tracking a "current" pointer separately. URLClassLoader
+			// implements Closeable (Java 7+); some parents may not, hence try/catch.
+			for (var staleKey in application.$wheelsDeployJarLoaders) {
+				try {
+					application.$wheelsDeployJarLoaders[staleKey].close();
+				} catch (any e) {
+					// Best-effort cleanup — keep going.
+				}
+			}
+			structClear(application.$wheelsDeployJarLoaders);
+
 			var loader = $buildClassLoader();
 			application.$wheelsDeployJarLoaders[key] = loader;
 			return loader;
