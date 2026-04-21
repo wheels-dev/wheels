@@ -1393,6 +1393,27 @@ component extends="modules.BaseModule" {
 					default:
 						throw(message="Unknown wheels deploy registry verb: #registryVerb#");
 				}
+			case "build":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy build requires a verb");
+				}
+				var buildVerb = positional[2];
+				var buildCli = new cli.lucli.services.deploy.cli.DeployBuildCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (buildVerb) {
+					case "deliver":
+					case "push":
+					case "pull":
+					case "create":
+					case "remove":
+					case "details":
+					case "dev":
+						invoke(buildCli, buildVerb, [opts]);
+						return arrayToList(buildCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy build verb: #buildVerb#");
+				}
 			case "accessory":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy accessory requires a verb");

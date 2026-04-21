@@ -31,4 +31,31 @@ component extends="Base" {
             variables.config.absoluteImage(arguments.aliasName)
         );
     }
+
+    public string function create() {
+        return docker("buildx", "create", "--name", $builderName(), "--driver=docker-container");
+    }
+
+    public string function remove() {
+        return docker("buildx", "rm", $builderName());
+    }
+
+    public string function details() {
+        return docker("buildx", "inspect", $builderName());
+    }
+
+    public string function dev() {
+        var b = variables.config.builder();
+        return docker(
+            "buildx", "build",
+            "--load",
+            "--tag", variables.config.image() & ":dirty",
+            "--file", b.dockerfile(),
+            b.context()
+        );
+    }
+
+    public string function $builderName() {
+        return "kamal-" & variables.config.service();
+    }
 }
