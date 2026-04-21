@@ -46,29 +46,41 @@ if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${POR
 else
   echo "Starting LuCLI server on port ${PORT}..."
 
+  start_lucli() {
+    nohup lucli server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &
+    SERVER_PID=$!
+    STARTED_SERVER=true
+  }
+
+  wait_for_server() {
+    for i in $(seq 1 120); do
+      if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
+        echo "Server ready (attempt $i)"
+        return 0
+      fi
+      if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+        echo "Server process died. Check /tmp/wheels-cli-test-server.log"
+        cat /tmp/wheels-cli-test-server.log 2>/dev/null | tail -20
+        exit 1
+      fi
+      sleep 2
+    done
+    echo "Server failed to become ready within 240s"
+    cat /tmp/wheels-cli-test-server.log 2>/dev/null | tail -20
+    exit 1
+  }
+
+  start_lucli
+  echo "Waiting for server..."
+  wait_for_server
+
   # Ensure SQLite JDBC is installed in LuCLI's lib/ext/ — the CLI test
   # suite includes specs (e.g. TestRunnerSpec) that bring up ephemeral
   # Lucee servers against SQLite and need the driver in lib/ext/.
   #
-  # The express dir only materializes after LuCLI has run at least once.
-  # On a fresh CI runner it doesn't exist yet, so pre-warm by spinning
-  # LuCLI up briefly to trigger the Lucee extraction, then tear down.
-  if [ ! -d "$HOME/.lucli/express" ]; then
-    echo "Pre-warming LuCLI to trigger express directory extraction..."
-    nohup lucli server run --port="$PORT" --force > /tmp/wheels-cli-warmup.log 2>&1 &
-    WARMUP_PID=$!
-    for _ in $(seq 1 60); do
-      [ -d "$HOME/.lucli/express" ] && break
-      sleep 1
-    done
-    kill "$WARMUP_PID" 2>/dev/null || true
-    wait "$WARMUP_PID" 2>/dev/null || true
-    lucli server stop 2>/dev/null || true
-    sleep 2  # give the port a moment to release
-  fi
-
-  # Belt-and-braces: guard the find so a missing express dir doesn't kill
-  # the script under `pipefail`. Empty LUCEE_LIB just skips the install.
+  # lib/ext/ only exists after LuCLI fully extracts Lucee, which is
+  # complete by the time the server is ready above. If the JAR is missing,
+  # install it AND restart LuCLI so the classloader picks it up.
   LUCEE_LIB=""
   if [ -d "$HOME/.lucli/express" ]; then
     LUCEE_LIB="$(find "$HOME/.lucli/express" -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)"
@@ -77,25 +89,15 @@ else
     echo "Downloading SQLite JDBC driver to $LUCEE_LIB..."
     curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \
       -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
+    echo "Restarting LuCLI to pick up new JAR..."
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+    lucli server stop 2>/dev/null || true
+    sleep 3  # give the port a moment to release
+    start_lucli
+    echo "Waiting for server after JDBC install..."
+    wait_for_server
   fi
-
-  nohup lucli server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &
-  SERVER_PID=$!
-  STARTED_SERVER=true
-
-  echo "Waiting for server..."
-  for i in $(seq 1 60); do
-    if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
-      echo "Server ready (attempt $i)"
-      break
-    fi
-    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-      echo "Server process died. Check /tmp/wheels-cli-test-server.log"
-      cat /tmp/wheels-cli-test-server.log 2>/dev/null | tail -20
-      exit 1
-    fi
-    sleep 2
-  done
 fi
 
 # ── Warm up Wheels ──────────────────────────────────
