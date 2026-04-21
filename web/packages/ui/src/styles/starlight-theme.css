@@ -198,3 +198,14 @@ starlight-toc a[aria-current='true'] {
 	width: auto;
 	word-break: break-word;
 }
+
+/* ── Prev/Next page footer ─────────────────────────────────────────
+ * Starlight ships .link-title at 1.5rem which is louder than needed
+ * on function reference pages where names like clearCachableActions()
+ * overflow two lines at 24px. Step it down to text-lg (18px) so the
+ * two cards read as navigation, not billboards.
+ */
+.pagination-links .link-title {
+	font-size: var(--text-lg);
+	font-weight: 600;
+}
