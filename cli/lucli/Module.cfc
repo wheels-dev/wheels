@@ -1329,6 +1329,30 @@ component extends="modules.BaseModule" {
 				return arrayToList(dmc.dryRunOutput(), chr(10));
 			case "version":
 				return dmc.version();
+			case "app":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy app requires a verb");
+				}
+				var appVerb = positional[2];
+				var appCli = new cli.lucli.services.deploy.cli.DeployAppCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (appVerb) {
+					case "boot":
+					case "start":
+					case "stop":
+					case "details":
+					case "containers":
+					case "images":
+					case "logs":
+					case "live":
+					case "maintenance":
+					case "remove":
+						appCli[appVerb](opts);
+						return arrayToList(appCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy app verb: #appVerb#");
+				}
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}

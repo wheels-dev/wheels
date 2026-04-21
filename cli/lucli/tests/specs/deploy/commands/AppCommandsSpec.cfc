@@ -55,6 +55,26 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("--follow");
                 expect(cmd).toInclude("demo-web-abc");
             });
+
+            it("maintenance() touches the marker file", () => {
+                var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
+                    .maintenance(variables.cfg.roles()[1], "v1");
+                expect(cmd).toInclude("touch /tmp/kamal-maintenance-demo");
+            });
+
+            it("live() removes the marker file", () => {
+                var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
+                    .live(variables.cfg.roles()[1], "v1");
+                expect(cmd).toInclude("rm -f /tmp/kamal-maintenance-demo");
+            });
+
+            it("remove() chains docker stop and docker rm", () => {
+                var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
+                    .remove(variables.cfg.roles()[1], "v9");
+                expect(cmd).toInclude("docker stop demo-web-v9");
+                expect(cmd).toInclude("docker rm demo-web-v9");
+                expect(cmd).toInclude("&&");
+            });
         });
     }
 }

@@ -64,6 +64,26 @@ component extends="Base" {
         return "#variables.config.service()#-#arguments.role.name()#-#arguments.version#";
     }
 
+    /**
+     * Phase 2 simplification: live/maintenance use a marker file on the server
+     * rather than kamal-proxy's native maintenance mode. Full proxy-native
+     * semantics land in a Phase 3 follow-up task.
+     */
+    public string function live(required any role, required string version) {
+        return "rm -f /tmp/kamal-maintenance-" & variables.config.service();
+    }
+
+    public string function maintenance(required any role, required string version) {
+        return "touch /tmp/kamal-maintenance-" & variables.config.service();
+    }
+
+    public string function remove(required any role, required string version) {
+        return chain([
+            docker("stop", container_name(arguments.role, arguments.version)),
+            docker("rm", container_name(arguments.role, arguments.version))
+        ]);
+    }
+
     private array function $labelArgs(required any role, required string version) {
         return [
             "--label", "service=#variables.config.service()#",
