@@ -45,11 +45,19 @@ function buildSidebarForVersion(version) {
 	return {
 		label: version.label,
 		collapsed: version.collapsed,
-		items: groups.map((g) => ({
-			label: g.label,
-			collapsed: version.collapsed,
-			items: (g.items || []).map(normalizeItem).filter(Boolean),
-		})),
+		items: groups.map((g) => {
+			// Top-level entry with a link and no children → render as a leaf link,
+			// not a collapsible group. Without this, Starlight would wrap it as an
+			// empty group and drop the link entirely (Glossary hit this bug).
+			if (g.link && (!g.items || g.items.length === 0)) {
+				return { label: g.label, link: g.link };
+			}
+			return {
+				label: g.label,
+				collapsed: version.collapsed,
+				items: (g.items || []).map(normalizeItem).filter(Boolean),
+			};
+		}),
 	};
 }
 
