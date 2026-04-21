@@ -1,0 +1,24 @@
+services:
+  sshd1:
+    image: linuxserver/openssh-server:latest
+    environment:
+      PUBLIC_KEY_FILE: /keys/authorized_keys
+      USER_NAME: deploy
+      SUDO_ACCESS: "true"
+      PASSWORD_ACCESS: "false"
+    volumes:
+      - ./authorized_keys:/keys/authorized_keys:ro
+    ports:
+      - "22022:2222"
+
+  sshd2:
+    image: linuxserver/openssh-server:latest
+    environment:
+      PUBLIC_KEY_FILE: /keys/authorized_keys
+      USER_NAME: deploy
+      SUDO_ACCESS: "true"
+      PASSWORD_ACCESS: "false"
+    volumes:
+      - ./authorized_keys:/keys/authorized_keys:ro
+    ports:
+      - "22023:2222"
