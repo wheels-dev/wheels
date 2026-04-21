@@ -145,6 +145,67 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(findNoCase("hook pre-deploy", joined)).toBe(0);
                 expect(findNoCase("hook post-deploy", joined)).toBe(0);
             });
+
+            it("init_stub writes config/deploy.yml and .kamal/secrets to the target cwd", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var msg = localCli.init_stub({cwd: tmpCwd, service: "demo", image: "acme/demo"});
+
+                expect(fileExists(tmpCwd & "/config/deploy.yml")).toBeTrue();
+                expect(fileExists(tmpCwd & "/.kamal/secrets")).toBeTrue();
+                expect(directoryExists(tmpCwd & "/.kamal/hooks")).toBeTrue();
+                expect(msg).toInclude("config/deploy.yml");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub populates the template with service + image names", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                localCli.init_stub({cwd: tmpCwd, service: "myapp", image: "acme/myapp"});
+
+                var yml = fileRead(tmpCwd & "/config/deploy.yml");
+                expect(yml).toInclude("service: myapp");
+                expect(yml).toInclude("image: acme/myapp");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub refuses to overwrite an existing config/deploy.yml without force", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd & "/config", true, true);
+                fileWrite(tmpCwd & "/config/deploy.yml", "already here");
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                expect(() => localCli.init_stub({cwd: tmpCwd, service: "x", image: "y/z"}))
+                    .toThrow();
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub overwrites when force=true", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd & "/config", true, true);
+                fileWrite(tmpCwd & "/config/deploy.yml", "old content");
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                localCli.init_stub({cwd: tmpCwd, service: "new", image: "new/web", force: true});
+                var yml = fileRead(tmpCwd & "/config/deploy.yml");
+                expect(yml).toInclude("service: new");
+
+                directoryDelete(tmpCwd, true);
+            });
         });
     }
 }

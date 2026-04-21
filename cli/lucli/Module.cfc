@@ -1421,6 +1421,23 @@ component extends="modules.BaseModule" {
 			} else if (a == "--configPath" && i < n) {
 				opts.configPath = arguments.args[i+1];
 				i++;
+			} else if (a == "--force") {
+				opts.force = true;
+			} else if (left(a, 10) == "--service=") {
+				opts.service = mid(a, 11, 99999);
+			} else if (a == "--service" && i < n) {
+				opts.service = arguments.args[i+1];
+				i++;
+			} else if (left(a, 8) == "--image=") {
+				opts.image = mid(a, 9, 99999);
+			} else if (a == "--image" && i < n) {
+				opts.image = arguments.args[i+1];
+				i++;
+			} else if (left(a, 20) == "--registry-username=") {
+				opts.registryUsername = mid(a, 21, 99999);
+			} else if (a == "--registry-username" && i < n) {
+				opts.registryUsername = arguments.args[i+1];
+				i++;
 			}
 			i++;
 		}

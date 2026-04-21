@@ -147,7 +147,49 @@ component {
     }
 
     public string function init_stub(required struct opts) {
-        return "created config/deploy.yml (stub)";
+        var cwd = arguments.opts.cwd ?: expandPath("./");
+        if (right(cwd, 1) != "/") cwd &= "/";
+
+        var force = arguments.opts.force ?: false;
+        var deployYmlPath = cwd & "config/deploy.yml";
+        var secretsPath = cwd & ".kamal/secrets";
+
+        if (!force && fileExists(deployYmlPath)) {
+            throw(
+                type = "DeployMainCli.InitAlreadyExists",
+                message = "config/deploy.yml already exists at " & deployYmlPath & "; pass --force to overwrite"
+            );
+        }
+
+        var serviceName = arguments.opts.service ?: $basename(cwd);
+        var imageName = arguments.opts.image ?: (serviceName & "/web");
+        var registryUser = arguments.opts.registryUsername ?: "changeme";
+
+        var mustache = new cli.lucli.services.deploy.lib.Mustache();
+        var tplDir = expandPath("/cli/lucli/templates/deploy/init");
+        var ctx = {
+            service_name: serviceName,
+            image_name: imageName,
+            registry_username: registryUser
+        };
+
+        if (!directoryExists(cwd & "config")) directoryCreate(cwd & "config", true, true);
+        fileWrite(deployYmlPath, mustache.render(fileRead(tplDir & "/deploy.yml.mustache"), ctx));
+
+        if (!directoryExists(cwd & ".kamal/hooks")) directoryCreate(cwd & ".kamal/hooks", true, true);
+        fileWrite(secretsPath, mustache.render(fileRead(tplDir & "/secrets.mustache"), ctx));
+
+        return "Created config/deploy.yml and .kamal/secrets." & chr(10)
+             & "Next steps:" & chr(10)
+             & "  1. Edit config/deploy.yml — update servers, proxy host, registry username." & chr(10)
+             & "  2. Populate .kamal/secrets with real values (or $(cmd) substitutions)." & chr(10)
+             & "  3. wheels deploy setup";
+    }
+
+    private string function $basename(required string path) {
+        var parts = listToArray(arguments.path, "/\");
+        if (!arrayLen(parts)) return "myapp";
+        return parts[arrayLen(parts)];
     }
 
     // ── Private helpers ────────────────────────────────────────────
