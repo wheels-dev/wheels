@@ -44,6 +44,28 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("--tail 42");
                 expect(cmd).toInclude("kamal-proxy");
             });
+
+            it("reboot() chains remove + boot", () => {
+                var cmd = new cli.lucli.services.deploy.commands.ProxyCommands(variables.cfg).reboot();
+                expect(cmd).toInclude("docker stop kamal-proxy");
+                expect(cmd).toInclude("docker rm kamal-proxy");
+                expect(cmd).toInclude("docker run");
+            });
+
+            it("start() starts the kamal-proxy container", () => {
+                var cmd = new cli.lucli.services.deploy.commands.ProxyCommands(variables.cfg).start();
+                expect(cmd).toBe("docker start kamal-proxy");
+            });
+
+            it("stop() stops the kamal-proxy container", () => {
+                var cmd = new cli.lucli.services.deploy.commands.ProxyCommands(variables.cfg).stop();
+                expect(cmd).toBe("docker stop kamal-proxy");
+            });
+
+            it("restart() restarts the kamal-proxy container", () => {
+                var cmd = new cli.lucli.services.deploy.commands.ProxyCommands(variables.cfg).restart();
+                expect(cmd).toBe("docker restart kamal-proxy");
+            });
         });
     }
 }

@@ -1353,6 +1353,28 @@ component extends="modules.BaseModule" {
 					default:
 						throw(message="Unknown wheels deploy app verb: #appVerb#");
 				}
+			case "proxy":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy proxy requires a verb");
+				}
+				var proxyVerb = positional[2];
+				var proxyCli = new cli.lucli.services.deploy.cli.DeployProxyCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (proxyVerb) {
+					case "boot":
+					case "reboot":
+					case "start":
+					case "stop":
+					case "restart":
+					case "details":
+					case "logs":
+					case "remove":
+						invoke(proxyCli, proxyVerb, [opts]);
+						return arrayToList(proxyCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy proxy verb: #proxyVerb#");
+				}
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}
