@@ -19,11 +19,17 @@ export async function createFixture(name = 'fixture') {
   // or similar "engine is null" errors from the Lucee script engine init.
   // The error is transient; retry once or twice resolves it. Upstream fix
   // (atomic lucee.json write in LuCLI) is tracked but not shipped.
-  const MAX_ATTEMPTS = 3;
+  const MAX_ATTEMPTS = 4;
   const TRANSIENT_PATTERNS = [
     /Can't cast String \[\] to a value of type \[Struct\]/,
     /because "engine" is null/,
     /ScriptEngine\.put/,
+    // When many fixtures spawn concurrently, posix_spawn occasionally
+    // returns ENOENT on the wrapper path even though it exists + is
+    // executable. Appears to be a Linuxbrew + parallel-JVM contention
+    // issue. Transient; retry resolves.
+    /^spawn .* ENOENT$/m,
+    /spawn \/home\/linuxbrew.*ENOENT/,
   ];
   let lastError;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
