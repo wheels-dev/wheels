@@ -1479,6 +1479,17 @@ component extends="modules.BaseModule" {
 					default:
 						throw(message="Unknown wheels deploy server verb: #serverVerb#");
 				}
+			case "lock":
+				if (arrayLen(positional) < 2) throw(message="wheels deploy lock requires a verb (acquire/release/status)");
+				var lockVerb = positional[2];
+				if (!listFindNoCase("acquire,release,status", lockVerb)) {
+					throw(message="Unknown wheels deploy lock verb: " & lockVerb);
+				}
+				var lockCli = new cli.lucli.services.deploy.cli.DeployLockCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				invoke(lockCli, lockVerb, [opts]);
+				return arrayToList(lockCli.dryRunOutput(), chr(10));
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}
@@ -1533,6 +1544,11 @@ component extends="modules.BaseModule" {
 				opts.keep = mid(a, 8, 99999);
 			} else if (a == "--keep" && i < n) {
 				opts.keep = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--message=") {
+				opts.message = mid(a, 11, 99999);
+			} else if (a == "--message" && i < n) {
+				opts.message = arguments.args[i+1];
 				i++;
 			}
 			i++;
