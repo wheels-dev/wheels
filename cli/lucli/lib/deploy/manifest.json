@@ -2,6 +2,7 @@
   "version": 1,
   "generated": "2026-04-21",
   "jars": [
-    {"name": "jmustache-1.16.jar", "sha256": "3d4b984abd66908f05b38c9c892325cd4785d01ff33922569ff9b90c9ebfc475"}
+    {"name": "jmustache-1.16.jar", "sha256": "3d4b984abd66908f05b38c9c892325cd4785d01ff33922569ff9b90c9ebfc475"},
+    {"name": "snakeyaml-2.3.jar", "sha256": "63a76fe66b652360bd4c2c107e6f0258daa7d4bb492008ba8c26fcd230ff9146"}
   ]
 }
