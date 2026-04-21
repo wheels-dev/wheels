@@ -21,6 +21,8 @@ Used inside migration table definitions to define a primary key for the table. B
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — |  |
@@ -32,6 +34,8 @@ Used inside migration table definitions to define a primary key for the table. B
 | `references` | `string` | no | — |  |
 | `onUpdate` | `string` | no | — |  |
 | `onDelete` | `string` | no | — |  |
+
+</div>
 
 ## Examples
 

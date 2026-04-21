@@ -21,9 +21,13 @@ Returns a reference to a specific model defined in your application, allowing yo
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the model to get a reference to. |
+
+</div>
 
 ## Examples
 

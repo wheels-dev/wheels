@@ -19,6 +19,8 @@ Deletes the object, which means the row is deleted from the database (unless pre
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `parameterize` | `any` | yes | `true` | Set to true to use cfqueryparam on all columns, or pass in a list of property names to use cfqueryparam on those only. |
@@ -26,6 +28,8 @@ Deletes the object, which means the row is deleted from the database (unless pre
 | `callbacks` | `boolean` | yes | `true` | Set to false to disable callbacks for this operation. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
 | `softDelete` | `boolean` | yes | `true` | Set to false to permanently delete a record, even if it has a soft delete column. |
+
+</div>
 
 ## Examples
 

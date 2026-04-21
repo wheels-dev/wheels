@@ -21,6 +21,8 @@ Builds and returns three select form controls for hours, minutes, and seconds, b
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | no | — | The variable name of the object to build the form control for. |
@@ -43,6 +45,8 @@ Builds and returns three select form controls for hours, minutes, and seconds, b
 | `combine` | `boolean` | no | — | Set to false to not combine the select parts into a single DateTime object. |
 | `twelveHour` | `boolean` | no | `false` | whether to display the hours in 24 or 12 hour format. 12 hour format has AM/PM drop downs |
 | `encode` | `any` | no | `true` | Use this argument to decide whether the output of the function should be encoded in order to prevent Cross Site Scripting (XSS) attacks. Set it to `true` to encode all relevant output for the specific HTML element in question (e.g. tag content, attribute values, and URLs). For HTML elements that have both tag content and attribute values you can set this argument to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

@@ -21,6 +21,8 @@ Used when defining a table schema to add reference columns that act as foreign k
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `referenceNames` | `string` | yes | — |  |
@@ -30,6 +32,8 @@ Used when defining a table schema to add reference columns that act as foreign k
 | `foreignKey` | `boolean` | no | `true` |  |
 | `onUpdate` | `string` | no | — |  |
 | `onDelete` | `string` | no | — |  |
+
+</div>
 
 ## Examples
 

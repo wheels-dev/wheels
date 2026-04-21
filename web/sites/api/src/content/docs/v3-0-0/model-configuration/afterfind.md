@@ -21,9 +21,13 @@ Registers one or more callback methods that should be executed after an existing
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `methods` | `string` | no | — | Method name or list of method names that should be called when this callback event occurs in an object's life cycle (can also be called with the `method` argument). |
+
+</div>
 
 ## Examples
 

@@ -22,10 +22,14 @@ Returns an empty string if no errors exist.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | The variable name of the object to display error messages for. |
 | `class` | `string` | no | `error-messages` | CSS `class` to set on the `ul` element. |
 | `showDuplicates` | `boolean` | no | `true` | Whether or not to show duplicate error messages. |
 | `encode` | `boolean` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 

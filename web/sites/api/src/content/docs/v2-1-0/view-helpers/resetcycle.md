@@ -21,9 +21,13 @@ Resets a cycle so that it starts from the first list value the next time it is c
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | `default` | The name of the cycle to reset. |
+
+</div>
 
 ## Examples
 

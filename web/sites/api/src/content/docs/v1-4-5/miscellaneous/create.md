@@ -19,6 +19,8 @@ Creates a new object, saves it to the database (if the validation permits it), a
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | yes | — | See documentation for new. |
@@ -27,6 +29,8 @@ Creates a new object, saves it to the database (if the validation permits it), a
 | `validate` | `boolean` | yes | `true` | See documentation for save. |
 | `transaction` | `string` | yes | — | See documentation for save. |
 | `callbacks` | `boolean` | yes | `true` | See documentation for save. |
+
+</div>
 
 ## Examples
 

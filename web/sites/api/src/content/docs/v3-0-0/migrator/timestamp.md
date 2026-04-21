@@ -21,12 +21,16 @@ Used to add one or more <code>TIMESTAMP</code> (or <code>DATETIME</code>) column
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `default` | `string` | no | — |  |
 | `allowNull` | `boolean` | no | — |  |
 | `columnType` | `string` | no | `datetime` |  |
+
+</div>
 
 ## Examples
 

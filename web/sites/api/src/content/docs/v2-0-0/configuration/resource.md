@@ -21,6 +21,8 @@ Create a group of routes that exposes actions for manipulating a singular resour
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Camel-case name of resource to reference when build links and form actions. This is typically a singular word (e.g., `profile`). |
@@ -37,6 +39,8 @@ Create a group of routes that exposes actions for manipulating a singular resour
 | `constraints` | `struct` | no | — | Variable patterns to use for matching. |
 | `$call` | `string` | no | `resource` |  |
 | `$plural` | `boolean` | no | `false` |  |
+
+</div>
 
 ## Examples
 

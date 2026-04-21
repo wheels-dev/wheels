@@ -21,10 +21,14 @@ Used to delete an index from a database table within a migration CFC. Indexes ar
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to perform the index operation on |
 | `indexName` | `string` | yes | — | the name of the index to remove |
+
+</div>
 
 ## Examples
 

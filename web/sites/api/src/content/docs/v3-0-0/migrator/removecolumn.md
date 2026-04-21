@@ -21,11 +21,15 @@ Used to delete a column from a database table within a migration CFC. This is us
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table containing the column to remove |
 | `columnName` | `string` | no | — | The column name to remove |
 | `referenceName` | `string` | no | — | optional reference name |
+
+</div>
 
 ## Examples
 

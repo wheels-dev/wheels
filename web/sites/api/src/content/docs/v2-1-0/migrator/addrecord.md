@@ -22,9 +22,13 @@ Only available in a migration CFC
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to add the record to |
+
+</div>
 
 ## Examples
 

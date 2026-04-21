@@ -21,6 +21,8 @@ Adds a column to table definition.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnName` | `string` | yes | — |  |
@@ -30,4 +32,6 @@ Adds a column to table definition.
 | `limit` | `any` | no | — |  |
 | `precision` | `numeric` | no | — |  |
 | `scale` | `numeric` | no | — |  |
+
+</div>
 

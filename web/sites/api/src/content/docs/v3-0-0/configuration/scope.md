@@ -21,6 +21,8 @@ The scope() function in Wheels is used to define a block of routes that share co
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | — | Name to prepend to child route names for use when building links, forms, and other URLs. |
@@ -32,6 +34,8 @@ The scope() function in Wheels is used to define a block of routes that share co
 | `shallowName` | `string` | no | — | Shallow name prefix. |
 | `constraints` | `struct` | no | — | Variable patterns to use for matching. |
 | `$call` | `string` | no | `scope` |  |
+
+</div>
 
 ## Examples
 

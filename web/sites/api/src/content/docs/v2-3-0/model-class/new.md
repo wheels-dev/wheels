@@ -23,11 +23,15 @@ Property names and values can be passed in either using named arguments or as a 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | no | `[runtime expression]` | The properties you want to set on the object (can also be passed in as named arguments). |
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
 | `allowExplicitTimestamps` | `boolean` | no | `false` | Set this to `true` to allow explicit assignment of `createdAt` or `updatedAt` properties |
+
+</div>
 
 ## Examples
 

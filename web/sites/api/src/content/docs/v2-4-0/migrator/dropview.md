@@ -22,7 +22,11 @@ Only available in a migration CFC
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the view to drop |
+
+</div>
 

@@ -21,9 +21,13 @@ Converts a string so that the first letter of each word is capitalized, producin
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `word` | `string` | yes | — | The text to turn into a title. |
+
+</div>
 
 ## Examples
 

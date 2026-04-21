@@ -21,11 +21,15 @@ Returns formatted text using HTML break tags (<code><br></code>) and HTML paragr
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | The text to format. |
 | `wrap` | `boolean` | no | `true` | Set to `true` to wrap the result in a paragraph HTML element. |
 | `encode` | `boolean` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

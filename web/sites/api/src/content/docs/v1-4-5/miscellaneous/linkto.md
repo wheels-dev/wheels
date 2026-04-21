@@ -19,6 +19,8 @@ Creates a link to another page in your application. Pass in the name of a route 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | The text content of the link. |
@@ -34,6 +36,8 @@ Creates a link to another page in your application. Pass in the name of a route 
 | `protocol` | `string` | yes | — | Set this to override the current protocol. |
 | `port` | `numeric` | yes | `0` | Set this to override the current port number. |
 | `href` | `string` | yes | — | Pass a link to an external site here if you want to bypass the CFWheels routing system altogether and link to an external URL. |
+
+</div>
 
 ## Examples
 

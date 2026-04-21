@@ -21,6 +21,8 @@ Sends a file to the user (from the <code>files</code> folder or a path relative 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `file` | `string` | yes | — | The file to send to the user. |
@@ -30,6 +32,8 @@ Sends a file to the user (from the <code>files</code> folder or a path relative 
 | `directory` | `string` | no | — | Directory outside of the web root where the file exists. Must be a full path. |
 | `deleteFile` | `boolean` | no | `false` | Pass in `true` to delete the file on the server after sending it. |
 | `deliver` | `boolean` | no | `true` |  |
+
+</div>
 
 ## Examples
 

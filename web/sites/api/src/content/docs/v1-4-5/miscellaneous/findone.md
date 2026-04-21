@@ -19,6 +19,8 @@ Fetches the first record found based on the WHERE and ORDER BY clauses. With the
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `any` | yes | — | This argument maps to the WHERE clause of the query. The following operators are supported: =, !=, <>, <, <=, >, >=, LIKE, NOT LIKE, IN, NOT IN, IS NULL, IS NOT NULL, AND, and OR. (Note that the key words need to be written in upper case.) You can also use parentheses to group statements. You do not need to specify the table name(s); Wheels will do that for you. |
@@ -30,6 +32,8 @@ Fetches the first record found based on the WHERE and ORDER BY clauses. With the
 | `parameterize` | `any` | yes | `true` | Set to true to use cfqueryparam on all columns, or pass in a list of property names to use cfqueryparam on those only. |
 | `returnAs` | `string` | yes | `objects` | Set this to objects to return an array of objects. Set this to query to return a query result set. |
 | `includeSoftDeletes` | `boolean` | yes | `false` | You can set this argument to true to include soft-deleted records in the results. |
+
+</div>
 
 ## Examples
 

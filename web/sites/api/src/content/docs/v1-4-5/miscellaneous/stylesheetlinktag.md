@@ -19,6 +19,8 @@ Returns a link tag for a stylesheet (or several) based on the supplied arguments
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `sources` | `string` | yes | — | The name of one or many CSS files in the stylesheets folder, minus the .css extension. (Can also be called with the source argument.) Pass a full URL to generate a tag for an external style sheet. |
@@ -26,6 +28,8 @@ Returns a link tag for a stylesheet (or several) based on the supplied arguments
 | `media` | `string` | yes | `all` | The media attribute for the link tag. |
 | `head` | `string` | yes | `false` | Set to true to place the output in the head area of the HTML page instead of the default behavior, which is to place the output where the function is called from. |
 | `delim` | `string` | yes | `,` | the delimiter to use for the list of stylesheets |
+
+</div>
 
 ## Examples
 

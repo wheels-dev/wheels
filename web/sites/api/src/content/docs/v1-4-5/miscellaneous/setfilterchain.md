@@ -19,9 +19,13 @@ Use this function if you need a more low level way of setting the entire filter 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `chain` | `array` | yes | — | An array of structs, each of which represent an argumentCollection that get passed to the filters function. This should represent the entire filter chain that you want to use for this controller. |
+
+</div>
 
 ## Examples
 

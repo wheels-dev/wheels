@@ -21,9 +21,13 @@ Returns the singular form of the passed in word.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `word` | `string` | yes | — |  |
+
+</div>
 
 ## Examples
 

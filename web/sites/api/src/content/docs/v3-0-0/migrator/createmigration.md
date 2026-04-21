@@ -21,11 +21,15 @@ The createMigration() method is used to generate a new migration file for managi
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `migrationName` | `string` | yes | — |  |
 | `templateName` | `string` | no | — |  |
 | `migrationPrefix` | `string` | no | `timestamp` |  |
+
+</div>
 
 ## Examples
 

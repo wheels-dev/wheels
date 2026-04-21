@@ -21,10 +21,14 @@ The findFirst() function fetches the first record from the database table mapped
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | no | `[runtime expression]` | Name of the property to order by. This argument is also aliased as `properties`. |
 | `$sort` | `string` | no | `ASC` |  |
+
+</div>
 
 ## Examples
 

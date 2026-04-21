@@ -19,6 +19,8 @@ Builds and returns a string containing a select form control for the months of t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | See documentation for textFieldTag. |
@@ -33,6 +35,8 @@ Builds and returns a string containing a select form control for the months of t
 | `append` | `string` | yes | — | See documentation for textField. |
 | `prependToLabel` | `string` | yes | — | See documentation for textField. |
 | `appendToLabel` | `string` | yes | — | See documentation for textField. |
+
+</div>
 
 ## Examples
 

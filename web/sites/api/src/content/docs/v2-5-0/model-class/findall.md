@@ -22,6 +22,8 @@ The records will be returned as either a <code>cfquery</code> result set, an arr
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `where` | `string` | no | — | Maps to the `WHERE` clause of the query (or `HAVING` when necessary). The following operators are supported: `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `LIKE`, `NOT LIKE`, `IN`, `NOT IN`, `IS NULL`, `IS NOT NULL`, `AND`, and `OR` (note that the key words need to be written in upper case). You can also use parentheses to group statements. You do not need to specify the table name(s); CFWheels will do that for you. |
@@ -46,6 +48,8 @@ The records will be returned as either a <code>cfquery</code> result set, an arr
 | `dataSource` | `string` | no | `[runtime expression]` | Override the default datasource |
 | `$limit` | `numeric` | no | `0` |  |
 | `$offset` | `numeric` | no | `0` |  |
+
+</div>
 
 ## Examples
 

@@ -19,6 +19,8 @@ Instructs the controller to render the data passed in to the format that is requ
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `data` | `any` | yes | — | Data to format and render. |
@@ -29,6 +31,8 @@ Instructs the controller to render the data passed in to the format that is requ
 | `cache` | `any` | yes | — | See documentation for renderPage. |
 | `returnAs` | `string` | yes | — | See documentation for renderPage. |
 | `hideDebugInformation` | `boolean` | yes | `false` | See documentation for renderPage. |
+
+</div>
 
 ## Examples
 

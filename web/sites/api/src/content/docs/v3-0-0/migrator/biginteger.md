@@ -21,12 +21,16 @@ Adds one or more big integer columns to a table definition in a migration. Use t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `limit` | `numeric` | no | — |  |
 | `default` | `string` | no | — |  |
 | `allowNull` | `boolean` | no | — |  |
+
+</div>
 
 ## Examples
 

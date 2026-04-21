@@ -19,9 +19,13 @@ Removes all HTML tags from a string.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `html` | `string` | yes | — | The HTML to remove tag markup from. |
+
+</div>
 
 ## Examples
 

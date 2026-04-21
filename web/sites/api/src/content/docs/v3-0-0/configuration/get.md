@@ -21,10 +21,14 @@ Returns the current value of a Wheels configuration setting or the default value
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Variable name to get setting for. |
 | `functionName` | `string` | no | — | Function name to get setting for. |
+
+</div>
 
 ## Examples
 

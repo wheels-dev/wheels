@@ -22,6 +22,8 @@ Returns an empty string if no errors exist.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | The variable name of the object to display error messages for. |
@@ -29,4 +31,6 @@ Returns an empty string if no errors exist.
 | `showDuplicates` | `boolean` | no | `true` | Whether or not to show duplicate error messages. |
 | `encode` | `boolean` | no | `true` | Use this argument to decide whether the output of the function should be encoded in order to prevent Cross Site Scripting (XSS) attacks. Set it to `true` to encode all relevant output for the specific HTML element in question (e.g. tag content, attribute values, and URLs). For HTML elements that have both tag content and attribute values you can set this argument to `attributes` to only encode attribute values and not tag content. |
 | `includeAssociations` | `boolean` | no | `true` |  |
+
+</div>
 

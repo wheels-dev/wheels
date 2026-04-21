@@ -21,9 +21,13 @@ dropView() is used to remove a database view entirely. A view is a saved query t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the view to drop |
+
+</div>
 
 ## Examples
 

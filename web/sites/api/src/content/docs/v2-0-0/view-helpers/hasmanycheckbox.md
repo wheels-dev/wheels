@@ -22,6 +22,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | Name of the variable containing the parent object to represent with this form field. |
@@ -36,6 +38,8 @@ Note: Pass any additional arguments like class, rel, and id, and the generated t
 | `errorElement` | `string` | no | — | HTML tag to wrap the form control with when the object contains errors. |
 | `errorClass` | `string` | no | — | The `class` name of the HTML tag that wraps the form control when there are errors. |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

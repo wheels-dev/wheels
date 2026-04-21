@@ -19,9 +19,13 @@ Alias for primaryKey(). Use this for better readability when you're accessing mu
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `position` | `numeric` | yes | `0` | If you are accessing a composite primary key, pass the position of a single key to fetch. |
+
+</div>
 
 ## Examples
 

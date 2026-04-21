@@ -19,6 +19,8 @@ Validates that the specified property exists and that its value is not blank.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | See documentation for validatesConfirmationOf. |
@@ -26,6 +28,8 @@ Validates that the specified property exists and that its value is not blank.
 | `when` | `string` | yes | `onSave` | See documentation for validatesConfirmationOf. |
 | `condition` | `string` | yes | — | See documentation for validatesConfirmationOf. |
 | `unless` | `string` | yes | — | See documentation for validatesConfirmationOf. |
+
+</div>
 
 ## Examples
 

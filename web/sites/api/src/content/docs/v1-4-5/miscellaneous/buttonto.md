@@ -19,6 +19,8 @@ Creates a form containing a single button that submits to the URL. The URL is bu
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | The text content of the button. |
@@ -35,6 +37,8 @@ Creates a form containing a single button that submits to the URL. The URL is bu
 | `host` | `string` | yes | — | See documentation for URLFor. |
 | `protocol` | `string` | yes | — | See documentation for URLFor. |
 | `port` | `numeric` | yes | `0` | See documentation for URLFor. |
+
+</div>
 
 ## Examples
 

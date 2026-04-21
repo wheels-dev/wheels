@@ -21,9 +21,13 @@ Allows you to set multiple properties of a model object at once. It is useful wh
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | no | `[runtime expression]` | The properties you want to set on the object (can also be passed in as named arguments). |
+
+</div>
 
 ## Examples
 

@@ -19,10 +19,14 @@ Use this in an individual controller action to define which formats the action w
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `formats` | `string` | yes | — | See documentation for provides. |
 | `action` | `string` | yes | — | Name of action, defaults to current. |
+
+</div>
 
 ## Examples
 

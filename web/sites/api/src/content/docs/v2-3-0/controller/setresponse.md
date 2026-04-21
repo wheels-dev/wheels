@@ -21,9 +21,13 @@ Sets content that CFWheels will send to the client in response to the request.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `content` | `string` | yes | — | The content to send to the client. |
+
+</div>
 
 ## Examples
 

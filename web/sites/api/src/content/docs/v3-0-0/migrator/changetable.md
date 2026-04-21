@@ -21,9 +21,13 @@ Creates a table definition object used to store and apply modifications to an ex
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name of the table to set change properties on |
+
+</div>
 
 ## Examples
 

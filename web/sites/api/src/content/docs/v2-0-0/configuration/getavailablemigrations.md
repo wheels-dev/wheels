@@ -21,9 +21,13 @@ Searches db/migrate folder for migrations. Whilst you can use this in your appli
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `path` | `string` | no | `[runtime expression]` | Path to Migration Files: defaults to /migrator/migrations/ |
+
+</div>
 
 ## Examples
 

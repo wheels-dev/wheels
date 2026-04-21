@@ -19,9 +19,13 @@ Returns true if the specified property (or any if none was passed in) has been c
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to check for change. |
+
+</div>
 
 ## Examples
 

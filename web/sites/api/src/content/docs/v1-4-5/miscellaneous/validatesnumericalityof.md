@@ -19,6 +19,8 @@ Validates that the value of the specified property is numeric.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | See documentation for validatesConfirmationOf. |
@@ -35,6 +37,8 @@ Validates that the value of the specified property is numeric.
 | `equalTo` | `numeric` | yes | — | Specifies whether or not the value must be equal to the supplied value. |
 | `lessThan` | `numeric` | yes | — | Specifies whether or not the value must be less than the supplied value. |
 | `lessThanOrEqualTo` | `numeric` | yes | — | Specifies whether or not the value must be less than or equal the supplied value. |
+
+</div>
 
 ## Examples
 

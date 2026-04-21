@@ -19,9 +19,13 @@ Allows you to pass in the name(s) of the property(s) that should be used as the 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Property (or list of properties) to set as the primary key. |
+
+</div>
 
 ## Examples
 

@@ -19,6 +19,8 @@ Builds and returns a string containing a text field form control based on the su
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | The variable name of the object to build the form control for. |
@@ -35,6 +37,8 @@ Builds and returns a string containing a text field form control based on the su
 | `errorClass` | `string` | yes | `fieldWithErrors` | The class name of the HTML tag that wraps the form control when there are errors. |
 | `type` | `string` | yes | `text` | Input type attribute. Common examples in HTML5 and later are text (default), email, tel, and url. |
 | `labelClass` | `string` | yes | — | String added to the label's class. |
+
+</div>
 
 ## Examples
 

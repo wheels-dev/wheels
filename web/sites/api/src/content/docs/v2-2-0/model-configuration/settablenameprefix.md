@@ -21,9 +21,13 @@ Sets a prefix to prepend to the table name when this model runs SQL queries.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `prefix` | `string` | yes | — | A prefix to prepend to the table name. |
+
+</div>
 
 ## Examples
 

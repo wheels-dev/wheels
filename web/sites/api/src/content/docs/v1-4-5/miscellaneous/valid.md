@@ -19,9 +19,13 @@ Runs the validation on the object and returns true if it passes it. Wheels will 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `callbacks` | `boolean` | yes | `true` | Set to false to disable callbacks for this operation. |
+
+</div>
 
 ## Examples
 

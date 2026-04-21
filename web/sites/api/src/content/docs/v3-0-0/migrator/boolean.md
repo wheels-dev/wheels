@@ -21,11 +21,15 @@ Adds one or more boolean columns to a table definition in a migration. Use this 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `default` | `string` | no | — |  |
 | `allowNull` | `boolean` | no | — |  |
+
+</div>
 
 ## Examples
 

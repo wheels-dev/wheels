@@ -21,8 +21,12 @@ Returns the mapper object used to configure your application's routes. Usually y
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `restful` | `boolean` | no | `true` |  |
 | `methods` | `boolean` | no | `[runtime expression]` |  |
+
+</div>
 

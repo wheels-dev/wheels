@@ -19,6 +19,8 @@ Used as a shortcut to output the proper form elements for an association. Note: 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | Name of the variable containing the parent object to represent with this form field. |
@@ -28,6 +30,8 @@ Used as a shortcut to output the proper form elements for an association. Note: 
 | `tagValue` | `string` | yes | — | The value of the radio button when selected. |
 | `checkIfBlank` | `boolean` | yes | `false` | Whether or not to check this form field as a default if there is a blank value set for the property. |
 | `label` | `string` | yes | — | The label text to use in the form control. |
+
+</div>
 
 ## Examples
 

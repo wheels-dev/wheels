@@ -21,11 +21,15 @@ Adds datetime columns to a table definition when creating or altering a table in
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `default` | `string` | no | — |  |
 | `allowNull` | `boolean` | no | — |  |
+
+</div>
 
 ## Examples
 

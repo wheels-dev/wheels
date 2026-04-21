@@ -19,6 +19,8 @@ Instructs the controller to render a partial when it's finished processing the a
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `partial` | `string` | yes | — | The name of the partial file to be used. Prefix with a leading slash / if you need to build a path from the root views folder. Do not include the partial filename's underscore and file extension. |
@@ -26,6 +28,8 @@ Instructs the controller to render a partial when it's finished processing the a
 | `layout` | `string` | yes | — | See documentation for renderPage. |
 | `returnAs` | `string` | yes | — | See documentation for renderPage. |
 | `dataFunction` | `any` | yes | `true` | Name of a controller function to load data from. |
+
+</div>
 
 ## Examples
 

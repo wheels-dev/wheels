@@ -21,6 +21,8 @@ The findByKey() function retrieves a single record from the database using its p
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `any` | yes | — | Primary key value(s) of the record. Separate with comma if passing in multiple primary key values. Accepts a string, list, or a numeric value. |
@@ -34,6 +36,8 @@ The findByKey() function retrieves a single record from the database using its p
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
 | `includeSoftDeletes` | `boolean` | no | `false` | Set to `true` to include soft-deleted records in the queries that this method runs. |
 | `dataSource` | `string` | no | `[runtime expression]` | Override the default datasource |
+
+</div>
 
 ## Examples
 

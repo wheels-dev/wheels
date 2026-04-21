@@ -21,9 +21,13 @@ The flashKeep() function allows you to preserve Flash data for one additional re
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `string` | no | — |  |
+
+</div>
 
 ## Examples
 

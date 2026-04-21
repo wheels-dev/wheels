@@ -21,11 +21,15 @@ Builds and returns a string containing the closing <code>form</code> tag.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `prepend` | `string` | no | — | String to prepend to the form control. Useful to wrap the form control with HTML tags. |
 | `append` | `string` | no | — | String to append to the form control. Useful to wrap the form control with HTML tags. |
 | `encode` | `any` | no | `true` | When set to `true`, encodes tag content, attribute values, and URLs so that Cross Site Scripting (XSS) attacks can be prevented. Set to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

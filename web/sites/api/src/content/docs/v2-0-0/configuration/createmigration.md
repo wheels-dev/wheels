@@ -21,11 +21,15 @@ Creates a migration file. Whilst you can use this in your application, the recom
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `migrationName` | `string` | yes | — |  |
 | `templateName` | `string` | no | — |  |
 | `migrationPrefix` | `string` | no | `timestamp` |  |
+
+</div>
 
 ## Examples
 

@@ -21,12 +21,16 @@ The createTable() function is used in migration CFCs to define a new database ta
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | The name of the table to create |
 | `force` | `boolean` | no | `false` | whether to drop the table before creating it |
 | `id` | `boolean` | no | `true` | Whether to create a default primarykey or not |
 | `primaryKey` | `string` | no | `id` | Name of the primary key field to create |
+
+</div>
 
 ## Examples
 

@@ -19,9 +19,13 @@ Returns the name of the primary key for this model's table. This is determined t
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `position` | `numeric` | yes | `0` | If you are accessing a composite primary key, pass the position of a single key to fetch. |
+
+</div>
 
 ## Examples
 

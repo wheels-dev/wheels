@@ -19,12 +19,16 @@ Extracts an excerpt from text that matches the first instance of a given phrase.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | The text to extract an excerpt from. |
 | `phrase` | `string` | yes | — | The phrase to extract. |
 | `radius` | `numeric` | yes | `100` | Number of characters to extract surrounding the phrase. |
 | `excerptString` | `string` | yes | `...` | String to replace first and/or last characters with. |
+
+</div>
 
 ## Examples
 

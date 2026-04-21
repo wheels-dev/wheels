@@ -21,9 +21,13 @@ Returns the database column name that corresponds to a given model property. Thi
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to inspect. |
+
+</div>
 
 ## Examples
 

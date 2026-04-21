@@ -21,9 +21,13 @@ Converts an obfuscated string back into its original value. This is typically us
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `param` | `string` | yes | — | The value to deobfuscate. |
+
+</div>
 
 ## Examples
 

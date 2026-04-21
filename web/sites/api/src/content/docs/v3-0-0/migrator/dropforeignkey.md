@@ -21,10 +21,14 @@ dropForeignKey() is used to remove a foreign key constraint from a table in the 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to perform the operation on |
 | `keyName` | `string` | yes | — | the name of the key to drop |
+
+</div>
 
 ## Examples
 

@@ -21,11 +21,15 @@ Adds a custom error to a model instance. This is useful when built-in validation
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | The name of the property you want to add an error on. |
 | `message` | `string` | yes | — | The error message (such as "Please enter a correct name in the form field" for example). |
 | `name` | `string` | no | — | A name to identify the error by (useful when you need to distinguish one error from another one set on the same object and you don't want to use the error message itself for that). |
+
+</div>
 
 ## Examples
 

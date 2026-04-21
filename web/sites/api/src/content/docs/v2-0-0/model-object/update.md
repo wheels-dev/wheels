@@ -22,6 +22,8 @@ Returns <code>true</code> if the object was saved successfully to the database a
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | no | `[runtime expression]` | The properties you want to set on the object (can also be passed in as named arguments). |
@@ -30,6 +32,8 @@ Returns <code>true</code> if the object was saved successfully to the database a
 | `validate` | `boolean` | no | `true` | Set to `false` to skip validations for this operation. |
 | `transaction` | `string` | no | `[runtime expression]` | Set this to `commit` to update the database, `rollback` to run all the database queries but not commit them, or `none` to skip transaction handling altogether. |
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
+
+</div>
 
 ## Examples
 

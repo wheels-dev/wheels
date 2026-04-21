@@ -21,9 +21,13 @@ Migrates the database schema to a specified version. This function is primarily 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `version` | `string` | no | — | The Database schema version to migrate to |
+
+</div>
 
 ## Examples
 

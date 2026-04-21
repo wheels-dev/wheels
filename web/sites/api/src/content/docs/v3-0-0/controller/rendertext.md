@@ -21,10 +21,14 @@ Instructs the controller to output plain text as the response when an action com
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | no | — | The text to render. |
 | `status` | `any` | no | `[runtime expression]` | Force request to return with specific HTTP status code. |
+
+</div>
 
 ## Examples
 

@@ -21,6 +21,8 @@ Returns a <code>link</code> tag for a stylesheet (or several) based on the suppl
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `sources` | `string` | no | — | The name of one or many CSS files in the stylesheets folder, minus the `.css` extension. Pass a full URL to generate a tag for an external style sheet. Can also be called with the `source` argument. |
@@ -30,6 +32,8 @@ Returns a <code>link</code> tag for a stylesheet (or several) based on the suppl
 | `head` | `boolean` | no | `false` | Set to `true` to place the output in the `head` area of the HTML page instead of the default behavior (which is to place the output where the function is called from). |
 | `delim` | `string` | no | `,` | The delimiter to use for the list of CSS files. |
 | `encode` | `boolean` | no | `true` | Use this argument to decide whether the output of the function should be encoded in order to prevent Cross Site Scripting (XSS) attacks. Set it to `true` to encode all relevant output for the specific HTML element in question (e.g. tag content, attribute values, and URLs). For HTML elements that have both tag content and attribute values you can set this argument to `attributes` to only encode attribute values and not tag content. |
+
+</div>
 
 ## Examples
 

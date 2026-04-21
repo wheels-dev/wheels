@@ -21,6 +21,8 @@ Validates that the specified property exists and that its value is not blank.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | no | — | Name of property or list of property names to validate against (can also be called with the `property` argument). |
@@ -28,6 +30,8 @@ Validates that the specified property exists and that its value is not blank.
 | `when` | `string` | no | `onSave` | Pass in `onCreate` or `onUpdate` to limit when this validation occurs (by default validation will occur on both create and update, i.e. `onSave`). |
 | `condition` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `true` validation will run). |
 | `unless` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `false` validation will run). |
+
+</div>
 
 ## Examples
 

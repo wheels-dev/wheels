@@ -24,6 +24,8 @@ Primarily used for testing purposes.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `params` | `struct` | yes | — | The params struct to use in the request (make sure that at least `controller` and `action` are set). |
@@ -31,4 +33,6 @@ Primarily used for testing purposes.
 | `returnAs` | `string` | no | — | Pass in `struct` to return all information about the request instead of just the final output (`body`). |
 | `rollback` | `string` | no | `false` | Pass in `true` to roll back all database transactions made during the request. |
 | `includeFilters` | `string` | no | `true` | Set to `before` to only execute "before" filters, `after` to only execute "after" filters or `false` to skip all filters. |
+
+</div>
 

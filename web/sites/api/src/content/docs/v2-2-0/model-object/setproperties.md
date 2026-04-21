@@ -21,9 +21,13 @@ Allows you to set all the properties of an object at once by passing in a struct
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | no | `[runtime expression]` | The properties you want to set on the object (can also be passed in as named arguments). |
+
+</div>
 
 ## Examples
 

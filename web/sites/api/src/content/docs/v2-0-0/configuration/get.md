@@ -21,10 +21,14 @@ Returns the current setting for the supplied CFWheels setting or the current def
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Variable name to get setting for. |
 | `functionName` | `string` | no | — | Function name to get setting for. |
+
+</div>
 
 ## Examples
 

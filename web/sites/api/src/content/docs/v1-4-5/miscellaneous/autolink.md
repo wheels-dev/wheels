@@ -19,11 +19,15 @@ Turns all URLs and email addresses into hyperlinks.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `text` | `string` | yes | — | The text to create links in. |
 | `link` | `string` | yes | `all` | Whether to link URLs, email addresses or both. Possible values are: all (default), URLs and emailAddresses. |
 | `relative` | `boolean` | yes | `true` | Should we autolink relative urls |
+
+</div>
 
 ## Examples
 

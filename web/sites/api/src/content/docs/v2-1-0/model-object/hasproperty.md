@@ -21,9 +21,13 @@ Returns <code>true</code> if the specified property name exists on the model.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to inspect. |
+
+</div>
 
 ## Examples
 

@@ -21,9 +21,13 @@ Returns the previous value of a property that has been modified on a model objec
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `property` | `string` | yes | — | Name of property to get the previous value for. |
+
+</div>
 
 ## Examples
 

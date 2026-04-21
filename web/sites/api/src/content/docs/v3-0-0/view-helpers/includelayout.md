@@ -21,9 +21,13 @@ Includes the contents of another layout file. Typically used when a child layout
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | no | `layout` | Name of the layout file to include. |
+
+</div>
 
 ## Examples
 

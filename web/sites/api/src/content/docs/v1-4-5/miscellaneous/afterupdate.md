@@ -19,9 +19,13 @@ Registers method(s) that should be called after an existing object is updated.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `methods` | `string` | yes | — | See documentation for afterNew. |
+
+</div>
 
 ## Examples
 

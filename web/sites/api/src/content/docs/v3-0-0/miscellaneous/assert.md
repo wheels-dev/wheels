@@ -19,9 +19,13 @@ Asserts that an expression evaluates to true in a test. If the expression evalua
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `expression` | `string` | yes | — |  |
+
+</div>
 
 ## Examples
 

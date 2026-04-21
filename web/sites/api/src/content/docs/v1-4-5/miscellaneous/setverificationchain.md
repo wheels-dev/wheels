@@ -19,9 +19,13 @@ Use this function if you need a more low level way of setting the entire verific
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `chain` | `array` | yes | — | An array of structs, each of which represent an argumentCollection that get passed to the verifies function. This should represent the entire verification chain that you want to use for this controller. |
+
+</div>
 
 ## Examples
 

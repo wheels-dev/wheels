@@ -22,6 +22,8 @@ Besides the CFWheels-specific arguments documented here, you can also pass in an
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `template` | `string` | no | — | The path to the email template or two paths if you want to send a multipart email. if the `detectMultipart` argument is `false`, the template for the text version should be the first one in the list. This argument is also aliased as `templates`. |
@@ -33,6 +35,8 @@ Besides the CFWheels-specific arguments documented here, you can also pass in an
 | `detectMultipart` | `boolean` | no | `true` | When set to `true` and multiple values are provided for the `template` argument, CFWheels will detect which of the templates is text and which one is HTML (by counting the `<` characters). |
 | `deliver` | `boolean` | no | `true` | When set to `false`, the email will not be sent. |
 | `writeToFile` | `string` | no | — | The file to which the email contents will be written |
+
+</div>
 
 ## Examples
 

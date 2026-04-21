@@ -21,6 +21,8 @@ Ensures that a property’s value is numeric. You can also enforce additional co
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | no | — | Name of property or list of property names to validate against (can also be called with the `property` argument). |
@@ -37,6 +39,8 @@ Ensures that a property’s value is numeric. You can also enforce additional co
 | `equalTo` | `numeric` | no | — | Specifies whether or not the value must be equal to the supplied value. |
 | `lessThan` | `numeric` | no | — | Specifies whether or not the value must be less than the supplied value. |
 | `lessThanOrEqualTo` | `numeric` | no | — | Specifies whether or not the value must be less than or equal the supplied value. |
+
+</div>
 
 ## Examples
 

@@ -21,10 +21,14 @@ Adds a reference column and a foreign key constraint to a table in one step. Thi
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to perform the operation on |
 | `referenceName` | `string` | yes | — | The reference table name to perform the operation on |
+
+</div>
 
 ## Examples
 

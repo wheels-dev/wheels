@@ -21,12 +21,16 @@ Adds a foreign key constraint between two tables. This ensures that values in on
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to perform the operation on |
 | `referenceTable` | `string` | yes | — | The reference table name to perform the operation on |
 | `column` | `string` | yes | — | The column name to perform the operation on |
 | `referenceColumn` | `string` | yes | — | The reference column name to perform the operation on |
+
+</div>
 
 ## Examples
 

@@ -19,6 +19,8 @@ Instructs CFWheels to verify that some specific criterias are met before running
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `only` | `string` | yes | — | List of action names to limit this verification to. |
@@ -33,6 +35,8 @@ Instructs CFWheels to verify that some specific criterias are met before running
 | `cookieTypes` | `string` | yes | — | List of types to check each listed cookie value against (will be passed through to your CFML engine's IsValid function). |
 | `sessionTypes` | `string` | yes | — | List of types to check each list session value against (will be passed through to your CFML engine's IsValid function). |
 | `paramsTypes` | `string` | yes | — | List of types to check each params value against (will be passed through to your CFML engine's IsValid function). |
+
+</div>
 
 ## Examples
 

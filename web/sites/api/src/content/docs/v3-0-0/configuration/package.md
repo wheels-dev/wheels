@@ -21,10 +21,14 @@ Scopes the controllers for any routes defined inside its block to a specific sub
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Name to prepend to child route names. |
 | `package` | `string` | no | `[runtime expression]` | Subfolder (package) to reference for controllers. This defaults to the value provided for `name`. |
+
+</div>
 
 ## Examples
 

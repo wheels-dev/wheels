@@ -21,10 +21,14 @@ Create a route that matches the root of its current context. This mapper can be 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `to` | `string` | no | — | Set `controller##action` combination to map the route to. You may use either this argument or a combination of `controller` and `action`. |
 | `mapFormat` | `boolean` | no | — | Set to `true` to include the format (e.g. `.json`) in the route. |
+
+</div>
 
 ## Examples
 

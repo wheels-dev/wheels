@@ -19,9 +19,13 @@ Returns an array of all the filters set on this controller in the order in which
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `type` | `string` | yes | `all` | Use this argument to return only before or after filters. |
+
+</div>
 
 ## Examples
 

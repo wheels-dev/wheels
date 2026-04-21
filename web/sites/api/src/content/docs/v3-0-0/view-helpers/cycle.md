@@ -21,10 +21,14 @@ cycle() is a view helper used to loop through a list of values sequentially, ret
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `values` | `string` | yes | — | List of values to cycle through. |
 | `name` | `string` | no | `default` | Name to give the cycle. Useful when you use multiple cycles on a page. |
+
+</div>
 
 ## Examples
 

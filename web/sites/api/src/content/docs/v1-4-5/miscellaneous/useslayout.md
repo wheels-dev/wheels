@@ -19,6 +19,8 @@ Used within a controller's init() function to specify controller- or action-spec
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `template` | `string` | yes | — | Name of the layout template or function name you want to use. |
@@ -26,6 +28,8 @@ Used within a controller's init() function to specify controller- or action-spec
 | `except` | `string` | yes | — | List of actions that should not get the layout. |
 | `only` | `string` | yes | — | List of actions that should only get the layout. |
 | `useDefault` | `boolean` | yes | `true` | When specifying conditions or a function, pass true to use the default layout.cfm if none of the conditions are met. |
+
+</div>
 
 ## Examples
 

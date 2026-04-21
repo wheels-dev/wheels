@@ -21,11 +21,15 @@ Used to add one or more UUID (Universally Unique Identifier) columns to a table 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `default` | `string` | no | `newid()` |  |
 | `allowNull` | `boolean` | no | — |  |
+
+</div>
 
 ## Examples
 

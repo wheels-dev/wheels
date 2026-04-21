@@ -19,9 +19,13 @@ Use this method to specify which properties cannot be set through mass assignmen
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `string` | yes | — | Property name (or list of property names) that are not allowed to be altered through mass assignment. |
+
+</div>
 
 ## Examples
 

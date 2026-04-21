@@ -21,10 +21,14 @@ Used to change the name of an existing database table within a migration CFC. Th
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `oldName` | `string` | yes | — | Name the old table |
 | `newName` | `string` | yes | — | New name for the table |
+
+</div>
 
 ## Examples
 

@@ -22,6 +22,8 @@ Returns <code>true</code> on successful deletion of the row, <code>false</code> 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `key` | `any` | yes | — | Primary key value(s) of the record to fetch. Separate with comma if passing in multiple primary key values. Accepts a string, list, or a numeric value. |
@@ -30,6 +32,8 @@ Returns <code>true</code> on successful deletion of the row, <code>false</code> 
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
 | `includeSoftDeletes` | `boolean` | no | `false` | Set to `true` to include soft-deleted records in the queries that this method runs. |
 | `softDelete` | `boolean` | no | `true` | Set to `false` to permanently delete a record, even if it has a soft delete column. |
+
+</div>
 
 ## Examples
 

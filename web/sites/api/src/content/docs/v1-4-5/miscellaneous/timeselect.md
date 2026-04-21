@@ -19,6 +19,8 @@ Builds and returns a string containing three select form controls for hour, minu
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `any` | yes | — | See documentation for textField. |
@@ -40,6 +42,8 @@ Builds and returns a string containing three select form controls for hour, minu
 | `errorClass` | `string` | yes | `fieldWithErrors` | See documentation for textField. |
 | `combine` | `boolean` | yes | — | See documentation for dateSelect. |
 | `twelveHour` | `boolean` | yes | `false` | whether to display the hours in 24 or 12 hour format. 12 hour format has AM/PM drop downs |
+
+</div>
 
 ## Examples
 

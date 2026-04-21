@@ -21,7 +21,11 @@ Reruns the specified migration version. Whilst you can use this in your applicat
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `version` | `string` | no | — | The Database schema version to rerun |
+
+</div>
 

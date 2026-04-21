@@ -21,9 +21,13 @@ Converts a plural word into its singular form. It uses Wheels’ built-in inflec
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `word` | `string` | yes | — |  |
+
+</div>
 
 ## Examples
 

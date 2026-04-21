@@ -19,6 +19,8 @@ Creates an internal URL based on supplied arguments.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `route` | `string` | yes | — | Name of a route that you have configured in config/routes.cfm. |
@@ -31,6 +33,8 @@ Creates an internal URL based on supplied arguments.
 | `host` | `string` | yes | — | Set this to override the current host. |
 | `protocol` | `string` | yes | — | Set this to override the current protocol. |
 | `port` | `numeric` | yes | `0` | Set this to override the current port number. |
+
+</div>
 
 ## Examples
 

@@ -22,8 +22,12 @@ Only available in a migration CFC
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `table` | `string` | yes | — | The table name to perform the operation on |
 | `referenceName` | `string` | yes | — | the name of the reference to drop |
+
+</div>
 

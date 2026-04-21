@@ -19,10 +19,14 @@ Returns all primary key values in a list. In addition to quoted and delimiter yo
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `quoted` | `boolean` | yes | `false` | Set to true to enclose each value in single-quotation marks. |
 | `delimiter` | `string` | yes | `,` | The delimiter character to separate the list items with. |
+
+</div>
 
 ## Examples
 

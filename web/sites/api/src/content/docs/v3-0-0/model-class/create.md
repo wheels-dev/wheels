@@ -21,6 +21,8 @@ The create() method is used to instantiate a new model object, set its propertie
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `properties` | `struct` | no | `[runtime expression]` | The properties you want to set on the object (can also be passed in as named arguments). |
@@ -30,6 +32,8 @@ The create() method is used to instantiate a new model object, set its propertie
 | `transaction` | `string` | no | `[runtime expression]` | Set this to `commit` to update the database, `rollback` to run all the database queries but not commit them, or `none` to skip transaction handling altogether. |
 | `callbacks` | `boolean` | no | `true` | Set to `false` to disable callbacks for this method. |
 | `allowExplicitTimestamps` | `boolean` | no | `false` | Set this to `true` to allow explicit assignment of `createdAt` or `updatedAt` properties |
+
+</div>
 
 ## Examples
 

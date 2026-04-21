@@ -21,9 +21,13 @@ Obfuscates a value, typically used to hide sensitive information like primary ke
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `param` | `any` | yes | — | The value to obfuscate. |
+
+</div>
 
 ## Examples
 

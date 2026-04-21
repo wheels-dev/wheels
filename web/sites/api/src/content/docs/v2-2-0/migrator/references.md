@@ -21,6 +21,8 @@ adds integer reference columns to table definition and creates foreign key const
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `referenceNames` | `string` | yes | — |  |
@@ -30,4 +32,6 @@ adds integer reference columns to table definition and creates foreign key const
 | `foreignKey` | `boolean` | no | `true` |  |
 | `onUpdate` | `string` | no | — |  |
 | `onDelete` | `string` | no | — |  |
+
+</div>
 

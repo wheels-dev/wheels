@@ -19,6 +19,8 @@ Returns the error message, if one exists, on the object's property. If multiple 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | The variable name of the object to display the error message for. |
@@ -27,6 +29,8 @@ Returns the error message, if one exists, on the object's property. If multiple 
 | `appendText` | `string` | yes | — | String to append to the error message. |
 | `wrapperElement` | `string` | yes | `span` | HTML element to wrap the error message in. |
 | `class` | `string` | yes | `errorMessage` | CSS class to set on the wrapper element. |
+
+</div>
 
 ## Examples
 

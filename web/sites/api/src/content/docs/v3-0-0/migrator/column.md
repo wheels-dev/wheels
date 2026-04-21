@@ -21,6 +21,8 @@ Adds a column to a table definition in a migration. This function is used when d
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnName` | `string` | yes | — |  |
@@ -30,6 +32,8 @@ Adds a column to a table definition in a migration. This function is used when d
 | `limit` | `any` | no | — |  |
 | `precision` | `numeric` | no | — |  |
 | `scale` | `numeric` | no | — |  |
+
+</div>
 
 ## Examples
 

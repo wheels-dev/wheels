@@ -19,12 +19,16 @@ Displays a marked-up listing of messages that exist in the Flash.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `keys` | `string` | yes | — | The key (or list of keys) to show the value for. You can also use the key argument instead for better readability when accessing a single key. |
 | `class` | `string` | yes | `flashMessages` | HTML class to set on the div element that contains the messages. |
 | `includeEmptyContainer` | `boolean` | yes | `false` | Includes the div container even if the Flash is empty. |
 | `lowerCaseDynamicClassValues` | `boolean` | yes | `false` | Outputs all class attribute values in lower case (except the main one). |
+
+</div>
 
 ## Examples
 

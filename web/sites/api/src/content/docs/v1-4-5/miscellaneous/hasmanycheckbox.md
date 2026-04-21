@@ -19,6 +19,8 @@ Used as a shortcut to output the proper form elements for an association. Note: 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `objectName` | `string` | yes | — | Name of the variable containing the parent object to represent with this form field. |
@@ -32,6 +34,8 @@ Used as a shortcut to output the proper form elements for an association. Note: 
 | `appendToLabel` | `string` | yes | — | String to append to the form control's label. Useful to wrap the form control with HTML tags. |
 | `errorElement` | `string` | yes | — | HTML tag to wrap the form control with when the object contains errors. |
 | `errorClass` | `string` | yes | — | The class name of the HTML tag that wraps the form control when there are errors. |
+
+</div>
 
 ## Examples
 

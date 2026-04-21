@@ -21,6 +21,8 @@ Sets up a <code>hasMany</code> association between this model and the specified 
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `name` | `string` | yes | — | Gives the association a name that you refer to when working with the association (in the `include` argument to `findAll`, to name one example). |
@@ -31,6 +33,8 @@ Sets up a <code>hasMany</code> association between this model and the specified 
 | `dependent` | `string` | no | `false` | Defines how to handle dependent model objects when you delete an object from this model. `delete` / `deleteAll` deletes the record(s) (`deleteAll` bypasses object instantiation). `remove` / `removeAll` sets the forein key field(s) to `NULL` (`removeAll` bypasses object instantiation). |
 | `shortcut` | `string` | no | — | Set this argument to create an additional dynamic method that gets the object(s) from the other side of a many-to-many association. |
 | `through` | `string` | no | `[runtime expression]` | Set this argument if you need to override CFWheels conventions when using the `shortcut` argument. Accepts a list of two association names representing the chain from the opposite side of the many-to-many relationship to this model. |
+
+</div>
 
 ## Examples
 

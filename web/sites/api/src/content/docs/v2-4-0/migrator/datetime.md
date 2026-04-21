@@ -21,9 +21,13 @@ adds datetime columns to table definition
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `columnNames` | `string` | no | — |  |
 | `default` | `string` | no | — |  |
 | `null` | `boolean` | no | — |  |
+
+</div>
 

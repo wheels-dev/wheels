@@ -19,10 +19,14 @@ Returns an associated MIME type based on a file extension.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `extension` | `string` | yes | — | The extension to get the MIME type for. |
 | `fallback` | `string` | yes | `application/octet-stream` | The fallback MIME type to return. |
+
+</div>
 
 ## Examples
 

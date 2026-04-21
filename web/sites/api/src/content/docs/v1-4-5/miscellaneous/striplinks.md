@@ -19,9 +19,13 @@ Removes all links from an HTML string, leaving just the link text.
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `html` | `string` | yes | — | The HTML to remove links from. |
+
+</div>
 
 ## Examples
 

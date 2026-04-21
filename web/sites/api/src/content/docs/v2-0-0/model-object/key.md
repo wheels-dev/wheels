@@ -23,10 +23,14 @@ This method is more useful when you do dynamic programming and don't know the na
 
 ## Parameters
 
+<div class="wd-params-table">
+
 | Name | Type | Required | Default | Description |
 | ---- | ---- | -------- | ------- | ----------- |
 | `$persisted` | `boolean` | no | `false` |  |
 | `$returnTickCountWhenNew` | `boolean` | no | `false` |  |
+
+</div>
 
 ## Examples
 
