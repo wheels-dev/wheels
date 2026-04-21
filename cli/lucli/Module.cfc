@@ -1375,6 +1375,24 @@ component extends="modules.BaseModule" {
 					default:
 						throw(message="Unknown wheels deploy proxy verb: #proxyVerb#");
 				}
+			case "registry":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy registry requires a verb");
+				}
+				var registryVerb = positional[2];
+				var registryCli = new cli.lucli.services.deploy.cli.DeployRegistryCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (registryVerb) {
+					case "setup":
+					case "login":
+					case "logout":
+					case "remove":
+						invoke(registryCli, registryVerb, [opts]);
+						return arrayToList(registryCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy registry verb: #registryVerb#");
+				}
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}
