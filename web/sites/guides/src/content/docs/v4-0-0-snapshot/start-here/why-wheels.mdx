@@ -1,0 +1,109 @@
+---
+title: Why Wheels?
+description: How Wheels compares to Rails, Laravel, and Django, and when to reach for it.
+type: concept
+sidebar:
+  order: 2
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+You're evaluating web frameworks. You've probably used at least one of Rails, Laravel, or Django. This page is an honest comparison — what Wheels shares, where it differs, and when it's the wrong tool.
+
+**You'll learn:**
+
+- What CFML actually is (two paragraphs)
+- How Wheels maps to Rails / Laravel / Django concepts
+- When to reach for Wheels and when not to
+
+<Aside type="note">
+  This page assumes you've built a web app in at least one mature framework. If you haven't, skip to [Your First 15 Minutes](/v4-0-0-snapshot/start-here/first-15-minutes/) for a hands-on intro instead.
+</Aside>
+
+## What CFML is
+
+CFML is a server-side language. It's been around since 1995, which makes it older than PHP. The syntax reads like a blend of JavaScript and Ruby: loose typing, structs and arrays as first-class values, closures, lots of built-in functions for web work.
+
+Two runtime engines implement CFML. Lucee is open source, free, and community-maintained; it's what Wheels 4.0 targets by default. Adobe ColdFusion is a commercial product from Adobe. Both run on the JVM. You write CFML, Lucee or ACF compiles it to Java bytecode at request time. You don't install a Ruby / Python / PHP runtime — you install Lucee via the `wheels` CLI, and it brings its own.
+
+One common confusion: "ColdFusion" the language is CFML. "Adobe ColdFusion" is one of two implementations. Wheels does not require Adobe's commercial product.
+
+## Wheels vs Rails
+
+Closest conceptual neighbor. Both descended from the same Rails-era design.
+
+| Concern | Rails | Wheels |
+|---------|-------|--------|
+| Language | Ruby | CFML (runs on JVM) |
+| ORM style | ActiveRecord | ActiveRecord-style (`Model` base class) |
+| Convention | Strong | Strong — same "fat models, thin controllers" shape |
+| CLI | `bin/rails` / `gem install rails` | `wheels` |
+| Scaffold | `rails generate scaffold` | `wheels generate scaffold` |
+| Migrations | `db/migrate/*.rb` | `app/migrator/migrations/*.cfc` |
+| View layer | ERB / Haml / etc. | `.cfm` templates (inline expressions via `#...#`) |
+| Hotwire | Bundled (Turbo Drive / Frames / Streams) | Via `wheels-hotwire` package (opt-in activation) |
+| Testing | Minitest / RSpec | WheelsTest (BDD, `describe`/`it`) |
+| Jobs | Active Job + Sidekiq/etc. | Built-in job queue (`wheels jobs work`) |
+
+If you know Rails, the tutorial will feel familiar in pacing and idioms. The differences that bite most often:
+
+- **Hash-delimited expressions in CFML strings.** `"Hello #user.name#"` interpolates `user.name`. This is different from Ruby's `"Hello #{user.name}"`; the `#` pairs are delimiters, not escape-plus-braces.
+- **Named-argument style matters.** Wheels functions often take positional OR named args, never a mix. `hasMany(name="comments", dependent="delete")` — not `hasMany("comments", dependent="delete")`.
+- **No bundler / Gemfile.** The framework lives in `vendor/wheels/`, copied into the app by the CLI. There's a package system (first-party packages activate via copy from `packages/` into `vendor/`), but there's no central package registry or lockfile — intentional.
+
+## Wheels vs Laravel
+
+Laravel is more spiritually aligned than structurally. Both are opinionated, both emphasize developer experience, both have generators and a robust CLI.
+
+| Concern | Laravel | Wheels |
+|---------|---------|--------|
+| ORM | Eloquent (ActiveRecord-ish) | Wheels `Model` (ActiveRecord) |
+| Routing | PHP closures + controllers | CFML script (`mapper()...end()`) |
+| Views | Blade | `.cfm` (inline) or partials |
+| CLI | Artisan | `wheels` |
+| Auth | Sanctum / Fortify / Breeze | Built-in `wheels.auth` (session / JWT / token strategies) |
+| Queues | Horizon + Redis / SQS | Built-in job queue with DB backing |
+| Real-time | Livewire / Broadcasting | Server-Sent Events (native) + Turbo Streams (via package) |
+| Package manager | Composer | No central registry; `packages/` → `vendor/` activation |
+
+The closest comparison point is Laravel's scaffold ethos. `wheels generate scaffold Post title:string body:text` produces the same "everything-you-need-to-see-a-CRUD-interface-running" result as `php artisan make:model Post -a` + `make:controller`. Wheels goes a step further: the scaffolded views use Basecoat UI (when the `basecoat` package is activated) so you get a modern-looking app without writing CSS.
+
+Livewire has no direct Wheels analog. For similar "server-rendered, JavaScript-light interactivity," use [Turbo Frames](/v4-0-0-snapshot/digging-deeper/) from the `hotwire` package.
+
+## Wheels vs Django
+
+Bigger gap. Django is DataMapper (models + views + serializers are separate concerns); Wheels is ActiveRecord (models carry behavior). Django emphasizes explicit over implicit; Wheels emphasizes conventional over configured.
+
+| Concern | Django | Wheels |
+|---------|--------|--------|
+| ORM | DataMapper (Django ORM) | ActiveRecord (Wheels `Model`) |
+| URL routing | `urls.py`, explicit patterns | `routes.cfm`, `resources("posts")` + conventions |
+| Admin | Auto-generated `/admin` | `wheels generate admin ModelName` (scaffolded, not auto) |
+| Migrations | `makemigrations` + `migrate` | `wheels generate migration` + `wheels migrate latest` |
+| Templates | Jinja-like DSL | `.cfm` (inline expressions) |
+| Forms | `forms.py` with Form classes | View helpers (`textField`, `textArea`, etc.) |
+| Auth | `django.contrib.auth` | `wheels.auth` |
+
+The sharpest difference is philosophy. Django expects you to be explicit about URLs, form fields, admin configs. Wheels expects you to follow the conventions and only override when you need to. If you reach for Django because "explicit is better than implicit," Wheels will feel too magical. If you reach for Rails because conventions let you move fast, Wheels is in the same family.
+
+Django's auto-generated admin panel has no Wheels equivalent. `wheels generate admin User` produces a scaffolded admin section you own and customize — more like Rails' `rails_admin` gem than Django's built-in admin.
+
+## When Wheels is the right choice
+
+- **Database-heavy line-of-business apps.** Invoicing, inventory, CMS, internal tools. Wheels' ORM + scaffolds + migrations + admin generator ship these fast.
+- **Teams with existing CFML or Java infrastructure.** You already have Lucee or ACF servers, or you're comfortable on the JVM. Wheels fits the existing stack.
+- **Apps where "scaffold and ship" beats "latest runtime feature."** Wheels is mature and boring in good ways. Monthly releases, clear upgrade paths, no weekly framework-rearchitecture.
+- **Teams migrating from legacy CFML.** The 3.x → 4.0 upgrade guide is well-trodden. If you're on CFWheels 2.x, the path forward is clear.
+
+## When Wheels is the wrong choice
+
+- **GraphQL-first APIs.** Wheels ships a REST-style controller surface. GraphQL works but isn't native; you'll wire it yourself.
+- **Realtime-first apps.** SSE is native, Turbo Streams cover in-page updates, and WebSocket support is available — but if your product is a chat app or collaborative editor, Phoenix / Elixir, Rails + ActionCable, or Django Channels fit better.
+- **Cloud-native serverless.** CFML is JVM-hosted. Cold starts are slow. If you need AWS Lambda-style per-request provisioning, pick a runtime that targets it.
+- **Frontend-heavy SPAs.** If your app is 90% React or Vue talking to an API backend, pick a framework that specializes in API-only. Wheels can do it, but you're leaving most of the framework on the table.
+
+## See also
+
+- [Welcome to Wheels](/v4-0-0-snapshot/start-here/welcome/) — orientation and structure
+- [Your First 15 Minutes](/v4-0-0-snapshot/start-here/first-15-minutes/) — see Wheels in action
+- [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) — get the CLI

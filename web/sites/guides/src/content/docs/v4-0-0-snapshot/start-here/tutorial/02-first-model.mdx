@@ -1,0 +1,313 @@
+---
+title: "Part 2: Your First Model"
+description: Generate a Post model by hand, write a migration, seed data, and build the index/show actions. Meet Wheels' ORM.
+type: tutorial
+sidebar:
+  order: 2
+---
+
+import { Aside, Steps, FileTree } from '@astrojs/starlight/components';
+
+You'll add a `Post` model, create the `posts` table via a migration, seed two records, and build `index`/`show` actions backed by Wheels' ORM.
+
+**You'll learn:**
+
+- How Wheels models map to tables, and where configuration lives
+- How migrations describe schema changes in ordered CFC files
+- How `seedOnce()` keeps seed data idempotent
+- How finders, scopes, and enums combine into query-building
+
+Estimated time: 25 minutes.
+
+<Aside type="note">
+  This builds on [Part 1](/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/). You need the `blog` app from Part 1, with the dev server able to start on port 8080.
+</Aside>
+
+## Where we left off
+
+At the end of Part 1 you had a running `blog` app with a `/hello` route. There's no database, no models, and no data:
+
+<FileTree>
+- blog
+  - app
+    - controllers
+      - Controller.cfc
+      - Main.cfc
+    - views
+      - layout.cfm
+      - main
+        - index.cfm
+        - hello.cfm
+  - config
+    - routes.cfm
+    - settings.cfm
+  - db
+    - development.sqlite
+</FileTree>
+
+`Main.cfc` has `index` and `hello` actions. `config/routes.cfm` has a `/hello` named route alongside the wildcard and root. The SQLite database file exists but has no application tables. You'll fix all of that here.
+
+## Hand-write the Post model
+
+Normally you'd run `wheels generate model Post title:string body:text` and Wheels would write both the model CFC and a migration. On the `wheels` CLI version this tutorial targets (`0.3.5-SNAPSHOT`), the generator needs snippet templates that a fresh `wheels new` doesn't ship with. The generator will gain those templates in a future CLI release. For now, you'll hand-write the files — it's three small files, and it's a useful exercise.
+
+<Steps>
+
+1. Create `app/models/Post.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Model" {
+       function config() {
+           enum(property="status", values="draft,published,archived");
+       }
+   }
+   ```
+
+</Steps>
+
+`component extends="Model"` makes this a Wheels model — by convention, `Post.cfc` maps to a `posts` table. The `config()` function is where model configuration (associations, validations, callbacks, enums, scopes) goes.
+
+`enum(property="status", values="draft,published,archived")` declares that `status` can only hold one of three values. In return Wheels auto-generates:
+
+- Scopes: `Post.draft()`, `Post.published()`, `Post.archived()` — chainable query fragments.
+- Checkers: `post.isDraft()`, `post.isPublished()`, `post.isArchived()` — per-instance booleans.
+
+You'll use the `published()` scope in a minute.
+
+## Write the migration
+
+Migrations are ordered, reversible schema changes. Each one is a CFC in `app/migrator/migrations/` whose filename starts with a timestamp (`YYYYMMDDHHMMSS_description.cfc`). `wheels migrate latest` runs every pending migration in timestamp order.
+
+<Steps>
+
+1. Create `app/migrator/migrations/20260419120000_create_posts_table.cfc`:
+
+   ```cfm {test:compile}
+   component extends="wheels.migrator.Migration" hint="Create posts table" {
+       function up() {
+           transaction {
+               try {
+                   t = createTable(name="posts");
+                   t.string(columnNames="title", default="", allowNull=true, limit=255);
+                   t.text(columnNames="body", default="", allowNull=true);
+                   t.string(columnNames="status", default="draft", allowNull=false, limit=20);
+                   t.datetime(columnNames="publishedAt", allowNull=true);
+                   t.timestamps();
+                   t.create();
+               } catch (any e) {
+                   local.exception = e;
+               }
+               if (StructKeyExists(local, "exception")) {
+                   transaction action="rollback";
+                   Throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
+               } else {
+                   transaction action="commit";
+               }
+           }
+       }
+       function down() {
+           transaction {
+               dropTable("posts");
+               transaction action="commit";
+           }
+       }
+   }
+   ```
+
+</Steps>
+
+A few things to notice:
+
+- `up()` runs when applying the migration; `down()` reverses it.
+- `createTable(name="posts")` returns a builder. You add typed columns on it, then call `t.create()` to emit the DDL.
+- `t.timestamps()` adds both `createdAt` and `updatedAt` as `datetime` columns — don't add them yourself.
+- `status` is stored as a short string matching the enum values. Wheels doesn't require a database-level enum type.
+- The `transaction { try ... catch ... }` shape looks verbose. It's what the generator produces too; it ensures partial schema changes roll back cleanly.
+
+<Aside type="note">
+  In real use, the CLI picks the timestamp. Here we use a fixed `20260419120000` so the filename is stable across readers.
+</Aside>
+
+## Run the migration
+
+`wheels migrate latest` needs the dev server running — it reaches into the app over HTTP to execute migrations.
+
+<Steps>
+
+1. Make sure the server is up:
+
+   ```bash title="your shell"
+   wheels start
+   ```
+
+   If it's already running, this is a no-op.
+
+2. Apply pending migrations:
+
+   ```bash title="your shell"
+   wheels migrate latest
+   ```
+
+   Expected output includes `Migrating up 20260419120000_create_posts_table.cfc` followed by `Migration complete.`
+
+</Steps>
+
+The `posts` table now exists in `db/development.sqlite`.
+
+## Seed the database
+
+Wheels loads seed data from `app/db/seeds.cfm` (shared) and optionally `app/db/seeds/<environment>.cfm` (environment-specific). The `seedOnce()` helper is idempotent: it checks `uniqueProperties` first and only inserts when the record is missing. Running `wheels seed` repeatedly is safe.
+
+<Steps>
+
+1. Create `app/db/seeds.cfm`:
+
+   ```cfm {test:compile}
+   seedOnce(modelName="Post", uniqueProperties="title", properties={
+       title: "Hello world",
+       body: "My first Wheels post.",
+       status: "published",
+       publishedAt: Now()
+   });
+   seedOnce(modelName="Post", uniqueProperties="title", properties={
+       title: "Learning Wheels",
+       body: "Working through the tutorial.",
+       status: "published",
+       publishedAt: Now()
+   });
+   ```
+
+2. Run the seed:
+
+   ```bash title="your shell"
+   wheels seed
+   ```
+
+   Expected output mentions two records seeded. Run it again — both will be skipped because the titles already exist.
+
+</Steps>
+
+## Build the index and show actions
+
+Controllers pull data and hand it to views. You'll add a `Posts` controller with two actions: `index` (list all posts) and `show` (one post by ID).
+
+<Steps>
+
+1. Create `app/controllers/Posts.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Controller" {
+       function index() {
+           posts = model("Post").published().findAll(order="publishedAt DESC");
+       }
+       function show() {
+           post = model("Post").findByKey(params.key);
+       }
+   }
+   ```
+
+</Steps>
+
+What the code does:
+
+- `model("Post")` returns the `Post` model object you can call finders on.
+- `.published()` is the scope auto-generated from the `status` enum — equivalent to "where status = 'published'".
+- `.findAll(order="publishedAt DESC")` executes the query and returns a query object (not an array).
+- `findByKey(params.key)` looks up one record by primary key. `params.key` is the URL segment Wheels extracts from resource routes (e.g. `/posts/7` → `params.key = 7`).
+
+## Add the routes
+
+Now wire URLs to those actions.
+
+<Steps>
+
+1. Update `config/routes.cfm`:
+
+   ```cfm {test:compile}
+   mapper()
+       .resources(name="posts", only="index,show")
+       .get(name="hello", pattern="/hello", to="main##hello")
+       .wildcard()
+       .root(to="posts##index", method="get")
+   .end();
+   ```
+
+</Steps>
+
+`.resources(name="posts", only="index,show")` declares the two RESTful routes you need: `GET /posts` → `posts##index`, `GET /posts/:key` → `posts##show`. Route order matters — `.resources` before `.wildcard()`, and `.root(...)` last. The root now points at `posts##index` instead of `main##index`, so `/` lists posts.
+
+## Write the views
+
+Finally, the templates.
+
+<Steps>
+
+1. Create `app/views/posts/index.cfm`:
+
+   ```cfm title="app/views/posts/index.cfm"
+   <cfparam name="posts" default="">
+   <cfoutput>
+   <h1>Posts</h1>
+   <cfloop query="posts">
+       <article>
+           <h2>#linkTo(route="post", key=posts.id, text=posts.title)#</h2>
+           <p>#posts.body#</p>
+       </article>
+   </cfloop>
+   </cfoutput>
+   ```
+
+2. Create `app/views/posts/show.cfm`:
+
+   ```cfm title="app/views/posts/show.cfm"
+   <cfparam name="post" default="">
+   <cfoutput>
+   <h1>#post.title#</h1>
+   <p>#post.body#</p>
+   <p>#linkTo(route="posts", text="← all posts")#</p>
+   </cfoutput>
+   ```
+
+</Steps>
+
+A few things to notice:
+
+- `<cfparam name="posts" default="">` declares the variable the view expects. Every variable handed from a controller to a view should be `cfparam`'d at the top of the view.
+- `<cfloop query="posts">` iterates the query returned by `findAll()`. Inside the loop, `posts.title`, `posts.body`, and `posts.id` refer to the current row's columns.
+- `linkTo(route="post", key=posts.id, text=posts.title)` generates a link to `/posts/:key` using the singular route name `post` that `.resources("posts")` defined for you. `linkTo(route="posts")` (plural) points back to the index.
+
+## Smoke test
+
+Confirm your CLI is the version this tutorial targets:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+The verify-docs harness runs this to confirm your `wheels` CLI is installed and reports a Wheels version.
+
+## Checkpoint
+
+Reload the app and hit the three URLs below. Each should return the response listed.
+
+```bash title="your shell"
+wheels reload
+```
+
+- `curl http://localhost:8080/posts` — returns the index page with both posts rendered inside `<article>` tags.
+- `curl http://localhost:8080/posts/1` — returns the show page for the first post.
+- `curl http://localhost:8080/` — the root now renders the posts index (because you changed the root route).
+
+## Troubleshooting
+
+**`Data source wheelstestdb not found`** — the migration didn't run, so the `posts` table doesn't exist. Make sure the dev server is running, then run `wheels migrate latest`.
+
+**`model 'Post' is undefined`** — Wheels caches model discovery. After adding `app/models/Post.cfc` you must run `wheels reload` (or append `?reload=true&password=...` to any URL).
+
+**No rows on the index page** — the seed file didn't run. Run `wheels seed` and check the output mentions two records. If the seed ran but the page is still empty, verify both seed records have `status: "published"` — the controller filters by `.published()`.
+
+## What's next
+
+In [Part 3: CRUD Scaffold](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/) you'll throw most of Part 2's hand-written code away and let `wheels generate scaffold` produce the full create/read/update/delete stack. You'll also activate the Hotwire and Basecoat packages so the scaffold renders with styled forms and Turbo page transitions instead of plain HTML.
+
+Want a reference-level tour of what you just built? See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/) and [Migrations](/v4-0-0-snapshot/basics/migrations/).

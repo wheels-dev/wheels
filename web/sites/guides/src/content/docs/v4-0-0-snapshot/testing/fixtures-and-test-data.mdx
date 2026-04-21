@@ -1,0 +1,231 @@
+---
+title: Fixtures & Test Data
+description: tests/populate.cfm conventions, test-only models, factory patterns, and per-spec isolation.
+type: howto
+sidebar:
+  order: 8
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Every test type in Wheels — model, controller, view, integration, functional, browser — leans on the same fixture plumbing: `tests/populate.cfm`, optional test-only models, and a default transaction mode of `none`. This page walks the lifecycle so you know what runs when, how to keep specs from leaking into each other, and how to build ergonomic per-spec data without re-inventing ActiveRecord fixtures.
+
+**You'll learn:**
+
+- The real `populate.cfm` lifecycle — when it runs, when it doesn't, and why
+- How to write a minimal populate file that drops, creates, and seeds
+- How to isolate a destructive spec with a manual transaction rollback
+- When to reach for test-only models versus the real app models
+- How to keep specs readable with small factory helpers
+- The scope gotcha that bites every first-time populate author
+
+<Aside type="note">
+  You should already know BDD basics. See [Model Tests](/v4-0-0-snapshot/testing/model-tests/) for the spec shape. This page covers the fixture plumbing every test type relies on.
+</Aside>
+
+## The populate lifecycle
+
+`tests/populate.cfm` runs **once per test run**, not once per spec. The runner includes it before TestBox boots, which means every `describe` and every `it` in the run starts with the same schema and the same seed rows. If your first spec writes a row and the tenth spec reads the table, the tenth spec sees the write.
+
+The trigger conditions live in `vendor/wheels/tests/runner.cfm`. The runner reads `url.populate` — defaulting to `true` when the param is missing — and also checks whether the core tables already exist. Populate runs when `url.populate` is truthy *or* when a sentinel table (`c_o_r_e_authors` in the framework's own suite) is missing from the database. In practice that means a fresh `wheels test run` always populates; passing `?populate=false` in a URL invocation skips the drop-and-recreate but still runs if the schema is missing.
+
+This is a significant departure from Rails or Laravel, where the framework wraps each test in a transaction and rolls back. Wheels sets `application.wheels.transactionMode = "none"` in `runner.cfm`, so writes during a test run persist across specs. The two mechanisms you have for isolation are: (1) make `populate.cfm` idempotent so re-running it always resets the world, and (2) wrap destructive specs in a manual `transaction { ... }` block that rolls back.
+
+<Aside type="caution">
+  `populate.cfm` does not run between specs. A `create()` in `specs/models/PostSpec.cfc` leaves a row visible to `specs/models/CommentSpec.cfc`. Design specs to tolerate shared state, or roll back writes explicitly.
+</Aside>
+
+## A minimal populate.cfm
+
+The canonical pattern is DROP + CREATE + seed, in that order, with the drops in reverse dependency order (children first, parents last) so foreign-key constraints don't trip you. Here's a small example for a blog with users, posts, and comments:
+
+```cfm {test:compile} title="tests/populate.cfm"
+<cfscript>
+// Runs once per test run. Triggered by runner.cfm whenever url.populate is
+// truthy (default) or when the sentinel table is missing.
+
+// Drop existing tables (reverse dependency order)
+try { application.wo.execute("DROP TABLE comments"); } catch (any e) {}
+try { application.wo.execute("DROP TABLE posts"); } catch (any e) {}
+try { application.wo.execute("DROP TABLE users"); } catch (any e) {}
+
+// Create tables
+application.wo.execute("
+    CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        passwordHash VARCHAR(100) NOT NULL,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL
+    )
+");
+
+application.wo.execute("
+    CREATE TABLE posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        title VARCHAR(120) NOT NULL,
+        body TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL
+    )
+");
+
+application.wo.execute("
+    CREATE TABLE comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        postId INTEGER NOT NULL,
+        author VARCHAR(60) NOT NULL,
+        body TEXT NOT NULL,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL
+    )
+");
+
+// Seed known fixtures
+application.wo.execute("
+    INSERT INTO users (email, passwordHash, createdAt, updatedAt)
+    VALUES ('alice@example.com', 'hash', NOW(), NOW()),
+           ('bob@example.com', 'hash', NOW(), NOW())
+");
+
+application.wo.execute("
+    INSERT INTO posts (userId, title, body, status, createdAt, updatedAt)
+    VALUES (1, 'Welcome', 'First post', 'published', NOW(), NOW())
+");
+</cfscript>
+```
+
+Two things to notice. First, every call goes through `application.wo.execute(...)` rather than a bare `execute(...)`. That's the scope gotcha (covered below) — Wheels' internal functions are not available as globals inside a plain `.cfm` include. Second, the schema uses SQLite-flavoured syntax (`AUTOINCREMENT`, `TEXT`) because SQLite is the inner-loop reference platform for Wheels 4.0 tests.
+
+## Per-spec isolation — the manual pattern
+
+When a spec's writes would confuse later specs, wrap the work in a transaction and roll back at the end. The pattern is a `try/finally` around the assertions so rollback still runs if an expectation fails:
+
+```cfm {test:compile} title="tests/specs/models/PostCreateSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Post creation", () => {
+            it("creates a post without leaking to other specs", () => {
+                transaction {
+                    try {
+                        var post = model("Post").create(
+                            userId=1, title="Temp", body="B", status="draft"
+                        );
+                        expect(post.valid()).toBeTrue();
+                        expect(model("Post").count(where="title='Temp'")).toBe(1);
+                    } finally {
+                        transaction action="rollback";
+                    }
+                }
+
+                // Temp is gone — this spec saw it, later specs won't.
+                expect(model("Post").count(where="title='Temp'")).toBe(0);
+            });
+        });
+    }
+}
+```
+
+The outer `transaction { ... }` opens a savepoint; the `transaction action="rollback"` inside `finally` discards everything done inside the block. Every `create`, `update`, and `delete` reverses before the next `it` runs. Use this pattern for any spec that would otherwise leave detectable state behind — lingering rows, updated counters, deleted rows that populate needed.
+
+## Test-only models
+
+Sometimes you want a model that exists only during the test run — a stripped-down subject for isolating behaviour the real app model doesn't expose, or a wrapper around a fixture table that shouldn't ship in production. The framework itself uses this pattern extensively: `vendor/wheels/tests/_assets/models/` holds dozens of test models that point at `c_o_r_e_*` tables defined in `populate.cfm`.
+
+```cfm {test:compile} title="tests/_assets/models/TestPost.cfc"
+component extends="Model" {
+    function config() {
+        tableName("test_posts");
+        setPrimaryKey("id");
+    }
+}
+```
+
+A test-only model lives at `tests/_assets/models/` and maps to a table created by `populate.cfm`. To make the framework discover models in that directory during tests, point the app at it in `tests/TestRunner.cfc` (or the equivalent bootstrap) using `application.wheels.modelPath`. The framework's own `runner.cfm` does this with `set(modelPath = "/wheels/tests/_assets/models")`.
+
+## Factory-style builders
+
+When `populate.cfm` seeds the bare minimum and individual specs need their own per-test data with small variations, extract a factory. A factory is just a private function that returns a `new` (unsaved) or saved instance with sensible defaults, overridable per call:
+
+```cfm {test:compile} title="tests/specs/models/PostFactorySpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Post", () => {
+            it("uses defaults + overrides via a factory", () => {
+                var post = buildPost(title="Specific Title");
+                expect(post.title).toBe("Specific Title");
+                expect(post.status).toBe("draft");
+            });
+
+            it("exposes the same factory in every spec", () => {
+                var draft = buildPost();
+                var live = buildPost(status="published");
+                expect(draft.status).toBe("draft");
+                expect(live.status).toBe("published");
+            });
+        });
+    }
+
+    private any function buildPost(struct overrides={}) {
+        var defaults = {
+            userId: 1,
+            title: "Default Title",
+            body: "Default Body",
+            status: "draft"
+        };
+        StructAppend(defaults, arguments.overrides, true);
+        return model("Post").new(argumentCollection=defaults);
+    }
+}
+```
+
+Factories trade a few lines of setup for a shorter, more readable spec body. When the same factory appears in three or more spec files, lift it into a helper CFC under `tests/_helpers/` and include it from the specs that need it.
+
+## The scope gotcha
+
+Wheels' internal functions (`model()`, `$dbinfo`, `execute()`, and friends) are not available as bare globals inside plain `.cfm` files that are included from CFCs like `TestRunner.cfc`. If you write `execute("CREATE TABLE ...")` in `populate.cfm`, you'll get a "variable EXECUTE is undefined" error.
+
+<Aside type="caution">
+  Call framework internals via `application.wo.` (the scope where Wheels stores its callable methods) or use native CFML tags. `application.wo.execute("CREATE TABLE ...")` works; so does `<cfdbinfo>`, `<cfquery>`, and `<cfdump>`. Same rule for `application.wo.model("Post")` if you need to seed through the ORM instead of raw SQL.
+</Aside>
+
+This is the most common first-time-authoring bug in `populate.cfm`. If your tests die at boot with "function not defined" and the stack trace points at your populate, it's this.
+
+## SQL-level vs model-level seeding
+
+Seeding with raw SQL (`INSERT INTO users ...`) is fast and sidesteps model callbacks entirely. That's usually what you want for baseline fixtures: you need rows to exist, not a lifecycle exercise. Raw SQL also avoids a chicken-and-egg problem — if `populate.cfm` creates the schema and your model's `beforeSave` callback assumes a table exists that populate hasn't created yet, model-level seeding crashes.
+
+Seeding through `application.wo.model("Post").create(...)` fires the full callback chain, runs validations, and returns a model instance. Reach for it in narrow cases — a spec that wants a known-good record that exercised the real save path, or a fixture where you genuinely need the callback output. For the common case, raw SQL is both faster and more predictable.
+
+## Idempotent populate
+
+The DROP + CREATE + seed pattern shown above is idempotent by construction: every run starts from a clean schema, so re-running populate produces the same database every time. That's the recommended approach.
+
+If your test database is large enough that dropping tables is disruptive (say, a shared CI database with other jobs querying it), you can shift to row-level idempotency: keep the tables permanent, `DELETE FROM` the rows you seed, then `INSERT` the fresh batch. For most apps the drop-and-recreate pattern is simpler and fast enough — SQLite does it in tens of milliseconds.
+
+## Cross-engine considerations
+
+`populate.cfm` runs against whatever database the test run targets. `NOW()` is portable across MySQL, PostgreSQL, SQL Server, H2, and SQLite. `CURRENT_TIMESTAMP` is not fully portable — SQL Server and Oracle treat it slightly differently. Identity-column syntax diverges more sharply: `AUTOINCREMENT` in SQLite, `SERIAL` in PostgreSQL, `IDENTITY(1,1)` in SQL Server, `AUTO_INCREMENT` in MySQL.
+
+Target your reference platform. Wheels 4.0's inner-loop tests run on SQLite, so SQLite-flavoured DDL in `populate.cfm` is fine for local development. When you need a shared populate that works across multiple engines, look at how the framework's own `vendor/wheels/tests/populate.cfm` detects the database type via `<cfdbinfo>` and branches on `local.db` to pick the right identity-column syntax.
+
+## Common patterns
+
+- One `populate.cfm` per app — shared across every test category
+- Drop tables in reverse dependency order (children first, parents last)
+- Seed timestamps with `NOW()` for cross-engine safety
+- Use factory functions for per-spec data that varies; keep populate for the stable baseline
+- Transaction-wrap specs that would otherwise leak state (`transaction { ... transaction action="rollback"; }`)
+- Put test-only models at `tests/_assets/models/` and set `modelPath` in the test bootstrap
+- Prefix framework calls with `application.wo.` inside `.cfm` includes — it's the scope gotcha every time
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Model Tests" href="/v4-0-0-snapshot/testing/model-tests/" description="BDD specs for validations, callbacks, scopes, and associations." />
+  <LinkCard title="Controller Tests" href="/v4-0-0-snapshot/testing/controller-tests/" description="TestClient HTTP patterns — response assertions, redirects, filters, session handling." />
+  <LinkCard title="Integration Tests" href="/v4-0-0-snapshot/testing/integration-tests/" description="Multi-request journeys across your stack — login, create, redirect." />
+  <LinkCard title="Running Tests Locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="LuCLI test runner, Docker matrix, common test commands." />
+</CardGrid>

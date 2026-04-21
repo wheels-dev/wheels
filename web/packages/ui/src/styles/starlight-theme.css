@@ -55,9 +55,17 @@
 	font-size: 0.875em;
 }
 
+/*
+ * Code block container — borrow radius and shadow, but leave background
+ * and text color to the active expressive-code theme. Forcing a fixed
+ * dark background here used to break light mode: expressive-code rendered
+ * GitHub-light token colors (designed for a white background) on the
+ * forced-dark background, producing unreadable blue-on-black and
+ * gray-on-black for keywords and comments.
+ *
+ * See astro.config.mjs `expressiveCode.themes` for the theme pair.
+ */
 .sl-markdown-content pre {
-	background: #111;
-	color: #e5e5e5;
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-sm);
 }

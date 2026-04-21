@@ -1,0 +1,254 @@
+---
+title: Packages
+description: Activating first-party packages, writing your own, the package.json manifest, and the activation model.
+type: howto
+sidebar:
+  order: 10
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to work with Wheels packages — optional first-party modules that ship in the monorepo under `packages/` and activate when copied into `vendor/`. You'll activate a shipped package, read the `package.json` manifest, write your own package, understand the error-isolation boundary around each one, and see where the CLI surface is heading next.
+
+**You'll learn:**
+
+- How the `packages/` → `vendor/` activation model works and why there's no registration step
+- Which first-party packages ship with Wheels and what each one does
+- Every field in the `package.json` manifest, including the explicit `provides.mixins` opt-in
+- How to write your own package — directory layout, lifecycle, and where mixin methods land
+- How error isolation keeps a broken package from crashing the app
+- The current state of package distribution and the planned install CLI
+
+<Aside type="note">
+  You should already know how middleware and the DI container work if your package provides those. See [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/) and [Dependency Injection](/v4-0-0-snapshot/core-concepts/dependency-injection/).
+</Aside>
+
+## The activation model
+
+On application startup, Wheels runs `vendor/wheels/PackageLoader.cfc`. It scans `vendor/` for every subdirectory that contains a `package.json`, skips `vendor/wheels/` (the framework core itself), resolves the dependency graph across whatever it finds, and loads each package in topological order. There is no separate registration step — presence of a directory under `vendor/` with a valid manifest *is* the activation.
+
+This inverts the classic plugin pattern. Instead of a registry that names every installed plugin, the filesystem layout is the registry. To add a package, you put its files where the loader looks. To remove one, you take them away.
+
+`packages/` in the repo is a **staging area**. Files there are never loaded. Activation means getting a copy (or symlink) of a package into `vendor/` under its own directory.
+
+<Aside type="caution">
+  Wheels 4.0 does not yet ship a `wheels package install` command. Activation is manual — `cp -r` or a symlink. This is tracked as a framework gap; once the CLI surface ships, this page will document the install command as the canonical workflow.
+</Aside>
+
+Manual activation:
+
+```bash title="your shell"
+cp -r packages/hotwire vendor/hotwire
+wheels reload
+```
+
+Symlink for active development (edits in `packages/` take effect immediately):
+
+```bash title="your shell"
+ln -s ../../packages/hotwire vendor/hotwire
+wheels reload
+```
+
+Deactivation is equally manual — delete the `vendor/<name>` directory and reload:
+
+```bash title="your shell"
+rm -rf vendor/hotwire
+wheels reload
+```
+
+The reload step re-runs `PackageLoader`, which rediscovers what's in `vendor/` and reconciles the mixin, service, and middleware tables with the new state.
+
+## First-party packages
+
+Four packages ship in `packages/` as of Wheels 4.0. All are optional; the framework core runs fine with none of them activated.
+
+- **`hotwire/`** (`wheels-hotwire`) — Turbo Drive, Turbo Frames, Turbo Streams, and Stimulus integration for server-rendered UI. Mixes into controllers and views. Used heavily in the tutorial app.
+- **`basecoat/`** (`wheels-basecoat`) — UI component helpers styled with Tailwind CSS. shadcn/ui-quality forms, buttons, and cards without React. Mixes into controllers and views.
+- **`sentry/`** (`wheels-sentry`) — Sentry.io error tracking with framework-aware context enrichment. Captures exceptions with request, user, and route context. Mixes into controllers.
+- **`legacyadapter/`** (`wheels-legacy-adapter`) — Backward-compatibility shim for Wheels 3.x plugins. Deprecation logging, API adapters, and a scanner that flags 3.x patterns you should modernize. Mixes into controllers.
+
+A fifth candidate, `wheels-i18n`, lives as a plugin at [`wheels-dev/wheels-i18n`](https://github.com/wheels-dev/wheels-i18n) on GitHub and is planned for conversion to a first-party package in a future release.
+
+## The `package.json` manifest
+
+Every package declares a `package.json` at its root. The loader parses it before instantiating any CFC, so a manifest error isolates cleanly — the package is skipped, but the rest of the app boots.
+
+```json title="packages/sentry/package.json"
+{
+    "name": "wheels-sentry",
+    "version": "1.0.0",
+    "author": "PAI Industries",
+    "description": "Sentry error tracking for Wheels with framework-aware context enrichment",
+    "wheelsVersion": ">=3.0",
+    "provides": {
+        "mixins": "controller",
+        "services": [],
+        "middleware": []
+    },
+    "dependencies": {}
+}
+```
+
+Field reference:
+
+- **`name`** — the package name as you'd reference it in docs or a future registry. Usually matches the directory but doesn't have to (`wheels-sentry` lives in `sentry/`). Required.
+- **`version`** — semver. Required. Used in load logs and by future install tooling.
+- **`author`** — free-form string. Not validated.
+- **`description`** — one-line description shown in logs and tooling.
+- **`wheelsVersion`** — compatibility range (npm semver syntax). Declared as a constraint against the framework version; mismatches are logged.
+- **`provides.mixins`** — comma-delimited target list: `controller`, `view`, `model`, `global`, `none`. **Default is `none`** — a package with no `provides.mixins` field contributes no mixed-in methods. This is the explicit opt-in model and is a deliberate break from legacy plugins, which defaulted to `global` and made reasoning about method provenance hard.
+- **`provides.services`** — reserved for services the package registers with the DI container. Currently populated by the package's own `register()` hook rather than read from the manifest; the field is here for future tooling.
+- **`provides.middleware`** — array of middleware entries the loader appends to the global pipeline. Each entry is `{"component": "vendor.mypackage.MyMiddleware", "options": {...}}`.
+- **`dependencies`** — map of other package names to version ranges. The loader resolves these into a load order (topological sort) so a dependent package sees its dependencies already loaded.
+
+The four `provides.mixins` targets map to where a package's public methods become callable:
+
+- `controller` — methods available on every controller instance (and in controller filters)
+- `view` — methods available in every view and partial
+- `model` — methods available on every model
+- `global` — all three at once (use sparingly; it's the old plugin default and the one we're steering away from)
+- `none` — no mixin; the package is service/middleware-only
+
+## Writing your own package
+
+A package is a directory with a `package.json` and at least one CFC. The loader's convention is that the main CFC's filename matches the directory name — `packages/myfeature/MyFeature.cfc` — and gets instantiated via `CreateObject("component", "vendor.myfeature.MyFeature").init()`. If that file doesn't exist, the loader falls back to the first `.cfc` it finds in the directory.
+
+A minimal layout:
+
+```
+packages/myfeature/
+  package.json                     # manifest (required)
+  MyFeature.cfc                    # main entry — matches directory name
+  middleware/MyMiddleware.cfc      # optional — referenced in provides.middleware
+  tests/                           # optional — runs via the core test runner
+```
+
+A minimal manifest:
+
+```json title="packages/myfeature/package.json"
+{
+    "name": "my-feature",
+    "version": "0.1.0",
+    "description": "Adds a thing to Wheels",
+    "wheelsVersion": ">=4.0",
+    "provides": {
+        "mixins": "controller"
+    }
+}
+```
+
+A minimal entry CFC:
+
+```cfm {test:compile} title="packages/myfeature/MyFeature.cfc"
+component output="false" {
+
+    public any function init() {
+        return this;
+    }
+
+    /**
+     * Public methods become mixins on the targets declared in provides.mixins.
+     * This one lands on every controller because the manifest says "controller".
+     */
+    public string function myHelper(required string name) {
+        return "Hello, " & arguments.name;
+    }
+}
+```
+
+After copying `packages/myfeature/` to `vendor/myfeature/` and reloading, every controller has `myHelper()` available. The framework collects public methods from the package instance and merges them into the application mixin tables — the same machinery that runs for plugins, but scoped to the targets you named in the manifest.
+
+Lifecycle hook names the loader specifically skips when collecting mixins: `init`, `onPluginLoad`, `onPluginActivate`, `register`, `boot`. If you name a method any of those, it won't be mixed in — the loader treats them as package infrastructure. `register(container)` and `boot(app)` are recognized as DI service-provider hooks if the CFC declares `implements="wheels.ServiceProviderInterface"`.
+
+## Per-method mixin overrides
+
+The manifest-level `provides.mixins` sets the default for every public method. If one method needs a different target, annotate the method with a `mixin` metadata attribute — the loader reads it via `GetMetadata()` and overrides the package default for that method only.
+
+```cfm {test:compile} title="packages/myfeature/MyFeature.cfc"
+component output="false" {
+
+    public any function init() {
+        return this;
+    }
+
+    // This method follows the manifest default (controller).
+    public string function controllerOnlyHelper() {
+        return "I'm on controllers";
+    }
+
+    // This method overrides to view-only, even if the manifest says "controller".
+    public string function viewOnlyHelper() mixin="view" {
+        return "I'm on views";
+    }
+}
+```
+
+## Error isolation
+
+Every package loads inside its own try/catch. A package that throws during manifest parsing, CFC instantiation, or mixin collection is recorded in the loader's `failedPackages` array and logged to the application log. The rest of the app — framework core, other packages, application code — continues loading normally.
+
+Common failure modes and what happens:
+
+- **Malformed `package.json`** — logged as a manifest error, package skipped.
+- **Missing required manifest fields (`name`, `version`)** — same: logged and skipped.
+- **Dependency not installed** — the dependency-resolution phase records the error before any CFC is instantiated. Dependent packages are excluded from the load order.
+- **Circular dependencies** — surfaces as a graph error at resolution time; all packages in the cycle are excluded with a clear log message.
+- **Exception during CFC `init()`** — caught, logged with stack, package skipped. Mixins are never partially applied.
+- **Checksum mismatch** (if `checksums` declared in manifest) — logged as a security warning, package skipped.
+
+The framework's contract is that activating a broken package cannot take down a working app. Check the application log after a deploy to see which packages loaded, which were skipped, and why.
+
+## Testing a package
+
+Package tests live under `packages/<name>/tests/`. Each first-party package ships its own suite. Once activated in `vendor/`, you can run a package's tests through the core test runner by pointing `directory` at the package subdirectory:
+
+```bash title="your shell"
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.sentry.tests"
+```
+
+This compiles and runs every spec under `vendor/sentry/tests/` and nothing else — the same mechanism the framework uses for its own suite, scoped to one package. Any spec that extends `wheels.WheelsTest` works here without extra wiring.
+
+## Dependency resolution
+
+When a package's manifest declares `dependencies`, the loader builds a dependency graph and loads in topological order — dependencies first, dependents later. A package with no dependencies can load anytime; a package that declares `"dependencies": {"hotwire": ">=0.1.0"}` is guaranteed to see the Hotwire mixins already installed before its own `init()` runs.
+
+If a declared dependency isn't present in `vendor/`, or if two packages form a cycle, the loader records the error and excludes every package involved in the failure — again, without taking down the app.
+
+## Publishing
+
+Wheels 4.0 has no centralized package registry yet. The current distribution story:
+
+- **First-party packages** — ship inside the `packages/` directory of the Wheels repo. You get them by having the framework.
+- **Third-party packages** — published as their own GitHub repos. Users clone or download the repo, then copy the contents under `packages/` in their app, then activate into `vendor/`. Some packages ship an install script; others document a manual clone.
+
+Several strong candidates for first-party promotion already exist as 3.x-era plugins. `wheels-i18n` is the first flagged for conversion — a ported, package-shaped version will replace the CLAUDE.md note in a future release.
+
+## The future of package install
+
+Framework gap #2 tracks adding a proper CLI surface:
+
+- `wheels package install <name>` — fetch a package from a registry or URL, verify it, place it in `packages/`, and activate into `vendor/`.
+- `wheels package list` — show installed and activated packages with versions.
+- `wheels package activate <name>` / `wheels package deactivate <name>` — manage the `vendor/` symlink or copy without the user running `cp` and `rm`.
+
+Until those commands land, scripting `cp -r packages/<name> vendor/<name>` in your app's deploy pipeline (or committing the `vendor/<name>` copy directly to your app repo) is the best practice. Both approaches are stable — the activation model itself isn't expected to change when the CLI arrives, only the ergonomics.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Middleware Pipeline"
+    description="Where packages plug in request-level concerns. A package that provides middleware appends to the same pipeline you configure directly in settings.cfm."
+    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+  />
+  <LinkCard
+    title="Dependency Injection"
+    description="Packages that implement ServiceProviderInterface register services with the DI container. If your package provides services, start here."
+    href="/v4-0-0-snapshot/core-concepts/dependency-injection/"
+  />
+  <LinkCard
+    title="Contributing"
+    description="Submitting a package for first-party inclusion goes through the same process as any other framework contribution."
+    href="/v4-0-0-snapshot/contributing/"
+  />
+</CardGrid>

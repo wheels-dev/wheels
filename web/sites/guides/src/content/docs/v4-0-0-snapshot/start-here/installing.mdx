@@ -1,0 +1,180 @@
+---
+title: Installing Wheels
+description: Install the Wheels CLI on macOS, Windows, or Linux.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, Tabs, TabItem, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Install the `wheels` CLI. Five minutes.
+
+**You'll learn:**
+
+- How to install Wheels on macOS, Windows, or Linux
+- How to verify the install worked
+- How to upgrade later
+
+<Aside type="note">
+  **Prerequisite:** Java 21 or newer. `wheels` bundles a CFML runtime (Lucee) that targets JDK 21. Install it from [Adoptium](https://adoptium.net/) if you don't already have it. On macOS: `brew install openjdk@21`.
+</Aside>
+
+## Install the CLI
+
+<Tabs>
+
+<TabItem label="macOS" icon="apple">
+
+<Steps>
+
+1. Tap the Wheels Homebrew repo:
+
+   ```bash title="your shell"
+   brew tap wheels-dev/wheels
+   ```
+
+2. Install the CLI:
+
+   ```bash title="your shell"
+   brew install wheels
+   ```
+
+3. Verify:
+
+   ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+   wheels --version
+   ```
+
+   You should see a line like `Wheels Framework v4.0.0 (LuCLI 0.3.5-SNAPSHOT)`.
+
+</Steps>
+
+</TabItem>
+
+<TabItem label="Windows" icon="seti:windows">
+
+<Steps>
+
+1. Install via Chocolatey. Open PowerShell as Administrator:
+
+   ```powershell title="admin PowerShell"
+   choco install wheels
+   ```
+
+2. Open a new PowerShell (so PATH picks up the CLI) and verify:
+
+   ```powershell title="PowerShell"
+   wheels --version
+   ```
+
+   You should see a line like `Wheels Framework v4.0.0 (LuCLI 0.3.5-SNAPSHOT)`.
+
+</Steps>
+
+</TabItem>
+
+<TabItem label="Linux" icon="linux">
+
+<Steps>
+
+1. Install via the official installer script:
+
+   ```bash title="your shell"
+   curl -fsSL https://get.wheels.dev/install.sh | bash
+   ```
+
+   The script downloads the latest release into `~/.wheels/bin/` and adds it to your `PATH`.
+
+2. Reload your shell or source the updated profile:
+
+   ```bash title="your shell"
+   exec "$SHELL"
+   ```
+
+3. Verify:
+
+   ```bash title="your shell"
+   wheels --version
+   ```
+
+   You should see a line like `Wheels Framework v4.0.0 (LuCLI 0.3.5-SNAPSHOT)`.
+
+</Steps>
+
+</TabItem>
+
+</Tabs>
+
+## Upgrading
+
+<Tabs>
+
+<TabItem label="macOS" icon="apple">
+
+```bash title="your shell"
+brew update
+brew upgrade wheels
+```
+
+</TabItem>
+
+<TabItem label="Windows" icon="seti:windows">
+
+```powershell title="admin PowerShell"
+choco upgrade wheels
+```
+
+</TabItem>
+
+<TabItem label="Linux" icon="linux">
+
+Re-run the installer script — it detects existing installs and upgrades in place:
+
+```bash title="your shell"
+curl -fsSL https://get.wheels.dev/install.sh | bash
+```
+
+</TabItem>
+
+</Tabs>
+
+## Troubleshooting
+
+**`wheels: command not found`**
+
+Your shell's `PATH` doesn't include the CLI. Restart your shell, or on Linux source `~/.wheels/env` manually. On macOS, confirm Homebrew's bin path is in `PATH`: `echo $PATH | tr ':' '\n' | grep brew`.
+
+**`Error: unable to find Java runtime`**
+
+Install Java 21+ from [Adoptium](https://adoptium.net/). On macOS: `brew install openjdk@21`. Then export `JAVA_HOME` in your shell profile:
+
+```bash title="~/.zshrc or ~/.bashrc"
+export JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.8/libexec/openjdk.jdk/Contents/Home
+```
+
+Path will differ if you installed from Adoptium directly — use whatever `/usr/libexec/java_home -v 21` prints.
+
+**`brew: cask 'wheels' has no formulae to install from`**
+
+You skipped `brew tap wheels-dev/wheels`. Run the tap command, then re-run the install.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Your First 15 Minutes"
+    href="/v4-0-0-snapshot/start-here/first-15-minutes/"
+    description="Zero to a running page."
+  />
+  <LinkCard
+    title="Build a Blog"
+    href="/v4-0-0-snapshot/start-here/tutorial/"
+    description="The real introduction. Three and a half hours."
+  />
+  <LinkCard
+    title="Upgrading Wheels"
+    href="/v4-0-0-snapshot/upgrading/"
+    description="Move between Wheels versions."
+  />
+</CardGrid>

@@ -59,6 +59,13 @@ export default defineConfig({
 		starlight({
 			title: 'Wheels Guides',
 			description: 'Official guides for the Wheels CFML MVC framework.',
+			expressiveCode: {
+				// High-contrast theme pair — github-dark-high-contrast (dark) and
+				// github-light (light) both produce WCAG-AA contrast ratios between
+				// every token color and the theme's own background. Starlight picks
+				// the first for `data-theme="dark"` and the second for light mode.
+				themes: ['github-dark-high-contrast', 'github-light'],
+			},
 			customCss: [
 				'@wheels-dev/ui/styles/tokens.css',
 				'@wheels-dev/ui/styles/base.css',

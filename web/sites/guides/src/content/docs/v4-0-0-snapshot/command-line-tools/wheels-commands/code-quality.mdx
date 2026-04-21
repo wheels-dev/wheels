@@ -1,0 +1,178 @@
+---
+title: "Code Quality"
+description: wheels analyze and wheels validate — read-only diagnostics that surface anti-patterns, complex functions, code smells, and validation errors across models, controllers, views, and routes.
+type: reference
+sidebar:
+  order: 7
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Two commands cluster here, both read-only and both backed by the same `analysis` service. `wheels analyze` produces a long-form report with metrics, anti-patterns, and complexity hotspots. `wheels validate` runs a tighter, error-focused pass over models, controllers, routes, and views and reports pass/fail.
+
+**You'll use this for:**
+
+- Catching Wheels anti-patterns (mixed argument styles, query-vs-array confusion, non-private filters) before they ship.
+- Spotting complex functions and code smells that have grown past sanity while you weren't looking.
+- Running a quick validation sweep before a deploy to confirm models, controllers, routes, and views still parse clean.
+
+### `wheels analyze`
+
+Walk the project's CFC and CFM files and print a code-health report: totals, a graded health score, and lists of anti-patterns, complex functions, and code smells.
+
+#### Synopsis
+
+```
+wheels analyze [target]
+```
+
+#### Description
+
+`wheels analyze` delegates to the `analysis` service, which reads files under `app/models/`, `app/controllers/`, and `app/views/` (or a single directory if you pass a target). Each file is scanned for Wheels-specific anti-patterns — the kind listed in the top-10 at the root of this project — plus cyclomatic-complexity outliers and generic code smells. The command prints counts, a letter grade (A–F) backed by a 0–100 health score, and the individual findings with file name, line number, and severity.
+
+This command does not require a running server. It reads the project off disk and exits.
+
+#### Target argument
+
+| Value | Scans |
+|---|---|
+| `all` (default) | `app/models/`, `app/controllers/`, and `app/views/` |
+| `models` | `app/models/` only |
+| `controllers` | `app/controllers/` only |
+| `views` | `app/views/` only |
+
+If you pass anything else, the command falls through to `all`.
+
+#### Flags
+
+None. `wheels analyze` takes a single positional target and no flags.
+
+#### Example
+
+```bash {test:cli cmd="wheels analyze"}
+wheels analyze
+```
+
+Sample output (trimmed):
+
+```text
+Analyzing code...
+
+Code Analysis Results
+────────────────────────────────────
+Files:      29
+Lines:      1842
+Functions:  134
+Grade:      B (82/100)
+
+Anti-Patterns (2)
+  [ERROR] Posts.cfc:18 — hasMany mixes positional and named args
+  [WARNING] User.cfc:34 — filter 'authenticate' is public, should be private
+
+Complex Functions (1)
+  Posts.cfc:create — complexity 14
+
+Completed in 0.42s
+```
+
+If nothing is found, the command prints `No issues found!` in green instead of the three category lists.
+
+### `wheels validate`
+
+Run the shorter, error-focused pass: check model associations, controller conventions, route syntax, and view `cfparam` declarations, then report pass/fail.
+
+#### Synopsis
+
+```
+wheels validate
+```
+
+#### Description
+
+`wheels validate` uses the same `analysis` service but calls its `validate()` method, which runs four targeted checks:
+
+- **Models** — iterates `app/models/*.cfc` and flags problems like mixed association argument styles.
+- **Controllers** — iterates `app/controllers/*.cfc` looking for convention violations (public filter functions, missing `extends="Controller"`, etc.).
+- **Routes** — parses `config/routes.cfm` for syntax problems.
+- **Views** — walks `app/views/` for `.cfm` files missing `cfparam` declarations.
+
+The result is a `valid` flag (true if zero `error`-severity issues exist), a total count, and a per-issue list with file, severity, and message.
+
+#### Flags
+
+None. `wheels validate` takes no arguments and no flags.
+
+#### Example
+
+```bash {test:cli cmd="wheels validate"}
+wheels validate
+```
+
+Sample output when everything passes (warnings can still appear):
+
+```text
+Validating...
+
+Validation passed — no errors found (1 warnings)
+  [WARNING] show.cfm — missing cfparam for 'post'
+```
+
+Sample output with errors:
+
+```text
+Validating...
+
+Validation found 2 issue(s):
+  [ERROR] Posts.cfc — hasMany mixes positional and named args
+  [ERROR] routes.cfm — unclosed resources() block
+```
+
+<Aside type="note" title="analyze vs validate">
+Both commands read the same files through the same service, but they answer different questions. `wheels analyze` is **observational** — here's what your code looks like, here are metrics, here are hotspots. `wheels validate` is **pass/fail** — either there are no errors (exit green) or there are errors you need to fix. Reach for `analyze` during development or a refactor; reach for `validate` right before committing or deploying.
+</Aside>
+
+## Common workflows
+
+### Pre-commit sanity check
+
+```bash
+wheels validate
+wheels analyze
+```
+
+Run `validate` first and read its output for any ✗ errors or ⚠ warnings. Then run `analyze` for a broader look at health scores and anti-patterns. Both commands always exit 0 regardless of findings, so read each report before moving on — the results are in the output, not the exit code.
+
+### Scope the analysis
+
+```bash
+wheels analyze models
+wheels analyze controllers
+wheels analyze views
+```
+
+Narrow to one directory while you're iterating on it. Useful when you're refactoring models and don't want controller noise in the report — or vice versa.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="App Inspection"
+    href="../app-inspection/"
+    description="wheels routes, info, stats, notes, doctor — quick reads of project state."
+  />
+  <LinkCard
+    title="Testing"
+    href="../testing/"
+    description="wheels test — run the BDD suite after analyze and validate come back clean."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../../configuration/"
+    description="CLI configuration knobs, environment detection, and settings hierarchy."
+  />
+  <LinkCard
+    title="Code Generation"
+    href="../code-generation/"
+    description="wheels generate and wheels destroy — create and remove scaffolded artifacts."
+  />
+</CardGrid>

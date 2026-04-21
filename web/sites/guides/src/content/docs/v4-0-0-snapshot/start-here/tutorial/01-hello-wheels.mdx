@@ -1,0 +1,184 @@
+---
+title: "Part 1: Hello, Wheels"
+description: Install Wheels, create your first app, and render a page. No concepts yet — just get something running in 20 minutes.
+type: tutorial
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps, FileTree } from '@astrojs/starlight/components';
+
+You'll create a new Wheels app called `blog`, start the dev server, and add a `/hello` route that renders a custom page. By the end, `curl localhost:8080/hello` returns "Hello, World."
+
+**You'll learn:**
+
+- What `wheels new` scaffolds
+- How to add a route, a controller action, and a view
+- How reload works
+
+<Aside type="note">
+  This is Part 1 of the [Build a Blog tutorial](/v4-0-0-snapshot/start-here/tutorial/). You don't need Wheels or CFML experience — just general programming background.
+</Aside>
+
+## Where we left off
+
+This is Part 1. You're starting with nothing. By the end, you'll have a working Wheels app responding to `/hello`. Each subsequent part begins with a "Where we left off" banner showing the file tree and database schema, so you can resume without reading Part N-1.
+
+## Install the Wheels CLI
+
+If you haven't yet, see [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) for macOS, Windows, and Linux.
+
+Verify:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+You should see a Wheels version number. If not, revisit the install guide.
+
+## Create the app
+
+<Steps>
+
+1. Create a new app called `blog`. Run this in a fresh directory where you want the app to live:
+
+   ```bash title="your shell"
+   wheels new blog
+   ```
+
+   Expected output: a configuration summary (port, datasource, reload password) and the `Next steps` block.
+
+2. Move into the new directory:
+
+   ```bash title="your shell"
+   cd blog
+   ```
+
+3. Start the dev server:
+
+   ```bash title="your shell"
+   wheels start
+   ```
+
+   The server boots in a few seconds and prints the URL it's listening on (default: `http://localhost:8080`).
+
+</Steps>
+
+Open `http://localhost:8080` in your browser. You'll see a welcome page: "Welcome to blog. Your Wheels application is running."
+
+## What got created
+
+<FileTree>
+- blog
+  - app
+    - controllers/
+      - Controller.cfc
+      - Main.cfc
+    - models/
+    - views/
+      - layout.cfm
+      - helpers.cfm
+      - main/
+        - index.cfm
+    - migrator/
+  - config
+    - routes.cfm
+    - settings.cfm
+    - environment.cfm
+  - db/
+    - development.sqlite
+  - public/
+  - tests/
+  - vendor
+    - wheels/
+  - lucee.json
+</FileTree>
+
+Three directories matter right now:
+
+- `app/controllers/` — request-handling code. You'll see the default `Main.cfc`.
+- `app/views/` — templates. The default home page lives at `app/views/main/index.cfm`.
+- `config/routes.cfm` — maps URLs to controller actions.
+
+`vendor/wheels/` is the framework itself, copied into your app. You generally don't touch it.
+
+<Aside type="tip">
+  **On Hotwire and Basecoat:** a fresh `wheels new` ships with only the core framework. Turbo (for SPA-like page transitions) and Basecoat (for styled forms and components) arrive as packages later in the tutorial when you actually need them. For now, everything is plain server-rendered HTML.
+</Aside>
+
+## Add a `/hello` route
+
+You'll add a new URL, a new action on the existing `Main` controller, and a new view.
+
+<Steps>
+
+1. Open `config/routes.cfm`. Inside the `<cfscript>...</cfscript>` block, you'll find a `mapper()...end()` chain. It looks like this:
+
+   ```cfm title="config/routes.cfm — starting state"
+   mapper()
+       // CLI-Appends-Here
+       .wildcard()
+       .root(to="main##index", method="get")
+   .end();
+   ```
+
+   Add a `.get(...)` line for `/hello` before `.wildcard()`:
+
+   ```cfm {test:compile}
+   mapper()
+       .get(name="hello", pattern="/hello", to="main##hello")
+       .wildcard()
+       .root(to="main##index", method="get")
+   .end();
+   ```
+
+   `.get(...)` declares: when a GET hits `/hello`, run the `hello` action on the `Main` controller. Route name `hello` means you can generate this URL elsewhere with `urlFor(route="hello")`.
+
+2. Open `app/controllers/Main.cfc` and add a `hello` action alongside `index`:
+
+   ```cfm {test:compile}
+   component extends="Controller" {
+       function index() {
+       }
+       function hello() {
+       }
+   }
+   ```
+
+   The action does nothing visible. Wheels will still render the view at `app/views/main/hello.cfm` by convention.
+
+3. Create `app/views/main/hello.cfm`:
+
+   ```cfm title="app/views/main/hello.cfm"
+   <h1>Hello, World</h1>
+   ```
+
+4. Tell Wheels to pick up your changes:
+
+   ```bash title="your shell"
+   wheels reload
+   ```
+
+</Steps>
+
+## Checkpoint
+
+Your app should now respond to `/hello`:
+
+```bash title="verify"
+curl -s http://localhost:8080/hello
+```
+
+Expected: `<h1>Hello, World</h1>` in the response body (plus any layout wrapping).
+
+## Troubleshooting
+
+**`wheels: command not found`** — PATH doesn't see the CLI. See [Installing Wheels](/v4-0-0-snapshot/start-here/installing/).
+
+**`Route '/hello' not found`** — you added the route but didn't reload. Run `wheels reload`.
+
+**Blank page at `/hello`** — the view file is in the wrong place. It must be at `app/views/main/hello.cfm` (lowercase `main`, matching the controller name).
+
+## What's next
+
+In [Part 2](/v4-0-0-snapshot/start-here/tutorial/02-first-model/) you'll add your first model, write a migration, and seed real data. The browser-render-a-page part is done; now you meet the database.

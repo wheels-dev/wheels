@@ -1,0 +1,181 @@
+---
+title: "Console & REPL"
+description: wheels console — an interactive CFML prompt bound to your running application's context. Inspect models, resolve DI services, poke at routes, and try expressions against live state.
+type: reference
+sidebar:
+  order: 9
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`wheels console` is an interactive prompt that evaluates CFML expressions inside your running application's context. Models resolve, the DI container responds, routes are visible — everything the framework knows about, the console knows about. It is a separate surface from LuCLI's bare `repl`, which is a context-free CFML evaluator useful outside of Wheels projects.
+
+**You'll use this for:**
+
+- Inspecting the state of a running application without writing a one-off controller action.
+- Trying a model query interactively — `findAll`, scopes, chained `.where` calls — and seeing the shape of the result before committing to view code.
+- Debugging a DI-resolved service by asking the container for it and invoking methods directly.
+
+### Overview
+
+`wheels console` requires a running Wheels server. It discovers the port with `detectServerPort()`, reads the reload password (from `.env` or `config/settings.cfm` unless you pass `--password`), and issues a `__ping__` to `/wheels/console/eval` to confirm the endpoint is reachable. Once connected, every line you type is POSTed to that endpoint, evaluated inside the live application, and the result streamed back.
+
+Because the evaluation happens in the server, not the CLI, every expression runs with full access to `application.wheels.*`, registered models, the DI container, framework helpers like `get()` and `service()`, and any mixins the app has loaded.
+
+### Synopsis
+
+```bash
+wheels console [--password=<value>]
+```
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `--password=<value>` | Reload password for the server. If omitted, the CLI auto-detects it from `.env` or `config/settings.cfm`. You only need this flag when detection fails or when you're pointing at a server configured with a non-default password. |
+
+If no server is running, the command prints `No running Wheels server detected` and exits. Start one with `wheels start` first.
+
+### What's available at the prompt
+
+The console is a thin wrapper around the server-side evaluator — anything that would compile inside a normal CFML component is fair game. In practice, these are the surfaces you'll reach for most:
+
+| Surface | Example |
+|---|---|
+| Model finders | `model("User").findAll()` |
+| Model instances | `model("User").new(email="test@example.com")` |
+| Model scopes & chains | `model("Post").published().where("authorId", 1).get()` |
+| DI services | `service("emailService")` |
+| Framework settings | `get("environment")`, `get("dataSourceName")` |
+| Live app globals | `application.wheels.version`, `application.wheels.models`, `application.wheels.routes` |
+| Plain CFML | `now()`, `arrayLen([1,2,3])`, `structKeyArray(myStruct)` |
+
+The examples below assume you've defined a `User` model in `app/models/User.cfc` with `email` validation — adapt the names to whatever your app actually has.
+
+### Built-in console commands
+
+Commands at the prompt start with `/`. They're short-circuits for things you'd otherwise type as full expressions — skip them if you prefer the long form.
+
+| Command | Description |
+|---|---|
+| `/help`, `/h` | Print the console help text (commands + example expressions). |
+| `/env` | Print the current environment (development, production, etc.). |
+| `/models` | List every registered model, sorted alphabetically. |
+| `/routes` | List all routes as `pattern -> controller#action`. |
+| `/version` | Print the Wheels version from `application.wheels.version`. |
+| `/ds`, `/datasource` | Print the current datasource name. |
+| `/reload` | Reload the application (equivalent to `?reload=true`). |
+| `/clear` | Clear the terminal screen (ANSI reset). |
+| `/exit`, `/quit`, `/q` | Exit the console. |
+
+### Examples
+
+Invoke the console from a project root while a dev server is running:
+
+```bash
+wheels console
+```
+
+A typical session looks like this — the prompt is `wheels>`, and each line you type is evaluated in the app context:
+
+```text
+Wheels Console v4.0.0
+Connected to localhost:3000 (development) — Wheels 4.0.0
+Type expressions to evaluate in your app context. /help for commands.
+
+wheels> model("User").count()
+=> 42
+
+wheels> /models
+=> [
+    "Comment",
+    "Post",
+    "User"
+  ]
+```
+
+Build a new model instance, check validations, and inspect the error list:
+
+```text
+wheels> var u = model("User").new(email="bad")
+wheels> u.valid()
+=> false
+
+wheels> u.errorsOn("email")
+=> [
+    {
+      "message": "must be a valid email address"
+    }
+  ]
+```
+
+Resolve a DI-registered service and invoke a method:
+
+```text
+wheels> var svc = service("emailService")
+wheels> svc.isConfigured()
+=> true
+```
+
+Chain scopes against a model that defines them:
+
+```text
+wheels> model("Post").published().recent().findAll().recordCount
+=> 17
+```
+
+Queries come back rendered as a column-aligned table; model instances come back as key-value blocks; structs and arrays come back pretty-printed as JSON. Primitives (`number`, `boolean`, `string`) print inline after `=>`.
+
+### `console` vs `repl`
+
+The two surfaces look similar and are not the same tool.
+
+| | `wheels console` | `wheels repl` (LuCLI) |
+|---|---|---|
+| Prompt | `wheels>` | `cfml>` |
+| App context | Full Wheels app loaded | None — bare CFML evaluator |
+| Models resolve? | Yes | No |
+| DI container available? | Yes (`service("...")`) | No |
+| Requires a running server? | Yes | No |
+| Exit commands | `/exit`, `/quit`, `/q`, Ctrl+D | `exit`, `quit`, Ctrl+D |
+| Use case | Inspect running app state | Quick CFML expression evaluation anywhere |
+
+Reach for the console when you need to see what the application sees. Reach for LuCLI's `repl` when you want to try a CFML expression outside a project, or when no Wheels server is running and you just need a calculator.
+
+### How to exit
+
+Any of these end the session:
+
+- Type `/exit`, `/quit`, or `/q` and press Enter.
+- Press Ctrl+D to send EOF — the console prints `Bye!` and returns.
+
+There is no `.exit` command. Typing `exit` or `quit` without the leading slash will be evaluated as a CFML expression and produce an error.
+
+<Aside type="note" title="Expressions, not statements">
+Each line is evaluated as a CFML expression. Variable assignments work (`var x = 1`), but multi-line blocks, `if`/`else` control flow, and `cfscript` component declarations are not supported — wrap them in a `.cfm` script and execute that instead.
+</Aside>
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="CFML Execution"
+    href="../../core-commands/cfml-execution/"
+    description="LuCLI `repl` and `cfml` — bare CFML evaluation without an app context."
+  />
+  <LinkCard
+    title="App Inspection"
+    href="../app-inspection/"
+    description="wheels routes, info, stats — non-interactive surfaces for inspecting an app."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../../configuration/"
+    description="Reload passwords, environment files, and the settings the console reads to connect."
+  />
+  <LinkCard
+    title="Testing"
+    href="../testing/"
+    description="wheels test — the non-interactive path to exercising model and controller code."
+  />
+</CardGrid>

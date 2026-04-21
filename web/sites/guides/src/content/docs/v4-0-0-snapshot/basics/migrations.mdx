@@ -1,0 +1,255 @@
+---
+title: Migrations
+description: Writing and running schema migrations — column types, indexes, foreign keys, and rollbacks.
+type: howto
+sidebar:
+  order: 8
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Migrations are versioned CFCs that carry your schema forward and back. Each one subclasses `wheels.migrator.Migration`, exposes an `up()` method that applies a change and a `down()` that undoes it, and lives in `app/migrator/migrations/` with a timestamped filename so the runner can order them. The same migrations run in every environment — development, test, CI, production — which is how a fresh clone of your repo reaches the current schema by running one command.
+
+**You'll learn:**
+
+- The four `wheels migrate` commands and when to reach for each
+- How to generate a migration file and what the timestamped filename means
+- The column builder methods on `createTable` — `string`, `integer`, `datetime`, `references`, `timestamps`
+- How to add and remove indexes and foreign keys without dropping a table
+- How to add, rename, and remove columns on an existing table
+- When a migration can't be reversed and how to signal that honestly
+
+<Aside type="note">
+  A migration describes schema — the tables and columns your models map to. For the model side — finders, validations, callbacks — see [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/).
+</Aside>
+
+## Running migrations
+
+Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `schema_migrations`, so the app has to be running (or at least reachable) for them to work — see [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) for the server setup.
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+- `wheels migrate latest` — apply every pending migration in order. The most common command; you'll run it after pulling someone else's changes.
+- `wheels migrate up` — apply exactly one pending migration. Useful when you want to watch the effect of a single file.
+- `wheels migrate down` — roll back the most recently applied migration. Runs the `down()` method of the newest row in `schema_migrations`.
+- `wheels migrate info` — show which migrations have run and which are still pending. Read-only; safe any time.
+
+The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly — the schema either moves fully or not at all.
+
+## Generating a migration
+
+The generator scaffolds a CFC with `up()` and `down()` stubs and drops it in `app/migrator/migrations/` with a timestamp prefix.
+
+```bash title="your shell"
+wheels generate migration CreatePosts
+```
+
+That produces a file named like `20260420143000_create_posts_table.cfc`. The prefix is `YYYYMMDDHHMMSS` — generated from the clock at creation time — and the runner applies migrations in filename order, so the timestamp is what puts your change after everyone else's. Never rename or reorder migration files after they've been committed: the history in `schema_migrations` keys on the filename, and a renamed file looks like a brand-new migration to the runner.
+
+## Writing a migration — full example
+
+Open the generated CFC and fill in the body. A migration for a new table typically builds the table definition with `createTable()`, chains column methods on the returned builder, and flushes with `.create()`. The `down()` just drops the table.
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Create posts table" {
+    function up() {
+        t = createTable(name="posts");
+        t.string(columnNames="title", allowNull=false, limit=120);
+        t.text(columnNames="body");
+        t.integer(columnNames="status", default=0);
+        t.datetime(columnNames="publishedAt");
+        t.timestamps();
+        t.create();
+    }
+
+    function down() {
+        dropTable(name="posts");
+    }
+}
+```
+
+Three things to note:
+
+1. `createTable("posts")` returns a table-builder object. Every column method — `t.string`, `t.integer`, `t.datetime` — mutates that builder. Nothing hits the database until `t.create()`.
+2. `t.timestamps()` creates `createdAt`, `updatedAt`, **and** a soft-delete column (`deletedAt`). Don't also add those columns by hand — you'll get duplicate-column errors. See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/) for how Wheels populates them automatically on save.
+3. The column-builder methods use `columnNames` (plural) and `allowNull` — not `columnName` and `null`. A single call can create several same-typed columns at once: `t.string(columnNames="firstName,lastName", limit=60)`.
+
+## Column types
+
+These are the column-builder methods defined on `TableDefinition`. Every one takes `columnNames` (comma-separated string), and most accept `default` and `allowNull`. A few take type-specific extras.
+
+| Method | DB type | Common options |
+|--------|---------|----------------|
+| `t.string(columnNames=, limit=, allowNull=, default=)` | VARCHAR | `limit` defaults to 255 |
+| `t.char(columnNames=, limit=)` | CHAR | fixed-width string |
+| `t.text(columnNames=, size=)` | TEXT / MEDIUMTEXT / LONGTEXT | `size` is MySQL-only |
+| `t.integer(columnNames=, limit=, allowNull=, default=)` | INT | `limit=8` maps to BIGINT on MySQL |
+| `t.bigInteger(columnNames=)` | BIGINT | |
+| `t.float(columnNames=)` | FLOAT | |
+| `t.decimal(columnNames=, precision=, scale=)` | DECIMAL | use for money |
+| `t.boolean(columnNames=, default=)` | BOOLEAN / BIT | |
+| `t.date(columnNames=)` | DATE | |
+| `t.datetime(columnNames=)` | DATETIME / TIMESTAMP | |
+| `t.time(columnNames=)` | TIME | |
+| `t.timestamp(columnNames=)` | DATETIME | single-column version |
+| `t.binary(columnNames=)` | BLOB / VARBINARY | |
+| `t.uniqueidentifier(columnNames=)` | UNIQUEIDENTIFIER / UUID | defaults to `newid()` |
+| `t.references(referenceNames=, foreignKey=, onDelete=)` | INT + FK | creates `<name>Id` and a FK constraint |
+| `t.timestamps()` | creates `createdAt`, `updatedAt`, `deletedAt` | no arguments |
+
+`t.references(referenceNames="user")` is the shortcut for the common case of a foreign key: it adds an integer column named `userId`, plus a FK constraint pointing at `users.id`. Pass `polymorphic=true` to also create a `userType` string column for [polymorphic associations](/v4-0-0-snapshot/basics/associations/#polymorphic-associations). Pass `foreignKey=false` to skip the constraint and leave only the column — useful when the referenced table lives in another datasource.
+
+## Indexes
+
+Indexes don't belong in `createTable()` — they're a separate concern, and you'll often add them to existing tables as query patterns emerge. Use `addIndex()` and `removeIndex()`.
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Index posts publishedAt" {
+    function up() {
+        addIndex(table="posts", columnNames="publishedAt");
+        addIndex(table="posts", columnNames="userId,status", indexName="idx_posts_user_status");
+    }
+
+    function down() {
+        removeIndex(table="posts", indexName="posts_publishedAt");
+        removeIndex(table="posts", indexName="idx_posts_user_status");
+    }
+}
+```
+
+If you don't pass `indexName`, Wheels generates one by joining the table name and first column — in this case `posts_publishedAt`. For multi-column indexes or when you want a predictable name, pass `indexName` explicitly. `removeIndex` always needs the name.
+
+Pass `unique=true` on `addIndex` to create a unique constraint, which is what [`validatesUniquenessOf`](/v4-0-0-snapshot/basics/validation-and-errors/) should sit on top of to race-proof the check at the database level.
+
+## Foreign keys
+
+`t.references()` inside `createTable()` adds a foreign key as part of the `CREATE TABLE` statement. When you need to add a FK to an existing table — or the foreign key doesn't follow the `<parent>Id` convention — use `addForeignKey()`.
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Add fk: comments.postId -> posts.id" {
+    function up() {
+        addForeignKey(
+            table="comments",
+            referenceTable="posts",
+            column="postId",
+            referenceColumn="id"
+        );
+    }
+
+    function down() {
+        dropForeignKey(table="comments", keyName="FK_comments_posts");
+    }
+}
+```
+
+`addForeignKey()` takes four required arguments and generates a constraint name like `FK_<table>_<referenceTable>`. The `down()` drops it by that generated name — `dropForeignKey(table=, keyName=)`. There's also `addReference()` / `dropReference()` for the convention case where the column is `<singular>Id` and the table is `<plural>`: `addReference(table="comments", referenceName="post")` does the same thing as the long form above.
+
+<Aside type="caution">
+  The public `addForeignKey()` method doesn't take `onDelete` or `onUpdate` — those options are only available on `t.references()` inside `createTable()`. If you need cascade behavior on a FK added later, drop and recreate the constraint inside the transaction, or drop the whole table and recreate it. Application-level cascade via `hasMany(name=..., dependent="delete")` is the simpler path; see [Associations](/v4-0-0-snapshot/basics/associations/).
+</Aside>
+
+## Adding, removing, renaming columns
+
+Three methods cover the common single-column changes. Each one is a method on the Migration base class — no table builder, no `.create()` flush.
+
+Add a column:
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Add archived flag" {
+    function up() {
+        addColumn(table="posts", columnType="boolean", columnName="archived", default=false);
+    }
+
+    function down() {
+        removeColumn(table="posts", columnName="archived");
+    }
+}
+```
+
+Rename a column:
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Rename body to content" {
+    function up() {
+        renameColumn(table="posts", columnName="body", newColumnName="content");
+    }
+
+    function down() {
+        renameColumn(table="posts", columnName="content", newColumnName="body");
+    }
+}
+```
+
+Remove a column:
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Remove deprecated teaser" {
+    function up() {
+        removeColumn(table="posts", columnName="teaser");
+    }
+
+    function down() {
+        addColumn(table="posts", columnType="string", columnName="teaser", limit=255);
+    }
+}
+```
+
+`addColumn` takes the same type-specific options as the table-builder methods: `limit`, `precision`, `scale`, `default`, `allowNull`. Pass `columnType="string"` or `"integer"` or `"datetime"` and so on — the same type names the `t.*` methods use internally.
+
+## Seeding via migrations — avoid, but if you must
+
+Real seed data — users, roles, reference lookups — belongs in `app/db/seeds.cfm` where it runs idempotently via `seedOnce()`. See [Seeding](/v4-0-0-snapshot/basics/seeding/) for that path. Don't use migrations for seed data in long-lived projects: a `INSERT` in a migration runs exactly once, so editing the inserted row later means writing another migration to update it, and fresh clones of the repo end up with whatever the most recent migration wrote.
+
+That said, you'll occasionally want a migration to backfill data for a schema change — for example, populating a new column from an existing one. When you do, use inline SQL with `NOW()` for timestamps. Parameter binding in `execute()` is unreliable across databases, and database-specific date functions (`CURRENT_TIMESTAMP`, `GETDATE()`, `SYSDATETIME()`) don't port. `NOW()` works across MySQL, PostgreSQL, SQL Server, H2, and SQLite.
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Seed admin role" {
+    function up() {
+        execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
+    }
+
+    function down() {
+        execute("DELETE FROM roles WHERE name = 'admin'");
+    }
+}
+```
+
+Quote string values inline; wrap each statement in `execute()` individually. For anything structural — building a compound object, branching on current rows — consider writing a one-off script under `app/scripts/` and calling it from your deploy pipeline instead.
+
+## Reversible vs irreversible
+
+Every `up()` should have a matching `down()` so `wheels migrate down` can walk the history back. Most changes are trivially reversible: `createTable` pairs with `dropTable`, `addColumn` with `removeColumn`, `addIndex` with `removeIndex`.
+
+Some aren't. Dropping a column with data loses that data forever; a row-level transformation (`UPDATE posts SET slug = LOWER(...)`) can't be undone without the original values. In those cases, write the forward change and have `down()` throw — loudly — so an accidental rollback fails instead of silently corrupting the schema.
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Slugify posts — irreversible" {
+    function up() {
+        execute("UPDATE posts SET slug = LOWER(REPLACE(title, ' ', '-'))");
+    }
+
+    function down() {
+        Throw(
+            type="IrreversibleMigration",
+            message="Cannot reverse slug transformation — original titles may differ from the generated slugs."
+        );
+    }
+}
+```
+
+The throw is the honest signal: "you can't walk past this point backward." If you need to undo the change in practice, write a new forward migration.
+
+## Filename format
+
+Generated migration files are named `<YYYYMMDDHHMMSS>_<snake_case_name>.cfc` — a 14-digit UTC-ish timestamp, an underscore, then the name you passed to `wheels generate migration`. The timestamp determines the order the runner applies them. Don't hand-edit the prefix; if you need to reorder after a merge conflict, regenerate the file and move your body into it.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="Models map to the tables migrations create — finders, persistence, validations." />
+  <LinkCard title="Associations" href="/v4-0-0-snapshot/basics/associations/" description="The foreign-key columns that hasMany and belongsTo read from — defined here, declared there." />
+  <LinkCard title="Seeding" href="/v4-0-0-snapshot/basics/seeding/" description="Idempotent seed data via seedOnce() — the right home for reference records." />
+  <LinkCard title="Database and Multiple Datasources" href="/v4-0-0-snapshot/basics/database-and-multiple-datasources/" description="Configuring the connection migrations run against, and targeting a non-default datasource." />
+</CardGrid>

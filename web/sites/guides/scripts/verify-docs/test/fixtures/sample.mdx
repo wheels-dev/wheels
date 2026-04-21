@@ -1,0 +1,31 @@
+---
+title: Sample page
+---
+
+Sample page with tagged code blocks.
+
+```cfm {test:compile}
+component extends="Model" {}
+```
+
+An illustrative block that should be ignored:
+
+```cfm title="illustrative"
+someAPI.that.doesntExist();
+```
+
+A CLI block with asserts:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+A tutorial-tagged block (Phase 1 driver; extract still recognizes it):
+
+```cfm {test:tutorial step=1 file="app/models/Post.cfc"}
+component extends="Model" {
+  function config() {
+    validatesPresenceOf("title");
+  }
+}
+```
