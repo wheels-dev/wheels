@@ -70,6 +70,17 @@ jobs:
         # the harness spawns `wheels`.
         run: wheels --version >/dev/null
 
+      - name: Diagnose shebang interpreter availability
+        run: |
+          echo "=== head of wrapper ==="
+          head -1 "$(readlink -f $(which wheels))"
+          echo "=== /bin/bash ==="
+          ls -la /bin/bash || echo "MISSING /bin/bash"
+          echo "=== /usr/bin/env ==="
+          ls -la /usr/bin/env || echo "MISSING /usr/bin/env"
+          echo "=== node exec('/bin/bash') ==="
+          node -e "const {spawnSync}=require('child_process'); const r=spawnSync('/bin/bash',['-c','echo ok'],{encoding:'utf8'}); console.log(JSON.stringify({status:r.status,err:r.error&&r.error.code,stdout:r.stdout}));"
+
       - name: Run harness unit tests
         working-directory: web/sites/guides
         # LUCLI_HOME points LuCLI at the wrapper's module directory
