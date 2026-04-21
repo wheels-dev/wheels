@@ -97,7 +97,37 @@
   {
     "label": "CLI Reference",
     "link": "/v4-0-0-snapshot/command-line-tools/",
-    "items": []
+    "items": [
+      { "label": "Installation", "link": "/v4-0-0-snapshot/command-line-tools/installation/" },
+      { "label": "Quick Start", "link": "/v4-0-0-snapshot/command-line-tools/quick-start/" },
+      { "label": "Configuration", "link": "/v4-0-0-snapshot/command-line-tools/configuration/" },
+      { "label": "MCP Integration", "link": "/v4-0-0-snapshot/command-line-tools/mcp-integration/" },
+      {
+        "label": "Wheels Commands",
+        "items": [
+          { "label": "Creating a Project", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/creating-a-project/" },
+          { "label": "Code Generation", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/code-generation/" },
+          { "label": "Database", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/database/" },
+          { "label": "Dev Server", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/dev-server/" },
+          { "label": "Testing", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/testing/" },
+          { "label": "App Inspection", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/app-inspection/" },
+          { "label": "Code Quality", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/code-quality/" },
+          { "label": "Scaffold Cleanup", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/scaffold-cleanup/" },
+          { "label": "Console & REPL", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/console-and-repl/" },
+          { "label": "Upgrade", "link": "/v4-0-0-snapshot/command-line-tools/wheels-commands/upgrade/" }
+        ]
+      },
+      {
+        "label": "Core Commands (LuCLI)",
+        "items": [
+          { "label": "Server", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/server/" },
+          { "label": "CFML Execution", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/cfml-execution/" },
+          { "label": "System & Secrets", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/system-and-secrets/" },
+          { "label": "Modules & Deps", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/modules-and-deps/" },
+          { "label": "AI & Completion", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/ai-and-completion/" }
+        ]
+      }
+    ]
   },
   {
     "label": "Contributing & Project",
