@@ -1,0 +1,2 @@
+image: acme/demo
+servers: [1.2.3.4]
