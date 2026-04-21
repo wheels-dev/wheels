@@ -1,0 +1,34 @@
+---
+title: "wheels deploy build dev"
+description: Build a local dev-tagged image without pushing to a registry.
+type: reference
+sidebar:
+  label: "dev"
+  order: 7
+---
+
+Build the app image locally and tag it with `:dev`. No registry push; intended for local smoke testing.
+
+## Synopsis
+
+```
+wheels deploy build dev [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the `docker build` command without executing. |
+
+## Behavior
+
+Emits `docker build -t <image>:dev ...` on the control machine, using the same `builder.context`, `dockerfile`, and `args` as a regular push. No `docker push`. Useful when you want to verify the image builds before running `wheels deploy build push`.
+
+## Example
+
+```bash
+wheels deploy build dev
+docker run --rm -it <image>:dev   # spot-check locally
+```

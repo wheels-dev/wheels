@@ -1,0 +1,39 @@
+---
+title: "wheels deploy build create"
+description: Create a docker buildx builder for multi-arch or remote builds.
+type: reference
+sidebar:
+  label: "create"
+  order: 4
+---
+
+Create a `docker buildx` builder on the control machine. One-time setup for multi-arch builds and remote builds.
+
+## Synopsis
+
+```
+wheels deploy build create [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## When to run
+
+- Before the first multi-arch build (`builder.arch:` has more than one entry).
+- Before the first build against a remote builder (`builder.remote:` is set).
+- Single-arch local builds don't need `build create` — `docker build` alone suffices.
+
+## Behavior
+
+Emits `docker buildx create --use ...` with a name derived from the service. Idempotent — re-running uses the existing builder.
+
+## Example
+
+```bash
+wheels deploy build create
+```

@@ -1,0 +1,43 @@
+---
+title: "wheels deploy app logs"
+description: docker logs fanned out across every host. Tail, follow, and per-container filtering supported.
+type: reference
+sidebar:
+  label: "logs"
+  order: 7
+---
+
+`docker logs` fanned out across every host, prefixed by host. Follows and per-container targeting supported.
+
+## Synopsis
+
+```
+wheels deploy app logs [--tail=<N>] [--follow] [--container=<name>] [--role=<name>] [--destination=<name>]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--tail=<N>` | Trailing lines per host. Default 100. |
+| `--follow` | `docker logs --follow`. Leaves the connection open; Ctrl-C to stop. |
+| `--container=<name>` | Target one specific container name instead of every service-labelled container. |
+| `--role=<name>` | Limit to one role. |
+| `--destination=<name>` | Overlay destination config. |
+
+`--version` is not required.
+
+## Behavior
+
+Emits `docker logs --tail <N> [--follow] [<container>]` per host. Output is line-buffered and prefixed with `[<host>]`.
+
+Under `--follow`, the command fans out in parallel and stays running until interrupted.
+
+## Examples
+
+```bash
+wheels deploy app logs
+wheels deploy app logs --tail=500
+wheels deploy app logs --follow --role=web
+wheels deploy app logs --container=myapp-web-abc1234
+```

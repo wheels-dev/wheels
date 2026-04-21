@@ -1,0 +1,34 @@
+---
+title: "wheels deploy accessory reboot"
+description: Stop, remove, and re-run the named accessory container.
+type: reference
+sidebar:
+  label: "reboot"
+  order: 2
+---
+
+Stop, remove, and re-run the named accessory container. Useful after bumping the image tag in `deploy.yml`.
+
+## Synopsis
+
+```
+wheels deploy accessory reboot --name=<name|all> [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Behavior
+
+Per accessory: `docker stop <service>-<name>`, `docker rm <service>-<name>`, then the same `docker run` as [`accessory boot`](/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/boot/). Downtime lasts until the new container passes its health check (if declared).
+
+## Example
+
+```bash
+wheels deploy accessory reboot --name=redis
+```

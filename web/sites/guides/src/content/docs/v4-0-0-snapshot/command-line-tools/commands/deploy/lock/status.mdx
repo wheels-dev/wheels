@@ -1,0 +1,35 @@
+---
+title: "wheels deploy lock status"
+description: Report whether the deploy lock is held and who holds it.
+type: reference
+sidebar:
+  label: "status"
+  order: 3
+---
+
+Report whether the per-service deploy lock is held. If held, prints the user and message that took it.
+
+## Synopsis
+
+```
+wheels deploy lock status [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the command without executing. |
+
+## Behavior
+
+Reads `/tmp/kamal_deploy_lock_<service>` on a single host. Unlocked: empty output. Locked: message and performer from the lock file.
+
+Always run this before `lock release` — it's the only safe way to tell a stale lock from an active one.
+
+## Example
+
+```bash
+wheels deploy lock status
+```

@@ -1,0 +1,33 @@
+---
+title: "wheels deploy build details"
+description: docker buildx inspect for the configured builder.
+type: reference
+sidebar:
+  label: "details"
+  order: 6
+---
+
+`docker buildx inspect` for the builder associated with this service.
+
+## Synopsis
+
+```
+wheels deploy build details [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Shows builder name, driver, endpoint, and supported platforms. Confirms multi-arch builds will land on the architectures you expect.
+
+## Example
+
+```bash
+wheels deploy build details
+```

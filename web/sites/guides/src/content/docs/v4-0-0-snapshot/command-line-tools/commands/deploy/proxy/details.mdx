@@ -1,0 +1,29 @@
+---
+title: "wheels deploy proxy details"
+description: docker ps filtered to the kamal-proxy container on every host.
+type: reference
+sidebar:
+  label: "details"
+  order: 6
+---
+
+`docker ps --filter name=kamal-proxy` on every host. Confirms the proxy is up and reports uptime.
+
+## Synopsis
+
+```
+wheels deploy proxy details [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Example
+
+```bash
+wheels deploy proxy details
+```

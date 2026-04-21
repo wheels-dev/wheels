@@ -1,0 +1,34 @@
+---
+title: "wheels deploy app"
+description: App container lifecycle verbs — boot, start, stop, logs, containers, images, live, maintenance, remove.
+type: reference
+sidebar:
+  label: "app"
+  order: 20
+---
+
+App container lifecycle. Every verb targets containers labelled with the current service, optionally filtered by `--role`.
+
+## Verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`boot`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/boot/) | `docker run` new containers for the given version. |
+| [`start`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/start/) | `docker start` existing stopped containers. |
+| [`stop`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/stop/) | `docker stop` running containers. |
+| [`details`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/details/) | `docker inspect` for the given version's containers. |
+| [`containers`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/containers/) | `docker ps` filtered by service label. |
+| [`images`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/images/) | `docker images` for the app image. |
+| [`logs`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/logs/) | `docker logs` across every host. |
+| [`live`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/live/) | Clear the maintenance marker file. |
+| [`maintenance`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/maintenance/) | Write the maintenance marker file. |
+| [`remove`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/remove/) | Stop + remove containers for the given version. |
+
+## Common flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | Required for boot/start/stop/details/live/maintenance/remove. |
+| `--role=<name>` | Limit to one role. Default: all roles. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |

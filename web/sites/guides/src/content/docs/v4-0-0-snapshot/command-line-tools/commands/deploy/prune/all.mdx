@@ -1,0 +1,33 @@
+---
+title: "wheels deploy prune all"
+description: Prune both old containers and old images on every host.
+type: reference
+sidebar:
+  label: "all"
+  order: 1
+---
+
+Prune old containers and old images on every host, respecting `retain_containers:`.
+
+## Synopsis
+
+```
+wheels deploy prune all [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Runs [`prune containers`](/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/containers/) then [`prune images`](/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/images/) on every host. The current live container and everything in the retention window survives.
+
+## Example
+
+```bash
+wheels deploy prune all
+```

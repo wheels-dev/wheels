@@ -93,6 +93,12 @@
     "label": "Deployment & Operations",
     "link": "/v4-0-0-snapshot/deployment/",
     "items": [
+      { "label": "Your First Deploy", "link": "/v4-0-0-snapshot/deployment/first-deploy/" },
+      { "label": "deploy.yml Reference", "link": "/v4-0-0-snapshot/deployment/config-reference/" },
+      { "label": "Accessories", "link": "/v4-0-0-snapshot/deployment/accessories/" },
+      { "label": "Secrets", "link": "/v4-0-0-snapshot/deployment/secrets/" },
+      { "label": "Hooks", "link": "/v4-0-0-snapshot/deployment/hooks/" },
+      { "label": "Migrating from Kamal", "link": "/v4-0-0-snapshot/deployment/migrating-from-kamal/" },
       { "label": "Production Configuration", "link": "/v4-0-0-snapshot/deployment/production-config/" },
       { "label": "Docker Deployment", "link": "/v4-0-0-snapshot/deployment/docker-deployment/" },
       { "label": "VM and Bare-metal Deployment", "link": "/v4-0-0-snapshot/deployment/vm-deployment/" },
@@ -131,6 +137,134 @@
           { "label": "System & Secrets", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/system-and-secrets/" },
           { "label": "Modules & Deps", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/modules-and-deps/" },
           { "label": "AI & Completion", "link": "/v4-0-0-snapshot/command-line-tools/core-commands/ai-and-completion/" }
+        ]
+      },
+      {
+        "label": "Deploy Commands",
+        "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/",
+        "items": [
+          { "label": "deploy", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/deploy/" },
+          { "label": "setup", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/setup/" },
+          { "label": "redeploy", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/redeploy/" },
+          { "label": "rollback", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/rollback/" },
+          { "label": "config", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/config/" },
+          { "label": "init", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/init/" },
+          { "label": "version", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/version/" },
+          { "label": "audit", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/audit/" },
+          { "label": "details", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/details/" },
+          { "label": "docs", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/docs/" },
+          { "label": "remove", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/remove/" },
+          {
+            "label": "app",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/",
+            "collapsed": true,
+            "items": [
+              { "label": "app boot", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/boot/" },
+              { "label": "app start", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/start/" },
+              { "label": "app stop", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/stop/" },
+              { "label": "app details", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/details/" },
+              { "label": "app containers", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/containers/" },
+              { "label": "app images", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/images/" },
+              { "label": "app logs", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/logs/" },
+              { "label": "app live", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/live/" },
+              { "label": "app maintenance", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/maintenance/" },
+              { "label": "app remove", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/app/remove/" }
+            ]
+          },
+          {
+            "label": "proxy",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/",
+            "collapsed": true,
+            "items": [
+              { "label": "proxy boot", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/boot/" },
+              { "label": "proxy reboot", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/reboot/" },
+              { "label": "proxy start", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/start/" },
+              { "label": "proxy stop", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/stop/" },
+              { "label": "proxy restart", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/restart/" },
+              { "label": "proxy details", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/details/" },
+              { "label": "proxy logs", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/logs/" },
+              { "label": "proxy remove", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/remove/" }
+            ]
+          },
+          {
+            "label": "accessory",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/",
+            "collapsed": true,
+            "items": [
+              { "label": "accessory boot", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/boot/" },
+              { "label": "accessory reboot", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/reboot/" },
+              { "label": "accessory start", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/start/" },
+              { "label": "accessory stop", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/stop/" },
+              { "label": "accessory restart", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/restart/" },
+              { "label": "accessory details", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/details/" },
+              { "label": "accessory logs", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/logs/" },
+              { "label": "accessory remove", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/remove/" }
+            ]
+          },
+          {
+            "label": "build",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/",
+            "collapsed": true,
+            "items": [
+              { "label": "build deliver", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/deliver/" },
+              { "label": "build push", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/push/" },
+              { "label": "build pull", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/pull/" },
+              { "label": "build create", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/create/" },
+              { "label": "build remove", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/remove/" },
+              { "label": "build details", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/details/" },
+              { "label": "build dev", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/build/dev/" }
+            ]
+          },
+          {
+            "label": "registry",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/",
+            "collapsed": true,
+            "items": [
+              { "label": "registry setup", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/setup/" },
+              { "label": "registry login", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/login/" },
+              { "label": "registry logout", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/logout/" },
+              { "label": "registry remove", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/remove/" }
+            ]
+          },
+          {
+            "label": "server",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/server/",
+            "collapsed": true,
+            "items": [
+              { "label": "server exec", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/server/exec/" },
+              { "label": "server bootstrap", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/server/bootstrap/" }
+            ]
+          },
+          {
+            "label": "prune",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/",
+            "collapsed": true,
+            "items": [
+              { "label": "prune all", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/all/" },
+              { "label": "prune images", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/images/" },
+              { "label": "prune containers", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/containers/" }
+            ]
+          },
+          {
+            "label": "lock",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/lock/",
+            "collapsed": true,
+            "items": [
+              { "label": "lock acquire", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/lock/acquire/" },
+              { "label": "lock release", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/lock/release/" },
+              { "label": "lock status", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/lock/status/" }
+            ]
+          },
+          {
+            "label": "secrets",
+            "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/secrets/",
+            "collapsed": true,
+            "items": [
+              { "label": "secrets fetch", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/secrets/fetch/" },
+              { "label": "secrets extract", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/secrets/extract/" },
+              { "label": "secrets print", "link": "/v4-0-0-snapshot/command-line-tools/commands/deploy/secrets/print/" }
+            ]
+          }
         ]
       }
     ]
