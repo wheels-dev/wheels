@@ -101,12 +101,11 @@ component {
 		var previousTCCL = thread.getContextClassLoader();
 		try {
 			thread.setContextClassLoader(getClassLoader());
-			if (arrayLen(arguments.args) == 0) {
-				var ctor = klass.getDeclaredConstructor(javaCast("Class[]", []));
-				return ctor.newInstance(javaCast("Object[]", []));
-			}
-			// Best-effort: match by arity. If a caller needs exact type matching
-			// we extend this later. Deploy JARs we bundle today don't need it.
+			// Match by arity via getDeclaredConstructors(). Direct
+			// klass.getDeclaredConstructor(javaCast("Class[]", [])) hits a
+			// Lucee varargs-bridge limitation ("class [Class] not found") so
+			// we iterate — same workaround Yaml.cfc / Mustache.cfc use.
+			// Deploy JARs we bundle today don't need exact type matching.
 			var ctors = klass.getDeclaredConstructors();
 			for (var i = 1; i <= arrayLen(ctors); i++) {
 				if (arrayLen(ctors[i].getParameterTypes()) == arrayLen(arguments.args)) {
