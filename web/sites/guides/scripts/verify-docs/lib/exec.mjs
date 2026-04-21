@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { statSync, accessSync, constants } from 'node:fs';
 
 /**
  * Resolve `wheels` to an absolute path at module load time. Node 22's
@@ -57,6 +58,16 @@ export function runExec(program, args = [], opts = {}) {
   // Workers inherit default env from the parent; the resolved path
   // sidesteps any PATH lookup fragility inside test-runner workers.
   const resolvedProgram = program === 'wheels' ? RESOLVED_WHEELS : program;
+
+  if (process.env.VERIFY_DOCS_DEBUG && resolvedProgram.startsWith('/')) {
+    try {
+      const s = statSync(resolvedProgram);
+      accessSync(resolvedProgram, constants.X_OK);
+      console.error(`[exec.mjs] spawn pre-check: ${resolvedProgram} isFile=${s.isFile()} isSymlink=${s.isSymbolicLink()} mode=${s.mode.toString(8)} executable=yes pid=${process.pid}`);
+    } catch (e) {
+      console.error(`[exec.mjs] spawn pre-check FAILED: ${resolvedProgram} err=${e.code} msg=${e.message} pid=${process.pid}`);
+    }
+  }
 
   return new Promise((resolve) => {
     const proc = spawn(resolvedProgram, args, spawnOpts);
