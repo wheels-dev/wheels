@@ -47,3 +47,24 @@ Real Ruby-vs-Wheels command-string parity becomes a **Phase 2** task, gated on e
 - Track Kamal upstream for `--dry-run` support on `deploy`.
 - Prototype `tools/kamal-capture/` (SSHKit printer backend + Thor wrapper) as a Phase 2 spike.
 - Once wheels deploy wiring routes correctly from an installed CLI binary (currently the PATH `wheels` binary doesn't see this worktree's Module.cfc), re-run `deploy-config-diff.sh` end-to-end and fold it into `tests.yml` as a soft-fail matrix job.
+
+## Task 38 addendum (2026-04-21 later in day)
+
+Phase 3's Task 38 was originally planned as the byte-identical comparison
+harness across every in-scope verb. Given the reality documented above
+(Kamal has no dry-run flag we can diff against), the Phase 3 harness
+decomposes into two realistically-achievable gates:
+
+- `tools/deploy-verb-smoke.sh` — runs every `wheels deploy <verb> --dry-run`
+  combination against the fixture corpus, asserts clean exit + non-empty
+  output. Gates regressions in our own Cli dispatch, flag parsing, and
+  command-string generation. Does NOT verify parity with Ruby Kamal.
+
+- `tools/deploy-config-diff.sh` — expanded to cover every fixture. Shows
+  `kamal config` vs `wheels deploy config` side-by-side. Config-layer
+  parity remains the only thing we can honestly measure between the two
+  tools today.
+
+`tools/deploy-dry-run-diff.sh` was rewritten from a stub to a documented
+placeholder naming the two concrete paths to ever making it real (Kamal
+upstream, or a SSHKit capture shim).

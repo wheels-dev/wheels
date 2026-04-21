@@ -47,13 +47,16 @@ fi
 KAMAL_VERSION="$(kamal version 2>/dev/null || echo unknown)"
 echo "Using Ruby Kamal version: $KAMAL_VERSION"
 
-# Select fixtures — defaulting to minimal only. full.yml exercises
-# accessories + multi-role which Phase 1 wheels-deploy does not emit,
-# so including it in the gate would be noise. Pass a stem to override.
+# Select fixtures. Task 38 expanded the default loop to cover all three
+# fixtures (minimal, full, with-accessories). Our output remains a
+# deliberate subset vs. Kamal's fully-resolved Configuration hash; this
+# script still does NOT enforce strict exit-gate equality on field
+# contents — it asserts both tools produced output for every fixture and
+# emits the pair for reviewer eyeballing. Pass a stem to override.
 if [ "$#" -gt 0 ]; then
     STEMS=("$@")
 else
-    STEMS=(minimal)
+    STEMS=(minimal full with-accessories)
 fi
 
 FAIL=0
