@@ -7,11 +7,16 @@
  * loaded per invocation and passed into each *Commands.cfc. All methods
  * honor opts.dryRun — when true, commands print to writeOutput with a
  * [host] prefix and no network calls happen.
+ *
+ * Phase 2 integration: lock acquire/release (bracketing the body of work
+ * with try/finally so the lock is released even on failure), and pre/post
+ * deploy hooks that run locally on the dev machine via ProcessBuilder.
  */
 component {
 
-    public DeployMainCli function init(any sshPool = "") {
+    public DeployMainCli function init(any sshPool = "", struct opts = {}) {
         variables.sshPool = arguments.sshPool;
+        variables.projectRoot = arguments.opts.projectRoot ?: expandPath("./");
         variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
@@ -58,21 +63,53 @@ component {
         var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
         var proxy = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
         var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+        var lock = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+        var hooks = new cli.lucli.services.deploy.commands.HookCommands(
+            cfg,
+            {projectRoot: variables.projectRoot}
+        );
 
         var hosts = $allHosts(cfg);
+        var hookEnv = {
+            KAMAL_VERSION: ver,
+            KAMAL_HOSTS: arrayToList(hosts, ",")
+        };
+        var deployStart = getTickCount();
 
-        $dispatch(hosts, builder.pull(ver), dryRun);
-        $dispatch(hosts, proxy.details() & " || " & proxy.boot(), dryRun);
+        $fireHook(hooks, "pre-deploy", hookEnv, dryRun);
 
-        for (var role in cfg.roles()) {
-            for (var host in role.hosts()) {
-                $dispatch([host], app.run(role, ver), dryRun);
-                $dispatch(
-                    [host],
-                    proxy.deploy(role, app.container_name(role, ver) & ":3000"),
-                    dryRun
-                );
+        try {
+            $dispatchAny(
+                hosts,
+                lock.acquire({user: $currentUser(), message: "deploy " & ver}),
+                dryRun
+            );
+
+            try {
+                $dispatch(hosts, builder.pull(ver), dryRun);
+                $dispatchAny(hosts, proxy.details() & " || " & proxy.boot(), dryRun);
+
+                for (var role in cfg.roles()) {
+                    for (var host in role.hosts()) {
+                        $dispatch([host], app.run(role, ver), dryRun);
+                        $dispatch(
+                            [host],
+                            proxy.deploy(role, app.container_name(role, ver) & ":3000"),
+                            dryRun
+                        );
+                    }
+                }
+            } finally {
+                $dispatchAny(hosts, lock.release(), dryRun);
             }
+
+            hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
+            $fireHook(hooks, "post-deploy", hookEnv, dryRun);
+        } catch (any e) {
+            hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
+            hookEnv.KAMAL_ERROR = e.message;
+            $fireHook(hooks, "post-deploy-failure", hookEnv, dryRun);
+            rethrow;
         }
     }
 
@@ -132,6 +169,91 @@ component {
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
             ssh.run(c);
         });
+    }
+
+    /**
+     * Dispatch a single command to "any one" host — used for operations
+     * that only need to happen once across the fleet (lock acquire/release,
+     * proxy boot check). FakeSshPool.onAny records exactly one call.
+     */
+    private void function $dispatchAny(
+        required array hosts,
+        required string cmd,
+        required boolean dryRun
+    ) {
+        if (arguments.dryRun) {
+            arrayAppend(variables.dryRunBuffer, "[any] " & arguments.cmd);
+            return;
+        }
+        if (arrayLen(arguments.hosts) == 0) return;
+        var c = arguments.cmd;
+        // Prefer onAny when available (both real SshPool and FakeSshPool
+        // expose it). Fall back to onEach with a single host otherwise.
+        if (structKeyExists(variables.sshPool, "onAny")) {
+            variables.sshPool.onAny(arguments.hosts, function(ssh, host) {
+                ssh.run(c);
+            });
+        } else {
+            variables.sshPool.onEach([arguments.hosts[1]], function(ssh, host) {
+                ssh.run(c);
+            });
+        }
+    }
+
+    /**
+     * Fire a local hook with KAMAL_* env. Silently no-ops if the hook
+     * doesn't exist (hooks are optional). Under dryRun, records a marker
+     * in the dryRun buffer instead of exec'ing.
+     */
+    private void function $fireHook(
+        required any hooks,
+        required string name,
+        required struct env,
+        required boolean dryRun
+    ) {
+        var h = arguments.hooks.forHook(arguments.name, arguments.env);
+        if (!h.exists) return;
+
+        if (arguments.dryRun) {
+            arrayAppend(
+                variables.dryRunBuffer,
+                "[local] hook " & arguments.name & " " & h.hookPath
+            );
+            return;
+        }
+
+        var pb = createObject("java", "java.lang.ProcessBuilder").init([h.hookPath]);
+        var envMap = pb.environment();
+        for (var k in h.env) {
+            envMap.put(javaCast("string", k), javaCast("string", h.env[k]));
+        }
+        pb.directory(createObject("java", "java.io.File").init(variables.projectRoot));
+        pb.redirectErrorStream(true);
+        var proc = pb.start();
+        var reader = createObject("java", "java.io.BufferedReader").init(
+            createObject("java", "java.io.InputStreamReader").init(
+                proc.getInputStream(), "UTF-8"
+            )
+        );
+        var line = reader.readLine();
+        while (!isNull(line)) {
+            writeOutput("[hook:" & arguments.name & "] " & line & chr(10));
+            line = reader.readLine();
+        }
+        var exitCode = proc.waitFor();
+        if (exitCode != 0) {
+            throw(
+                type = "DeployMainCli.HookFailed",
+                message = "Hook " & arguments.name & " exited with code " & exitCode
+            );
+        }
+    }
+
+    private string function $currentUser() {
+        var sys = createObject("java", "java.lang.System");
+        var user = sys.getenv("USER");
+        if (isNull(user) || !len(user)) user = "unknown";
+        return user;
     }
 
     private array function $allHosts(required any cfg) {
