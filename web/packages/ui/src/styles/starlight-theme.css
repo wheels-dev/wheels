@@ -168,7 +168,17 @@ starlight-toc a[aria-current='true'] {
  * the slack. Scoped via .wd-params-table so prose tables elsewhere
  * are unaffected.
  */
+/* Wrap in an overflow:auto container so very wide rows can still scroll
+ * horizontally on narrow viewports — mirrors what Starlight does globally
+ * via `display: block; overflow: auto` on markdown tables, but we need to
+ * restore `display: table` on the <table> itself so the column-width
+ * algorithm (required by the width:1% idiom below) works. */
+.sl-markdown-content .wd-params-table {
+	overflow-x: auto;
+}
+
 .sl-markdown-content .wd-params-table table {
+	display: table;
 	table-layout: auto;
 	width: 100%;
 }
@@ -176,10 +186,15 @@ starlight-toc a[aria-current='true'] {
 .sl-markdown-content .wd-params-table th:nth-child(-n + 4),
 .sl-markdown-content .wd-params-table td:nth-child(-n + 4) {
 	white-space: nowrap;
+	/* width: 1% + nowrap is the canonical "shrink-to-content" idiom for
+	 * auto-layout tables — without it, browsers distribute all columns
+	 * evenly and the Description column ends up at ~1/5 of the width
+	 * instead of absorbing the slack. */
+	width: 1%;
 }
 
 .sl-markdown-content .wd-params-table th:nth-child(5),
 .sl-markdown-content .wd-params-table td:nth-child(5) {
-	width: 100%;
+	width: auto;
 	word-break: break-word;
 }
