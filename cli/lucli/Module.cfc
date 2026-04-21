@@ -1329,6 +1329,19 @@ component extends="modules.BaseModule" {
 				return arrayToList(dmc.dryRunOutput(), chr(10));
 			case "version":
 				return dmc.version();
+			case "audit":
+				dmc.audit(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "docs":
+				// `docs [SECTION]` — section is the optional second positional.
+				opts.section = arrayLen(positional) >= 2 ? positional[2] : "";
+				return dmc.docs(opts);
+			case "details":
+				dmc.details(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "remove":
+				dmc.remove(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
 			case "app":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy app requires a verb");
@@ -1582,6 +1595,13 @@ component extends="modules.BaseModule" {
 			} else if (a == "--from" && i < n) {
 				opts.from = arguments.args[i+1];
 				i++;
+			} else if (a == "--confirm") {
+				opts.confirm = true;
+			} else if (left(a, 7) == "--tail=") {
+				opts.tail = mid(a, 8, 99999);
+			} else if (a == "--tail" && i < n) {
+				opts.tail = arguments.args[i+1];
+				i++;
 			}
 			i++;
 		}
@@ -1596,7 +1616,9 @@ component extends="modules.BaseModule" {
 			var a = arguments.args[i];
 			if (left(a, 2) == "--") {
 				// Space-style flag with a value? Consume the value too.
-				if (!find("=", a) && a != "--dry-run" && i < n && left(arguments.args[i+1], 2) != "--") {
+				// Boolean flags take no value.
+				var booleans = "--dry-run,--force,--confirm";
+				if (!find("=", a) && !listFindNoCase(booleans, a) && i < n && left(arguments.args[i+1], 2) != "--") {
 					i++; // consume value
 				}
 				i++;

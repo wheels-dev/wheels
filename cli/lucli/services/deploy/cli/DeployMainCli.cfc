@@ -146,6 +146,142 @@ component {
         deploy(arguments.opts);
     }
 
+    /**
+     * Print the on-server audit log. Emits `tail -n <N> /tmp/kamal-audit.log`
+     * on every host, aggregates output via the dry-run buffer when requested.
+     */
+    public string function audit(required struct opts) {
+        arrayClear(variables.dryRunBuffer);
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
+        var tail = arguments.opts.tail ?: 100;
+        var cmd = "tail -n " & tail & " /tmp/kamal-audit.log";
+        var hosts = $allHosts(cfg);
+        var dryRun = arguments.opts.dryRun ?: false;
+        $dispatch(hosts, cmd, dryRun);
+        return arrayToList(variables.dryRunBuffer, chr(10));
+    }
+
+    /**
+     * Embedded Markdown help.
+     * Bare `docs` prints a TOC of available sections; `docs <section>`
+     * prints that section's content. Section files live in ./docs/*.md.
+     */
+    public string function docs(required struct opts) {
+        var section = arguments.opts.section ?: "";
+        var sections = $docsSections();
+        if (!len(section)) {
+            return "Available docs sections:" & chr(10) & chr(10)
+                 & "  " & arrayToList(sections, chr(10) & "  ") & chr(10) & chr(10)
+                 & "Usage: wheels deploy docs <section>";
+        }
+        var path = $docsPath(section);
+        if (!fileExists(path)) {
+            throw(
+                type = "DeployMainCli.UnknownDocsSection",
+                message = "No docs section named '" & section & "'. Run 'wheels deploy docs' for the list."
+            );
+        }
+        return fileRead(path);
+    }
+
+    /**
+     * Aggregate of app.containers, proxy.details, and accessory.details
+     * for every accessory. Dispatched per-host so the user can see the
+     * state of each host independently.
+     */
+    public string function details(required struct opts) {
+        arrayClear(variables.dryRunBuffer);
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
+        var dryRun = arguments.opts.dryRun ?: false;
+        var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+        var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+        var hosts = $allHosts(cfg);
+
+        // app details: docker ps filtered by service label
+        $dispatch(hosts, appCmds.containers(), dryRun);
+        // proxy details: docker ps filtered by kamal-proxy name
+        $dispatch(hosts, proxyCmds.details(), dryRun);
+        // accessory details (if any)
+        if (arrayLen(cfg.accessories())) {
+            var accCmds = new cli.lucli.services.deploy.commands.AccessoryCommands(cfg);
+            for (var acc in cfg.accessories()) {
+                $dispatch(acc.hosts(), accCmds.details(acc), dryRun);
+            }
+        }
+        return arrayToList(variables.dryRunBuffer, chr(10));
+    }
+
+    /**
+     * Destructive teardown. Requires --confirm. Chains app container
+     * removal → proxy removal → accessory removal → registry logout.
+     */
+    public void function remove(required struct opts) {
+        if (!(arguments.opts.confirm ?: false)) {
+            throw(
+                type = "DeployMainCli.RemoveNotConfirmed",
+                message = "remove is destructive — pass --confirm to proceed"
+            );
+        }
+        arrayClear(variables.dryRunBuffer);
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
+        var dryRun = arguments.opts.dryRun ?: false;
+        var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+        var regCmds = new cli.lucli.services.deploy.commands.RegistryCommands(cfg);
+        var hosts = $allHosts(cfg);
+
+        // Remove all app containers for this service, across all versions.
+        // Versions can't be enumerated locally, so we issue a broad
+        // docker rm scoped by the service label.
+        var broadRemove = "docker ps -a --filter label=service=" & cfg.service()
+                        & " --format '{{.ID}}' | xargs -r docker rm -f";
+        for (var role in cfg.roles()) {
+            for (var host in role.hosts()) {
+                $dispatch([host], broadRemove, dryRun);
+            }
+        }
+        // Remove proxy.
+        $dispatch(hosts, proxyCmds.remove(), dryRun);
+        // Remove each accessory.
+        if (arrayLen(cfg.accessories())) {
+            var accCmds = new cli.lucli.services.deploy.commands.AccessoryCommands(cfg);
+            for (var acc in cfg.accessories()) {
+                $dispatch(acc.hosts(), accCmds.remove(acc), dryRun);
+            }
+        }
+        // Logout of registry.
+        $dispatch(hosts, regCmds.logout(), dryRun);
+    }
+
+    private array function $docsSections() {
+        // Hardcoded to keep TOC output stable across Lucee / Adobe
+        // (directoryList sort differs). The files must exist on disk —
+        // $docsPath throws if one goes missing.
+        return [
+            "accessories",
+            "builder",
+            "env",
+            "hooks",
+            "proxy",
+            "registry",
+            "servers",
+            "ssh"
+        ];
+    }
+
+    private string function $docsPath(required string section) {
+        return expandPath("/cli/lucli/services/deploy/cli/docs")
+             & "/" & arguments.section & ".md";
+    }
+
     public string function init_stub(required struct opts) {
         var cwd = arguments.opts.cwd ?: expandPath("./");
         if (right(cwd, 1) != "/") cwd &= "/";

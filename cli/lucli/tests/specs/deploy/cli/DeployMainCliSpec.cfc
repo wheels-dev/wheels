@@ -206,6 +206,75 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
                 directoryDelete(tmpCwd, true);
             });
+
+            it("audit dispatches tail of audit log to every host", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.audit({configPath: variables.fixture});
+                expect(fake.calls()[1].cmd).toInclude("tail -n 100 /tmp/kamal-audit.log");
+            });
+
+            it("audit honors --tail flag", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.audit({configPath: variables.fixture, tail: 25});
+                expect(fake.calls()[1].cmd).toInclude("tail -n 25");
+            });
+
+            it("docs without section prints the TOC", () => {
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var out = dc.docs({});
+                expect(out).toInclude("Available docs sections");
+            });
+
+            it("docs with a valid section prints its content", () => {
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var out = dc.docs({section: "servers"});
+                expect(out).toInclude("servers:");
+            });
+
+            it("docs with unknown section throws", () => {
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                expect(() => dc.docs({section: "nonexistent"})).toThrow();
+            });
+
+            it("details dispatches app containers + proxy details", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.details({configPath: variables.fixture});
+                var cmds = [];
+                for (var c in fake.calls()) arrayAppend(cmds, c.cmd ?: "");
+                expect($anyInclude(cmds, "docker ps --filter label=service=demo")).toBeTrue();
+                expect($anyInclude(cmds, "name=kamal-proxy")).toBeTrue();
+            });
+
+            it("remove without --confirm throws", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                expect(() => dc.remove({configPath: variables.fixture})).toThrow();
+            });
+
+            it("remove --confirm dispatches broad teardown", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.remove({configPath: variables.fixture, confirm: true});
+                var cmds = [];
+                for (var c in fake.calls()) arrayAppend(cmds, c.cmd ?: "");
+                expect($anyInclude(cmds, "docker ps -a --filter label=service=demo")).toBeTrue();
+                expect($anyInclude(cmds, "docker stop kamal-proxy")).toBeTrue();
+                expect($anyInclude(cmds, "docker logout")).toBeTrue();
+            });
         });
+    }
+
+    private boolean function $anyInclude(required array arr, required string needle) {
+        for (var s in arguments.arr) if (findNoCase(arguments.needle, s)) return true;
+        return false;
     }
 }
