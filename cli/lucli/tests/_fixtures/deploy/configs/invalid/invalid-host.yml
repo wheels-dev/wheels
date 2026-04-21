@@ -1,0 +1,4 @@
+service: demo
+image: acme/demo
+servers:
+  - "not:a:valid:host:at:all"
