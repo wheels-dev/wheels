@@ -1490,6 +1490,23 @@ component extends="modules.BaseModule" {
 				);
 				invoke(lockCli, lockVerb, [opts]);
 				return arrayToList(lockCli.dryRunOutput(), chr(10));
+			case "secrets":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy secrets requires a verb (fetch/extract/print)");
+				}
+				var secVerb = positional[2];
+				if (!listFindNoCase("fetch,extract,print", secVerb)) {
+					throw(message="Unknown wheels deploy secrets verb: " & secVerb);
+				}
+				if (secVerb == "fetch") {
+					opts.keys = [];
+					for (var si = 3; si <= arrayLen(positional); si++) arrayAppend(opts.keys, positional[si]);
+				}
+				if (secVerb == "extract") {
+					opts.key = arrayLen(positional) >= 3 ? positional[3] : "";
+				}
+				var secCli = new cli.lucli.services.deploy.cli.DeploySecretsCli();
+				return invoke(secCli, secVerb, [opts]);
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}
@@ -1549,6 +1566,21 @@ component extends="modules.BaseModule" {
 				opts.message = mid(a, 11, 99999);
 			} else if (a == "--message" && i < n) {
 				opts.message = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--adapter=") {
+				opts.adapter = mid(a, 11, 99999);
+			} else if (a == "--adapter" && i < n) {
+				opts.adapter = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--account=") {
+				opts.account = mid(a, 11, 99999);
+			} else if (a == "--account" && i < n) {
+				opts.account = arguments.args[i+1];
+				i++;
+			} else if (left(a, 7) == "--from=") {
+				opts.from = mid(a, 8, 99999);
+			} else if (a == "--from" && i < n) {
+				opts.from = arguments.args[i+1];
 				i++;
 			}
 			i++;
