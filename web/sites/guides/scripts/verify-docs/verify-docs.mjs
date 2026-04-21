@@ -45,11 +45,29 @@ async function main() {
 
   const { perBlock, cumulative } = partitionAndOrder(examples);
 
-  const perBlockResults = await Promise.all(perBlock.map(async (ex) => {
-    if (ex.kind === 'cli') return { ...ex, ...(await runCli(ex)) };
-    if (ex.kind === 'compile') return { ...ex, ...(await runCompile(ex)) };
-    return { ...ex, ok: false, message: `no driver for kind "${ex.kind}"` };
-  }));
+  // Concurrency cap — LuCLI's lucee.json writer races at high parallelism,
+  // and homebrew's Cellar access at scale transiently returns ENOENT on
+  // the wrapper. 4-way parallelism keeps gap #11 from biting at scale
+  // while still being fast (~1/4 of full serial time on macOS laptops).
+  // Env var VERIFY_DOCS_CONCURRENCY overrides. Compile blocks (which don't
+  // spawn LuCLI fixtures) could run at higher concurrency but we keep it
+  // simple and uniform.
+  const CONCURRENCY = Number(process.env.VERIFY_DOCS_CONCURRENCY) || 4;
+  const perBlockResults = new Array(perBlock.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (true) {
+      const i = nextIndex++;
+      if (i >= perBlock.length) return;
+      const ex = perBlock[i];
+      let result;
+      if (ex.kind === 'cli') result = await runCli(ex);
+      else if (ex.kind === 'compile') result = await runCompile(ex);
+      else result = { ok: false, message: `no driver for kind "${ex.kind}"` };
+      perBlockResults[i] = { ...ex, ...result };
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, perBlock.length) }, worker));
 
   const cumulativeResults = [];
   const session = cumulative.length > 0 ? new TutorialSession() : null;
