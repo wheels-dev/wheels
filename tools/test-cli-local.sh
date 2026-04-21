@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Run CLI-layer tests (cli/lucli/tests/specs/**) locally via LuCLI + SQLite.
+#
+# Companion to tools/test-local.sh. Where that script runs core framework
+# tests at /wheels/core/tests, this one runs the CLI module's own spec
+# suite at /cli/lucli/tests/runner.cfm.
+#
+# Prerequisites:
+#   - LuCLI 0.3.3+ on PATH
+#   - Java 21+
+#
+# Usage:
+#   bash tools/test-cli-local.sh              # run all CLI specs
+#   PORT=9090 bash tools/test-cli-local.sh    # custom port
+#
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PORT="${PORT:-8080}"
+PASSWORD="wheels"
+RESULT_FILE="/tmp/wheels-cli-test-results.json"
+
+cd "$PROJECT_ROOT"
+
+# ── Lifecycle ───────────────────────────────────────
+cleanup() {
+  if [ "${STARTED_SERVER:-false}" = "true" ]; then
+    echo "Stopping test server..."
+    kill "$SERVER_PID" 2>/dev/null || true
+    lucli server stop 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
+# ── Start server if not already running ─────────────
+STARTED_SERVER=false
+if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
+  echo "Using existing server on port ${PORT}"
+else
+  echo "Starting LuCLI server on port ${PORT}..."
+  nohup lucli server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &
+  SERVER_PID=$!
+  STARTED_SERVER=true
+
+  echo "Waiting for server..."
+  for i in $(seq 1 60); do
+    if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
+      echo "Server ready (attempt $i)"
+      break
+    fi
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      echo "Server process died. Check /tmp/wheels-cli-test-server.log"
+      cat /tmp/wheels-cli-test-server.log 2>/dev/null | tail -20
+      exit 1
+    fi
+    sleep 2
+  done
+fi
+
+# ── Warm up Wheels ──────────────────────────────────
+echo "Warming up..."
+curl -s -o /dev/null --max-time 120 "http://localhost:${PORT}/?reload=true&password=${PASSWORD}" || true
+sleep 2
+
+# ── Run tests ───────────────────────────────────────
+TEST_URL="http://localhost:${PORT}/cli/lucli/tests/runner.cfm?format=json"
+echo "Running CLI tests: ${TEST_URL}"
+
+HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
+  --max-time 600 \
+  --write-out "%{http_code}" \
+  "$TEST_URL" || echo "000")
+
+# ── Parse and display results ───────────────────────
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; then
+  python3 -c "
+import json, sys
+try:
+    d = json.load(open('$RESULT_FILE'))
+except Exception as e:
+    print(f'Failed to parse results: {e}')
+    sys.exit(2)
+print(f\"{d.get('totalPass', 0)} pass, {d.get('totalFail', 0)} fail, {d.get('totalError', 0)} error\")
+for b in d.get('bundleStats', []):
+    for s in b.get('suiteStats', []):
+        for sp in s.get('specStats', []):
+            if sp.get('status') in ('Failed', 'Error'):
+                msg = (sp.get('failMessage') or '')[:180]
+                print(f\"  {sp['status']}: {sp['name']}: {msg}\")
+sys.exit(0 if (d.get('totalFail', 0) + d.get('totalError', 0)) == 0 else 1)
+"
+else
+  echo "Test runner returned HTTP ${HTTP_CODE}"
+  cat "$RESULT_FILE" | head -30
+  exit 1
+fi

@@ -12,6 +12,20 @@
 
 ---
 
+## Amendment — 2026-04-21
+
+Discovered during Task 2 execution: the plan's test paths didn't line up with the repo's CLI test infrastructure. Three global corrections apply to every subsequent task:
+
+1. **Spec location.** Every `tests/specs/deploy/...` path becomes `cli/lucli/tests/specs/deploy/...`. Deploy is a CLI-layer feature; CLI specs live under `cli/lucli/tests/specs/` alongside `commands/`, `services/`, `integration/` (the existing pattern).
+2. **Base class.** Every `component extends="wheels.WheelsTest"` becomes `component extends="wheels.wheelstest.system.BaseSpec"`. This is what every existing CLI spec uses.
+3. **Test runner.** Every `bash tools/test-local.sh deploy` becomes `bash tools/test-cli-local.sh`. `test-local.sh` runs core framework tests at `/wheels/core/tests`; the new `tools/test-cli-local.sh` (companion script) runs CLI specs at `/cli/lucli/tests/runner.cfm`. The CLI runner doesn't currently support directory filtering — all CLI specs run on every invocation, which is fast enough for the TDD inner loop. If deploy specs push the suite over ~15s wall-clock, a directory filter becomes a follow-up.
+4. **Test fixtures.** Every `tests/_fixtures/deploy/...` path becomes `cli/lucli/tests/_fixtures/deploy/...` for consistency with the co-located CLI test tree.
+5. **Test helpers.** `tests/_helpers/DeployShellHelper.cfc` becomes `cli/lucli/tests/_helpers/DeployShellHelper.cfc`.
+
+The plan body below was written before these were known. Apply the amendment mentally when reading paths; subagent dispatch prompts already incorporate the corrections.
+
+---
+
 ## File Map
 
 ### Phase 0 — Foundations
