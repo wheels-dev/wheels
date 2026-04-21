@@ -92,7 +92,13 @@
   {
     "label": "Deployment & Operations",
     "link": "/v4-0-0-snapshot/deployment/",
-    "items": []
+    "items": [
+      { "label": "Production Configuration", "link": "/v4-0-0-snapshot/deployment/production-config/" },
+      { "label": "Docker Deployment", "link": "/v4-0-0-snapshot/deployment/docker-deployment/" },
+      { "label": "VM and Bare-metal Deployment", "link": "/v4-0-0-snapshot/deployment/vm-deployment/" },
+      { "label": "Security Hardening", "link": "/v4-0-0-snapshot/deployment/security-hardening/" },
+      { "label": "Observability and Logging", "link": "/v4-0-0-snapshot/deployment/observability-and-logging/" }
+    ]
   },
   {
     "label": "CLI Reference",
@@ -132,12 +138,19 @@
   {
     "label": "Contributing & Project",
     "link": "/v4-0-0-snapshot/contributing/",
-    "items": []
+    "items": [
+      { "label": "Submitting Pull Requests", "link": "/v4-0-0-snapshot/contributing/pull-requests/" },
+      { "label": "Coding Standards", "link": "/v4-0-0-snapshot/contributing/coding-standards/" },
+      { "label": "Writing Documentation", "link": "/v4-0-0-snapshot/contributing/writing-docs/" }
+    ]
   },
   {
     "label": "Upgrading",
     "link": "/v4-0-0-snapshot/upgrading/",
-    "items": []
+    "items": [
+      { "label": "Upgrading from 3.x to 4.0", "link": "/v4-0-0-snapshot/upgrading/3x-to-4x/" },
+      { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0-snapshot/upgrading/2x-to-3x/" }
+    ]
   },
   {
     "label": "Glossary",
