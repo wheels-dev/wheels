@@ -1,0 +1,15 @@
+# Minimal nginx image that serves "v1" on /.
+#
+# Unused in the default `approach (c)` E2E run — the fixture mocks `docker`
+# itself rather than actually starting containers, so this file doesn't get
+# built during `bash tools/deploy-e2e-up.sh`. Kept here for two reasons:
+#
+#   1. Documents the app-shape the test contract pretends to deploy (a
+#      stateless service returning a version marker). Anyone wiring up a
+#      future docker-in-docker E2E (approach (a) or (b)) has the image recipe
+#      already spelled out.
+#   2. A follow-up task can build + `docker save` this into a tarball, load
+#      it into a dind service, and flip the test from "command-dispatch
+#      assertions" to "real HTTP v1 serves".
+FROM nginx:alpine
+RUN printf '%s\n' 'v1' > /usr/share/nginx/html/index.html

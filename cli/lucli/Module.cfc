@@ -1276,6 +1276,361 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  deploy — Kamal-style production deploys
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Deploy the app to production servers.
+	 *
+	 * Usage:
+	 *   wheels deploy                          - full deploy
+	 *   wheels deploy --dry-run                - print commands, skip execution
+	 *   wheels deploy --destination production - load deploy.production.yml overlay
+	 *   wheels deploy rollback v1              - roll back to version v1
+	 *   wheels deploy config                   - print resolved config as YAML
+	 *   wheels deploy init                     - create config stub
+	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy version                  - show version pinning
+	 */
+	public string function deploy() {
+		var args = getArgs(arguments);
+		var opts = $deployArgsToOptions(args);
+		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
+			opts.configPath = expandPath("config/deploy.yml");
+		}
+
+		var positional = $deployStripFlags(args);
+		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
+
+		var dmc = new cli.lucli.services.deploy.cli.DeployMainCli(
+			new cli.lucli.services.deploy.lib.SshPool()
+		);
+
+		switch (sub) {
+			case "deploy":
+				dmc.deploy(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "redeploy":
+				dmc.redeploy(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "rollback":
+				if (arrayLen(positional) < 2) {
+					throw(message="rollback requires a version argument: wheels deploy rollback <version>");
+				}
+				opts.version = positional[2];
+				dmc.rollback(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "config":
+				return dmc.config(opts);
+			case "init":
+				return dmc.init_stub(opts);
+			case "setup":
+				dmc.setup(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "version":
+				return dmc.version();
+			case "audit":
+				dmc.audit(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "docs":
+				// `docs [SECTION]` — section is the optional second positional.
+				opts.section = arrayLen(positional) >= 2 ? positional[2] : "";
+				return dmc.docs(opts);
+			case "details":
+				dmc.details(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "remove":
+				dmc.remove(opts);
+				return arrayToList(dmc.dryRunOutput(), chr(10));
+			case "app":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy app requires a verb");
+				}
+				var appVerb = positional[2];
+				var appCli = new cli.lucli.services.deploy.cli.DeployAppCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (appVerb) {
+					case "boot":
+					case "start":
+					case "stop":
+					case "details":
+					case "containers":
+					case "images":
+					case "logs":
+					case "live":
+					case "maintenance":
+					case "remove":
+						appCli[appVerb](opts);
+						return arrayToList(appCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy app verb: #appVerb#");
+				}
+			case "proxy":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy proxy requires a verb");
+				}
+				var proxyVerb = positional[2];
+				var proxyCli = new cli.lucli.services.deploy.cli.DeployProxyCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (proxyVerb) {
+					case "boot":
+					case "reboot":
+					case "start":
+					case "stop":
+					case "restart":
+					case "details":
+					case "logs":
+					case "remove":
+						invoke(proxyCli, proxyVerb, [opts]);
+						return arrayToList(proxyCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy proxy verb: #proxyVerb#");
+				}
+			case "registry":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy registry requires a verb");
+				}
+				var registryVerb = positional[2];
+				var registryCli = new cli.lucli.services.deploy.cli.DeployRegistryCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (registryVerb) {
+					case "setup":
+					case "login":
+					case "logout":
+					case "remove":
+						invoke(registryCli, registryVerb, [opts]);
+						return arrayToList(registryCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy registry verb: #registryVerb#");
+				}
+			case "build":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy build requires a verb");
+				}
+				var buildVerb = positional[2];
+				var buildCli = new cli.lucli.services.deploy.cli.DeployBuildCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (buildVerb) {
+					case "deliver":
+					case "push":
+					case "pull":
+					case "create":
+					case "remove":
+					case "details":
+					case "dev":
+						invoke(buildCli, buildVerb, [opts]);
+						return arrayToList(buildCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy build verb: #buildVerb#");
+				}
+			case "accessory":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy accessory requires a verb");
+				}
+				var accVerb = positional[2];
+				opts.name = arrayLen(positional) >= 3 ? positional[3] : "";
+				var accCli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (accVerb) {
+					case "boot":
+					case "reboot":
+					case "start":
+					case "stop":
+					case "restart":
+					case "details":
+					case "logs":
+					case "remove":
+						invoke(accCli, accVerb, [opts]);
+						return arrayToList(accCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy accessory verb: #accVerb#");
+				}
+			case "prune":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy prune requires a verb (all/images/containers)");
+				}
+				var pruneVerb = positional[2];
+				if (!listFindNoCase("all,images,containers", pruneVerb)) {
+					throw(message="Unknown wheels deploy prune verb: " & pruneVerb);
+				}
+				var pruneCli = new cli.lucli.services.deploy.cli.DeployPruneCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				invoke(pruneCli, pruneVerb, [opts]);
+				return arrayToList(pruneCli.dryRunOutput(), chr(10));
+			case "server":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy server requires a verb (exec or bootstrap)");
+				}
+				var serverVerb = positional[2];
+				if (serverVerb == "exec") {
+					if (arrayLen(positional) < 3) {
+						throw(message="wheels deploy server exec requires a command");
+					}
+					// Preserve multi-token commands: join all positional args after the verb.
+					var cmdParts = [];
+					for (var ci = 3; ci <= arrayLen(positional); ci++) {
+						arrayAppend(cmdParts, positional[ci]);
+					}
+					opts.cmd = arrayToList(cmdParts, " ");
+				}
+				var serverCli = new cli.lucli.services.deploy.cli.DeployServerCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (serverVerb) {
+					case "exec":
+						serverCli.exec(opts);
+						return arrayToList(serverCli.dryRunOutput(), chr(10));
+					case "bootstrap":
+						serverCli.bootstrap(opts);
+						return arrayToList(serverCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy server verb: #serverVerb#");
+				}
+			case "lock":
+				if (arrayLen(positional) < 2) throw(message="wheels deploy lock requires a verb (acquire/release/status)");
+				var lockVerb = positional[2];
+				if (!listFindNoCase("acquire,release,status", lockVerb)) {
+					throw(message="Unknown wheels deploy lock verb: " & lockVerb);
+				}
+				var lockCli = new cli.lucli.services.deploy.cli.DeployLockCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				invoke(lockCli, lockVerb, [opts]);
+				return arrayToList(lockCli.dryRunOutput(), chr(10));
+			case "secrets":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy secrets requires a verb (fetch/extract/print)");
+				}
+				var secVerb = positional[2];
+				if (!listFindNoCase("fetch,extract,print", secVerb)) {
+					throw(message="Unknown wheels deploy secrets verb: " & secVerb);
+				}
+				if (secVerb == "fetch") {
+					opts.keys = [];
+					for (var si = 3; si <= arrayLen(positional); si++) arrayAppend(opts.keys, positional[si]);
+				}
+				if (secVerb == "extract") {
+					opts.key = arrayLen(positional) >= 3 ? positional[3] : "";
+				}
+				var secCli = new cli.lucli.services.deploy.cli.DeploySecretsCli();
+				return invoke(secCli, secVerb, [opts]);
+			default:
+				throw(message="Unknown deploy subcommand: #sub#");
+		}
+	}
+
+	private struct function $deployArgsToOptions(required array args) {
+		var opts = {};
+		var n = arrayLen(arguments.args);
+		var i = 1;
+		while (i <= n) {
+			var a = arguments.args[i];
+			if (a == "--dry-run") {
+				opts.dryRun = true;
+			} else if (left(a, 14) == "--destination=") {
+				opts.destination = mid(a, 15, 99999);
+			} else if (a == "--destination" && i < n) {
+				opts.destination = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--version=") {
+				opts.version = mid(a, 11, 99999);
+			} else if (a == "--version" && i < n) {
+				opts.version = arguments.args[i+1];
+				i++;
+			} else if (left(a, 13) == "--configPath=") {
+				opts.configPath = mid(a, 14, 99999);
+			} else if (a == "--configPath" && i < n) {
+				opts.configPath = arguments.args[i+1];
+				i++;
+			} else if (a == "--force") {
+				opts.force = true;
+			} else if (left(a, 10) == "--service=") {
+				opts.service = mid(a, 11, 99999);
+			} else if (a == "--service" && i < n) {
+				opts.service = arguments.args[i+1];
+				i++;
+			} else if (left(a, 8) == "--image=") {
+				opts.image = mid(a, 9, 99999);
+			} else if (a == "--image" && i < n) {
+				opts.image = arguments.args[i+1];
+				i++;
+			} else if (left(a, 20) == "--registry-username=") {
+				opts.registryUsername = mid(a, 21, 99999);
+			} else if (a == "--registry-username" && i < n) {
+				opts.registryUsername = arguments.args[i+1];
+				i++;
+			} else if (left(a, 7) == "--host=") {
+				opts.host = mid(a, 8, 99999);
+			} else if (a == "--host" && i < n) {
+				opts.host = arguments.args[i+1];
+				i++;
+			} else if (left(a, 7) == "--keep=") {
+				opts.keep = mid(a, 8, 99999);
+			} else if (a == "--keep" && i < n) {
+				opts.keep = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--message=") {
+				opts.message = mid(a, 11, 99999);
+			} else if (a == "--message" && i < n) {
+				opts.message = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--adapter=") {
+				opts.adapter = mid(a, 11, 99999);
+			} else if (a == "--adapter" && i < n) {
+				opts.adapter = arguments.args[i+1];
+				i++;
+			} else if (left(a, 10) == "--account=") {
+				opts.account = mid(a, 11, 99999);
+			} else if (a == "--account" && i < n) {
+				opts.account = arguments.args[i+1];
+				i++;
+			} else if (left(a, 7) == "--from=") {
+				opts.from = mid(a, 8, 99999);
+			} else if (a == "--from" && i < n) {
+				opts.from = arguments.args[i+1];
+				i++;
+			} else if (a == "--confirm") {
+				opts.confirm = true;
+			} else if (left(a, 7) == "--tail=") {
+				opts.tail = mid(a, 8, 99999);
+			} else if (a == "--tail" && i < n) {
+				opts.tail = arguments.args[i+1];
+				i++;
+			}
+			i++;
+		}
+		return opts;
+	}
+
+	private array function $deployStripFlags(required array args) {
+		var out = [];
+		var n = arrayLen(arguments.args);
+		var i = 1;
+		while (i <= n) {
+			var a = arguments.args[i];
+			if (left(a, 2) == "--") {
+				// Space-style flag with a value? Consume the value too.
+				// Boolean flags take no value.
+				var booleans = "--dry-run,--force,--confirm";
+				if (!find("=", a) && !listFindNoCase(booleans, a) && i < n && left(arguments.args[i+1], 2) != "--") {
+					i++; // consume value
+				}
+				i++;
+				continue;
+			}
+			arrayAppend(out, a);
+			i++;
+		}
+		return out;
+	}
+
+	// ─────────────────────────────────────────────────
 	//  stats — Code statistics
 	// ─────────────────────────────────────────────────
 

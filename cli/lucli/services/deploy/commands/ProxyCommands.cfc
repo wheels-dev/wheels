@@ -58,4 +58,24 @@ component extends="Base" {
         var tail = arguments.opts.tail ?: 100;
         return docker("logs", "--tail", tail, variables.PROXY_CONTAINER_NAME);
     }
+
+    public string function reboot() {
+        // Stop, remove, rebuild — in order. Returns a single chained command.
+        return chain([
+            remove(),   // stops + rms
+            boot()      // rebuilds
+        ]);
+    }
+
+    public string function start() {
+        return docker("start", variables.PROXY_CONTAINER_NAME);
+    }
+
+    public string function stop() {
+        return docker("stop", variables.PROXY_CONTAINER_NAME);
+    }
+
+    public string function restart() {
+        return docker("restart", variables.PROXY_CONTAINER_NAME);
+    }
 }
