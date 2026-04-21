@@ -64,75 +64,25 @@ jobs:
       - name: Smoke-test the CLI
         run: wheels --version
 
-      - name: Diagnose wrapper (temporary — remove once spawn enoent is root-caused)
-        run: |
-          WRAPPER=/home/linuxbrew/.linuxbrew/bin/wheels
-          echo "=== file ==="
-          file "$WRAPPER"
-          echo "=== readlink -f ==="
-          readlink -f "$WRAPPER"
-          echo "=== stat ==="
-          stat "$WRAPPER"
-          echo "=== head -10 (resolved) ==="
-          head -10 "$(readlink -f "$WRAPPER")"
-          echo "=== strace execve of wheels --version ==="
-          sudo apt-get install -y strace >/dev/null 2>&1 || true
-          strace -f -e trace=execve -s 256 wheels --version 2>&1 | head -60 || true
-          echo "=== node spawnSync (main process, no --test) ==="
-          node -e "const {spawnSync}=require('child_process'); const r=spawnSync('$WRAPPER',['--version'],{encoding:'utf8'}); console.log(JSON.stringify({status:r.status,err:r.error&&r.error.code,stderr:(r.stderr||'').slice(0,300),stdout:(r.stdout||'').slice(0,200)}));"
-          echo "=== node spawn inside --test worker (matrix of options) ==="
-          cat > /tmp/spawn-probe.mjs <<'EOF'
-          import { test } from 'node:test';
-          import { spawn } from 'node:child_process';
-          import { mkdtempSync } from 'node:fs';
-          import { tmpdir } from 'node:os';
-          import { join } from 'node:path';
-          const WRAPPER = process.env.WRAPPER;
-          const tmpCwd = mkdtempSync(join(tmpdir(), 'probe-'));
-          const scenarios = [
-            { label: 'A/minimal', args: ['--version'], opts: {} },
-            { label: 'B/new-minimal', args: ['new', 'probeapp', '--no-open-browser'], opts: {} },
-            { label: 'C/new-cwd', args: ['new', 'probeapp', '--no-open-browser'], opts: { cwd: tmpCwd } },
-            { label: 'D/new-cwd-stdio', args: ['new', 'probeapp', '--no-open-browser'], opts: { cwd: tmpCwd, stdio: ['ignore','pipe','pipe'] } },
-            { label: 'E/new-cwd-stdio-env', args: ['new', 'probeapp', '--no-open-browser'], opts: { cwd: tmpCwd, stdio: ['ignore','pipe','pipe'], env: { ...process.env, PATH: process.env.PATH + ':/home/linuxbrew/.linuxbrew/bin' } } },
-          ];
-          for (const s of scenarios) {
-            test(s.label, async () => {
-              await new Promise((res) => {
-                const p = spawn(WRAPPER, s.args, s.opts);
-                let out='', err='', spawnErr=null;
-                if (p.stdout) p.stdout.on('data', d=>out+=d);
-                if (p.stderr) p.stderr.on('data', d=>err+=d);
-                p.on('error', e => { spawnErr={code:e.code, msg:e.message, syscall:e.syscall, path:e.path}; });
-                p.on('close', code => { console.error('PROBE', s.label, JSON.stringify({code, err: err.slice(0,200), spawnErr})); res(); });
-              });
-            });
-          }
-          EOF
-          WRAPPER="$WRAPPER" node --test --test-concurrency=1 /tmp/spawn-probe.mjs 2>&1 | grep PROBE | head -20 || true
-
       - name: Warm up wheels module (first-run copy)
+        # Homebrew wrapper copies the module to $HOME/.wheels/modules/wheels
+        # on first invocation. Trigger it so the module is in place before
+        # the harness spawns `wheels`.
         run: wheels --version >/dev/null
 
       - name: Run harness unit tests
         working-directory: web/sites/guides
-        # Soft-fail: Node 22's test-runner workers cannot exec shebang scripts
-        # (including /opt/homebrew/bin/wheels and /bin/bash) — returns ENOENT
-        # even when statSync confirms the file exists and is executable. The
-        # same driver works fine outside test-runner workers (direct `node -e
-        # spawn('wheels')` succeeds). Tests pass locally. Tracked upstream;
-        # not blocking merge until Node/libuv is debugged.
-        continue-on-error: true
+        # LUCLI_HOME points LuCLI at the wrapper's module directory
+        # ($HOME/.wheels/modules/) rather than its DefaultProfile fallback
+        # ($HOME/.lucli/modules/). Follow-up tracked: fix the wrapper to
+        # pass -Dlucli.binary.name=wheels so WheelsProfile activates and
+        # this override becomes unnecessary.
         run: |
           export LUCLI_HOME="$HOME/.wheels"
           pnpm test:docs-harness
 
       - name: Verify v4 docs
         working-directory: web/sites/guides
-        # Same node test-runner spawn issue affects verify-docs blocks that
-        # invoke wheels — soft-fail here too until the upstream issue lands.
-        # Content still passes locally, which is the canonical correctness gate.
-        continue-on-error: true
         run: |
           export LUCLI_HOME="$HOME/.wheels"
           pnpm verify:docs
