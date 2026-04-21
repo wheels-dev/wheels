@@ -22,6 +22,13 @@ RESULT_FILE="/tmp/wheels-cli-test-results.json"
 
 cd "$PROJECT_ROOT"
 
+# Ensure JAVA_HOME is set (lucli server run needs it explicitly on some macOS setups).
+if [ -z "${JAVA_HOME:-}" ]; then
+  if command -v /usr/libexec/java_home >/dev/null 2>&1; then
+    export JAVA_HOME="$(/usr/libexec/java_home -v 21 2>/dev/null || /usr/libexec/java_home 2>/dev/null || true)"
+  fi
+fi
+
 # ── Lifecycle ───────────────────────────────────────
 cleanup() {
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
@@ -63,7 +70,7 @@ curl -s -o /dev/null --max-time 120 "http://localhost:${PORT}/?reload=true&passw
 sleep 2
 
 # ── Run tests ───────────────────────────────────────
-TEST_URL="http://localhost:${PORT}/cli/lucli/tests/runner.cfm?format=json"
+TEST_URL="http://localhost:${PORT}/wheels/cli/tests?format=json"
 echo "Running CLI tests: ${TEST_URL}"
 
 HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
@@ -80,14 +87,21 @@ try:
 except Exception as e:
     print(f'Failed to parse results: {e}')
     sys.exit(2)
-print(f\"{d.get('totalPass', 0)} pass, {d.get('totalFail', 0)} fail, {d.get('totalError', 0)} error\")
+# TestBox's totalError is unreliable in this repo (sometimes negative when
+# skipped/pending specs exist). Trust totalFail + explicit Error statuses.
+passes = d.get('totalPass', 0)
+fails = d.get('totalFail', 0)
+err = max(0, d.get('totalError', 0))
+print(f\"{passes} pass, {fails} fail, {err} error\")
+real_errors = 0
 for b in d.get('bundleStats', []):
     for s in b.get('suiteStats', []):
         for sp in s.get('specStats', []):
             if sp.get('status') in ('Failed', 'Error'):
+                real_errors += 1
                 msg = (sp.get('failMessage') or '')[:180]
                 print(f\"  {sp['status']}: {sp['name']}: {msg}\")
-sys.exit(0 if (d.get('totalFail', 0) + d.get('totalError', 0)) == 0 else 1)
+sys.exit(0 if (fails + real_errors) == 0 else 1)
 "
 else
   echo "Test runner returned HTTP ${HTTP_CODE}"
