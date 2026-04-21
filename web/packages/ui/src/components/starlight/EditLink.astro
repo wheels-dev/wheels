@@ -1,19 +1,12 @@
 ---
 // EditLink override.
 //
-// Both Starlight sites serve GENERATED content:
-//   - guides: rendered from markdown at docs/src/**/*.md in this repo
-//   - api:    rendered from docs/api/v{version}.json (extracted from CFC source)
-//
-// The default Starlight editUrl composes baseUrl + entry.filePath, which for
-// our setup points at the generated file (wrong — edits get overwritten on
-// regen). This override ignores editUrl and composes its own target:
-//
-//   - guides: strip the v{slug}/ prefix from entry.id → link at
-//     https://github.com/wheels-dev/wheels/edit/develop/docs/src/<path>.md
-//   - api:    GitHub code-search for the function name scoped to the repo.
-//     A follow-up could enhance generate-api-docs.mjs to record a
-//     sourcePath per function; for now, search is good enough.
+// Guides MDX is authored directly at
+// web/sites/guides/src/content/docs/<version>/*.mdx, so the edit link points
+// straight at that file. API pages are rendered from generated JSON
+// (docs/api/v{version}.json); the default editUrl would point at the
+// generated markdown which gets overwritten on regen, so for API pages we
+// fall back to GitHub code-search for the function name.
 
 const route = Astro.locals.starlightRoute;
 const entry = route.entry;
@@ -38,9 +31,9 @@ if (isApiFunction) {
 		label = 'View source on GitHub';
 	}
 } else {
-	// Guides. Strip leading 'v4-0-0-snapshot/' (or similar) version segment.
-	const withoutVersion = id.replace(/^v[^/]+\//, '');
-	href = `https://github.com/wheels-dev/wheels/edit/develop/docs/src/${withoutVersion}.md`;
+	// Guides. entry.id already includes the version segment (e.g.
+	// 'v4-0-0-snapshot/basics/associations'), which matches the on-disk layout.
+	href = `https://github.com/wheels-dev/wheels/edit/develop/web/sites/guides/src/content/docs/${id}.mdx`;
 }
 ---
 

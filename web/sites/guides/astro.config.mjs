@@ -88,11 +88,12 @@ export default defineConfig({
 				EditLink: '@wheels-dev/ui/components/starlight/EditLink.astro',
 			},
 			editLink: {
-				// Our EditLink override computes its own target (strips the version
-				// slug and points at docs/src/*.md), so the value here is mostly
-				// vestigial — but Starlight only renders EditLink when editLink is
-				// configured, so we still need this.
-				baseUrl: 'https://github.com/wheels-dev/wheels/edit/develop/docs/src/',
+				// Our EditLink override computes its own target and points at
+				// the Starlight-native MDX at
+				// web/sites/guides/src/content/docs/<version>/*.mdx, so the value
+				// here is mostly vestigial — but Starlight only renders EditLink
+				// when editLink is configured, so we still need this.
+				baseUrl: 'https://github.com/wheels-dev/wheels/edit/develop/web/sites/guides/src/content/docs/',
 			},
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/wheels-dev/wheels' }],
 			sidebar: [{ label: 'Overview', link: '/' }, ...versions.map(buildSidebarForVersion)],

@@ -8,7 +8,7 @@
     <owners>wheels-dev</owners>
     <projectUrl>https://github.com/cybersonic/LuCLI</projectUrl>
     <licenseUrl>https://github.com/cybersonic/LuCLI/blob/main/LICENSE</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/wheels-dev/wheels/develop/docs/src/assets/wheels-icon.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/wheels-dev/wheels/develop/web/packages/ui/src/assets/wheels-logo-mark.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>LuCLI is a fast, native Lucee CLI for running CFML from the command line. It powers the Wheels framework CLI (`wheels` command) for code generation, migrations, testing, and MCP-based AI editor integration.
 
