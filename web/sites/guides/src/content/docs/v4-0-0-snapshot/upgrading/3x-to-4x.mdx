@@ -65,11 +65,7 @@ Related hardening: wildcard-plus-credentials combinations are now rejected (#205
 
 **CHANGELOG:** `Breaking: HSTS header defaults on in production` (#2081).
 
-The `SecurityHeaders` middleware (#2036) emits `Strict-Transport-Security` by default in the `production` environment. If you terminate TLS outside the app and do not want HSTS emitted from here, disable it explicitly.
-
-```cfm {test:compile} title="config/settings.cfm"
-set(middleware = [ new wheels.middleware.SecurityHeaders(hsts=false) ]);
-```
+The `SecurityHeaders` middleware (#2036) emits `Strict-Transport-Security: max-age=31536000; includeSubDomains` by default in the `production` environment. If you terminate TLS outside the app and do not want HSTS emitted from here, there is currently no clean off-switch — see [#2174](https://github.com/wheels-dev/wheels/issues/2174). The workaround until that lands is to strip `Strict-Transport-Security` at your reverse proxy. `deployment/security-hardening.mdx` covers the configuration knobs that do exist today.
 
 ### 3. CSRF key required in production; JWT algorithm validated
 
