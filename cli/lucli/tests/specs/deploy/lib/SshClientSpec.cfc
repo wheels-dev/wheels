@@ -36,6 +36,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				ssh.close();
 			});
 
+			it("uploads a string directly and reads it back via cat", () => {
+				var ssh = makeClient(22022);
+				ssh.uploadString("hello direct", "/tmp/wheels-deploy-test-up.txt");
+				var r = ssh.run("cat /tmp/wheels-deploy-test-up.txt");
+				expect(trim(r.stdout)).toBe("hello direct");
+				ssh.close();
+			});
+
+			it("round-trips content via upload and download", () => {
+				var ssh = makeClient(22022);
+				ssh.uploadString("roundtrip payload", "/tmp/wheels-deploy-test-round.txt");
+				var localDown = getTempFile(getTempDirectory(), "wheels-deploy-down");
+				ssh.download("/tmp/wheels-deploy-test-round.txt", localDown);
+				expect(fileRead(localDown)).toBe("roundtrip payload");
+				fileDelete(localDown);
+				ssh.close();
+			});
+
 		});
 	}
 
