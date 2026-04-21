@@ -1437,6 +1437,35 @@ component extends="modules.BaseModule" {
 					default:
 						throw(message="Unknown wheels deploy accessory verb: #accVerb#");
 				}
+			case "server":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy server requires a verb (exec or bootstrap)");
+				}
+				var serverVerb = positional[2];
+				if (serverVerb == "exec") {
+					if (arrayLen(positional) < 3) {
+						throw(message="wheels deploy server exec requires a command");
+					}
+					// Preserve multi-token commands: join all positional args after the verb.
+					var cmdParts = [];
+					for (var ci = 3; ci <= arrayLen(positional); ci++) {
+						arrayAppend(cmdParts, positional[ci]);
+					}
+					opts.cmd = arrayToList(cmdParts, " ");
+				}
+				var serverCli = new cli.lucli.services.deploy.cli.DeployServerCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				switch (serverVerb) {
+					case "exec":
+						serverCli.exec(opts);
+						return arrayToList(serverCli.dryRunOutput(), chr(10));
+					case "bootstrap":
+						serverCli.bootstrap(opts);
+						return arrayToList(serverCli.dryRunOutput(), chr(10));
+					default:
+						throw(message="Unknown wheels deploy server verb: #serverVerb#");
+				}
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}
@@ -1481,6 +1510,11 @@ component extends="modules.BaseModule" {
 				opts.registryUsername = mid(a, 21, 99999);
 			} else if (a == "--registry-username" && i < n) {
 				opts.registryUsername = arguments.args[i+1];
+				i++;
+			} else if (left(a, 7) == "--host=") {
+				opts.host = mid(a, 8, 99999);
+			} else if (a == "--host" && i < n) {
+				opts.host = arguments.args[i+1];
 				i++;
 			}
 			i++;
