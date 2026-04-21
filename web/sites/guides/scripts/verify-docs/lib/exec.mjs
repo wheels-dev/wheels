@@ -1,4 +1,32 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+
+/**
+ * Resolve `wheels` to an absolute path at module load time. Node 22's
+ * test-runner workers don't inherit PATH the same way bash does, so
+ * `spawn('wheels')` can return ENOENT inside a worker even when bash
+ * can resolve the binary. Looking up the absolute path in the main
+ * module scope (before workers fork) sidesteps the lookup entirely.
+ *
+ * We do NOT pass explicit `env` to spawn — that breaks shebang-script
+ * exec on Linuxbrew in a way whose root cause we haven't pinned down.
+ * Default env inheritance works correctly for the spawned process.
+ */
+function resolveWheels() {
+  if (process.env.WHEELS_BIN) return process.env.WHEELS_BIN;
+  const r = spawnSync('/usr/bin/env', ['command', '-v', 'wheels'], { encoding: 'utf8' });
+  if (r.status === 0 && r.stdout) {
+    const first = r.stdout.split('\n')[0].trim();
+    if (first) return first;
+  }
+  for (const prefix of ['/opt/homebrew/bin', '/usr/local/bin', '/home/linuxbrew/.linuxbrew/bin']) {
+    const candidate = `${prefix}/wheels`;
+    const test = spawnSync('/bin/sh', ['-c', `test -x "${candidate}"`]);
+    if (test.status === 0) return candidate;
+  }
+  return 'wheels';
+}
+
+const RESOLVED_WHEELS = resolveWheels();
 
 /**
  * Launches `program` with the given argv array. Never invokes a shell.
@@ -10,8 +38,6 @@ import { spawn } from 'node:child_process';
  * pre-tokenize into program + args.
  */
 export function runExec(program, args = [], opts = {}) {
-  // Whitelist the spawn options we actually need. Anything else (especially
-  // `shell`) is dropped — we must never let a caller re-enable shell execution.
   const { cwd, env, timeout } = opts;
   const spawnOpts = {
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -21,8 +47,13 @@ export function runExec(program, args = [], opts = {}) {
   if (env !== undefined) spawnOpts.env = env;
   if (timeout !== undefined) spawnOpts.timeout = timeout;
 
+  // Substitute the absolute `wheels` path resolved at module load.
+  // Workers inherit default env from the parent; the resolved path
+  // sidesteps any PATH lookup fragility inside test-runner workers.
+  const resolvedProgram = program === 'wheels' ? RESOLVED_WHEELS : program;
+
   return new Promise((resolve) => {
-    const proc = spawn(program, args, spawnOpts);
+    const proc = spawn(resolvedProgram, args, spawnOpts);
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', (d) => (stdout += d.toString()));
