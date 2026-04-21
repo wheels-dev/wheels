@@ -10,8 +10,6 @@
   "excludeFolders": [
     "cli",
     "design_docs",
-    "docs/overrides",
-    "docs/public",
     "examples",
     "vendor",
     "test-artifacts",
