@@ -1437,6 +1437,19 @@ component extends="modules.BaseModule" {
 					default:
 						throw(message="Unknown wheels deploy accessory verb: #accVerb#");
 				}
+			case "prune":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy prune requires a verb (all/images/containers)");
+				}
+				var pruneVerb = positional[2];
+				if (!listFindNoCase("all,images,containers", pruneVerb)) {
+					throw(message="Unknown wheels deploy prune verb: " & pruneVerb);
+				}
+				var pruneCli = new cli.lucli.services.deploy.cli.DeployPruneCli(
+					new cli.lucli.services.deploy.lib.SshPool()
+				);
+				invoke(pruneCli, pruneVerb, [opts]);
+				return arrayToList(pruneCli.dryRunOutput(), chr(10));
 			case "server":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy server requires a verb (exec or bootstrap)");
@@ -1515,6 +1528,11 @@ component extends="modules.BaseModule" {
 				opts.host = mid(a, 8, 99999);
 			} else if (a == "--host" && i < n) {
 				opts.host = arguments.args[i+1];
+				i++;
+			} else if (left(a, 7) == "--keep=") {
+				opts.keep = mid(a, 8, 99999);
+			} else if (a == "--keep" && i < n) {
+				opts.keep = arguments.args[i+1];
 				i++;
 			}
 			i++;
