@@ -12,19 +12,39 @@ import { runExec } from './exec.mjs';
  * state (migrations, controllers, routes) in ~1.5s locally.
  */
 export async function createFixture(name = 'fixture') {
-  const parent = await mkdtemp(join(tmpdir(), 'wheels-doctest-'));
-  const result = await runExec(
-    'wheels',
-    ['new', name, '--no-open-browser'],
-    { cwd: parent },
-  );
-  if (result.code !== 0) {
-    await rm(parent, { recursive: true, force: true });
-    throw new Error(
-      `wheels new failed (exit ${result.code}):\n${result.stderr || result.stdout}`,
+  // Retry loop for framework gap #11 — LuCLI parallel-spawn race:
+  // When multiple `wheels new` fixtures are created concurrently, LuCLI's
+  // `lucee.json` writer occasionally races and fails with:
+  //   "Can't cast String [] to a value of type [Struct]"
+  // or similar "engine is null" errors from the Lucee script engine init.
+  // The error is transient; retry once or twice resolves it. Upstream fix
+  // (atomic lucee.json write in LuCLI) is tracked but not shipped.
+  const MAX_ATTEMPTS = 3;
+  const TRANSIENT_PATTERNS = [
+    /Can't cast String \[\] to a value of type \[Struct\]/,
+    /because "engine" is null/,
+    /ScriptEngine\.put/,
+  ];
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const parent = await mkdtemp(join(tmpdir(), 'wheels-doctest-'));
+    const result = await runExec(
+      'wheels',
+      ['new', name, '--no-open-browser'],
+      { cwd: parent },
     );
+    if (result.code === 0) return join(parent, name);
+    await rm(parent, { recursive: true, force: true });
+    const combined = `${result.stderr || ''}${result.stdout || ''}`;
+    const transient = TRANSIENT_PATTERNS.some((p) => p.test(combined));
+    lastError = new Error(
+      `wheels new failed (exit ${result.code}, attempt ${attempt}/${MAX_ATTEMPTS}):\n${combined}`,
+    );
+    if (!transient) break;
+    // Back off briefly before retrying (200ms, 400ms).
+    await new Promise((r) => setTimeout(r, 200 * attempt));
   }
-  return join(parent, name);
+  throw lastError;
 }
 
 /**
