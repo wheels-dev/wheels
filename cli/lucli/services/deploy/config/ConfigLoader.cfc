@@ -19,6 +19,7 @@ component {
 		variables.yaml = new cli.lucli.services.deploy.lib.Yaml();
 		variables.validator = new Validator();
 		variables.envOverride = arguments.opts.envOverride ?: {};
+		variables.secretResolver = arguments.opts.secretResolver ?: "";
 		return this;
 	}
 
@@ -39,6 +40,16 @@ component {
 				var overlay = variables.yaml.parse(fileRead(overlayPath));
 				raw = variables.yaml.deepMerge(raw, overlay);
 			}
+		}
+
+		// Build a SecretResolver lazily if the caller didn't inject one.
+		// Project root defaults to the directory containing the YAML file —
+		// this lets `.kamal/secrets` alongside `deploy.yml` resolve naturally.
+		if (!isObject(variables.secretResolver)) {
+			variables.secretResolver = new cli.lucli.services.deploy.lib.SecretResolver({
+				projectRoot: getDirectoryFromPath(arguments.path),
+				destination: dest
+			});
 		}
 
 		raw = $interpolate(raw);
@@ -103,12 +114,16 @@ component {
 	/**
 	 * Resolve a single ${VAR} reference:
 	 *   1. envOverride struct (explicit test/config override)
-	 *   2. System.getenv(name)
-	 *   3. "" (empty string — Kamal behavior for unset vars)
+	 *   2. SecretResolver (.kamal/secrets + destination overlay, with $(cmd) expansion)
+	 *   3. System.getenv(name)
+	 *   4. "" (empty string — Kamal behavior for unset vars)
 	 */
 	public string function $resolveVar(required string name) {
 		if (structKeyExists(variables.envOverride, arguments.name)) {
 			return variables.envOverride[arguments.name];
+		}
+		if (isObject(variables.secretResolver) && variables.secretResolver.has(arguments.name)) {
+			return variables.secretResolver.get(arguments.name);
 		}
 		var sys = createObject("java", "java.lang.System");
 		var fromEnv = sys.getenv(javaCast("string", arguments.name));

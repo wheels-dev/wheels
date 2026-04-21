@@ -55,6 +55,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					.toThrow("DeployConfigError");
 			});
 
+			it("resolves ${VAR} from .kamal/secrets when envOverride and process env are empty", () => {
+				var tmpRoot = getTempDirectory() & "/wheels-deploy-cfg-secret-" & createUUID();
+				directoryCreate(tmpRoot & "/.kamal", true, true);
+				fileWrite(tmpRoot & "/.kamal/secrets", "SECRET_VAR=fromSecretsFile");
+
+				var yml = tmpRoot & "/deploy.yml";
+				fileWrite(yml, "service: demo#chr(10)#image: acme/${SECRET_VAR}#chr(10)#servers: [1.2.3.4]#chr(10)#registry: {username: u, password: [X]}");
+
+				var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(yml);
+				expect(cfg.image()).toBe("acme/fromSecretsFile");
+
+				directoryDelete(tmpRoot, true);
+			});
+
 		});
 
 	}
