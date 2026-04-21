@@ -17,6 +17,22 @@ import { assertCliResult } from '../lib/cli-assert.mjs';
  * (e.g., `wheels --version`). `asserts-output` is the forgiving default
  * when the author doesn't care which stream the text lands on.
  */
+// Transient error patterns from gap #11 — LuCLI concurrency races.
+// Shared between createFixture retry and per-block retry.
+const TRANSIENT_PATTERNS = [
+  /Can't cast String \[\] to a value of type \[Struct\]/,
+  /because "engine" is null/,
+  /ScriptEngine\.put/,
+  /^spawn .* ENOENT$/m,
+  /spawn \/home\/linuxbrew.*ENOENT/,
+];
+
+function isTransient(result) {
+  if (!result || result.code === 0) return false;
+  const text = `${result.stderr || ''}${result.stdout || ''}`;
+  return TRANSIENT_PATTERNS.some((p) => p.test(text));
+}
+
 export async function runCli(example) {
   const cmd = example.attrs.cmd;
   if (!cmd) return { ok: false, message: 'missing required attr: cmd' };
@@ -29,11 +45,21 @@ export async function runCli(example) {
   }
   const [program, ...args] = tokens;
 
-  const fixture = await createFixture();
-  try {
-    const result = await runExec(program, args, { cwd: fixture });
-    return assertCliResult(result, example.attrs);
-  } finally {
-    await destroyFixture(fixture);
+  // Retry the whole block on transient gap #11 errors. createFixture
+  // has its own retry for fixture creation itself; this covers the
+  // subsequent runExec call which can also hit transient spawn ENOENT
+  // at high parallelism.
+  const MAX_ATTEMPTS = 4;
+  let lastResult;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const fixture = await createFixture();
+    try {
+      lastResult = await runExec(program, args, { cwd: fixture });
+    } finally {
+      await destroyFixture(fixture);
+    }
+    if (!isTransient(lastResult)) break;
+    await new Promise((r) => setTimeout(r, 150 * attempt));
   }
+  return assertCliResult(lastResult, example.attrs);
 }
