@@ -70,19 +70,42 @@ jobs:
         # the harness spawns `wheels`.
         run: wheels --version >/dev/null
 
+      - name: Set up Node.js (harness tests)
+        # Pin Node 20 for the harness unit tests only. Node 22's test-runner
+        # workers on Linuxbrew return spawn ENOENT on EVERY absolute path —
+        # including /bin/bash itself — even when statSync/accessSync confirm
+        # the file is executable and spawnable from the main process. Node 20
+        # is unaffected. Tracked as issue #2178 (workaround pending upstream
+        # Node fix). The main content gate (Verify v4 docs) continues on
+        # Node 22 below.
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
       - name: Run harness unit tests
         working-directory: web/sites/guides
-        # Soft-fail: Node 22 test-runner workers on Linuxbrew return spawn
-        # ENOENT on EVERY absolute path — including /bin/bash itself — even
-        # when statSync/accessSync confirm the file is regular, executable,
-        # and /bin/bash is spawnable from the main process. Node bug we
-        # couldn't pin down despite ~25 rounds of debugging. Tests pass
-        # locally; the actual content verification (Verify v4 docs below)
-        # uses a single main process and is unaffected.
+        # Runs on Node 20 to avoid the Node 22 spawn ENOENT bug (see the
+        # "Set up Node.js (harness tests)" step above). Ref #2178.
+        #
+        # Still soft-fail for now: with Node 20 the spawns work, which
+        # surfaces 7 pre-existing tutorial-driver failures (blog-tutorial
+        # fixture's lucee.json is no longer emitted by `wheels new`).
+        # Tracked separately — once fixtures are fixed, drop
+        # continue-on-error so regressions fail CI as originally intended.
         continue-on-error: true
         run: |
           export LUCLI_HOME="$HOME/.wheels"
           pnpm test:docs-harness
+
+      - name: Set up Node.js (main)
+        # Restore Node 22 for the content gate and the guides build below.
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Verify v4 docs
         working-directory: web/sites/guides
