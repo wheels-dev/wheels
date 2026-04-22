@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runExec } from './exec.mjs';
@@ -39,7 +39,28 @@ export async function createFixture(name = 'fixture') {
       ['new', name, '--no-open-browser'],
       { cwd: parent },
     );
-    if (result.code === 0) return join(parent, name);
+    const expected = join(parent, name);
+    if (result.code === 0) {
+      // `wheels new` can exit 0 even when framework lookup fails (it prints
+      // an error, cleans up the partial scaffold, and still returns 0). If
+      // we don't catch that here, downstream spawns run with cwd=<missing>
+      // and Node surfaces misleading "spawn PROGRAM ENOENT" errors that
+      // point at the executable instead of the cwd. See #2178.
+      try {
+        await stat(expected);
+      } catch {
+        await rm(parent, { recursive: true, force: true });
+        throw new Error(
+          `wheels new reported success (exit 0) but did not create ${expected}.\n` +
+          `Likely cause: the wheels CLI could not locate the framework source. ` +
+          `Set WHEELS_FRAMEWORK_PATH to a vendor/wheels/ directory (e.g., the ` +
+          `wheels repo checkout) before running the harness.\n` +
+          `--- wheels stderr ---\n${result.stderr || ''}\n` +
+          `--- wheels stdout ---\n${result.stdout || ''}`,
+        );
+      }
+      return expected;
+    }
     await rm(parent, { recursive: true, force: true });
     const combined = `${result.stderr || ''}${result.stdout || ''}`;
     const transient = TRANSIENT_PATTERNS.some((p) => p.test(combined));
