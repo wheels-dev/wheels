@@ -48,6 +48,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Middleware pipeline: closure-based chain running at dispatch level before controller instantiation, route-scoped via `.scope(middleware=[...])` or global via `set(middleware=[...])` (#1924)
 - Rate limiting middleware with `wheels.middleware.RateLimiter` supporting fixed window, sliding window, and token bucket strategies with in-memory and database storage (#1931)
 - SecurityHeaders middleware emits Content-Security-Policy, HSTS, and Permissions-Policy headers (#2036)
+- `hsts` argument on `SecurityHeaders` middleware to suppress the `Strict-Transport-Security` header entirely, for apps behind TLS-terminating proxies that emit HSTS themselves (#2174)
 - Multi-tenant support with per-request datasource switching (#1951)
 
 **Views**

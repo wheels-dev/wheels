@@ -49,6 +49,7 @@ Verified against `vendor/wheels/middleware/SecurityHeaders.cfc`:
 | `referrerPolicy` | `Referrer-Policy` | `strict-origin-when-cross-origin` | line 27, 63 |
 | `contentSecurityPolicy` | `Content-Security-Policy` | `""` (opt-in) | line 28, 65-67 |
 | `strictTransportSecurity` | `Strict-Transport-Security` | `""` — auto-resolves to `max-age=31536000; includeSubDomains` in production | line 29, 48-51, 68-70 |
+| `hsts` | — | `true` — set to `false` to suppress `Strict-Transport-Security` entirely | new |
 | `permissionsPolicy` | `Permissions-Policy` | `""` (opt-in) | line 30, 71-73 |
 | `environment` | — | `""` — falls back to `application.$wheels.environment` | line 31, 37-45 |
 
@@ -91,8 +92,16 @@ new wheels.middleware.SecurityHeaders(
 )
 ```
 
-<Aside type="caution">
-  **No HSTS off-switch yet.** `SecurityHeaders` has no boolean to disable HSTS entirely. Setting `strictTransportSecurity=""` keeps the production auto-default; setting `"max-age=0"` tells browsers to *clear* HSTS memory, which is worse. The only supported way to suppress the header today is to pass an explicit value that matches your proxy. Tracked in [#2174](https://github.com/wheels-dev/wheels/issues/2174).
+<Aside type="tip">
+  **Suppressing HSTS entirely.** When your TLS-terminating proxy (load balancer, CDN, reverse proxy) already emits `Strict-Transport-Security`, pass `hsts=false` so the app does not emit a competing header:
+
+  ```cfm title="config/settings.cfm"
+  set(middleware = [
+      new wheels.middleware.SecurityHeaders(hsts=false)
+  ]);
+  ```
+
+  `hsts=false` takes precedence over both `strictTransportSecurity` and the production auto-default. Leave `hsts=true` (the default) whenever the app owns the HSTS header.
 </Aside>
 
 ## CSRF protection
