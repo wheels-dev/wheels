@@ -90,14 +90,18 @@ component {
 		// Process relationship placeholders
 		processed = processRelationships(processed, arguments.context);
 
-		// Process attributes/validations
-		if (structKeyExists(arguments.context, "attributes") && len(arguments.context.attributes)) {
+		// Process {{validations}} placeholder. Prefer the pre-built `validations`
+		// code string from context (populated by CodeGen.generateModel); fall back
+		// to deriving from the legacy `attributes` string shape for callers that
+		// still use it.
+		var validationCode = "";
+		if (structKeyExists(arguments.context, "validations") && isSimpleValue(arguments.context.validations)) {
+			validationCode = arguments.context.validations;
+		} else if (structKeyExists(arguments.context, "attributes") && len(arguments.context.attributes)) {
 			var attributesStruct = parseAttributes(arguments.context.attributes);
-			var validationCode = generateValidationCode(attributesStruct);
-			processed = reReplace(processed, "\{\{validations\}\}", validationCode, "all");
-		} else {
-			processed = reReplace(processed, "\{\{validations\}\}", "", "all");
+			validationCode = generateValidationCode(attributesStruct);
 		}
+		processed = reReplace(processed, "\{\{validations\}\}", validationCode, "all");
 
 		// Process actions for controllers
 		if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
