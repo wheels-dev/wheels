@@ -17,6 +17,7 @@ on:
 
 env:
   WHEELS_PRERELEASE: false
+  LUCLI_VERSION: "0.3.3"
 
 jobs:
   #############################################
@@ -341,3 +342,77 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+
+  #############################################
+  # Smoke-test the built module against a clean install.
+  #
+  # Installs the just-built wheels-module-*.tar.gz into an isolated LUCLI_HOME,
+  # extracts wheels-core-*.zip for WHEELS_FRAMEWORK_PATH, then runs every
+  # template-driven generator against a scratch project. Catches packaging
+  # regressions like #1944 (codegen templates unbundled) that the monorepo
+  # test suite can't surface because it exercises source paths, not the
+  # built distribution. See #2208.
+  #############################################
+  smoke-test-distribution:
+    name: Smoke Test Installed Distribution
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+          lucli --version
+
+      - name: Download built module artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-module
+          path: smoke-artifacts/module/
+
+      - name: Download built core artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-core
+          path: smoke-artifacts/core/
+
+      - name: Locate artifacts
+        id: artifacts
+        run: |
+          MODULE_TAR=$(find smoke-artifacts/module -name 'wheels-module-*.tar.gz' | head -1)
+          CORE_ZIP=$(find smoke-artifacts/core -name 'wheels-core-*.zip' ! -name '*-be.zip' | head -1)
+          if [[ -z "$MODULE_TAR" || -z "$CORE_ZIP" ]]; then
+            echo "::error::Artifacts not found. module=$MODULE_TAR core=$CORE_ZIP"
+            find smoke-artifacts -type f
+            exit 1
+          fi
+          echo "module_tar=$MODULE_TAR" >> "$GITHUB_OUTPUT"
+          echo "core_zip=$CORE_ZIP"     >> "$GITHUB_OUTPUT"
+
+      - name: Run smoke test
+        env:
+          MODULE_TAR: ${{ steps.artifacts.outputs.module_tar }}
+          CORE_ZIP: ${{ steps.artifacts.outputs.core_zip }}
+        run: |
+          bash tools/ci/smoke-test-module.sh "$MODULE_TAR" "$CORE_ZIP"
+
+      - name: Upload smoke-test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs
+          path: |
+            smoke-artifacts/
+          retention-days: 7
