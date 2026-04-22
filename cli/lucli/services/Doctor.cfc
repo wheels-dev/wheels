@@ -1,15 +1,17 @@
 /**
  * Health check service for diagnosing Wheels application issues.
  *
- * Performs 7 categories of checks: required dirs, recommended dirs,
+ * Performs 8 categories of checks: required dirs, recommended dirs,
  * required files, config validation, write permissions, database config,
- * and test coverage. All checks are local file operations — no running
- * server required.
+ * test coverage, and — when running from a source checkout — CLI install
+ * freshness. All checks are local file operations — no running server
+ * required.
  */
 component {
 
-	public function init(required string projectRoot) {
+	public function init(required string projectRoot, string installedModuleRoot = "") {
 		variables.projectRoot = arguments.projectRoot;
+		variables.installedModuleRoot = arguments.installedModuleRoot;
 		return this;
 	}
 
@@ -26,6 +28,7 @@ component {
 		checkWritePermissions(results);
 		checkDatabaseConfig(results);
 		checkTestCoverage(results);
+		checkCliInstallFreshness(results);
 
 		// Determine overall status
 		if (arrayLen(results.issues)) {
@@ -188,6 +191,89 @@ component {
 		}
 	}
 
+	/**
+	 * Detect a stale installed CLI module that shadows the source checkout.
+	 *
+	 * When invoked as `wheels`, LuCLI loads modules from ~/.wheels/modules/.
+	 * If ~/.wheels/modules/wheels/ is a real directory holding a pre-install
+	 * copy of Module.cfc, edits a contributor makes in cli/lucli/ of their
+	 * checkout silently do not take effect — exit-0 behavior persists even
+	 * after a fix is merged. See issue #2223.
+	 *
+	 * This check runs only when all three signals are present:
+	 *   - installedModuleRoot was supplied (we know where LuCLI loaded us from)
+	 *   - projectRoot looks like a wheels source checkout (has cli/lucli/Module.cfc
+	 *     and vendor/wheels/)
+	 *   - the installed module is NOT the checkout's cli/lucli/ directory
+	 *     (i.e., not a dev-install pointing directly at the checkout)
+	 */
+	private void function checkCliInstallFreshness(required struct results) {
+		if (!len(variables.installedModuleRoot)) return;
+
+		var checkoutModulePath = variables.projectRoot & "/cli/lucli/Module.cfc";
+		var vendorWheelsPath = variables.projectRoot & "/vendor/wheels";
+		if (!fileExists(checkoutModulePath) || !directoryExists(vendorWheelsPath)) return;
+
+		var installedDir = $normalizePath(variables.installedModuleRoot);
+		var checkoutDir = $normalizePath(variables.projectRoot & "/cli/lucli");
+		if (installedDir == checkoutDir) return;
+
+		var installedModulePath = variables.installedModuleRoot & "/Module.cfc";
+		if (!fileExists(installedModulePath)) return;
+
+		if ($isSymbolicLink(installedModulePath) || $isSymbolicLink(variables.installedModuleRoot)) {
+			arrayAppend(arguments.results.passed, "Installed CLI module is a symlink (source changes take effect immediately)");
+			return;
+		}
+
+		if ($filesBytesEqual(installedModulePath, checkoutModulePath)) {
+			arrayAppend(arguments.results.passed, "Installed CLI module matches source checkout");
+			return;
+		}
+
+		arrayAppend(
+			arguments.results.warnings,
+			"Installed CLI module at #variables.installedModuleRoot# diverges from this source checkout. "
+			& "Edits under cli/lucli/ will not take effect until you reinstall or replace the installed copy with a symlink."
+		);
+	}
+
+	// ── Path helpers ─────────────────────────────────────────
+
+	private string function $normalizePath(required string path) {
+		var p = replace(arguments.path, "\", "/", "all");
+		while (len(p) > 1 && right(p, 1) == "/") {
+			p = left(p, len(p) - 1);
+		}
+		return p;
+	}
+
+	private boolean function $isSymbolicLink(required string path) {
+		try {
+			var Paths = createObject("java", "java.nio.file.Paths");
+			var Files = createObject("java", "java.nio.file.Files");
+			var javaPath = Paths.get(javacast("string", arguments.path), javacast("string[]", []));
+			return Files.isSymbolicLink(javaPath);
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	private boolean function $filesBytesEqual(required string a, required string b) {
+		try {
+			var Paths = createObject("java", "java.nio.file.Paths");
+			var Files = createObject("java", "java.nio.file.Files");
+			var pa = Paths.get(javacast("string", arguments.a), javacast("string[]", []));
+			var pb = Paths.get(javacast("string", arguments.b), javacast("string[]", []));
+			if (Files.size(pa) != Files.size(pb)) return false;
+			var bytesA = Files.readAllBytes(pa);
+			var bytesB = Files.readAllBytes(pb);
+			return createObject("java", "java.util.Arrays").equals(bytesA, bytesB);
+		} catch (any e) {
+			return false;
+		}
+	}
+
 	// ── Recommendations ──────────────────────────────────────
 
 	private array function buildRecommendations(required struct results) {
@@ -208,6 +294,14 @@ component {
 		}
 		if (findNoCase("Missing required directory", combined)) {
 			arrayAppend(recs, "Run 'wheels new' to scaffold a complete project structure");
+		}
+		if (findNoCase("Installed CLI module", combined) && findNoCase("diverges", combined)) {
+			arrayAppend(
+				recs,
+				"Replace the stale installed module with a symlink to your checkout: "
+				& "rm -rf #variables.installedModuleRoot# && "
+				& "ln -s #variables.projectRoot#/cli/lucli #variables.installedModuleRoot#"
+			);
 		}
 
 		return recs;
