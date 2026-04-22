@@ -3229,6 +3229,13 @@ component extends="modules.BaseModule" {
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
 		};
 
+		// Resolve the Wheels framework source BEFORE creating any files. A
+		// scaffolded app requires vendor/wheels/ to boot, and failing after
+		// emitting "create" lines left automation confused (GH #2211). On
+		// failure this prints a diagnostic and throws, so the caller sees a
+		// non-zero exit code instead of a silent success.
+		var wheelsSource = resolveFrameworkSourceOrFail(appName);
+
 		out("Creating new Wheels application: #appName#...", "cyan");
 		out("");
 
@@ -3252,21 +3259,8 @@ component extends="modules.BaseModule" {
 		// Copy template directory tree to target, processing placeholders
 		copyTemplateDir(templateDir, targetDir, appName, context);
 
-		// Install Wheels framework into vendor/wheels/ — abort (and clean up)
-		// if the framework source cannot be located. Without vendor/wheels/
-		// the scaffolded app cannot boot (onApplicationStart would fail on the
-		// missing `/wheels/Injector.cfc` mapping, producing a misleading
-		// "key [WO] doesn't exist" error downstream).
-		if (!installWheelsFramework(targetDir, appName)) {
-			// Remove the partially-created app directory so the user can retry
-			// cleanly after providing a framework source.
-			try {
-				directoryDelete(targetDir, true);
-			} catch (any e) {
-				// Best-effort cleanup — if this fails the user can remove it manually.
-			}
-			return "";
-		}
+		// Copy the framework into vendor/wheels/ (source was resolved above).
+		copyFrameworkToVendor(wheelsSource, targetDir, appName);
 
 		// Set up embedded database: H2 if explicitly requested, SQLite by default
 		if (opts.setupH2) {
@@ -3409,38 +3403,56 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Copy the Wheels framework into the new application's vendor/wheels/ directory.
-	 * Resolves the framework source from the current project installation.
+	 * Resolve the Wheels framework source or fail fast. Prints a diagnostic
+	 * listing every path tried plus a WHEELS_FRAMEWORK_PATH hint, then throws
+	 * so LuCLI surfaces a non-zero exit code. Returns the resolved path on
+	 * success. Called before any files are created so the caller sees a clean
+	 * failure rather than a partial scaffold followed by cleanup (GH #2211).
 	 */
-	private boolean function installWheelsFramework(required string targetDir, required string appName) {
+	private string function resolveFrameworkSourceOrFail(required string appName) {
 		var wheelsSource = resolveFrameworkSource();
-
-		if (!len(wheelsSource)) {
-			out("", "red");
-			out("Error: Could not locate the Wheels framework source.", "red");
-			out("");
-			out("A scaffolded app requires vendor/wheels/ to boot. Tried:", "yellow");
-			for (var candidate in variables.frameworkSearchPaths ?: []) {
-				out("  - #candidate#");
-			}
-			out("");
-			out("To fix, either:", "bold");
-			out("  1. Run `wheels new` from inside a directory that contains");
-			out("     vendor/wheels/ (e.g. an existing Wheels project, or a");
-			out("     checkout of the wheels repository).");
-			out("  2. Set WHEELS_FRAMEWORK_PATH to point at a vendor/wheels/ directory:");
-			out("       WHEELS_FRAMEWORK_PATH=/path/to/vendor/wheels wheels new #appName#");
-			out("");
-			out("See: https://guides.wheels.dev/docs/getting-started");
-			return false;
+		if (len(wheelsSource)) {
+			return wheelsSource;
 		}
 
+		out("", "red");
+		out("Error: Could not locate the Wheels framework source.", "red");
+		out("");
+		out("A scaffolded app requires vendor/wheels/ to boot. Tried:", "yellow");
+		for (var candidate in variables.frameworkSearchPaths ?: []) {
+			out("  - #candidate#");
+		}
+		out("");
+		out("To fix, either:", "bold");
+		out("  1. Run `wheels new` from inside a directory that contains");
+		out("     vendor/wheels/ (e.g. an existing Wheels project, or a");
+		out("     checkout of the wheels repository).");
+		out("  2. Set WHEELS_FRAMEWORK_PATH to point at a vendor/wheels/ directory:");
+		out("       WHEELS_FRAMEWORK_PATH=/path/to/vendor/wheels wheels new #appName#");
+		out("");
+		out("See: https://guides.wheels.dev/docs/getting-started");
+
+		throw(
+			type="Wheels.FrameworkNotFound",
+			message="wheels new #appName#: Wheels framework source not found (see output above for search paths and WHEELS_FRAMEWORK_PATH hint)"
+		);
+	}
+
+	/**
+	 * Copy a resolved Wheels framework source into the new application's
+	 * vendor/wheels/ directory. The source must already exist — callers should
+	 * obtain it via resolveFrameworkSourceOrFail() before any file creation.
+	 */
+	private void function copyFrameworkToVendor(
+		required string wheelsSource,
+		required string targetDir,
+		required string appName
+	) {
 		out("Installing Wheels framework from #wheelsSource#...");
 		var vendorDir = targetDir & "/vendor/wheels";
 		ensureDirectory(vendorDir);
 		directoryCopy(wheelsSource, vendorDir, true);
 		printCreated(appName & "/vendor/wheels/");
-		return true;
 	}
 
 	/**

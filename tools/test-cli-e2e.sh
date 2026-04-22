@@ -127,6 +127,10 @@ fi
 section "Phase 1: wheels new $APP_NAME"
 
 cd "$TMPDIR"
+# Point `wheels new` at this checkout's framework source. Without this, running
+# in a temp dir with no ancestor vendor/wheels/ now fails hard (GH #2211) —
+# which is the correct behavior for real users but breaks this in-monorepo test.
+export WHEELS_FRAMEWORK_PATH="$PROJECT_ROOT/vendor/wheels"
 if lucli wheels new "$APP_NAME" --port="$PORT" --no-open-browser > "$TMPDIR/new.log" 2>&1; then
     pass "wheels new $APP_NAME succeeded"
 else
