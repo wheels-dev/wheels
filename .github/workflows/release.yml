@@ -198,6 +198,12 @@ jobs:
       - name: Build Wheels Module Tarball
         run: |
           mkdir -p artifacts/wheels/${{ env.WHEELS_VERSION }}
+          # Bundle codegen templates into the module so Templates.cfc::resolveTemplateDir()
+          # finds them at moduleRoot/templates/codegen/ in installed distributions.
+          # Without this, every template-driven generator (model, controller, view,
+          # scaffold, helper, api-resource) fails or emits empty output. See #1944.
+          mkdir -p cli/lucli/templates/codegen
+          cp -R cli/src/templates/. cli/lucli/templates/codegen/
           tar czf artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-${{ env.WHEELS_VERSION }}.tar.gz -C cli/lucli .
           cd cli/lucli && zip -r ../../artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-${{ env.WHEELS_VERSION }}.zip . && cd ../..
           cd artifacts/wheels/${{ env.WHEELS_VERSION }}
