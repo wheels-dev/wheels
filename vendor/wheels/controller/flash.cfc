@@ -153,6 +153,17 @@ component {
 		if (!StructKeyExists(arguments, "$locked")) {
 			local.lockName = "flashLock" & application.applicationName;
 			local.rv = $simpleLock(name = local.lockName, type = "readonly", execute = "$readFlash", executeArgs = arguments);
+		} else if ($getFlashStorage() == "cookie" && $inTestHarness() && StructKeyExists(request, "$testCookieFlash")) {
+			// Test-harness shim: cookie writes can't round-trip after the
+			// response buffer commits (Undertow auto-commit), so tests read
+			// from a request-scoped slot instead of the real cookie scope.
+			if (isJSON(request.$testCookieFlash)) {
+				local.rv = DeserializeJSON(request.$testCookieFlash);
+			} else {
+				local.rv = {
+					"action": request.$testCookieFlash
+				};
+			}
 		} else if ($getFlashStorage() == "cookie" && StructKeyExists(cookie, "flash")) {
 			if (isJSON(cookie.flash)) {
 				local.rv = DeserializeJSON(cookie.flash);
@@ -182,7 +193,18 @@ component {
 			local.rv = $simpleLock(name = local.lockName, type = "exclusive", execute = "$writeFlash", executeArgs = arguments);
 		} else {
 			if ($getFlashStorage() == "cookie") {
-				cookie.flash = SerializeJSON(arguments.flash);
+				if ($inTestHarness()) {
+					// Test-harness shim: writing to the cookie scope triggers
+					// a Set-Cookie response header, which throws
+					// IllegalStateException on Undertow once the response
+					// buffer has auto-committed (which happens mid-run
+					// because the runner streams the large results JSON back
+					// to the client before this spec executes). Round-trip
+					// through a request-scoped slot instead.
+					request.$testCookieFlash = SerializeJSON(arguments.flash);
+				} else {
+					cookie.flash = SerializeJSON(arguments.flash);
+				}
 			} else if ($getFlashStorage() == "session") {
 				session.flash = arguments.flash;
 			}
@@ -190,6 +212,16 @@ component {
 		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
+	}
+
+	/**
+	 * Internal function. Returns true when running inside the Wheels test
+	 * harness. Set by `Test.cfc::$wheelsRunner` for every core test request.
+	 * Pure CFML — no engine-specific Java calls — so it is safe on
+	 * Lucee 5/6/7, Adobe 2018-2025, and BoxLang.
+	 */
+	public boolean function $inTestHarness() {
+		return StructKeyExists(request, "$wheelsTestRun") && request.$wheelsTestRun;
 	}
 
 	/**

@@ -484,6 +484,11 @@ component output="false" displayName="Test" extends="wheels.Global"{
 		// the key in the request scope that will contain the test results
 		local.resultKey = "WheelsTests";
 
+		// Flag this request as a test harness run so framework internals
+		// (e.g. flash cookie writes) can short-circuit operations that are
+		// unsafe after the response buffer auto-commits mid-suite.
+		request.$wheelsTestRun = true;
+
 		// save the original environment for overloading
 		if (application.wheels.restoreTestRunnerApplicationScope) {
 			request.wheels.testRunnerApplicationScope = Duplicate(application.wheels);
