@@ -116,7 +116,7 @@
 			"clob":false,
 			"database":"wheelstestdb",
 			"dbdriver":"Other",
-			"dsn":"jdbc:sqlite:/app/wheelstestdb.db",
+			"dsn":"jdbc:sqlite:/wheels-test-suite/wheelstestdb.db",
 			"host":"",
 			"password":"",
 			"username":""
@@ -127,7 +127,7 @@
 			"clob":false,
 			"database":"wheelstestdb_tenant_b",
 			"dbdriver":"Other",
-			"dsn":"jdbc:sqlite:/app/wheelstestdb_tenant_b.db",
+			"dsn":"jdbc:sqlite:/wheels-test-suite/wheelstestdb_tenant_b.db",
 			"host":"",
 			"password":"",
 			"username":""

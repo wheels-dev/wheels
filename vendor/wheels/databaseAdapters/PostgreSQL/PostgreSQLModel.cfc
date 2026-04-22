@@ -155,6 +155,20 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			// Strip identifier quotes from column list for comparison
 			local.columnList = $stripIdentifierQuotes(local.columnList);
 
+			// Bulk operations (insertAll / upsertAll) invoke the shared
+			// query path without a primary-key hint, because the caller
+			// does not consume a generated key. Skip the sequence lookup
+			// in that case — otherwise we emit
+			// `pg_get_serial_sequence(..., '')`, which Postgres rejects
+			// with `column "" of relation "..." does not exist`. Scope:
+			// vanilla PostgreSQL only. The CockroachDB adapter's
+			// RETURNING / ON CONFLICT multi-value path is a separate
+			// failure surface tracked under #2106 and is intentionally
+			// not touched here.
+			if (!Len(arguments.primaryKey)) {
+				return;
+			}
+
 			// Lucee/ACF doesn't support PostgreSQL natively when it comes to returning the primary key value of the last inserted record so we have to do it manually by using the sequence.
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
@@ -162,7 +176,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				// Strip identifier quotes that may have been added by $quoteIdentifier
 				local.tbl = ReReplace(local.tbl, '^"|"$', "", "all");
 				query = $query(
-					sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",
+					sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#ListFirst(arguments.primaryKey)#')) AS lastId",
 					argumentCollection = arguments.queryAttributes
 				);
 				local.rv[$generatedKey()] = query.lastId;
