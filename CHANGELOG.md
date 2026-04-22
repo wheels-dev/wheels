@@ -140,6 +140,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Fixed
 
+- `changeColumn` on SQLite now works by implementing the SQLite-standard recreate-table pattern in `SQLiteMigrator`. Previously, SQLite migrations inherited MySQL's `ALTER TABLE ... CHANGE` syntax from `Abstract.cfc` and failed with `near "CHANGE": syntax error`. The migrator's `$execute` now accepts an array of statements so adapters can return multi-step DDL. v1 limitations: foreign-key constraints declared inline on `CREATE TABLE` and triggers are not preserved across the recreate. (#2207)
 - Framework-internal browser-test fixture controllers, views, and the `/_browser/*` routes no longer leak into application-level files. Moved from `app/controllers/BrowserTest*.cfc`, `app/views/browsertest*/`, and `config/routes.cfm` into `vendor/wheels/public/browser-fixtures/`, auto-mounted by `$lockedLoadRoutes` when environment is `testing` or `development` and the new opt-in setting `loadBrowserTestFixtures=true` is set. Apps upgrading from a 4.0 snapshot that had custom `/_browser/*` routes must opt in explicitly or re-declare them in `config/routes.cfm`. (#2135, #2138)
 - Stray `app/mailers/UserNotificationsMailer.cfc` demo removed from the framework repo root (byte-identical copies remain in the example apps under `examples/tweet/` and `examples/starter-app/`). (#2138)
 - View lookup after `renderText()` / `renderWith()` no longer breaks subsequent partial rendering (#1991)

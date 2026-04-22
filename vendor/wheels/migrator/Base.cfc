@@ -101,7 +101,17 @@ component extends="wheels.Global"{
 		return local.foreignKeyList;
 	}
 
-	private void function $execute(required string sql, string dataSource = "") {
+	private void function $execute(required any sql, string dataSource = "") {
+		// Adapters may return an array of statements for multi-step DDL
+		// (notably SQLite's recreate-table pattern for changeColumnInTable).
+		if (IsArray(arguments.sql)) {
+			for (local.stmt in arguments.sql) {
+				if (Len(Trim(local.stmt))) {
+					$execute(sql = local.stmt, dataSource = arguments.dataSource);
+				}
+			}
+			return;
+		}
 		local.appKey = $appKey();
 		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
 		local.sql = Trim(arguments.sql);
