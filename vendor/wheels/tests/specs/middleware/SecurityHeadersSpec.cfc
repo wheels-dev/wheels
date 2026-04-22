@@ -130,6 +130,30 @@ component extends="wheels.WheelsTest" {
 					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
 				});
 
+				it("omits HSTS header when hsts=false even in production", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						environment = "production",
+						hsts = false
+					);
+					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
+				});
+
+				it("omits HSTS header when hsts=false and explicit strictTransportSecurity provided", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						strictTransportSecurity = "max-age=86400",
+						hsts = false
+					);
+					expect(local.mw.$headers()).notToHaveKey("Strict-Transport-Security");
+				});
+
+				it("defaults hsts=true to preserve legacy production behavior", function() {
+					local.mw = new wheels.middleware.SecurityHeaders(
+						environment = "production"
+					);
+					expect(local.mw.$headers()).toHaveKey("Strict-Transport-Security");
+					expect(local.mw.$headers()["Strict-Transport-Security"]).toBe("max-age=31536000; includeSubDomains");
+				});
+
 			});
 
 			describe("Permissions-Policy", function() {

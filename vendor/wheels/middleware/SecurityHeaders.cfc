@@ -17,6 +17,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @referrerPolicy Referrer-Policy value.
 	 * @contentSecurityPolicy Content-Security-Policy value. Empty by default (opt-in) because a restrictive policy can break apps with inline scripts/styles.
 	 * @strictTransportSecurity Strict-Transport-Security value. Auto-defaults to `max-age=31536000; includeSubDomains` in production when not explicitly set.
+	 * @hsts Set to false to suppress the Strict-Transport-Security header entirely, regardless of environment or strictTransportSecurity value. Useful when a TLS-terminating proxy already emits HSTS.
 	 * @permissionsPolicy Permissions-Policy value. Empty by default (opt-in) because it is app-specific.
 	 * @environment Application environment (e.g. "production", "development"). When empty, falls back to application.$wheels.environment if available.
 	 */
@@ -27,6 +28,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		string referrerPolicy = "strict-origin-when-cross-origin",
 		string contentSecurityPolicy = "",
 		string strictTransportSecurity = "",
+		boolean hsts = true,
 		string permissionsPolicy = "",
 		string environment = ""
 	) {
@@ -44,10 +46,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			}
 		}
 
-		// Default HSTS in production when not explicitly configured
-		local.hsts = arguments.strictTransportSecurity;
-		if (!Len(local.hsts) && local.env == "production") {
-			local.hsts = "max-age=31536000; includeSubDomains";
+		// Default HSTS in production when not explicitly configured. When arguments.hsts is false,
+		// skip entirely so the header is not emitted regardless of environment or explicit value.
+		local.hsts = "";
+		if (arguments.hsts) {
+			local.hsts = arguments.strictTransportSecurity;
+			if (!Len(local.hsts) && local.env == "production") {
+				local.hsts = "max-age=31536000; includeSubDomains";
+			}
 		}
 
 		if (Len(arguments.frameOptions)) {
