@@ -13,14 +13,19 @@ component aliases="-v,--version" extends="base" {
 	 * @help Show version information
 	 */
 	public void function run() {
-		// Get server information
-		local.serverInfo = getServerInfo();
-		
-		print.boldGreenLine("Wheels CLI Module " & getWheelsCliVersion());
-		print.line("");
-		print.greenLine("Wheels Version: " & $getWheelsVersion());
-		print.greenLine("CFML Engine: " & local.serverInfo.name & " " & local.serverInfo.version);
-		print.greenLine("CommandBox Version: " & shell.getVersion());
+		try {
+			// Get server information
+			local.serverInfo = getServerInfo();
+			
+			print.boldGreenLine("Wheels CLI Module " & getWheelsCliVersion());
+			print.line("");
+			print.greenLine("Wheels Version: " & $getWheelsVersion());
+			print.greenLine("CFML Engine: " & local.serverInfo.name & " " & local.serverInfo.version);
+			print.greenLine("CommandBox Version: " & shell.getVersion());
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
 	}
 
 	private struct function getServerInfo() {
@@ -52,7 +57,7 @@ component aliases="-v,--version" extends="base" {
 
 	private string function getWheelsCliVersion() {
 		// Read from CLI module's box.json
-		local.boxJsonPath = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../box.json";
+		local.boxJsonPath = expandPath("/wheels-cli/box.json");
 		if (FileExists(local.boxJsonPath)) {
 			try {
 				local.boxJson = DeserializeJSON(FileRead(local.boxJsonPath));
