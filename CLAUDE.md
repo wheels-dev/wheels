@@ -20,7 +20,7 @@ Prefer MCP tools when the Wheels MCP server is available (`mcp__wheels__*`). Fal
 | Task | MCP | CLI |
 |------|-----|-----|
 | Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
-| Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels dbmigrate latest\|up\|down\|info` |
+| Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels migrate latest\|up\|down\|info` |
 | Test | `wheels_test()` | `wheels test run` |
 | Reload | `wheels_reload()` | `?reload=true&password=...` |
 | Server | `wheels_server(action="status")` | `wheels start\|stop\|status` |
