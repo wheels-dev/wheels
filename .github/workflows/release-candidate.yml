@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Checkout Repository
         id: Checkout-Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -176,7 +176,7 @@ jobs:
           ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
       - name: Upload Wheels Base Template Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rc-build-artifacts-base-template
           path: |
@@ -185,7 +185,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
 
       - name: Upload Wheels Core Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rc-build-artifacts-core
           path: |
@@ -194,7 +194,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
 
       - name: Upload Wheels CLI Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rc-build-artifacts-cli
           path: |
@@ -203,7 +203,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
 
       - name: Upload Wheels Starter App Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rc-build-artifacts-starter-app
           path: |
@@ -212,7 +212,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
 
       - name: Upload All Wheels Artifacts (Combined)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rc-build-artifacts-all
           path: |
@@ -220,7 +220,7 @@ jobs:
 
       - name: Upload Workflow Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-release-candidate
           path: |
@@ -241,7 +241,7 @@ jobs:
           cat release-notes.md
 
       - name: Create GitHub Prerelease
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.WHEELS_VERSION }}
           name: Wheels ${{ env.WHEELS_VERSION }} (Release Candidate)
