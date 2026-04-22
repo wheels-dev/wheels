@@ -140,6 +140,8 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Fixed
 
+- Framework-internal browser-test fixture controllers, views, and the `/_browser/*` routes no longer leak into application-level files. Moved from `app/controllers/BrowserTest*.cfc`, `app/views/browsertest*/`, and `config/routes.cfm` into `vendor/wheels/public/browser-fixtures/`, auto-mounted by `$lockedLoadRoutes` when environment is `testing` or `development` and the new opt-in setting `loadBrowserTestFixtures=true` is set. Apps upgrading from a 4.0 snapshot that had custom `/_browser/*` routes must opt in explicitly or re-declare them in `config/routes.cfm`. (#2135, #2138)
+- Stray `app/mailers/UserNotificationsMailer.cfc` demo removed from the framework repo root (byte-identical copies remain in the example apps under `examples/tweet/` and `examples/starter-app/`). (#2138)
 - View lookup after `renderText()` / `renderWith()` no longer breaks subsequent partial rendering (#1991)
 - Scaffolded apps from `wheels new` now boot correctly (#2096)
 - `wheels stats` crash on Lucee 7 — private `sprintf()` helper called `Left(result, 0)` when the format string started with a placeholder. Lucee 7 throws where Lucee 6 returned empty silently. Added a ternary guard per the project's cross-engine compatibility pattern.

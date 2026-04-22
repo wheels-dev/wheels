@@ -245,6 +245,18 @@ See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for manifest fields, p
 
 **CHANGELOG:** `Deprecated: In-dev-server HTTP MCP endpoint at /wheels/mcp — superseded by the LuCLI stdio MCP server (wheels mcp wheels).` Migrate with `wheels mcp setup --force`.
 
+### Browser-test fixture routes (`/_browser/*`) moved into the framework
+
+**CHANGELOG:** `Fixed: Framework-internal browser-test fixture controllers, views, and /_browser/* routes no longer leak into application-level files.` (#2135, #2138)
+
+The `/_browser/home`, `/_browser/login`, `/_browser/dashboard`, `/_browser/login-as`, and related fixture routes used by Wheels' browser-testing DSL (`wheels.wheelstest.BrowserTest`) used to live in application-level files — `config/routes.cfm` plus `app/controllers/BrowserTest*.cfc` and `app/views/browsertest*/`. As of 4.0 they ship as framework internals under `vendor/wheels/public/browser-fixtures/` and are auto-mounted by the framework's own route loader.
+
+**What you need to do depends on whether your app relied on these routes:**
+
+- **You never used `/_browser/*` yourself** — no action. These routes were only ever meaningful when you ran Wheels' own browser specs against the dev server, and Wheels-generated app scaffolds (`wheels new`) never included them. Your `config/routes.cfm` stays as-is.
+- **You ran Wheels browser specs against a running dev server** — opt in by adding `set(loadBrowserTestFixtures=true);` to `config/settings.cfm` (or to your `testing`/`development` env override). The framework then mounts the `/_browser/*` routes automatically. The setting defaults to `false` and production/maintenance/staging environments always skip the mount.
+- **You defined your own `/_browser/*` routes in `config/routes.cfm`** (rare — Wheels 4.0 snapshot only) — either keep them (your routes win), or delete them and opt in via `loadBrowserTestFixtures=true` to use the framework copies. The framework registers before `config/routes.cfm` is loaded, so any same-named app route overrides the fixture.
+
 ## Removed in 4.0
 
 **CHANGELOG** → Removed:
