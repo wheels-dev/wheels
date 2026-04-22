@@ -3484,17 +3484,30 @@ component extends="modules.BaseModule" {
 		variables.frameworkSearchPaths = [];
 
 		// 1. Explicit override via environment variable — highest priority.
+		//    When the user sets WHEELS_FRAMEWORK_PATH they are giving an
+		//    imperative "use this" — if the path doesn't exist, hard-fail
+		//    rather than silently falling through to auto-discovery (a stale
+		//    or typo'd path could otherwise resolve to a surprising framework
+		//    version). See GH #2215.
+		var override = "";
 		try {
 			var javaSystem = createObject("java", "java.lang.System");
-			var override = javaSystem.getenv("WHEELS_FRAMEWORK_PATH");
-			if (!isNull(override) && len(trim(override))) {
-				arrayAppend(variables.frameworkSearchPaths, override & "  (from $WHEELS_FRAMEWORK_PATH)");
-				if (directoryExists(override)) {
-					return override;
-				}
+			var envValue = javaSystem.getenv("WHEELS_FRAMEWORK_PATH");
+			if (!isNull(envValue)) {
+				override = envValue;
 			}
 		} catch (any e) {
-			// Ignore — env var not accessible in this runtime.
+			// Env var not accessible in this runtime — treat as unset.
+		}
+		if (len(trim(override))) {
+			arrayAppend(variables.frameworkSearchPaths, override & "  (from $WHEELS_FRAMEWORK_PATH)");
+			if (directoryExists(override)) {
+				return override;
+			}
+			throw(
+				type="Wheels.FrameworkPathInvalid",
+				message="WHEELS_FRAMEWORK_PATH is set to '#override#' but that directory does not exist. Unset the variable to fall back to auto-discovery, or point it at a valid vendor/wheels/ source."
+			);
 		}
 
 		// 2. Project root (e.g. user ran `wheels new` from inside an existing
