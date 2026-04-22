@@ -442,7 +442,7 @@ function refreshMigrationData() {
         $table.css('opacity', '1');
     })
     .fail(function() {
-        console.error('Failed to refresh migration data');/
+        console.error('Failed to refresh migration data');
         $table.css('opacity', '1');
     });
 }
