@@ -64,6 +64,21 @@ function buildSidebarForVersion(version) {
 
 export default defineConfig({
 	site: 'https://guides.wheels.dev',
+	redirects: {
+		// Phase 0 preview at /v4-0-0-snapshot/cli-reference/ was retired in
+		// PR #2169 and replaced by the 103-page tree at
+		// /v4-0-0-snapshot/command-line-tools/. Preserve any external
+		// bookmarks or backlinks accumulated during the preview window.
+		// See issue #2179.
+		//
+		// Note: Astro's static `redirects` map does not support [...spread]
+		// sources without a backing page that can supply getStaticPaths,
+		// so deep-link catch-alls (e.g. /cli-reference/foo/bar) fall through
+		// to the site's 404 page rather than redirecting. Only the two
+		// documented Phase 0 URLs are redirected.
+		'/v4-0-0-snapshot/cli-reference': '/v4-0-0-snapshot/command-line-tools/',
+		'/v4-0-0-snapshot/cli-reference/info': '/v4-0-0-snapshot/command-line-tools/',
+	},
 	integrations: [
 		starlight({
 			title: 'Wheels Guides',
