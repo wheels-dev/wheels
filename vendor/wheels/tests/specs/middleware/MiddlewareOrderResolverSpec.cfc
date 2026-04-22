@@ -186,11 +186,17 @@ component extends="wheels.WheelsTest" {
 
 	/**
 	 * Helper to create a middleware entry struct matching the format from Plugins.cfc.
+	 * The first-arg `name` is used as the ordering identifier so specs can reference
+	 * before/after targets via the same name they create entries with.
 	 */
 	private struct function $entry(required string name, required string pluginName, struct options = {}) {
+		var opts = Duplicate(arguments.options);
+		if (!StructKeyExists(opts, "name")) {
+			opts.name = arguments.name;
+		}
 		return {
 			middleware = "test.middleware.#arguments.name#",
-			options = arguments.options,
+			options = opts,
 			pluginName = arguments.pluginName
 		};
 	}

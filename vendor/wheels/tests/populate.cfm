@@ -207,6 +207,7 @@ CREATE TABLE c_o_r_e_posts
 	,deletedat #local.datetimeColumnType# NULL
 	,views #local.intColumnType# DEFAULT 0 NOT NULL
 	,averagerating #local.floatColumnType# NULL
+	,status varchar(20) DEFAULT 'draft' NOT NULL
 	,PRIMARY KEY(id)
 ) #local.storageEngine#
 </cfquery>
@@ -483,30 +484,34 @@ FROM c_o_r_e_users u INNER JOIN c_o_r_e_galleries g ON u.id = g.userid
 
 <cfset local.per = model("author").create(firstName = "Per", lastName = "Djurner")>
 <cfset local.per.createProfile(dateOfBirth = "20/02/1975", bio = "ColdFusion Developer")>
-<cfset local.per.createPost(title = "Title for first test post", body = "Text for first test post", views = 5)>
+<cfset local.per.createPost(title = "Title for first test post", body = "Text for first test post", views = 5, status = "published")>
 <cfset local.per.createPost(
 	title = "Title for second test post",
 	body = "Text for second test post",
 	views = 5,
-	averageRating = "3.6"
+	averageRating = "3.6",
+	status = "published"
 )>
 <cfset local.per.createPost(
 	title = "Title for third test post",
 	body = "Text for third test post",
-	averageRating = "3.2"
+	averageRating = "3.2",
+	status = "archived"
 )>
 <cfset local.tony = model("author").create(firstName = "Tony", lastName = "Petruzzi")>
 <cfset local.tony.createPost(
 	title = "Title for fourth test post",
 	body = "Text for fourth test post",
 	views = 3,
-	averageRating = "3.6"
+	averageRating = "3.6",
+	status = "draft"
 )>
 <cfset local.tony.createPost(
 	title = "Title for fifth test post",
 	body = "Text for fifth test post",
 	views = 2,
-	averageRating = "3.6"
+	averageRating = "3.6",
+	status = "draft"
 )>
 <cfset local.chris = model("author").create(firstName = "Chris", lastName = "Peters")>
 <cfset local.peter = model("author").create(firstName = "Peter", lastName = "Amiri")>
