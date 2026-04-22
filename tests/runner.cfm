@@ -117,6 +117,13 @@
         }
         
         result = testBox.run(argumentCollection = testBoxOptions);
+        DeJsonResult = DeserializeJSON(result);
+
+        if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
+            cfheader(statuscode=417);
+        } else {
+            cfheader(statuscode=200);
+        }
     }
     else if(url.format eq "json"){
         // Set JSON reporter
