@@ -90,6 +90,17 @@ fi
 echo ""
 echo "--- Phase 3: Scaffold a test project ---"
 cd "$TMPDIR"
+# `wheels new` requires a discoverable vendor/wheels/ framework source and
+# now exits non-zero if one isn't found (GH #2211). The distribution module
+# itself does not ship the framework, so the caller must point at a checkout
+# via WHEELS_FRAMEWORK_PATH. Skip the scaffold phase gracefully if it isn't set.
+if [ -z "${WHEELS_FRAMEWORK_PATH:-}" ]; then
+    echo "  SKIP: WHEELS_FRAMEWORK_PATH not set — skipping scaffold phases"
+    echo "  Set WHEELS_FRAMEWORK_PATH=/path/to/wheels/vendor/wheels to run full test"
+    echo ""
+    echo "=== Summary: $PASS pass, $FAIL fail (scaffold phases skipped) ==="
+    [ "$FAIL" -eq 0 ] && exit 0 || exit 1
+fi
 if lucli wheels new testapp 2>&1; then
     pass "wheels new testapp succeeded"
 else
