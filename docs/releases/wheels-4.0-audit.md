@@ -122,7 +122,7 @@
 
 **CLI UX & generators:**
 
-- **`wheels snippets` → `wheels code` command rename** (#1852) — breaking; aligns with the "code snippets" concept.
+- **`wheels snippets` → `wheels generate snippets` command rename** (#1852) — breaking; aligns with the "code snippets" concept.
 - **Scaffold, seed, in-process services** (#2065) — Phase 3-4 of LuCLI migration. In-process service invocation removes external process overhead for generators.
 - **Playwright CLI commands** (#2013, #2021) — configuration, test helpers.
 - **Oracle admin privilege check for DB creation** (#1843).
@@ -229,7 +229,7 @@ Dependabot bumps (dev/CI infrastructure — not user-facing): #1898 (basic-ftp),
 
 Items that require migration notes for users upgrading from 3.x. These should have top billing in the upgrade guide and blog posts.
 
-1. **`wheels snippets` command renamed to `wheels code`** (#1852) — CLI breaking. Scripts/aliases calling `wheels snippets` must update.
+1. **`wheels snippets` command renamed to `wheels generate snippets`** (#1852) — CLI breaking. Scripts/aliases calling `wheels snippets` must update.
 2. **CFWheels → Wheels rebrand in active code** (#2064) — callers referencing old namespaces (e.g., `cfwheels.*`) must update. Most user code unaffected; internal reference.
 3. **`testbox` → `wheelstest` namespace** (#1889) — test CFCs should extend `wheels.WheelsTest` (old `wheels.Test` continues to work but is legacy).
 4. **Tests directory `tests/specs/functions/` → `tests/specs/functional/`** (#1872).

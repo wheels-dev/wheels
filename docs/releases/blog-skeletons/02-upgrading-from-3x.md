@@ -34,7 +34,7 @@ Use a consistent 4-part micro-template per item: **What changed / How to detect 
 2. **HSTS default-on in production** ([#2081](https://github.com/wheels-dev/wheels/pull/2081)).
 3. **CSRF key required in production; JWT algorithm validation** ([#2079](https://github.com/wheels-dev/wheels/pull/2079)).
 4. **`allowEnvironmentSwitchViaUrl` default false in prod; reload password required** ([#2076](https://github.com/wheels-dev/wheels/pull/2076), [#2082](https://github.com/wheels-dev/wheels/pull/2082)).
-5. **`wheels snippets` → `wheels code`** ([#1852](https://github.com/wheels-dev/wheels/pull/1852)).
+5. **`wheels snippets` → `wheels generate snippets`** ([#1852](https://github.com/wheels-dev/wheels/pull/1852)).
 6. **Test base class: `wheels.Test` → `wheels.WheelsTest`** ([#1889](https://github.com/wheels-dev/wheels/pull/1889)).
 7. **Tests directory rename: `tests/specs/functions/` → `tests/specs/functional/`** ([#1872](https://github.com/wheels-dev/wheels/pull/1872)).
 8. **Legacy RocketUnit removed from core** ([#1925](https://github.com/wheels-dev/wheels/pull/1925)) — existing RocketUnit specs still run; WheelsTest BDD mandatory for new.
