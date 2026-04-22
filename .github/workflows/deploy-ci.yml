@@ -11,7 +11,7 @@
 #
 # Prerequisites (already present in this repo's CI):
 #   - LuCLI install recipe mirrors .github/workflows/pr.yml (cybersonic/LuCLI release).
-#   - Java 21 via actions/setup-java@v4.
+#   - Java 21 via actions/setup-java@v5.
 #
 # Gating model:
 #   1. cli-tests              - runs `tools/test-cli-local.sh`, must be 365+/0/0.
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
