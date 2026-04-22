@@ -145,13 +145,14 @@ echo ""
 echo "=== Phase 4: Exercise every template-driven generator ==="
 
 echo ""
-echo "--- generate model User name:string email:string ---"
-lucli wheels generate model User name:string email:string 2>&1 | sed 's/^/    /' || true
+echo "--- generate model User name:string email:email ---"
+lucli wheels generate model User name:string email:email 2>&1 | sed 's/^/    /' || true
 assert_file_nonempty "app/models/User.cfc" "model User.cfc generated"
-# Current ModelContent template renders component shell + config() scaffold but
-# does not emit validations from attrs. Assert structure, not content we don't emit.
 assert_grep 'extends="Model"' "app/models/User.cfc" "model extends Model"
 assert_grep "function config" "app/models/User.cfc" "model has config()"
+# Typed attrs must round-trip into validations in config(). See #2219.
+assert_grep 'validatesPresenceOf\("name,email"\)' "app/models/User.cfc" "model emits validatesPresenceOf for attrs"
+assert_grep 'validatesFormatOf\(property="email", type="email"\)' "app/models/User.cfc" "model emits validatesFormatOf for email-typed attr"
 
 echo ""
 echo "--- generate controller Users index show ---"

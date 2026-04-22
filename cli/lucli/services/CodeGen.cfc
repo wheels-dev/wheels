@@ -49,6 +49,7 @@ component {
 			belongsTo: arguments.belongsTo,
 			hasMany: arguments.hasMany,
 			hasOne: arguments.hasOne,
+			validations: buildModelValidations(arguments.properties),
 			timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
 		};
 
@@ -59,6 +60,32 @@ component {
 		);
 
 		return result;
+	}
+
+	/**
+	 * Build validation code lines for a model's config() from typed properties.
+	 * Emits a single combined validatesPresenceOf("a,b,c") for all properties,
+	 * plus per-property validatesFormatOf for email and URL types.
+	 */
+	private string function buildModelValidations(required array properties) {
+		if (!arrayLen(arguments.properties)) return "";
+
+		var presenceProps = [];
+		var formatLines = [];
+
+		for (var prop in arguments.properties) {
+			arrayAppend(presenceProps, prop.name);
+			var propType = structKeyExists(prop, "type") ? lCase(prop.type) : "string";
+			if (propType == "email") {
+				arrayAppend(formatLines, "		validatesFormatOf(property=""#prop.name#"", type=""email"");");
+			} else if (propType == "url") {
+				arrayAppend(formatLines, "		validatesFormatOf(property=""#prop.name#"", type=""URL"");");
+			}
+		}
+
+		var lines = ["		validatesPresenceOf(""#arrayToList(presenceProps)#"");"];
+		lines.append(formatLines, true);
+		return arrayToList(lines, chr(10));
 	}
 
 	/**

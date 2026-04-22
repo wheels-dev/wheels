@@ -53,6 +53,50 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude("config()");
 				});
 
+				it("emits validatesPresenceOf combining all properties (##2219)", () => {
+					codegen.generateModel(
+						name = "Foo",
+						properties = [
+							{name: "bar", type: "string"},
+							{name: "baz", type: "integer"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/Foo.cfc");
+					expect(content).toInclude('validatesPresenceOf("bar,baz")');
+				});
+
+				it("emits validatesFormatOf for email-typed properties (##2219)", () => {
+					codegen.generateModel(
+						name = "Subscriber",
+						properties = [
+							{name: "name", type: "string"},
+							{name: "email", type: "email"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/Subscriber.cfc");
+					expect(content).toInclude('validatesPresenceOf("name,email")');
+					expect(content).toInclude('validatesFormatOf(property="email", type="email")');
+				});
+
+				it("emits validatesFormatOf for url-typed properties (##2219)", () => {
+					codegen.generateModel(
+						name = "Link",
+						properties = [{name: "website", type: "url"}],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/Link.cfc");
+					expect(content).toInclude('validatesFormatOf(property="website", type="URL")');
+				});
+
+				it("skips validations when no properties given (##2219)", () => {
+					codegen.generateModel(name = "Empty", properties = [], force = true);
+					var content = fileRead(tempRoot & "/app/models/Empty.cfc");
+					expect(content).notToInclude("validatesPresenceOf");
+					expect(content).notToInclude("validatesFormatOf");
+				});
+
 			});
 
 			describe("generateController()", () => {

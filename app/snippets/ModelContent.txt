@@ -5,6 +5,7 @@
 		{{belongsToRelationships}}
 		{{hasManyRelationships}}
 		{{hasOneRelationships}}
+		{{validations}}
 	}
 
 }
