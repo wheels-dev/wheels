@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Regression test for GH #2211 and GH #2214: `wheels new` must exit
-# non-zero on every user-facing error path, not silently succeed.
+# Regression tests for wheels new exit-code contracts.
 #
-# Coverage:
-#   - #2211: framework source not found
-#   - #2214: target directory already exists
-#   - #2214: app name missing (args supplied but none parsed as appname)
+#   GH #2211 — framework source not found anywhere must exit non-zero
+#   GH #2215 — explicit WHEELS_FRAMEWORK_PATH pointing at a non-existent
+#              directory must hard-fail (not silently fall through to
+#              auto-discovery)
+#   GH #2214 — target directory already exists must exit non-zero
+#   GH #2214 — app name missing (args supplied but none parsed) must exit non-zero
 #
 # Prerequisites:
 #   - wheels binary on PATH
@@ -67,6 +68,46 @@ if [ ! -d "$TMPDIR/fixture" ]; then
 else
     fail "partial fixture/ directory left behind"
 fi
+
+echo ""
+echo "=== GH #2215: invalid WHEELS_FRAMEWORK_PATH must hard-fail ==="
+echo ""
+
+# Fresh subdir so a leftover fixture/ from case #2211 doesn't poison the check.
+SUBDIR="$TMPDIR/case-2215"
+mkdir -p "$SUBDIR"
+cd "$SUBDIR"
+
+BAD_PATH="$SUBDIR/does-not-exist/vendor/wheels"
+export WHEELS_FRAMEWORK_PATH="$BAD_PATH"
+
+OUT=$(wheels new fixture --no-open-browser 2>&1)
+CODE=$?
+
+echo "--- output (last 8 lines) ---"
+echo "$OUT" | tail -8
+echo "--- exit code: $CODE ---"
+echo ""
+
+if [ "$CODE" -ne 0 ]; then
+    pass "wheels new exits non-zero when WHEELS_FRAMEWORK_PATH is invalid"
+else
+    fail "wheels new exited 0 despite invalid WHEELS_FRAMEWORK_PATH (GH #2215)"
+fi
+
+if echo "$OUT" | grep -qF "$BAD_PATH"; then
+    pass "error message echoes the invalid path"
+else
+    fail "error message does not mention the invalid path"
+fi
+
+if [ ! -d "$SUBDIR/fixture" ]; then
+    pass "no partial fixture/ directory left behind (case 2215)"
+else
+    fail "partial fixture/ directory left behind (case 2215)"
+fi
+
+unset WHEELS_FRAMEWORK_PATH
 
 echo ""
 echo "=== GH #2214: wheels new target-directory-exists regression ==="
