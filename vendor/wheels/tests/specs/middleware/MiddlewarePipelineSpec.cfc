@@ -36,7 +36,7 @@ component extends="wheels.WheelsTest" {
 
 				it("passes request through a single middleware to core handler", function() {
 					var shared = {order = []};
-					var mw = new tests.specs.middleware._helpers.TrackingMiddleware(id = "A", tracker = shared);
+					var mw = new wheels.tests.specs.middleware._helpers.TrackingMiddleware(id = "A", tracker = shared);
 					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 					var handler = function(required struct request) {
 						ArrayAppend(shared.order, "core");
@@ -51,8 +51,8 @@ component extends="wheels.WheelsTest" {
 
 				it("executes multiple middleware in correct order", function() {
 					var shared = {order = []};
-					var mwA = new tests.specs.middleware._helpers.TrackingMiddleware(id = "A", tracker = shared);
-					var mwB = new tests.specs.middleware._helpers.TrackingMiddleware(id = "B", tracker = shared);
+					var mwA = new wheels.tests.specs.middleware._helpers.TrackingMiddleware(id = "A", tracker = shared);
+					var mwB = new wheels.tests.specs.middleware._helpers.TrackingMiddleware(id = "B", tracker = shared);
 					var pipeline = new wheels.middleware.Pipeline(middleware = [mwA, mwB]);
 					var handler = function(required struct request) {
 						ArrayAppend(shared.order, "core");
@@ -69,8 +69,8 @@ component extends="wheels.WheelsTest" {
 
 				it("allows middleware to short-circuit the pipeline", function() {
 					var shared = {order = []};
-					var blocker = new tests.specs.middleware._helpers.BlockingMiddleware(tracker = shared);
-					var mwB = new tests.specs.middleware._helpers.TrackingMiddleware(id = "B", tracker = shared);
+					var blocker = new wheels.tests.specs.middleware._helpers.BlockingMiddleware(tracker = shared);
+					var mwB = new wheels.tests.specs.middleware._helpers.TrackingMiddleware(id = "B", tracker = shared);
 					var pipeline = new wheels.middleware.Pipeline(middleware = [blocker, mwB]);
 					var handler = function(required struct request) {
 						ArrayAppend(shared.order, "core");
@@ -83,7 +83,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("passes request data through the middleware chain", function() {
-					var enricher = new tests.specs.middleware._helpers.EnrichingMiddleware();
+					var enricher = new wheels.tests.specs.middleware._helpers.EnrichingMiddleware();
 					var pipeline = new wheels.middleware.Pipeline(middleware = [enricher]);
 					var shared = {capturedRequest = {}};
 					var handler = function(required struct request) {

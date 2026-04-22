@@ -1671,7 +1671,7 @@ component extends="wheels.WheelsTest" {
 
 				local.a = qi("c_o_r_e_authors");
 				local.p = qi("c_o_r_e_posts");
-				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating AS postaveragerating,#local.p#.body AS postbody,#local.p#.createdat AS postcreatedat,#local.p#.deletedat AS postdeletedat,#local.p#.id AS postid,#local.p#.title AS posttitle,#local.p#.updatedat AS postupdatedat,#local.p#.views AS postviews")
+				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating AS postaveragerating,#local.p#.body AS postbody,#local.p#.createdat AS postcreatedat,#local.p#.deletedat AS postdeletedat,#local.p#.id AS postid,#local.p#.status AS poststatus,#local.p#.title AS posttitle,#local.p#.updatedat AS postupdatedat,#local.p#.views AS postviews")
 			})
 
 			it("works with association with expanded aliases disabled", () => {
@@ -1688,7 +1688,7 @@ component extends="wheels.WheelsTest" {
 
 				local.a = qi("c_o_r_e_authors");
 				local.p = qi("c_o_r_e_posts");
-				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating,#local.p#.body,#local.p#.createdat,#local.p#.deletedat,#local.p#.id AS postid,#local.p#.title,#local.p#.updatedat,#local.p#.views")
+				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating,#local.p#.body,#local.p#.createdat,#local.p#.deletedat,#local.p#.id AS postid,#local.p#.status,#local.p#.title,#local.p#.updatedat,#local.p#.views")
 			})
 
 			it("works on calculated property", () => {

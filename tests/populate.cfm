@@ -106,13 +106,13 @@ application.wo.model("author").create(firstName = "Adam", lastName = "Chapman");
 application.wo.model("author").create(firstName = "Tom", lastName = "King");
 application.wo.model("author").create(firstName = "David", lastName = "Belanger");
 
-// Create posts with various statuses
+// Seed a handful of posts for scaffold/generator examples.
 local.per = application.wo.model("author").findOne(where = "firstName = 'Per'");
-local.per.createPost(title = "First post", body = "Body 1", views = 5, status = "published");
-local.per.createPost(title = "Second post", body = "Body 2", views = 5, status = "published");
-local.per.createPost(title = "Third post", body = "Body 3", views = 0, averageRating = "3.2", status = "archived");
+local.per.createPost(title = "First post", body = "Body 1", views = 5);
+local.per.createPost(title = "Second post", body = "Body 2", views = 5);
+local.per.createPost(title = "Third post", body = "Body 3", views = 0, averageRating = "3.2");
 
 local.tony = application.wo.model("author").findOne(where = "firstName = 'Tony'");
-local.tony.createPost(title = "Fourth post", body = "Body 4", views = 3, averageRating = "3.6", status = "draft");
-local.tony.createPost(title = "Fifth post", body = "Body 5", views = 2, averageRating = "3.6", status = "draft");
+local.tony.createPost(title = "Fourth post", body = "Body 4", views = 3, averageRating = "3.6");
+local.tony.createPost(title = "Fifth post", body = "Body 5", views = 2, averageRating = "3.6");
 </cfscript>
