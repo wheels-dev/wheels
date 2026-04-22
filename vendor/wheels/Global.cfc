@@ -1,11 +1,18 @@
 component output="false" {
 
-	public any function $doubleCheckedLock(required string name, required string condition, required string execute, struct conditionArgs = "#StructNew()#", struct executeArgs = "#StructNew()#", numeric timeout=30){
+	public any function $doubleCheckedLock(
+		required string name,
+		required string condition,
+		required string execute,
+		struct conditionArgs = "#StructNew()#",
+		struct executeArgs = "#StructNew()#",
+		numeric timeout = 30
+	) {
 		local.rv = $invoke(method = arguments.condition, invokeArgs = arguments.conditionArgs);
-		if(IsBoolean(local.rv) AND NOT local.rv){
+		if (IsBoolean(local.rv) AND NOT local.rv) {
 			lock timeout="#arguments.timeout#" name="#arguments.name#" {
 				local.rv = $invoke(method = arguments.condition, invokeArgs = arguments.conditionArgs);
-				if(IsBoolean(local.rv) AND NOT local.rv){
+				if (IsBoolean(local.rv) AND NOT local.rv) {
 					local.rv = $invoke(method = arguments.execute, invokeArgs = arguments.executeArgs)
 				}
 			}
@@ -13,28 +20,38 @@ component output="false" {
 		return local.rv;
 	}
 
-	public any function $simpleLock(required string name, required string type, required string execute, struct executeArgs = "#StructNew()#", numeric timeout=30){
-		if(StructKeyExists(arguments, "object")){
+	public any function $simpleLock(
+		required string name,
+		required string type,
+		required string execute,
+		struct executeArgs = "#StructNew()#",
+		numeric timeout = 30
+	) {
+		if (StructKeyExists(arguments, "object")) {
 			lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#" {
-				local.rv = $invoke(component = "#arguments.object#", method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
+				local.rv = $invoke(
+					component = "#arguments.object#",
+					method = "#arguments.execute#",
+					argumentCollection = "#arguments.executeArgs#"
+				);
 			}
-		}else{
+		} else {
 			arguments.executeArgs.$locked = true;
-			lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#"{
+			lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#" {
 				local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
 			}
 		}
-		if(StructKeyExists(local, "rv")){
+		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
 	}
 
-	public struct function $image(){
-    	local.rv = {};
+	public struct function $image() {
+		local.rv = {};
 		if (arguments.action == "info") {
 			local.rv = $engineAdapter().imageInfo(arguments.source);
 		} else if ($engineAdapter().isBoxLang()) {
-			throw(
+			Throw(
 				type = "Wheels.Image.UnsupportedAction",
 				message = "The `$image()` function in BoxLang currently supports only the 'info' action."
 			);
@@ -47,79 +64,79 @@ component output="false" {
 		return local.rv;
 	}
 
-	public void function $mail(){
-    if(StructKeyExists(arguments, "mailparts")){
-        local.mailparts = arguments.mailparts;
-        StructDelete(arguments, "mailparts");
-    }
-    if(StructKeyExists(arguments, "mailparams")){
-        local.mailparams = arguments.mailparams;
-		StructDelete(arguments, "mailparams");
-    }
-    if(StructKeyExists(arguments, "tagContent")){
-        local.tagContent = arguments.tagContent;
-		StructDelete(arguments, "tagContent");
-    }
-    cfmail(attributeCollection="#arguments#"){
-      if(StructKeyExists(local, "mailparams")){
-        for(local.i in local.mailparams){
-            cfmailparam(attributeCollection="#local.i#");
-        }
-      }
-      if(StructKeyExists(local, "mailparts")){
-        for(local.i in local.mailparts){
-          local.innerTagContent = local.i.tagContent;
-			    StructDelete(local.i, "tagContent");
-          cfmailpart(attributeCollection="#local.i#"){
-            writeOutput(local.innerTagContent)
+	public void function $mail() {
+		if (StructKeyExists(arguments, "mailparts")) {
+			local.mailparts = arguments.mailparts;
+			StructDelete(arguments, "mailparts");
+		}
+		if (StructKeyExists(arguments, "mailparams")) {
+			local.mailparams = arguments.mailparams;
+			StructDelete(arguments, "mailparams");
+		}
+		if (StructKeyExists(arguments, "tagContent")) {
+			local.tagContent = arguments.tagContent;
+			StructDelete(arguments, "tagContent");
+		}
+		cfmail(attributeCollection = "#arguments#") {
+			if (StructKeyExists(local, "mailparams")) {
+				for (local.i in local.mailparams) {
+					cfmailparam(attributeCollection = "#local.i#");
+				}
+			}
+			if (StructKeyExists(local, "mailparts")) {
+				for (local.i in local.mailparts) {
+					local.innerTagContent = local.i.tagContent;
+					StructDelete(local.i, "tagContent");
+					cfmailpart(attributeCollection = "#local.i#") {
+						WriteOutput(local.innerTagContent)
 					}
-        }
-      }
-      if(StructKeyExists(local, "tagContent")){
-        writeOutput(local.tagContent)
-      }
-    }
+				}
+			}
+			if (StructKeyExists(local, "tagContent")) {
+				WriteOutput(local.tagContent)
+			}
+		}
 	}
 
-	public any function $cache(){
-    // If cache is found only the function is aborted, not page. --->
+	public any function $cache() {
+		// If cache is found only the function is aborted, not page. --->
 		variables.$instance.reCache = false;
-		cfcache(attributeCollection="#arguments#");
+		cfcache(attributeCollection = "#arguments#");
 		variables.$instance.reCache = true;
 	}
 
-	public any function $content(){
-    cfcontent(attributeCollection="#arguments#");
+	public any function $content() {
+		cfcontent(attributeCollection = "#arguments#");
 	}
 
-	public void function $header(){
+	public void function $header() {
 		// Adobe CF 2025 removed statusText attribute - remove it if present
-		if (structKeyExists(arguments, "statusText")) {
+		if (StructKeyExists(arguments, "statusText")) {
 			local.args = {};
 			for (local.key in arguments) {
 				if (local.key != "statusText") {
 					local.args[local.key] = arguments[local.key];
 				}
 			}
-			cfheader(attributeCollection="#local.args#");
+			cfheader(attributeCollection = "#local.args#");
 		} else {
-			cfheader(attributeCollection="#arguments#");
+			cfheader(attributeCollection = "#arguments#");
 		}
 	}
 
-	public void function $include(required string template){
-    include "#LCase(arguments.template)#";
+	public void function $include(required string template) {
+		include "#LCase(arguments.template)#";
 	}
 
-	public void function $includeAndOutput(required string template){
-    include "#LCase(arguments.template)#";
+	public void function $includeAndOutput(required string template) {
+		include "#LCase(arguments.template)#";
 	}
 
-	public string function $includeAndReturnOutput(required string $template){
-    // Make it so the developer can reference passed in arguments in the loc scope if they prefer.
-		if(StructKeyExists(arguments, "$type") AND arguments.$type IS "partial"){
+	public string function $includeAndReturnOutput(required string $template) {
+		// Make it so the developer can reference passed in arguments in the loc scope if they prefer.
+		if (StructKeyExists(arguments, "$type") AND arguments.$type IS "partial") {
 			local = arguments;
-  	}
+		}
 		// Include the template and return the result.
 		// Variable is set to $wheels to limit chances of it being overwritten in the included template.
 		// cfformat-ignore-start
@@ -127,72 +144,72 @@ component output="false" {
   	  include "#LCase(arguments.$template)#"
   	};
 		// cfformat-ignore-end
-		return local.$wheels;
+return local.$wheels;
 	}
 
-	public any function $directory(){
-    local.rv = "";
-    arguments.name = "rv";
-		cfdirectory(attributeCollection="#arguments#");
+	public any function $directory() {
+		local.rv = "";
+		arguments.name = "rv";
+		cfdirectory(attributeCollection = "#arguments#");
 		return local.rv;
 	}
 
-	public any function $file(){
-    cffile(attributeCollection="#arguments#");
+	public any function $file() {
+		cffile(attributeCollection = "#arguments#");
 	}
 
-	public any function $cfinvoke(required string component, required string method, struct invokeArguments){
-    cfinvoke
-        component="#arguments.component#"
-        method="#arguments.method#"
-        returnVariable="#arguments.returnVariable#"
-        argumentCollection="#arguments.invokeArguments#";
-    return local.rv;
+	public any function $cfinvoke(required string component, required string method, struct invokeArguments) {
+		cfinvoke
+		component = "#arguments.component#"
+		method = "#arguments.method#"
+		returnVariable = "#arguments.returnVariable#"
+		argumentCollection = "#arguments.invokeArguments#";
+		return local.rv;
 	}
 
-	public any function $invoke(){
-    arguments.returnVariable = "local.rv";
-    if(StructKeyExists(arguments, "componentReference")){
-      arguments.component = arguments.componentReference;
-      StructDelete(arguments, "componentReference");
-    }else if(NOT StructKeyExists(variables, arguments.method)){
-      // this is done so that we can call dynamic methods via "onMissingMethod" on the object (we need to pass in the object for this so it can call methods on the "this" scope instead)
-      arguments.component = this;
-    }
-    if(StructKeyExists(arguments, "invokeArgs")){
-      arguments.argumentCollection = arguments.invokeArgs;
-      if(StructCount(arguments.argumentCollection) IS NOT ListLen(StructKeyList(arguments.argumentCollection))){
-        // work-around for fasthashremoved cf8 bug
-        arguments.argumentCollection = StructNew();
-        for(local.i in StructKeyList(arguments.invokeArgs)){
-          arguments.argumentCollection[local.i] = arguments.invokeArgs[local.i];
-        }
-      }
+	public any function $invoke() {
+		arguments.returnVariable = "local.rv";
+		if (StructKeyExists(arguments, "componentReference")) {
+			arguments.component = arguments.componentReference;
+			StructDelete(arguments, "componentReference");
+		} else if (NOT StructKeyExists(variables, arguments.method)) {
+			// this is done so that we can call dynamic methods via "onMissingMethod" on the object (we need to pass in the object for this so it can call methods on the "this" scope instead)
+			arguments.component = this;
+		}
+		if (StructKeyExists(arguments, "invokeArgs")) {
+			arguments.argumentCollection = arguments.invokeArgs;
+			if (StructCount(arguments.argumentCollection) IS NOT ListLen(StructKeyList(arguments.argumentCollection))) {
+				// work-around for fasthashremoved cf8 bug
+				arguments.argumentCollection = StructNew();
+				for (local.i in StructKeyList(arguments.invokeArgs)) {
+					arguments.argumentCollection[local.i] = arguments.invokeArgs[local.i];
+				}
+			}
 
 
-      if(StructKeyExists(arguments.invokeArgs, "componentReference")){
-      	arguments.component = arguments.invokeArgs.componentReference;
-      }
+			if (StructKeyExists(arguments.invokeArgs, "componentReference")) {
+				arguments.component = arguments.invokeArgs.componentReference;
+			}
 
 
-      StructDelete(arguments, "invokeArgs");
-    }
-    cfinvoke(attributeCollection="#arguments#");
-    if(StructKeyExists(local, "rv")){
-      return local.rv;
-    }
+			StructDelete(arguments, "invokeArgs");
+		}
+		cfinvoke(attributeCollection = "#arguments#");
+		if (StructKeyExists(local, "rv")) {
+			return local.rv;
+		}
 	}
 
-	public void function $location(boolean delay = false){
-    StructDelete(arguments, "$args", false);
-    if(NOT arguments.delay){
-      StructDelete(arguments, "delay", false);
-      cflocation(attributeCollection="#arguments#");
-    }
+	public void function $location(boolean delay = false) {
+		StructDelete(arguments, "$args", false);
+		if (NOT arguments.delay) {
+			StructDelete(arguments, "delay", false);
+			cflocation(attributeCollection = "#arguments#");
+		}
 	}
 
-	public void function $htmlhead(){
-    cfhtmlhead(attributeCollection="#arguments#");
+	public void function $htmlhead() {
+		cfhtmlhead(attributeCollection = "#arguments#");
 	}
 
 	public any function $dbinfo() {
@@ -241,7 +258,7 @@ component output="false" {
 						AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
 					ORDER BY i.name, ic.key_ordinal
 				";
-				local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+				local.rv = $query(sql = local.sql, datasource = arguments.datasource);
 				return local.rv;
 			}
 
@@ -267,13 +284,13 @@ component output="false" {
 						AND ai.INDEX_TYPE != 'LOB'
 					ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
 				";
-				local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+				local.rv = $query(sql = local.sql, datasource = arguments.datasource);
 				return local.rv;
 			}
 		}
 
 		if (
-			structKeyExists(arguments, "type") &&
+			StructKeyExists(arguments, "type") &&
 			arguments.type eq "index" &&
 			$get("adapterName") eq "SQLiteModel"
 		) {
@@ -345,11 +362,11 @@ component output="false" {
 		// Override name for test mode
 		if (
 			arguments.type IS "version" AND
-			structKeyExists(url, "controller") AND
-			structKeyExists(url, "action") AND
-			structKeyExists(url, "view") AND
-			structKeyExists(url, "type") AND
-			structKeyExists(url, "adapter")
+			StructKeyExists(url, "controller") AND
+			StructKeyExists(url, "action") AND
+			StructKeyExists(url, "view") AND
+			StructKeyExists(url, "type") AND
+			StructKeyExists(url, "adapter")
 		) {
 			if (url.controller IS "wheels" AND url.action IS "wheels" AND url.view IS "tests" AND url.type IS "core") {
 				QuerySetCell(local.rv, "driver_name", url.adapter);
@@ -359,28 +376,28 @@ component output="false" {
 		return local.rv;
 	}
 
-	public any function $wddx(required any input, string action = "cfml2wddx", boolean useTimeZoneInfo = true){
-    arguments.output = "local.output";
-    cfwddx(attributeCollection="#arguments#");
-    if(StructKeyExists(local, "output")){
-      return local.output;
-    }
+	public any function $wddx(required any input, string action = "cfml2wddx", boolean useTimeZoneInfo = true) {
+		arguments.output = "local.output";
+		cfwddx(attributeCollection = "#arguments#");
+		if (StructKeyExists(local, "output")) {
+			return local.output;
+		}
 	}
 
-	public any function $zip(){
+	public any function $zip() {
 		$engineAdapter().prepareZipArgs(arguments);
- 		cfzip(attributeCollection="#arguments#");
+		cfzip(attributeCollection = "#arguments#");
 	}
 
-	public any function $query(required string sql){
+	public any function $query(required string sql) {
 		StructDelete(arguments, "name");
 		// allow the use of query of queries, caveat: Query must be called query. Eg: SELECT * from query
-		if(StructKeyExists(arguments, "query") && IsQuery(arguments.query)){
+		if (StructKeyExists(arguments, "query") && IsQuery(arguments.query)) {
 			var query = Duplicate(arguments.query);
 		}
-		local.rv = queryExecute(PreserveSingleQuotes(arguments.sql), [],  arguments);
+		local.rv = QueryExecute(PreserveSingleQuotes(arguments.sql), [], arguments);
 		// some sql statements may not return a value
-		if(StructKeyExists(local, "rv")){
+		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
 	}
@@ -407,7 +424,7 @@ component output="false" {
 	 * @name The environment variable name to look up.
 	 * @default Value to return if the variable is not found.
 	 */
-	public any function env(required string name, any default="") {
+	public any function env(required string name, any default = "") {
 		if (StructKeyExists(application, "env") && StructKeyExists(application.env, arguments.name)) {
 			return application.env[arguments.name];
 		}
@@ -444,7 +461,10 @@ component output="false" {
 			!Len(arguments.functionName)
 			&& IsDefined("request.wheels.tenant.config")
 			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
-			&& !ListFindNoCase("encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls", arguments.name)
+			&& !ListFindNoCase(
+				"encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls",
+				arguments.name
+			)
 		) {
 			return request.wheels.tenant.config[arguments.name];
 		}
@@ -525,10 +545,7 @@ component output="false" {
 	 */
 	public void function switchTenant(required struct tenant, boolean force = false) {
 		if (!StructKeyExists(arguments.tenant, "dataSource") || !Len(arguments.tenant.dataSource)) {
-			Throw(
-				type = "Wheels.InvalidTenant",
-				message = "The tenant struct must contain a non-empty `dataSource` key."
-			);
+			Throw(type = "Wheels.InvalidTenant", message = "The tenant struct must contain a non-empty `dataSource` key.");
 		}
 		if (!StructKeyExists(request, "wheels")) {
 			request.wheels = {};
@@ -602,7 +619,7 @@ component output="false" {
 		if (IsNumeric(arguments.cache)) {
 			local.cache = arguments.cache;
 		}
-		local.listArray = [0,0,0,0];
+		local.listArray = [0, 0, 0, 0];
 		local.dateParts = "d,h,n,s";
 		local.datePartsArray = ListToArray(local.dateParts);
 		local.iEnd = ArrayLen(local.datePartsArray);
@@ -611,12 +628,7 @@ component output="false" {
 				local.listArray[local.i] = local.cache;
 			}
 		}
-		local.rv = CreateTimespan(
-			local.listArray[1],
-			local.listArray[2],
-			local.listArray[3],
-			local.listArray[4]
-		);
+		local.rv = CreateTimespan(local.listArray[1], local.listArray[2], local.listArray[3], local.listArray[4]);
 		return local.rv;
 	}
 
@@ -751,12 +763,11 @@ component output="false" {
 		local.method = arguments.method;
 		local.component = ListChangeDelims(arguments.path, ".", "/") & "." & ListChangeDelims(arguments.fileName, ".", "/");
 		local.argumentCollection = arguments;
-		if(local.method EQ 'init'){
+		if (local.method EQ 'init') {
 			local.rv = application.wheelsdi.getInstance(name = "#local.component#", initArguments = local.argumentCollection);
-		}
-		else{
+		} else {
 			local.instance = application.wheelsdi.getInstance(name = "#local.component#");
-      local.rv = invoke(local.instance, local.method, local.argumentCollection);
+			local.rv = Invoke(local.instance, local.method, local.argumentCollection);
 		}
 		return local.rv;
 	}
@@ -997,16 +1008,16 @@ component output="false" {
 	 * @name The registered service name to resolve.
 	 */
 	public any function service(required string name) {
-		if (!isDefined("application.wheelsdi")) {
-			throw(
-				type="Wheels.DI.NotInitialized",
-				message="The DI container has not been initialized. Ensure your application has started properly."
+		if (!IsDefined("application.wheelsdi")) {
+			Throw(
+				type = "Wheels.DI.NotInitialized",
+				message = "The DI container has not been initialized. Ensure your application has started properly."
 			);
 		}
 		if (!application.wheelsdi.containsInstance(arguments.name)) {
-			throw(
-				type="Wheels.DI.ServiceNotFound",
-				message="No service registered with the name '#arguments.name#'. Check your config/services.cfm registrations."
+			Throw(
+				type = "Wheels.DI.ServiceNotFound",
+				message = "No service registered with the name '#arguments.name#'. Check your config/services.cfm registrations."
 			);
 		}
 		return application.wheelsdi.getInstance(arguments.name);
@@ -1019,10 +1030,10 @@ component output="false" {
 	 * [category: Miscellaneous Functions]
 	 */
 	public any function injector() {
-		if (!isDefined("application.wheelsdi")) {
-			throw(
-				type="Wheels.DI.NotInitialized",
-				message="The DI container has not been initialized. Ensure your application has started properly."
+		if (!IsDefined("application.wheelsdi")) {
+			Throw(
+				type = "Wheels.DI.NotInitialized",
+				message = "The DI container has not been initialized. Ensure your application has started properly."
 			);
 		}
 		return application.wheelsdi;
@@ -1055,11 +1066,7 @@ component output="false" {
 		string adapter = ""
 	) {
 		local.engine = $getChannelEngine(arguments.adapter);
-		return local.engine.publish(
-			channel = arguments.channel,
-			event = arguments.event,
-			data = arguments.data
-		);
+		return local.engine.publish(channel = arguments.channel, event = arguments.event, data = arguments.data);
 	}
 
 	/**
@@ -1203,12 +1210,7 @@ component output="false" {
 	/**
 	 * Internal function.
 	 */
-	public string function $prependUrl(
-		required string path,
-		string host = "",
-		string protocol = "",
-		numeric port = 0
-	) {
+	public string function $prependUrl(required string path, string host = "", string protocol = "", numeric port = 0) {
 		local.rv = arguments.path;
 		if (arguments.port != 0) {
 			// use the port that was passed in by the developer
@@ -1250,6 +1252,26 @@ component output="false" {
 		// load wheels internal gui routes
 		// TODO skip this if mode != development|testing?
 		$include(template = "/wheels/public/routes.cfm");
+		// Browser-test fixture routes — opt-in, only mounted in testing/development.
+		// See `vendor/wheels/public/browser-fixtures/routes.cfm` and issues #2135, #2138.
+		// The fixture controllers live at `vendor/wheels/public/browser-fixtures/controllers/`
+		// and render their own views via explicit `$include`, so only `controllerPath`
+		// needs to be extended (viewPath is single-string and left alone).
+		if (
+			StructKeyExists(application[local.appKey], "loadBrowserTestFixtures")
+			&& application[local.appKey].loadBrowserTestFixtures
+			&& StructKeyExists(application[local.appKey], "environment")
+			&& ListFindNoCase("testing,development", application[local.appKey].environment)
+		) {
+			local.fixtureControllerPath = "/wheels/public/browser-fixtures/controllers";
+			if (!ListFindNoCase(application[local.appKey].controllerPath, local.fixtureControllerPath)) {
+				application[local.appKey].controllerPath = ListAppend(
+					application[local.appKey].controllerPath,
+					local.fixtureControllerPath
+				);
+			}
+			$include(template = "/wheels/public/browser-fixtures/routes.cfm");
+		}
 		// load developer routes next
 		$include(template = "/config/routes.cfm");
 		// set lookup info for the named routes
@@ -1974,7 +1996,10 @@ component output="false" {
 		if (StructKeyExists(server, "lucee") || StructKeyExists(server, "boxlang")) {
 			return GetPageContext().getResponse().getStatus();
 		}
-		return GetPageContext().getFusionContext().getResponse().getStatus();
+		return GetPageContext()
+			.getFusionContext()
+			.getResponse()
+			.getStatus();
 	}
 
 	/**
@@ -1997,12 +2022,16 @@ component output="false" {
 			if (StructKeyExists(server, "boxlang")) {
 				local.header = local.response.getRequest().getHeader("Content-Type");
 			} else {
-				local.header = local.response.containsHeader("Content-Type") ? local.response.getHeader("Content-Type") : javacast("null", "");
+				local.header = local.response.containsHeader("Content-Type") ? local.response.getHeader("Content-Type") : Javacast(
+					"null",
+					""
+				);
 			}
 			if (!IsNull(local.header)) {
 				local.rv = local.header;
 			}
-		} catch (any e) {}
+		} catch (any e) {
+		}
 		return local.rv;
 	}
 
@@ -2138,13 +2167,23 @@ component output="false" {
 	 * Checks both application.wheels (post-init) and application.$wheels (during init).
 	 */
 	public any function $engineAdapter() {
-		if (StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(application.wheels, "engineAdapter")) {
+		if (
+			StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(
+				application.wheels,
+				"engineAdapter"
+			)
+		) {
 			return application.wheels.engineAdapter;
 		}
-		if (StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(application.$wheels, "engineAdapter")) {
+		if (
+			StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(
+				application.$wheels,
+				"engineAdapter"
+			)
+		) {
 			return application.$wheels.engineAdapter;
 		}
-		throw(type="Wheels.EngineAdapterNotInitialized", message="Engine adapter has not been initialized yet.");
+		Throw(type = "Wheels.EngineAdapterNotInitialized", message = "Engine adapter has not been initialized yet.");
 	}
 
 	/**
@@ -2152,8 +2191,18 @@ component output="false" {
 	 * Used by functions that may be called before onApplicationStart completes.
 	 */
 	public boolean function $hasEngineAdapter() {
-		return (StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(application.wheels, "engineAdapter"))
-			|| (StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(application.$wheels, "engineAdapter"));
+		return (
+			StructKeyExists(application, "wheels") && IsStruct(application.wheels) && StructKeyExists(
+				application.wheels,
+				"engineAdapter"
+			)
+		)
+		|| (
+			StructKeyExists(application, "$wheels") && IsStruct(application.$wheels) && StructKeyExists(
+				application.$wheels,
+				"engineAdapter"
+			)
+		);
 	}
 
 	// ======================================================================
@@ -2332,7 +2381,10 @@ component output="false" {
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.arg = local.requiredKeysArray[local.i];
 				if (!StructKeyExists(arguments.args, local.arg)) {
-					Throw(type = "Wheels.IncorrectArguments", message = "The `#local.arg#` argument is required but not passed in.");
+					Throw(
+						type = "Wheels.IncorrectArguments",
+						message = "The `#local.arg#` argument is required but not passed in."
+					);
 				}
 			}
 		}
@@ -2410,20 +2462,30 @@ component output="false" {
 			local.s = Trim(val);
 
 			// Match patterns loosely so they work for plain dates too
-			local.patternAMPM  = '^\d{1,2}/\d{1,2}/\d{4}(\s+\d{1,2}:\d{2}(\s*(AM|PM))?)?$';
-			local.patternISO   = '^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$';
+			local.patternAMPM = '^\d{1,2}/\d{1,2}/\d{4}(\s+\d{1,2}:\d{2}(\s*(AM|PM))?)?$';
+			local.patternISO = '^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$';
 			local.patternSlash = '^\s*\d{1,2}/\d{1,2}/\d{4}\s*$';
 
 
 			// Day name or other verbose formats are ignored to avoid false positives
-			if (ReFindNoCase(local.patternAMPM, local.s) OR ReFindNoCase(local.patternISO, local.s) OR ReFindNoCase(local.patternSlash, local.s)) {
+			if (
+				ReFindNoCase(local.patternAMPM, local.s) OR ReFindNoCase(local.patternISO, local.s) OR ReFindNoCase(
+					local.patternSlash,
+					local.s
+				)
+			) {
 				// Promote to datetime so the datetime branch will run below
 				detectedType = "datetime";
 			}
 		}
 
 		// Pre-process date strings with AM/PM that may be parsed differently per engine
-		if ($engineAdapter().isBoxLang() && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
+		if (
+			$engineAdapter().isBoxLang() && IsSimpleValue(arguments.value) && ReFindNoCase(
+				"^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$",
+				arguments.value
+			)
+		) {
 			// Manually parse DD/MM/YYYY format to avoid engine-specific interpretation
 			local.parts = ListToArray(arguments.value, " ");
 			local.datePart = local.parts[1];
@@ -2433,8 +2495,8 @@ component output="false" {
 			local.dateComponents = ListToArray(local.datePart, "/");
 			local.timeComponents = ListToArray(local.timePart, ":");
 
-			local.day = Val(local.dateComponents[1]);    // First = day (DD/MM/YYYY)
-			local.month = Val(local.dateComponents[2]);  // Second = month
+			local.day = Val(local.dateComponents[1]); // First = day (DD/MM/YYYY)
+			local.month = Val(local.dateComponents[2]); // Second = month
 			local.year = Val(local.dateComponents[3]);
 			local.hour = Val(local.timeComponents[1]);
 			local.minute = Val(local.timeComponents[2]);
@@ -2452,7 +2514,6 @@ component output="false" {
 		switch (detectedType) {
 			case "array":
 				return ArrayToList(val);
-
 			case "struct":
 				local.kList = ListSort(StructKeyList(val), "textnocase", "asc");
 				local.out = "";
@@ -2460,10 +2521,8 @@ component output="false" {
 					local.out = ListAppend(local.out, local.k & "=" & val[local.k]);
 				}
 				return local.out;
-
 			case "binary":
 				return ToString(val);
-
 			case "float":
 			case "integer":
 				if (!Len(val)) {
@@ -2473,13 +2532,11 @@ component output="false" {
 					return "1";
 				}
 				return Val(val);
-
 			case "boolean":
 				if (Len(val)) {
 					return (val IS true) ? "true" : "false";
 				}
 				return "";
-
 			case "datetime":
 				// If it's already a date object, canonicalize
 				if (IsDate(val)) {
@@ -2500,8 +2557,8 @@ component output="false" {
 
 						// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
 						if (ReFind("(?i)^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$", local.s2)) {
-							local.parts = REReplace(local.s2, "^(\\d{4})-(\\d{2})-(\\d{2}).*$", "\\1-\\2-\\3", "all");
-							local.timePart = REReplace(local.s2, ".*[ T](\\d{1,2}:\\d{2}(?::\\d{2})?).*$", "\\1", "all");
+							local.parts = ReReplace(local.s2, "^(\\d{4})-(\\d{2})-(\\d{2}).*$", "\\1-\\2-\\3", "all");
+							local.timePart = ReReplace(local.s2, ".*[ T](\\d{1,2}:\\d{2}(?::\\d{2})?).*$", "\\1", "all");
 							if (Len(local.timePart) AND local.timePart NEQ local.s2) {
 								// has time
 								local.dt = ParseDateTime(local.parts & " " & local.timePart);
@@ -2510,7 +2567,11 @@ component output="false" {
 								}
 							} else {
 								// date only
-								local.dt = CreateDate(Val(ListGetAt(local.parts,1,"-")), Val(ListGetAt(local.parts,2,"-")), Val(ListGetAt(local.parts,3,"-")));
+								local.dt = CreateDate(
+									Val(ListGetAt(local.parts, 1, "-")),
+									Val(ListGetAt(local.parts, 2, "-")),
+									Val(ListGetAt(local.parts, 3, "-"))
+								);
 								return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
 							}
 						}
@@ -2520,14 +2581,16 @@ component output="false" {
 							local.comps = ListToArray(local.s2, "/");
 							local.d1 = Val(local.comps[1]);
 							local.d2 = Val(local.comps[2]);
-							local.y  = Val(local.comps[3]);
+							local.y = Val(local.comps[3]);
 
 							// Heuristic: if day part > 12 then it's DD/MM/YYYY
 							if (d1 > 12) {
-								local.day = d1; local.month = d2;
+								local.day = d1;
+								local.month = d2;
 							} else if (d2 > 12) {
 								// likely MM/DD/YYYY
-								local.month = d1; local.day = d2;
+								local.month = d1;
+								local.day = d2;
 							} else {
 								// ambiguous -> use adapter to determine date format preference
 								local.ambiguousDate = $engineAdapter().parseAmbiguousSlashDate(d1, d2, y);
@@ -2553,7 +2616,6 @@ component output="false" {
 				}
 				// If we reach here, parsing failed — return original string to allow comparison
 				return val;
-
 			default:
 				// Default: return raw value as string (no conversion)
 				return val;
@@ -2813,7 +2875,7 @@ component output="false" {
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
 		application[local.appKey].pluginMiddleware = application[local.appKey].PluginObj.getPluginMiddleware();
 		// Invoke register(container) on ServiceProviderInterface plugins before activation
-		if (isDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PluginObj.getServiceProviders())) {
+		if (IsDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PluginObj.getServiceProviders())) {
 			application[local.appKey].PluginObj.$invokeServiceProviderRegister(application.wheelsdi);
 			// Boot after all register() calls complete — plugins can now resolve services
 			application[local.appKey].PluginObj.$invokeServiceProviderBoot(application[local.appKey]);
@@ -2860,7 +2922,7 @@ component output="false" {
 		}
 
 		// Invoke ServiceProvider register/boot if DI container exists
-		if (isDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PackageLoaderObj.getServiceProviders())) {
+		if (IsDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PackageLoaderObj.getServiceProviders())) {
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderRegister(application.wheelsdi);
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderBoot(application[local.appKey]);
 		}
@@ -2869,7 +2931,10 @@ component output="false" {
 	/**
 	 * NB: url rewriting files need to be removed from here.
 	 */
-	public string function $buildReleaseZip(string version = application.wheels.version, string directory = ExpandPath("/")) {
+	public string function $buildReleaseZip(
+		string version = application.wheels.version,
+		string directory = ExpandPath("/")
+	) {
 		local.name = "wheels-" & LCase(Replace(arguments.version, " ", "-", "all"));
 		local.name = Replace(local.name, "alpha-", "alpha.");
 		local.name = Replace(local.name, "beta-", "beta.");
@@ -2913,13 +2978,13 @@ component output="false" {
 		// Entries without "/" → treat as webroot (/public) paths
 		for (local.i in local.include) {
 			if (FileExists(ExpandPath(local.i))) {
-				if(left(local.i,1) neq "/" && left(local.i,2) neq ".."){
+				if (Left(local.i, 1) neq "/" && Left(local.i, 2) neq "..") {
 					$zip(file = local.path, source = ExpandPath(local.i), prefix = "/public");
 				} else {
 					$zip(file = local.path, source = ExpandPath(local.i));
 				}
 			} else if (DirectoryExists(ExpandPath(local.i))) {
-				if(left(local.i,1) neq "/" && left(local.i,2) neq ".."){
+				if (Left(local.i, 1) neq "/" && Left(local.i, 2) neq "..") {
 					$zip(file = local.path, source = ExpandPath(local.i), prefix = "/public/#local.i#");
 				} else {
 					$zip(file = local.path, source = ExpandPath(local.i), prefix = local.i);
@@ -2956,7 +3021,7 @@ component output="false" {
 	 */
 	public string function generateUUID() {
 		// Use Java UUID generator for a 36-character format
-		return createObject("java", "java.util.UUID").randomUUID().toString();
+		return CreateObject("java", "java.util.UUID").randomUUID().toString();
 	}
 
 	/**
@@ -3167,8 +3232,8 @@ component output="false" {
 		local.insideFunction = false;
 		local.bracketCount = 0;
 
-		for (local.i = 1; i <= len(arguments.list); i++) {
-			local.char = mid(arguments.list, i, 1);
+		for (local.i = 1; i <= Len(arguments.list); i++) {
+			local.char = Mid(arguments.list, i, 1);
 
 			// Check if we are entering or exiting a function's parentheses
 			if (local.char == "(") {
@@ -3186,7 +3251,7 @@ component output="false" {
 
 			// Split based on commas outside functions
 			if (local.char == arguments.splitBy && !local.insideFunction) {
-				arrayAppend(local.rv, trim(local.temp));
+				ArrayAppend(local.rv, Trim(local.temp));
 				local.temp = "";
 			} else {
 				local.temp &= local.char;
@@ -3194,8 +3259,8 @@ component output="false" {
 		}
 
 		// Append the final segment
-		if (len(trim(local.temp))) {
-			arrayAppend(local.rv, trim(local.temp));
+		if (Len(Trim(local.temp))) {
+			ArrayAppend(local.rv, Trim(local.temp));
 		}
 
 		return local.rv;
@@ -3211,8 +3276,8 @@ component output="false" {
 	 */
 	public string function $normalizePath(required string path) {
 		local.norm = arguments.path;
-		local.norm = reReplace(local.norm, "\[(.*?)\]", ".\1", "all");
-		local.norm = reReplace(local.norm, "^\.", "", "one");
+		local.norm = ReReplace(local.norm, "\[(.*?)\]", ".\1", "all");
+		local.norm = ReReplace(local.norm, "^\.", "", "one");
 		return local.norm;
 	}
 
@@ -3360,7 +3425,7 @@ component output="false" {
 		// Set Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With Allow Headers
 		$header(name = "Access-Control-Allow-Headers", value = arguments.allowHeaders);
 
-			// Either Look up Route specific allowed methods, or just use default
+		// Either Look up Route specific allowed methods, or just use default
 		if (arguments.allowMethodsByRoute) {
 			local.permittedMethods = [];
 
@@ -3457,9 +3522,18 @@ component output="false" {
 		// Check Model interface (requires at least one model to be loaded)
 		try {
 			local.modelMethods = [
-				"findAll", "findOne", "findByKey", "count", "exists",
-				"save", "valid", "update", "delete",
-				"hasMany", "belongsTo", "hasOne",
+				"findAll",
+				"findOne",
+				"findByKey",
+				"count",
+				"exists",
+				"save",
+				"valid",
+				"update",
+				"delete",
+				"hasMany",
+				"belongsTo",
+				"hasOne",
 				"validatesPresenceOf"
 			];
 			if (StructKeyExists(application.wheels, "models") && !StructIsEmpty(application.wheels.models)) {
@@ -3478,11 +3552,18 @@ component output="false" {
 		// Check Controller interface
 		try {
 			local.controllerMethods = [
-				"renderView", "renderPartial", "renderText", "redirectTo",
-				"linkTo", "urlFor", "startFormTag", "endFormTag",
-				"filters", "verifies"
+				"renderView",
+				"renderPartial",
+				"renderText",
+				"redirectTo",
+				"linkTo",
+				"urlFor",
+				"startFormTag",
+				"endFormTag",
+				"filters",
+				"verifies"
 			];
-			local.params = {controller: "wheels", action: "wheels"};
+			local.params = {controller = "wheels", action = "wheels"};
 			local.testController = controller(name = "wheels", params = local.params);
 			for (local.m in local.controllerMethods) {
 				if (!StructKeyExists(local.testController, local.m)) {
@@ -3505,4 +3586,5 @@ component output="false" {
 
 	// User-defined global functions
 	include "/app/global/functions.cfm";
+
 }
