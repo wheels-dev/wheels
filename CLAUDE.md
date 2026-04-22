@@ -609,7 +609,7 @@ curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
 - **`private` mixin functions not integrated**: `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helper functions in mixin CFCs (`vendor/wheels/model/*.cfc`, view helpers, etc.) MUST use `public` access. Use `$` prefix for internal scope instead of `private` keyword. BoxLang handles this differently, so `private` may pass BoxLang tests but fail Lucee/Adobe.
 
 ### CI soft-fail databases
-CockroachDB is marked as soft-fail in `.github/workflows/tests.yml` — failures are logged as warnings but don't block the build. The `SOFT_FAIL_DBS` variable controls this. Remove a database from the list once its tests are fixed.
+`SOFT_FAIL_DBS` in `.github/workflows/compat-matrix.yml` (lines 389, 519) is currently empty (`""`) — **all databases, including CockroachDB, are hard-gated in CI**. To mark a database as soft-fail (failures logged as warnings but not blocking the build), add it to `SOFT_FAIL_DBS` in both locations. Remove a database from the list once its tests are fixed.
 
 ### Cleanup
 ```bash

@@ -65,6 +65,11 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 	 * Override query setup to append RETURNING clause to INSERTs.
 	 * CockroachDB does not support pg_get_serial_sequence()/currval(),
 	 * so the RETURNING clause is the correct way to retrieve generated keys.
+	 *
+	 * Skip the RETURNING append on bulk / upsert paths: bulk.cfc's insertAll
+	 * and upsertAll call $querySetup without $primaryKey (default empty), and
+	 * upsert statements already include ON CONFLICT clauses. In both cases,
+	 * appending `RETURNING ` produces syntactically invalid SQL.
 	 */
 	public struct function $querySetup(
 		required array sql,
@@ -74,7 +79,18 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 		string $primaryKey = ""
 	) {
 		if (Left(arguments.sql[1], 11) == "INSERT INTO") {
-			ArrayAppend(arguments.sql, "RETURNING #arguments.$primaryKey#");
+			local.shouldAppendReturning = Len(Trim(arguments.$primaryKey)) > 0;
+			if (local.shouldAppendReturning) {
+				for (local.chunk in arguments.sql) {
+					if (IsSimpleValue(local.chunk) && ReFindNoCase("ON[[:space:]]+CONFLICT", local.chunk)) {
+						local.shouldAppendReturning = false;
+						break;
+					}
+				}
+			}
+			if (local.shouldAppendReturning) {
+				ArrayAppend(arguments.sql, "RETURNING #arguments.$primaryKey#");
+			}
 		}
 		$convertMaxRowsToLimit(args = arguments);
 		$removeColumnAliasesInOrderClause(args = arguments);
