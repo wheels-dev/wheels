@@ -85,6 +85,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Legacy compatibility adapter for 3.x → 4.0 migration soft-landing (#2015)
 
 **CLI & LuCLI**
+- `wheels doctor` now detects a stale installed CLI module at `~/.wheels/modules/wheels/` that shadows a source checkout and warns with a remediation command (symlink). Previously, contributors running `wheels` from a checkout could silently execute a pre-install Module.cfc, making merged fixes appear not to take effect. (#2223)
 - LuCLI Phase 2: zero-Docker local testing via `tools/test-local.sh` (#2063)
 - LuCLI Phase 2: service layer, generators, MCP annotations (#1941)
 - LuCLI Phase 3–4: scaffold, seed, in-process services (#2065)

@@ -116,8 +116,153 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(passedText).toInclude("Write permission");
 			});
 
+			describe("CLI install freshness (##2223)", () => {
+
+				it("is silent when no installedModuleRoot is provided", () => {
+					var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+					var results = doctor.runChecks();
+					var combined = arrayToList(results.warnings, " ") & " " & arrayToList(results.passed, " ");
+					expect(combined).notToInclude("Installed CLI module");
+				});
+
+				it("is silent when projectRoot is not a wheels source checkout", () => {
+					// tempRoot has no cli/lucli/Module.cfc — should not trigger the check
+					var fakeInstalled = getTempDirectory() & "wheels-install-" & createUUID();
+					directoryCreate(fakeInstalled, true);
+					fileWrite(fakeInstalled & "/Module.cfc", "component { }");
+
+					var doctor = new cli.lucli.services.Doctor(
+						projectRoot = tempRoot,
+						installedModuleRoot = fakeInstalled
+					);
+					var results = doctor.runChecks();
+					var combined = arrayToList(results.warnings, " ") & " " & arrayToList(results.passed, " ");
+					expect(combined).notToInclude("Installed CLI module");
+
+					directoryDelete(fakeInstalled, true);
+				});
+
+				it("warns when installed Module.cfc diverges from checkout", () => {
+					var checkout = makeFakeCheckout("component { /* checkout version */ }");
+					var installed = getTempDirectory() & "wheels-install-" & createUUID();
+					directoryCreate(installed, true);
+					fileWrite(installed & "/Module.cfc", "component { /* stale installed version */ }");
+
+					var doctor = new cli.lucli.services.Doctor(
+						projectRoot = checkout,
+						installedModuleRoot = installed
+					);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).toInclude("Installed CLI module");
+					expect(warningText).toInclude("diverges");
+
+					var recText = arrayToList(results.recommendations, " ");
+					expect(recText).toInclude("ln -s");
+
+					directoryDelete(checkout, true);
+					directoryDelete(installed, true);
+				});
+
+				it("passes when installed Module.cfc matches checkout bytes", () => {
+					var src = "component { /* identical bytes */ }";
+					var checkout = makeFakeCheckout(src);
+					var installed = getTempDirectory() & "wheels-install-" & createUUID();
+					directoryCreate(installed, true);
+					fileWrite(installed & "/Module.cfc", src);
+
+					var doctor = new cli.lucli.services.Doctor(
+						projectRoot = checkout,
+						installedModuleRoot = installed
+					);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).notToInclude("Installed CLI module");
+
+					var passedText = arrayToList(results.passed, " ");
+					expect(passedText).toInclude("matches source checkout");
+
+					directoryDelete(checkout, true);
+					directoryDelete(installed, true);
+				});
+
+				it("skips when installedModuleRoot is the checkout's own cli/lucli/", () => {
+					var checkout = makeFakeCheckout("component { }");
+					var selfInstalled = checkout & "/cli/lucli";
+
+					var doctor = new cli.lucli.services.Doctor(
+						projectRoot = checkout,
+						installedModuleRoot = selfInstalled
+					);
+					var results = doctor.runChecks();
+
+					var combined = arrayToList(results.warnings, " ") & " " & arrayToList(results.passed, " ");
+					expect(combined).notToInclude("Installed CLI module");
+
+					directoryDelete(checkout, true);
+				});
+
+				it("passes when installed module is a symlink", () => {
+					var checkout = makeFakeCheckout("component { /* target */ }");
+					var installedParent = getTempDirectory() & "wheels-install-" & createUUID();
+					directoryCreate(installedParent, true);
+					var installed = installedParent & "/wheels";
+
+					var linkCreated = tryCreateSymlink(installed, checkout & "/cli/lucli");
+					if (!linkCreated) {
+						// Symlink unsupported on this FS — skip the assertion
+						directoryDelete(checkout, true);
+						directoryDelete(installedParent, true);
+						return;
+					}
+
+					var doctor = new cli.lucli.services.Doctor(
+						projectRoot = checkout,
+						installedModuleRoot = installed
+					);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).notToInclude("Installed CLI module");
+
+					var passedText = arrayToList(results.passed, " ");
+					expect(passedText).toInclude("symlink");
+
+					// Delete symlink first, then dirs
+					try { fileDelete(installed); } catch (any e) {}
+					directoryDelete(installedParent, true);
+					directoryDelete(checkout, true);
+				});
+
+			});
+
 		});
 
+	}
+
+	// ── Spec helpers ─────────────────────────────────────────
+
+	private string function makeFakeCheckout(required string moduleContent) {
+		var root = getTempDirectory() & "wheels-checkout-" & createUUID();
+		directoryCreate(root & "/cli/lucli", true);
+		directoryCreate(root & "/vendor/wheels", true);
+		fileWrite(root & "/cli/lucli/Module.cfc", arguments.moduleContent);
+		return root;
+	}
+
+	private boolean function tryCreateSymlink(required string link, required string target) {
+		try {
+			var Paths = createObject("java", "java.nio.file.Paths");
+			var Files = createObject("java", "java.nio.file.Files");
+			var linkPath = Paths.get(javacast("string", arguments.link), javacast("string[]", []));
+			var targetPath = Paths.get(javacast("string", arguments.target), javacast("string[]", []));
+			Files.createSymbolicLink(linkPath, targetPath, javacast("java.nio.file.attribute.FileAttribute[]", []));
+			return true;
+		} catch (any e) {
+			return false;
+		}
 	}
 
 }

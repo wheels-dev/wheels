@@ -3877,7 +3877,8 @@ component extends="modules.BaseModule" {
 					break;
 				case "doctor":
 					variables.services.doctor = new services.Doctor(
-						projectRoot = variables.projectRoot
+						projectRoot = variables.projectRoot,
+						installedModuleRoot = variables.moduleRoot
 					);
 					break;
 				case "stats":
