@@ -446,7 +446,13 @@ component extends="modules.BaseModule" {
 		if (!len(appName)) {
 			out("Error: app name is required.", "red");
 			out("Usage: wheels new <appname>");
-			return "";
+			// Args were supplied (the zero-args branch above already returned
+			// usage help) but none parsed as an app name — e.g. `wheels new
+			// --port=3000`. Throw so LuCLI surfaces a non-zero exit (GH #2214).
+			throw(
+				type="Wheels.InvalidArguments",
+				message="wheels new: app name argument is required"
+			);
 		}
 
 		// Default datasource to app name, generate random reload password
@@ -3216,7 +3222,12 @@ component extends="modules.BaseModule" {
 
 		if (directoryExists(targetDir)) {
 			out("Directory already exists: #appName#", "red");
-			return "";
+			// Throw so LuCLI exits non-zero instead of silently succeeding and
+			// fooling automation (GH #2214). Done before any files are written.
+			throw(
+				type="Wheels.TargetDirectoryExists",
+				message="wheels new #appName#: target directory already exists at #targetDir#"
+			);
 		}
 
 		// Merge defaults for any missing options
@@ -3243,7 +3254,13 @@ component extends="modules.BaseModule" {
 		var templateDir = variables.moduleRoot & "templates/app";
 		if (!directoryExists(templateDir)) {
 			out("Project template not found at: #templateDir#", "red");
-			return "";
+			// Indicates a broken install (distribution zip missing templates/app/).
+			// Throw so LuCLI exits non-zero — otherwise the partial scaffold from
+			// an earlier step would look successful to automation (GH #2214).
+			throw(
+				type="Wheels.TemplateNotFound",
+				message="wheels new #appName#: project template directory not found at #templateDir#"
+			);
 		}
 
 		// Template variable context — all config values flow through here
