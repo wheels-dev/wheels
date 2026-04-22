@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Checkout Repository
         id: Checkout-Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -213,7 +213,7 @@ jobs:
           sha512sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512
 
       - name: Upload Wheels Base Template Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-base-template
           path: |
@@ -223,7 +223,7 @@ jobs:
             artifacts/wheels/wheels-base-template-be.zip
 
       - name: Upload Wheels Core Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-core
           path: |
@@ -233,7 +233,7 @@ jobs:
             artifacts/wheels/wheels-core-be.zip
 
       - name: Upload Wheels CLI Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-cli
           path: |
@@ -243,7 +243,7 @@ jobs:
             artifacts/wheels/wheels-cli-be.zip
       
       - name: Upload Wheels Starter App Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-starter-app
           path: |
@@ -253,7 +253,7 @@ jobs:
             artifacts/wheels/wheels-starter-app-be.zip
 
       - name: Upload Wheels Module Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-module
           path: |
@@ -263,7 +263,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.sha512
 
       - name: Upload All Wheels Artifacts (Combined)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-all
           path: |
@@ -271,7 +271,7 @@ jobs:
 
       - name: Upload Workflow Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-release
           path: |
@@ -294,7 +294,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.WHEELS_VERSION }}
           name: Wheels ${{ env.WHEELS_VERSION }}
@@ -327,7 +327,7 @@ jobs:
 
       - name: Create Snapshot Pre-Release
         if: github.ref != 'refs/heads/main'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.WHEELS_VERSION }}
           name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
