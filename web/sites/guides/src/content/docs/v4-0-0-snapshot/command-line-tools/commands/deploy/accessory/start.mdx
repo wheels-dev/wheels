@@ -1,0 +1,30 @@
+---
+title: "wheels deploy accessory start"
+description: docker start the named accessory container.
+type: reference
+sidebar:
+  label: "start"
+  order: 3
+---
+
+`docker start <service>-<name>` on the accessory's pinned host(s). Fails if the container doesn't exist — use [`accessory boot`](/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/boot/) for first-time install.
+
+## Synopsis
+
+```
+wheels deploy accessory start --name=<name|all> [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Example
+
+```bash
+wheels deploy accessory start --name=db
+```

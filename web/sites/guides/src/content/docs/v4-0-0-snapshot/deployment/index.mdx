@@ -1,101 +1,130 @@
 ---
 title: Deployment & Operations
-description: How Wheels apps reach production — the two supported models, what the framework provides, and what you provide.
-type: section
+description: How Wheels apps reach production — the built-in wheels deploy orchestrator, when to use it vs. other paths, and the line between what the framework ships and what you provide.
+type: howto
 sidebar:
   order: 6
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-A Wheels app in production is a Java webapp running on a CFML engine. That one fact determines everything that follows — your deployment target is anything that can host a JVM process and terminate HTTP in front of it. This page is the map for the Deployment & Operations section. It covers the two models Wheels supports today, the line between what the framework gives you and what you own, and where each detail page lives.
+A Wheels app in production is a Java webapp running on a CFML engine. That one fact determines everything that follows — your deployment target is anything that can host a JVM process and terminate HTTP in front of it. What's new in 4.0 is that you don't have to assemble the glue yourself: `wheels deploy` ships a first-party, zero-downtime rolling deploy orchestrator that takes your app from laptop to production Linux hosts in one command.
 
 **You'll learn:**
 
-- The two deployment models Wheels supports today and how to choose between them
+- What `wheels deploy` is, and the lineage it inherits from Basecamp's Kamal
+- When to use `wheels deploy` versus a plain `docker compose` or VM-based path
+- How zero-downtime rollover works through `kamal-proxy`
 - Exactly what the framework ships versus what production infrastructure you provide
-- The current state of the `wheels deploy` CLI and how to deploy without it
 
-## The two models
+## What `wheels deploy` is
 
-Every Wheels deployment the authors have seen in the wild fits one of two shapes. Pick the one that matches your team's operational maturity, not the one that looks modern.
+`wheels deploy` is a port of [Kamal](https://kamal-deploy.org/), Basecamp's container-based deployer, into the Wheels CLI. It orchestrates from your laptop or CI runner over plain SSH — there is no agent on the target hosts. Commands like `wheels deploy`, `wheels deploy rollback`, and `wheels deploy app logs` fan out to your servers, drive `docker` remotely, and stream prefixed output back so you can see what each host is doing.
 
-| | Containerized (Docker) | Traditional (VM / bare metal) |
-|---|---|---|
-| **Artifact** | OCI image containing Lucee + your app | Directory of app code plus an installed engine |
-| **Runtime** | Container runtime (Docker, Podman, Kubernetes) | systemd service running CommandBox or a servlet container |
-| **Updates** | Build image, push to registry, roll out new image | Pull code, restart service |
-| **Dev/prod parity** | High — same image in both environments | Lower — dev and prod diverge on engine version, JVM flags, OS libs |
-| **Ops burden** | Registry, orchestrator or Compose, image hygiene | Config management (Ansible/Puppet/Chef), package pinning |
+The port is byte-compatible with Ruby Kamal on the server side. Container names, labels, Docker network, lock-file paths, and the `.kamal/` directory layout all match exactly — a host managed by Ruby Kamal can be taken over by `wheels deploy` during evaluation, and vice versa. You don't need Ruby, a gem install, or a second CLI. The mirrored Kamal version is 2.4.0; the `kamal-proxy` image is pinned at v0.8.6.
 
-### Pick containerized when
+There is exactly one deliberate schema divergence: `deploy.yml` does not support ERB. Where Ruby Kamal writes `<%= ENV["APP_NAME"] %>`, Wheels writes `{{env.APP_NAME}}`. Everything else is identical. See [Migrating from Kamal](/v4-0-0-snapshot/deployment/migrating-from-kamal/) for the full story.
 
-- Your team already runs containers for other services. The existing registry, orchestration, and observability stack applies unchanged.
-- You want one artifact you can run identically on a laptop, in CI, and in production.
-- You're comfortable operating a registry and either an orchestrator or a Compose-based host.
+## When to reach for `wheels deploy`
 
-### Pick traditional when
+`wheels deploy` targets the common production shape — one to a few dozen Linux servers, one or more Docker images, a handful of sidecar services (a database, a cache), and a requirement for zero-downtime rollover. If that's your target, it is the shortest path.
 
-- You have existing VM or bare-metal infrastructure with mature config management, and adding a container layer adds cost without reducing risk.
-- Compliance, audit, or network topology constraints make containers harder than they're worth.
-- Your team is small and one long-lived host per environment is simpler than an orchestrator.
+Reach for something else when:
 
-Both models are first-class. The detail pages go deep on each.
+- **Your deploy target is Kubernetes.** `wheels deploy` talks to `docker` remotely, not to a Kubernetes API. Use your normal k8s pipeline; the [Docker Deployment](/v4-0-0-snapshot/deployment/docker-deployment/) page covers image hygiene for that world.
+- **You're deploying locally with Docker Compose only.** For single-host, developer-centric Compose setups, [Docker Deployment](/v4-0-0-snapshot/deployment/docker-deployment/) covers the Compose path end-to-end. `wheels deploy` adds value once you have two or more servers to coordinate.
+- **Your target is a VM without containers.** If you run CommandBox or a standalone servlet container under systemd, stay on that path — [VM and Bare-metal Deployment](/v4-0-0-snapshot/deployment/vm-deployment/) covers it. `wheels deploy` is Docker-only on the server side; it does not grow a systemd mode.
+- **Your servers run Windows.** Kamal doesn't support Windows servers and `wheels deploy` inherits that limitation. Windows developer workstations are best-effort.
+
+If none of those apply, start with [Your First Deploy](/v4-0-0-snapshot/deployment/first-deploy/).
+
+## Zero-downtime rollover
+
+Every `wheels deploy` invocation follows the same sequence:
+
+1. Acquire a per-service lock on one host so two operators don't trip over each other.
+2. Build and push the new image to your registry.
+3. Pull the image on every target host in parallel.
+4. Boot `kamal-proxy` if it isn't already running (it's a singleton per host).
+5. For each host in sequence: start the new container, then ask `kamal-proxy` to switch traffic. The proxy drains in-flight requests from the old container and routes fresh ones to the new one. If health checks on the new container fail, the proxy refuses to cut over and the old container stays authoritative.
+6. Release the lock.
+
+The load-bearing hand-off is `kamal-proxy deploy <service> --target <container>:<port>`. That's a Go binary — not a Ruby one — and it runs on your hosts as a long-lived container. `wheels deploy` produces the `docker exec` that invokes it; `kamal-proxy` itself does the actual traffic switch. See [Proxy](/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/) for the operational surface.
+
+<Aside type="note" title="Phase status">
+The 4.0 port is feature-complete for the Kamal 2.4.0 surface — all 25 top-level verbs, the full `app`/`proxy`/`accessory`/`build`/`registry`/`secrets`/`server`/`prune`/`lock` subcommand tree, and 5 secret-store adapters (1Password, Bitwarden, AWS Secrets Manager, LastPass, Doppler). The `app live`/`app maintenance` verbs use a server-side marker-file approach rather than `kamal-proxy`'s native maintenance mode — a follow-up will swap that in.
+</Aside>
 
 ## What Wheels provides vs. what you provide
 
-The framework is deliberately narrow about production. Wheels gives you a CFML app that boots on any supported engine, configures itself from environment variables, and exposes health and observability hooks. Everything outside the JVM process is yours.
+The framework is narrow about production. Wheels gives you a CFML app that boots on any supported engine, configures itself from environment variables, and exposes observability hooks. `wheels deploy` packages, ships, and rolls out that app. Everything else is still yours.
 
 **Wheels provides:**
 
-- A CFML application that runs on Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023/2025, or BoxLang. The 4.0 reference engine for core tests is Lucee 7 on Java 21.
+- A CFML application that runs on Lucee 6/7 or Adobe ColdFusion 2023/2025. The 4.0 reference engine for core tests is Lucee 7 on Java 21.
+- `wheels deploy` — orchestration, dry-run, rollback, accessories, secrets adapters, hooks. See [Your First Deploy](/v4-0-0-snapshot/deployment/first-deploy/).
 - Environment-aware configuration (`config/environment.cfm`, `config/environments/*.cfm`) that selects behavior by `WHEELS_ENV`.
-- Secrets loaded from `.env` (dev) or process environment (prod) via `config/settings.cfm`.
-- A migrator (`wheels dbmigrate`) and seeder (`wheels seed`) that run against your production database on deploy.
+- A migrator (`wheels dbmigrate`) and seeder (`wheels seed`) that run inside the deployed container against your production database.
 - Built-in middleware for request IDs, security headers, CORS, and rate limiting — wired in `config/settings.cfm`.
-- A reload endpoint (`?reload=true&password=...`) and health-check surface your orchestrator or load balancer can poll.
+- A reload endpoint (`?reload=true&password=...`) and a health-check surface `kamal-proxy` polls.
 
 **You provide:**
 
-- The container or VM. Wheels does not ship a canonical base image or bake-a-VM recipe.
-- The CFML engine install and its JVM. A typical production Wheels container runs Lucee 7 on Java 21; a typical VM install uses the same engine under CommandBox or a standalone servlet container.
-- A reverse proxy (nginx, Caddy, Traefik, HAProxy, ALB) to terminate TLS and forward plain HTTP to the engine.
-- TLS certificates and their renewal. Wheels has an `HTTPS detection` helper but does not issue or rotate certificates.
-- Secrets management. The app reads from environment variables; how those variables get populated (1Password Connect, Vault, SSM Parameter Store, Docker secrets, plain `.env` files) is your call.
-- The database, its backups, and its failover story. Migrations run against whatever `WHEELS_DATASOURCE_*` points at — the framework does not provision databases.
-- Logs, metrics, and traces. See [Observability & Logging](/v4-0-0-snapshot/deployment/observability-and-logging/) for the hooks Wheels exposes.
-
-<Aside type="note">
-  This split is deliberate. Wheels runs inside every kind of production environment teams already have — locking the framework to one opinionated stack would exclude most of them. The detail pages show concrete setups for the common cases.
-</Aside>
-
-## The `wheels deploy` CLI
-
-There is no `wheels deploy` command in 4.0 today. Deployment is currently assembled from the pieces your infrastructure gives you — a Dockerfile and a `docker compose` or Kubernetes manifest, or an Ansible playbook and a systemd unit.
-
-A first-party `wheels deploy` is in active development. The design ports the [Kamal](https://kamal-deploy.org/) deploy model — single-binary, zero-downtime rolling deploys from a laptop, with the orchestration state kept on the target hosts — onto the Wheels CLI surface. It targets Docker-based deployments first, and treats the reverse proxy, TLS via Let's Encrypt, and rolling container replacement as built-in rather than user-provided.
-
-{/* TODO(phase-2c): swap this paragraph for a link to the wheels deploy PR/issue once opened */}
-
-Until it ships, everything on the detail pages assumes you are assembling deployment yourself.
+- The Linux hosts. Bare VMs, cloud instances, it doesn't matter — Docker is the only hard requirement. `wheels deploy server bootstrap` installs Docker on a fresh host.
+- The Docker image. Wheels doesn't ship a canonical base image; your `Dockerfile` lives in your app repo.
+- The container registry. Docker Hub, GHCR, ECR, or self-hosted — `wheels deploy` logs in, pushes, and pulls; the registry itself is yours to operate.
+- TLS certificates. `kamal-proxy` will request Let's Encrypt certs automatically when `proxy.ssl: true`, but if you need wildcards, custom CAs, or static certs, you configure the proxy.
+- Secrets storage. `.kamal/secrets` resolves `$(op read ...)`, `$(aws secretsmanager ...)`, and equivalents — the vault itself is yours.
+- The database, its backups, and its failover story. Accessories can host one if you want Wheels to manage it, or you can point at an existing managed database.
+- Logs, metrics, and traces. See [Observability & Logging](/v4-0-0-snapshot/deployment/observability-and-logging/).
 
 ## Where to go next
 
 <CardGrid>
   <LinkCard
+    title="Your First Deploy"
+    href="/v4-0-0-snapshot/deployment/first-deploy/"
+    description="A guided walk from wheels deploy init to running app, assuming no prior Kamal knowledge."
+  />
+  <LinkCard
+    title="deploy.yml Reference"
+    href="/v4-0-0-snapshot/deployment/config-reference/"
+    description="Every top-level key in deploy.yml, what it does, and when to reach for it."
+  />
+  <LinkCard
+    title="Accessories"
+    href="/v4-0-0-snapshot/deployment/accessories/"
+    description="Sidecar containers for databases, caches, and search. Booted once and left alone."
+  />
+  <LinkCard
+    title="Secrets"
+    href="/v4-0-0-snapshot/deployment/secrets/"
+    description="The .kamal/secrets file, $(...) command substitution, and the 5 built-in adapters."
+  />
+  <LinkCard
+    title="Hooks"
+    href="/v4-0-0-snapshot/deployment/hooks/"
+    description="Shell scripts under .kamal/hooks/ that run locally around every deploy."
+  />
+  <LinkCard
+    title="Migrating from Kamal"
+    href="/v4-0-0-snapshot/deployment/migrating-from-kamal/"
+    description="For teams coming from Ruby Kamal — what's compatible, what's not, and the one schema divergence."
+  />
+  <LinkCard
     title="Production Configuration"
     href="/v4-0-0-snapshot/deployment/production-config/"
-    description="Environment files, secrets, reload passwords, and the settings that differ between dev and prod."
+    description="Environment files, secrets, reload passwords, and settings that differ between dev and prod."
   />
   <LinkCard
     title="Docker Deployment"
     href="/v4-0-0-snapshot/deployment/docker-deployment/"
-    description="Dockerfile layout, a working Compose setup, registry workflow, and rolling image updates."
+    description="Dockerfile layout, image hygiene, and the Compose path for smaller setups."
   />
   <LinkCard
-    title="VM Deployment"
+    title="VM & Bare-metal Deployment"
     href="/v4-0-0-snapshot/deployment/vm-deployment/"
-    description="systemd units, Ansible-style provisioning, reverse proxy configuration, and deploy scripts."
+    description="systemd units, reverse proxy configuration, and deploy scripts for non-container setups."
   />
   <LinkCard
     title="Security Hardening"
@@ -106,5 +135,10 @@ Until it ships, everything on the detail pages assumes you are assembling deploy
     title="Observability & Logging"
     href="/v4-0-0-snapshot/deployment/observability-and-logging/"
     description="Request IDs, structured logs, health checks, error tracking, and metrics hooks."
+  />
+  <LinkCard
+    title="CLI Reference"
+    href="/v4-0-0-snapshot/command-line-tools/commands/deploy/"
+    description="Every wheels deploy verb — flags, examples, behavior."
   />
 </CardGrid>

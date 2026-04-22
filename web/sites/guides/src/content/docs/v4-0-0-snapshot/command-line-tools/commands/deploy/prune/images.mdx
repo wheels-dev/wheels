@@ -1,0 +1,33 @@
+---
+title: "wheels deploy prune images"
+description: Prune old images for the service on every host.
+type: reference
+sidebar:
+  label: "images"
+  order: 2
+---
+
+Prune old images of the service on every host. Leaves the current image and anything referenced by a retained container.
+
+## Synopsis
+
+```
+wheels deploy prune images [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Per host, emits a `docker image prune --filter` scoped to the service's image name. Images referenced by retained containers are safe.
+
+## Example
+
+```bash
+wheels deploy prune images
+```

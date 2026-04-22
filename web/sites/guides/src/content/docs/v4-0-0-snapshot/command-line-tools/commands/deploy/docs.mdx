@@ -1,0 +1,41 @@
+---
+title: "wheels deploy docs"
+description: Print embedded per-topic Markdown help shipped with the CLI binary.
+type: reference
+sidebar:
+  label: "docs"
+  order: 10
+---
+
+Print embedded per-topic help. `wheels deploy docs` lists the available sections; `wheels deploy docs <section>` prints that section's Markdown.
+
+## Synopsis
+
+```
+wheels deploy docs [<section>]
+```
+
+## Sections
+
+- `accessories` — sidecar containers
+- `builder` — Docker image build config
+- `env` — environment variable handling
+- `hooks` — `.kamal/hooks/` scripts
+- `proxy` — `kamal-proxy` configuration
+- `registry` — image registry setup
+- `servers` — the `servers:` block shapes
+- `ssh` — SSH connection config
+
+## Behavior
+
+Output is plain Markdown straight from the binary's bundled docs. Unknown section names throw `DeployMainCli.UnknownDocsSection`.
+
+These embedded docs are a terser, hands-on companion to the web guides. For the full treatment, see [Deployment & Operations](/v4-0-0-snapshot/deployment/).
+
+## Examples
+
+```bash
+wheels deploy docs
+wheels deploy docs proxy
+wheels deploy docs ssh
+```

@@ -1,0 +1,47 @@
+---
+title: "wheels deploy app boot"
+description: Run new app containers for the given version on every host in every role.
+type: reference
+sidebar:
+  label: "boot"
+  order: 1
+---
+
+`docker run` new containers for the given version, on every host in every role.
+
+## Synopsis
+
+```
+wheels deploy app boot --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | **Required.** Version to boot. Throws `DeployAppCli.MissingVersion` if absent. |
+| `--role=<name>` | Limit to one role. Default: every role. |
+| `--destination=<name>` | Overlay `deploy.<name>.yml`. |
+| `--dry-run` | Print the `docker run` commands without executing. |
+
+## Behavior
+
+For each host in each role, emits:
+
+```
+docker run --detach --restart unless-stopped \
+  --name <service>-<role>-<version> \
+  --network kamal \
+  --label service=<service> --label role=<role> --label destination=<dest> --label version=<v> \
+  -e KEY=VALUE ... \
+  <image>:<version>
+```
+
+`boot` does **not** ask the proxy to cut traffic — that's what `wheels deploy` does. Use `boot` for a stand-alone container bring-up; use `wheels deploy` for a full zero-downtime rollout.
+
+## Example
+
+```bash
+wheels deploy app boot --version=abc1234
+wheels deploy app boot --version=abc1234 --role=job
+```

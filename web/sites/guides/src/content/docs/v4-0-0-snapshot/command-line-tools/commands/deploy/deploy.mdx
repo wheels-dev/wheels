@@ -1,0 +1,43 @@
+---
+title: "wheels deploy deploy"
+description: Rolling zero-downtime deploy. The everyday verb — builds, pushes, pulls, boots new containers, and asks kamal-proxy to cut traffic over.
+type: reference
+sidebar:
+  label: "deploy"
+  order: 1
+---
+
+The everyday deploy verb. Runs the full rolling flow: lock, build, push, pull, boot new containers, cut traffic, release lock.
+
+## Synopsis
+
+```
+wheels deploy [--version=<v>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | Version label for the new containers. Defaults to `git rev-parse --short HEAD`. |
+| `--destination=<name>` | Overlay `deploy.<name>.yml` and `.kamal/secrets.<name>`. |
+| `--dry-run` | Print the commands that would run, prefixed by host. No network. |
+| `--config=<path>` | Override `config/deploy.yml`. |
+
+## Behavior
+
+1. Fires `pre-deploy` hook on the control machine.
+2. Acquires a per-service lock on one host.
+3. Pulls the image on every host in parallel.
+4. Boots `kamal-proxy` if it isn't running.
+5. For each host sequentially: `docker run` new container, then `kamal-proxy deploy` to cut traffic.
+6. Releases the lock.
+7. Fires `post-deploy` hook (or `post-deploy-failure` if anything threw).
+
+## Examples
+
+```bash
+wheels deploy
+wheels deploy --version=v1.2.3
+wheels deploy --destination=staging --dry-run
+```
