@@ -41,6 +41,7 @@ tests/_output/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 .claude/launch.json
+CLAUDE.local.md
 .DS_Store
 .superpowers/
 
