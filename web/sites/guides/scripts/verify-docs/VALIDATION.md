@@ -110,3 +110,21 @@ Blocks that cannot or should not compile:
 ```cfm title="illustrative — do not type"
 someAPI.callThat.doesntExistYet();
 ```
+
+## Running the harness locally
+
+The drivers spawn `wheels new` into a temp directory per test. `wheels new`
+needs a `vendor/wheels/` source tree, and a temp directory has none in its
+ancestry. Point the CLI at this repo's checkout before running either the
+harness unit tests or the full content gate:
+
+```sh
+export WHEELS_FRAMEWORK_PATH="$(git rev-parse --show-toplevel)/vendor/wheels"
+pnpm --filter @wheels/guides test:docs-harness   # harness unit tests
+pnpm --filter @wheels/guides verify:docs         # full content gate
+```
+
+Without `WHEELS_FRAMEWORK_PATH`, `wheels new` prints a framework-not-found
+error and exits 0 anyway; the harness detects the missing fixture directory
+and throws with a pointer back to this doc rather than surfacing a
+misleading `spawn … ENOENT` on the next child process.

@@ -48,12 +48,13 @@ export function runExec(program, args = [], opts = {}) {
   if (timeout !== undefined) spawnOpts.timeout = timeout;
 
   // Substitute the absolute `wheels` path resolved at module load.
-  // Workers inherit default env from the parent; the resolved path
-  // sidesteps PATH lookup fragility inside test-runner workers. On
-  // Linuxbrew + node --test workers, spawn ALSO ENOENTs on absolute
-  // paths including /bin/bash (Node 22 test-runner posix_spawn quirk
-  // we couldn't pin down). The main verify-docs run works — only the
-  // harness unit tests hit this; those are soft-failed in CI.
+  // Belt-and-braces: also protects against shells where PATH doesn't
+  // include the homebrew bin dir (e.g., a test runner spawned from a
+  // stripped env). The separate "spawn PROGRAM ENOENT" failures we
+  // used to see under node --test were not a Node bug — they came
+  // from spawning with a cwd that no longer existed because
+  // `wheels new` exited 0 despite a framework-not-found error. See
+  // fixtures.mjs `createFixture` for the guard.
   const resolvedProgram = program === 'wheels' ? RESOLVED_WHEELS : program;
 
   return new Promise((resolve) => {

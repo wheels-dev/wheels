@@ -70,42 +70,26 @@ jobs:
         # the harness spawns `wheels`.
         run: wheels --version >/dev/null
 
-      - name: Set up Node.js (harness tests)
-        # Pin Node 20 for the harness unit tests only. Node 22's test-runner
-        # workers on Linuxbrew return spawn ENOENT on EVERY absolute path —
-        # including /bin/bash itself — even when statSync/accessSync confirm
-        # the file is executable and spawnable from the main process. Node 20
-        # is unaffected. Tracked as issue #2178 (workaround pending upstream
-        # Node fix). The main content gate (Verify v4 docs) continues on
-        # Node 22 below.
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
-
       - name: Run harness unit tests
         working-directory: web/sites/guides
-        # Runs on Node 20 to avoid the Node 22 spawn ENOENT bug (see the
-        # "Set up Node.js (harness tests)" step above). Ref #2178.
+        # Runs on Node 22 (no longer pinned to Node 20). The "spawn ENOENT"
+        # that looked like a Node 22 posix_spawn regression was actually
+        # caused by `wheels new` exiting 0 after a framework-not-found
+        # error, leaving the fixture cwd missing; Node's spawn then reports
+        # ENOENT against the program instead of the cwd. Setting
+        # WHEELS_FRAMEWORK_PATH at the checked-out repo's vendor/wheels
+        # lets `wheels new` succeed, which makes fixture cwds real. See
+        # #2178 for the full root-cause write-up.
         #
-        # Still soft-fail for now: with Node 20 the spawns work, which
-        # surfaces 7 pre-existing tutorial-driver failures (blog-tutorial
-        # fixture's lucee.json is no longer emitted by `wheels new`).
-        # Tracked separately — once fixtures are fixed, drop
-        # continue-on-error so regressions fail CI as originally intended.
+        # Still soft-fail: surfaces the remaining tutorial-driver fixture
+        # issues (e.g., blog-tutorial's lucee.json emission). Drop
+        # continue-on-error once those are fixed.
         continue-on-error: true
+        env:
+          WHEELS_FRAMEWORK_PATH: ${{ github.workspace }}/vendor/wheels
         run: |
           export LUCLI_HOME="$HOME/.wheels"
           pnpm test:docs-harness
-
-      - name: Set up Node.js (main)
-        # Restore Node 22 for the content gate and the guides build below.
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Verify v4 docs
         working-directory: web/sites/guides
