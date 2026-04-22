@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      LUCLI_VERSION: "0.3.3"
+      LUCLI_VERSION: "0.3.7"
       WHEELS_CI: "true"
       PORT: "8080"
     steps:

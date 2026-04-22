@@ -31,7 +31,7 @@ jobs:
     name: "Lucee 7 + SQLite (LuCLI)"
     runs-on: ubuntu-latest
     env:
-      LUCLI_VERSION: "0.3.3"
+      LUCLI_VERSION: "0.3.7"
       WHEELS_CI: "true"
       WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
     steps:
