@@ -109,7 +109,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - **Breaking:** CSRF cookie now sets `SameSite` attribute (#2035)
 - **Breaking:** RateLimiter `trustProxy` default changed from `true` to `false` (#2024)
 - **Breaking:** RateLimiter proxy strategy default changed to `last` (#2088)
-- **Breaking:** `wheels snippets` CLI command renamed to `wheels code` (#1852)
+- **Breaking:** `wheels snippets` CLI command renamed to `wheels generate snippets` (#1852)
 - **Breaking:** Test base class namespace renamed: new tests extend `wheels.WheelsTest` (old `wheels.Test` preserved during 4.0 as a deprecation path) (#1889)
 - **Breaking:** Tests directory `tests/specs/functions/` renamed to `tests/specs/functional/` (#1872)
 - **Breaking:** `application.wirebox` renamed to `application.wheelsdi` (#1888)

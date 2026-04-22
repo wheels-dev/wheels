@@ -110,9 +110,9 @@ Rate limiter also now fails closed on lock timeout (#2069) rather than fail-open
 
 Cross-site `POST`s from third-party frames that relied on the missing attribute will break. Same-site app flows are unaffected.
 
-### 7. `wheels snippets` renamed to `wheels code`
+### 7. `wheels snippets` renamed to `wheels generate snippets`
 
-**CHANGELOG:** `Breaking: wheels snippets CLI command renamed to wheels code` (#1852).
+**CHANGELOG:** `Breaking: wheels snippets CLI command renamed to wheels generate snippets` (#1852).
 
 Update any scripts, CI jobs, or IDE integrations that shell out to `wheels snippets`. The flag surface is otherwise unchanged.
 

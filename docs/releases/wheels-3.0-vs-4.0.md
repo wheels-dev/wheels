@@ -133,7 +133,7 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | Dev inner-loop | Docker-required for tests | Zero-Docker LuCLI + SQLite (`tools/test-local.sh`) | **New** ([#2063](https://github.com/wheels-dev/wheels/pull/2063)) |
 | CI engine matrix | 42 jobs across engines × DBs | 8 jobs via engine-grouped testing | **Streamlined** ([#1939](https://github.com/wheels-dev/wheels/pull/1939)) |
 | CI pipeline | Docker-based | LuCLI-native Lucee 7 + SQLite | **Changed** ([#2032](https://github.com/wheels-dev/wheels/pull/2032)) |
-| `wheels snippets` command | Existed | Renamed to `wheels code` | **Breaking** ([#1852](https://github.com/wheels-dev/wheels/pull/1852)) |
+| `wheels snippets` command | Existed | Renamed to `wheels generate snippets` | **Breaking** ([#1852](https://github.com/wheels-dev/wheels/pull/1852)) |
 | LuCLI tier-1 commands | ~~absent~~ | Ported as a LuCLI module; WheelsTest suite | **New** ([#2092](https://github.com/wheels-dev/wheels/pull/2092), [#2093](https://github.com/wheels-dev/wheels/pull/2093)) |
 | LuCLI phase 3-4 | ~~absent~~ | Scaffold, seed, in-process services | **New** ([#2065](https://github.com/wheels-dev/wheels/pull/2065)) |
 | Scaffolded-app boot | ~~broken post-flatten~~ | Fixed | **Fixed** ([#2096](https://github.com/wheels-dev/wheels/pull/2096)) |
