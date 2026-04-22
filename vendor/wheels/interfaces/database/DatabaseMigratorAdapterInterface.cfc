@@ -121,11 +121,16 @@ interface {
 	/**
 	 * Generate an ALTER TABLE ... ALTER COLUMN statement.
 	 *
+	 * Most adapters return a single SQL string. SQLite returns an array of
+	 * statements because its ALTER TABLE does not support column type/constraint
+	 * changes — the recreate-table pattern requires multiple steps. The migrator's
+	 * `$execute` accepts either form.
+	 *
 	 * @name Table name.
 	 * @column Column definition struct with new settings.
-	 * @return The ALTER COLUMN SQL statement.
+	 * @return The ALTER COLUMN SQL statement, or an array of statements.
 	 */
-	public string function changeColumnInTable(required string name, required any column);
+	public any function changeColumnInTable(required string name, required any column);
 
 	/**
 	 * Generate an ALTER TABLE ... RENAME COLUMN statement.

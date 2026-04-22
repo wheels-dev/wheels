@@ -803,10 +803,49 @@ component extends="wheels.WheelsTest" {
 
 		describe("Tests changeColumn", () => {
 
+			it("changes a column on SQLite via recreate-table pattern", () => {
+				if (get("adapterName") neq 'SQLiteModel') return;
+				tableName = "dbm_sqlite_changecolumn"
+				columnName = "stringcolumn"
+
+				t = migration.createTable(name = tableName, force = true)
+				t.string(columnNames = columnName, limit = 10, allowNull = true)
+				t.integer(columnNames = "othercolumn", default = 0)
+				t.create()
+
+				// Insert data to confirm preservation across recreate.
+				g.$query(datasource = application.wheels.dataSourceName, sql = "INSERT INTO #tableName# (stringcolumn, othercolumn) VALUES ('keep', 42)")
+
+				migration.changeColumn(
+					table = tableName,
+					columnName = columnName,
+					columnType = 'string',
+					limit = 50,
+					allowNull = false,
+					default = "foo"
+				)
+
+				pragma = g.$query(datasource = application.wheels.dataSourceName, sql = "PRAGMA table_info(#tableName#)")
+				changedRow = 0
+				for (i = 1; i <= pragma.recordCount; i++) {
+					if (pragma.name[i] == columnName) { changedRow = i; break; }
+				}
+
+				// Preserved row survives the recreate.
+				rowCheck = g.$query(datasource = application.wheels.dataSourceName, sql = "SELECT stringcolumn, othercolumn FROM #tableName# WHERE stringcolumn = 'keep'")
+				migration.dropTable(tableName)
+
+				expect(changedRow).toBeGT(0)
+				expect(pragma.notnull[changedRow]).toBe(1)
+				expect(pragma.dflt_value[changedRow]).toInclude("foo")
+				expect(rowCheck.recordCount).toBe(1)
+				expect(rowCheck.othercolumn[1]).toBe(42)
+			})
+
 			it("is changing column", () => {
 				if (_isCockroachDB) return;
 				if(get("adapterName") eq 'SQLiteModel') {
-					skip("SQLite does not allow altering Columns.")
+					skip("SQLite changeColumn is covered by the SQLite-specific spec above.")
 				}
 				tableName = "dbm_changecolumn_tests"
 				columnName = "stringcolumn"
