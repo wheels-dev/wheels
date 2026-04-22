@@ -31,7 +31,6 @@ jobs:
     name: "Lucee 7 + SQLite (LuCLI)"
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       LUCLI_VERSION: "0.3.3"
       WHEELS_CI: "true"
       WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
