@@ -177,6 +177,7 @@ This release includes 40+ security-hardening PRs. Key themes:
 - **XSS (pagination)** — HTML entity encoding bypass (#2057); `prependToPage` / `anchorDivider` / `appendToPage` sanitization (#2042, #2060).
 - **JWT** — algorithm claim validation to prevent algorithm confusion (#2079); constant-time signature verification (#2086).
 - **CLI shell argument validation** — deploy command sanitization (#2068, #2073); quote blocking and box fallback fix (#2073); command injection in `db shell` (#2040).
+- **Public GUI production gate** — `/wheels/*` routes (`info`, `routes`, `testbox`, `runner`, `consoleeval`, `migrator`, `build`, etc.) now hard-abort with HTTP 404 in `production` even when a developer has explicitly set `enablePublicComponent=true`. The dispatch-layer gate also returns 404 with a `Not Found` body instead of a silent blank HTTP 200, so the surface can no longer be fingerprinted. Only `index()` (the congratulations page) remains respect-the-toggle, so dev/testing ergonomics are unchanged. (#2233)
 - **Known security limitations** documented for operators (#2078).
 
 ----

@@ -8,6 +8,34 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return this;
 	}
 
+	/**
+	 * Returns true when the current application environment is `production`.
+	 *
+	 * The public GUI exposes routes, env info, a CFML REPL, test runners, and
+	 * a migration UI. Even if a developer overrides `enablePublicComponent` to
+	 * true in production (documented historical behavior for ad-hoc
+	 * debugging), these surfaces must stay gated. See issue #2233.
+	 */
+	public boolean function $shouldBlockInProduction() {
+		return structKeyExists(application, "wheels")
+			&& structKeyExists(application.wheels, "environment")
+			&& application.wheels.environment == "production";
+	}
+
+	/**
+	 * Defense-in-depth: if the current environment is production, short-circuit
+	 * the handler with a 404 response before any view is included. Called as
+	 * the first statement of every non-`index` handler in this component.
+	 */
+	public void function $blockInProduction() {
+		if ($shouldBlockInProduction()) {
+			cfheader(statuscode=404);
+			cfcontent(type="text/plain");
+			writeOutput("Not Found");
+			abort;
+		}
+	}
+
 	/*
 	This is just a proof of concept
 	*/
@@ -16,35 +44,43 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 	function info() {
+		$blockInProduction();
 		include "/wheels/public/views/info.cfm";
 		return "";
 	}
 	function routes() {
+		$blockInProduction();
 		include "/wheels/public/views/routes.cfm";
 		return "";
 	}
 	function routetester(verb, path) {
+		$blockInProduction();
 		include "/wheels/public/views/routetester.cfm";
 		return "";
 	}
 	function routetesterprocess(verb, path) {
+		$blockInProduction();
 		include "views/routetesterprocess.cfm";
 		return "";
 	}
 	function api() {
+		$blockInProduction();
 		include "/wheels/public/views/api.cfm";
 		return "";
 	}
 	function runner(){
+		$blockInProduction();
 		include "/wheels/public/views/runner.cfm";
 		return "";
 	}
 
 	function testbox(){
+		$blockInProduction();
 		include "/tests/runner.cfm";
 	}
-	
+
 	public function tests_testbox(){
+		$blockInProduction();
 		// Delegate to RocketUnit if testFramework setting says so
 		if (
 			structKeyExists(application, "wheels")
@@ -79,63 +115,78 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		abort;
 	}
 	public function clitests() {
+		$blockInProduction();
 		include "/wheels/public/views/clitests.cfm";
 		abort;
 	}
 
 	function packages() {
+		$blockInProduction();
 		include "/wheels/public/views/packages.cfm";
 		return "";
 	}
 	function tests() {
+		$blockInProduction();
 		include "/wheels/public/views/tests.cfm";
 		return "";
 	}
 	function migrator() {
+		$blockInProduction();
 		include "/wheels/public/views/migrator.cfm";
 		return "";
 	}
 	function migratortemplates() {
+		$blockInProduction();
 		include "/wheels/public/views/templating.cfm";
 		return "";
 	}
 	function migratortemplatescreate() {
+		$blockInProduction();
 		include "/wheels/public/migrator/templating.cfm";
 		return "";
 	}
 	function migratorcommand() {
+		$blockInProduction();
 		include "/wheels/public/migrator/command.cfm";
 		return "";
 	}
 	function migratorsql() {
+		$blockInProduction();
 		include "/wheels/public/migrator/sql.cfm";
 		return "";
 	}
 	function consoleeval() {
+		$blockInProduction();
 		include "/wheels/public/views/consoleeval.cfm";
 		return "";
 	}
 	function cli() {
+		$blockInProduction();
 		include "/wheels/public/views/cli.cfm";
 		return "";
 	}
 	function packagelist() {
+		$blockInProduction();
 		include "/wheels/public/views/packagelist.cfm";
 		return "";
 	}
 	function packageentry() {
+		$blockInProduction();
 		include "/wheels/public/views/packageentry.cfm";
 		return "";
 	}
 	function plugins() {
+		$blockInProduction();
 		include "/wheels/public/views/plugins.cfm";
 		return "";
 	}
 	function pluginentry() {
+		$blockInProduction();
 		include "/wheels/public/views/pluginentry.cfm";
 		return "";
 	}
 	function build() {
+		$blockInProduction();
 		setting requestTimeout=10000 showDebugOutput=false;
 		zipPath = $buildReleaseZip();
 		$header(name = "Content-disposition", value = "inline; filename=#GetFileFromPath(zipPath)#");
@@ -164,6 +215,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			view=tests&type=[PLUGIN]
 		*/
 	function wheels() {
+		$blockInProduction();
 		local.action = StructKeyExists(request.wheels.params, "action") ? request.wheels.params.action : "";
 		local.view = StructKeyExists(request.wheels.params, "view") ? request.wheels.params.view : "";
 		local.type = StructKeyExists(request.wheels.params, "type") ? request.wheels.params.type : "";
@@ -193,21 +245,25 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 	
 	function legacy() {
+		$blockInProduction();
 		// Handle legacy ?controller=wheels&action=wheels&view=xxx URLs
 		return wheels();
 	}
 
 	function guides() {
+		$blockInProduction();
 		include "/wheels/public/views/guides.cfm";
 		return "";
 	}
 
 	function ai() {
+		$blockInProduction();
 		include "/wheels/public/views/ai.cfm";
 		return "";
 	}
 
 	function guideImage() {
+		$blockInProduction();
 		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
 
 		file = getFileFromPath(file);
@@ -250,6 +306,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	function mcp() {
+		$blockInProduction();
 		include "/wheels/public/views/mcp.cfm";
 		return "";
 	}
