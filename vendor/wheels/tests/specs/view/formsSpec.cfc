@@ -865,6 +865,7 @@ component extends="wheels.WheelsTest" {
 				request.$wheelsProtectedFromForgery = true
 				// Save and configure routes so "root" route is available
 				_savedRoutes = Duplicate(application.wheels.routes)
+				_savedNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
 				_savedRewrite = application.wheels.URLRewriting
 				application.wheels.URLRewriting = "On"
 				$clearRoutes()
@@ -880,6 +881,7 @@ component extends="wheels.WheelsTest" {
 				g.set(functionName = "startFormTag", encode = true)
 				request.$wheelsProtectedFromForgery = false
 				application.wheels.routes = _savedRoutes
+				application.wheels.namedRoutePositions = _savedNamedRoutePositions
 				application.wheels.URLRewriting = _savedRewrite
 			})
 

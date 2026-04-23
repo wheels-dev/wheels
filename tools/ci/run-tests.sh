@@ -37,7 +37,7 @@ fi
 
 # --- Warm up Wheels application ---
 echo "Warming up Wheels application..."
-curl -s -o /dev/null --max-time 120 "${BASE_URL}/?reload=true&password=wheels_test_password" || true
+curl -s -o /dev/null --max-time 120 "${BASE_URL}/?reload=true&password=wheels-dev" || true
 sleep 2
 
 # --- Run tests ---

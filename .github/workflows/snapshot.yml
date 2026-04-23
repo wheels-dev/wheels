@@ -25,6 +25,7 @@ jobs:
     env:
       WHEELS_CI: "true"
       WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
+      WHEELS_BROWSER_CI_ENABLE: "true"
     steps:
       - uses: actions/checkout@v5
 

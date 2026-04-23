@@ -11,6 +11,7 @@ component extends="wheels.WheelsTest" {
 				_params = {controller = "test", action = "index"}
 				_originalRoutes = Duplicate(application.wheels.routes)
 				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+				_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
 				_originalUrlRewriting = application.wheels.URLRewriting
 				_originalObfuscateUrls = application.wheels.obfuscateUrls
 			})
@@ -18,6 +19,7 @@ component extends="wheels.WheelsTest" {
 			afterEach(() => {
 				application.wheels.routes = _originalRoutes
 				application.wheels.staticRoutes = _originalStaticRoutes
+				application.wheels.namedRoutePositions = _originalNamedRoutePositions
 				application.wheels.URLRewriting = _originalUrlRewriting
 				application.wheels.obfuscateUrls = _originalObfuscateUrls
 			})

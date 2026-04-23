@@ -5,11 +5,13 @@ component extends="wheels.Testbox" {
 		_params = {controller = "test", action = "index"}
 		_originalRoutes = Duplicate(application.wheels.routes)
 		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+		_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
 	}
 
 	function afterAll() {
 		application.wheels.routes = _originalRoutes
 		application.wheels.staticRoutes = _originalStaticRoutes
+		application.wheels.namedRoutePositions = _originalNamedRoutePositions
 	}
 
 	function run() {
