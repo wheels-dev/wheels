@@ -131,6 +131,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - RocketUnit test style for new tests — BDD syntax (via WheelsTest) is required going forward. Existing RocketUnit specs continue to run. (#1925)
 - `wheels.Test` test base class — extend `wheels.WheelsTest` instead (#1889)
 - In-dev-server HTTP MCP endpoint at `/wheels/mcp` — superseded by the LuCLI stdio MCP server (`wheels mcp wheels`). Emits a deprecation warning to the `wheels_mcp` log on first request and advertises `deprecated: true` in the `serverInfo` handshake. Scheduled for removal in a future release. Migrate existing projects with `wheels mcp setup --force`.
+- Legacy CommandBox `wheels-cli` module (`wheels g app`, `wheels new` via the CommandBox wizard) — superseded by LuCLI's canonical `wheels new`. Emits a deprecation banner on every invocation. Scheduled for removal in v5.0. (#2227)
 
 ### Removed
 
@@ -142,6 +143,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Fixed
 
+- Legacy CommandBox `wheels g app` now scaffolds a 4.0 app by default — the `wheels-base-template` default was pinned at `@^3.1.0`, so `box install wheels-cli && wheels g app myapp` produced a 3.x scaffold at 4.0 GA. Updated default (and the `WheelsBaseTemplate` shortcut + wizard default selection) to `@^4.0.0`, fixed the stale "Default is Bleeding Edge" docstring, and added a deprecation banner pointing users at LuCLI's `wheels new`. (#2227)
 - `changeColumn` on SQLite now works by implementing the SQLite-standard recreate-table pattern in `SQLiteMigrator`. Previously, SQLite migrations inherited MySQL's `ALTER TABLE ... CHANGE` syntax from `Abstract.cfc` and failed with `near "CHANGE": syntax error`. The migrator's `$execute` now accepts an array of statements so adapters can return multi-step DDL. v1 limitations: foreign-key constraints declared inline on `CREATE TABLE` and triggers are not preserved across the recreate. (#2207)
 - Framework-internal browser-test fixture controllers, views, and the `/_browser/*` routes no longer leak into application-level files. Moved from `app/controllers/BrowserTest*.cfc`, `app/views/browsertest*/`, and `config/routes.cfm` into `vendor/wheels/public/browser-fixtures/`, auto-mounted by `$lockedLoadRoutes` when environment is `testing` or `development` and the new opt-in setting `loadBrowserTestFixtures=true` is set. Apps upgrading from a 4.0 snapshot that had custom `/_browser/*` routes must opt in explicitly or re-declare them in `config/routes.cfm`. (#2135, #2138)
 - Stray `app/mailers/UserNotificationsMailer.cfc` demo removed from the framework repo root (byte-identical copies remain in the example apps under `examples/tweet/` and `examples/starter-app/`). (#2138)

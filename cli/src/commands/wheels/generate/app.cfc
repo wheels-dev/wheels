@@ -14,7 +14,7 @@
  *  {code}
  *
  *  Here are the basic templates that are available for you that come from ForgeBox
- *  - Wheels Base Template - 3.0 Stable (default)
+ *  - Wheels Base Template - 4.0 Stable (default)
  *  - Wheels Base Template - Bleeding Edge
  *  - Wheels Template - HelloWorld
  *  - Wheels Template - HelloDynamic
@@ -43,7 +43,7 @@ component aliases="wheels g app" extends="../base" {
 
     // Map these shortcut names to the actual ForgeBox slugs
     variables.templateMap = {
-      'WheelsBaseTemplate'        : 'wheels-base-template@^3.1.0',
+      'WheelsBaseTemplate'        : 'wheels-base-template@^4.0.0',
       'BleedingEdge'              : 'wheels-base-template@BE',
       'WheelsTemplateHTMX'        : 'wheels-template-htmx-alpine-simple',
       'WheelsStarterApp'          : 'wheels-starter-app',
@@ -55,7 +55,7 @@ component aliases="wheels g app" extends="../base" {
 
   /**
    * @name           The name of the app you want to create
-   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug). Default is Bleeding Edge
+   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug). Default is the stable Wheels Base Template (4.0).
    * @directory      The directory to create the app in
    * @reloadPassword The reload passwrod to set for the app
    * @datasourceName The datasource name to set for the app
@@ -68,7 +68,7 @@ component aliases="wheels g app" extends="../base" {
    **/
   function run(
     name     = 'MyApp',
-    template = 'wheels-base-template@^3.1.0',
+    template = 'wheels-base-template@^4.0.0',
     directory,
     reloadPassword = '',
     datasourceName,
@@ -85,6 +85,14 @@ component aliases="wheels g app" extends="../base" {
 
     // Initialize detail service
     var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
+
+    // Deprecation notice — legacy CommandBox surface is scheduled for removal in Wheels v5.0.
+    // Canonical 4.0+ CLI is LuCLI's `wheels new` (https://github.com/bpamiri/LuCLI).
+    details.getPrint().yellowBoldLine( "[DEPRECATED] 'wheels g app' (CommandBox wheels-cli) is deprecated." );
+    details.getPrint().yellowLine( "             Use LuCLI 'wheels new' instead — the canonical Wheels 4.0+ CLI." );
+    details.getPrint().yellowLine( "             Install: brew install lucli  (or see https://github.com/bpamiri/LuCLI)" );
+    details.getPrint().yellowLine( "             This command will be removed in Wheels v5.0." );
+    details.line();
 
     // set defaults based on app name
     if ( !len( arguments.directory ) ) {
