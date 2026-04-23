@@ -35,6 +35,56 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("$readFrameworkVersion synthesizes <rootversion>-dev when placeholder is detected inside the wheels monorepo", () => {
+				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
+				var rootTmp = getTempDirectory() & "wheels-version-root-#CreateUUID()#.json";
+				fileWrite(fwTmp, '{"version":"@build.version@"}');
+				fileWrite(rootTmp, '{"name":"Wheels.fw","slug":"wheels","version":"4.0.0"}');
+				try {
+					expect(g.$readFrameworkVersion(fwTmp, rootTmp)).toBe("4.0.0-dev");
+				} finally {
+					fileDelete(fwTmp);
+					fileDelete(rootTmp);
+				}
+			});
+
+			it("$readFrameworkVersion falls back to 0.0.0-dev when the enclosing box.json is not the wheels monorepo (vendored install)", () => {
+				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
+				var rootTmp = getTempDirectory() & "wheels-version-root-#CreateUUID()#.json";
+				fileWrite(fwTmp, '{"version":"@build.version@"}');
+				fileWrite(rootTmp, '{"name":"SomeUserApp","slug":"user-app","version":"2.1.0"}');
+				try {
+					expect(g.$readFrameworkVersion(fwTmp, rootTmp)).toBe("0.0.0-dev");
+				} finally {
+					fileDelete(fwTmp);
+					fileDelete(rootTmp);
+				}
+			});
+
+			it("$readFrameworkVersion falls back to 0.0.0-dev when the enclosing box.json is also unreplaced", () => {
+				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
+				var rootTmp = getTempDirectory() & "wheels-version-root-#CreateUUID()#.json";
+				fileWrite(fwTmp, '{"version":"@build.version@"}');
+				fileWrite(rootTmp, '{"name":"Wheels.fw","slug":"wheels","version":"@build.version@"}');
+				try {
+					expect(g.$readFrameworkVersion(fwTmp, rootTmp)).toBe("0.0.0-dev");
+				} finally {
+					fileDelete(fwTmp);
+					fileDelete(rootTmp);
+				}
+			});
+
+			it("$readFrameworkVersion falls back to 0.0.0-dev when the enclosing box.json is missing", () => {
+				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
+				var missingRoot = getTempDirectory() & "wheels-version-missing-#CreateUUID()#.json";
+				fileWrite(fwTmp, '{"version":"@build.version@"}');
+				try {
+					expect(g.$readFrameworkVersion(fwTmp, missingRoot)).toBe("0.0.0-dev");
+				} finally {
+					fileDelete(fwTmp);
+				}
+			});
+
 			it("$readFrameworkVersion throws Wheels.VersionReadFailed when the file is missing", () => {
 				var missing = getTempDirectory() & "wheels-version-missing-#CreateUUID()#.json";
 				var threw = false;

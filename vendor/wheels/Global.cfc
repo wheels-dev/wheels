@@ -2753,7 +2753,7 @@ return local.$wheels;
 		return local.rv;
 	}
 
-	public string function $readFrameworkVersion(string boxJsonPath = "") {
+	public string function $readFrameworkVersion(string boxJsonPath = "", string rootBoxJsonPath = "") {
 		local.path = Len(arguments.boxJsonPath)
 			? arguments.boxJsonPath
 			: GetDirectoryFromPath(GetCurrentTemplatePath()) & "box.json";
@@ -2782,6 +2782,33 @@ return local.$wheels;
 			);
 		}
 		if (local.box.version == "@build.version@") {
+			// Dev checkout. Try to synthesize a more useful version by reading the
+			// enclosing repo's root box.json — when that box.json identifies itself as
+			// the wheels-dev/wheels monorepo, report "<rootversion>-dev" so the
+			// homepage shows the upcoming version rather than a blank placeholder.
+			local.rootPath = Len(arguments.rootBoxJsonPath)
+				? arguments.rootBoxJsonPath
+				: GetDirectoryFromPath(GetCurrentTemplatePath()) & "../box.json";
+			try {
+				if (FileExists(local.rootPath)) {
+					local.rootBox = DeserializeJSON(FileRead(local.rootPath));
+					local.isWheelsRepo = IsStruct(local.rootBox)
+						&& (
+							(StructKeyExists(local.rootBox, "slug") && local.rootBox.slug == "wheels")
+							|| (StructKeyExists(local.rootBox, "name") && local.rootBox.name == "Wheels.fw")
+						);
+					if (
+						local.isWheelsRepo
+						&& StructKeyExists(local.rootBox, "version")
+						&& Len(local.rootBox.version)
+						&& local.rootBox.version != "@build.version@"
+					) {
+						return local.rootBox.version & "-dev";
+					}
+				}
+			} catch (any e) {
+				// fall through to the plain dev sentinel
+			}
 			return "0.0.0-dev";
 		}
 		return local.box.version;
