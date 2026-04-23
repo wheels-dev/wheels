@@ -3,8 +3,9 @@
 **Purpose:** Canonical inventory of every user-visible change merged into `develop` between the 3.0.0 stable release and today. Source of truth for blog posts, release notes, and the 3.0 → 4.0 comparison narrative.
 
 **Baseline:** `v3.0.0+33` — Wheels 3.0.0 stable release, tagged 2026-01-10 ([CHANGELOG entry](../../CHANGELOG.md)).
-**Audit range:** 2026-01-12 → 2026-04-16 (approx. 14 weeks).
-**Audit date:** 2026-04-16.
+**Audit range:** 2026-01-12 → 2026-04-22 (approx. 15 weeks).
+**Initial audit date:** 2026-04-16.
+**Refreshed:** 2026-04-22 — added delta section below ("Post-2026-04-16 additions") covering 69 PRs merged in the subsequent 6-day window.
 
 ## Methodology
 
@@ -16,11 +17,11 @@
 
 ## Summary stats
 
-- **Total merged PRs:** 185
-- **Distinct user-visible features / changes:** ~70 (after grouping multi-PR features)
-- **Security-hardening PRs:** 40+ (see Security Hardening section)
-- **Breaking changes:** 7 (see Breaking Changes section)
-- **Contributors:** @bpamiri (Peter Amiri), @zainforbjs, @chapmandu, @mlibbe, plus Dependabot
+- **Total merged PRs:** 260+ (185 through 2026-04-16 + 69 in the refresh window)
+- **Distinct user-visible features / changes:** ~75 (after grouping multi-PR features; see delta section for the ~6 additions since 2026-04-16)
+- **Security-hardening PRs:** 40+ (see Security Hardening section; unchanged in delta window)
+- **Breaking changes:** 7 (see Breaking Changes section; unchanged in delta window — HTTP MCP deprecation in #2140 emits a warning but does not remove the endpoint)
+- **Contributors:** @bpamiri (Peter Amiri), @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta, plus Dependabot
 - **CHANGELOG coverage gap:** `[Unreleased]` missed ~60 user-visible items — blog + CHANGELOG catch-up work recommended.
 
 ---
@@ -294,6 +295,43 @@ When blog posts are drafted on top of this audit, these are the natural story ar
 6. **"Upgrading from Wheels 3.x"** — practical migration guide centered on the Breaking Changes list and the Legacy compatibility adapter (#2015).
 7. **"Testing in Wheels 4.0"** — HTTP test client + parallel runner + browser testing + BDD-only posture.
 8. **"Multi-tenancy built in"** — Wheels is now one of the few frameworks with first-class per-request datasource switching.
+
+---
+
+## Post-2026-04-16 additions
+
+Between the initial audit (2026-04-16) and the refresh (2026-04-22), 69 additional PRs merged to `develop`. Bucketed below. The majority were docs-site migration to Astro/Starlight (not framework-surface) and test / CI infrastructure; ~6 were user-visible framework additions.
+
+### New user-visible capabilities (framework surface)
+
+- **`wheels deploy` — Basecamp Kamal port** (#2187) — new first-class CLI surface for Dockerized deploys to Linux servers via SSH. Byte-compatible with Kamal's `config/deploy.yml` schema and on-server conventions (container names, labels, network, lock path). Invokes the same `kamal-proxy` Go binary for zero-downtime rollover. Adds `wheels deploy init | setup | rollback | config | app | proxy | accessory | build | registry | server | prune | lock | secrets | audit | details | remove | docs` subcommands. Major addition — warrants its own category in future audits.
+- **SQLite `changeColumn` via recreate-table pattern** (#2218) — SQLite adapter previously couldn't alter columns; now supported via table-recreate behind the same migration API.
+- **Vite pipeline: transitive modulepreload + CSS resolution** (#2133) — asset-pipeline improvement for the Vite integration (closes part of the "asset-pipeline maturity" gap called out in `docs/wheels-vs-frameworks.md`).
+- **`SecurityHeaders` HSTS off-switch** (#2195) — explicit opt-out for environments that need to disable HSTS (e.g., behind a TLS-terminating proxy that handles HSTS itself).
+- **LuCLI stdio MCP canonicalized; in-dev-server HTTP MCP deprecated** (#2140) — consolidates the MCP surface on `wheels mcp wheels`. HTTP endpoint at `/wheels/mcp` still works but emits a deprecation warning on first request. Scheduled for removal in a future release.
+- **Framework gap fixes — batch 1** (#2168) — scaffold / routing / forms / CLI polish (umbrella PR; multiple small user-visible improvements).
+
+### Formalized (previously incomplete, now reliable)
+
+- **CockroachDB bulk-ops + pessimistic locking test failures resolved** (#2206) — these features shipped in the initial audit window but had matrix test failures. Now passing across the compat matrix; CockroachDB reaches feature parity for bulk insert/upsert and `.forUpdate()`.
+
+### Fixes (preexisting capabilities made more reliable)
+
+- **CLI:** `wheels new` non-zero exit on framework-not-found (#2216) and remaining silent-exit paths (#2221); `wheels stats` crash + MCP surface curation (#2139); codegen templates bundled into installed wheels-module tar (#2209).
+- **Tests:** 20 browser-spec errors resolved (#2134); core test failures across all databases (#2204); dispatch app `populate.cfm` across supported databases (#2198).
+- **zainforbjs:** navbar issue #2012 (#2108), issue #2107 (#2109), issue #2166 (#2167), issue #2171 (#2180), issue #2170 (#2172), issue #2202 (#2203), CLI fix (#2199).
+- **Docs / web:** `docstring` default for `@with` (#2183, @MukundaKatta — new contributor), various Starlight rendering fixes.
+
+### Breaking changes (delta)
+
+None in this window. #2140 is a deprecation with a warning, not a removal — the endpoint still responds.
+
+### Infrastructure / not user-visible
+
+- **Docs site migration to Astro/Starlight** (~25 PRs: #2141, #2143–#2150, #2152–#2154, #2157–#2162, #2169, #2181, #2182, #2185, #2186, #2190, #2191, #2192) — entirely new static-site pipeline replacing the GitBook-era tooling. Major engineering lift, but framework users consume it via browser rather than code.
+- **Test suite reorganization:** move core framework specs from app to core suite (#2200); move browser-test fixtures/routes out of app (#2205).
+- **CI hardening:** visual regression promoted to hard gate (#2163); snapshot API docs deployed on develop (#2164); retire stale workflows (#2165); auto-labeler for fork PRs (#2188); pin verify-docs to node 20 (#2193); node-24 bumps (#2212, #2213); smoke-test installed wheels-module against clean filesystem (#2217); verify-docs `spawn ENOENT` root cause fix (#2210).
+- **Chore:** `.gitignore` (#2220); delete stale `wheels_spec` / `wheels_build` / `wheels_validate` slash commands (#2151); retire wheels.dev-era publishing pipeline (#2189); drop CommandBox refs from README and CLI docs (#2155, #2156, #2162); rename `wheels code` → `wheels generate snippets` in docs (#2194); 301 redirects for retired CLI URLs (#2197); drop duplicate blog posts + visual baseline refresh (#2191, #2192); `.ai/` reference sections for MCP and packages (#2142); blog skeletons (#2132) and social announcements (#2137).
 
 ---
 
