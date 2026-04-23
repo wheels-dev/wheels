@@ -11,8 +11,23 @@
 	local.dbName = application.wheels.dataSourceName;
 	local.environment = get("environment");
 
-	// CLI detection
+	// CLI detection — best-effort across install vectors:
+	//   1. Monorepo dev checkout (CLI source is in-tree)
+	//   2. CommandBox module install (`box install wheels-cli`)
+	//   3. LuCLI install (Homebrew, Chocolatey, or direct download)
 	local.hasCLI = FileExists(ExpandPath("/cli/lucli/Module.cfc"));
+	if (!local.hasCLI) {
+		try {
+			local.userHome = CreateObject("java", "java.lang.System").getProperty("user.home");
+			local.hasCLI = Len(local.userHome) && (
+				FileExists(local.userHome & "/.CommandBox/cfml/modules/wheels-cli/ModuleConfig.cfc")
+				|| FileExists(local.userHome & "/.lucli/lucli")
+				|| FileExists(local.userHome & "/.lucli/bin/lucli")
+			);
+		} catch (any e) {
+			// best-effort — if home dir is unavailable, fall back to "not detected"
+		}
+	}
 
 	// OS detection for install tab pre-selection
 	local.osName = server.os.name;
