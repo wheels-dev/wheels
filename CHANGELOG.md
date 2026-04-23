@@ -140,6 +140,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - `server.cfc` file (#1902)
 - Stale monorepo artifacts after repository flatten (#1988)
 - `cli/lucli/services/MCP.cfc` parallel schema registry — never wired into LuCLI's MCP discovery, drifted out of sync with `Module.cfc`. Rich parameter schemas will return via typed parameters directly on Module.cfc functions in a follow-up PR.
+- Undocumented per-file `checksums` field from `package.json` manifest and its verification code in `PackageLoader` — superseded by the registry-level tarball sha256 pinned at publish time. No migration required (no shipped package used it). (#2248)
 
 ### Fixed
 

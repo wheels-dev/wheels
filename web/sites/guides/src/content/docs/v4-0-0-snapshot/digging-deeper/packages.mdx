@@ -194,7 +194,6 @@ Common failure modes and what happens:
 - **Dependency not installed** — the dependency-resolution phase records the error before any CFC is instantiated. Dependent packages are excluded from the load order.
 - **Circular dependencies** — surfaces as a graph error at resolution time; all packages in the cycle are excluded with a clear log message.
 - **Exception during CFC `init()`** — caught, logged with stack, package skipped. Mixins are never partially applied.
-- **Checksum mismatch** (if `checksums` declared in manifest) — logged as a security warning, package skipped.
 
 The framework's contract is that activating a broken package cannot take down a working app. Check the application log after a deploy to see which packages loaded, which were skipped, and why.
 
