@@ -253,6 +253,24 @@ component output="false" {
 		// Parse and validate the manifest
 		local.manifest = $parseManifest(arguments.manifestPath);
 
+		// Enforce wheelsVersion constraint before doing any other work so an
+		// incompatible package never contributes metadata, mixins, or services.
+		if (!$isCompatibleVersion(local.manifest)) {
+			local.constraint = Trim(local.manifest.wheelsVersion);
+			local.runtime = $normalizeWheelsVersion();
+			ArrayAppend(variables.failedPackages, {
+				name = arguments.dirName,
+				error = "Incompatible wheelsVersion constraint",
+				detail = "Package requires '#local.constraint#' but Wheels #local.runtime# is running"
+			});
+			WriteLog(
+				text = "[Wheels] Package '#arguments.dirName#' skipped: requires Wheels #local.constraint#, running #local.runtime#",
+				type = "warning",
+				file = "application"
+			);
+			return;
+		}
+
 		// Store metadata
 		variables.packageMeta[arguments.dirName] = {
 			name = StructKeyExists(local.manifest, "name") ? local.manifest.name : arguments.dirName,
@@ -533,6 +551,48 @@ component output="false" {
 		for (local.pkgKey in variables.serviceProviders) {
 			variables.packages[local.pkgKey].boot(arguments.app);
 		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// wheelsVersion compatibility
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Returns the runtime Wheels version normalised for semver comparison.
+	 * Dev builds ship the unresolved "@build.version@" token — treat as 0.0.0
+	 * so strict constraints don't falsely reject packages during development.
+	 */
+	private string function $normalizeWheelsVersion() {
+		local.raw = SpanExcluding(variables.wheelsVersion, " ");
+		return (local.raw == "@build.version@") ? "0.0.0" : local.raw;
+	}
+
+	/**
+	 * Validates a package manifest's wheelsVersion constraint against the
+	 * running Wheels version. Packages that omit the field, use "*", or are
+	 * evaluated against a dev-stamp runtime always pass — a strict constraint
+	 * in that case would break `wheels test run` on unbuilt checkouts.
+	 *
+	 * @manifest Parsed package.json struct
+	 * @return True if the package is compatible with the running Wheels version
+	 */
+	private boolean function $isCompatibleVersion(required struct manifest) {
+		if (!StructKeyExists(arguments.manifest, "wheelsVersion")
+			|| !IsSimpleValue(arguments.manifest.wheelsVersion)) {
+			return true;
+		}
+		local.constraint = Trim(arguments.manifest.wheelsVersion);
+		if (!Len(local.constraint) || local.constraint == "*") {
+			return true;
+		}
+		local.runtime = $normalizeWheelsVersion();
+		// Unstamped dev build or caller that didn't pass a runtime version:
+		// skip enforcement so local dev and embedding callers don't break.
+		if (!Len(local.runtime) || local.runtime == "0.0.0") {
+			return true;
+		}
+		local.semver = CreateObject("component", "wheels.SemVer");
+		return local.semver.satisfiesAll(local.runtime, local.constraint);
 	}
 
 }
