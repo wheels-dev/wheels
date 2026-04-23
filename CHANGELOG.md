@@ -104,6 +104,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ### Changed
 
 - **Breaking:** CORS middleware default changed from wildcard `*` to deny-all. Apps must explicitly configure `allowOrigins` or set an explicit wildcard. (#2039)
+- **Breaking:** `viteStrictManifest` defaults to `true` — a missing Vite manifest entry now throws `Wheels.ViteAssetNotFound` in production instead of silently falling back (3.x behavior). Rebuild Vite assets during the upgrade window; to retain 3.x silent behavior, `set(viteStrictManifest=false)`. (#2133)
 - **Breaking:** `allowEnvironmentSwitchViaUrl` defaults to `false` in production (#2076)
 - **Breaking:** Reload password must be non-empty for environment switching in production (#2082)
 - **Breaking:** HSTS header defaults on in production (#2081)
