@@ -127,7 +127,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Deprecated
 
-- Legacy `plugins/` folder — superseded by the new `packages/` → `vendor/` activation model. Plugins still load, with a deprecation warning. (#1995)
+- Legacy `plugins/` folder — superseded by the new `packages/` → `vendor/` activation model. Plugins still load, with a deprecation warning. Scheduled for removal in v5.0. (#1995)
 - RocketUnit test style for new tests — BDD syntax (via WheelsTest) is required going forward. Existing RocketUnit specs continue to run. (#1925)
 - `wheels.Test` test base class — extend `wheels.WheelsTest` instead (#1889)
 - In-dev-server HTTP MCP endpoint at `/wheels/mcp` — superseded by the LuCLI stdio MCP server (`wheels mcp wheels`). Emits a deprecation warning to the `wheels_mcp` log on first request and advertises `deprecated: true` in the `serverInfo` handshake. Scheduled for removal in a future release. Migrate existing projects with `wheels mcp setup --force`.
