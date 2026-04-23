@@ -270,6 +270,76 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect($anyInclude(cmds, "docker stop kamal-proxy")).toBeTrue();
                 expect($anyInclude(cmds, "docker logout")).toBeTrue();
             });
+
+            // Regression tests for issue #2230 — deploy verbs returned a blank
+            // string in real (non-dry-run) mode because Module.cfc wrapped the
+            // void methods with dryRunOutput(), which is only populated during
+            // dry-run. Real deploys must return a visible success summary;
+            // dry-run must continue to return the buffered command list.
+
+            it("deploy (real mode) returns a non-empty success summary", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({configPath: variables.fixture, version: "v1"});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("Deployed");
+                expect(out).toInclude("demo");
+                expect(out).toInclude("v1");
+            });
+
+            it("deploy --dry-run returns the buffered command list", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({
+                    configPath: variables.fixture,
+                    dryRun: true,
+                    version: "v1"
+                });
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("docker pull");
+            });
+
+            it("rollback (real mode) returns a non-empty success summary", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.rollback({configPath: variables.fixture, version: "v-old"});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("Rolled back");
+                expect(out).toInclude("v-old");
+            });
+
+            it("setup (real mode) returns a non-empty success summary", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.setup({configPath: variables.fixture, version: "v1"});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("Deployed");
+            });
+
+            it("audit (real mode) returns a non-empty success summary", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.audit({configPath: variables.fixture});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("audit log");
+            });
+
+            it("details (real mode) returns a non-empty success summary", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.details({configPath: variables.fixture});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("details");
+            });
+
+            it("remove --confirm (real mode) returns a non-empty success summary", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.remove({configPath: variables.fixture, confirm: true});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("Removed");
+                expect(out).toInclude("demo");
+            });
         });
     }
 

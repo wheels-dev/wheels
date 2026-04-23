@@ -51,7 +51,7 @@ component {
         });
     }
 
-    public void function deploy(required struct opts) {
+    public string function deploy(required struct opts) {
         arrayClear(variables.dryRunBuffer);
         var cfg = variables.loader.load(
             arguments.opts.configPath,
@@ -111,13 +111,19 @@ component {
             $fireHook(hooks, "post-deploy-failure", hookEnv, dryRun);
             rethrow;
         }
+
+        return $renderResult(
+            arguments.opts,
+            "Deployed " & cfg.service() & " version " & ver
+                & " to " & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+        );
     }
 
-    public void function redeploy(required struct opts) {
-        deploy(arguments.opts);
+    public string function redeploy(required struct opts) {
+        return deploy(arguments.opts);
     }
 
-    public void function rollback(required struct opts) {
+    public string function rollback(required struct opts) {
         arrayClear(variables.dryRunBuffer);
         if (!len(arguments.opts.version ?: "")) {
             throw(
@@ -129,6 +135,7 @@ component {
         var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
         var proxy = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
+        var hostList = [];
         for (var role in cfg.roles()) {
             for (var host in role.hosts()) {
                 $dispatch([host], app.start(role, arguments.opts.version), dryRun);
@@ -137,13 +144,20 @@ component {
                     proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":3000"),
                     dryRun
                 );
+                arrayAppend(hostList, host);
             }
         }
+
+        return $renderResult(
+            arguments.opts,
+            "Rolled back " & cfg.service() & " to version " & arguments.opts.version
+                & " on " & arrayLen(hostList) & " host(s): " & arrayToList(hostList, ", ")
+        );
     }
 
-    public void function setup(required struct opts) {
+    public string function setup(required struct opts) {
         // Phase 2 will add accessory boot; for Phase 1 this equals deploy.
-        deploy(arguments.opts);
+        return deploy(arguments.opts);
     }
 
     /**
@@ -161,7 +175,11 @@ component {
         var hosts = $allHosts(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
         $dispatch(hosts, cmd, dryRun);
-        return arrayToList(variables.dryRunBuffer, chr(10));
+        return $renderResult(
+            arguments.opts,
+            "Tailed audit log (last " & tail & " lines) on "
+                & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+        );
     }
 
     /**
@@ -214,14 +232,18 @@ component {
                 $dispatch(acc.hosts(), accCmds.details(acc), dryRun);
             }
         }
-        return arrayToList(variables.dryRunBuffer, chr(10));
+        return $renderResult(
+            arguments.opts,
+            "Collected app + proxy + accessory details from "
+                & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+        );
     }
 
     /**
      * Destructive teardown. Requires --confirm. Chains app container
      * removal → proxy removal → accessory removal → registry logout.
      */
-    public void function remove(required struct opts) {
+    public string function remove(required struct opts) {
         if (!(arguments.opts.confirm ?: false)) {
             throw(
                 type = "DeployMainCli.RemoveNotConfirmed",
@@ -259,6 +281,12 @@ component {
         }
         // Logout of registry.
         $dispatch(hosts, regCmds.logout(), dryRun);
+
+        return $renderResult(
+            arguments.opts,
+            "Removed " & cfg.service() & " and its containers from "
+                & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+        );
     }
 
     private array function $docsSections() {
@@ -329,6 +357,20 @@ component {
     }
 
     // ── Private helpers ────────────────────────────────────────────
+
+    /**
+     * Unified result renderer. In --dry-run mode, returns the buffered
+     * commands so the operator can inspect them. In real mode, returns
+     * the caller-supplied summary so the user gets visible confirmation
+     * that the deploy completed. Avoids the blank-string bug that occurs
+     * when Module.cfc wraps void verbs with dryRunOutput().
+     */
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
+    }
 
     private void function $dispatch(
         required array hosts,

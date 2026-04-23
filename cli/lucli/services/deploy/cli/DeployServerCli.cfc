@@ -16,7 +16,7 @@ component {
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
-    public void function exec(required struct opts) {
+    public string function exec(required struct opts) {
         if (!len(arguments.opts.cmd ?: "")) {
             throw(type="DeployServerCli.MissingCommand",
                   message="server exec requires a command (opts.cmd)");
@@ -26,15 +26,31 @@ component {
         arrayClear(variables.dryRunBuffer);
         var hosts = $filteredHosts(cfg, arguments.opts.host ?: "");
         $dispatch(hosts, arguments.opts.cmd, dryRun);
+        return $renderResult(
+            arguments.opts,
+            "Ran '" & arguments.opts.cmd & "' on " & arrayLen(hosts) & " host(s): "
+                & arrayToList(hosts, ", ")
+        );
     }
 
-    public void function bootstrap(required struct opts) {
+    public string function bootstrap(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         var hosts = $allHosts(cfg);
         var cmd = "which docker >/dev/null 2>&1 || curl -fsSL https://get.docker.com | sh";
         $dispatch(hosts, cmd, dryRun);
+        return $renderResult(
+            arguments.opts,
+            "Bootstrapped Docker on " & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+        );
+    }
+
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
     }
 
     private any function $loadCfg(required struct opts) {
