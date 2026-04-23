@@ -3,6 +3,7 @@ component extends="wheels.WheelsTest" {
 	function beforeAll() {
 		_originalRoutes = Duplicate(application.wheels.routes)
 		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+		_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
 		nounPlurals = [
 			"people",
 			"dogs",
@@ -83,6 +84,7 @@ component extends="wheels.WheelsTest" {
 	function afterAll() {
 		application.wheels.routes = _originalRoutes
 		application.wheels.staticRoutes = _originalStaticRoutes
+		application.wheels.namedRoutePositions = _originalNamedRoutePositions
 	}
 	
 	function run() {

@@ -57,18 +57,6 @@ component extends="wheels.WheelsTest" {
             return;
         }
 
-        // Browser specs depend on named fixture routes (browserTestHome,
-        // browserTestLogin, etc.) declared in vendor/wheels/tests/routes.cfm.
-        // Other specs in the suite (mapperSpec, security/PaginationXssSpec,
-        // view/formsSpec, view/linksSpec) legitimately clear the route table
-        // via `$clearRoutes()` to test route-registration behavior, and do
-        // not restore it afterwards. If those specs run before browser
-        // specs — which happens alphabetically in the core suite — the
-        // fixture routes are gone by the time browser specs execute.
-        // Re-include the test routes here so browser specs are self-contained.
-        application.wo.$include(template="/wheels/tests/routes.cfm");
-        application.wo.$setNamedRoutePositions();
-
         try {
             variables.$launcher = $ensureLauncher();
         } catch (Wheels.BrowserNotInstalled e) {
