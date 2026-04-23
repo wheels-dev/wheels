@@ -329,11 +329,7 @@ component extends="modules.BaseModule" {
 	 * hint: Reload the running Wheels application
 	 */
 	public string function reload() {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected. Start one with: wheels start", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		var password = detectReloadPassword();
 
@@ -506,11 +502,7 @@ component extends="modules.BaseModule" {
 	 * hint: List all configured routes with method, path, and controller action
 	 */
 	public string function routes() {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected. Start one with: wheels start", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		try {
 			var routesUrl = "http://localhost:#serverPort#/wheels/ai?context=routing";
@@ -659,12 +651,10 @@ component extends="modules.BaseModule" {
 		}
 
 		// Detect server
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("The console requires a running server. Start with: wheels start");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"The console requires a running server.",
+			"Start one with: wheels start"
+		]);
 
 		// Auto-detect reload password if not provided
 		if (!len(password)) {
@@ -2337,12 +2327,10 @@ component extends="modules.BaseModule" {
 			if (arguments.args[i] == "--no-routes") noRoutes = true;
 		}
 
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running server detected. Start with 'wheels start' first.", "red");
-			out("Admin generation requires a running server for model introspection.");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Admin generation requires a running server for model introspection.",
+			"Start one with: wheels start"
+		]);
 
 		// Introspect the model via the server
 		out("Introspecting model: #modelName#...", "cyan");
@@ -2648,12 +2636,10 @@ component extends="modules.BaseModule" {
 	// ── Migration Execution ──────────────────────────
 
 	private string function runMigration(required string action) {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("Migrations require a running server. Start with: wheels start");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Migrations require a running server.",
+			"Start one with: wheels start"
+		]);
 
 		out("Running migration: #action#...", "cyan");
 
@@ -2695,12 +2681,10 @@ component extends="modules.BaseModule" {
 	// ── Seed Execution ──────────────────────────────
 
 	private string function runSeed(string mode = "auto", string environment = "") {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("Seeding requires a running server. Start with: wheels start");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Seeding requires a running server.",
+			"Start one with: wheels start"
+		]);
 
 		out("Running database seeds...", "cyan");
 
@@ -2782,11 +2766,7 @@ component extends="modules.BaseModule" {
 			if (arg == "--pending") pendingOnly = true;
 		}
 
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running server detected. Start with 'wheels start' first.", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		try {
 			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
@@ -2832,11 +2812,7 @@ component extends="modules.BaseModule" {
 			if (arg == "--detailed") detailed = true;
 		}
 
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running server detected. Start with 'wheels start' first.", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		try {
 			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
@@ -3059,13 +3035,10 @@ component extends="modules.BaseModule" {
 		string db = "sqlite",
 		boolean ciMode = false
 	) {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("Start with: wheels start", "yellow");
-			out("Or use: bash tools/test-local.sh (auto-manages server)", "yellow");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Start one with: wheels start",
+			"Or use: bash tools/test-local.sh (auto-manages server)"
+		]);
 
 		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
 		out("Running #(coreTests ? 'core' : 'app')# tests (#db#)...", "cyan");
@@ -3736,6 +3709,28 @@ component extends="modules.BaseModule" {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Guard for commands that require a live Wheels dev server. Returns the
+	 * detected port on success; prints a red diagnostic + any yellow hints
+	 * and throws `Wheels.ServerNotRunning` on failure, so LuCLI's Picocli
+	 * ExecutionExceptionHandler surfaces a non-zero exit instead of the
+	 * previous silent `return ""` (GH #2229).
+	 */
+	private numeric function $requireRunningServer(array hints = []) {
+		var serverPort = detectServerPort();
+		if (serverPort) return serverPort;
+
+		out("No running Wheels server detected.", "red");
+		var hintList = arrayLen(arguments.hints) ? arguments.hints : ["Start one with: wheels start"];
+		for (var hint in hintList) {
+			out(hint, "yellow");
+		}
+		throw(
+			type="Wheels.ServerNotRunning",
+			message="No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
+		);
 	}
 
 	/**
