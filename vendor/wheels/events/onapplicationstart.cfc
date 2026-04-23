@@ -81,8 +81,7 @@ component {
 		request.cgi = application.wo.$cgiScope();
 
 		// Set up containers for routes, caches, settings etc.
-		// TODO remove the static version number
-		application.$wheels.version = "4.0.0";
+		application.$wheels.version = application.wo.$readFrameworkVersion();
 		try {
 			application.$wheels.hostName = CreateObject("java", "java.net.InetAddress").getLocalHost().getHostName();
 		} catch (any e) {
