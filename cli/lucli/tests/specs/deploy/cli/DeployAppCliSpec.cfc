@@ -77,6 +77,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("docker stop");
                 expect(out).toInclude("[1.2.3.4]");
             });
+
+            // Regression for issue #2230 — the real-mode path must return a
+            // visible success summary, not an empty string.
+
+            it("boot (real mode) returns a non-empty success summary", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var out = cli.boot({configPath: variables.fixture, version: "v1"});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("Booted");
+            });
+
+            it("stop --dry-run returns the buffered command list", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var out = cli.stop({configPath: variables.fixture, version: "v1", dryRun: true});
+                expect(len(out)).toBeGT(0);
+                expect(out).toInclude("docker stop");
+            });
         });
     }
 

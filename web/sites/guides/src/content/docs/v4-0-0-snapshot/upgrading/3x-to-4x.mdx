@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-This guide walks every breaking change between Wheels 3.x and 4.0, with before/after code for each. Most 3.x apps upgrade in an afternoon. The pressure points are CORS defaults, the test base class rename, the `plugins/` → `packages/` split, and the `wheels` CLI command renames. Everything else is either additive or continues to work with a deprecation warning.
+This guide walks every breaking change between Wheels 3.x and 4.0, with before/after code for each. Most 3.x apps upgrade in an afternoon. The pressure points are CORS defaults, the test base class rename, the `plugins/` → `packages/` split, the `wheels` CLI command renames, and Vite manifest strictness (production now throws on missing entries — rebuild assets during the upgrade window). Everything else is either additive or continues to work with a deprecation warning.
 
 **You'll learn:**
 
@@ -37,7 +37,7 @@ This guide walks every breaking change between Wheels 3.x and 4.0, with before/a
 
 </Steps>
 
-## The ten breaking changes
+## The eleven breaking changes
 
 Each item cites its `CHANGELOG.md` "Changed" or "Removed" entry. Where the skeleton blog post calls out a two-path upgrade, Path A (fix directly) is documented here; Path B (the Legacy Compatibility Adapter, #2015) is covered at the end.
 
@@ -169,6 +169,28 @@ var svc = service("emailService");
 
 `service()` is the new global helper (#1933); prefer it over reaching into the container.
 
+### 11. Vite manifest strictness — missing entries throw in production
+
+**CHANGELOG:** `Breaking: viteStrictManifest defaults to true` (#2133).
+
+In 3.x, a missing entry in `public/assets/.vite/manifest.json` silently fell back to the raw source path. In 4.0, the default flips: `viteScriptTag()`, `viteStyleTag()`, and `vitePreloadTag()` throw `Wheels.ViteAssetNotFound` in production when the manifest doesn't contain the requested entrypoint. This catches stale-build deploys at first request instead of letting them ship broken `<script>` tags to the browser.
+
+The most common failure mode is a deploy that pushes new CFML code without rebuilding the Vite bundle — the manifest on the server is older than the entrypoint referenced in a view.
+
+**Recommended fix — rebuild assets as part of the deploy:**
+
+```bash title="your shell (or CI/CD deploy step)"
+npm run build   # produces public/assets/.vite/manifest.json
+```
+
+**Escape hatch — restore 3.x silent-fallback behavior:**
+
+```cfm {test:compile} title="config/settings.cfm"
+set(viteStrictManifest = false);
+```
+
+Use the escape hatch only if you can't rebuild assets during the upgrade window — then flip it back on once your deploy pipeline emits the manifest reliably.
+
 ## Deprecations you should plan to address
 
 ### Plugins → packages
@@ -270,7 +292,7 @@ The `/_browser/home`, `/_browser/login`, `/_browser/dashboard`, `/_browser/login
 
 **CHANGELOG:** `Legacy compatibility adapter for 3.x → 4.0 migration soft-landing` (#2015), shipped as `packages/legacyadapter/`.
 
-When you can't fix all ten breaking items in one sprint, activate the adapter, ship the upgrade, and modernize incrementally:
+When you can't fix all eleven breaking items in one sprint, activate the adapter, ship the upgrade, and modernize incrementally:
 
 ```bash title="your shell"
 cp -r packages/legacyadapter vendor/legacyadapter
@@ -322,6 +344,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 - **Test runner can't find specs.** Check for `tests/specs/functions/` — rename to `functional/`. See #1872.
 - **Plugin warning at startup.** Port to `packages/` (see above) or accept the warning until you do.
 - **JWT tokens reject as invalid after upgrade.** Algorithm validation is on. Confirm your issuer sets `alg` to a supported value and the signature verification path uses constant-time comparison. See #2079, #2086.
+- **`Wheels.ViteAssetNotFound` thrown on first request after deploy.** The deploy shipped code referencing a Vite entrypoint that isn't in the manifest. Rebuild Vite assets (`npm run build`) before deploy, or temporarily `set(viteStrictManifest=false)` to restore 3.x silent fallback. See #2133.
 
 ## Related guides
 

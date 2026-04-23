@@ -17,7 +17,7 @@ component {
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
-    public void function acquire(required struct opts) {
+    public string function acquire(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
@@ -27,22 +27,32 @@ component {
             message: arguments.opts.message ?: "manual acquire"
         });
         $dispatchAny($allHosts(cfg), cmd, dryRun);
+        return $renderResult(arguments.opts, "Acquired deploy lock for " & cfg.service());
     }
 
-    public void function release(required struct opts) {
+    public string function release(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         var lock = new cli.lucli.services.deploy.commands.LockCommands(cfg);
         $dispatchAny($allHosts(cfg), lock.release(), dryRun);
+        return $renderResult(arguments.opts, "Released deploy lock for " & cfg.service());
     }
 
-    public void function status(required struct opts) {
+    public string function status(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         var lock = new cli.lucli.services.deploy.commands.LockCommands(cfg);
         $dispatchAny($allHosts(cfg), lock.status(), dryRun);
+        return $renderResult(arguments.opts, "Checked deploy lock status for " & cfg.service());
+    }
+
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
     }
 
     private any function $loadCfg(required struct opts) {

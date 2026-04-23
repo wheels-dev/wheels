@@ -329,11 +329,7 @@ component extends="modules.BaseModule" {
 	 * hint: Reload the running Wheels application
 	 */
 	public string function reload() {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected. Start one with: wheels start", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		var password = detectReloadPassword();
 
@@ -506,11 +502,7 @@ component extends="modules.BaseModule" {
 	 * hint: List all configured routes with method, path, and controller action
 	 */
 	public string function routes() {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected. Start one with: wheels start", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		try {
 			var routesUrl = "http://localhost:#serverPort#/wheels/ai?context=routing";
@@ -659,12 +651,10 @@ component extends="modules.BaseModule" {
 		}
 
 		// Detect server
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("The console requires a running server. Start with: wheels start");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"The console requires a running server.",
+			"Start one with: wheels start"
+		]);
 
 		// Auto-detect reload password if not provided
 		if (!len(password)) {
@@ -1314,40 +1304,33 @@ component extends="modules.BaseModule" {
 
 		switch (sub) {
 			case "deploy":
-				dmc.deploy(opts);
-				return arrayToList(dmc.dryRunOutput(), chr(10));
+				return dmc.deploy(opts);
 			case "redeploy":
-				dmc.redeploy(opts);
-				return arrayToList(dmc.dryRunOutput(), chr(10));
+				return dmc.redeploy(opts);
 			case "rollback":
 				if (arrayLen(positional) < 2) {
 					throw(message="rollback requires a version argument: wheels deploy rollback <version>");
 				}
 				opts.version = positional[2];
-				dmc.rollback(opts);
-				return arrayToList(dmc.dryRunOutput(), chr(10));
+				return dmc.rollback(opts);
 			case "config":
 				return dmc.config(opts);
 			case "init":
 				return dmc.init_stub(opts);
 			case "setup":
-				dmc.setup(opts);
-				return arrayToList(dmc.dryRunOutput(), chr(10));
+				return dmc.setup(opts);
 			case "version":
 				return dmc.version();
 			case "audit":
-				dmc.audit(opts);
-				return arrayToList(dmc.dryRunOutput(), chr(10));
+				return dmc.audit(opts);
 			case "docs":
 				// `docs [SECTION]` — section is the optional second positional.
 				opts.section = arrayLen(positional) >= 2 ? positional[2] : "";
 				return dmc.docs(opts);
 			case "details":
-				dmc.details(opts);
-				return arrayToList(dmc.dryRunOutput(), chr(10));
+				return dmc.details(opts);
 			case "remove":
-				dmc.remove(opts);
-				return arrayToList(dmc.dryRunOutput(), chr(10));
+				return dmc.remove(opts);
 			case "app":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy app requires a verb");
@@ -1367,8 +1350,7 @@ component extends="modules.BaseModule" {
 					case "live":
 					case "maintenance":
 					case "remove":
-						appCli[appVerb](opts);
-						return arrayToList(appCli.dryRunOutput(), chr(10));
+						return invoke(appCli, appVerb, [opts]);
 					default:
 						throw(message="Unknown wheels deploy app verb: #appVerb#");
 				}
@@ -1389,8 +1371,7 @@ component extends="modules.BaseModule" {
 					case "details":
 					case "logs":
 					case "remove":
-						invoke(proxyCli, proxyVerb, [opts]);
-						return arrayToList(proxyCli.dryRunOutput(), chr(10));
+						return invoke(proxyCli, proxyVerb, [opts]);
 					default:
 						throw(message="Unknown wheels deploy proxy verb: #proxyVerb#");
 				}
@@ -1407,8 +1388,7 @@ component extends="modules.BaseModule" {
 					case "login":
 					case "logout":
 					case "remove":
-						invoke(registryCli, registryVerb, [opts]);
-						return arrayToList(registryCli.dryRunOutput(), chr(10));
+						return invoke(registryCli, registryVerb, [opts]);
 					default:
 						throw(message="Unknown wheels deploy registry verb: #registryVerb#");
 				}
@@ -1428,8 +1408,7 @@ component extends="modules.BaseModule" {
 					case "remove":
 					case "details":
 					case "dev":
-						invoke(buildCli, buildVerb, [opts]);
-						return arrayToList(buildCli.dryRunOutput(), chr(10));
+						return invoke(buildCli, buildVerb, [opts]);
 					default:
 						throw(message="Unknown wheels deploy build verb: #buildVerb#");
 				}
@@ -1451,8 +1430,7 @@ component extends="modules.BaseModule" {
 					case "details":
 					case "logs":
 					case "remove":
-						invoke(accCli, accVerb, [opts]);
-						return arrayToList(accCli.dryRunOutput(), chr(10));
+						return invoke(accCli, accVerb, [opts]);
 					default:
 						throw(message="Unknown wheels deploy accessory verb: #accVerb#");
 				}
@@ -1467,8 +1445,7 @@ component extends="modules.BaseModule" {
 				var pruneCli = new cli.lucli.services.deploy.cli.DeployPruneCli(
 					new cli.lucli.services.deploy.lib.SshPool()
 				);
-				invoke(pruneCli, pruneVerb, [opts]);
-				return arrayToList(pruneCli.dryRunOutput(), chr(10));
+				return invoke(pruneCli, pruneVerb, [opts]);
 			case "server":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy server requires a verb (exec or bootstrap)");
@@ -1490,11 +1467,9 @@ component extends="modules.BaseModule" {
 				);
 				switch (serverVerb) {
 					case "exec":
-						serverCli.exec(opts);
-						return arrayToList(serverCli.dryRunOutput(), chr(10));
+						return serverCli.exec(opts);
 					case "bootstrap":
-						serverCli.bootstrap(opts);
-						return arrayToList(serverCli.dryRunOutput(), chr(10));
+						return serverCli.bootstrap(opts);
 					default:
 						throw(message="Unknown wheels deploy server verb: #serverVerb#");
 				}
@@ -1507,8 +1482,7 @@ component extends="modules.BaseModule" {
 				var lockCli = new cli.lucli.services.deploy.cli.DeployLockCli(
 					new cli.lucli.services.deploy.lib.SshPool()
 				);
-				invoke(lockCli, lockVerb, [opts]);
-				return arrayToList(lockCli.dryRunOutput(), chr(10));
+				return invoke(lockCli, lockVerb, [opts]);
 			case "secrets":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy secrets requires a verb (fetch/extract/print)");
@@ -2337,12 +2311,10 @@ component extends="modules.BaseModule" {
 			if (arguments.args[i] == "--no-routes") noRoutes = true;
 		}
 
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running server detected. Start with 'wheels start' first.", "red");
-			out("Admin generation requires a running server for model introspection.");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Admin generation requires a running server for model introspection.",
+			"Start one with: wheels start"
+		]);
 
 		// Introspect the model via the server
 		out("Introspecting model: #modelName#...", "cyan");
@@ -2648,12 +2620,10 @@ component extends="modules.BaseModule" {
 	// ── Migration Execution ──────────────────────────
 
 	private string function runMigration(required string action) {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("Migrations require a running server. Start with: wheels start");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Migrations require a running server.",
+			"Start one with: wheels start"
+		]);
 
 		out("Running migration: #action#...", "cyan");
 
@@ -2695,12 +2665,10 @@ component extends="modules.BaseModule" {
 	// ── Seed Execution ──────────────────────────────
 
 	private string function runSeed(string mode = "auto", string environment = "") {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("Seeding requires a running server. Start with: wheels start");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Seeding requires a running server.",
+			"Start one with: wheels start"
+		]);
 
 		out("Running database seeds...", "cyan");
 
@@ -2782,11 +2750,7 @@ component extends="modules.BaseModule" {
 			if (arg == "--pending") pendingOnly = true;
 		}
 
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running server detected. Start with 'wheels start' first.", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		try {
 			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
@@ -2832,11 +2796,7 @@ component extends="modules.BaseModule" {
 			if (arg == "--detailed") detailed = true;
 		}
 
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running server detected. Start with 'wheels start' first.", "red");
-			return "";
-		}
+		var serverPort = $requireRunningServer();
 
 		try {
 			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
@@ -3059,13 +3019,10 @@ component extends="modules.BaseModule" {
 		string db = "sqlite",
 		boolean ciMode = false
 	) {
-		var serverPort = detectServerPort();
-		if (!serverPort) {
-			out("No running Wheels server detected.", "red");
-			out("Start with: wheels start", "yellow");
-			out("Or use: bash tools/test-local.sh (auto-manages server)", "yellow");
-			return "";
-		}
+		var serverPort = $requireRunningServer([
+			"Start one with: wheels start",
+			"Or use: bash tools/test-local.sh (auto-manages server)"
+		]);
 
 		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
 		out("Running #(coreTests ? 'core' : 'app')# tests (#db#)...", "cyan");
@@ -3736,6 +3693,28 @@ component extends="modules.BaseModule" {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Guard for commands that require a live Wheels dev server. Returns the
+	 * detected port on success; prints a red diagnostic + any yellow hints
+	 * and throws `Wheels.ServerNotRunning` on failure, so LuCLI's Picocli
+	 * ExecutionExceptionHandler surfaces a non-zero exit instead of the
+	 * previous silent `return ""` (GH #2229).
+	 */
+	private numeric function $requireRunningServer(array hints = []) {
+		var serverPort = detectServerPort();
+		if (serverPort) return serverPort;
+
+		out("No running Wheels server detected.", "red");
+		var hintList = arrayLen(arguments.hints) ? arguments.hints : ["Start one with: wheels start"];
+		for (var hint in hintList) {
+			out(hint, "yellow");
+		}
+		throw(
+			type="Wheels.ServerNotRunning",
+			message="No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
+		);
 	}
 
 	/**
