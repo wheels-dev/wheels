@@ -113,8 +113,12 @@ component output="false" {
 	 * Returns the per-target method→package-name mapping built during mixin
 	 * collection. Used by $loadPackages to name the package side of a
 	 * cross-system collision with a legacy plugin.
+	 *
+	 * Named getMethodProviders (not $methodProviders) to avoid shadowing the
+	 * variables.$methodProviders storage struct on Adobe CF, which stores
+	 * method declarations in the same `variables` scope keyed by name.
 	 */
-	public struct function $methodProviders() {
+	public struct function getMethodProviders() {
 		return variables.$methodProviders;
 	}
 

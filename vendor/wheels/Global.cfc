@@ -2957,17 +2957,23 @@ return local.$wheels;
 		local.pluginProviders = StructKeyExists(application[local.appKey], "PluginObj")
 			? application[local.appKey].PluginObj.getMethodProviders()
 			: {};
-		local.pkgProviders = application[local.appKey].PackageLoaderObj.$methodProviders();
+		local.pkgProviders = application[local.appKey].PackageLoaderObj.getMethodProviders();
 		for (local.target in local.pkgMixins) {
 			if (!StructKeyExists(application[local.appKey].mixins, local.target)) {
 				application[local.appKey].mixins[local.target] = {};
 			}
 			for (local.methodName in local.pkgMixins[local.target]) {
 				if (StructKeyExists(application[local.appKey].mixins[local.target], local.methodName)) {
-					local.pluginName = StructKeyExists(local.pluginProviders, local.target)
-						&& StructKeyExists(local.pluginProviders[local.target], local.methodName)
-						? local.pluginProviders[local.target][local.methodName]
-						: "(unknown plugin)";
+					// Only treat this as a cross-system collision when the existing entry
+					// came from a known plugin. Without an attributable plugin provider
+					// the prior entry could be framework-internal or pre-seeded, and a
+					// "migrate the plugin" recommendation would be misleading.
+					local.pluginAttributable = StructKeyExists(local.pluginProviders, local.target)
+						&& StructKeyExists(local.pluginProviders[local.target], local.methodName);
+					if (!local.pluginAttributable) {
+						continue;
+					}
+					local.pluginName = local.pluginProviders[local.target][local.methodName];
 					local.pkgName = StructKeyExists(local.pkgProviders, local.target)
 						&& StructKeyExists(local.pkgProviders[local.target], local.methodName)
 						? local.pkgProviders[local.target][local.methodName]

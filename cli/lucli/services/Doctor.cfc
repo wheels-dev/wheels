@@ -362,22 +362,29 @@ component {
 		var cfcSource = fileRead(cfcPath);
 		var lifecycleHooks = "init,onPluginLoad,onPluginActivate,register,boot";
 		var methods = {};
-		var pattern = "public\s+[a-zA-Z0-9_\[\]\.]+\s+function\s+([a-zA-Z0-9_\$]+)\s*\(";
-		var matches = reMatchNoCase(pattern, cfcSource);
-		for (var m in matches) {
-			var nameMatch = reFindNoCase(pattern, m, 1, true);
-			if (structKeyExists(nameMatch, "match") && arrayLen(nameMatch.match) >= 2) {
-				var methodName = nameMatch.match[2];
-				if (!listFindNoCase(lifecycleHooks, methodName)) {
+		// Capture (access, methodName). Access and return type are both optional
+		// so we catch: `public string function x()`, `public function x()`,
+		// and the implicit-public `function x()`. Skip when access == "private".
+		var pattern = "\b(public|private|package|remote)?\s*(?:[a-zA-Z0-9_\[\]\.]+\s+)?function\s+([a-zA-Z0-9_\$]+)\s*\(";
+		var pos = 1;
+		while (true) {
+			var nameMatch = reFindNoCase(pattern, cfcSource, pos, true);
+			if (!structKeyExists(nameMatch, "pos") || !arrayLen(nameMatch.pos) || nameMatch.pos[1] == 0) break;
+			if (arrayLen(nameMatch.match) >= 3) {
+				var access = lCase(trim(nameMatch.match[2]));
+				var methodName = nameMatch.match[3];
+				if (access != "private" && !listFindNoCase(lifecycleHooks, methodName)) {
 					methods[methodName] = true;
 				}
 			}
+			pos = nameMatch.pos[1] + nameMatch.len[1];
 		}
 
-		// Expand targets (global = all supported mixin component types)
+		// Expand targets (global = all supported mixin component types).
+		// Wrap in listToArray so Adobe CF's for...in iterates elements, not chars.
 		var allTargets = "application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test";
 		var expanded = (targetsRaw == "global") ? allTargets : targetsRaw;
-		for (var target in expanded) {
+		for (var target in listToArray(expanded)) {
 			target = trim(target);
 			if (!len(target) || !listFindNoCase(allTargets, target)) continue;
 			for (var methodName in methods) {
