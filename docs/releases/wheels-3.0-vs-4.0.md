@@ -4,7 +4,7 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 
 **Companion docs:**
 - [docs/wheels-vs-frameworks.md](../wheels-vs-frameworks.md) — Wheels 4.0 parity comparison against Rails 8, Laravel 12, Django 5.
-- [docs/releases/wheels-4.0-audit.md](wheels-4.0-audit.md) — full 185-PR audit of everything shipped between 3.0.0 and 4.0.
+- [docs/releases/wheels-4.0-audit.md](wheels-4.0-audit.md) — full 260+ PR audit of everything shipped between 3.0.0 and 4.0.
 
 **Sources:** CHANGELOG.md `[3.0.0]` section (what 3.0 shipped) + 4.0 feature audit (what 4.0 adds). "Formalized" means the feature may have had partial/undocumented precedent but became production-ready with tests and official docs in 4.0.
 
@@ -14,8 +14,8 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 
 | | Count |
 |---|---|
-| New capabilities added | ~35 |
-| Capabilities formalized (tests + docs, made official) | ~10 |
+| New capabilities added | ~40 |
+| Capabilities formalized (tests + docs, made official) | ~11 |
 | Breaking defaults hardened | 7 |
 | Security-hardening passes | 40+ PRs grouped by theme |
 | Legacy surfaces removed | 4 |
@@ -35,6 +35,7 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | Advisory locks | ~~absent~~ | `withAdvisoryLock(name, callback)` with try/finally release | **New** ([#2103](https://github.com/wheels-dev/wheels/pull/2103)) |
 | Pessimistic locking | ~~absent~~ | `.forUpdate()` on QueryBuilder for `SELECT ... FOR UPDATE` | **New** ([#2103](https://github.com/wheels-dev/wheels/pull/2103)) |
 | CockroachDB support | ~~not supported~~ | Full adapter with `RETURNING` clause identity select, `unique_rowid()` PK | **New** ([#1876](https://github.com/wheels-dev/wheels/pull/1876), [#1986](https://github.com/wheels-dev/wheels/pull/1986), [#1993](https://github.com/wheels-dev/wheels/pull/1993), [#1999](https://github.com/wheels-dev/wheels/pull/1999)) |
+| CockroachDB bulk-ops + locking test parity | ~~adapter present but bulk-ops / `.forUpdate()` failing in compat matrix~~ | All bulk-insert/upsert and pessimistic-locking tests pass on CockroachDB | **Fixed** ([#2206](https://github.com/wheels-dev/wheels/pull/2206)) |
 | Reserved-word identifier quoting | ~~manual~~ | Automatic quoting of reserved words in table/column names | **New** ([#1874](https://github.com/wheels-dev/wheels/pull/1874)) |
 | Strict unknown-column detection | ~~silently tolerant~~ | `set(throwOnColumnNotFound=true)` opt-in strictness | **New** ([#1938](https://github.com/wheels-dev/wheels/pull/1938)) |
 | Calculated property SQL validation | ~~lazy (runtime error)~~ | Validated at model config time | **Hardened** ([#2067](https://github.com/wheels-dev/wheels/pull/2067)) |
@@ -47,6 +48,7 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | Auto-migrations from models | ~~absent~~ | `AutoMigrator.diff(model)` compares properties vs DB schema; generates CFC with `up()`/`down()` | **New** ([#2102](https://github.com/wheels-dev/wheels/pull/2102)) |
 | Rename detection in auto-migrations | ~~absent~~ | Explicit hints + heuristic suggestions (normalized-token + Levenshtein); new `wheels dbmigrate diff` CLI | **New** ([#2112](https://github.com/wheels-dev/wheels/pull/2112)) |
 | Gap migration detection | ~~endpoint-only~~ | `migrateTo()` detects and runs previously-skipped migrations in range | **Fixed** ([#1928](https://github.com/wheels-dev/wheels/pull/1928)) |
+| SQLite `changeColumn` | ~~unsupported~~ | Implemented via recreate-table pattern; SQLite migrations can now alter columns through the standard API | **New** ([#2218](https://github.com/wheels-dev/wheels/pull/2218)) |
 
 ## 3. Routing
 
@@ -83,6 +85,7 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | RateLimiter `trustProxy` default | — | `false` (was `true` during dev) | **Breaking** ([#2024](https://github.com/wheels-dev/wheels/pull/2024)) |
 | RateLimiter proxy strategy default | — | `last` for security | **Breaking** ([#2088](https://github.com/wheels-dev/wheels/pull/2088)) |
 | RateLimiter fail-closed on lock timeout | — | Now fails closed instead of open | **Hardened** ([#2069](https://github.com/wheels-dev/wheels/pull/2069)) |
+| HSTS off-switch | ~~default-on in prod, no opt-out~~ | Explicit opt-out for environments behind TLS-terminating proxies that own HSTS | **New** ([#2195](https://github.com/wheels-dev/wheels/pull/2195)) |
 
 ## 6. Views & Templates
 
@@ -93,6 +96,7 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | Partial path traversal | ~~`includePartial("../…")` unblocked~~ | Validated | **Hardened** ([#2071](https://github.com/wheels-dev/wheels/pull/2071)) |
 | Pagination XSS via prependToPage / anchorDivider / appendToPage | ~~bypassable~~ | Sanitized; HTML-entity-encoding bypass closed | **Hardened** ([#2042](https://github.com/wheels-dev/wheels/pull/2042), [#2057](https://github.com/wheels-dev/wheels/pull/2057), [#2060](https://github.com/wheels-dev/wheels/pull/2060)) |
 | Scaffolded-app landing page | ~~CFWheels-era splash~~ | Redesigned 4.0 congratulations page | **Refreshed** ([#2098](https://github.com/wheels-dev/wheels/pull/2098)) |
+| Vite asset pipeline | ~~basic entry-point resolution~~ | Transitive `modulepreload` + CSS resolution for multi-entry Vite builds | **New** ([#2133](https://github.com/wheels-dev/wheels/pull/2133)) |
 
 ## 7. Dependency Injection
 
@@ -140,6 +144,8 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | Playwright CLI commands | ~~absent~~ | Config + test helpers | **New** ([#2013](https://github.com/wheels-dev/wheels/pull/2013), [#2021](https://github.com/wheels-dev/wheels/pull/2021)) |
 | MCP endpoint | Existed | Hardened: auth gate, path-traversal guards, structural allowlist for commands, CSRNG session tokens, error suppression | **Hardened** ([#2049](https://github.com/wheels-dev/wheels/pull/2049), [#2050](https://github.com/wheels-dev/wheels/pull/2050), [#2062](https://github.com/wheels-dev/wheels/pull/2062), [#2083](https://github.com/wheels-dev/wheels/pull/2083), [#2087](https://github.com/wheels-dev/wheels/pull/2087)) |
 | CLI shell-arg sanitization | ~~weak~~ | Structural allowlist; blocks command injection via db shell / deploy | **Hardened** ([#2040](https://github.com/wheels-dev/wheels/pull/2040), [#2068](https://github.com/wheels-dev/wheels/pull/2068), [#2073](https://github.com/wheels-dev/wheels/pull/2073)) |
+| `wheels deploy` | ~~absent~~ | First-class Dockerized deploy via SSH; byte-compatible with Basecamp Kamal's `config/deploy.yml`, on-server conventions, and `kamal-proxy` for zero-downtime rollover | **New** ([#2187](https://github.com/wheels-dev/wheels/pull/2187)) |
+| MCP surface | HTTP endpoint at `/wheels/mcp` (in-dev-server) | LuCLI stdio MCP (`wheels mcp wheels`) is canonical; HTTP endpoint deprecated with warning, scheduled for removal | **Changed** ([#2140](https://github.com/wheels-dev/wheels/pull/2140)) |
 
 ## 11. Package/Plugin Ecosystem
 

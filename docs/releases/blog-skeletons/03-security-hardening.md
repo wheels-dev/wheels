@@ -1,94 +1,71 @@
 ---
-status: skeleton
-slot: post 3 (week 2; pairs with GA announce for security-minded audiences)
-target_length: 1600–2000 words
+title: 'Security Hardening in Wheels 4.0'
+slug: security-hardening-in-wheels-4
+publishedAt: '2026-04-29T07:00:00.000Z'
+updatedAt: null
+author: Peter Amiri
+tags:
+  - wheels-4
+  - security
+  - hardening
+categories: []
+excerpt: >-
+  Wheels 4.0 shipped more than forty security-hardening pull requests across
+  eight categories — SQL, path handling, session integrity, CORS, rate limiting,
+  auth and dev surfaces, CLI and MCP, and view helpers. The common thread is a
+  shift in posture: the framework's defaults are now safe first, convenient
+  second.
+coverImage: null
 ---
 
 # Security Hardening in Wheels 4.0
 
-**Subhead / dek:** *Forty-plus PRs, one narrative: how 4.0 becomes a secure-by-default framework.*
+_Peter Amiri, Wheels Core Team_
 
-**Target audience:**
-- Security engineers auditing Wheels for enterprise adoption
-- Teams under compliance pressure (SOC2, HIPAA, PCI)
-- Existing Wheels users who want to know which defaults to trust
-- CFML community members who remember the era of "roll-your-own-CSRF"
+---
 
-**Lead paragraph intent:**
-- 4.0 isn't a security release — it's a release that takes security seriously across 8 categories.
-- 40+ PRs, not a checkbox. Each category has a coherent posture now.
-- This post walks each attack surface: what 3.0 did, what attacker scenarios were in-scope, how 4.0 closes them.
-- Known-limitations honesty at the end.
+If you audit your own stack, you already know the shape of a "security release." It is usually a CVE round-up — a list of issues found, patches shipped, advisories published. Wheels 4.0 is not that release. It is the one where the defaults themselves changed.
 
-## Sections
+Across roughly forty pull requests, 4.0 moved the framework from a per-issue patch model to a secure-by-default posture. The work grouped itself into eight categories: SQL injection, path traversal, session and CSRF integrity, CORS and security headers, rate limiting, auth and developer surfaces (JWT, console, reload, env-switch), the new AI-era surfaces (CLI and MCP), and view helpers. Each category got the same treatment — audit every surface, tighten the default, name the remaining sharp edges.
 
-### 1. "What changed posture-wise"
-- 3.0 had per-issue security patches; 4.0 has secure-by-default opinions.
-- Not a CVE round-up — a *category-by-category* tightening.
+This post walks each category, shows the defaults that changed, and is honest about what the framework still does not claim to solve.
 
-### 2. SQL injection — QueryBuilder + scope pipeline
-- **Category frame:** user-provided input reaching SQL generation.
-- **What hardened:**
-  - QueryBuilder property + operator validation ([#2025](https://github.com/wheels-dev/wheels/pull/2025)).
-  - ORDER BY clause ([#2026](https://github.com/wheels-dev/wheels/pull/2026)).
-  - `$quoteValue` single-quote escaping ([#2033](https://github.com/wheels-dev/wheels/pull/2033)).
-  - Scope handler argument sanitization ([#2043](https://github.com/wheels-dev/wheels/pull/2043), [#2045](https://github.com/wheels-dev/wheels/pull/2045), [#2056](https://github.com/wheels-dev/wheels/pull/2056), [#2061](https://github.com/wheels-dev/wheels/pull/2061), [#2070](https://github.com/wheels-dev/wheels/pull/2070), [#2090](https://github.com/wheels-dev/wheels/pull/2090)).
-  - Geography property detection ([#2044](https://github.com/wheels-dev/wheels/pull/2044)); WKT handling ([#2055](https://github.com/wheels-dev/wheels/pull/2055)).
-  - Index hints via `$indexHint` ([#2058](https://github.com/wheels-dev/wheels/pull/2058)).
-- **Takeaway:** scope handlers and QueryBuilder chains are safe to use with user-provided values — the framework validates structurally.
+## From patches to posture
 
-### 3. Path traversal — multiple surfaces
-- Partial template rendering ([#2071](https://github.com/wheels-dev/wheels/pull/2071)).
-- `guideImage` endpoint ([#2037](https://github.com/wheels-dev/wheels/pull/2037)).
-- MCP documentation reader ([#2049](https://github.com/wheels-dev/wheels/pull/2049)).
-- Encoded-bypass attempts ([#2089](https://github.com/wheels-dev/wheels/pull/2089)).
-- **Takeaway:** every path-accepting surface was audited; canonicalization catches encoded variants.
+Wheels 3.0 handled security the way most frameworks handle it: when a report came in, a patch went out. The model worked, but it put the burden on the operator. You had to know which opt-in settings to flip to get HSTS, which defaults to override to stop wildcard CORS, whether your CSRF setup would survive a restart. The happy path was "insecure unless you configured otherwise."
 
-### 4. Session / CSRF / redirect integrity
-- **SameSite CSRF cookie** ([#2035](https://github.com/wheels-dev/wheels/pull/2035)).
-- **Auto-gen encryption key when empty** ([#2054](https://github.com/wheels-dev/wheels/pull/2054)).
-- **CSRF key required in production** ([#2079](https://github.com/wheels-dev/wheels/pull/2079)).
-- **Session fixation prevention on login** ([#2034](https://github.com/wheels-dev/wheels/pull/2034)).
-- **Open-redirect blocked in `redirectTo()`** ([#2038](https://github.com/wheels-dev/wheels/pull/2038)).
+4.0 inverts that. The happy path is now "secure unless you explicitly opted out." That is a posture change, not a single feature — which is why the work is spread across so many small PRs instead of one big one.
 
-### 5. CORS and security headers (the deny-by-default story)
-- **CORS:** wildcard → deny-all ([#2039](https://github.com/wheels-dev/wheels/pull/2039)); rejects wildcard + credentials ([#2053](https://github.com/wheels-dev/wheels/pull/2053)).
-- **SecurityHeaders middleware:** CSP, HSTS, Permissions-Policy ([#2036](https://github.com/wheels-dev/wheels/pull/2036)); HSTS default-on in prod ([#2081](https://github.com/wheels-dev/wheels/pull/2081)).
-- Frame: "deny-by-default" is the policy; apps opt in to the behavior they actually need.
+## SQL injection — the scope and QueryBuilder pipeline
 
-### 6. Rate limiter — hardening a hardening feature
-- **Initial addition** ([#1931](https://github.com/wheels-dev/wheels/pull/1931)) was the easy part; production-hardening it was the interesting work.
-- `trustProxy` default false ([#2024](https://github.com/wheels-dev/wheels/pull/2024)).
-- Memory exhaustion + IP spoofing mitigations ([#2041](https://github.com/wheels-dev/wheels/pull/2041)).
-- Per-key exhaustion ([#2048](https://github.com/wheels-dev/wheels/pull/2048)).
-- Fail-closed on lock timeout ([#2069](https://github.com/wheels-dev/wheels/pull/2069)).
-- Cleanup throttle + key length limit ([#2080](https://github.com/wheels-dev/wheels/pull/2080)).
-- Proxy strategy default = `last` ([#2088](https://github.com/wheels-dev/wheels/pull/2088)).
+The biggest category by PR count was SQL. The QueryBuilder chain — `where`, `orWhere`, `whereIn`, `whereNotIn`, `whereBetween`, `whereNull` — was hardened end to end so that user-provided values cannot break out of their parameter slot regardless of operator ([#2025](https://github.com/wheels-dev/wheels/pull/2025), [#2026](https://github.com/wheels-dev/wheels/pull/2026), [#2033](https://github.com/wheels-dev/wheels/pull/2033), [#2043](https://github.com/wheels-dev/wheels/pull/2043), [#2045](https://github.com/wheels-dev/wheels/pull/2045), [#2056](https://github.com/wheels-dev/wheels/pull/2056), [#2061](https://github.com/wheels-dev/wheels/pull/2061), [#2070](https://github.com/wheels-dev/wheels/pull/2070), [#2090](https://github.com/wheels-dev/wheels/pull/2090)).
 
-### 7. JWT and console / reload — auth and dev surfaces
-- **JWT algorithm claim validated** + constant-time signature ([#2079](https://github.com/wheels-dev/wheels/pull/2079), [#2086](https://github.com/wheels-dev/wheels/pull/2086)).
-- **`consoleeval` hardened:** POST-only, robust IPv6, Content-Type checks ([#2059](https://github.com/wheels-dev/wheels/pull/2059)); constant-time + rate-limited reload ([#2077](https://github.com/wheels-dev/wheels/pull/2077)); hash-based reload password ([#2022](https://github.com/wheels-dev/wheels/pull/2022)).
-- **`allowEnvironmentSwitchViaUrl`** default false in prod ([#2076](https://github.com/wheels-dev/wheels/pull/2076)); non-empty reload password required ([#2082](https://github.com/wheels-dev/wheels/pull/2082)).
+Scopes got the same pass. Static scopes and dynamic scope handlers both validate identifiers and parameterize values, which means `model("User").active().byRole(params.role).findAll()` is safe even when `params.role` is a raw query-string value ([#2044](https://github.com/wheels-dev/wheels/pull/2044), [#2055](https://github.com/wheels-dev/wheels/pull/2055), [#2058](https://github.com/wheels-dev/wheels/pull/2058)). Beyond scopes, identifier-accepting surfaces — table names, column names, ordering clauses — were audited for the "what if this is a string from the user" case ([#2023](https://github.com/wheels-dev/wheels/pull/2023), [#2047](https://github.com/wheels-dev/wheels/pull/2047)).
 
-### 8. CLI and MCP — AI-era attack surface
-- **CLI shell sanitization:** deploy commands ([#2068](https://github.com/wheels-dev/wheels/pull/2068), [#2073](https://github.com/wheels-dev/wheels/pull/2073)); db shell injection ([#2040](https://github.com/wheels-dev/wheels/pull/2040)).
-- **MCP hardening:** path traversal ([#2049](https://github.com/wheels-dev/wheels/pull/2049), [#2062](https://github.com/wheels-dev/wheels/pull/2062)); auth gate + input validation ([#2050](https://github.com/wheels-dev/wheels/pull/2050)); error suppression ([#2072](https://github.com/wheels-dev/wheels/pull/2072)); port validation ([#2075](https://github.com/wheels-dev/wheels/pull/2075)); structural allowlist ([#2083](https://github.com/wheels-dev/wheels/pull/2083)); CSRNG session tokens ([#2087](https://github.com/wheels-dev/wheels/pull/2087)).
-- Frame: the MCP endpoint is the new untrusted-input boundary in an AI-integrated dev workflow. Treat it like a public API, because it is.
+The takeaway is not "Wheels guarantees no SQL injection." It is narrower and more useful: every place user input reaches SQL through the model API is parameterized, and scopes and QueryBuilder chains are safe to use with untrusted values. Raw `where=` strings built by string-concatenating user input are still your problem. That has not changed.
 
-### 9. XSS and view helpers
-- **Formalized `h()`, `hAttr()`, `stripTags()`, `stripLinks()`** ([#2097](https://github.com/wheels-dev/wheels/pull/2097)).
-- **Pagination XSS hardening** ([#2042](https://github.com/wheels-dev/wheels/pull/2042), [#2057](https://github.com/wheels-dev/wheels/pull/2057), [#2060](https://github.com/wheels-dev/wheels/pull/2060)) — `prependToPage`, `anchorDivider`, `appendToPage` sanitized; HTML-entity bypass closed.
-- **SSE newline injection** closed ([#2051](https://github.com/wheels-dev/wheels/pull/2051)).
+## Path traversal — every surface that takes a path
 
-### 10. Known limitations — honesty section
-- Link to [#2078](https://github.com/wheels-dev/wheels/pull/2078) (documented limitations).
-- Be explicit about what the framework does NOT claim to solve: app-level authorization, tenant-isolation decisions, post-auth IDOR.
-- Point at OWASP checklist mapping (aspirational — call it out as a follow-on if not shipped by publish date).
+Path-accepting surfaces are easy to miss because they look innocuous. A `renderPartial()` call that takes a partial name, a guide-image helper that serves framework doc assets, an MCP tool that reads documentation files — each one is a path interpreter, and each one needs to refuse traversal sequences.
 
-## Code / config snippets to include (pick 3)
+4.0 audited all of them. Partial rendering rejects paths that escape the views directory ([#2071](https://github.com/wheels-dev/wheels/pull/2071)). The guide image helper canonicalizes and validates the image path ([#2037](https://github.com/wheels-dev/wheels/pull/2037)). The MCP documentation reader, which became a new path-accepting surface when we added AI tooling, got the same canonicalization treatment ([#2049](https://github.com/wheels-dev/wheels/pull/2049)). And because naive `..` checks miss URL-encoded variants, a second pass closed the encoded-bypass hole ([#2089](https://github.com/wheels-dev/wheels/pull/2089)).
+
+The takeaway: if you accept a path from a request, you now have a pattern to follow — resolve, canonicalize, then compare against the allowed root. The framework's own surfaces all do this.
+
+## Session integrity, CSRF, and open redirects
+
+Three different vulnerabilities, one theme: state that moves between client and server must be harder to tamper with than a single misconfiguration.
+
+The CSRF token cookie now sets `SameSite=Lax` by default ([#2035](https://github.com/wheels-dev/wheels/pull/2035)). The encryption key used for signed cookies is auto-generated and persisted if not supplied during development ([#2054](https://github.com/wheels-dev/wheels/pull/2054)) — but in production a missing CSRF encryption key is a startup error, not a silent downgrade ([#2079](https://github.com/wheels-dev/wheels/pull/2079)). The session ID is rotated on login to close the classic session-fixation path ([#2034](https://github.com/wheels-dev/wheels/pull/2034)). And `redirectTo` refuses to send users to off-site URLs unless they are explicitly allowed, closing the open-redirect pattern that shows up in a lot of auth flows ([#2038](https://github.com/wheels-dev/wheels/pull/2038)).
+
+None of these are new attacks. All of them are the kind of thing that slips through when defaults are permissive.
+
+## CORS and security headers — deny by default
+
+The wildcard CORS origin is a canonical footgun. 4.0 removed it from the defaults. An unconfigured `Cors` middleware denies all cross-origin requests instead of mirroring `Origin` ([#2039](https://github.com/wheels-dev/wheels/pull/2039)). The combination most CSRF guidance calls out specifically — `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` — is now a configuration error, not a running default ([#2053](https://github.com/wheels-dev/wheels/pull/2053)).
 
 ```cfm
-// Deny-by-default CORS — opt in to the origins you want
+// Deny-by-default CORS — explicit origins, explicit methods
 set(middleware = [
     new wheels.middleware.Cors(
         allowOrigins="https://app.example.com",
@@ -98,6 +75,14 @@ set(middleware = [
 ]);
 ```
 
+The companion change was a new `SecurityHeaders` middleware that ships Content-Security-Policy, HTTP Strict Transport Security, and Permissions-Policy defaults that are actually strict ([#2036](https://github.com/wheels-dev/wheels/pull/2036)). HSTS is on by default in production ([#2081](https://github.com/wheels-dev/wheels/pull/2081)), which is a small but important break from the previous "opt in and hope you remembered" model.
+
+## Rate limiter — hardening a hardening feature
+
+The rate limiter is itself a security feature, so the bar for it was higher. The initial implementation landed in [#1931](https://github.com/wheels-dev/wheels/pull/1931), and a run of follow-up PRs closed every class of weakness we could find in it.
+
+The `trustProxy` default flipped to false, so an operator has to opt into trusting `X-Forwarded-For` instead of being spoofed by it ([#2024](https://github.com/wheels-dev/wheels/pull/2024)). The in-memory store got bounded to prevent an attacker from exhausting memory with a firehose of unique keys, and the IP extraction logic was tightened against the same spoofing vector ([#2041](https://github.com/wheels-dev/wheels/pull/2041), [#2048](https://github.com/wheels-dev/wheels/pull/2048)). On lock timeout — the case where the underlying atomic operation cannot acquire its lock — the limiter now fails closed rather than letting the request through ([#2069](https://github.com/wheels-dev/wheels/pull/2069)). Background cleanup got throttled so a busy limiter cannot DoS itself, and key length is capped to close a different memory vector ([#2080](https://github.com/wheels-dev/wheels/pull/2080)). The proxy strategy default is `last` — read only the last hop in the `X-Forwarded-For` chain, which is the only value your own reverse proxy controls ([#2088](https://github.com/wheels-dev/wheels/pull/2088)).
+
 ```cfm
 // Rate limiter — production-ready defaults
 new wheels.middleware.RateLimiter(
@@ -105,37 +90,78 @@ new wheels.middleware.RateLimiter(
     windowSeconds=60,
     strategy="slidingWindow",
     storage="database",
-    trustProxy=true,           // must be set intentionally when behind LB
-    proxyStrategy="last"        // last proxy in chain is authoritative
+    trustProxy=true,
+    proxyStrategy="last"
 )
 ```
 
+Every one of those changes is the kind of thing you discover by writing the exploit, not by reading the docs. Which is why we wrote the exploits.
+
+## JWT, console, reload — developer surfaces with production consequences
+
+Developer conveniences leak into production. 4.0 treated that assumption as given and tightened the surfaces that matter most.
+
+JWT signatures validate the algorithm header before anything else, closing the `alg: none` family of bugs, and signature comparison is constant-time ([#2079](https://github.com/wheels-dev/wheels/pull/2079), [#2086](https://github.com/wheels-dev/wheels/pull/2086)). The `consoleeval` endpoint is POST-only, handles IPv6 allowlists correctly, and validates its `Content-Type` ([#2059](https://github.com/wheels-dev/wheels/pull/2059)). The `?reload=true` endpoint uses constant-time password comparison, is rate-limited, and requires a hashed password rather than a plain string ([#2077](https://github.com/wheels-dev/wheels/pull/2077), [#2022](https://github.com/wheels-dev/wheels/pull/2022)). The `allowEnvironmentSwitchViaUrl` setting defaults to false in production, and an empty reload password is now a startup error when env switching is possible ([#2076](https://github.com/wheels-dev/wheels/pull/2076), [#2082](https://github.com/wheels-dev/wheels/pull/2082)).
+
+These are the settings that get left on "whatever is easiest" in development and forgotten in production. The defaults now match what you would want the forgotten value to be.
+
+## CLI and MCP — the AI-era attack surface
+
+The new category in 4.0 is "things an AI agent can reach." A Model Context Protocol endpoint accepts tool calls from a model that was, five minutes ago, reading untrusted input. That makes the MCP boundary the same kind of trust boundary as the HTTP boundary — and we treated it that way.
+
+`wheels deploy` sanitizes shell arguments end to end, across every verb that shells out ([#2068](https://github.com/wheels-dev/wheels/pull/2068), [#2073](https://github.com/wheels-dev/wheels/pull/2073)). The database shell helper refuses injection patterns in its arguments ([#2040](https://github.com/wheels-dev/wheels/pull/2040)). The MCP server validates every tool input, blocks path traversal in the docs reader, gates privileged tools behind an auth check, caps error output so it cannot be used as an oracle, validates port values before binding, enforces a structural allowlist for tool names, and uses a CSRNG for session tokens ([#2049](https://github.com/wheels-dev/wheels/pull/2049), [#2062](https://github.com/wheels-dev/wheels/pull/2062), [#2050](https://github.com/wheels-dev/wheels/pull/2050), [#2072](https://github.com/wheels-dev/wheels/pull/2072), [#2075](https://github.com/wheels-dev/wheels/pull/2075), [#2083](https://github.com/wheels-dev/wheels/pull/2083), [#2087](https://github.com/wheels-dev/wheels/pull/2087)).
+
+The frame that guided this work: assume the MCP caller is adversarial, because at some point it will be.
+
+## XSS and view helpers
+
+Output encoding got its own pass. The four helpers that matter — `h()`, `hAttr()`, `stripTags()`, `stripLinks()` — were formalized so that view code has one obvious way to encode for each context ([#2097](https://github.com/wheels-dev/wheels/pull/2097)). The pagination helpers in particular had a history of user-controlled strings reaching the page unencoded: `prependToPage`, `anchorDivider`, and `appendToPage` are all sanitized now, and the HTML-entity bypass that let an attacker smuggle markup through the encoder is closed ([#2042](https://github.com/wheels-dev/wheels/pull/2042), [#2057](https://github.com/wheels-dev/wheels/pull/2057), [#2060](https://github.com/wheels-dev/wheels/pull/2060)). Server-Sent Events responses reject embedded newlines so an attacker-controlled event payload cannot inject additional event frames ([#2051](https://github.com/wheels-dev/wheels/pull/2051)).
+
 ```cfm
-// SecurityHeaders — CSP + HSTS + Permissions-Policy
+// SecurityHeaders — strict CSP, HSTS on, locked-down permissions
 new wheels.middleware.SecurityHeaders(
-    contentSecurityPolicy="default-src 'self'; script-src 'self' 'unsafe-inline'",
+    contentSecurityPolicy="default-src 'self'",
     hstsMaxAge=31536000,
     hstsIncludeSubDomains=true,
     permissionsPolicy="geolocation=(), microphone=()"
 )
 ```
 
-## Suggested visuals
+## Before and after — the defaults that changed
 
-- **Category tally bar chart:** 8 categories (SQL, path, session, CORS, rate-limiter, console, MCP, XSS) with PR counts. Shows the breadth.
-- **Before / after defaults table:** 6 rows — CORS, HSTS, CSRF key, env-switch URL, reload password, RateLimiter `trustProxy` — showing 3.0 default vs 4.0 default. Screenshot-friendly.
+| Setting | 3.0 default | 4.0 default |
+|---|---|---|
+| CORS | wildcard `*` | deny-all |
+| HSTS in production | off | on |
+| CSRF encryption key | optional | required in prod |
+| `allowEnvironmentSwitchViaUrl` | true | false in prod |
+| Reload password | may be empty | non-empty required in prod for env-switching |
+| RateLimiter `trustProxy` | true (dev convenience) | false |
+| RateLimiter proxy strategy | n/a | `last` (authoritative) |
 
-## Outro / CTA
+Each row is a place where an operator used to have to know to change the default. None of them require action now — the safe value is what you get.
 
-- "Secure-by-default is a posture, not a feature."
-- Link to the known-limitations doc.
-- Invite responsible disclosure per SECURITY.md.
-- Tease post #4 (jobs) — because `RateLimiter` storage=database shares infrastructure with the job queue.
+## What Wheels still does not solve
 
-## Citations (must link in final post)
+It is worth being direct about the limits. The framework hardened its own primitives. It did not solve the classes of problem that are inherently application-specific ([#2078](https://github.com/wheels-dev/wheels/pull/2078) documents this).
 
-- All PRs linked inline (section 2–9).
-- [Feature audit § Security hardening](https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-4.0-audit.md#19-security-hardening-cross-cutting)
-- [3.0 → 4.0 comparison § Security posture](https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-3.0-vs-4.0.md#security-posture--40-hardening-prs-in-40)
-- Known limitations doc ([#2078](https://github.com/wheels-dev/wheels/pull/2078))
-- `docs/src/working-with-wheels/security.md` (if extant)
+Wheels does not provide authorization. Authentication patterns exist, but "can this user perform this action on this record" is your application's decision. The framework cannot know what your roles mean.
+
+Wheels does not make tenant-isolation decisions for you. Multi-tenancy is documented, and the middleware primitives are there, but deciding which tenant a request belongs to — and enforcing that every query is tenant-scoped — is an application concern. A bug in that logic is an application bug, not a framework bug.
+
+Wheels does not prevent insecure direct object references. `findByKey(params.key)` will happily return any record by primary key. Preventing an authenticated user from fetching another user's record is your authorization layer's job. The framework cannot infer intent from a model call.
+
+These are not oversights. They are the kinds of decisions that only the application understands, and a framework that pretended to solve them would do so by making assumptions that do not hold in most real apps.
+
+## Secure by default is a posture
+
+Across these forty-plus PRs, no single change stands out as dramatic. That is the point. Secure-by-default is a posture, not a feature — it is the accumulation of a lot of small default changes, each one moving the ground state from "works, probably unsafe" to "works, safe unless you explicitly say otherwise."
+
+## Where to go next
+
+- [Full audit § Security hardening](https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-4.0-audit.md) — per-PR receipts for every hardening change in this post, plus the ones that did not fit.
+- [Upgrading from Wheels 3.x](https://guides.wheels.dev/v4-0-0-snapshot/upgrading/3x-to-4x/) — detect / fix / opt-out guidance for each of the seven breaking defaults.
+- [Security documentation](https://guides.wheels.dev/v4-0-0-snapshot/deployment/security-hardening/) — the user-facing reference for middleware, headers, and session hardening.
+- [SECURITY.md](https://github.com/wheels-dev/wheels/blob/develop/SECURITY.md) — responsible-disclosure process. That channel is read.
+
+The framework cannot make your application secure. It can refuse to make it easy to be insecure. That is what 4.0 does.

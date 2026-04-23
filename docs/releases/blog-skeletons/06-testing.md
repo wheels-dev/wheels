@@ -1,81 +1,46 @@
 ---
-status: skeleton
-slot: post 6 (week 2–3; pairs with LuCLI post)
-target_length: 1400–1700 words
+title: 'Testing in Wheels 4.0'
+slug: testing-in-wheels-4
+publishedAt: '2026-05-03T07:00:00.000Z'
+updatedAt: null
+author: Peter Amiri
+tags:
+  - wheels-4
+  - testing
+  - playwright
+  - bdd
+categories: []
+excerpt: >-
+  Wheels 4.0 completes the test pyramid: BDD unit tests, a fluent HTTP
+  TestClient for integration, and Playwright-powered browser automation for
+  end-to-end — all running in parallel. The category that was most embarrassing
+  in 3.0 is the most complete in 4.0.
+coverImage: null
 ---
 
 # Testing in Wheels 4.0
 
-**Subhead / dek:** *HTTP integration tests, parallel runners, and full-browser Playwright — the category that was most embarrassing in 3.0 is the most complete in 4.0.*
+_Peter Amiri, Wheels Core Team_
 
-**Target audience:**
-- QA engineers evaluating CFML frameworks
-- Developers who've been writing integration tests with curl + bash
-- Teams considering Cypress/Playwright but wanting a unified CFML testing story
-- Existing Wheels teams wondering whether BDD-only is worth the migration
+---
 
-**Lead paragraph intent:**
-- In 3.0, Wheels testing was RocketUnit specs and custom harnesses.
-- In 4.0, Wheels testing is a full pyramid: unit (WheelsTest BDD) + integration (HTTP TestClient) + end-to-end (Playwright-backed BrowserTest) — run in parallel.
-- This post walks each layer with a concrete example, then discusses the BDD-only stance.
+If you have been writing integration tests for a Wheels app with `curl` and bash, or verifying critical paths by clicking through the browser yourself, Wheels 4.0 is the release where that stops.
 
-## Sections
+The framework ships with three testing layers, all first-class, all in the core distribution: BDD unit tests, an HTTP TestClient for integration, and a Playwright-driven browser DSL for end-to-end. They run in parallel on multi-core runners. They share one base class, one test runner, and one reporter. Across roughly 15 weeks and 260+ merged PRs, testing is the category that moved furthest — and the one that, honestly, most needed it.
 
-### 1. "The test pyramid, finally complete"
-- Unit tests exist in every framework; that's table stakes.
-- Integration and E2E were the gaps. Both land in 4.0 — natively, not via third-party bridges.
-- Running them fast: parallel by default.
+## The test pyramid, finally complete
 
-### 2. Unit tests — WheelsTest BDD
-- `wheels.WheelsTest` replaces `wheels.Test` as the canonical base class ([#1889](https://github.com/wheels-dev/wheels/pull/1889)).
-- `describe()` / `it()` / `expect()` — familiar BDD syntax.
-- RocketUnit retained for legacy specs but deprecated for new work ([#1925](https://github.com/wheels-dev/wheels/pull/1925)).
-- Tests directory renamed to `tests/specs/functional/` ([#1872](https://github.com/wheels-dev/wheels/pull/1872)).
+Unit tests have always been table stakes. Every framework ships with them. Wheels 3.0 had RocketUnit, and later added a BDD layer, and that was fine for testing model validations and controller helpers in isolation.
 
-### 3. Integration — HTTP TestClient
-- `TestClient.visit("/users").assertOk().assertSee("John")` — fluent, familiar from Laravel/Rails test clients.
-- Assertions: status codes, body content (`assertSee`, `assertDontSee`, `assertSeeInOrder`), JSON responses (`assertJson`, `assertJsonPath` with dot notation), redirects, headers, cookies.
-- Cookies tracked across requests → session support.
-- PR: [#2099](https://github.com/wheels-dev/wheels/pull/2099).
-- Use case: test a full request/response cycle without a browser.
+The gaps were integration and end-to-end. If you wanted to assert that `GET /users` returned a 200 and contained "John", you wrote a shell script. If you wanted to confirm that logging in, creating a record, and seeing it in the list actually worked as a user would experience it, you either did not test it or you wired in Selenium from scratch.
 
-### 4. End-to-end — BrowserTest (Playwright Java)
-- Extend `wheels.wheelstest.BrowserTest`; get `this.browser` as a fluent DSL wrapping Playwright Java.
-- Install once: `wheels browser:install` — ~370MB (JARs + Chromium).
-- ~60 DSL methods: navigation, interaction (`click`, `fill`, `select`, `attach`, `dragAndDrop`), keyboard, waiting (`waitFor`, `waitForText`, `waitForUrl`), scoping (`within`), cookies, auth (`loginAs`, `logout`), dialogs (Lucee-only), viewport (`resize`, `resizeToMobile`), script, screenshots, full assertion suite.
-- Shipped across [#2113](https://github.com/wheels-dev/wheels/pull/2113), [#2115](https://github.com/wheels-dev/wheels/pull/2115), [#2116](https://github.com/wheels-dev/wheels/pull/2116), [#2121](https://github.com/wheels-dev/wheels/pull/2121), [#2122](https://github.com/wheels-dev/wheels/pull/2122).
-- CI runs browser specs in `pr.yml` and `snapshot.yml` with Playwright JARs + Chromium cached.
-- Caveat: dialogs use `createDynamicProxy` which is Lucee-specific; specs skip gracefully on other engines.
+In 4.0 both of those are first-class. Not through a plugin, not through a third-party bridge — in the core distribution, extending the same base class, discoverable by the same runner, reported through the same JSON format. The pyramid is complete, and every layer runs fast enough that you will actually use it.
 
-### 5. Parallel — ParallelRunner
-- PR: [#2100](https://github.com/wheels-dev/wheels/pull/2100).
-- Discovers bundles, round-robin partitions them across N workers, fires parallel HTTP requests via `cfthread`, aggregates JSON results.
-- Configurable worker count and timeout.
-- Cuts suite time on multi-core CI runners.
+## Unit tests: WheelsTest BDD
 
-### 6. "Why BDD-only for new tests?"
-- Signals intent clearly: `describe("User.valid()", () => { it("requires email", ...) })` reads top-to-bottom.
-- Consolidates on one style — dual-stack testing confused contributors.
-- Legacy RocketUnit specs continue to run; nobody has to migrate. New specs should follow the BDD pattern.
+`wheels.WheelsTest` is the canonical base class for new tests (#1889). RocketUnit — the older `wheels.Test` base with `test_` prefixed methods and `assert()` calls — is retained for backward compatibility and deprecated for new work (#1925). Every legacy spec continues to run; nobody has to migrate.
 
-### 7. A critical-path test, end-to-end in 50 lines
-- Skeleton example: login → create a record → verify it appears in the list → delete it → verify it's gone.
-- Show the BrowserTest equivalent using `loginAs()`, `fill()`, `click()`, `assertSee()`.
-- 15-minute setup, lifetime of regression coverage. Call out that this replaces manual QA for the 5-10 critical journeys in most apps.
-
-### 8. Hard-won gotchas (short list)
-- **`##` in selectors** — CFML requires `##` to emit literal `#`. `"##email"` → `"#email"` at runtime.
-- **`client` is a Lucee reserved scope.** Use `var c = ...` or `var bc = ...` instead of `var client`.
-- **`this.browserTestSkipped`** — when Playwright JARs aren't installed, `beforeAll` sets this flag; all `it`s should short-circuit to stay green.
-- **Data URLs work for most tests** — no fixture server needed for ~95% of DSL coverage.
-- Reference: [`.ai/wheels/testing/browser-testing.md`](https://github.com/wheels-dev/wheels/blob/develop/.ai/wheels/testing/browser-testing.md).
-
-### 9. Test data, fixtures, and populate.cfm
-- `tests/populate.cfm` remains the DROP + CREATE + seed harness.
-- Test models live in `tests/_assets/models/`.
-- LuCLI + SQLite for local runs; full matrix DBs for CI.
-
-## Code / config snippets to include (pick 3)
+The BDD syntax reads top-to-bottom the way a specification does:
 
 ```cfm
 // Unit — WheelsTest BDD
@@ -90,6 +55,14 @@ component extends="wheels.WheelsTest" {
     }
 }
 ```
+
+Specs live under `tests/specs/` — organized into `tests/specs/models/`, `tests/specs/controllers/`, and `tests/specs/functional/` (#1872). The folder layout is convention, not configuration — the runner discovers everything recursively.
+
+We consolidated on BDD-only for new tests deliberately. Dual-stack testing confused contributors. A PR would land with one spec in RocketUnit style and another in BDD style, and the reviewer would have to hold two mental models at once. `describe("User.valid()", () => { it("requires email", ...) })` signals intent unambiguously — the describe block names the unit under test, the `it` names the behavior, the matcher names the expectation. There is exactly one idiomatic way to write a new spec.
+
+## Integration: HTTP TestClient
+
+`TestClient` is a fluent HTTP client for hitting your own app from inside a test (#2099). It speaks the same routes, cookies, and sessions that real requests do, but without the ceremony of spinning up a server and curling against it.
 
 ```cfm
 // Integration — HTTP TestClient
@@ -107,8 +80,16 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
+The assertion surface covers what you actually want to assert on an HTTP response: status codes (`assertOk`, `assertStatus`, `assertRedirect`), body content (`assertSee`, `assertDontSee`), JSON responses with dot-notation path access (`assertJson`, `assertJsonPath`), headers, and cookies. Cookies are tracked across requests on the same client instance, which means session-based flows — log in on one request, act as the logged-in user on the next — work without extra wiring.
+
+This is the middle layer that was missing in 3.0. You no longer need to stand up a fixture server just to assert that a route returns the right JSON shape.
+
+## End-to-end: BrowserTest with Playwright Java
+
+End-to-end is the layer that turns a "does it work?" question into an actual answer. `wheels.wheelstest.BrowserTest` is the base class; `this.browser` is a fluent DSL wrapping Playwright Java, which drives a real Chromium over the DevTools protocol.
+
 ```cfm
-// End-to-end — BrowserTest with loginAs + critical-path assertion
+// End-to-end — BrowserTest
 component extends="wheels.wheelstest.BrowserTest" {
     this.browserEngine = "chromium";
 
@@ -130,25 +111,61 @@ component extends="wheels.wheelstest.BrowserTest" {
 }
 ```
 
-## Suggested visuals
+One-time install, about 370MB for JARs plus Chromium:
 
-- **Test pyramid:** classic triangle — unit (wide base: WheelsTest BDD) / integration (middle: TestClient) / E2E (tip: BrowserTest). Label each layer with the Wheels-specific API.
-- **Screenshot:** parallel runner output showing workers claiming bundles, final aggregate summary.
-- **Before/after (3.0 vs 4.0):** checklist matrix — unit / integration / E2E / parallel / BDD syntax. 3.0 column mostly empty; 4.0 column mostly checked.
+```bash
+wheels browser:install
+```
 
-## Outro / CTA
+The DSL lands with roughly 60 methods across the shape you want for realistic specs: navigation (`visit`, `visitRoute`, `back`, `refresh`), interaction (`click`, `fill`, `type`, `select`, `check`, `attach`, `dragAndDrop`), keyboard (`press`, `pressEnter`, `pressTab`), waiting (`waitFor`, `waitForText`, `waitForUrl`), scoping (`within(selector, callback)`), cookies, authentication helpers (`loginAs`, `logout`), dialog handling, viewport resize for mobile/tablet/desktop shapes, screenshots, and a text-and-visibility-and-URL-and-form assertion set that covers the common ground. The shape shipped across #2113, #2115, #2116, #2121, and #2122.
 
-- "You can reach your first green browser test in under half an hour."
-- Link to `docs/src/working-with-wheels/testing-your-application.md`.
-- Link to `.ai/wheels/testing/browser-testing.md` for the deep reference.
-- Note BrowserTest is Chromium-only at 4.0 launch; Firefox/WebKit are roadmap.
+CI runs browser specs in both `pr.yml` and `snapshot.yml`. Playwright JARs and Chromium are cached keyed on the hash of `browser-manifest.json`, so the download cost lands once per manifest change rather than once per run. The environment variable `WHEELS_BROWSER_TEST_BASE_URL=http://localhost:60007` is set automatically.
 
-## Citations (must link in final post)
+Chromium is the only engine at 4.0 launch. Firefox and WebKit are on the roadmap — the DSL is already shaped to accept them; the work is in the installer and the cross-engine behavior smoothing, not the test code you write.
 
-- [TestClient PR #2099](https://github.com/wheels-dev/wheels/pull/2099)
-- [ParallelRunner PR #2100](https://github.com/wheels-dev/wheels/pull/2100)
-- [BrowserTest PRs #2113, #2115, #2116, #2121, #2122](https://github.com/wheels-dev/wheels/pull/2113)
-- [WheelsTest namespace #1889](https://github.com/wheels-dev/wheels/pull/1889)
-- [RocketUnit deprecation #1925](https://github.com/wheels-dev/wheels/pull/1925)
-- `docs/src/working-with-wheels/testing-your-application.md`
-- `.ai/wheels/testing/browser-testing.md`
+## Parallel: ParallelRunner
+
+Slow test suites are test suites you do not run. The `ParallelRunner` (#2100) discovers test bundles, partitions them round-robin across N workers, fires parallel HTTP requests through `cfthread`, and aggregates the JSON results at the end. On a multi-core CI runner, suite time drops proportionally.
+
+This matters especially for the browser layer, where each spec carries the cost of a real page load. What used to be a coffee-break suite becomes something you run while you are still looking at the screen.
+
+## A critical path, end-to-end
+
+The shape that justifies the whole effort looks like this:
+
+1. Log in as an admin.
+2. Navigate to the new-user form.
+3. Fill in name and email.
+4. Submit.
+5. Assert the URL redirected to the index.
+6. Assert the new user shows up in the list.
+7. Optionally: click delete, confirm the dialog, assert the user is gone.
+
+That is the end-to-end spec shown above. Write it once in about 15 minutes, get regression coverage for the lifetime of that flow. It catches the class of bug where individual units all pass but the wiring between them is broken — a route that is not mounted, a form that submits to the wrong action, a redirect that targets a URL that no longer exists.
+
+## Hard-won gotchas
+
+These are the ones that bit us during the port, in the order you will likely hit them.
+
+- **`##` in selectors.** CFML requires `##` to emit a literal `#`. In browser selectors, `"##email"` is what you write to target `#email`. Every CSS ID selector in a spec needs this. Miss it and you will see `Invalid Syntax Closing [#] not found` at compile time, which crashes the entire suite, not just the file.
+- **`client` is a Lucee reserved scope.** Writing `var client = ...` inside a closure throws `"client scope is not enabled"`. Use `var c = ...` or `var bc = ...` instead. `session` and `application` have the same trap; use `sess` and `app`.
+- **`this.browserTestSkipped`** — when Playwright JARs are not installed (fresh clone, clean CI image), the `beforeAll` hook sets this flag and the `browserDescribe` helper short-circuits every nested `it`. All browser specs should open with `if (this.browserTestSkipped) return;` so a machine without JARs stays green instead of red.
+- **Data URLs cover about 95% of browser DSL coverage.** Most specs do not need a running fixture server — `this.browser.visitUrl("data:text/html,<title>Hi</title><h1>x</h1>")` is enough to exercise navigation, interaction, waiting, and assertions. Spin up the full fixture app only when you actually need cookies, form submissions, or redirects hitting real routes.
+- **Dialogs are Lucee-only.** `acceptDialog`, `dismissDialog`, and `dialogMessage` use `createDynamicProxy`, which is a Lucee feature. Specs that depend on them should skip gracefully on other engines.
+- **Fixture routes.** `/_browser/login-as` and `/_browser/logout` are mounted automatically in test mode. They have to come before `.wildcard()` in `routes.cfm` or they will never match.
+
+The full reference is at [`.ai/wheels/testing/browser-testing.md`](https://github.com/wheels-dev/wheels/blob/develop/.ai/wheels/testing/browser-testing.md).
+
+## Test data and fixtures
+
+`tests/populate.cfm` remains the DROP + CREATE + seed harness — it runs once at the start of a test run, resets the schema, and seeds whatever the suite depends on. Test-only models live in `tests/_assets/models/` and use `table()` to map against test tables so they do not collide with real application models.
+
+For local development, the canonical stack is LuCLI with SQLite — `bash tools/test-local.sh` handles everything from database creation through cleanup, no Docker required. CI runs the full matrix across Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang, against MySQL, PostgreSQL, SQL Server, H2, SQLite, and CockroachDB. The LuCLI inner loop is fast enough to use between every edit; the full matrix is what runs pre-merge.
+
+## Where to go next
+
+- [Testing guide](https://guides.wheels.dev/v4-0-0-snapshot/testing/) — the user-facing walkthrough for WheelsTest, TestClient, and the spec layout.
+- [Browser testing deep reference](https://github.com/wheels-dev/wheels/blob/develop/.ai/wheels/testing/browser-testing.md) — the full DSL surface, every gotcha we hit during the port, and the classloader/Playwright internals.
+- [Running tests locally](https://guides.wheels.dev/v4-0-0-snapshot/testing/running-tests-locally/) — LuCLI and Docker paths.
+
+If you have been treating testing as the part of the Wheels workflow you do not really do, 4.0 is the release where that calculus changes. First green unit spec in under five minutes. First green browser test in under 30. Feedback welcome on everything that is not yet obvious — contributors this cycle include @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta, and Dependabot, and the feedback loop that shaped the testing surface is exactly the one we want to keep open for 4.0.x.
