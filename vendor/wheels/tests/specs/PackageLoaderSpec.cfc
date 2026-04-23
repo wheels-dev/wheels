@@ -262,6 +262,72 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("wheelsVersion compatibility", () => {
+
+				it("rejects packages whose wheelsVersion constraint the runtime cannot satisfy", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix,
+						wheelsVersion = "4.0.0"
+					);
+					var pkgs = loader.getPackages();
+					var meta = loader.getPackageMeta();
+					var failed = loader.getFailedPackages();
+
+					// Fixture declares ">=99.0" which 4.0.0 cannot satisfy
+					expect(pkgs).notToHaveKey("incompatversion");
+					expect(meta).notToHaveKey("incompatversion");
+
+					var foundIncompat = false;
+					for (var f in failed) {
+						if (f.name == "incompatversion" && Find("wheelsVersion", f.error)) {
+							foundIncompat = true;
+						}
+					}
+					expect(foundIncompat).toBeTrue();
+				});
+
+				it("loads packages whose wheelsVersion constraint is satisfied", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix,
+						wheelsVersion = "4.0.0"
+					);
+					var pkgs = loader.getPackages();
+
+					// Fixture declares ">=3.0" which 4.0.0 satisfies
+					expect(pkgs).toHaveKey("compatversion");
+				});
+
+				it("loads packages that omit wheelsVersion (backward compatible)", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix,
+						wheelsVersion = "4.0.0"
+					);
+					var pkgs = loader.getPackages();
+
+					// Existing fixtures like depA/depB/replacer have no wheelsVersion declared
+					expect(pkgs).toHaveKey("depA");
+					expect(pkgs).toHaveKey("depB");
+					expect(pkgs).toHaveKey("replacer");
+				});
+
+				it("treats dev build stamp as permissive so strict constraints do not reject in local dev", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix,
+						wheelsVersion = "@build.version@"
+					);
+					var pkgs = loader.getPackages();
+
+					// Even the ">=99.0" fixture loads on an unstamped dev build
+					expect(pkgs).toHaveKey("incompatversion");
+					expect(pkgs).toHaveKey("compatversion");
+				});
+
+			});
+
 			describe("Lazy loading", () => {
 
 				it("does not eagerly instantiate lazy packages", () => {
