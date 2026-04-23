@@ -49,7 +49,7 @@ If you know Rails, the tutorial will feel familiar in pacing and idioms. The dif
 
 - **Hash-delimited expressions in CFML strings.** `"Hello #user.name#"` interpolates `user.name`. This is different from Ruby's `"Hello #{user.name}"`; the `#` pairs are delimiters, not escape-plus-braces.
 - **Named-argument style matters.** Wheels functions often take positional OR named args, never a mix. `hasMany(name="comments", dependent="delete")` — not `hasMany("comments", dependent="delete")`.
-- **No bundler / Gemfile.** The framework lives in `vendor/wheels/`, copied into the app by the CLI. There's a package system (first-party packages activate via copy from `packages/` into `vendor/`), but there's no central package registry or lockfile — intentional.
+- **No bundler / Gemfile.** The framework lives in `vendor/wheels/`, copied into the app by the CLI. There's a package system (first-party packages are standalone repos indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry and installed into `vendor/<name>/`), but there's no lockfile — intentional.
 
 ## Wheels vs Laravel
 
@@ -64,7 +64,7 @@ Laravel is more spiritually aligned than structurally. Both are opinionated, bot
 | Auth | Sanctum / Fortify / Breeze | Built-in `wheels.auth` (session / JWT / token strategies) |
 | Queues | Horizon + Redis / SQS | Built-in job queue with DB backing |
 | Real-time | Livewire / Broadcasting | Server-Sent Events (native) + Turbo Streams (via package) |
-| Package manager | Composer | No central registry; `packages/` → `vendor/` activation |
+| Package manager | Composer | Curated `wheels-packages` registry; install into `vendor/<name>/` |
 
 The closest comparison point is Laravel's scaffold ethos. `wheels generate scaffold Post title:string body:text` produces the same "everything-you-need-to-see-a-CRUD-interface-running" result as `php artisan make:model Post -a` + `make:controller`. Wheels goes a step further: the scaffolded views use Basecoat UI (when the `basecoat` package is activated) so you get a modern-looking app without writing CSS.
 

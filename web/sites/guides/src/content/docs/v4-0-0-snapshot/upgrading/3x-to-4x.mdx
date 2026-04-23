@@ -8,12 +8,12 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-This guide walks every breaking change between Wheels 3.x and 4.0, with before/after code for each. Most 3.x apps upgrade in an afternoon. The pressure points are CORS defaults, the test base class rename, the `plugins/` → `packages/` split, the `wheels` CLI command renames, and Vite manifest strictness (production now throws on missing entries — rebuild assets during the upgrade window). Everything else is either additive or continues to work with a deprecation warning.
+This guide walks every breaking change between Wheels 3.x and 4.0, with before/after code for each. Most 3.x apps upgrade in an afternoon. The pressure points are CORS defaults, the test base class rename, the `plugins/` → packages split (packages are now standalone repos installed into `vendor/`), the `wheels` CLI command renames, and Vite manifest strictness (production now throws on missing entries — rebuild assets during the upgrade window). Everything else is either additive or continues to work with a deprecation warning.
 
 **You'll learn:**
 
 - Every breaking default and rename in 4.0, with the source PR or `CHANGELOG.md` entry
-- How to port a 3.x plugin to the new `packages/` activation model
+- How to port a 3.x plugin to the new package activation model
 - How to move your tests from `wheels.Test` (RocketUnit) to `wheels.WheelsTest` (BDD)
 - What to verify after the upgrade and where to look when something misbehaves
 
@@ -197,23 +197,23 @@ Use the escape hatch only if you can't rebuild assets during the upgrade window 
 
 **CHANGELOG:** `Deprecated: Legacy plugins/ folder — superseded by the new packages/ → vendor/ activation model. Plugins still load, with a deprecation warning.` (#1995).
 
-The `plugins/` directory still works. It emits a warning at load. Plan a migration — here's the shape of porting a 3.x plugin called `AuditLog`:
+The `plugins/` directory still works. It emits a warning at load. Plan a migration — here's the shape of porting a 3.x plugin called `AuditLog` into its own package repo:
 
 <Steps>
 
-1. Create a package directory. The main CFC's filename matches the directory name.
+1. Create a package repo. The main CFC's filename matches the directory name. You can start locally and publish to GitHub later (or host privately).
 
    ```
-   packages/auditlog/
+   wheels-auditlog/
      package.json
      AuditLog.cfc
    ```
 
 2. Write the `package.json` manifest. `provides.mixins` is opt-in; 3.x plugins defaulted to `global`, which is why provenance was hard to trace.
 
-   ```json title="packages/auditlog/package.json"
+   ```json title="wheels-auditlog/package.json"
    {
-       "name": "audit-log",
+       "name": "wheels-auditlog",
        "version": "1.0.0",
        "description": "Writes a row to audit_log for every mutating action",
        "wheelsVersion": ">=4.0",
@@ -225,7 +225,7 @@ The `plugins/` directory still works. It emits a warning at load. Plan a migrati
 
 3. Port the plugin CFC. Rename lifecycle hooks if you used them — `init`, `register`, `boot`, `onPluginLoad`, `onPluginActivate` are reserved and never mixed in.
 
-   ```cfm {test:compile} title="packages/auditlog/AuditLog.cfc"
+   ```cfm {test:compile} title="wheels-auditlog/AuditLog.cfc"
    component output="false" {
 
        public any function init() {
@@ -242,10 +242,10 @@ The `plugins/` directory still works. It emits a warning at load. Plan a migrati
    }
    ```
 
-4. Activate by copying (or symlinking) into `vendor/`, then reload.
+4. Install into `vendor/`, then reload. Wheels 4.1 will ship `wheels packages install`; until then, clone (or symlink a local checkout) into `vendor/`:
 
    ```bash title="your shell"
-   cp -r packages/auditlog vendor/auditlog
+   gh repo clone yourorg/wheels-auditlog vendor/wheels-auditlog
    wheels reload
    ```
 
@@ -253,7 +253,7 @@ The `plugins/` directory still works. It emits a warning at load. Plan a migrati
 
 </Steps>
 
-See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for manifest fields, per-method mixin overrides via `mixin="view"` annotations, and error isolation. If you need a staged migration, the `legacyadapter` package (`packages/legacyadapter/`) ships deprecation logging and API shims for 3.x patterns.
+See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for manifest fields, per-method mixin overrides via `mixin="view"` annotations, and error isolation. If you need a staged migration, the [`wheels-legacy-adapter`](https://github.com/wheels-dev/wheels-legacy-adapter) package ships deprecation logging and API shims for 3.x patterns.
 
 ### Monolithic `paginationLinks()`
 
@@ -290,12 +290,12 @@ The `/_browser/home`, `/_browser/login`, `/_browser/dashboard`, `/_browser/login
 
 ## The Legacy Compatibility Adapter (optional soft landing)
 
-**CHANGELOG:** `Legacy compatibility adapter for 3.x → 4.0 migration soft-landing` (#2015), shipped as `packages/legacyadapter/`.
+**CHANGELOG:** `Legacy compatibility adapter for 3.x → 4.0 migration soft-landing` (#2015), now distributed as the standalone [`wheels-dev/wheels-legacy-adapter`](https://github.com/wheels-dev/wheels-legacy-adapter) package.
 
-When you can't fix all eleven breaking items in one sprint, activate the adapter, ship the upgrade, and modernize incrementally:
+When you can't fix all eleven breaking items in one sprint, install the adapter, ship the upgrade, and modernize incrementally. Wheels 4.1 will support `wheels packages install wheels-legacy-adapter`; until then, the interim install is:
 
 ```bash title="your shell"
-cp -r packages/legacyadapter vendor/legacyadapter
+gh repo clone wheels-dev/wheels-legacy-adapter vendor/wheels-legacy-adapter
 wheels reload
 ```
 
@@ -342,7 +342,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 - **Requests return 403 with no CORS header.** `allowOrigins` isn't set. See #2039.
 - **Rate limiter counts wrong behind your load balancer.** `trustProxy` defaults to `false` now. See #2024, #2088.
 - **Test runner can't find specs.** Check for `tests/specs/functions/` — rename to `functional/`. See #1872.
-- **Plugin warning at startup.** Port to `packages/` (see above) or accept the warning until you do.
+- **Plugin warning at startup.** Port to a package (see above) or accept the warning until you do.
 - **JWT tokens reject as invalid after upgrade.** Algorithm validation is on. Confirm your issuer sets `alg` to a supported value and the signature verification path uses constant-time comparison. See #2079, #2086.
 - **`Wheels.ViteAssetNotFound` thrown on first request after deploy.** The deploy shipped code referencing a Vite entrypoint that isn't in the manifest. Rebuild Vite assets (`npm run build`) before deploy, or temporarily `set(viteStrictManifest=false)` to restore 3.x silent fallback. See #2133.
 
@@ -351,7 +351,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 <CardGrid>
   <LinkCard
     title="Packages"
-    description="The activation model, manifest fields, and error isolation for the packages/ → vendor/ system that replaces plugins/."
+    description="The activation model, manifest fields, and error isolation for the registry-based package system that replaces plugins/."
     href="/v4-0-0-snapshot/digging-deeper/packages/"
   />
   <LinkCard

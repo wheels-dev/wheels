@@ -19,7 +19,7 @@ This page shows you how to instrument a Wheels app so you can tell what it's doi
 - Which metrics and APM options are external and where to hook them in
 
 <Aside type="note">
-  You should already be comfortable editing `config/settings.cfm` and activating packages. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for the `packages/` → `vendor/` activation model.
+  You should already be comfortable editing `config/settings.cfm` and installing packages. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for the registry-based distribution and `vendor/` activation model.
 </Aside>
 
 ## Enable request IDs
@@ -205,22 +205,22 @@ Point your load balancer at `/healthz` with a short timeout (1–2 seconds) and 
 
 ## Error tracking with the Sentry package
 
-The `wheels-sentry` package ships in `packages/sentry/` and captures exceptions with framework-aware context — controller name, action, request URL, tags, breadcrumbs, and optional user identity.
+The [`wheels-sentry`](https://github.com/wheels-dev/wheels-sentry) package captures exceptions with framework-aware context — controller name, action, request URL, tags, breadcrumbs, and optional user identity. It's distributed as a standalone repo under `wheels-dev/`, indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry.
 
-### Activate the package
+### Install the package
 
-Sentry is a first-party package that follows the standard `packages/` → `vendor/` activation model:
+Wheels 4.1 will ship `wheels packages install wheels-sentry`. Until then, the interim install is a manual clone:
 
 ```bash title="your shell"
-cp -r packages/sentry vendor/sentry
+gh repo clone wheels-dev/wheels-sentry vendor/wheels-sentry
 wheels reload
 ```
 
-On startup, `PackageLoader` discovers `vendor/sentry/package.json`, instantiates `Sentry.cfc`, and mixes its public methods (`sentryCapture`, `sentryMessage`, `sentrySetUser`, `sentryAddBreadcrumb`) into every controller. See `packages/sentry/package.json` — `"provides": {"mixins": "controller"}` — for the wiring.
+On startup, `PackageLoader` discovers `vendor/wheels-sentry/package.json`, instantiates `Sentry.cfc`, and mixes its public methods (`sentryCapture`, `sentryMessage`, `sentrySetUser`, `sentryAddBreadcrumb`) into every controller. The package's `package.json` declares `"provides": {"mixins": "controller"}` to drive that wiring.
 
 ### Configure the DSN
 
-Set the DSN via environment variable or `config/settings.cfm`. The package reads `sentryDSN` first, then falls back to the `SENTRY_DSN` Java system environment variable (`packages/sentry/Sentry.cfc` lines 36–45):
+Set the DSN via environment variable or `config/settings.cfm`. The package reads `sentryDSN` first, then falls back to the `SENTRY_DSN` Java system environment variable (see `Sentry.cfc` in the `wheels-sentry` repo):
 
 ```cfm {test:compile} title="config/settings.cfm"
 set(sentryDSN = "https://your-key@o123.ingest.us.sentry.io/456");

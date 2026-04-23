@@ -15,7 +15,7 @@ You'll delete the hand-written controller and views from Part 2, regenerate them
 - What `wheels generate scaffold` produces — 7 actions, 4 views, one shared form partial
 - How the standard REST actions (`index`/`show`/`new`/`create`/`edit`/`update`/`delete`) fit together
 - How route model binding turns `params.key` into `params.post` automatically
-- What packages are and how the `packages/` → `vendor/` activation model works
+- What packages are and how the `vendor/` activation model works
 
 Estimated time: 25 minutes.
 
@@ -275,7 +275,7 @@ The `binding=true` arg turns on **route model binding**. When a request hits `/p
 
 ## Packages — the activation model
 
-Core Wheels lives in `vendor/wheels/`. Optional features ship as separate packages. In the framework source tree those packages live at `packages/<name>/`. Activating one means copying (or symlinking) it into `vendor/<name>/`. On app boot, `PackageLoader.cfc` walks `vendor/*/package.json` and wires each package's mixins, services, and middleware into the framework.
+Core Wheels lives in `vendor/wheels/`. Optional features ship as separate packages — standalone repositories maintained under `wheels-dev/` and indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry. Installing one means getting its files into `vendor/<name>/`. On app boot, `PackageLoader.cfc` walks `vendor/*/package.json` and wires each package's mixins, services, and middleware into the framework.
 
 Three first-party packages ship today:
 
@@ -283,15 +283,15 @@ Three first-party packages ship today:
 - **`basecoat`** — Tailwind-based UI components for forms, buttons, and layouts.
 - **`sentry`** — error tracking integration.
 
-Conceptually, activating Hotwire looks like this:
+Conceptually, installing Hotwire looks like this:
 
 ```bash title="illustrative — do not type"
-cp -r packages/hotwire vendor/hotwire
+gh repo clone wheels-dev/wheels-hotwire vendor/wheels-hotwire
 wheels reload
 ```
 
 <Aside type="caution">
-  On a fresh `wheels new` app, the `packages/` directory doesn't exist — it lives in the framework source tree. On this CLI version, you'd copy the package from the framework repo by hand. A future release will add a `wheels package install <name>` command. Part 4 wires Hotwire into the blog for real.
+  Wheels 4.1 will ship `wheels packages install wheels-hotwire` which resolves names against the registry. Until then, the `gh repo clone` above is the interim install path. Part 4 wires Hotwire into the blog for real.
 </Aside>
 
 Once Hotwire is active, clicking any internal link becomes a Turbo Drive visit — the page body swaps in without a full reload, and the browser history is preserved. The magic is invisible: no `<turbo-frame>` markup is required for the baseline experience.
