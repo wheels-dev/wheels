@@ -7,6 +7,10 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				fixturesPath = ExpandPath("/wheels/tests/_assets/packages");
 				componentPrefix = "wheels.tests._assets.packages";
+				parseFixturesPath = ExpandPath("/wheels/tests/_assets/packages_parse");
+				parsePrefix = "wheels.tests._assets.packages_parse";
+				privateFixturesPath = ExpandPath("/wheels/tests/_assets/packages_private");
+				privatePrefix = "wheels.tests._assets.packages_private";
 			});
 
 			describe("Discovery", () => {
@@ -530,6 +534,154 @@ component extends="wheels.WheelsTest" {
 						expect(Len(c.secondProvider)).toBeGT(0);
 						expect(c.firstProvider).notToBe(c.secondProvider);
 					}
+				});
+
+			});
+
+			describe("Hidden directory skip", () => {
+
+				it("ignores dot-prefixed directories even when they contain a package.json", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = parseFixturesPath,
+						componentPrefix = parsePrefix
+					);
+
+					// `.hiddenpkg` has a valid manifest but the loader must never look at it.
+					expect(loader.getPackages()).notToHaveKey(".hiddenpkg");
+					expect(loader.getPackages()).notToHaveKey("hiddenpkg");
+					expect(loader.getPackageMeta()).notToHaveKey(".hiddenpkg");
+
+					var failed = loader.getFailedPackages();
+					for (var f in failed) {
+						expect(f.name).notToBe(".hiddenpkg");
+						expect(f.name).notToBe("hiddenpkg");
+					}
+				});
+
+			});
+
+			describe("Manifest validation", () => {
+
+				it("records a failure when the manifest is missing the name field", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = parseFixturesPath,
+						componentPrefix = parsePrefix
+					);
+					var failed = loader.getFailedPackages();
+
+					var found = false;
+					for (var f in failed) {
+						if (f.name == "missingname" && FindNoCase("name", f.error)) {
+							found = true;
+						}
+					}
+					expect(found).toBeTrue();
+					expect(loader.getPackages()).notToHaveKey("missingname");
+				});
+
+				it("records a failure when the manifest is missing the version field", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = parseFixturesPath,
+						componentPrefix = parsePrefix
+					);
+					var failed = loader.getFailedPackages();
+
+					var found = false;
+					for (var f in failed) {
+						if (f.name == "missingversion" && FindNoCase("version", f.error)) {
+							found = true;
+						}
+					}
+					expect(found).toBeTrue();
+					expect(loader.getPackages()).notToHaveKey("missingversion");
+				});
+
+				it("isolates malformed JSON so sibling packages still load", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = parseFixturesPath,
+						componentPrefix = parsePrefix
+					);
+					var failed = loader.getFailedPackages();
+					var pkgs = loader.getPackages();
+
+					var foundBroken = false;
+					for (var f in failed) {
+						if (f.name == "malformedjson") foundBroken = true;
+					}
+					expect(foundBroken).toBeTrue();
+
+					// `goodafter` shares the same fixture root — it must still load,
+					// proving error isolation at the manifest-parse boundary.
+					expect(pkgs).toHaveKey("goodafter");
+				});
+
+				it("rejects a manifest whose root JSON value is not an object", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = parseFixturesPath,
+						componentPrefix = parsePrefix
+					);
+					var failed = loader.getFailedPackages();
+
+					var found = false;
+					for (var f in failed) {
+						if (f.name == "notobject") found = true;
+					}
+					expect(found).toBeTrue();
+					expect(loader.getPackages()).notToHaveKey("notobject");
+				});
+
+				it("continues loading remaining packages after per-package manifest failures", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = parseFixturesPath,
+						componentPrefix = parsePrefix
+					);
+					// At least one failure recorded AND the healthy sibling reached the packages map.
+					expect(ArrayLen(loader.getFailedPackages())).toBeGTE(1);
+					expect(loader.getPackages()).toHaveKey("goodafter");
+				});
+
+			});
+
+			describe("Private method isolation", () => {
+
+				it("mixes in public methods but ignores private ones", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = privateFixturesPath,
+						componentPrefix = privatePrefix
+					);
+					var mixins = loader.getMixins();
+
+					// Public method reaches the declared mixin target.
+					expect(mixins.controller).toHaveKey("$publicHelper");
+					// Private method is not exposed on the CFC's public surface, so it
+					// must not leak into the mixin map on any target.
+					expect(mixins.controller).notToHaveKey("$privateHelper");
+					expect(mixins.model).notToHaveKey("$privateHelper");
+					expect(mixins.application).notToHaveKey("$privateHelper");
+				});
+
+			});
+
+			describe("Legacy plugin coexistence", () => {
+
+				it("exposes its inventory alongside the legacy plugins loader in application state", () => {
+					// Framework boot populates both inventories under application.wheels.
+					// Each may be empty in a given test environment, but both must be
+					// present so downstream code can iterate them uniformly.
+					expect(StructKeyExists(application.wheels, "packages")).toBeTrue();
+					expect(StructKeyExists(application.wheels, "plugins")).toBeTrue();
+					expect(IsStruct(application.wheels.packages)).toBeTrue();
+					expect(IsStruct(application.wheels.plugins)).toBeTrue();
+				});
+
+				it("does not share backing storage between the two loaders", () => {
+					// The structs are independent — mutating one must not leak into the
+					// other. This guards against a future refactor that accidentally
+					// points both keys at the same reference.
+					var pkgKey = "__pkgProbe_#CreateUUID()#";
+					application.wheels.packages[pkgKey] = true;
+					expect(StructKeyExists(application.wheels.plugins, pkgKey)).toBeFalse();
+					StructDelete(application.wheels.packages, pkgKey);
 				});
 
 			});

@@ -1,0 +1,4 @@
+{
+	"name": "wheels-missingversion",
+	"description": "Test fixture: manifest with no 'version' field — must be rejected."
+}

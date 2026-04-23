@@ -238,6 +238,13 @@ component output="false" {
 				continue;
 			}
 
+			// Skip hidden directories (e.g. .git, .cache, editor metadata).
+			// Package conventions never use dot-prefixed names, and loading a
+			// stray manifest from one would be surprising and unsafe.
+			if (Left(local.dirName, 1) == ".") {
+				continue;
+			}
+
 			local.pkgDir = variables.vendorPath & "/" & local.dirName;
 
 			// Must be a directory
