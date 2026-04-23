@@ -1,0 +1,5 @@
+{
+	"name": "wheels-hiddenpkg",
+	"version": "1.0.0",
+	"description": "Test fixture: hidden directory — loader must skip it entirely."
+}

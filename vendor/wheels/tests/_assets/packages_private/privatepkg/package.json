@@ -1,0 +1,8 @@
+{
+	"name": "wheels-privatepkg",
+	"version": "1.0.0",
+	"description": "Test fixture: exercises public-vs-private method mixin collection.",
+	"provides": {
+		"mixins": "controller"
+	}
+}

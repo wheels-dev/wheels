@@ -1,0 +1,4 @@
+{
+	"version": "1.0.0",
+	"description": "Test fixture: manifest with no 'name' field — must be rejected."
+}

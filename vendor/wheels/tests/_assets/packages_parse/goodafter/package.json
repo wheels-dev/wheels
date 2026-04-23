@@ -1,0 +1,8 @@
+{
+	"name": "wheels-goodafter",
+	"version": "1.0.0",
+	"description": "Test fixture: healthy package — proves a broken sibling didn't kill the whole loader.",
+	"provides": {
+		"mixins": "none"
+	}
+}
