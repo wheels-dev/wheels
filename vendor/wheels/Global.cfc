@@ -2753,6 +2753,40 @@ return local.$wheels;
 		return local.rv;
 	}
 
+	public string function $readFrameworkVersion(string boxJsonPath = "") {
+		local.path = Len(arguments.boxJsonPath)
+			? arguments.boxJsonPath
+			: GetDirectoryFromPath(GetCurrentTemplatePath()) & "box.json";
+		if (!FileExists(local.path)) {
+			Throw(
+				type = "Wheels.VersionReadFailed",
+				message = "Framework box.json not found at #local.path#.",
+				extendedInfo = "This file is expected to ship with the framework. A distributed copy of Wheels should always contain it."
+			);
+		}
+		try {
+			local.contents = FileRead(local.path);
+			local.box = DeserializeJSON(local.contents);
+		} catch (any e) {
+			Throw(
+				type = "Wheels.VersionReadFailed",
+				message = "Framework box.json at #local.path# could not be parsed as JSON.",
+				extendedInfo = e.message
+			);
+		}
+		if (!IsStruct(local.box) || !StructKeyExists(local.box, "version") || !Len(local.box.version)) {
+			Throw(
+				type = "Wheels.VersionReadFailed",
+				message = "Framework box.json at #local.path# is missing a non-empty 'version' key.",
+				extendedInfo = "The release build pipeline substitutes @build.version@; a dev checkout should still define the key with the placeholder."
+			);
+		}
+		if (local.box.version == "@build.version@") {
+			return "0.0.0-dev";
+		}
+		return local.box.version;
+	}
+
 	public string function $checkMinimumVersion(required string engine, required string version) {
 		local.rv = "";
 		local.version = Replace(arguments.version, ".", ",", "all");
