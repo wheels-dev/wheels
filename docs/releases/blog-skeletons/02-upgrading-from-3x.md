@@ -47,7 +47,7 @@ Use a consistent 4-part micro-template per item: **What changed / How to detect 
 - Link to LCA docs.
 
 ### 4. Deprecations to address (not breakers, but don't sleep on them)
-- **Legacy `plugins/` folder** ([#1995](https://github.com/wheels-dev/wheels/pull/1995)) — still works, warns on load. Plan a migration to `packages/` → `vendor/`.
+- **Legacy `plugins/` folder** ([#1995](https://github.com/wheels-dev/wheels/pull/1995)) — still works in 4.x with a deprecation warning; scheduled for removal in v5.0. Migrate to `packages/` → `vendor/` before upgrading to 5.x.
 - **Monolithic `paginationLinks()`** ([#1930](https://github.com/wheels-dev/wheels/pull/1930)) — retained for back-compat; new code should use `paginationNav()` or the composable helpers.
 - **`wheels.Test` extension** — retained; new specs extend `wheels.WheelsTest`.
 

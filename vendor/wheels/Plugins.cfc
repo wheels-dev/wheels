@@ -561,7 +561,7 @@ component output="false" extends="wheels.Global"{
 			local.pluginList = StructKeyList(variables.$class.plugins);
 			WriteLog(
 				type = "warning",
-				text = "[Wheels] The plugins/ directory is deprecated. Plugins found: #local.pluginList#. Move them to packages/ and activate by copying to vendor/. See: https://wheels.dev/docs/packages"
+				text = "[Wheels] The plugins/ directory is deprecated as of Wheels 4.0 and will be removed in Wheels 5.0. Plugins found: #local.pluginList#. Move them to packages/ and activate by copying to vendor/. See: https://wheels.dev/docs/packages"
 			);
 		}
 	}
