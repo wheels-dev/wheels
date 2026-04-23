@@ -238,8 +238,104 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("checkMixinCollisions", () => {
+
+				it("reports passed when no packages/plugins exist", () => {
+					var root = makeProjectRoot();
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+					var combined = arrayToList(results.warnings, " ");
+					expect(combined).notToInclude("Mixin collision");
+					directoryDelete(root, true);
+				});
+
+				it("reports passed when two packages provide non-overlapping methods", () => {
+					var root = makeProjectRoot();
+					makePackage(root, "pkgA", "controller", "$helperA", []);
+					makePackage(root, "pkgB", "controller", "$helperB", []);
+
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).notToInclude("Mixin collision");
+					var passedText = arrayToList(results.passed, " ");
+					expect(passedText).toInclude("No static mixin collisions");
+					directoryDelete(root, true);
+				});
+
+				it("warns when two packages provide the same method on the same target", () => {
+					var root = makeProjectRoot();
+					makePackage(root, "pkgA", "controller", "$shared", []);
+					makePackage(root, "pkgB", "controller", "$shared", []);
+
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).toInclude("Mixin collision");
+					expect(warningText).toInclude("$shared");
+					expect(warningText).toInclude("controller");
+					directoryDelete(root, true);
+				});
+
+				it("suppresses warning when overriding package declares provides.overrides", () => {
+					var root = makeProjectRoot();
+					makePackage(root, "pkgA", "controller", "$shared", []);
+					makePackage(root, "pkgB", "controller", "$shared", ["$shared"]);
+
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).notToInclude("Mixin collision");
+					directoryDelete(root, true);
+				});
+
+			});
+
 		});
 
+	}
+
+	// ── Mixin collision spec helpers ─────────────────────────
+
+	private string function makeProjectRoot() {
+		var root = getTempDirectory() & "wheels-collision-" & createUUID();
+		directoryCreate(root & "/vendor", true);
+		directoryCreate(root & "/config", true);
+		directoryCreate(root & "/app", true);
+		directoryCreate(root & "/app/controllers", true);
+		directoryCreate(root & "/app/models", true);
+		directoryCreate(root & "/app/views", true);
+		directoryCreate(root & "/public", true);
+		fileWrite(root & "/config/routes.cfm", "mapper().wildcard().end();");
+		fileWrite(root & "/config/settings.cfm", "set(dataSourceName='test');");
+		return root;
+	}
+
+	private void function makePackage(
+		required string root,
+		required string name,
+		required string target,
+		required string methodName,
+		required array overrides
+	) {
+		var pkgDir = arguments.root & "/vendor/" & arguments.name;
+		directoryCreate(pkgDir, true);
+		var manifest = {
+			"name": "wheels-" & arguments.name,
+			"version": "1.0.0",
+			"provides": {"mixins": arguments.target}
+		};
+		if (arrayLen(arguments.overrides)) {
+			manifest.provides.overrides = arguments.overrides;
+		}
+		fileWrite(pkgDir & "/package.json", serializeJSON(manifest));
+		fileWrite(
+			pkgDir & "/" & arguments.name & ".cfc",
+			'component { public any function init() { return this; } public string function ' & arguments.methodName & '() { return "x"; } }'
+		);
 	}
 
 	// ── Spec helpers ─────────────────────────────────────────

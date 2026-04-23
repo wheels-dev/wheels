@@ -706,10 +706,12 @@ component output="false" extends="wheels.Global"{
 			variables.$class.mixins[local.iMixableComponents] = {};
 		}
 
-		// track which plugin provided each method per mixin target for collision detection
-		local.methodProviders = {};
+		// track which plugin provided each method per mixin target for collision detection.
+		// Persisted on variables.$class so cross-system (package) collisions can identify the
+		// originating plugin by name when PackageLoader overlays its mixins.
+		variables.$class.methodProviders = {};
 		for (local.iMixableComponents in variables.$class.mixableComponents) {
-			local.methodProviders[local.iMixableComponents] = {};
+			variables.$class.methodProviders[local.iMixableComponents] = {};
 		}
 
 		// get a sorted list of plugins so that we run through them the same on
@@ -752,8 +754,8 @@ component output="false" extends="wheels.Global"{
 							for (local.iMixableComponent in variables.$class.mixableComponents) {
 								if (local.methodMixins == "global" || ListFindNoCase(local.methodMixins, local.iMixableComponent)) {
 									// detect collision: another plugin already provided this method for this target
-									if (StructKeyExists(local.methodProviders[local.iMixableComponent], local.iPluginMethods)) {
-										local.existingPlugin = local.methodProviders[local.iMixableComponent][local.iPluginMethods];
+									if (StructKeyExists(variables.$class.methodProviders[local.iMixableComponent], local.iPluginMethods)) {
+										local.existingPlugin = variables.$class.methodProviders[local.iMixableComponent][local.iPluginMethods];
 										ArrayAppend(variables.$class.mixinCollisions, {
 											method = local.iPluginMethods,
 											target = local.iMixableComponent,
@@ -763,7 +765,7 @@ component output="false" extends="wheels.Global"{
 									}
 									// cfformat-ignore-start
 									variables.$class.mixins[local.iMixableComponent][local.iPluginMethods] = local.plugin[local.iPluginMethods];
-									local.methodProviders[local.iMixableComponent][local.iPluginMethods] = local.iPlugin;
+									variables.$class.methodProviders[local.iMixableComponent][local.iPluginMethods] = local.iPlugin;
 									// cfformat-ignore-end
 								}
 							}
@@ -864,6 +866,18 @@ component output="false" extends="wheels.Global"{
 
 	public any function getMixinCollisions() {
 		return variables.$class.mixinCollisions;
+	}
+
+	/**
+	 * Returns the per-target method→plugin-name mapping built during $processMixins.
+	 * Used by $loadPackages to attribute cross-system collisions to the originating
+	 * plugin rather than a generic "(legacy plugin)" placeholder.
+	 */
+	public struct function getMethodProviders() {
+		if (!StructKeyExists(variables.$class, "methodProviders")) {
+			return {};
+		}
+		return variables.$class.methodProviders;
 	}
 
 	public array function getPluginMiddleware() {

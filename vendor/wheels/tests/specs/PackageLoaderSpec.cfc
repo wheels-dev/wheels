@@ -444,6 +444,96 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("Mixin collisions", () => {
+
+				beforeEach(() => {
+					collisionFixturesPath = ExpandPath("/wheels/tests/_assets/packages_collision");
+					collisionPrefix = "wheels.tests._assets.packages_collision";
+				});
+
+				it("records no collisions when no method overlaps", () => {
+					// Default shared fixtures path — none of those fixtures collide
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					expect(loader.getMixinCollisions()).toBeEmpty();
+				});
+
+				it("detects collisions when two packages provide the same method for the same target", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = collisionFixturesPath,
+						componentPrefix = collisionPrefix
+					);
+					var collisions = loader.getMixinCollisions();
+
+					// mixincolA, mixincolB, and mixincolOverride all provide $sharedHelper on controller.
+					// Sorted load order means two collisions are recorded (A→B, B→Override)
+					expect(ArrayLen(collisions)).toBeGTE(1);
+
+					var found = false;
+					for (var c in collisions) {
+						if (c.method == "$sharedHelper" && c.target == "controller") {
+							found = true;
+						}
+					}
+					expect(found).toBeTrue();
+				});
+
+				it("both packages still load — collision doesn't block loading", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = collisionFixturesPath,
+						componentPrefix = collisionPrefix
+					);
+					var pkgs = loader.getPackages();
+					expect(pkgs).toHaveKey("mixincolA");
+					expect(pkgs).toHaveKey("mixincolB");
+				});
+
+				it("marks collision as acknowledged when overriding package declares overrides", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = collisionFixturesPath,
+						componentPrefix = collisionPrefix
+					);
+					var collisions = loader.getMixinCollisions();
+
+					var acknowledgedFound = false;
+					for (var c in collisions) {
+						if (c.secondProvider == "mixincolOverride" && c.method == "$sharedHelper") {
+							expect(c.acknowledged).toBeTrue();
+							acknowledgedFound = true;
+						}
+					}
+					expect(acknowledgedFound).toBeTrue();
+				});
+
+				it("records source as 'package' for package-to-package collisions", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = collisionFixturesPath,
+						componentPrefix = collisionPrefix
+					);
+					var collisions = loader.getMixinCollisions();
+					expect(ArrayLen(collisions)).toBeGTE(1);
+					for (var c in collisions) {
+						expect(c.source).toBe("package");
+					}
+				});
+
+				it("records firstProvider and secondProvider correctly", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = collisionFixturesPath,
+						componentPrefix = collisionPrefix
+					);
+					var collisions = loader.getMixinCollisions();
+					for (var c in collisions) {
+						expect(Len(c.firstProvider)).toBeGT(0);
+						expect(Len(c.secondProvider)).toBeGT(0);
+						expect(c.firstProvider).notToBe(c.secondProvider);
+					}
+				});
+
+			});
+
 		});
 
 	}

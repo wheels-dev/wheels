@@ -41,6 +41,11 @@ component output="false" {
 		variables.excludedPackages = {};
 		variables.loadOrder = [];
 		variables.lazyPackages = {};
+		variables.mixinCollisions = [];
+		// Tracks which package first registered each method per target so a
+		// later registration can be flagged as an overwrite. Keyed by target,
+		// then by method name, holding the originating package dir name.
+		variables.$methodProviders = {};
 
 		// The same mixin targets as Plugins.cfc
 		variables.mixableComponents = "application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test";
@@ -48,6 +53,7 @@ component output="false" {
 		// Initialize mixin containers
 		for (local.target in variables.mixableComponents) {
 			variables.mixins[local.target] = {};
+			variables.$methodProviders[local.target] = {};
 		}
 
 		// Run the loading pipeline
@@ -90,6 +96,30 @@ component output="false" {
 
 	public array function getLoadOrder() {
 		return variables.loadOrder;
+	}
+
+	/**
+	 * Returns mixin collision records — cases where a package registered a
+	 * method name for a target that another package had already claimed.
+	 * Each entry: {target, method, firstProvider, secondProvider, acknowledged}.
+	 * An `acknowledged` true means the overwriting package declared the method
+	 * in its `provides.overrides` list, which suppresses the warning log.
+	 */
+	public array function getMixinCollisions() {
+		return variables.mixinCollisions;
+	}
+
+	/**
+	 * Returns the per-target method→package-name mapping built during mixin
+	 * collection. Used by $loadPackages to name the package side of a
+	 * cross-system collision with a legacy plugin.
+	 *
+	 * Named getMethodProviders (not $methodProviders) to avoid shadowing the
+	 * variables.$methodProviders storage struct on Adobe CF, which stores
+	 * method declarations in the same `variables` scope keyed by name.
+	 */
+	public struct function getMethodProviders() {
+		return variables.$methodProviders;
 	}
 
 	/**
@@ -387,7 +417,8 @@ component output="false" {
 
 		// Collect mixins if targets declared
 		if (arguments.mixinTargets != "none") {
-			$collectMixins(arguments.dirName, local.pkg, arguments.mixinTargets);
+			local.overrides = $resolveOverrides(arguments.provides);
+			$collectMixins(arguments.dirName, local.pkg, arguments.mixinTargets, local.overrides);
 		}
 
 		// Log success
@@ -432,12 +463,18 @@ component output="false" {
 
 	/**
 	 * Collects public methods from a package CFC and assigns them to mixin targets.
-	 * Follows the same pattern as Plugins.cfc $processMixins().
+	 * Follows the same pattern as Plugins.cfc $processMixins() but also records
+	 * collisions when two packages register the same method for the same target.
+	 *
+	 * @overrides Lowercase-keyed struct of method names the package deliberately
+	 *            overrides (from manifest provides.overrides). Suppresses the
+	 *            warning log but still records the collision as `acknowledged`.
 	 */
 	private void function $collectMixins(
 		required string pkgName,
 		required any pkg,
-		required string mixinTargets
+		required string mixinTargets,
+		struct overrides = {}
 	) {
 		local.methods = StructKeyList(arguments.pkg);
 		local.lifecycleHooks = "init,onPluginLoad,onPluginActivate,register,boot";
@@ -463,10 +500,80 @@ component output="false" {
 
 			for (local.target in variables.mixableComponents) {
 				if (local.effectiveTargets == "global" || ListFindNoCase(local.effectiveTargets, local.target)) {
+					// Collision check: another package already registered this method
+					// for this target. Record it and keep the later registration
+					// (current StructAppend-based merge semantics) so behaviour is
+					// unchanged, but make the overwrite visible.
+					if (StructKeyExists(variables.$methodProviders[local.target], local.methodName)) {
+						local.firstProvider = variables.$methodProviders[local.target][local.methodName];
+						local.acknowledged = StructKeyExists(arguments.overrides, LCase(local.methodName));
+						$recordCollision(
+							target = local.target,
+							method = local.methodName,
+							firstProvider = local.firstProvider,
+							secondProvider = arguments.pkgName,
+							acknowledged = local.acknowledged
+						);
+					}
 					variables.mixins[local.target][local.methodName] = arguments.pkg[local.methodName];
+					variables.$methodProviders[local.target][local.methodName] = arguments.pkgName;
 				}
 			}
 		}
+	}
+
+	/**
+	 * Records a mixin collision and emits a warning log unless the overwriting
+	 * package explicitly acknowledged the override via provides.overrides.
+	 */
+	private void function $recordCollision(
+		required string target,
+		required string method,
+		required string firstProvider,
+		required string secondProvider,
+		required boolean acknowledged
+	) {
+		ArrayAppend(variables.mixinCollisions, {
+			target = arguments.target,
+			method = arguments.method,
+			firstProvider = arguments.firstProvider,
+			secondProvider = arguments.secondProvider,
+			acknowledged = arguments.acknowledged,
+			source = "package"
+		});
+
+		if (arguments.acknowledged) {
+			WriteLog(
+				type = "information",
+				text = "[Wheels] Package '#arguments.secondProvider#' intentionally overrides method '#arguments.method#' on target '#arguments.target#' (previously provided by '#arguments.firstProvider#')",
+				file = "application"
+			);
+		} else {
+			WriteLog(
+				type = "warning",
+				text = "[Wheels] Mixin collision: method '#arguments.method#' on target '#arguments.target#' provided by package '#arguments.firstProvider#' is being overwritten by package '#arguments.secondProvider#'. Declare the method in the overwriting package's provides.overrides to acknowledge this.",
+				file = "application"
+			);
+		}
+	}
+
+	/**
+	 * Normalises provides.overrides into a lowercase-keyed struct for O(1) lookup.
+	 * Accepts an array of method names; any other shape is ignored.
+	 */
+	private struct function $resolveOverrides(required struct provides) {
+		local.result = {};
+		if (!StructKeyExists(arguments.provides, "overrides")) {
+			return local.result;
+		}
+		if (IsArray(arguments.provides.overrides)) {
+			for (local.name in arguments.provides.overrides) {
+				if (IsSimpleValue(local.name) && Len(Trim(local.name))) {
+					local.result[LCase(Trim(local.name))] = true;
+				}
+			}
+		}
+		return local.result;
 	}
 
 	// ---------------------------------------------------------------------------
