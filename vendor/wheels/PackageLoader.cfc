@@ -297,6 +297,11 @@ component output="false" {
 			local.mixinTargets = Trim(local.manifest.mixins);
 		}
 
+		// Validate declared mixin targets against the allowlist. Unknown targets
+		// (typos, unsupported names like "view") silently produce zero injection
+		// under the legacy behavior — reject them up front instead.
+		$validateMixinTargets(arguments.dirName, local.mixinTargets);
+
 		// Check for middleware
 		local.hasMiddleware = StructKeyExists(local.provides, "middleware")
 			&& IsArray(local.provides.middleware)
@@ -521,6 +526,40 @@ component output="false" {
 	public void function $invokeServiceProviderBoot(required struct app) {
 		for (local.pkgKey in variables.serviceProviders) {
 			variables.packages[local.pkgKey].boot(arguments.app);
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Mixin target validation
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Validates each declared mixin target against the known allowlist.
+	 * Accepts the special values "none" (explicit opt-out) and "global" (wildcard);
+	 * every other entry must match one of variables.mixableComponents. An unknown
+	 * entry (typo like "controler", or an unsupported target like "view") throws
+	 * so the package is recorded as failed instead of silently loading with zero
+	 * mixin injection.
+	 *
+	 * @pkgName  Package directory name, used in the error message
+	 * @targets  Raw mixin-target declaration from the manifest
+	 */
+	private void function $validateMixinTargets(required string pkgName, required string targets) {
+		local.normalized = LCase(Trim(arguments.targets));
+		if (!Len(local.normalized) || local.normalized == "none" || local.normalized == "global") {
+			return;
+		}
+		for (local.target in local.normalized) {
+			local.entry = Trim(local.target);
+			if (!Len(local.entry)) {
+				continue;
+			}
+			if (!ListFindNoCase(variables.mixableComponents, local.entry)) {
+				Throw(
+					type = "Wheels.PackageInvalidMixinTarget",
+					message = "Package '#arguments.pkgName#' declares unknown mixin target '#local.entry#'. Valid targets: #variables.mixableComponents#."
+				);
+			}
 		}
 	}
 

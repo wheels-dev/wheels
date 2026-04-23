@@ -365,7 +365,7 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
 }
 ```
 
-**`provides.mixins`**: Comma-delimited targets — `controller`, `view`, `model`, `global`, `none`. Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`).
+**`provides.mixins`**: Comma-delimited targets from the allowlist `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus the special values `global` (inject into all targets) and `none` (explicit opt-out). Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`). Unknown targets (typos, `view`, `service`, etc.) are rejected with a clear error — view helpers belong in `controller` mixins since Wheels views execute in the controller's variables scope.
 
 ### Activating a Package
 

@@ -5,7 +5,7 @@
 	"description": "Hotwire infrastructure for Wheels: Turbo Drive, Turbo Frames, Turbo Streams, Stimulus helpers, and Hotwire Native mobile support",
 	"wheelsVersion": ">=3.0",
 	"provides": {
-		"mixins": "controller,view",
+		"mixins": "controller",
 		"services": [],
 		"middleware": []
 	},
