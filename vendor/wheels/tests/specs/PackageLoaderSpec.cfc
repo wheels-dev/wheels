@@ -328,6 +328,80 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("Mixin target validation", () => {
+
+				it("rejects packages with an unknown mixin target (typo)", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					var pkgs = loader.getPackages();
+					var failed = loader.getFailedPackages();
+
+					// invalidmixin declares "controler" (typo) — must not load
+					expect(pkgs).notToHaveKey("invalidmixin");
+
+					var foundInvalid = false;
+					var errorMessage = "";
+					for (var f in failed) {
+						if (f.name == "invalidmixin") {
+							foundInvalid = true;
+							errorMessage = f.error;
+						}
+					}
+					expect(foundInvalid).toBeTrue();
+					// Error must name the unknown target and list the allowlist
+					expect(errorMessage).toInclude("controler");
+					expect(errorMessage).toInclude("controller");
+				});
+
+				it("rejects packages whose target list contains any unknown entry", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					var pkgs = loader.getPackages();
+					var failed = loader.getFailedPackages();
+
+					// invalidmixinview declares "controller,view" — "view" is not mixable
+					expect(pkgs).notToHaveKey("invalidmixinview");
+
+					var foundInvalid = false;
+					var errorMessage = "";
+					for (var f in failed) {
+						if (f.name == "invalidmixinview") {
+							foundInvalid = true;
+							errorMessage = f.error;
+						}
+					}
+					expect(foundInvalid).toBeTrue();
+					expect(errorMessage).toInclude("view");
+				});
+
+				it("loads packages with valid single-target declarations", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					var pkgs = loader.getPackages();
+
+					// depA declares "controller" — a valid target
+					expect(pkgs).toHaveKey("depA");
+				});
+
+				it("accepts the special none target", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					var pkgs = loader.getPackages();
+
+					// nomixin declares "none" — must still load
+					expect(pkgs).toHaveKey("nomixin");
+				});
+
+			});
+
 			describe("Lazy loading", () => {
 
 				it("does not eagerly instantiate lazy packages", () => {
