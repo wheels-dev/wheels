@@ -23,25 +23,25 @@ component {
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
-    public void function boot(required struct opts)     { $forEach(arguments.opts, "run"); }
-    public void function reboot(required struct opts)   { $forEach(arguments.opts, "reboot"); }
-    public void function start(required struct opts)    { $forEach(arguments.opts, "start"); }
-    public void function stop(required struct opts)     { $forEach(arguments.opts, "stop"); }
-    public void function restart(required struct opts)  { $forEach(arguments.opts, "restart"); }
-    public void function details(required struct opts)  { $forEach(arguments.opts, "details"); }
-    public void function remove(required struct opts)   { $forEach(arguments.opts, "remove"); }
+    public string function boot(required struct opts)     { return $forEach(arguments.opts, "run",     "Booted accessory"); }
+    public string function reboot(required struct opts)   { return $forEach(arguments.opts, "reboot",  "Rebooted accessory"); }
+    public string function start(required struct opts)    { return $forEach(arguments.opts, "start",   "Started accessory"); }
+    public string function stop(required struct opts)     { return $forEach(arguments.opts, "stop",    "Stopped accessory"); }
+    public string function restart(required struct opts)  { return $forEach(arguments.opts, "restart", "Restarted accessory"); }
+    public string function details(required struct opts)  { return $forEach(arguments.opts, "details", "Collected accessory details"); }
+    public string function remove(required struct opts)   { return $forEach(arguments.opts, "remove",  "Removed accessory"); }
 
-    public void function logs(required struct opts) {
+    public string function logs(required struct opts) {
         var logOpts = {
             tail: arguments.opts.tail ?: 100,
             follow: arguments.opts.follow ?: false
         };
-        $forEach(arguments.opts, "logs", logOpts);
+        return $forEach(arguments.opts, "logs", "Tailed accessory logs", logOpts);
     }
 
     // ── Private plumbing ───────────────────────────────────────
 
-    private void function $forEach(required struct opts, required string method, struct methodOpts = {}) {
+    private string function $forEach(required struct opts, required string method, required string verbLabel, struct methodOpts = {}) {
         arrayClear(variables.dryRunBuffer);
         if (!len(arguments.opts.name ?: "")) {
             throw(
@@ -58,13 +58,27 @@ component {
         var targets = (arguments.opts.name == "all")
             ? cfg.accessories()
             : [cfg.accessory(arguments.opts.name)];
+        var names = [];
 
         for (var acc in targets) {
             var cmd = structIsEmpty(arguments.methodOpts)
                 ? invoke(accCmds, arguments.method, [acc])
                 : invoke(accCmds, arguments.method, [acc, arguments.methodOpts]);
             $dispatch(acc.hosts(), cmd, dryRun);
+            arrayAppend(names, acc.name());
         }
+
+        return $renderResult(
+            arguments.opts,
+            arguments.verbLabel & " " & arrayToList(names, ", ")
+        );
+    }
+
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
     }
 
     private void function $dispatch(required array hosts, required string cmd, required boolean dryRun) {

@@ -13,11 +13,11 @@ component {
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
-    public void function all(required struct opts)        { $runOnAllHosts(arguments.opts, "all"); }
-    public void function images(required struct opts)     { $runOnAllHosts(arguments.opts, "images"); }
-    public void function containers(required struct opts) { $runOnAllHosts(arguments.opts, "containers"); }
+    public string function all(required struct opts)        { return $runOnAllHosts(arguments.opts, "all",        "Pruned all (images + containers)"); }
+    public string function images(required struct opts)     { return $runOnAllHosts(arguments.opts, "images",     "Pruned images"); }
+    public string function containers(required struct opts) { return $runOnAllHosts(arguments.opts, "containers", "Pruned containers"); }
 
-    private void function $runOnAllHosts(required struct opts, required string method) {
+    private string function $runOnAllHosts(required struct opts, required string method, required string verbLabel) {
         arrayClear(variables.dryRunBuffer);
         var cfg = variables.loader.load(
             arguments.opts.configPath,
@@ -36,6 +36,17 @@ component {
 
         var hosts = $allHosts(cfg);
         $dispatch(hosts, cmdStr, dryRun);
+        return $renderResult(
+            arguments.opts,
+            arguments.verbLabel & " on " & arrayLen(hosts) & " host(s) (keep=" & keep & ")"
+        );
+    }
+
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
     }
 
     private array function $allHosts(required any cfg) {

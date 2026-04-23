@@ -22,26 +22,28 @@ component {
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
-    public void function boot(required struct opts)    { $runOnAllHosts(arguments.opts, "boot"); }
-    public void function reboot(required struct opts)  { $runOnAllHosts(arguments.opts, "reboot"); }
-    public void function start(required struct opts)   { $runOnAllHosts(arguments.opts, "start"); }
-    public void function stop(required struct opts)    { $runOnAllHosts(arguments.opts, "stop"); }
-    public void function restart(required struct opts) { $runOnAllHosts(arguments.opts, "restart"); }
-    public void function details(required struct opts) { $runOnAllHosts(arguments.opts, "details"); }
-    public void function remove(required struct opts)  { $runOnAllHosts(arguments.opts, "remove"); }
+    public string function boot(required struct opts)    { return $runOnAllHosts(arguments.opts, "boot",    "Booted kamal-proxy"); }
+    public string function reboot(required struct opts)  { return $runOnAllHosts(arguments.opts, "reboot",  "Rebooted kamal-proxy"); }
+    public string function start(required struct opts)   { return $runOnAllHosts(arguments.opts, "start",   "Started kamal-proxy"); }
+    public string function stop(required struct opts)    { return $runOnAllHosts(arguments.opts, "stop",    "Stopped kamal-proxy"); }
+    public string function restart(required struct opts) { return $runOnAllHosts(arguments.opts, "restart", "Restarted kamal-proxy"); }
+    public string function details(required struct opts) { return $runOnAllHosts(arguments.opts, "details", "Collected kamal-proxy details"); }
+    public string function remove(required struct opts)  { return $runOnAllHosts(arguments.opts, "remove",  "Removed kamal-proxy"); }
 
-    public void function logs(required struct opts) {
+    public string function logs(required struct opts) {
         var tail = arguments.opts.tail ?: 100;
-        $runOnAllHostsWithArg(arguments.opts, "logs", {tail: tail});
+        var n = $runOnAllHostsWithArg(arguments.opts, "logs", {tail: tail});
+        return $renderResult(arguments.opts, "Tailed kamal-proxy logs on " & n & " host(s)");
     }
 
     // ── Private plumbing ───────────────────────────────────────
 
-    private void function $runOnAllHosts(required struct opts, required string method) {
-        $runOnAllHostsWithArg(arguments.opts, arguments.method, {});
+    private string function $runOnAllHosts(required struct opts, required string method, required string verbLabel) {
+        var n = $runOnAllHostsWithArg(arguments.opts, arguments.method, {});
+        return $renderResult(arguments.opts, arguments.verbLabel & " on " & n & " host(s)");
     }
 
-    private void function $runOnAllHostsWithArg(required struct opts, required string method, required struct methodOpts) {
+    private numeric function $runOnAllHostsWithArg(required struct opts, required string method, required struct methodOpts) {
         arrayClear(variables.dryRunBuffer);
         var cfg = variables.loader.load(
             arguments.opts.configPath,
@@ -54,6 +56,14 @@ component {
             ? invoke(proxyCmds, arguments.method)
             : invoke(proxyCmds, arguments.method, [arguments.methodOpts]);
         $dispatch(hosts, cmdStr, dryRun);
+        return arrayLen(hosts);
+    }
+
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
     }
 
     private array function $allHosts(required any cfg) {

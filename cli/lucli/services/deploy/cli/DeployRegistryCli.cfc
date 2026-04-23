@@ -19,14 +19,14 @@ component {
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
-    public void function setup(required struct opts)  { login(arguments.opts); }
-    public void function login(required struct opts)  { $runLogin(arguments.opts, true); }
-    public void function logout(required struct opts) { $runLogin(arguments.opts, false); }
-    public void function remove(required struct opts) { logout(arguments.opts); }
+    public string function setup(required struct opts)  { return login(arguments.opts); }
+    public string function login(required struct opts)  { return $runLogin(arguments.opts, true); }
+    public string function logout(required struct opts) { return $runLogin(arguments.opts, false); }
+    public string function remove(required struct opts) { return logout(arguments.opts); }
 
     // ── Private plumbing ───────────────────────────────────────
 
-    private void function $runLogin(required struct opts, required boolean isLogin) {
+    private string function $runLogin(required struct opts, required boolean isLogin) {
         arrayClear(variables.dryRunBuffer);
         var cfg = variables.loader.load(
             arguments.opts.configPath,
@@ -39,6 +39,19 @@ component {
             ? regCmds.login({password: arguments.opts.password ?: $resolvePassword(cfg)})
             : regCmds.logout();
         $dispatch(hosts, cmd, dryRun);
+        var action = arguments.isLogin ? "Logged into" : "Logged out of";
+        return $renderResult(
+            arguments.opts,
+            action & " registry " & cfg.registry().server()
+                & " on " & arrayLen(hosts) & " host(s)"
+        );
+    }
+
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
     }
 
     private string function $resolvePassword(required any cfg) {

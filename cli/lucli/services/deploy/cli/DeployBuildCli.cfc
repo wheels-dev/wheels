@@ -21,24 +21,31 @@ component {
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
-    public void function deliver(required struct opts) {
+    public string function deliver(required struct opts) {
         // push clears the buffer and writes; tell pull to preserve what push wrote.
         push(arguments.opts);
         var pullOpts = duplicate(arguments.opts);
         pullOpts.preserveBuffer = "1";
         pull(pullOpts);
+        var cfg = $loadCfg(arguments.opts);
+        var version = arguments.opts.version ?: $gitShortSha();
+        return $renderResult(
+            arguments.opts,
+            "Delivered " & cfg.image() & ":" & version & " (pushed + pulled)"
+        );
     }
 
-    public void function push(required struct opts) {
+    public string function push(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var version = arguments.opts.version ?: $gitShortSha();
         var dryRun = arguments.opts.dryRun ?: false;
         if (!len(arguments.opts.preserveBuffer ?: "")) arrayClear(variables.dryRunBuffer);
         var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
         $runLocal(builder.push(version), dryRun);
+        return $renderResult(arguments.opts, "Pushed " & cfg.image() & ":" & version);
     }
 
-    public void function pull(required struct opts) {
+    public string function pull(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var version = arguments.opts.version ?: $gitShortSha();
         var dryRun = arguments.opts.dryRun ?: false;
@@ -46,37 +53,52 @@ component {
         var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
         var hosts = $allHosts(cfg);
         $dispatchSsh(hosts, builder.pull(version), dryRun);
+        return $renderResult(
+            arguments.opts,
+            "Pulled " & cfg.image() & ":" & version & " on " & arrayLen(hosts) & " host(s)"
+        );
     }
 
-    public void function create(required struct opts) {
+    public string function create(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).create(), dryRun);
+        return $renderResult(arguments.opts, "Created builder for " & cfg.image());
     }
 
-    public void function remove(required struct opts) {
+    public string function remove(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).remove(), dryRun);
+        return $renderResult(arguments.opts, "Removed builder for " & cfg.image());
     }
 
-    public void function details(required struct opts) {
+    public string function details(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).details(), dryRun);
+        return $renderResult(arguments.opts, "Collected builder details for " & cfg.image());
     }
 
-    public void function dev(required struct opts) {
+    public string function dev(required struct opts) {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).dev(), dryRun);
+        return $renderResult(arguments.opts, "Ran dev build for " & cfg.image());
     }
 
     // ── Private plumbing ───────────────────────────────────────
+
+    private string function $renderResult(required struct opts, required string summary) {
+        if (arguments.opts.dryRun ?: false) {
+            return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        return arguments.summary;
+    }
 
     private any function $loadCfg(required struct opts) {
         return variables.loader.load(
