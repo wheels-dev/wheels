@@ -29,6 +29,7 @@ component {
 		checkDatabaseConfig(results);
 		checkTestCoverage(results);
 		checkCliInstallFreshness(results);
+		checkMixinCollisions(results);
 
 		// Determine overall status
 		if (arrayLen(results.issues)) {
@@ -236,6 +237,163 @@ component {
 			"Installed CLI module at #variables.installedModuleRoot# diverges from this source checkout. "
 			& "Edits under cli/lucli/ will not take effect until you reinstall or replace the installed copy with a symlink."
 		);
+	}
+
+	/**
+	 * Static best-effort mixin collision scan for packages in vendor/ and
+	 * legacy plugins in plugins/. Reads manifests and regex-scans the main
+	 * CFC of each package for public-function declarations, mapping method
+	 * names to declared mixin targets. Reports method×target pairs that are
+	 * registered by more than one package/plugin unless the second source
+	 * acknowledged the override via provides.overrides.
+	 *
+	 * Limitations: regex-based, so unusual CFC shapes may under-detect; only
+	 * scans the main CFC (directory-name match) — included files and script-
+	 * imported functions are ignored. Runtime detection in PackageLoader is
+	 * authoritative; this check exists for pre-boot visibility.
+	 */
+	private void function checkMixinCollisions(required struct results) {
+		var vendorDir = variables.projectRoot & "/vendor";
+		var pluginsDir = variables.projectRoot & "/plugins";
+		var providers = {};
+
+		if (directoryExists(vendorDir)) {
+			for (var dirName in directoryList(vendorDir, false, "name")) {
+				if (lCase(dirName) == "wheels") continue;
+				var pkgPath = vendorDir & "/" & dirName;
+				if (!directoryExists(pkgPath)) continue;
+				var manifestPath = pkgPath & "/package.json";
+				if (!fileExists(manifestPath)) continue;
+				$recordProvidersFromManifest(providers, pkgPath, manifestPath, dirName, "package", "provides");
+			}
+		}
+
+		if (directoryExists(pluginsDir)) {
+			for (var dirName in directoryList(pluginsDir, false, "name")) {
+				var pluginPath = pluginsDir & "/" & dirName;
+				if (!directoryExists(pluginPath)) continue;
+				var manifestPath = pluginPath & "/plugin.json";
+				if (!fileExists(manifestPath)) continue;
+				$recordProvidersFromManifest(providers, pluginPath, manifestPath, dirName, "plugin", "");
+			}
+		}
+
+		var collisionCount = 0;
+		for (var key in providers) {
+			var entries = providers[key];
+			if (arrayLen(entries) < 2) continue;
+			// Static scan has no authoritative load order, so suppress the warning
+			// if ANY participant declared the method in provides.overrides — that
+			// signals someone is intentionally accepting the overlap. The runtime
+			// path in PackageLoader still enforces the stricter semantic.
+			var anyAcknowledged = false;
+			for (var entry in entries) {
+				if (entry.acknowledged) {
+					anyAcknowledged = true;
+					break;
+				}
+			}
+			if (anyAcknowledged) continue;
+			var first = entries[1];
+			for (var i = 2; i <= arrayLen(entries); i++) {
+				var second = entries[i];
+				collisionCount++;
+				arrayAppend(
+					arguments.results.warnings,
+					"Mixin collision: method '#second.method#' on '#second.target#' provided by #first.source# '#first.name#' is overwritten by #second.source# '#second.name#'. Acknowledge via provides.overrides to silence."
+				);
+				first = second;
+			}
+		}
+
+		if (collisionCount == 0 && (directoryExists(vendorDir) || directoryExists(pluginsDir))) {
+			arrayAppend(arguments.results.passed, "No static mixin collisions detected in vendor/ or plugins/");
+		}
+	}
+
+	/**
+	 * Reads a manifest + main CFC and appends provider records keyed by target+method.
+	 *
+	 * @providerStore Out-param struct keyed "target::method" → array of records
+	 * @providesKey   "provides" for packages (nested), "" for plugins (flat)
+	 */
+	private void function $recordProvidersFromManifest(
+		required struct providerStore,
+		required string pkgDir,
+		required string manifestPath,
+		required string name,
+		required string source,
+		required string providesKey
+	) {
+		var manifest = {};
+		try {
+			manifest = deserializeJSON(fileRead(arguments.manifestPath));
+		} catch (any e) {
+			return;
+		}
+		if (!isStruct(manifest)) return;
+
+		var provides = len(arguments.providesKey) && structKeyExists(manifest, arguments.providesKey) && isStruct(manifest[arguments.providesKey])
+			? manifest[arguments.providesKey]
+			: manifest;
+
+		var targetsRaw = "";
+		if (structKeyExists(provides, "mixins") && isSimpleValue(provides.mixins)) {
+			targetsRaw = trim(provides.mixins);
+		} else if (structKeyExists(manifest, "mixins") && isSimpleValue(manifest.mixins)) {
+			targetsRaw = trim(manifest.mixins);
+		}
+		if (!len(targetsRaw) || targetsRaw == "none") return;
+
+		var overrides = {};
+		if (structKeyExists(provides, "overrides") && isArray(provides.overrides)) {
+			for (var ov in provides.overrides) {
+				if (isSimpleValue(ov) && len(trim(ov))) overrides[lCase(trim(ov))] = true;
+			}
+		}
+
+		var cfcPath = arguments.pkgDir & "/" & arguments.name & ".cfc";
+		if (!fileExists(cfcPath)) {
+			var cfcs = directoryList(arguments.pkgDir, false, "name", "*.cfc");
+			if (!arrayLen(cfcs)) return;
+			cfcPath = arguments.pkgDir & "/" & cfcs[1];
+		}
+
+		var cfcSource = fileRead(cfcPath);
+		var lifecycleHooks = "init,onPluginLoad,onPluginActivate,register,boot";
+		var methods = {};
+		var pattern = "public\s+[a-zA-Z0-9_\[\]\.]+\s+function\s+([a-zA-Z0-9_\$]+)\s*\(";
+		var matches = reMatchNoCase(pattern, cfcSource);
+		for (var m in matches) {
+			var nameMatch = reFindNoCase(pattern, m, 1, true);
+			if (structKeyExists(nameMatch, "match") && arrayLen(nameMatch.match) >= 2) {
+				var methodName = nameMatch.match[2];
+				if (!listFindNoCase(lifecycleHooks, methodName)) {
+					methods[methodName] = true;
+				}
+			}
+		}
+
+		// Expand targets (global = all supported mixin component types)
+		var allTargets = "application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test";
+		var expanded = (targetsRaw == "global") ? allTargets : targetsRaw;
+		for (var target in expanded) {
+			target = trim(target);
+			if (!len(target) || !listFindNoCase(allTargets, target)) continue;
+			for (var methodName in methods) {
+				var key = target & "::" & methodName;
+				if (!structKeyExists(arguments.providerStore, key)) {
+					arguments.providerStore[key] = [];
+				}
+				arrayAppend(arguments.providerStore[key], {
+					name = arguments.name,
+					source = arguments.source,
+					target = target,
+					method = methodName,
+					acknowledged = structKeyExists(overrides, lCase(methodName))
+				});
+			}
+		}
 	}
 
 	// ── Path helpers ─────────────────────────────────────────

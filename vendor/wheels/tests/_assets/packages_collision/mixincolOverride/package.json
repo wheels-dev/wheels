@@ -1,0 +1,9 @@
+{
+	"name": "wheels-mixincolOverride",
+	"version": "1.0.0",
+	"description": "Test fixture: also defines $sharedHelper on controller but declares it as an acknowledged override",
+	"provides": {
+		"mixins": "controller",
+		"overrides": ["$sharedHelper"]
+	}
+}

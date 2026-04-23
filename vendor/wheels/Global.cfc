@@ -2940,11 +2940,51 @@ return local.$wheels;
 		application[local.appKey].packageMeta = application[local.appKey].PackageLoaderObj.getPackageMeta();
 		application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
 
-		// Merge package mixins into the existing mixins struct (plugins loaded first, packages overlay)
+		// Ensure mixinCollisions exists (unset when no plugins loaded before packages)
+		if (!StructKeyExists(application[local.appKey], "mixinCollisions")) {
+			application[local.appKey].mixinCollisions = [];
+		}
+
+		// Carry forward any collisions the PackageLoader detected internally
+		for (local.c in application[local.appKey].PackageLoaderObj.getMixinCollisions()) {
+			ArrayAppend(application[local.appKey].mixinCollisions, local.c);
+		}
+
+		// Merge package mixins into the existing mixins struct (plugins loaded first, packages overlay).
+		// Detect cross-system collisions — a package method that shadows a plugin method on the
+		// same target — before StructAppend silently overwrites.
 		local.pkgMixins = application[local.appKey].PackageLoaderObj.getMixins();
+		local.pluginProviders = StructKeyExists(application[local.appKey], "PluginObj")
+			? application[local.appKey].PluginObj.getMethodProviders()
+			: {};
+		local.pkgProviders = application[local.appKey].PackageLoaderObj.$methodProviders();
 		for (local.target in local.pkgMixins) {
 			if (!StructKeyExists(application[local.appKey].mixins, local.target)) {
 				application[local.appKey].mixins[local.target] = {};
+			}
+			for (local.methodName in local.pkgMixins[local.target]) {
+				if (StructKeyExists(application[local.appKey].mixins[local.target], local.methodName)) {
+					local.pluginName = StructKeyExists(local.pluginProviders, local.target)
+						&& StructKeyExists(local.pluginProviders[local.target], local.methodName)
+						? local.pluginProviders[local.target][local.methodName]
+						: "(unknown plugin)";
+					local.pkgName = StructKeyExists(local.pkgProviders, local.target)
+						&& StructKeyExists(local.pkgProviders[local.target], local.methodName)
+						? local.pkgProviders[local.target][local.methodName]
+						: "(unknown package)";
+					ArrayAppend(application[local.appKey].mixinCollisions, {
+						target = local.target,
+						method = local.methodName,
+						firstProvider = local.pluginName,
+						secondProvider = local.pkgName,
+						acknowledged = false,
+						source = "cross"
+					});
+					WriteLog(
+						type = "warning",
+						text = "[Wheels] Cross-system mixin collision: method '#local.methodName#' on target '#local.target#' provided by plugin '#local.pluginName#' is being overwritten by package '#local.pkgName#'. Migrate the plugin to a package or remove the duplicate to resolve."
+					);
+				}
 			}
 			StructAppend(application[local.appKey].mixins[local.target], local.pkgMixins[local.target]);
 		}
