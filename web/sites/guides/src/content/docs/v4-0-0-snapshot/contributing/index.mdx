@@ -47,7 +47,7 @@ Fixing a typo, clarifying a guide, adding a missing example, filling a gap. Docs
 
 ### Packages
 
-First-party packages live in `packages/` and are activated by copying into `vendor/`. Good candidates: opt-in integrations (error trackers, UI toolkits, front-end frameworks) that don't belong in the framework core. A new package needs a `package.json` manifest, tests in `packages/<name>/tests/`, and a docs page under Digging Deeper. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for the manifest shape and activation model.
+First-party packages are standalone repositories under `wheels-dev/` (e.g. [`wheels-sentry`](https://github.com/wheels-dev/wheels-sentry), [`wheels-hotwire`](https://github.com/wheels-dev/wheels-hotwire)), indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry. Good candidates: opt-in integrations (error trackers, UI toolkits, front-end frameworks) that don't belong in the framework core. A new package needs a `package.json` manifest, tests in `<package>/tests/`, and a docs page under Digging Deeper. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for the manifest shape and activation model; submit your package to the registry per its `CONTRIBUTING.md`.
 
 ### Issue triage
 

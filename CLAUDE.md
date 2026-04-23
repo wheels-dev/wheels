@@ -10,7 +10,7 @@ app/migrator/migrations/    app/db/seeds.cfm    app/db/seeds/
 app/events/    app/global/    app/lib/
 app/mailers/    app/jobs/    app/plugins/    app/snippets/
 config/settings.cfm    config/routes.cfm    config/environment.cfm
-packages/    plugins/    public/    tests/    vendor/    .env (never commit)
+plugins/    public/    tests/    vendor/    .env (never commit)
 ```
 
 ## Development Tools
@@ -334,16 +334,19 @@ Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `m
 
 ## Package System
 
-Optional first-party modules ship in `packages/` and are activated by copying to `vendor/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
+Optional first-party modules are distributed as standalone repositories and installed into `vendor/<name>/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
+
+Four first-party packages live in standalone repos under `wheels-dev/`, indexed by the `wheels-dev/wheels-packages` registry:
+
+- `wheels-dev/wheels-sentry` — error tracking
+- `wheels-dev/wheels-hotwire` — Turbo/Stimulus
+- `wheels-dev/wheels-basecoat` — UI components
+- `wheels-dev/wheels-legacy-adapter` — 3.x → 4.x compatibility shims
 
 ```
-packages/              # Source/staging (NOT auto-loaded)
-  sentry/              #   wheels-sentry — error tracking
-  hotwire/             #   wheels-hotwire — Turbo/Stimulus
-  basecoat/            #   wheels-basecoat — UI components
-vendor/                # Runtime: framework core + activated packages
+vendor/                # Runtime: framework core + installed packages
   wheels/              #   Framework core (excluded from package discovery)
-  sentry/              #   Activated package (copied from packages/)
+  wheels-sentry/       #   Installed package
 plugins/               # DEPRECATED: legacy plugins still work with warning
 ```
 
@@ -367,14 +370,16 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
 
 **`provides.mixins`**: Comma-delimited targets from the allowlist `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus the special values `global` (inject into all targets) and `none` (explicit opt-out). Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`). Unknown targets (typos, `view`, `service`, etc.) are rejected with a clear error — view helpers belong in `controller` mixins since Wheels views execute in the controller's variables scope.
 
-### Activating a Package
+### Installing a Package
+
+The Wheels 4.1 CLI will ship `wheels packages install <name>` which resolves names against the `wheels-dev/wheels-packages` registry. Until then, interim install is a manual clone:
 
 ```bash
-cp -r packages/sentry vendor/sentry    # activate
-rm -rf vendor/sentry                    # deactivate
+gh repo clone wheels-dev/wheels-sentry vendor/wheels-sentry    # install
+rm -rf vendor/wheels-sentry                                     # remove
 ```
 
-Restart or reload the app after activation. Symlinks also work: `ln -s ../../packages/sentry vendor/sentry`.
+Restart or reload the app after install.
 
 ### Error Isolation
 
@@ -384,7 +389,7 @@ Each package loads in its own try/catch. A broken package is logged and skipped 
 
 ```bash
 # Run a specific package's tests (package must be in vendor/)
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.sentry.tests"
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.wheels-sentry.tests"
 ```
 
 ## Routing Quick Reference

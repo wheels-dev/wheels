@@ -277,7 +277,7 @@ At runtime, LuCLI scans `<home>/modules/*/Module.cfc` for modules to load, where
 When you install Wheels via Homebrew, the Wheels module is already registered under `~/.wheels/modules/wheels/`, which is why `wheels modules list` shows it as `installed`. That single module registration is what makes `wheels generate`, `wheels migrate`, `wheels test`, and the rest of the Wheels surface available.
 
 <Aside type="note" title="Modules are LuCLI plugins, not Wheels packages">
-Don't confuse LuCLI modules with Wheels packages. Wheels packages (`packages/` → `vendor/`) are optional first-party framework modules that live *inside* a Wheels project — things like `wheels-sentry` and `wheels-hotwire`. LuCLI modules live *outside* any project, in LuCLI's home directory, and add commands to the CLI. They're fundamentally different mechanisms; this page covers only the CLI-level one.
+Don't confuse LuCLI modules with Wheels packages. Wheels packages (installed into `vendor/<name>/` from standalone repos like `wheels-dev/wheels-sentry` and `wheels-dev/wheels-hotwire`, indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) are optional first-party framework modules that live *inside* a Wheels project. LuCLI modules live *outside* any project, in LuCLI's home directory, and add commands to the CLI. They're fundamentally different mechanisms; this page covers only the CLI-level one.
 </Aside>
 
 ## Common workflows

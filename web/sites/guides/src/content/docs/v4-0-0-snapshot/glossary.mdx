@@ -100,7 +100,7 @@ Terms that carry a specific Wheels meaning. Each entry links to the guide page w
 
 ## P
 
-**Package.** An optional first-party module in `packages/` that activates by being copied or symlinked into `vendor/`. `PackageLoader` discovers and loads each on startup inside its own try/catch. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/).
+**Package.** An optional first-party module distributed as a standalone repository (indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) and activated by being installed into `vendor/<name>/`. `PackageLoader` discovers and loads each on startup inside its own try/catch. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/).
 
 **`package.json`.** The manifest at the root of every package — `name`, `version`, `wheelsVersion`, `provides.mixins`, `provides.middleware`, `dependencies`. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/).
 
