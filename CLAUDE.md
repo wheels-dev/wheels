@@ -336,12 +336,16 @@ Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `m
 
 Optional first-party modules are distributed as standalone repositories and installed into `vendor/<name>/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
 
-Four first-party packages live in standalone repos under `wheels-dev/`, indexed by the `wheels-dev/wheels-packages` registry:
+Public author-facing guide: [Packages](web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/packages.mdx) — manifest fields, mixin targets, lifecycle, service providers, lazy loading, testing, publishing flow. Submission workflow: [wheels-packages/CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md).
+
+Six first-party packages live in standalone repos under `wheels-dev/`, indexed by the `wheels-dev/wheels-packages` registry:
 
 - `wheels-dev/wheels-sentry` — error tracking
 - `wheels-dev/wheels-hotwire` — Turbo/Stimulus
 - `wheels-dev/wheels-basecoat` — UI components
 - `wheels-dev/wheels-legacy-adapter` — 3.x → 4.x compatibility shims
+- `wheels-dev/wheels-i18n` — internationalization (JSON or DB-backed translations, pluralization)
+- `wheels-dev/wheels-seo-suite` — SEO tooling (meta tags, Open Graph, sitemaps, robots.txt, debug panel)
 
 ```
 vendor/                # Runtime: framework core + installed packages
