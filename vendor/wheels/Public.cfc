@@ -36,6 +36,59 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 	}
 
+	/**
+	 * Returns a struct { packages: [...], error: "" } populated from the
+	 * wheels-packages registry. Short-circuits in production (defense in
+	 * depth — the handler is already $blockInProduction()-gated). Captures
+	 * any registry error into the `error` field so the view can render a
+	 * friendly banner instead of a stack trace.
+	 *
+	 * The optional `registry` argument is for tests; normal callers pass
+	 * nothing and get a memoized application-scope Registry instance.
+	 */
+	public struct function $loadRegistryPackages(any registry = "") {
+		if ($shouldBlockInProduction()) {
+			return {packages: [], error: ""};
+		}
+		// User apps generated with `wheels new` don't ship the CLI alongside.
+		// When the Registry class isn't on the classpath, silently disable the
+		// browse-registry feature rather than crashing. The installed-packages
+		// table still renders normally.
+		if (!IsObject(arguments.registry) && !$registryClientAvailable()) {
+			return {packages: [], error: ""};
+		}
+		local.reg = IsObject(arguments.registry) ? arguments.registry : $getRegistryClient();
+		try {
+			return {packages: local.reg.listAll(), error: ""};
+		} catch ("Wheels.Packages.RegistryUnavailable" e) {
+			return {packages: [], error: "Registry lookup failed: " & e.message};
+		} catch ("Wheels.Packages.RegistryMalformed" e) {
+			return {packages: [], error: "Registry lookup failed: " & e.message};
+		} catch ("Wheels.Packages.UnknownPackage" e) {
+			return {packages: [], error: "Registry lookup failed: " & e.message};
+		}
+	}
+
+	/**
+	 * True if the CLI's Registry component is on the classpath — i.e., we're
+	 * running inside the framework repo (or a user app that ships the CLI
+	 * alongside). In a plain user app this returns false and the browse-
+	 * registry section silently disables.
+	 */
+	private boolean function $registryClientAvailable() {
+		return FileExists(ExpandPath("/cli/lucli/services/packages/Registry.cfc"));
+	}
+
+	/**
+	 * Lazy, app-scope memo of the CLI's Registry component.
+	 */
+	private any function $getRegistryClient() {
+		if (!StructKeyExists(application.wheels, "$packageRegistry")) {
+			application.wheels.$packageRegistry = new cli.lucli.services.packages.Registry();
+		}
+		return application.wheels.$packageRegistry;
+	}
+
 	/*
 	This is just a proof of concept
 	*/

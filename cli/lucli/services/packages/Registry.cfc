@@ -104,6 +104,33 @@ component {
 		return local.manifest;
 	}
 
+	/**
+	 * Returns enriched summaries for every package in the registry.
+	 * One HTTP call for the index, one per package for its manifest
+	 * (all cached 24h). Skips packages whose manifest fails to parse;
+	 * propagates a registry-wide unavailability error.
+	 */
+	public array function listAll() {
+		local.names = listPackageNames();
+		local.out = [];
+		for (local.name in local.names) {
+			try {
+				local.m = fetchManifest(local.name);
+			} catch (Wheels.Packages.RegistryMalformed e) {
+				continue;
+			}
+			local.latest = local.m.versions[ArrayLen(local.m.versions)];
+			ArrayAppend(local.out, {
+				name:          local.m.name,
+				description:   local.m.description ?: "",
+				tags:          IsArray(local.m.tags ?: "") ? local.m.tags : [],
+				homepage:      local.m.homepage ?: "",
+				latestVersion: local.latest.version
+			});
+		}
+		return local.out;
+	}
+
 	public struct function info() {
 		local.cacheInfo = variables.cache.info();
 		return {
