@@ -297,24 +297,41 @@ function getQuickReference() {
 	};
 }
 
-// Get guides summary
+// Get guides summary — reads the Starlight sidebar JSON (monorepo checkout
+// only) and flattens sections + one level of items into a title/path/url list
+// pointing at guides.wheels.dev. Returns [] in installed apps where the
+// sidebar isn't present; callers should hit guides.wheels.dev directly.
 function getGuidesSummary() {
-	local.summaryPath = "/wheels/docs/src/SUMMARY.md";
 	local.guides = [];
+	local.sidebarPath = expandPath("/wheels/../../web/sites/guides/src/sidebars/v4-0-0-snapshot.json");
+	local.base = "https://guides.wheels.dev";
 
-	if (fileExists(expandPath(summaryPath))) {
-		local.summaryContent = fileRead(expandPath(summaryPath));
-		local.lines = listToArray(local.summaryContent, chr(10));
+	if (!fileExists(local.sidebarPath)) {
+		return local.guides;
+	}
 
-		for (local.line in local.lines) {
-			if (reFind("\[([^\]]+)\]\(([^\)]+)\)", local.line)) {
-				local.title = reReplace(local.line, ".*\[([^\]]+)\].*", "\1");
-				local.path = reReplace(local.line, ".*\(([^\)]+)\).*", "\1");
+	try {
+		local.sidebar = deserializeJSON(fileRead(local.sidebarPath));
+	} catch (any e) {
+		return local.guides;
+	}
 
+	for (local.section in local.sidebar) {
+		if (structKeyExists(local.section, "link")) {
+			arrayAppend(local.guides, {
+				"title": local.section.label,
+				"path": local.section.link,
+				"url": local.base & local.section.link
+			});
+		}
+		if (structKeyExists(local.section, "items")) {
+			for (local.item in local.section.items) {
+				// Skip sub-group headers (label + nested items, no link)
+				if (!structKeyExists(local.item, "link")) continue;
 				arrayAppend(local.guides, {
-					"title": local.title,
-					"path": local.path,
-					"endpoint": "/wheels/guides?path=" & reReplace(local.path, "\.md$", "") & "&format=json"
+					"title": local.section.label & " — " & local.item.label,
+					"path": local.item.link,
+					"url": local.base & local.item.link
 				});
 			}
 		}
