@@ -76,6 +76,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Package system (`PackageLoader`) with `packages/` → `vendor/` activation model, `package.json` manifests with `provides.mixins` targets, per-package error isolation (#1995)
 - Module system with dependency graph (requires/replaces/suggests topological sort) and lazy loading (#2017)
 - LuCLI module distribution via wheels-cli-lucli repo (#2018)
+- `/wheels/packages` developer page now shows a "Browse registry" section listing all packages available from `wheels-dev/wheels-packages` — package name, description, latest version, and a copy-to-clipboard `wheels packages install <name>` snippet per row. Rows matching an already-installed package show a `✓ Installed` badge. Dev/testing only; `$blockInProduction()` gate keeps it off production servers. Registry data comes from the CLI's `Registry.listAll()` with 24h app-scope cache (#2271, partial — wheels.dev/packages static-site work deferred)
 
 **Engine adapters & cross-engine**
 - Engine adapter modules encapsulating Lucee, Adobe CF, and BoxLang engine-specific behavior (#2016)
