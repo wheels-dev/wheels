@@ -186,5 +186,30 @@ describe('registry', () => {
       expect(all[0].homepage).toBe('');
       expect(all[0].tags).toEqual([]);
     });
+
+    it('throws when manifest.name disagrees with its directory name', async () => {
+      fetchSpy
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify([{ name: 'wheels-sentry', type: 'dir' }]),
+            { status: 200 },
+          ),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              name: 'wheels-foo',
+              description: 'x',
+              versions: [
+                { version: '1.0.0', publishedAt: '2026-04-01T00:00:00Z', wheelsVersion: '>=4.0', sourceTag: 'v1.0.0', tarball: 'x', sha256: 'y' },
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+
+      const { listAll } = await import('./registry');
+      await expect(listAll()).rejects.toThrow(/Registry drift/);
+    });
   });
 });

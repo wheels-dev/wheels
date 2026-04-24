@@ -73,10 +73,16 @@ export async function fetchManifest(name: string): Promise<Manifest> {
 export async function listAll(): Promise<PackageSummary[]> {
   const names = await listPackageNames();
   const manifests = await Promise.all(names.map(fetchManifest));
-  return manifests.map((m) => {
+  return manifests.map((m, i) => {
+    const dirName = names[i];
+    if (m.name !== dirName) {
+      throw new Error(
+        `Registry drift: manifest name '${m.name}' does not match directory '${dirName}'. Fix the registry manifest.`,
+      );
+    }
     const latest = m.versions[m.versions.length - 1];
     return {
-      name: m.name,
+      name: dirName,
       description: m.description ?? '',
       homepage: m.homepage ?? '',
       tags: m.tags ?? [],
