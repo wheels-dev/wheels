@@ -244,8 +244,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var root = makeProjectRoot();
 					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
+					expect(arrayLen(results.mixinCollisions)).toBe(0);
 					var combined = arrayToList(results.warnings, " ");
-					expect(combined).notToInclude("Mixin collision");
+					expect(combined).notToInclude("mixin collision");
 					directoryDelete(root, true);
 				});
 
@@ -257,14 +258,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
+					expect(arrayLen(results.mixinCollisions)).toBe(0);
 					var warningText = arrayToList(results.warnings, " ");
-					expect(warningText).notToInclude("Mixin collision");
+					expect(warningText).notToInclude("mixin collision");
 					var passedText = arrayToList(results.passed, " ");
 					expect(passedText).toInclude("No static mixin collisions");
 					directoryDelete(root, true);
 				});
 
-				it("warns when two packages provide the same method on the same target", () => {
+				it("emits summary in warnings and detail in mixinCollisions when packages collide", () => {
 					var root = makeProjectRoot();
 					makePackage(root, "pkgA", "controller", "$shared", []);
 					makePackage(root, "pkgB", "controller", "$shared", []);
@@ -272,14 +274,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
+					// Default output: count summary only, no inline detail
 					var warningText = arrayToList(results.warnings, " ");
-					expect(warningText).toInclude("Mixin collision");
-					expect(warningText).toInclude("$shared");
-					expect(warningText).toInclude("controller");
+					expect(warningText).toInclude("mixin collision(s) detected");
+					expect(warningText).toInclude("--verbose");
+					expect(warningText).notToInclude("$shared");
+
+					// Verbose-dump data on the results struct
+					expect(arrayLen(results.mixinCollisions)).toBe(1);
+					var c = results.mixinCollisions[1];
+					expect(c.method).toBe("$shared");
+					expect(c.target).toBe("controller");
+					// directoryList() iteration order isn't guaranteed across filesystems,
+					// so assert both packages are present without fixing which came first.
+					var participants = [c.firstName, c.secondName];
+					arraySort(participants, "textnocase");
+					expect(participants[1]).toBe("pkgA");
+					expect(participants[2]).toBe("pkgB");
+					expect(c.firstSource).toBe("package");
+					expect(c.secondSource).toBe("package");
 					directoryDelete(root, true);
 				});
 
-				it("suppresses warning when overriding package declares provides.overrides", () => {
+				it("suppresses warning and detail when overriding package declares provides.overrides", () => {
 					var root = makeProjectRoot();
 					makePackage(root, "pkgA", "controller", "$shared", []);
 					makePackage(root, "pkgB", "controller", "$shared", ["$shared"]);
@@ -287,8 +304,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
+					expect(arrayLen(results.mixinCollisions)).toBe(0);
 					var warningText = arrayToList(results.warnings, " ");
-					expect(warningText).notToInclude("Mixin collision");
+					expect(warningText).notToInclude("mixin collision");
 					directoryDelete(root, true);
 				});
 
