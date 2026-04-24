@@ -42,7 +42,7 @@ Both surfaces read the same GitHub-hosted registry (`wheels-dev/wheels-packages`
 Each surface runs its own registry client pointed at the same GitHub endpoints:
 
 - **CLI**: existing `cli.lucli.services.packages.Registry` — file-based 24h cache under `~/.wheels/cache/packages/`.
-- **In-app `/wheels/packages`**: reuses the **CLI's** `Registry.cfc` directly (it's on the classpath of every Wheels app). Cached in `application.wheels.$packageRegistry` (app-scope memo).
+- **In-app `/wheels/packages`**: reuses the **CLI's** `Registry.cfc` directly when it's on the classpath (framework repo via `public/Application.cfc`'s `/cli` mapping). In `wheels new`-generated user apps the CLI isn't shipped alongside, so the helper silently returns an empty browse-registry section — no crash, installed-packages table still renders normally. Cached in `application.wheels.$packageRegistry` (app-scope memo).
 - **wheels.dev**: new `app/models/services/RegistryClient.cfc` — sibling implementation, application-scope cache, same endpoints, same TTL.
 
 Rejected alternatives:
