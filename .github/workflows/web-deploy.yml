@@ -129,3 +129,140 @@ jobs:
             web/tests/visual-baselines/*.png
           if-no-files-found: ignore
           retention-days: 14
+
+  refresh-packages-baseline:
+    # Adding a package to the wheels-packages registry rebuilds
+    # packages.wheels.dev. The rebuilt index page then diffs against the
+    # committed baseline in web/tests/visual-baselines/packages-index.png,
+    # which would otherwise fail the next PR's visual-regression job.
+    #
+    # On the registry-updated dispatch, this job regenerates that one
+    # baseline from a fresh local build and opens a docs-tier PR so the
+    # refresh lands before any unrelated PR gets surprised by it.
+    #
+    # Note on CI: PRs opened by GITHUB_TOKEN do not trigger other
+    # workflow runs (GitHub's infinite-loop guard). If you want the bot
+    # PR to run visual-regression automatically, switch the token to a
+    # PAT or GitHub App token. For now reviewers can eyeball the diff
+    # before merging; CI catches any downstream issues on merge-to-develop.
+    name: Refresh packages-index baseline
+    if: github.event_name == 'repository_dispatch' && github.event.action == 'registry-updated'
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build packages site
+        working-directory: web
+        run: pnpm --filter @wheels-dev/site-packages build
+
+      - name: Regenerate packages-index baseline
+        working-directory: web
+        run: node scripts/visual-regression.mjs --update --site packages-index
+
+      - name: Detect baseline change
+        id: changes
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- web/tests/visual-baselines/packages-index.png; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No baseline change — the rebuilt packages-index matches the committed baseline."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Baseline changed — opening refresh PR."
+          fi
+
+      - name: Create refresh PR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # DISPATCH_SHA is a git SHA (hex) — safe to interpolate.
+          # We intentionally do not include github.event.client_payload
+          # in the commit or PR text: the dispatcher is trusted today,
+          # but keeping payload data out of shell-expanded strings keeps
+          # this job safe if the event ever comes from elsewhere.
+          DISPATCH_SHA: ${{ github.sha }}
+          BRANCH_PREFIX: chore/refresh-packages-baseline
+        run: |
+          set -euo pipefail
+
+          branch="${BRANCH_PREFIX}-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add web/tests/visual-baselines/packages-index.png
+
+          # Build the commit message in a temp file to avoid heredoc/YAML
+          # indentation conflicts and to keep untrusted data (if any ever
+          # gets in here) out of shell-expanded strings.
+          commit_msg_file="$(mktemp)"
+          {
+            printf '%s\n\n' "chore(docs): refresh packages-index visual baseline"
+            printf '%s\n' "The wheels-packages registry updated and the rebuilt packages.wheels.dev"
+            printf '%s\n' "index now differs from the committed visual-regression baseline. This is"
+            printf '%s\n\n' "the expected change — new package tiles on the listing page."
+            printf '%s\n' "Refreshed automatically by .github/workflows/web-deploy.yml"
+            printf '%s\n' "(refresh-packages-baseline job) on registry-updated dispatch ${DISPATCH_SHA}."
+          } > "$commit_msg_file"
+
+          git commit -F "$commit_msg_file"
+          rm -f "$commit_msg_file"
+
+          git push -u origin "$branch"
+
+          # Same pattern for the PR body — write to a file, pass to gh.
+          pr_body_file="$(mktemp)"
+          {
+            printf '%s\n\n' "## Summary"
+            printf '%s\n' "The \`wheels-packages\` registry merged a change that altered the \`/\` page of packages.wheels.dev. The committed visual-regression baseline at \`web/tests/visual-baselines/packages-index.png\` predated the registry change, so the next unrelated PR would have failed \`visual-regression\` on a stale diff."
+            printf '\n%s\n\n' "This PR refreshes only that one baseline so the next PR starts clean."
+            printf '%s\n\n' "Generated by the \`refresh-packages-baseline\` job in \`.github/workflows/web-deploy.yml\`, triggered by a \`repository_dispatch: registry-updated\` event from \`wheels-dev/wheels-packages\`."
+            printf '%s\n' "## Test plan"
+            printf '%s\n' "- [ ] \`visual-regression\` job passes on this PR"
+            printf '%s\n' "- [ ] \`Deploy packages\` job passes (confirms the page the baseline matches is what actually ships)"
+            printf '%s\n\n' "- [ ] Visual diff of the new baseline vs. the old one contains only the registry change (new package tiles, not layout/typography drift)"
+            printf '%s\n' "🤖 Opened automatically by GitHub Actions."
+          } > "$pr_body_file"
+
+          gh pr create \
+            --base develop \
+            --head "$branch" \
+            --title "chore(docs): refresh packages-index baseline after registry update" \
+            --body-file "$pr_body_file"
+
+          rm -f "$pr_body_file"
