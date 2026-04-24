@@ -129,3 +129,8 @@ jobs:
             web/tests/visual-baselines/*.png
           if-no-files-found: ignore
           retention-days: 14
+
+# Note: the packages-index baseline auto-refresh that fires on
+# repository_dispatch: registry-updated lives in its own workflow file
+# at .github/workflows/refresh-packages-baseline.yml so it doesn't
+# appear as a "skipped" check on regular PRs.
