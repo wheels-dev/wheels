@@ -3534,6 +3534,10 @@ component extends="modules.BaseModule" {
 	 * Copy a resolved Wheels framework source into the new application's
 	 * vendor/wheels/ directory. The source must already exist — callers should
 	 * obtain it via resolveFrameworkSourceOrFail() before any file creation.
+	 *
+	 * After the raw directory copy, delegates to FrameworkInstaller to rewrite
+	 * any unreplaced @build.version@ placeholder in the copied box.json when
+	 * the source is a dev checkout of the wheels-dev/wheels monorepo (GH #2279).
 	 */
 	private void function copyFrameworkToVendor(
 		required string wheelsSource,
@@ -3544,6 +3548,10 @@ component extends="modules.BaseModule" {
 		var vendorDir = targetDir & "/vendor/wheels";
 		ensureDirectory(vendorDir);
 		directoryCopy(wheelsSource, vendorDir, true);
+		new services.FrameworkInstaller().rewriteVersionPlaceholder(
+			wheelsSource = wheelsSource,
+			vendorDir = vendorDir
+		);
 		printCreated(appName & "/vendor/wheels/");
 	}
 
