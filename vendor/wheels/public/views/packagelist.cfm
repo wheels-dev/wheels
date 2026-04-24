@@ -150,7 +150,7 @@ for (local.key in packageMeta) {
 					<tr>
 						<td>
 							<strong>#HTMLEditFormat(local.rp.name)#</strong>
-							<cfif Len(local.rp.homepage)>
+							<cfif Len(local.rp.homepage) AND REFindNoCase("^https?://", local.rp.homepage)>
 								<br><a href="#HTMLEditFormat(local.rp.homepage)#" target="_blank" rel="noopener" class="ui small grey text">homepage</a>
 							</cfif>
 						</td>
@@ -160,10 +160,13 @@ for (local.key in packageMeta) {
 							<cfif local.isInstalled>
 								<span class="ui label"><i class="check icon"></i> Installed</span>
 							<cfelse>
+								<!--- rp.name is registry-schema-constrained to ^[a-z0-9][a-z0-9-]*$, so both id and JS string are already safe.
+								      JSStringFormat() is applied in the onclick defensively in case that invariant ever loosens. --->
 								<code id="install-#HTMLEditFormat(local.rpKey)#">wheels packages install #HTMLEditFormat(local.rp.name)#</code>
 								<button type="button"
 									class="ui tiny button"
-									onclick="navigator.clipboard.writeText(document.getElementById('install-#HTMLEditFormat(local.rpKey)#').innerText)">
+									aria-label="Copy install command for #HTMLEditFormat(local.rp.name)#"
+									onclick="navigator.clipboard.writeText(document.getElementById('install-#JSStringFormat(local.rpKey)#').innerText)">
 									Copy
 								</button>
 							</cfif>
