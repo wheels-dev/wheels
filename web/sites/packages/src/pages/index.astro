@@ -63,6 +63,7 @@ const packages = await listAll();
 
   // Copy buttons — 2s "Copied!" feedback.
   document.querySelectorAll<HTMLButtonElement>('.copy-btn').forEach((btn) => {
+    const originalLabel = btn.textContent ?? 'Copy';
     btn.addEventListener('click', async () => {
       const targetId = btn.dataset.target;
       if (!targetId) return;
@@ -71,9 +72,8 @@ const packages = await listAll();
       const text = target.textContent ?? '';
       try {
         await navigator.clipboard.writeText(text);
-        const original = btn.textContent;
         btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = original; }, 2000);
+        setTimeout(() => { btn.textContent = originalLabel; }, 2000);
       } catch (_err) {
         // Older browsers without the clipboard API silently skip.
       }
@@ -85,10 +85,10 @@ const packages = await listAll();
   .packages-page { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
   .page-header { margin-bottom: 2rem; }
   .page-header h1 { margin: 0 0 0.5rem; font-size: 2rem; }
-  .subhead { margin: 0 0 1.5rem; color: var(--color-text-muted, #555); max-width: 48rem; }
+  .subhead { margin: 0 0 1.5rem; color: var(--color-fg-muted, #555); max-width: 48rem; }
   .subhead code {
     font-size: 0.875em;
-    background: var(--color-surface-alt, #f3f3f3);
+    background: var(--color-surface-2, #f3f3f3);
     padding: 0.125rem 0.375rem;
     border-radius: 4px;
   }
@@ -111,7 +111,7 @@ const packages = await listAll();
   @media (min-width: 960px) {
     .package-grid { grid-template-columns: repeat(3, 1fr); }
   }
-  .count-line { margin-top: 1.5rem; color: var(--color-text-muted, #555); font-size: 0.875rem; }
+  .count-line { margin-top: 1.5rem; color: var(--color-fg-muted, #555); font-size: 0.875rem; }
   .visually-hidden {
     position: absolute;
     width: 1px;
