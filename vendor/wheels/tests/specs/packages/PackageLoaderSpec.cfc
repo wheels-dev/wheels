@@ -404,6 +404,49 @@ component extends="wheels.WheelsTest" {
 					expect(pkgs).toHaveKey("nomixin");
 				});
 
+				it("rejects packages whose per-method mixin metadata has an unknown target", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					var failed = loader.getFailedPackages();
+
+					// invalidmethodmixin has a method annotated mixin="controler" (typo)
+					var foundInvalid = false;
+					var errorMessage = "";
+					for (var f in failed) {
+						if (f.name == "invalidmethodmixin") {
+							foundInvalid = true;
+							errorMessage = f.error;
+						}
+					}
+					expect(foundInvalid).toBeTrue();
+					// Error must name the offending method, the unknown target, and the allowlist
+					expect(errorMessage).toInclude("$badTarget");
+					expect(errorMessage).toInclude("controler");
+					expect(errorMessage).toInclude("controller");
+				});
+
+				it("loads packages with valid per-method mixin overrides", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					var pkgs = loader.getPackages();
+					var mixins = loader.getMixins();
+
+					// validmethodmixin uses mixin="model" and mixin="none" — must still load
+					expect(pkgs).toHaveKey("validmethodmixin");
+
+					// Controller default reaches controller target
+					expect(mixins.controller).toHaveKey("$validmethodmixinControllerHelper");
+					// Override to model target takes effect
+					expect(mixins.model).toHaveKey("$validmethodmixinModelHelper");
+					// Opt-out method is not registered on any target
+					expect(mixins.controller).notToHaveKey("$validmethodmixinInternal");
+					expect(mixins.model).notToHaveKey("$validmethodmixinInternal");
+				});
+
 			});
 
 			describe("Lazy loading", () => {

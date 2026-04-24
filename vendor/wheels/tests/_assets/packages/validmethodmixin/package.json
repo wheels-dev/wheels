@@ -1,0 +1,8 @@
+{
+	"name": "wheels-validmethodmixin",
+	"version": "1.0.0",
+	"description": "Test fixture: valid per-method mixin metadata overrides",
+	"provides": {
+		"mixins": "controller"
+	}
+}

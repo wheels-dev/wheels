@@ -1,0 +1,8 @@
+{
+	"name": "wheels-invalidmethodmixin",
+	"version": "1.0.0",
+	"description": "Test fixture: method-level metadata declares unknown mixin target (typo)",
+	"provides": {
+		"mixins": "controller"
+	}
+}

@@ -486,6 +486,24 @@ component output="false" {
 		local.methods = StructKeyList(arguments.pkg);
 		local.lifecycleHooks = "init,onPluginLoad,onPluginActivate,register,boot";
 
+		// Validation pre-pass: reject per-method mixin metadata with unknown
+		// targets BEFORE mutating variables.mixins. Without this, a typo on
+		// method N would silently produce zero injection (see #2257) and —
+		// worse — methods 1..N-1 would already be registered when we threw
+		// mid-loop, leaving the package half-loaded.
+		for (local.methodName in local.methods) {
+			if (!IsCustomFunction(arguments.pkg[local.methodName])) {
+				continue;
+			}
+			if (ListFindNoCase(local.lifecycleHooks, local.methodName)) {
+				continue;
+			}
+			local.methodMeta = GetMetadata(arguments.pkg[local.methodName]);
+			if (StructKeyExists(local.methodMeta, "mixin")) {
+				$validateMixinTargets(arguments.pkgName, local.methodMeta.mixin, local.methodName);
+			}
+		}
+
 		for (local.methodName in local.methods) {
 			if (!IsCustomFunction(arguments.pkg[local.methodName])) {
 				continue;
@@ -655,10 +673,16 @@ component output="false" {
 	 * so the package is recorded as failed instead of silently loading with zero
 	 * mixin injection.
 	 *
-	 * @pkgName  Package directory name, used in the error message
-	 * @targets  Raw mixin-target declaration from the manifest
+	 * @pkgName     Package directory name, used in the error message
+	 * @targets     Raw mixin-target declaration from the manifest or per-method metadata
+	 * @methodName  Optional method name for per-method overrides; included in the
+	 *              error message so callers can locate the offending declaration
 	 */
-	private void function $validateMixinTargets(required string pkgName, required string targets) {
+	private void function $validateMixinTargets(
+		required string pkgName,
+		required string targets,
+		string methodName = ""
+	) {
 		local.normalized = LCase(Trim(arguments.targets));
 		if (!Len(local.normalized) || local.normalized == "none" || local.normalized == "global") {
 			return;
@@ -669,9 +693,10 @@ component output="false" {
 				continue;
 			}
 			if (!ListFindNoCase(variables.mixableComponents, local.entry)) {
+				local.context = Len(arguments.methodName) ? " method '#arguments.methodName#'" : "";
 				Throw(
 					type = "Wheels.PackageInvalidMixinTarget",
-					message = "Package '#arguments.pkgName#' declares unknown mixin target '#local.entry#'. Valid targets: #variables.mixableComponents#."
+					message = "Package '#arguments.pkgName#'#local.context# declares unknown mixin target '#local.entry#'. Valid targets: #variables.mixableComponents#."
 				);
 			}
 		}
