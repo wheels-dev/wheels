@@ -292,6 +292,109 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryDelete(root, true);
 				});
 
+				// ── Regression: issue ##2260 blind spots ────────────
+
+				it("honors per-method mixin attribute over manifest target (issue ##2260)", () => {
+					// Both packages declare provides.mixins = "controller" but the
+					// method itself declares `mixin="model"`. The static scan must
+					// report the collision on `model`, not `controller`.
+					var root = makeProjectRoot();
+					makePackageWithSource(
+						root = root,
+						name = "pkgA",
+						manifestTarget = "controller",
+						cfcBody = 'public string function $shared() mixin="model" { return "a"; }'
+					);
+					makePackageWithSource(
+						root = root,
+						name = "pkgB",
+						manifestTarget = "controller",
+						cfcBody = 'public string function $shared() mixin="model" { return "b"; }'
+					);
+
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).toInclude("Mixin collision");
+					expect(warningText).toInclude("$shared");
+					expect(warningText).toInclude("'model'");
+					expect(warningText).notToInclude("'controller'");
+					directoryDelete(root, true);
+				});
+
+				it("treats per-method mixin=none as an opt-out (issue ##2260)", () => {
+					// Manifest says "controller" but the method opts out; the
+					// scanner must not report a controller-level collision.
+					var root = makeProjectRoot();
+					makePackageWithSource(
+						root = root,
+						name = "pkgA",
+						manifestTarget = "controller",
+						cfcBody = 'public string function $shared() mixin="none" { return "a"; }'
+					);
+					makePackageWithSource(
+						root = root,
+						name = "pkgB",
+						manifestTarget = "controller",
+						cfcBody = 'public string function $shared() { return "b"; }'
+					);
+
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).notToInclude("Mixin collision");
+					directoryDelete(root, true);
+				});
+
+				it("follows in-package extends chain for inherited methods (issue ##2260)", () => {
+					// Each package's main CFC extends a same-package Base CFC
+					// that defines the shared method. Old scanner would miss it.
+					var root = makeProjectRoot();
+					makePackageWithExtendsChain(root, "pkgA", "controller", "$inherited");
+					makePackageWithExtendsChain(root, "pkgB", "controller", "$inherited");
+
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).toInclude("Mixin collision");
+					expect(warningText).toInclude("$inherited");
+					directoryDelete(root, true);
+				});
+
+				it("ignores function-like text inside block comments (issue ##2260)", () => {
+					// pkgA's real method is $real; its docblock MENTIONS $ghost.
+					// pkgB only declares $real. If the scanner picked up $ghost
+					// it would still collide on $real (so false positives for
+					// $ghost wouldn't change the count here) — but the warning
+					// text must not mention $ghost.
+					var root = makeProjectRoot();
+					makePackageWithSource(
+						root = root,
+						name = "pkgA",
+						manifestTarget = "controller",
+						cfcBody = '/** @deprecated use function $ghost() instead */
+							public string function $real() { return "a"; }'
+					);
+					makePackageWithSource(
+						root = root,
+						name = "pkgB",
+						manifestTarget = "controller",
+						cfcBody = 'public string function $real() { return "b"; }'
+					);
+
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
+					var results = doctor.runChecks();
+
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).toInclude("Mixin collision");
+					expect(warningText).toInclude("$real");
+					expect(warningText).notToInclude("$ghost");
+					directoryDelete(root, true);
+				});
+
 			});
 
 		});
@@ -335,6 +438,68 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		fileWrite(
 			pkgDir & "/" & arguments.name & ".cfc",
 			'component { public any function init() { return this; } public string function ' & arguments.methodName & '() { return "x"; } }'
+		);
+	}
+
+	/**
+	 * Creates a package with a hand-written CFC body so specs can exercise
+	 * the full function-signature parser (per-method `mixin` attributes,
+	 * docblocks, etc.) — unlike makePackage() which hard-codes the body.
+	 */
+	private void function makePackageWithSource(
+		required string root,
+		required string name,
+		required string manifestTarget,
+		required string cfcBody
+	) {
+		var pkgDir = arguments.root & "/vendor/" & arguments.name;
+		directoryCreate(pkgDir, true);
+		var manifest = {
+			"name": "wheels-" & arguments.name,
+			"version": "1.0.0",
+			"provides": {"mixins": arguments.manifestTarget}
+		};
+		fileWrite(pkgDir & "/package.json", serializeJSON(manifest));
+		fileWrite(
+			pkgDir & "/" & arguments.name & ".cfc",
+			'component {
+				public any function init() { return this; }
+				' & arguments.cfcBody & '
+			}'
+		);
+	}
+
+	/**
+	 * Creates a two-CFC package: the main CFC extends a Base CFC in the
+	 * same directory. The shared method lives on Base, so the static
+	 * scanner must follow extends to see it.
+	 */
+	private void function makePackageWithExtendsChain(
+		required string root,
+		required string name,
+		required string manifestTarget,
+		required string methodName
+	) {
+		var pkgDir = arguments.root & "/vendor/" & arguments.name;
+		directoryCreate(pkgDir, true);
+		var manifest = {
+			"name": "wheels-" & arguments.name,
+			"version": "1.0.0",
+			"provides": {"mixins": arguments.manifestTarget}
+		};
+		fileWrite(pkgDir & "/package.json", serializeJSON(manifest));
+		fileWrite(
+			pkgDir & "/Base.cfc",
+			'component {
+				public any function init() { return this; }
+				public string function ' & arguments.methodName & '() { return "inherited"; }
+			}'
+		);
+		fileWrite(
+			pkgDir & "/" & arguments.name & ".cfc",
+			'component extends="Base" {
+				public any function init() { super.init(); return this; }
+			}'
 		);
 	}
 

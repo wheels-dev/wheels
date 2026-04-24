@@ -241,16 +241,21 @@ component {
 
 	/**
 	 * Static best-effort mixin collision scan for packages in vendor/ and
-	 * legacy plugins in plugins/. Reads manifests and regex-scans the main
-	 * CFC of each package for public-function declarations, mapping method
-	 * names to declared mixin targets. Reports method×target pairs that are
-	 * registered by more than one package/plugin unless the second source
-	 * acknowledged the override via provides.overrides.
+	 * legacy plugins in plugins/. Reads manifests, strips block comments,
+	 * and parses each package's main CFC — plus any in-package `extends`
+	 * ancestors — for public-function declarations. Per-method `mixin="..."`
+	 * attributes in the signature tail override the manifest-level target,
+	 * matching the runtime semantics in PackageLoader.$collectMixins.
 	 *
-	 * Limitations: regex-based, so unusual CFC shapes may under-detect; only
-	 * scans the main CFC (directory-name match) — included files and script-
-	 * imported functions are ignored. Runtime detection in PackageLoader is
-	 * authoritative; this check exists for pre-boot visibility.
+	 * Reports method×target pairs registered by more than one package/plugin
+	 * unless any participant declared the method in provides.overrides.
+	 *
+	 * Residual limitations (runtime PackageLoader remains authoritative):
+	 *   • `extends` outside the package dir (e.g., wheels.* or a dotted path
+	 *     resolved via mapping) is not followed — we can't see those methods
+	 *     statically.
+	 *   • Methods composed into the main CFC at runtime (mixin injection,
+	 *     dynamic registration) are invisible to any static pass.
 	 */
 	private void function checkMixinCollisions(required struct results) {
 		var vendorDir = variables.projectRoot & "/vendor";
@@ -359,35 +364,25 @@ component {
 			cfcPath = arguments.pkgDir & "/" & cfcs[1];
 		}
 
-		var cfcSource = fileRead(cfcPath);
-		var lifecycleHooks = "init,onPluginLoad,onPluginActivate,register,boot";
+		// Collect methods from the main CFC and its in-package extends chain.
+		// Each value is either "" (use manifest target) or a per-method mixin
+		// attribute value (supports "none", "global", or a comma list).
 		var methods = {};
-		// Capture (access, methodName). Access and return type are both optional
-		// so we catch: `public string function x()`, `public function x()`,
-		// and the implicit-public `function x()`. Skip when access == "private".
-		var pattern = "\b(public|private|package|remote)?\s*(?:[a-zA-Z0-9_\[\]\.]+\s+)?function\s+([a-zA-Z0-9_\$]+)\s*\(";
-		var pos = 1;
-		while (true) {
-			var nameMatch = reFindNoCase(pattern, cfcSource, pos, true);
-			if (!structKeyExists(nameMatch, "pos") || !arrayLen(nameMatch.pos) || nameMatch.pos[1] == 0) break;
-			if (arrayLen(nameMatch.match) >= 3) {
-				var access = lCase(trim(nameMatch.match[2]));
-				var methodName = nameMatch.match[3];
-				if (access != "private" && !listFindNoCase(lifecycleHooks, methodName)) {
-					methods[methodName] = true;
-				}
-			}
-			pos = nameMatch.pos[1] + nameMatch.len[1];
-		}
+		$scanCfcRecursive(arguments.pkgDir, cfcPath, methods, {});
 
 		// Expand targets (global = all supported mixin component types).
 		// Wrap in listToArray so Adobe CF's for...in iterates elements, not chars.
 		var allTargets = "application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test";
-		var expanded = (targetsRaw == "global") ? allTargets : targetsRaw;
-		for (var target in listToArray(expanded)) {
-			target = trim(target);
-			if (!len(target) || !listFindNoCase(allTargets, target)) continue;
-			for (var methodName in methods) {
+		var defaultTargetsRaw = targetsRaw;
+
+		for (var methodName in methods) {
+			var perMethod = trim(methods[methodName]);
+			var effective = len(perMethod) ? perMethod : defaultTargetsRaw;
+			if (!len(effective) || effective == "none") continue;
+			var expanded = (effective == "global") ? allTargets : effective;
+			for (var target in listToArray(expanded)) {
+				target = trim(target);
+				if (!len(target) || !listFindNoCase(allTargets, target)) continue;
 				var key = target & "::" & methodName;
 				if (!structKeyExists(arguments.providerStore, key)) {
 					arguments.providerStore[key] = [];
@@ -401,6 +396,146 @@ component {
 				});
 			}
 		}
+	}
+
+	/**
+	 * Walks a CFC and its in-package `extends` ancestors, recording public
+	 * methods (excluding lifecycle hooks). Inherited entries write first, so
+	 * a method redeclared in the child overwrites — mirroring runtime
+	 * inheritance where the instantiated object sees the child's definition.
+	 *
+	 * @methods Out-param. Keys are method names; values are the per-method
+	 *          `mixin="..."` attribute (if declared in the signature tail)
+	 *          or "" to signal "inherit manifest target".
+	 * @visited Cycle guard, keyed by lowercased absolute path.
+	 */
+	private void function $scanCfcRecursive(
+		required string pkgDir,
+		required string cfcPath,
+		required struct methods,
+		required struct visited
+	) {
+		if (!fileExists(arguments.cfcPath)) return;
+		var canonical = lCase(arguments.cfcPath);
+		if (structKeyExists(arguments.visited, canonical)) return;
+		if (structCount(arguments.visited) >= 16) return;
+		arguments.visited[canonical] = true;
+
+		var source = $stripCfmlBlockComments(fileRead(arguments.cfcPath));
+
+		// Recurse into in-package parent FIRST so the child's redeclarations
+		// overwrite (last-write-wins matches runtime inheritance).
+		var extendsMatch = reFindNoCase(
+			"\bcomponent\b[^{]*?\bextends\s*=\s*[""']([^""']+)[""']",
+			source, 1, true
+		);
+		if (
+			structKeyExists(extendsMatch, "pos")
+			&& arrayLen(extendsMatch.pos) >= 2
+			&& extendsMatch.pos[2] > 0
+		) {
+			var parentRef = extendsMatch.match[2];
+			var parentName = listLast(parentRef, ".");
+			var parentPath = arguments.pkgDir & "/" & parentName & ".cfc";
+			if (fileExists(parentPath)) {
+				$scanCfcRecursive(arguments.pkgDir, parentPath, arguments.methods, arguments.visited);
+			}
+		}
+
+		// Function header. Access + return type both optional. Non-capturing
+		// group handles explicit return types (including Namespaced.Type).
+		var headerPattern = "\b(public|private|package|remote)?\s*(?:[a-zA-Z0-9_\[\]\.]+\s+)?function\s+([a-zA-Z0-9_\$]+)\s*\(";
+		var lifecycleHooks = "init,onPluginLoad,onPluginActivate,register,boot";
+		var sourceLen = len(source);
+		var pos = 1;
+
+		while (true) {
+			var nameMatch = reFindNoCase(headerPattern, source, pos, true);
+			if (!structKeyExists(nameMatch, "pos") || !arrayLen(nameMatch.pos) || nameMatch.pos[1] == 0) break;
+
+			var access = arrayLen(nameMatch.match) >= 2 ? lCase(trim(nameMatch.match[2])) : "";
+			var methodName = arrayLen(nameMatch.match) >= 3 ? nameMatch.match[3] : "";
+
+			// Advance past the `(` (last char of the matched header) so we can
+			// walk balanced parens and capture the per-method attribute tail.
+			var openParenPos = nameMatch.pos[1] + nameMatch.len[1] - 1;
+			var afterArgs = $advancePastBalancedParens(source, openParenPos);
+			var advanceTo = afterArgs > 0 ? afterArgs + 1 : (openParenPos + 1);
+
+			if (
+				len(methodName)
+				&& access != "private"
+				&& !listFindNoCase(lifecycleHooks, methodName)
+			) {
+				var perMethodTargets = "";
+				if (afterArgs > 0 && afterArgs < sourceLen) {
+					var bracePos = find("{", source, afterArgs + 1);
+					if (bracePos > afterArgs + 1) {
+						var tailLen = bracePos - afterArgs - 1;
+						var tail = mid(source, afterArgs + 1, tailLen);
+						var attrMatch = reFindNoCase(
+							"\bmixin\s*=\s*[""']([^""']*)[""']",
+							tail, 1, true
+						);
+						if (
+							structKeyExists(attrMatch, "pos")
+							&& arrayLen(attrMatch.pos) >= 2
+							&& attrMatch.pos[2] > 0
+						) {
+							perMethodTargets = trim(attrMatch.match[2]);
+						}
+					}
+				}
+				// Last-write-wins: if the child redeclares a parent method we
+				// keep the child's per-method attribute (runtime semantics).
+				arguments.methods[methodName] = perMethodTargets;
+			}
+
+			if (advanceTo <= pos) advanceTo = pos + 1;
+			if (advanceTo > sourceLen) break;
+			pos = advanceTo;
+		}
+	}
+
+	/**
+	 * Strip `/* ... *\/` block comments (including docblocks). Keeps line
+	 * comments as-is — stripping `//` is unsafe near URLs in string literals
+	 * and block-comment false-positives are the only class documented in
+	 * issue #2260.
+	 */
+	private string function $stripCfmlBlockComments(required string source) {
+		var s = arguments.source;
+		s = reReplace(s, "<!---[\s\S]*?--->", " ", "all");
+		s = reReplace(s, "/\*[\s\S]*?\*/", " ", "all");
+		return s;
+	}
+
+	/**
+	 * Scan forward from `openPos` (pointing AT `(`) and return the 1-indexed
+	 * position of the balanced `)`. Ignores parens inside `"..."`/`'...'`
+	 * string literals so default-value parens don't throw off the count.
+	 * Returns 0 if unbalanced (malformed source or truncated header).
+	 */
+	private numeric function $advancePastBalancedParens(required string source, required numeric openPos) {
+		var depth = 0;
+		var i = arguments.openPos;
+		var n = len(arguments.source);
+		var stringDelim = "";
+		while (i <= n) {
+			var ch = mid(arguments.source, i, 1);
+			if (len(stringDelim)) {
+				if (ch == stringDelim) stringDelim = "";
+			} else if (ch == '"' || ch == "'") {
+				stringDelim = ch;
+			} else if (ch == "(") {
+				depth++;
+			} else if (ch == ")") {
+				depth--;
+				if (depth == 0) return i;
+			}
+			i++;
+		}
+		return 0;
 	}
 
 	// ── Path helpers ─────────────────────────────────────────
