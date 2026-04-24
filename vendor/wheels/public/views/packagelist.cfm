@@ -38,6 +38,20 @@ if (request.wheels.params.format == "json") {
 	abort;
 }
 </cfscript>
+<cfscript>
+// Load registry packages for the "Browse registry" section.
+// Short-circuits in production via $loadRegistryPackages.
+registryResult = application.$wheels.public.$loadRegistryPackages();
+registryPackages = registryResult.packages;
+registryError = registryResult.error;
+
+// Build a set of installed package keys (lowercased) for quick
+// lookup when rendering the "✓ Installed" badge on registry rows.
+installedKeys = {};
+for (local.key in packageMeta) {
+	installedKeys[LCase(local.key)] = true;
+}
+</cfscript>
 <cfinclude template="../layout/_header.cfm">
 <cfoutput>
 <!--- cfformat-ignore-start --->
@@ -97,6 +111,67 @@ if (request.wheels.params.format == "json") {
 			</div>
 			<p>Activate packages by copying them from <code>packages/</code> to <code>vendor/</code>.</p>
 		</div>
+	</cfif>
+</div>
+
+<div class="ui container" style="margin-top: 3em;">
+	<h2 class="ui header">
+		Browse registry
+		<div class="sub header">
+			Packages available at
+			<a href="https://wheels.dev/packages" target="_blank" rel="noopener">wheels.dev/packages</a>.
+			Install with the CLI.
+		</div>
+	</h2>
+
+	<cfif Len(registryError)>
+		<div class="ui warning message">
+			<div class="header">Registry unavailable</div>
+			<p>#HTMLEditFormat(registryError)#</p>
+		</div>
+	<cfelseif ArrayLen(registryPackages) EQ 0>
+		<div class="ui message">
+			<p>No packages found in the registry.</p>
+		</div>
+	<cfelse>
+		<table class="ui celled striped table">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Description</th>
+					<th>Latest</th>
+					<th>Install</th>
+				</tr>
+			</thead>
+			<tbody>
+				<cfloop array="#registryPackages#" index="local.rp">
+					<cfset local.rpKey = LCase(local.rp.name)>
+					<cfset local.isInstalled = StructKeyExists(installedKeys, local.rpKey)>
+					<tr>
+						<td>
+							<strong>#HTMLEditFormat(local.rp.name)#</strong>
+							<cfif Len(local.rp.homepage)>
+								<br><a href="#HTMLEditFormat(local.rp.homepage)#" target="_blank" rel="noopener" class="ui small grey text">homepage</a>
+							</cfif>
+						</td>
+						<td>#HTMLEditFormat(local.rp.description)#</td>
+						<td>#HTMLEditFormat(local.rp.latestVersion)#</td>
+						<td>
+							<cfif local.isInstalled>
+								<span class="ui label"><i class="check icon"></i> Installed</span>
+							<cfelse>
+								<code id="install-#HTMLEditFormat(local.rpKey)#">wheels packages install #HTMLEditFormat(local.rp.name)#</code>
+								<button type="button"
+									class="ui tiny button"
+									onclick="navigator.clipboard.writeText(document.getElementById('install-#HTMLEditFormat(local.rpKey)#').innerText)">
+									Copy
+								</button>
+							</cfif>
+						</td>
+					</tr>
+				</cfloop>
+			</tbody>
+		</table>
 	</cfif>
 </div>
 
