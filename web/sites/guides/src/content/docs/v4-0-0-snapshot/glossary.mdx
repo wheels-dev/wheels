@@ -88,7 +88,7 @@ Terms that carry a specific Wheels meaning. Each entry links to the guide page w
 
 **Migration.** A versioned CFC in `app/migrator/migrations/` with `up()` and `down()` methods that carry the schema forward and back. See [Migrations](/v4-0-0-snapshot/basics/migrations/).
 
-**Mixin target.** The `provides.mixins` value in a package manifest — `controller`, `view`, `model`, `global`, or `none` — controlling which framework components receive the package's public methods. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/).
+**Mixin target.** The `provides.mixins` value in a package manifest — an allowlist of framework components (`controller`, `model`, `application`, `dispatch`, `mapper`, `base`, `sqlserver`, `mysql`, `postgresql`, `h2`, `test`) plus the special values `global` (inject everywhere) and `none` (opt out). There is no separate `view` target — views run in the controller's `variables` scope, so `controller` already makes methods callable from views. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/).
 
 **MVC.** Model-View-Controller — the layering rule Wheels applies the ActiveRecord way: fat models, thin controllers, dumb views. See [MVC in Wheels](/v4-0-0-snapshot/core-concepts/mvc-in-wheels/).
 
