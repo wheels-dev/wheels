@@ -41,7 +41,7 @@ if (request.wheels.params.format == "json") {
 <cfscript>
 // Load registry packages for the "Browse registry" section.
 // Short-circuits in production via $loadRegistryPackages.
-registryResult = application.$wheels.public.$loadRegistryPackages();
+registryResult = application.wheels.public.$loadRegistryPackages();
 registryPackages = registryResult.packages;
 registryError = registryResult.error;
 
