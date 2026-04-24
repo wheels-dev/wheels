@@ -258,9 +258,13 @@ component extends="wheels.WheelsTest" output="false" {
 }
 ```
 
-<Aside type="caution">
-  The core test runner's `directory=` URL parameter (sometimes referenced as a way to scope a run to `vendor.mypackage.tests`) is documented but not currently honoured — [`wheels#2280`](https://github.com/wheels-dev/wheels/issues/2280) tracks the fix. Until that lands, run your package's specs in the package repo's own CI (most first-party packages do this) rather than through the app's HTTP test endpoint.
-</Aside>
+Scope a run to a single package with the `directory=` URL param on the core test runner:
+
+```bash
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.mypackage.tests"
+```
+
+The runner accepts two allowlisted roots: `wheels.tests.*` (the framework core) and `vendor.<package>.tests.*` (any installed package). Any other value is silently ignored and the full core suite runs instead — the endpoint is unauthenticated and the allowlist prevents it from driving arbitrary CFC compilation.
 
 Package authors typically keep a matching set of specs in their repo and rely on the registry's `validate.yml` plus the package's own CI to catch regressions before tagging a release.
 
