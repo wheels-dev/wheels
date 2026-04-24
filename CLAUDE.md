@@ -372,14 +372,23 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
 
 ### Installing a Package
 
-The Wheels 4.1 CLI will ship `wheels packages install <name>` which resolves names against the `wheels-dev/wheels-packages` registry. Until then, interim install is a manual clone:
+Use the `wheels packages` CLI. Resolves names against the `wheels-dev/wheels-packages` registry, verifies sha256, extracts to `vendor/<name>/`.
 
 ```bash
-gh repo clone wheels-dev/wheels-sentry vendor/wheels-sentry    # install
-rm -rf vendor/wheels-sentry                                     # remove
+wheels packages list                          # browse the registry
+wheels packages search <query>                # name/description/tag match
+wheels packages show <name>                   # detail page
+wheels packages install <name>                # latest compat version
+wheels packages install <name>@<version>      # pin
+wheels packages install <name> --force        # overwrite an existing vendor/<name>
+wheels packages update <name> --yes           # explicit update
+wheels packages update --all --yes            # update every installed package
+wheels packages remove <name>                 # delete vendor/<name>
+wheels packages registry refresh              # bust the 24h cache
+wheels packages registry info                 # show registry URL + cache state
 ```
 
-Restart or reload the app after install.
+Override the registry with `WHEELS_PACKAGES_REGISTRY=<org>/<repo>` (defaults to `wheels-dev/wheels-packages`). Restart or `wheels reload` after install.
 
 ### Error Isolation
 

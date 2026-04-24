@@ -1588,6 +1588,124 @@ component extends="modules.BaseModule" {
 		return opts;
 	}
 
+	// ─────────────────────────────────────────────────
+	//  packages — registry-backed package manager
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Install, update, and list packages from the wheels-packages registry
+	 *
+	 * Usage:
+	 *   wheels packages list [--tag=<tag>]
+	 *   wheels packages search <query>
+	 *   wheels packages show <name>
+	 *   wheels packages install <name>[@<version>] [--force]
+	 *   wheels packages update <name> --yes
+	 *   wheels packages update --all --yes
+	 *   wheels packages remove <name>
+	 *   wheels packages registry refresh
+	 *   wheels packages registry info
+	 */
+	public string function packages() {
+		var args = getArgs(arguments);
+		var opts = $packagesArgsToOptions(args);
+		var positional = $packagesStripFlags(args);
+		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
+
+		switch (sub) {
+			case "list":
+				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				return mainCli.list(opts);
+			case "search":
+				if (arrayLen(positional) < 2) {
+					throw(message="search requires a query: wheels packages search <query>");
+				}
+				opts.query = positional[2];
+				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				return mainCli.search(opts);
+			case "show":
+				if (arrayLen(positional) < 2) {
+					throw(message="show requires a name: wheels packages show <name>");
+				}
+				opts.name = positional[2];
+				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				return mainCli.show(opts);
+			case "install":
+				if (arrayLen(positional) < 2) {
+					throw(message="install requires a name: wheels packages install <name>[@<version>]");
+				}
+				opts.target = positional[2];
+				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				return mainCli.install(opts);
+			case "update":
+				opts.target = arrayLen(positional) >= 2 ? positional[2] : "";
+				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				return mainCli.update(opts);
+			case "remove":
+				if (arrayLen(positional) < 2) {
+					throw(message="remove requires a name: wheels packages remove <name>");
+				}
+				opts.target = positional[2];
+				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				return mainCli.remove(opts);
+			case "registry":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels packages registry requires a verb (refresh or info)");
+				}
+				var regVerb = positional[2];
+				if (!listFindNoCase("refresh,info", regVerb)) {
+					throw(message="Unknown wheels packages registry verb: #regVerb#");
+				}
+				var regCli = new cli.lucli.services.packages.PackagesRegistryCli();
+				return invoke(regCli, regVerb, [opts]);
+			default:
+				throw(message="Unknown packages subcommand: #sub#");
+		}
+	}
+
+	private struct function $packagesArgsToOptions(required array args) {
+		var opts = {};
+		var n = arrayLen(arguments.args);
+		var i = 1;
+		while (i <= n) {
+			var a = arguments.args[i];
+			if (a == "--all") {
+				opts.all = true;
+			} else if (a == "--yes") {
+				opts.yes = true;
+			} else if (a == "--force") {
+				opts.force = true;
+			} else if (left(a, 6) == "--tag=") {
+				opts.tag = mid(a, 7, 99999);
+			} else if (a == "--tag" && i < n) {
+				opts.tag = arguments.args[i+1];
+				i++;
+			}
+			i++;
+		}
+		return opts;
+	}
+
+	private array function $packagesStripFlags(required array args) {
+		var out = [];
+		var n = arrayLen(arguments.args);
+		var i = 1;
+		while (i <= n) {
+			var a = arguments.args[i];
+			if (left(a, 2) == "--") {
+				var booleans = "--all,--yes,--force";
+				if (!find("=", a) && !listFindNoCase(booleans, a) && i < n && left(arguments.args[i+1], 2) != "--") {
+					i++;
+				}
+				i++;
+				continue;
+			}
+			arrayAppend(out, a);
+			i++;
+		}
+		return out;
+	}
+
 	private array function $deployStripFlags(required array args) {
 		var out = [];
 		var n = arrayLen(arguments.args);

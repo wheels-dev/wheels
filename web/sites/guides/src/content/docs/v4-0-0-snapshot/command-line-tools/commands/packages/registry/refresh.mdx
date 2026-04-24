@@ -1,0 +1,29 @@
+---
+title: "wheels packages registry refresh"
+description: Delete the local manifest cache so the next list/show/install hits the registry over the network.
+type: reference
+sidebar:
+  label: "refresh"
+  order: 1
+---
+
+Removes `~/.wheels/cache/packages/` entirely. The next registry-touching command repopulates it.
+
+## Synopsis
+
+```
+wheels packages registry refresh
+```
+
+## When to use
+
+- A package was just published and the 24h cache is serving stale data.
+- Debugging an install problem and you want to rule out cache corruption.
+- You changed `WHEELS_PACKAGES_REGISTRY` and want to discard the old registry's cache.
+
+## Example
+
+```
+$ wheels packages registry refresh
+Cache cleared. Next `wheels packages list` will re-fetch from the registry.
+```
