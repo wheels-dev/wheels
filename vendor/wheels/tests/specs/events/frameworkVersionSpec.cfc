@@ -85,6 +85,41 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("application.wheels.version resolves to <rootversion>-dev at boot in a monorepo dev checkout (regression for ##2291)", () => {
+				// Regression for ##2291. Asserts the *runtime boot* result — not a direct
+				// call — because $readFrameworkVersion is bound into the spec's scope by
+				// WheelsTest.cfc, which shifts GetCurrentTemplatePath() to this file and
+				// bypasses the code path we want to cover. application.wheels.version is
+				// populated by onapplicationstart.cfc calling $readFrameworkVersion() with
+				// no arguments, so whatever it resolved to is the answer we need to check.
+				//
+				// With the bug (one-level "../box.json"): default rootBoxJsonPath points at
+				// vendor/box.json, which does not exist, so the helper falls through to
+				// "0.0.0-dev" even in a monorepo checkout.
+				// With the fix (two-level "../../box.json"): default rootBoxJsonPath points
+				// at <repo-root>/box.json and yields "<rootversion>-dev".
+				var wheelsDir = ExpandPath("/wheels/");
+				var fwBoxPath = wheelsDir & "box.json";
+				var rootBoxPath = wheelsDir & "../../box.json";
+				if (!FileExists(fwBoxPath) || !FileExists(rootBoxPath)) {
+					return;
+				}
+				var fwBox = DeserializeJSON(FileRead(fwBoxPath));
+				var rootBox = DeserializeJSON(FileRead(rootBoxPath));
+				if (!IsStruct(fwBox) || (fwBox.version ?: "") != "@build.version@") {
+					return;
+				}
+				var isWheelsRepo = IsStruct(rootBox)
+					&& (
+						((rootBox.slug ?: "") == "wheels")
+						|| ((rootBox.name ?: "") == "Wheels.fw")
+					);
+				if (!isWheelsRepo || (rootBox.version ?: "") == "" || rootBox.version == "@build.version@") {
+					return;
+				}
+				expect(application.wheels.version).toBe(rootBox.version & "-dev");
+			});
+
 			it("$readFrameworkVersion throws Wheels.VersionReadFailed when the file is missing", () => {
 				var missing = getTempDirectory() & "wheels-version-missing-#CreateUUID()#.json";
 				var threw = false;

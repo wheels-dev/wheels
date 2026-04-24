@@ -2788,7 +2788,7 @@ return local.$wheels;
 			// homepage shows the upcoming version rather than a blank placeholder.
 			local.rootPath = Len(arguments.rootBoxJsonPath)
 				? arguments.rootBoxJsonPath
-				: GetDirectoryFromPath(GetCurrentTemplatePath()) & "../box.json";
+				: GetDirectoryFromPath(GetCurrentTemplatePath()) & "../../box.json";
 			try {
 				if (FileExists(local.rootPath)) {
 					local.rootBox = DeserializeJSON(FileRead(local.rootPath));
