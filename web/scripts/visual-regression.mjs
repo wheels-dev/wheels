@@ -46,6 +46,16 @@ const SITES = [
 		dist: resolve(WEB_ROOT, 'sites/api/dist'),
 		canary: '/v3-0-0/configuration/addformat/',
 	},
+	{
+		name: 'packages-index',
+		dist: resolve(WEB_ROOT, 'sites/packages/dist'),
+		canary: '/',
+	},
+	{
+		name: 'packages-wheels-sentry',
+		dist: resolve(WEB_ROOT, 'sites/packages/dist'),
+		canary: '/wheels-sentry/',
+	},
 ];
 
 const MIME = {
