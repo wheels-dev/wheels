@@ -36,6 +36,38 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 	}
 
+	/**
+	 * Returns a struct { packages: [...], error: "" } populated from the
+	 * wheels-packages registry. Short-circuits in production (defense in
+	 * depth — the handler is already $blockInProduction()-gated). Captures
+	 * any registry error into the `error` field so the view can render a
+	 * friendly banner instead of a stack trace.
+	 *
+	 * The optional `registry` argument is for tests; normal callers pass
+	 * nothing and get a memoized application-scope Registry instance.
+	 */
+	public struct function $loadRegistryPackages(any registry = "") {
+		if ($shouldBlockInProduction()) {
+			return {packages: [], error: ""};
+		}
+		local.reg = IsObject(arguments.registry) ? arguments.registry : $getRegistryClient();
+		try {
+			return {packages: local.reg.listAll(), error: ""};
+		} catch (any e) {
+			return {packages: [], error: "Registry lookup failed: " & e.message};
+		}
+	}
+
+	/**
+	 * Lazy, app-scope memo of the CLI's Registry component.
+	 */
+	private any function $getRegistryClient() {
+		if (!StructKeyExists(application.wheels, "$packageRegistry")) {
+			application.wheels.$packageRegistry = new cli.lucli.services.packages.Registry();
+		}
+		return application.wheels.$packageRegistry;
+	}
+
 	/*
 	This is just a proof of concept
 	*/
