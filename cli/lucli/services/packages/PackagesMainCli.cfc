@@ -252,8 +252,16 @@ component {
 	}
 
 	private struct function $parseTarget(required string target) {
-		if (Find("@", arguments.target)) {
-			local.at = Find("@", arguments.target);
+		local.at = Find("@", arguments.target);
+		if (local.at == 1) {
+			// Target starts with "@" — no name before the pin. Reject cleanly
+			// rather than crashing on Left(str, 0) (a documented Lucee 7 hazard).
+			Throw(
+				type = "Wheels.Packages.BadInput",
+				message = "Package name is required before '@'. Use: wheels packages install <name>[@<version>]"
+			);
+		}
+		if (local.at > 1) {
 			return {
 				name: Left(arguments.target, local.at - 1),
 				pin: Mid(arguments.target, local.at + 1, Len(arguments.target))

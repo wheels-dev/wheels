@@ -190,6 +190,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				stack.cache.refresh();
 				DirectoryDelete(proj, true);
 			});
+
+			it("install throws BadInput when target starts with '@' (empty name)", () => {
+				// Regression guard: `@1.0.0` used to hit Left(str, 0), which
+				// crashes on Lucee 7 and produces a cryptic error on other
+				// engines. Must reject cleanly with BadInput.
+				var proj = $scratch();
+				var stack = $buildStack(proj);
+				var threw = false;
+				try {
+					stack.cli.install({target: "@1.0.0"});
+				} catch (any e) {
+					threw = true;
+					expect(e.type).toBe("Wheels.Packages.BadInput");
+				}
+				expect(threw).toBeTrue();
+				stack.cache.refresh();
+				DirectoryDelete(proj, true);
+			});
 		});
 
 		describe("PackagesRegistryCli", () => {
