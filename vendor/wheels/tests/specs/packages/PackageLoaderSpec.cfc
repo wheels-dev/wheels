@@ -446,6 +446,23 @@ component extends="wheels.WheelsTest" {
 					expect(loader.getPackages()).toHaveKey("lazypkg");
 				});
 
+				it("ignores lazy=true when the package also declares mixins", () => {
+					// Packages that contribute to mixin tables must load eagerly
+					// so the tables are complete by the time controllers/views
+					// reference the mixed-in methods. The `canBeLazy` gate in
+					// PackageLoader requires mixins=none AND no middleware.
+					var loader = new wheels.PackageLoader(
+						vendorPath = fixturesPath,
+						componentPrefix = componentPrefix
+					);
+					var pkgs = loader.getPackages();
+
+					// lazyignored declares lazy=true + mixins=controller;
+					// it should be eagerly loaded despite the lazy flag.
+					expect(pkgs).toHaveKey("lazyignored");
+					expect(pkgs.lazyignored.initialized).toBeTrue();
+				});
+
 			});
 
 			describe("Mixin collisions", () => {

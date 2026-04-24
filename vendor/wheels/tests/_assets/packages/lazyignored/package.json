@@ -1,0 +1,9 @@
+{
+	"name": "wheels-lazyignored",
+	"version": "1.0.0",
+	"description": "Test fixture: lazy=true combined with mixins — lazy flag must be ignored, package must load eagerly so mixin tables are populated at boot.",
+	"lazy": true,
+	"provides": {
+		"mixins": "controller"
+	}
+}
