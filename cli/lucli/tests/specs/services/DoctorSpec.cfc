@@ -238,6 +238,61 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("framework source bundling", () => {
+
+				it("is silent when no installedModuleRoot is provided (dev checkout)", () => {
+					var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+					var results = doctor.runChecks();
+					var combined = arrayToList(results.issues, " ") & " " & arrayToList(results.passed, " ");
+					expect(combined).notToInclude("framework source");
+				});
+
+				it("passes when vendor/wheels/ exists at projectRoot", () => {
+					var checkout = makeFakeCheckout("component { }");
+					var installed = getTempDirectory() & "wheels-install-" & createUUID();
+					directoryCreate(installed, true);
+					fileWrite(installed & "/Module.cfc", "component { }");
+
+					var doctor = new cli.lucli.services.Doctor(
+						projectRoot = checkout,
+						installedModuleRoot = installed
+					);
+					var results = doctor.runChecks();
+
+					var passedText = arrayToList(results.passed, " ");
+					expect(passedText).toInclude("Wheels framework source available");
+
+					var issueText = arrayToList(results.issues, " ");
+					expect(issueText).notToInclude("framework source (vendor/wheels/) not found");
+
+					directoryDelete(checkout, true);
+					directoryDelete(installed, true);
+				});
+
+				it("flags CRITICAL when framework source is missing everywhere", () => {
+					var fakeInstalled = getTempDirectory() & "wheels-install-" & createUUID();
+					directoryCreate(fakeInstalled, true);
+					fileWrite(fakeInstalled & "/Module.cfc", "component { }");
+
+					var doctor = new cli.lucli.services.Doctor(
+						projectRoot = tempRoot,
+						installedModuleRoot = fakeInstalled
+					);
+					var results = doctor.runChecks();
+
+					var issueText = arrayToList(results.issues, " ");
+					expect(issueText).toInclude("framework source (vendor/wheels/) not found");
+					expect(results.status).toBe("CRITICAL");
+
+					var recText = arrayToList(results.recommendations, " ");
+					expect(recText).toInclude("WHEELS_FRAMEWORK_PATH");
+					expect(recText).notToInclude("Run 'wheels new' to scaffold");
+
+					directoryDelete(fakeInstalled, true);
+				});
+
+			});
+
 			describe("checkMixinCollisions", () => {
 
 				it("reports passed when no packages/plugins exist", () => {

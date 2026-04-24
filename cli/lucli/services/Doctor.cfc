@@ -29,6 +29,7 @@ component {
 		checkDatabaseConfig(results);
 		checkTestCoverage(results);
 		checkCliInstallFreshness(results);
+		checkFrameworkSourceBundled(results);
 		checkMixinCollisions(results);
 
 		// Determine overall status
@@ -236,6 +237,59 @@ component {
 			arguments.results.warnings,
 			"Installed CLI module at #variables.installedModuleRoot# diverges from this source checkout. "
 			& "Edits under cli/lucli/ will not take effect until you reinstall or replace the installed copy with a symlink."
+		);
+	}
+
+	/**
+	 * Verify the installed CLI has a usable Wheels framework source on disk so
+	 * `wheels new` will succeed. Matches the search order in Module.cfc's
+	 * resolveFrameworkSource() — project root walk-up and installed-module
+	 * walk-up. Only runs when invoked from an installed CLI (installedModuleRoot
+	 * set); dev checkouts always have vendor/wheels/ next to cli/lucli/ by
+	 * construction and don't need the check.
+	 *
+	 * Catches the Homebrew/Chocolatey-distribution packaging regression where
+	 * the module tarball is shipped without the companion framework-source zip.
+	 * A user in an empty directory would otherwise see doctor recommend
+	 * `wheels new` — which then errors out with "framework source not found".
+	 */
+	private void function checkFrameworkSourceBundled(required struct results) {
+		if (!len(variables.installedModuleRoot)) return;
+
+		var override = "";
+		try {
+			var envValue = createObject("java", "java.lang.System").getenv("WHEELS_FRAMEWORK_PATH");
+			if (!isNull(envValue)) override = envValue;
+		} catch (any e) {}
+
+		if (len(trim(override)) && directoryExists(override)) {
+			arrayAppend(arguments.results.passed, "Wheels framework source available via WHEELS_FRAMEWORK_PATH");
+			return;
+		}
+
+		var projectCandidate = variables.projectRoot & "/vendor/wheels";
+		if (directoryExists(projectCandidate)) {
+			arrayAppend(arguments.results.passed, "Wheels framework source available at #projectCandidate#");
+			return;
+		}
+
+		var File = createObject("java", "java.io.File");
+		var dir = variables.installedModuleRoot;
+		for (var i = 0; i < 6; i++) {
+			var canonical = File.init(dir).getCanonicalPath();
+			if (directoryExists(canonical & "/vendor/wheels")) {
+				arrayAppend(arguments.results.passed, "Wheels framework source bundled with installed CLI");
+				return;
+			}
+			var parent = File.init(canonical).getParent();
+			if (isNull(parent) || parent == canonical) break;
+			dir = parent;
+		}
+
+		arrayAppend(
+			arguments.results.issues,
+			"Wheels framework source (vendor/wheels/) not found anywhere the CLI searches — "
+			& "`wheels new` will fail. Your distribution package may be incomplete."
 		);
 	}
 
@@ -601,7 +655,14 @@ component {
 		if (findNoCase("No test files", combined) || findNoCase("Missing recommended directory: tests", combined)) {
 			arrayAppend(recs, "Run 'wheels generate test' to add test coverage");
 		}
-		if (findNoCase("Missing required directory", combined)) {
+		if (findNoCase("framework source (vendor/wheels/) not found", combined)) {
+			arrayAppend(
+				recs,
+				"Install or reinstall the Wheels CLI with a complete distribution, "
+				& "or set WHEELS_FRAMEWORK_PATH to a vendor/wheels/ directory. "
+				& "See: https://guides.wheels.dev/v4-0-0-snapshot/start-here/installing/"
+			);
+		} else if (findNoCase("Missing required directory", combined)) {
 			arrayAppend(recs, "Run 'wheels new' to scaffold a complete project structure");
 		}
 		if (findNoCase("Installed CLI module", combined) && findNoCase("diverges", combined)) {

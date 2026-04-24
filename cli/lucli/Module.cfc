@@ -3527,14 +3527,22 @@ component extends="modules.BaseModule" {
 			out("  - #candidate#");
 		}
 		out("");
-		out("To fix, either:", "bold");
-		out("  1. Run `wheels new` from inside a directory that contains");
-		out("     vendor/wheels/ (e.g. an existing Wheels project, or a");
-		out("     checkout of the wheels repository).");
-		out("  2. Set WHEELS_FRAMEWORK_PATH to point at a vendor/wheels/ directory:");
-		out("       WHEELS_FRAMEWORK_PATH=/path/to/vendor/wheels wheels new #appName#");
+		out("If you installed via Homebrew or Chocolatey, the framework source", "yellow");
+		out("must be bundled alongside the CLI. If it isn't on disk, the package", "yellow");
+		out("is incomplete — please report at https://github.com/wheels-dev/wheels/issues.", "yellow");
 		out("");
-		out("See: https://guides.wheels.dev/docs/getting-started");
+		out("To fix, any one of these works:", "bold");
+		out("  1. Set WHEELS_FRAMEWORK_PATH to point at a vendor/wheels/ directory:");
+		out("       WHEELS_FRAMEWORK_PATH=/path/to/vendor/wheels wheels new #appName#");
+		out("  2. Run `wheels new` from inside a directory that contains vendor/wheels/");
+		out("     (e.g. an existing Wheels project, or a checkout of the wheels repo).");
+		out("  3. Download the framework source manually and point at it:");
+		out("       # Pick the wheels-core-<version>.zip for the latest release at:");
+		out("       #   https://github.com/wheels-dev/wheels/releases");
+		out("       unzip wheels-core-<version>.zip -d ~/.wheels/modules/wheels/vendor/");
+		out("       wheels new #appName#");
+		out("");
+		out("See: https://guides.wheels.dev/v4-0-0-snapshot/start-here/installing/");
 
 		throw(
 			type="Wheels.FrameworkNotFound",
