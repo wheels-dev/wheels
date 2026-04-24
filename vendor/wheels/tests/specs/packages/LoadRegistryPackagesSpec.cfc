@@ -63,6 +63,24 @@ component extends="wheels.WheelsTest" {
 				});
 			});
 
+			it("lets non-Wheels.Packages errors bubble up as real bugs", () => {
+				$withEnv("development", () => {
+					var pub = $newPublic();
+					var thrown = "";
+					try {
+						pub.$loadRegistryPackages(
+							registry = $fakeRegistry(
+								throwType = "java.lang.NullPointerException",
+								throwMessage = "npe from listAll"
+							)
+						);
+					} catch ("java.lang.NullPointerException" e) {
+						thrown = e.message;
+					}
+					expect(thrown).toBe("npe from listAll");
+				});
+			});
+
 		});
 	}
 }

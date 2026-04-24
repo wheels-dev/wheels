@@ -53,7 +53,11 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		local.reg = IsObject(arguments.registry) ? arguments.registry : $getRegistryClient();
 		try {
 			return {packages: local.reg.listAll(), error: ""};
-		} catch (any e) {
+		} catch ("Wheels.Packages.RegistryUnavailable" e) {
+			return {packages: [], error: "Registry lookup failed: " & e.message};
+		} catch ("Wheels.Packages.RegistryMalformed" e) {
+			return {packages: [], error: "Registry lookup failed: " & e.message};
+		} catch ("Wheels.Packages.UnknownPackage" e) {
 			return {packages: [], error: "Registry lookup failed: " & e.message};
 		}
 	}
