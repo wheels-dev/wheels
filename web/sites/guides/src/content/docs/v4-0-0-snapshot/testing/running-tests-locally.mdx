@@ -100,6 +100,9 @@ curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=w
 
 # Skip populate when iterating on one spec and the schema is already in place
 curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&populate=false&directory=wheels.tests.specs.model.postSpec"
+
+# Scope to a single installed package's tests (e.g. wheels-sentry, wheels-i18n)
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.wheels-sentry.tests"
 ```
 
 The `populate=false` query param is the trick that makes tight inner loops possible. Populate drops and recreates every test table — a second or two on SQLite but much slower on networked databases. Once the schema is in place for the run, skipping populate shaves the wait down to just your specs executing.
@@ -114,6 +117,7 @@ The runner accepts filters at every layer. Pick whichever matches your workflow.
 | By directory (script) | `bash tools/test-local.sh model` |
 | By directory (URL) | `&directory=wheels.tests.specs.model` |
 | By single spec file (URL) | `&directory=wheels.tests.specs.model.postSpec` |
+| By installed package (URL) | `&directory=vendor.wheels-sentry.tests` |
 | Skip in source | `xdescribe("...", ...)` / `xit("...", ...)` — built into WheelsTest |
 | Skip the whole populate | `&populate=false` on the URL (schema must already exist) |
 

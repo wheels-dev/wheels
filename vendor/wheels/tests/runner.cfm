@@ -97,10 +97,28 @@
         }
     }
 
+    // Resolve the TestBox scope from url.directory with a conservative allowlist.
+    // Permitted roots (plus any dotted sub-path of them):
+    //   wheels.tests.*            — core framework specs
+    //   vendor.<package>.tests.*  — first-party / installed package specs
+    // The /wheels/core/tests endpoint is unauthenticated and only safe in dev;
+    // the allowlist is defense-in-depth so stray input can't drive arbitrary
+    // CFC compilation through whatever mappings happen to be registered.
+    local.testDirectory = "wheels.tests.specs";
+    if (StructKeyExists(url, "directory") && Len(Trim(url.directory))) {
+        local.requestedDirectory = Trim(url.directory);
+        if (ReFindNoCase(
+            "^(wheels\.tests|vendor\.[a-z0-9][a-z0-9\-]*\.tests)(\.[a-zA-Z0-9_]+)*$",
+            local.requestedDirectory
+        )) {
+            local.testDirectory = local.requestedDirectory;
+        }
+    }
+
     try {
         // Try to create TestBox instance with coverage disabled
         testBox = new wheels.wheelstest.system.TestBox(
-            directory="wheels.tests.specs",
+            directory=local.testDirectory,
             options={ coverage = { enabled = false } }
         );
     } catch (any e) {
