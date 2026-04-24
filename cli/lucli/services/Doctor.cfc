@@ -19,7 +19,7 @@ component {
 	 * Run all health checks and return categorized results.
 	 */
 	public struct function runChecks() {
-		var results = {issues: [], warnings: [], passed: []};
+		var results = {issues: [], warnings: [], passed: [], mixinCollisions: []};
 
 		checkRequiredDirs(results);
 		checkRecommendedDirs(results);
@@ -303,15 +303,24 @@ component {
 			for (var i = 2; i <= arrayLen(entries); i++) {
 				var second = entries[i];
 				collisionCount++;
-				arrayAppend(
-					arguments.results.warnings,
-					"Mixin collision: method '#second.method#' on '#second.target#' provided by #first.source# '#first.name#' is overwritten by #second.source# '#second.name#'. Acknowledge via provides.overrides to silence."
-				);
+				arrayAppend(arguments.results.mixinCollisions, {
+					target: second.target,
+					method: second.method,
+					firstName: first.name,
+					firstSource: first.source,
+					secondName: second.name,
+					secondSource: second.source
+				});
 				first = second;
 			}
 		}
 
-		if (collisionCount == 0 && (directoryExists(vendorDir) || directoryExists(pluginsDir))) {
+		if (collisionCount > 0) {
+			arrayAppend(
+				arguments.results.warnings,
+				"#collisionCount# mixin collision(s) detected — run 'wheels doctor --verbose' for details"
+			);
+		} else if (directoryExists(vendorDir) || directoryExists(pluginsDir)) {
 			arrayAppend(arguments.results.passed, "No static mixin collisions detected in vendor/ or plugins/");
 		}
 	}

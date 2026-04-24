@@ -1237,6 +1237,18 @@ component extends="modules.BaseModule" {
 			out("");
 		}
 
+		// Mixin collision detail (verbose only)
+		if (verbose && structKeyExists(results, "mixinCollisions") && arrayLen(results.mixinCollisions)) {
+			out("Mixin collisions (#arrayLen(results.mixinCollisions)#):", "yellow");
+			for (var c in results.mixinCollisions) {
+				out(
+					"  ! method '#c.method#' on '#c.target#' provided by #c.firstSource# '#c.firstName#' is overwritten by #c.secondSource# '#c.secondName#'. Acknowledge via provides.overrides to silence.",
+					"yellow"
+				);
+			}
+			out("");
+		}
+
 		// Passed (verbose only, or when no issues)
 		if (verbose || (results.status == "HEALTHY")) {
 			out("Passed (#arrayLen(results.passed)#):", "green");
