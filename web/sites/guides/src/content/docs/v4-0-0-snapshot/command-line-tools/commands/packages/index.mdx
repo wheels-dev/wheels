@@ -1,0 +1,61 @@
+---
+title: "wheels packages"
+description: Install, update, and list Wheels packages from the wheels-packages registry. No ForgeBox or CommandBox dependency.
+type: reference
+sidebar:
+  order: 12
+---
+
+`wheels packages` is the CLI surface for the [wheels-packages registry](https://github.com/wheels-dev/wheels-packages) — a curated, git-based distribution channel for Wheels ecosystem packages. Every verb talks to the registry over plain HTTPS and installs into `vendor/<name>/`, where `PackageLoader` picks it up on next reload.
+
+There is no ForgeBox and no CommandBox. The registry manifest is authoritative, tarballs live on the registry's GitHub Releases, and every tarball has a sha256 in the manifest that the installer verifies before extraction. Supply-chain attacks via force-pushed tags or drifted source archives are defeated by this design.
+
+## Synopsis
+
+```
+wheels packages list [--tag=<tag>]
+wheels packages search <query>
+wheels packages show <name>
+wheels packages install <name>[@<version>] [--force]
+wheels packages update <name> --yes
+wheels packages update --all --yes
+wheels packages remove <name>
+wheels packages registry refresh
+wheels packages registry info
+```
+
+## Verbs
+
+| Verb | Description |
+|------|-------------|
+| [`list`](./list) | Show every package in the registry, optionally filtered by `--tag`. |
+| [`search`](./search) | Substring match against name, description, and tags. |
+| [`show`](./show) | Detail page for a package: versions, homepage, license, install state. |
+| [`install`](./install) | Download, verify, extract into `vendor/<name>/`. |
+| [`update`](./update) | Re-install the latest compatible version. Explicit: requires `--yes`. |
+| [`remove`](./remove) | Delete `vendor/<name>/`. Refuses dirs without a `package.json`. |
+| [`registry refresh`](./registry-refresh) | Bust the 24h cache. |
+| [`registry info`](./registry-info) | Print registry URL, branch, cache state. |
+
+## Design principles
+
+- **Explicit updates only.** `update` is never implicit. There is no auto-pull on reload, no background upgrade. This is the only defense against malicious version-bump attacks — the user reviews every bump.
+- **Registry-hosted tarballs.** `tarball` URLs always point at `wheels-dev/wheels-packages` releases, never at the author's repo. GitHub's source-archive URLs drift; release assets don't.
+- **sha256 is mandatory.** Installation aborts on mismatch. There is no `--skip-checksum` flag.
+- **24h manifest cache.** `~/.wheels/cache/packages/`. Respects GitHub's 60 req/hr unauthenticated limit. `registry refresh` busts it.
+
+## Configuration
+
+| Env var | Purpose | Default |
+|---------|---------|---------|
+| `WHEELS_PACKAGES_REGISTRY` | Override the registry `<org>/<repo>`. Used for forks, mirrors, and test registries. | `wheels-dev/wheels-packages` |
+
+## Writing a package
+
+See the registry's [CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md) for the full submission checklist. The tl;dr:
+
+1. Build your package in its own repo with a valid `package.json` (same schema as the first-party packages — see [`wheels-sentry`](https://github.com/wheels-dev/wheels-sentry) for a reference).
+2. Tag a release on your repo (e.g. `v1.0.0`).
+3. Open a PR to `wheels-packages` adding `packages/<your-name>/manifest.json` with the version entry (leave `tarball` and `sha256` blank — CI fills them).
+4. After merge, the `mirror-tarball` workflow packages your tag, uploads it as a registry release asset, computes the sha256, and commits it back.
+5. Users can now `wheels packages install <your-name>`.

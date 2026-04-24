@@ -1,0 +1,31 @@
+---
+title: "wheels packages registry info"
+description: Print the registry URL, branch, cache directory, TTL, and cache freshness.
+type: reference
+sidebar:
+  label: "info"
+  order: 2
+---
+
+Prints diagnostic information about the registry and the local cache.
+
+## Synopsis
+
+```
+wheels packages registry info
+```
+
+## Example
+
+```
+$ wheels packages registry info
+Registry:       wheels-dev/wheels-packages
+Branch:         main
+Browse:         https://github.com/wheels-dev/wheels-packages/tree/main/packages
+Cache dir:      /Users/me/.wheels/cache/packages
+Cache TTL:      86400s
+Cache present:  yes
+Index fetched:  2026-04-23T16:42:10+00:00
+```
+
+Setting `WHEELS_PACKAGES_REGISTRY=acme/our-packages` before running the command changes the `Registry:` line and isolates the cache under the same path (entries keyed by package name only — if you swap registries, run `registry refresh` to avoid mixing manifests).

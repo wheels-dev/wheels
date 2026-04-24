@@ -1,0 +1,43 @@
+---
+title: "wheels packages update"
+description: Bump an installed package (or all of them) to the latest compatible version. Explicit — requires --yes.
+type: reference
+sidebar:
+  label: "update"
+  order: 5
+---
+
+Updates are always explicit. There is no auto-update on reload and no implicit upgrade when running `install` on an already-installed package. This is the registry's defense against malicious version-bump attacks — every version change is the user's conscious choice.
+
+## Synopsis
+
+```
+wheels packages update <name> --yes
+wheels packages update --all --yes
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--yes` | **Required.** Confirms the update. Missing `--yes` throws `Wheels.Packages.ConfirmationRequired`. |
+| `--all` | Update every installed package. Still requires `--yes`. |
+
+## Mass update semantics
+
+`update --all --yes` iterates every dir under `vendor/` (except `vendor/wheels/`) that has a `package.json`. Failures in one package do not halt the others — the run continues and prints a per-package report at the end. If any package failed, the command throws `Wheels.Packages.PartialUpdateFailure` so the shell exit code is non-zero; the aggregated report is in `extendedInfo`.
+
+## Example
+
+```
+$ wheels packages update wheels-sentry --yes
+Installed wheels-sentry@1.1.0 → /Users/me/app/vendor/wheels-sentry
+Run `wheels reload` to activate it.
+
+$ wheels packages update --all --yes
+Update report:
+  wheels-sentry: updated → 1.1.0
+  wheels-hotwire: already at 2.0.0
+  wheels-basecoat: FAILED (Wheels.Packages.RegistryUnavailable — HTTP 503)
+# exit 1 — partial failure
+```

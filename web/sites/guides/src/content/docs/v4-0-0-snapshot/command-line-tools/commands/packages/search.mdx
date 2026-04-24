@@ -1,0 +1,23 @@
+---
+title: "wheels packages search"
+description: Substring match against package name, description, and tags.
+type: reference
+sidebar:
+  label: "search"
+  order: 2
+---
+
+Case-insensitive substring match across `name`, `description`, and `tags[]`. Use `list --tag=<tag>` for exact-tag filtering.
+
+## Synopsis
+
+```
+wheels packages search <query>
+```
+
+## Example
+
+```
+$ wheels packages search sentry
+wheels-sentry    Sentry error tracking [monitoring, errors, observability]
+```
