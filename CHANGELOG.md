@@ -125,6 +125,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - CI engine testing restructured: 42 jobs reduced to 8 via engine-grouped testing (#1939)
 - `wheels mcp wheels` MCP surface curated — 7 CLI-only commands (`mcp`, `d`, `new`, `console`, `start`, `stop`, `browser`) hidden from MCP `tools/list` via the `mcpHiddenTools()` convention (requires LuCLI 0.3.4+). All remain reachable as CLI subcommands. Tool count drops from 23 to 16 for agent consumers.
 - LuCLI stdio MCP (`wheels mcp wheels`) is now the canonical AI-agent surface for Wheels. `wheels mcp setup` generates `.mcp.json` and `.opencode.json` pointing at the stdio transport. No port or running dev server required. Updated templates: `cli/src/templates/McpConfig.json`, `app/snippets/McpConfig.json`, `tools/build/base/.mcp.json`, `tools/build/base/.opencode.json`.
+- Package lazy-loading (`"lazy": true` in `package.json`) retained and documented in the [Packages](web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/packages.mdx) guide. Audit of all six first-party packages (`wheels-sentry`, `wheels-hotwire`, `wheels-basecoat`, `wheels-legacy-adapter`, `wheels-i18n`, `wheels-seo-suite`) found no candidates — all provide controller mixins, which require eager load to populate the mixin tables. The feature remains valid for third-party service-only packages. Added a defensive test that a package declaring `lazy: true` alongside mixins or middleware is still loaded eagerly (the loader's existing `canBeLazy` gate). (#2249)
 
 ### Deprecated
 
