@@ -1,0 +1,98 @@
+---
+import type { PackageSummary } from '../lib/registry';
+
+interface Props {
+  pkg: PackageSummary;
+}
+
+const { pkg } = Astro.props;
+const homepage = /^https?:\/\//.test(pkg.homepage) ? pkg.homepage : '';
+---
+
+<article class="package-card" data-match="true" data-search={`${pkg.name} ${pkg.description} ${pkg.tags.join(' ')}`.toLowerCase()}>
+  <header>
+    <h2>
+      <a href={`/${pkg.name}`}>{pkg.name}</a>
+    </h2>
+    <span class="version-pill">v{pkg.latestVersion}</span>
+  </header>
+  <p class="description">{pkg.description}</p>
+  {pkg.tags.length > 0 && (
+    <ul class="tags">
+      {pkg.tags.map((tag) => <li><span class="tag-chip">{tag}</span></li>)}
+    </ul>
+  )}
+  <div class="install">
+    <code id={`install-${pkg.name}`}>wheels packages install {pkg.name}</code>
+    <button
+      type="button"
+      class="copy-btn"
+      data-target={`install-${pkg.name}`}
+      aria-label={`Copy install command for ${pkg.name}`}
+    >Copy</button>
+  </div>
+  {homepage && (
+    <footer>
+      <a href={homepage} target="_blank" rel="noopener">Homepage ↗</a>
+    </footer>
+  )}
+</article>
+
+<style>
+  .package-card {
+    border: 1px solid var(--color-border, #e2e2e2);
+    border-radius: 8px;
+    padding: 1.25rem;
+    background: var(--color-surface, #fff);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .package-card[data-match='false'] { display: none; }
+  .package-card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .package-card h2 { margin: 0; font-size: 1.125rem; }
+  .package-card h2 a { text-decoration: none; color: inherit; }
+  .package-card h2 a:hover { text-decoration: underline; }
+  .version-pill {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--color-surface-2, #f3f3f3);
+    color: var(--color-fg-muted, #555);
+  }
+  .description { margin: 0; color: var(--color-fg-muted, #555); font-size: 0.95rem; }
+  .tags { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.375rem; }
+  .tag-chip {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    background: var(--color-brand-soft, #eef);
+    color: var(--color-brand, #335);
+  }
+  .install { display: flex; align-items: center; gap: 0.5rem; }
+  .install code {
+    flex: 1;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--color-surface-2, #f3f3f3);
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .copy-btn {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid var(--color-border, #e2e2e2);
+    background: var(--color-surface, #fff);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--color-surface-2, #f3f3f3); }
+  footer { margin-top: auto; }
+  footer a { font-size: 0.8125rem; color: var(--color-fg-muted, #555); }
+</style>

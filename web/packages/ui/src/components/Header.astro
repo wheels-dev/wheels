@@ -2,7 +2,7 @@
 import Logo from './Logo.astro';
 
 interface Props {
-	current?: 'landing' | 'guides' | 'api' | 'blog';
+	current?: 'landing' | 'guides' | 'api' | 'blog' | 'packages';
 }
 const { current } = Astro.props;
 
@@ -11,6 +11,7 @@ const links = [
 	{ label: 'Guides', href: 'https://guides.wheels.dev/', key: 'guides' },
 	{ label: 'API', href: 'https://api.wheels.dev/', key: 'api' },
 	{ label: 'Blog', href: 'https://blog.wheels.dev/', key: 'blog' },
+	{ label: 'Packages', href: 'https://packages.wheels.dev/', key: 'packages' },
 ];
 ---
 

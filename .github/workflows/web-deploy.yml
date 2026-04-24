@@ -11,6 +11,8 @@ on:
     paths:
       - 'web/**'
       - '.github/workflows/web-deploy.yml'
+  repository_dispatch:
+    types: [registry-updated]
 
 jobs:
   deploy:
@@ -26,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        site: [landing, blog, guides, api]
+        site: ${{ github.event_name == 'repository_dispatch' && fromJSON('["packages"]') || fromJSON('["landing", "blog", "guides", "api", "packages"]') }}
 
     steps:
       - name: Checkout

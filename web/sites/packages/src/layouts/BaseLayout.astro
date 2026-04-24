@@ -1,0 +1,43 @@
+---
+import Header from '@wheels-dev/ui/components/Header.astro';
+import Footer from '@wheels-dev/ui/components/Footer.astro';
+import '@wheels-dev/ui/styles/tokens.css';
+import '@wheels-dev/ui/styles/base.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'Wheels packages registry' } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style is:global>
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <Header current="packages" />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

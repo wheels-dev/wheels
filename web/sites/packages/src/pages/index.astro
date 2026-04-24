@@ -1,0 +1,115 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PackageCard from '../components/PackageCard.astro';
+import { listAll } from '../lib/registry';
+
+const packages = await listAll();
+---
+
+<BaseLayout
+  title="Wheels packages"
+  description="Browse the Wheels packages registry — first-party and community packages for the Wheels framework."
+>
+  <section class="packages-page">
+    <header class="page-header">
+      <h1>Wheels packages</h1>
+      <p class="subhead">
+        First-party and community packages for the Wheels framework. Install with
+        <code>wheels packages install &lt;name&gt;</code>.
+      </p>
+      <label class="filter">
+        <span class="visually-hidden">Filter packages</span>
+        <input
+          id="package-filter"
+          type="search"
+          placeholder="Filter packages by name, description, or tag…"
+          aria-label="Filter packages"
+        />
+      </label>
+    </header>
+
+    <div class="package-grid">
+      {packages.map((pkg) => <PackageCard pkg={pkg} />)}
+    </div>
+
+    <p class="count-line">
+      <span id="visible-count">{packages.length}</span> of {packages.length} packages
+    </p>
+  </section>
+</BaseLayout>
+
+<script>
+  // Client-side filter + copy-button behavior.
+
+  const filterInput = document.getElementById('package-filter') as HTMLInputElement | null;
+  const cards = document.querySelectorAll<HTMLElement>('.package-card');
+  const countEl = document.getElementById('visible-count');
+
+  function applyFilter(query: string) {
+    const q = query.trim().toLowerCase();
+    let visible = 0;
+    cards.forEach((card) => {
+      const haystack = card.dataset.search ?? '';
+      const match = q === '' || haystack.includes(q);
+      card.dataset.match = match ? 'true' : 'false';
+      if (match) visible += 1;
+    });
+    if (countEl) countEl.textContent = String(visible);
+  }
+
+  filterInput?.addEventListener('input', (e) => {
+    applyFilter((e.target as HTMLInputElement).value);
+  });
+
+  // Copy buttons — 2s "Copied!" feedback.
+  document.querySelectorAll<HTMLButtonElement>('.copy-btn').forEach((btn) => {
+    const originalLabel = btn.textContent ?? 'Copy';
+    btn.addEventListener('click', async () => {
+      const targetId = btn.dataset.target;
+      if (!targetId) return;
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      const text = target.textContent ?? '';
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = originalLabel; }, 2000);
+      } catch (_err) {
+        // Older browsers without the clipboard API silently skip.
+      }
+    });
+  });
+</script>
+
+<style>
+  .packages-page { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .page-header { margin-bottom: 2rem; }
+  .page-header h1 { margin: 0 0 0.5rem; font-size: 2rem; }
+  .subhead { margin: 0 0 1.5rem; color: var(--color-fg-muted, #555); max-width: 48rem; }
+  .subhead code {
+    font-size: 0.875em;
+    background: var(--color-surface-2, #f3f3f3);
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+  }
+  .filter input {
+    width: 100%;
+    max-width: 32rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    border: 1px solid var(--color-border, #e2e2e2);
+    border-radius: 6px;
+  }
+  .package-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 640px) {
+    .package-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 960px) {
+    .package-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  .count-line { margin-top: 1.5rem; color: var(--color-fg-muted, #555); font-size: 0.875rem; }
+</style>
