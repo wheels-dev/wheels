@@ -290,8 +290,8 @@ component output="false" displayName="MCP Server" {
 			},
 			{
 				"uri": "wheels://guides/all",
-				"name": "Wheels Guides",
-				"description": "All Wheels framework guides and tutorials",
+				"name": "Wheels Guides Index",
+				"description": "Section index for Wheels guides with links to guides.wheels.dev (full guide content is not served in-app as of v4.0)",
 				"mimeType": "application/json"
 			},
 			// .ai folder documentation
