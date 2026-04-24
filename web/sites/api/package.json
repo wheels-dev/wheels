@@ -7,7 +7,8 @@
 		"dev": "astro dev --port 4324",
 		"build": "astro build",
 		"preview": "astro preview",
-		"check": "astro check"
+		"check": "astro check",
+		"test": "vitest run --passWithNoTests"
 	},
 	"dependencies": {
 		"astro": "^5.1.0",
