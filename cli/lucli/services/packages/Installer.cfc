@@ -162,13 +162,15 @@ component {
 
 	private void function $extract(required string tarballPath, required string destDir) {
 		// Wrap in a try so a missing `tar` produces a clear error message.
+		local.result = {};
 		try {
 			cfexecute(
 				name = "tar",
 				arguments = "-xzf #arguments.tarballPath# -C #arguments.destDir#",
 				timeout = 120,
 				variable = "local.stdout",
-				errorVariable = "local.stderr"
+				errorVariable = "local.stderr",
+				result = "local.result"
 			);
 		} catch (any e) {
 			Throw(
@@ -177,11 +179,17 @@ component {
 				extendedInfo = e.message
 			);
 		}
-		if (StructKeyExists(local, "stderr") && Len(Trim(local.stderr))) {
+		// Gate on exit code, not stderr presence. GNU tar on Linux prints
+		// informational warnings ("Ignoring unknown extended header keyword
+		// 'LIBARCHIVE.xattr.com.apple.provenance'") for macOS-authored
+		// tarballs while still exiting 0 and extracting cleanly.
+		var exitCode = StructKeyExists(local.result, "exitCode") ? local.result.exitCode : 0;
+		if (exitCode != 0) {
+			var stderr = StructKeyExists(local, "stderr") ? local.stderr : "";
 			Throw(
 				type = "Wheels.Packages.ExtractionFailed",
-				message = "tar reported an error during extraction.",
-				extendedInfo = local.stderr
+				message = "tar exited with code #exitCode# during extraction.",
+				extendedInfo = stderr
 			);
 		}
 	}
