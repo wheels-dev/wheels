@@ -1,18 +1,28 @@
 # wheels-packages Phase 4 — Discovery UI
 
-**Status:** draft
+**Status:** in progress — wheels.dev portion deferred (see "Revision" below)
 **Date:** 2026-04-23
 **Issue:** [#2271](https://github.com/wheels-dev/wheels/issues/2271) (Phase 4 of [#2243](https://github.com/wheels-dev/wheels/issues/2243))
 **Depends on:** [#2233](https://github.com/wheels-dev/wheels/issues/2233) (production gating, already closed)
+
+## Revision — 2026-04-23
+
+Initial draft assumed `wheels.dev` was a live CFML app (legacy `wheels-dev/wheels.dev` repo). It is not. The site was migrated to four Astro static sites in this repo under `web/sites/{landing,guides,api,blog}/`, deployed to Cloudflare Pages via `.github/workflows/web-deploy.yml`.
+
+**Scope split:**
+- **In-app surface (Component 1)** — ships first, captured in full by this spec and the companion plan at `docs/superpowers/plans/2026-04-23-wheels-packages-phase4-inapp.md`.
+- **wheels.dev surface (Components 2 + 3)** — **deferred**. Will be redesigned against the Astro architecture in a follow-up spec before implementation. The CFML `RegistryClient` + `PackagesController` described below are superseded and should be treated as historical context only. The replacement approach will be build-time data fetching in Astro frontmatter (`getStaticPaths()`), with a `repository_dispatch` trigger from `wheels-dev/wheels-packages` → this repo's `web-deploy.yml` so manifest merges rebuild the landing site automatically.
+
+Issue #2271 will not close on the in-app PR. It stays open to track the deferred wheels.dev work.
 
 ## Summary
 
 Ship the discovery UI for the `wheels-packages` ecosystem on two surfaces:
 
-1. **`wheels.dev/packages`** — public listing + detail pages that read the registry over HTTP and render version history, install commands, and the per-package README.
+1. **`wheels.dev/packages`** — public listing + detail pages (Astro static site, deferred — see Revision above).
 2. **`/wheels/packages`** — in-app developer page, already shows *installed* packages; Phase 4 adds a **"Browse registry"** section so developers can discover installable packages without leaving their app.
 
-Both surfaces read the same GitHub-hosted registry (`wheels-dev/wheels-packages`) with a 24-hour cache. There is no install-via-browser action; installation remains a CLI operation (`wheels packages install <name>`).
+Both surfaces read the same GitHub-hosted registry (`wheels-dev/wheels-packages`). The in-app surface reuses the CLI's `Registry.cfc` with a 24-hour app-scope cache. There is no install-via-browser action; installation remains a CLI operation (`wheels packages install <name>`).
 
 ## Current state (pre-Phase-4)
 
@@ -129,7 +139,7 @@ if (application.wheels.environment != "production") {
 
 If `listAll()` does not yet exist on `Registry.cfc`, add it. Keep the shape symmetrical with the new wheels.dev `RegistryClient`.
 
-### Component 2 — wheels.dev: RegistryClient service
+### Component 2 — wheels.dev: RegistryClient service [DEFERRED — see Revision]
 
 **File:** `app/models/services/RegistryClient.cfc` (~100 lines).
 
@@ -155,7 +165,7 @@ RegistryClient init(
 di.map("registryClient").to("app.models.services.RegistryClient").asSingleton();
 ```
 
-### Component 3 — wheels.dev: PackagesController + views + routes
+### Component 3 — wheels.dev: PackagesController + views + routes [DEFERRED — see Revision]
 
 **Controller:** `app/controllers/web/PackagesController.cfc`
 
