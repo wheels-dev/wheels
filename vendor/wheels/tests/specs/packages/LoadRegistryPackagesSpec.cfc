@@ -81,6 +81,16 @@ component extends="wheels.WheelsTest" {
 				});
 			});
 
+			it("silently disables the browse section when the CLI registry class is not on the classpath", () => {
+				$withEnv("development", () => {
+					// Subclass that simulates a generated user app without cli/ on the classpath.
+					var pub = new wheels.tests._assets.packages.PublicWithoutRegistry();
+					var result = pub.$loadRegistryPackages();
+					expect(result.packages).toBe([]);
+					expect(result.error).toBe("");
+				});
+			});
+
 		});
 	}
 }

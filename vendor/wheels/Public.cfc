@@ -50,6 +50,13 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		if ($shouldBlockInProduction()) {
 			return {packages: [], error: ""};
 		}
+		// User apps generated with `wheels new` don't ship the CLI alongside.
+		// When the Registry class isn't on the classpath, silently disable the
+		// browse-registry feature rather than crashing. The installed-packages
+		// table still renders normally.
+		if (!IsObject(arguments.registry) && !$registryClientAvailable()) {
+			return {packages: [], error: ""};
+		}
 		local.reg = IsObject(arguments.registry) ? arguments.registry : $getRegistryClient();
 		try {
 			return {packages: local.reg.listAll(), error: ""};
@@ -60,6 +67,16 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		} catch ("Wheels.Packages.UnknownPackage" e) {
 			return {packages: [], error: "Registry lookup failed: " & e.message};
 		}
+	}
+
+	/**
+	 * True if the CLI's Registry component is on the classpath — i.e., we're
+	 * running inside the framework repo (or a user app that ships the CLI
+	 * alongside). In a plain user app this returns false and the browse-
+	 * registry section silently disables.
+	 */
+	private boolean function $registryClientAvailable() {
+		return FileExists(ExpandPath("/cli/lucli/services/packages/Registry.cfc"));
 	}
 
 	/**
