@@ -65,7 +65,7 @@ export async function fetchManifest(name: string): Promise<Manifest> {
     !manifest.name ||
     !Array.isArray(manifest.versions)
   ) {
-    throw new Error(`Malformed manifest for '${name}'`);
+    throw new Error(`Malformed manifest for '${name}' — ${url}`);
   }
   return manifest;
 }
