@@ -3537,8 +3537,8 @@ component extends="modules.BaseModule" {
 		out("  2. Run `wheels new` from inside a directory that contains vendor/wheels/");
 		out("     (e.g. an existing Wheels project, or a checkout of the wheels repo).");
 		out("  3. Download the framework source manually and point at it:");
-		out("       # Pick the wheels-core-<version>.zip for the latest release at:");
-		out("       #   https://github.com/wheels-dev/wheels/releases");
+		out("       ## Pick the wheels-core-<version>.zip for the latest release at:");
+		out("       ##   https://github.com/wheels-dev/wheels/releases");
 		out("       unzip wheels-core-<version>.zip -d ~/.wheels/modules/wheels/vendor/");
 		out("       wheels new #appName#");
 		out("");
