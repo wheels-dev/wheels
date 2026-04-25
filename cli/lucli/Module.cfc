@@ -3458,7 +3458,9 @@ component extends="modules.BaseModule" {
 	/**
 	 * Configure SQLite as the zero-config default database by creating the db
 	 * directory and injecting datasource configuration into config/app.cfm.
-	 * Lucee auto-downloads the SQLite JDBC bundle via the bundleName hint.
+	 * The SQLite JDBC driver is loaded from the standard Lucee classpath
+	 * (shipped with the Wheels distribution) rather than via OSGi bundle
+	 * resolution, which is currently unreliable on Lucee 7's BundleProvider.
 	 */
 	private void function configureSQLiteDatabase(
 		required string targetDir,
@@ -3482,14 +3484,12 @@ component extends="modules.BaseModule" {
 		sqliteConfig &= tab & "// SQLite zero-config database (configured by wheels new)" & nl;
 		sqliteConfig &= tab & 'this.datasources["#datasourceName#"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'bundleName: "org.xerial.sqlite-jdbc",' & nl;
 		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/development.sqlite")' & nl;
 		sqliteConfig &= tab & "};";
 
 		// Also add a test database datasource
 		sqliteConfig &= nl & tab & 'this.datasources["#datasourceName#_test"] = {' & nl;
 		sqliteConfig &= tab & tab & 'class: "org.sqlite.JDBC",' & nl;
-		sqliteConfig &= tab & tab & 'bundleName: "org.xerial.sqlite-jdbc",' & nl;
 		sqliteConfig &= tab & tab & 'connectionString: "jdbc:sqlite:" & expandPath("../db/test.sqlite")' & nl;
 		sqliteConfig &= tab & "};";
 
