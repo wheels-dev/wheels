@@ -54,15 +54,29 @@ Install the `wheels` CLI. Five minutes.
 
 <TabItem label="Windows" icon="seti:windows">
 
+<Aside type="caution" title="Do not run `choco install wheels` yet">
+The `wheels` package on the public Chocolatey feed is still the v1.x legacy (CommandBox-based) release and **cannot drive this tutorial**. The v2.x LuCLI-based package is built and tested in [`wheels-dev/chocolatey-wheels`](https://github.com/wheels-dev/chocolatey-wheels) but has not been pushed to the community feed yet. Use the manual JAR steps below until then. See [CLI Installation](/v4-0-0-snapshot/command-line-tools/installation/#windows-chocolatey) for context.
+</Aside>
+
 <Steps>
 
-1. Install via Chocolatey. Open PowerShell as Administrator:
+1. Download the LuCLI Windows launcher (`lucli-<version>.bat`) from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases). Rename it to `wheels.bat` and place it on your `PATH` (for example, `C:\Tools\wheels\wheels.bat`).
 
-   ```powershell title="admin PowerShell"
-   choco install wheels
+2. Download `wheels-module-<version>.zip` from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases) and extract it into `%USERPROFILE%\.wheels\modules\wheels\`:
+
+   ```powershell title="PowerShell"
+   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.wheels\modules\wheels" | Out-Null
+   Expand-Archive -Path "wheels-module-*.zip" -DestinationPath "$env:USERPROFILE\.wheels\modules\wheels"
    ```
 
-2. Open a new PowerShell (so PATH picks up the CLI) and verify:
+3. Set `JAVA_HOME` to your JDK 21 install and `LUCLI_HOME` to your Wheels directory (persist via System Properties → Environment Variables):
+
+   ```powershell title="PowerShell"
+   setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-21"
+   setx LUCLI_HOME "$env:USERPROFILE\.wheels"
+   ```
+
+4. Open a new PowerShell (so PATH and the new env vars pick up) and verify:
 
    ```powershell title="PowerShell"
    wheels --version
@@ -71,6 +85,8 @@ Install the `wheels` CLI. Five minutes.
    You should see a line like `Wheels Framework v4.0.0 (LuCLI 0.3.5-SNAPSHOT)`.
 
 </Steps>
+
+Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI Installation → Manual JAR install](/v4-0-0-snapshot/command-line-tools/installation/#manual-jar-install) for the canonical version-pairing source.
 
 </TabItem>
 
@@ -121,9 +137,14 @@ brew upgrade wheels
 
 <TabItem label="Windows" icon="seti:windows">
 
-```powershell title="admin PowerShell"
-choco upgrade wheels
-```
+Until the v2 Chocolatey package ships, upgrade by re-downloading the launcher and module from GitHub Releases:
+
+1. Replace `wheels.bat` on your `PATH` with the latest `lucli-<version>.bat` from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases).
+2. Re-extract the latest `wheels-module-<version>.zip` from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases) over `%USERPROFILE%\.wheels\modules\wheels\`:
+
+   ```powershell title="PowerShell"
+   Expand-Archive -Path "wheels-module-*.zip" -DestinationPath "$env:USERPROFILE\.wheels\modules\wheels" -Force
+   ```
 
 </TabItem>
 
