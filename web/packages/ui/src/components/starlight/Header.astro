@@ -1,5 +1,6 @@
 ---
 import { getCollection } from 'astro:content';
+import Search from 'virtual:starlight/components/Search';
 import Header from '../Header.astro';
 import VersionSwitcher from './VersionSwitcher.astro';
 import { computeVersionOptions } from '@wheels-dev/ui/data/versions';
@@ -32,6 +33,7 @@ const currentVersion = computed?.currentVersion ?? null;
 		options={options}
 		currentVersion={currentVersion}
 	/>
+	<Search slot="search" />
 	<VersionSwitcher
 		slot="in-nav-drawer"
 		variant="drawer"

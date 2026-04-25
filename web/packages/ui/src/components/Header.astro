@@ -23,6 +23,14 @@ const links = [
 		<slot name="after-brand" />
 	</div>
 
+	{
+		Astro.slots.has('search') && (
+			<div class="wd-header__search">
+				<slot name="search" />
+			</div>
+		)
+	}
+
 	<button
 		class="wd-header__toggle"
 		type="button"
@@ -110,6 +118,18 @@ const links = [
 		display: inline-flex;
 		align-items: center;
 		text-decoration: none;
+	}
+
+	.wd-header__search {
+		display: flex;
+		align-items: center;
+		margin-left: auto;
+		min-width: 0;
+	}
+
+	.wd-header__search :global(site-search) {
+		display: flex;
+		align-items: center;
 	}
 
 	.wd-header__nav {
