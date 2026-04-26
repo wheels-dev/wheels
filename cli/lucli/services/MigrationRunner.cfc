@@ -89,7 +89,7 @@ component {
 	public struct function runViaHttp(required numeric serverPort, required string action) {
 		var command = "";
 		switch (action) {
-			case "latest": command = "migrateTo"; break;
+			case "latest": command = "migrateToLatest"; break;
 			case "up":     command = "migrateUp"; break;
 			case "down":   command = "migrateDown"; break;
 			case "info":   command = "info"; break;

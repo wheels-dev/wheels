@@ -2760,17 +2760,13 @@ component extends="modules.BaseModule" {
 		try {
 			var command = "";
 			switch (action) {
-				case "latest": command = "migrateTo"; break;
+				case "latest": command = "migrateToLatest"; break;
 				case "up":     command = "migrateUp"; break;
 				case "down":   command = "migrateDown"; break;
 				case "info":   command = "info"; break;
 			}
 
 			var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
-			if (action == "latest") {
-				// migrateTo needs a version — omitting it runs to latest
-				migrateUrl &= "&version=";
-			}
 
 			var httpResult = makeHttpRequest(migrateUrl);
 
