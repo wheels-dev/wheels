@@ -8,7 +8,7 @@
  *
  * Source of truth: Kamal 2.4.0 lib/kamal/secrets/adapters/one_password.rb
  */
-component extends="cli.lucli.services.deploy.secrets.BaseAdapter" {
+component extends="modules.wheels.services.deploy.secrets.BaseAdapter" {
 
     public string function name() { return "op"; }
 

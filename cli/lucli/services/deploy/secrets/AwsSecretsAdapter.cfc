@@ -11,7 +11,7 @@
  *
  * Source of truth: Kamal 2.4.0 lib/kamal/secrets/adapters/aws_secrets_manager.rb
  */
-component extends="cli.lucli.services.deploy.secrets.BaseAdapter" {
+component extends="modules.wheels.services.deploy.secrets.BaseAdapter" {
 
     public string function name() { return "aws"; }
 

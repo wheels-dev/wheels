@@ -8,8 +8,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("DeployProxyCli", () => {
 
             it("boot emits proxy boot via SshPool", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.boot({configPath: variables.fixture});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker run")).toBeTrue();
@@ -17,8 +17,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("reboot chains stop/rm/run", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.reboot({configPath: variables.fixture});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker stop kamal-proxy")).toBeTrue();
@@ -27,43 +27,43 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("start dispatches docker start", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.start({configPath: variables.fixture});
                 expect($anyInclude($cmdsFrom(fake), "docker start kamal-proxy")).toBeTrue();
             });
 
             it("stop dispatches docker stop", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.stop({configPath: variables.fixture});
                 expect($anyInclude($cmdsFrom(fake), "docker stop kamal-proxy")).toBeTrue();
             });
 
             it("restart dispatches docker restart", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.restart({configPath: variables.fixture});
                 expect($anyInclude($cmdsFrom(fake), "docker restart kamal-proxy")).toBeTrue();
             });
 
             it("details filters ps", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.details({configPath: variables.fixture});
                 expect($anyInclude($cmdsFrom(fake), "name=kamal-proxy")).toBeTrue();
             });
 
             it("logs honors tail", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.logs({configPath: variables.fixture, tail: 25});
                 expect($anyInclude($cmdsFrom(fake), "--tail 25")).toBeTrue();
             });
 
             it("remove chains stop + rm", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.remove({configPath: variables.fixture});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker stop kamal-proxy")).toBeTrue();
@@ -71,8 +71,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("dry-run buffers output instead of dispatching", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployProxyCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployProxyCli(fake);
                 cli.stop({configPath: variables.fixture, dryRun: true});
                 expect(arrayLen(fake.calls())).toBe(0);
                 var out = arrayToList(cli.dryRunOutput(), chr(10));

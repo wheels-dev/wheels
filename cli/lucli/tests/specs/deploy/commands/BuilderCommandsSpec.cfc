@@ -1,7 +1,7 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
 
     function beforeAll() {
-        variables.cfg = new cli.lucli.services.deploy.config.ConfigLoader()
+        variables.cfg = new modules.wheels.services.deploy.config.ConfigLoader()
             .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml"));
     }
 
@@ -9,7 +9,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("BuilderCommands", () => {
 
             it("push() builds and pushes with --tag <image:version>", () => {
-                var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg)
                     .push("abc123");
                 expect(cmd).toInclude("docker buildx build");
                 expect(cmd).toInclude("--push");
@@ -17,13 +17,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("pull() pulls the versioned image", () => {
-                var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg)
                     .pull("v2");
                 expect(cmd).toBe("docker pull acme/demo:v2");
             });
 
             it("tag() creates an alias", () => {
-                var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg)
                     .tag("abc123", "latest");
                 expect(cmd).toInclude("docker tag");
                 expect(cmd).toInclude("acme/demo:abc123");
@@ -31,7 +31,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("create() emits buildx create with service-scoped builder name", () => {
-                var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg)
                     .create();
                 expect(cmd).toInclude("docker buildx create");
                 expect(cmd).toInclude("--name kamal-demo");
@@ -39,19 +39,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("remove() emits buildx rm with service-scoped builder name", () => {
-                var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg)
                     .remove();
                 expect(cmd).toBe("docker buildx rm kamal-demo");
             });
 
             it("details() emits buildx inspect with service-scoped builder name", () => {
-                var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg)
                     .details();
                 expect(cmd).toBe("docker buildx inspect kamal-demo");
             });
 
             it("dev() emits --load buildx build tagged :dirty", () => {
-                var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg)
                     .dev();
                 expect(cmd).toInclude("docker buildx build");
                 expect(cmd).toInclude("--load");
@@ -60,7 +60,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("$builderName() prefixes kamal- to the service name", () => {
-                var bc = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg);
+                var bc = new modules.wheels.services.deploy.commands.BuilderCommands(variables.cfg);
                 expect(bc.$builderName()).toBe("kamal-demo");
             });
         });

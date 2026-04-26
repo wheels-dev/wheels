@@ -16,7 +16,7 @@ component {
 
     public DeployAccessoryCli function init(any sshPool = "") {
         variables.sshPool = arguments.sshPool;
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -53,7 +53,7 @@ component {
             arguments.opts.configPath,
             {destination: arguments.opts.destination ?: ""}
         );
-        var accCmds = new cli.lucli.services.deploy.commands.AccessoryCommands(cfg);
+        var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
         var targets = (arguments.opts.name == "all")
             ? cfg.accessories()

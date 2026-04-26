@@ -17,8 +17,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			var $buildStack = (projRoot) => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cacheRoot = GetTempDirectory() & "wheels-cache-" & CreateUUID() & "/";
-				var cache = new cli.lucli.services.packages.ManifestCache(root = cacheRoot);
-				var registry = new cli.lucli.services.packages.Registry(
+				var cache = new modules.wheels.services.packages.ManifestCache(root = cacheRoot);
+				var registry = new modules.wheels.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "test/reg"
 				);
 				fake.seed(
@@ -58,10 +58,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					"https://example/wheels-fake-1.0.0.tar.gz",
 					{status: 200, body: FileReadBinary(fixturePath)}
 				);
-				var installer = new cli.lucli.services.packages.Installer(
+				var installer = new modules.wheels.services.packages.Installer(
 					httpClient = fake, projectRoot = projRoot
 				);
-				var cli = new cli.lucli.services.packages.PackagesMainCli(
+				var cli = new modules.wheels.services.packages.PackagesMainCli(
 					registry = registry, installer = installer, runtimeVersion = "4.0.0"
 				);
 				return {cli: cli, fake: fake, cache: cache};
@@ -215,11 +215,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("info prints registry details", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cacheRoot = GetTempDirectory() & "wheels-cache-" & CreateUUID() & "/";
-				var cache = new cli.lucli.services.packages.ManifestCache(root = cacheRoot);
-				var registry = new cli.lucli.services.packages.Registry(
+				var cache = new modules.wheels.services.packages.ManifestCache(root = cacheRoot);
+				var registry = new modules.wheels.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
-				var cli = new cli.lucli.services.packages.PackagesRegistryCli(registry = registry);
+				var cli = new modules.wheels.services.packages.PackagesRegistryCli(registry = registry);
 				var out = cli.info();
 				expect(out).toInclude("acme/pkgs");
 				expect(out).toInclude("main");
@@ -228,13 +228,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("refresh wipes the cache", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cacheRoot = GetTempDirectory() & "wheels-cache-" & CreateUUID() & "/";
-				var cache = new cli.lucli.services.packages.ManifestCache(root = cacheRoot);
+				var cache = new modules.wheels.services.packages.ManifestCache(root = cacheRoot);
 				cache.writeIndex(["a", "b"]);
 				expect(DirectoryExists(cacheRoot)).toBeTrue();
-				var registry = new cli.lucli.services.packages.Registry(
+				var registry = new modules.wheels.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
-				var cli = new cli.lucli.services.packages.PackagesRegistryCli(registry = registry);
+				var cli = new modules.wheels.services.packages.PackagesRegistryCli(registry = registry);
 				cli.refresh();
 				expect(DirectoryExists(cacheRoot)).toBeFalse();
 			});

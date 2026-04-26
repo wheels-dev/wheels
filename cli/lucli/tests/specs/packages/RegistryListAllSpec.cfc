@@ -5,7 +5,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			var $freshCache = () => {
 				var root = GetTempDirectory() & "wheels-registry-" & CreateUUID() & "/";
-				return new cli.lucli.services.packages.ManifestCache(root = root);
+				return new modules.wheels.services.packages.ManifestCache(root = root);
 			};
 
 			var $manifest = (name, versions = [{version: "1.0.0", wheelsVersion: ">=4.0", tarball: "x", sha256: "y"}]) => {
@@ -27,7 +27,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("returns enriched summaries for every package in the registry", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
-				var r = new cli.lucli.services.packages.Registry(
+				var r = new modules.wheels.services.packages.Registry(
 					httpClient = fake, cache = $freshCache(), registryRepo = "acme/pkgs"
 				);
 				fake.seed(
@@ -59,7 +59,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("skips a package whose manifest is malformed and continues", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
-				var r = new cli.lucli.services.packages.Registry(
+				var r = new modules.wheels.services.packages.Registry(
 					httpClient = fake, cache = $freshCache(), registryRepo = "acme/pkgs"
 				);
 				fake.seed(
@@ -82,7 +82,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("propagates Wheels.Packages.RegistryUnavailable from listPackageNames", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
-				var r = new cli.lucli.services.packages.Registry(
+				var r = new modules.wheels.services.packages.Registry(
 					httpClient = fake, cache = $freshCache(), registryRepo = "acme/pkgs"
 				);
 				fake.seed(

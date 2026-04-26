@@ -4,7 +4,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("LastPassAdapter", () => {
 
             it("reports its name as 'lastpass'", () => {
-                var adapter = new cli.lucli.services.deploy.secrets.LastPassAdapter();
+                var adapter = new modules.wheels.services.deploy.secrets.LastPassAdapter();
                 expect(adapter.name()).toBe("lastpass");
             });
 

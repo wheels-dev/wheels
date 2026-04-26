@@ -5,7 +5,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		describe("ConfigLoader", () => {
 
 			it("loads minimal.yml", () => {
-				var cfg = new cli.lucli.services.deploy.config.ConfigLoader()
+				var cfg = new modules.wheels.services.deploy.config.ConfigLoader()
 					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml"));
 				expect(cfg.service()).toBe("demo");
 				expect(cfg.image()).toBe("acme/demo");
@@ -16,7 +16,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("resolves ${VAR} from envOverride", () => {
 				var tmp = getTempFile(getTempDirectory(), "yml");
 				fileWrite(tmp, "service: demo#chr(10)#image: acme/${TESTVAR}#chr(10)#servers: [1.2.3.4]#chr(10)#registry: {username: u, password: [X]}");
-				var loader = new cli.lucli.services.deploy.config.ConfigLoader({envOverride: {TESTVAR: "custom"}});
+				var loader = new modules.wheels.services.deploy.config.ConfigLoader({envOverride: {TESTVAR: "custom"}});
 				var cfg = loader.load(tmp);
 				expect(cfg.image()).toBe("acme/custom");
 			});
@@ -26,31 +26,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				fileWrite(base, "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#env: {clear: {PORT: '3000'}}#chr(10)#registry: {username: u, password: [X]}");
 				var overlay = left(base, len(base) - 4) & ".production.yml";
 				fileWrite(overlay, "env:#chr(10)#  clear:#chr(10)#    PORT: '4000'");
-				var cfg = new cli.lucli.services.deploy.config.ConfigLoader()
+				var cfg = new modules.wheels.services.deploy.config.ConfigLoader()
 					.load(base, {destination: "production"});
 				expect(cfg.env().clear().PORT).toBe("4000");
 			});
 
 			it("parses full.yml (Kamal upstream fixture) without throwing", () => {
-				var cfg = new cli.lucli.services.deploy.config.ConfigLoader()
+				var cfg = new modules.wheels.services.deploy.config.ConfigLoader()
 					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml"));
 				expect(isObject(cfg)).toBeTrue();
 			});
 
 			it("rejects missing required 'service' key", () => {
-				expect(() => new cli.lucli.services.deploy.config.ConfigLoader()
+				expect(() => new modules.wheels.services.deploy.config.ConfigLoader()
 					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/invalid/missing-service.yml")))
 					.toThrow("DeployConfigError");
 			});
 
 			it("rejects invalid host", () => {
-				expect(() => new cli.lucli.services.deploy.config.ConfigLoader()
+				expect(() => new modules.wheels.services.deploy.config.ConfigLoader()
 					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/invalid/invalid-host.yml")))
 					.toThrow("DeployConfigError");
 			});
 
 			it("rejects unknown top-level key", () => {
-				expect(() => new cli.lucli.services.deploy.config.ConfigLoader()
+				expect(() => new modules.wheels.services.deploy.config.ConfigLoader()
 					.load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/invalid/unknown-key.yml")))
 					.toThrow("DeployConfigError");
 			});
@@ -63,7 +63,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var yml = tmpRoot & "/deploy.yml";
 				fileWrite(yml, "service: demo#chr(10)#image: acme/${SECRET_VAR}#chr(10)#servers: [1.2.3.4]#chr(10)#registry: {username: u, password: [X]}");
 
-				var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(yml);
+				var cfg = new modules.wheels.services.deploy.config.ConfigLoader().load(yml);
 				expect(cfg.image()).toBe("acme/fromSecretsFile");
 
 				directoryDelete(tmpRoot, true);

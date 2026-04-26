@@ -15,7 +15,7 @@ component {
 
     public DeployAppCli function init(any sshPool = "") {
         variables.sshPool = arguments.sshPool;
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -112,7 +112,7 @@ component {
                   message="This verb requires --version");
         }
         var dryRun = arguments.opts.dryRun ?: false;
-        var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+        var appCmds = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var roleFilter = arguments.opts.role ?: "";
         var hostCount = 0;
 

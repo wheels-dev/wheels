@@ -8,8 +8,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("DeployAccessoryCli", () => {
 
             it("boot dispatches docker run on the accessory host", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.boot({configPath: variables.fixture, name: "db"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker run")).toBeTrue();
@@ -20,8 +20,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("reboot chains stop/rm/run", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.reboot({configPath: variables.fixture, name: "db"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker stop demo-db")).toBeTrue();
@@ -30,43 +30,43 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("start dispatches docker start", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.start({configPath: variables.fixture, name: "db"});
                 expect($anyInclude($cmdsFrom(fake), "docker start demo-db")).toBeTrue();
             });
 
             it("stop dispatches docker stop", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.stop({configPath: variables.fixture, name: "db"});
                 expect($anyInclude($cmdsFrom(fake), "docker stop demo-db")).toBeTrue();
             });
 
             it("restart dispatches docker restart", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.restart({configPath: variables.fixture, name: "db"});
                 expect($anyInclude($cmdsFrom(fake), "docker restart demo-db")).toBeTrue();
             });
 
             it("details inspects container", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.details({configPath: variables.fixture, name: "db"});
                 expect($anyInclude($cmdsFrom(fake), "docker inspect")).toBeTrue();
             });
 
             it("logs honors tail", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.logs({configPath: variables.fixture, name: "db", tail: 25});
                 expect($anyInclude($cmdsFrom(fake), "--tail 25")).toBeTrue();
             });
 
             it("remove chains stop + rm", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.remove({configPath: variables.fixture, name: "db"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker stop demo-db")).toBeTrue();
@@ -74,8 +74,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("name=all fans out over every accessory", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.stop({configPath: variables.fixture, name: "all"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker stop demo-db")).toBeTrue();
@@ -83,8 +83,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("missing name throws DeployAccessoryCli.MissingName", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 var thrown = false;
                 try {
                     cli.stop({configPath: variables.fixture});
@@ -95,8 +95,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("dry-run buffers output instead of dispatching", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(fake);
                 cli.stop({configPath: variables.fixture, name: "db", dryRun: true});
                 expect(arrayLen(fake.calls())).toBe(0);
                 var out = arrayToList(cli.dryRunOutput(), chr(10));

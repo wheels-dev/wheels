@@ -3,7 +3,7 @@
  * Echoes the op:// URI from the command args so assertions can
  * verify the adapter built the right URL shape.
  */
-component extends="cli.lucli.services.deploy.secrets.OnePasswordAdapter" {
+component extends="modules.wheels.services.deploy.secrets.OnePasswordAdapter" {
 
     this.captureArgs = false;
     this.lastArgs = [];

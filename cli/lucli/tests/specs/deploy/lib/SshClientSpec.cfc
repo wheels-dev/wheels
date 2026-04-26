@@ -58,7 +58,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	private any function makeClient(required numeric port) {
-		return new cli.lucli.services.deploy.lib.SshClient().init(
+		return new modules.wheels.services.deploy.lib.SshClient().init(
 			"localhost",
 			{
 				user: "deploy",

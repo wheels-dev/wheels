@@ -15,7 +15,7 @@ component {
 
     public DeployProxyCli function init(any sshPool = "") {
         variables.sshPool = arguments.sshPool;
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -50,7 +50,7 @@ component {
             {destination: arguments.opts.destination ?: ""}
         );
         var dryRun = arguments.opts.dryRun ?: false;
-        var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+        var proxyCmds = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var hosts = $allHosts(cfg);
         var cmdStr = structIsEmpty(arguments.methodOpts)
             ? invoke(proxyCmds, arguments.method)

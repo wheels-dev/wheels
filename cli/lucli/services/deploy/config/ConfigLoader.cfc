@@ -16,7 +16,7 @@
 component {
 
 	public any function init(struct opts = {envOverride: {}}) {
-		variables.yaml = new cli.lucli.services.deploy.lib.Yaml();
+		variables.yaml = new modules.wheels.services.deploy.lib.Yaml();
 		variables.validator = new Validator();
 		variables.envOverride = arguments.opts.envOverride ?: {};
 		variables.secretResolver = arguments.opts.secretResolver ?: "";
@@ -46,7 +46,7 @@ component {
 		// Project root defaults to the directory containing the YAML file —
 		// this lets `.kamal/secrets` alongside `deploy.yml` resolve naturally.
 		if (!isObject(variables.secretResolver)) {
-			variables.secretResolver = new cli.lucli.services.deploy.lib.SecretResolver({
+			variables.secretResolver = new modules.wheels.services.deploy.lib.SecretResolver({
 				projectRoot: getDirectoryFromPath(arguments.path),
 				destination: dest
 			});

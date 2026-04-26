@@ -1,4 +1,4 @@
-component extends="cli.lucli.services.deploy.secrets.AwsSecretsAdapter" {
+component extends="modules.wheels.services.deploy.secrets.AwsSecretsAdapter" {
 
     this.lastArgs = [];
 

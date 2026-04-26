@@ -25,13 +25,13 @@ component {
 	) {
 		variables.registry = IsObject(arguments.registry)
 			? arguments.registry
-			: new cli.lucli.services.packages.Registry();
+			: new modules.wheels.services.packages.Registry();
 		variables.installer = IsObject(arguments.installer)
 			? arguments.installer
-			: new cli.lucli.services.packages.Installer();
+			: new modules.wheels.services.packages.Installer();
 		variables.resolver = IsObject(arguments.resolver)
 			? arguments.resolver
-			: new cli.lucli.services.packages.VersionResolver();
+			: new modules.wheels.services.packages.VersionResolver();
 		variables.runtime = Len(arguments.runtimeVersion)
 			? arguments.runtimeVersion
 			: $detectRuntime();

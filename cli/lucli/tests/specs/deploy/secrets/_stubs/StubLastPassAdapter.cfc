@@ -1,4 +1,4 @@
-component extends="cli.lucli.services.deploy.secrets.LastPassAdapter" {
+component extends="modules.wheels.services.deploy.secrets.LastPassAdapter" {
 
     this.lastArgs = [];
 

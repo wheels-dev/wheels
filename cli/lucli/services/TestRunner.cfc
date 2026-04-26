@@ -6,11 +6,11 @@
  * for test execution.
  *
  * Usage from LuceeScriptEngine:
- *   var runner = new cli.lucli.services.TestRunner(projectRoot);
+ *   var runner = new modules.wheels.services.TestRunner(projectRoot);
  *   var result = runner.run(options);
  *
  * Usage from HTTP fallback (Module.cfc delegates here when server is available):
- *   var runner = new cli.lucli.services.TestRunner(projectRoot);
+ *   var runner = new modules.wheels.services.TestRunner(projectRoot);
  *   var result = runner.runViaHttp(serverPort, options);
  */
 component {

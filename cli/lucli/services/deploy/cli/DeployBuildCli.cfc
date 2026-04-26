@@ -14,7 +14,7 @@ component {
 
     public DeployBuildCli function init(any sshPool = "") {
         variables.sshPool = arguments.sshPool;
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -40,7 +40,7 @@ component {
         var version = arguments.opts.version ?: $gitShortSha();
         var dryRun = arguments.opts.dryRun ?: false;
         if (!len(arguments.opts.preserveBuffer ?: "")) arrayClear(variables.dryRunBuffer);
-        var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+        var builder = new modules.wheels.services.deploy.commands.BuilderCommands(cfg);
         $runLocal(builder.push(version), dryRun);
         return $renderResult(arguments.opts, "Pushed " & cfg.image() & ":" & version);
     }
@@ -50,7 +50,7 @@ component {
         var version = arguments.opts.version ?: $gitShortSha();
         var dryRun = arguments.opts.dryRun ?: false;
         if (!len(arguments.opts.preserveBuffer ?: "")) arrayClear(variables.dryRunBuffer);
-        var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+        var builder = new modules.wheels.services.deploy.commands.BuilderCommands(cfg);
         var hosts = $allHosts(cfg);
         $dispatchSsh(hosts, builder.pull(version), dryRun);
         return $renderResult(
@@ -63,7 +63,7 @@ component {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
-        $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).create(), dryRun);
+        $runLocal(new modules.wheels.services.deploy.commands.BuilderCommands(cfg).create(), dryRun);
         return $renderResult(arguments.opts, "Created builder for " & cfg.image());
     }
 
@@ -71,7 +71,7 @@ component {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
-        $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).remove(), dryRun);
+        $runLocal(new modules.wheels.services.deploy.commands.BuilderCommands(cfg).remove(), dryRun);
         return $renderResult(arguments.opts, "Removed builder for " & cfg.image());
     }
 
@@ -79,7 +79,7 @@ component {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
-        $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).details(), dryRun);
+        $runLocal(new modules.wheels.services.deploy.commands.BuilderCommands(cfg).details(), dryRun);
         return $renderResult(arguments.opts, "Collected builder details for " & cfg.image());
     }
 
@@ -87,7 +87,7 @@ component {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
-        $runLocal(new cli.lucli.services.deploy.commands.BuilderCommands(cfg).dev(), dryRun);
+        $runLocal(new modules.wheels.services.deploy.commands.BuilderCommands(cfg).dev(), dryRun);
         return $renderResult(arguments.opts, "Ran dev build for " & cfg.image());
     }
 

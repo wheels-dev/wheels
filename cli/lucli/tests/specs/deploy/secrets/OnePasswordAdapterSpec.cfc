@@ -4,7 +4,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("OnePasswordAdapter", () => {
 
             it("reports its name as 'op'", () => {
-                var adapter = new cli.lucli.services.deploy.secrets.OnePasswordAdapter();
+                var adapter = new modules.wheels.services.deploy.secrets.OnePasswordAdapter();
                 expect(adapter.name()).toBe("op");
             });
 

@@ -12,7 +12,7 @@ component {
 
     public DeployRegistryCli function init(any sshPool = "") {
         variables.sshPool = arguments.sshPool;
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -33,7 +33,7 @@ component {
             {destination: arguments.opts.destination ?: ""}
         );
         var dryRun = arguments.opts.dryRun ?: false;
-        var regCmds = new cli.lucli.services.deploy.commands.RegistryCommands(cfg);
+        var regCmds = new modules.wheels.services.deploy.commands.RegistryCommands(cfg);
         var hosts = $allHosts(cfg);
         var cmd = arguments.isLogin
             ? regCmds.login({password: arguments.opts.password ?: $resolvePassword(cfg)})
@@ -61,7 +61,7 @@ component {
         // the first.
         var secrets = arguments.cfg.registry().password();
         if (!arrayLen(secrets)) return "";
-        var resolver = new cli.lucli.services.deploy.lib.SecretResolver();
+        var resolver = new modules.wheels.services.deploy.lib.SecretResolver();
         return resolver.get(secrets[1]);
     }
 

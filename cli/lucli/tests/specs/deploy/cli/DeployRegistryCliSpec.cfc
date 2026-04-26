@@ -8,8 +8,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("DeployRegistryCli", () => {
 
             it("login emits docker login on every host", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployRegistryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployRegistryCli(fake);
                 cli.login({configPath: variables.fixture, password: "s3cret"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker login")).toBeTrue();
@@ -18,29 +18,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("setup is an alias for login", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployRegistryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployRegistryCli(fake);
                 cli.setup({configPath: variables.fixture, password: "s3cret"});
                 expect($anyInclude($cmdsFrom(fake), "docker login")).toBeTrue();
             });
 
             it("logout emits docker logout", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployRegistryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployRegistryCli(fake);
                 cli.logout({configPath: variables.fixture});
                 expect($anyInclude($cmdsFrom(fake), "docker logout")).toBeTrue();
             });
 
             it("remove is an alias for logout", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployRegistryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployRegistryCli(fake);
                 cli.remove({configPath: variables.fixture});
                 expect($anyInclude($cmdsFrom(fake), "docker logout")).toBeTrue();
             });
 
             it("dry-run buffers output", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployRegistryCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployRegistryCli(fake);
                 cli.login({configPath: variables.fixture, password: "x", dryRun: true});
                 expect(arrayLen(fake.calls())).toBe(0);
                 var out = arrayToList(cli.dryRunOutput(), chr(10));

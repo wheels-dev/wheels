@@ -35,7 +35,7 @@ component {
 	 *       - timeoutMs              connect + session timeout, default 30000
 	 */
 	public SshClient function init(string host = "", struct opts = {}) {
-		variables.$loader = new cli.lucli.services.deploy.lib.JarLoader();
+		variables.$loader = new modules.wheels.services.deploy.lib.JarLoader();
 		// Deferred-open pattern: `new SshClient()` with no args is a no-op so
 		// Lucee's implicit init-on-new doesn't try to connect. Callers use
 		// `new SshClient().init(host, opts)` to actually open a connection.

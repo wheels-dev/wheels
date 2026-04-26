@@ -3,7 +3,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	function beforeAll() {
 		variables.testHelper = new cli.lucli.tests.TestHelper();
 		variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
-		variables.migrationRunner = new cli.lucli.services.MigrationRunner(
+		variables.migrationRunner = new modules.wheels.services.MigrationRunner(
 			projectRoot = variables.tempRoot
 		);
 	}

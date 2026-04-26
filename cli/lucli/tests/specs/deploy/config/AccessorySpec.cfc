@@ -2,7 +2,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
     function beforeAll() {
         variables.fixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-accessories.yml");
-        variables.cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+        variables.cfg = new modules.wheels.services.deploy.config.ConfigLoader().load(variables.fixture);
     }
 
     function run() {

@@ -8,8 +8,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("DeployAppCli", () => {
 
             it("boot emits docker run via SshPool per host", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.boot({configPath: variables.fixture, version: "abc1234"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker run")).toBeTrue();
@@ -17,51 +17,51 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("stop emits docker stop via SshPool", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.stop({configPath: variables.fixture, version: "v1"});
                 expect($anyInclude($cmdsFrom(fake), "docker stop demo-web-v1")).toBeTrue();
             });
 
             it("start emits docker start via SshPool", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.start({configPath: variables.fixture, version: "v1"});
                 expect($anyInclude($cmdsFrom(fake), "docker start demo-web-v1")).toBeTrue();
             });
 
             it("containers emits docker ps filter", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.containers({configPath: variables.fixture});
                 expect($anyInclude($cmdsFrom(fake), "docker ps")).toBeTrue();
                 expect($anyInclude($cmdsFrom(fake), "label=service=demo")).toBeTrue();
             });
 
             it("logs honors tail and follow opts", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.logs({configPath: variables.fixture, tail: 50, follow: false});
                 expect($anyInclude($cmdsFrom(fake), "--tail 50")).toBeTrue();
             });
 
             it("maintenance creates the marker", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.maintenance({configPath: variables.fixture, version: "v1"});
                 expect($anyInclude($cmdsFrom(fake), "touch /tmp/kamal-maintenance-demo")).toBeTrue();
             });
 
             it("live clears the marker", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.live({configPath: variables.fixture, version: "v1"});
                 expect($anyInclude($cmdsFrom(fake), "rm -f /tmp/kamal-maintenance-demo")).toBeTrue();
             });
 
             it("remove stops and rms the container", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.remove({configPath: variables.fixture, version: "v1"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker stop demo-web-v1")).toBeTrue();
@@ -69,8 +69,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("dry-run buffers output instead of dispatching", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 cli.stop({configPath: variables.fixture, version: "v1", dryRun: true});
                 expect(arrayLen(fake.calls())).toBe(0);
                 var out = arrayToList(cli.dryRunOutput(), chr(10));
@@ -82,16 +82,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             // visible success summary, not an empty string.
 
             it("boot (real mode) returns a non-empty success summary", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 var out = cli.boot({configPath: variables.fixture, version: "v1"});
                 expect(len(out)).toBeGT(0);
                 expect(out).toInclude("Booted");
             });
 
             it("stop --dry-run returns the buffered command list", () => {
-                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
-                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var fake = new modules.wheels.services.deploy.lib.FakeSshPool();
+                var cli = new modules.wheels.services.deploy.cli.DeployAppCli(fake);
                 var out = cli.stop({configPath: variables.fixture, version: "v1", dryRun: true});
                 expect(len(out)).toBeGT(0);
                 expect(out).toInclude("docker stop");

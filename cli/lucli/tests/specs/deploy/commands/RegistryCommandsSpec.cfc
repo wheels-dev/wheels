@@ -1,7 +1,7 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
 
     function beforeAll() {
-        variables.cfg = new cli.lucli.services.deploy.config.ConfigLoader()
+        variables.cfg = new modules.wheels.services.deploy.config.ConfigLoader()
             .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml"));
     }
 
@@ -9,7 +9,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("RegistryCommands", () => {
 
             it("login() emits docker login with user and password", () => {
-                var cmd = new cli.lucli.services.deploy.commands.RegistryCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.RegistryCommands(variables.cfg)
                     .login({password: "s3cr3t"});
                 expect(cmd).toInclude("docker login");
                 expect(cmd).toInclude("-u demo");
@@ -18,13 +18,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
             it("login() targets the configured server", () => {
                 // minimal.yml has no explicit server, defaults to docker.io
-                var cmd = new cli.lucli.services.deploy.commands.RegistryCommands(variables.cfg)
+                var cmd = new modules.wheels.services.deploy.commands.RegistryCommands(variables.cfg)
                     .login({password: "x"});
                 expect(cmd).toInclude("docker.io");
             });
 
             it("logout() logs out of the configured server", () => {
-                var cmd = new cli.lucli.services.deploy.commands.RegistryCommands(variables.cfg).logout();
+                var cmd = new modules.wheels.services.deploy.commands.RegistryCommands(variables.cfg).logout();
                 expect(cmd).toInclude("docker logout");
                 expect(cmd).toInclude("docker.io");
             });
