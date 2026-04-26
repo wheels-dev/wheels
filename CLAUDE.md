@@ -634,6 +634,46 @@ curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
 docker compose down    # Stop all containers
 ```
 
+## Local Onboarding Harness
+
+`tools/test-onboarding.sh` simulates the brand-new-user fresh-install flow without
+touching the user's daily wheels install. It is the right tool when:
+
+- Fixing CLI / framework / template code that affects the `wheels new` →
+  `wheels start` → `wheels migrate latest` cliff.
+- Validating cliff fixes BEFORE asking for a fresh-VM tutorial run.
+- Iterating on dotted-path resolution, Lucee bundle issues, or generated
+  config emission.
+
+```bash
+bash tools/test-onboarding.sh             # symlink-mount worktree (default)
+MODE=copy bash tools/test-onboarding.sh   # closer to brew-install simulation
+BASELINE=1 bash tools/test-onboarding.sh  # use the brew-installed wheels
+KEEP_TEMP=1 bash tools/test-onboarding.sh # preserve temp dirs for inspection
+FROM_PHASE=4 bash tools/test-onboarding.sh # skip earlier phases when iterating
+```
+
+The harness uses `LUCLI_HOME` isolation (writes only into `mktemp -d`), reuses
+the user's existing Lucee Express via symlink to skip the ~74MB redownload, and
+runs ~90 seconds end-to-end through 7 phases mirroring the fresh-VM onboarding
+journal format. Output is directly comparable to fresh-VM run reports.
+
+| Phase | Covers | Fresh-VM findings |
+|---|---|---|
+| 1 | Setup isolated `LUCLI_HOME`, framework path, Lucee Express symlink | — |
+| 2 | `wheels new` (no duplicate `create` lines, file tree, no `bundleName`) | F1, F3, F4 |
+| 3 | Server boot via `lucli server run` + sqlite-jdbc shim | (formula simulation) |
+| 4 | Migration cliff — verify the actual sqlite db has tables, not just exit 0 | F2, F5 |
+| 5 | Seed (cfscript wrapper + `seedOnce` idempotency) | F3-orig |
+| 6 | CRUD walkthrough (tutorial chapters 2-3 happy path) | tutorial verification |
+| 7 | `wheels packages list` | F7 (currently SKIP pending follow-up) |
+
+Output uses `✓` / `✗` / `-` per check. A green local run is a strong predictor
+of a green fresh-VM run; the SKIP markers signal known pending issues that are
+expected to fail until their respective follow-up PRs ship.
+
+Deeper reference: [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md).
+
 ## Auto-Migration Quick Reference
 
 Generate migrations from model/DB schema diffs. Rename detection via explicit hints (authoritative) + heuristic suggestions (normalized-token + Levenshtein).
@@ -945,7 +985,7 @@ Deeper documentation lives in `.ai/` — Claude will search it automatically whe
 - `.ai/wheels/mcp/` — AI agent integration via LuCLI stdio MCP (setup, tool reference, auto-discovery)
 - `.ai/wheels/packages/` — first-party packages (sentry, hotwire, basecoat) + activation model
 - `.ai/wheels/cli/` — generators (model, controller, scaffold, admin, migrations)
-- `.ai/wheels/testing/` — WheelsTest BDD, browser testing, browser automation patterns
+- `.ai/wheels/testing/` — WheelsTest BDD, browser testing, browser automation patterns, **onboarding harness** (fresh-install simulation for cliff fixes)
 - `.ai/wheels/security/` — CSRF protection, HTTPS detection
 - `.ai/wheels/patterns/` — authentication, CRUD, validation templates
 - `.ai/wheels/snippets/` — copy-paste model + controller examples
