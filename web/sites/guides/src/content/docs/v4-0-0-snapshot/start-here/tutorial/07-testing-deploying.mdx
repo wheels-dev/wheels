@@ -219,7 +219,7 @@ Four things to notice:
 ## Run the tests
 
 ```bash title="your shell"
-wheels test run
+wheels test
 ```
 
 Expected output (format may vary across releases):
@@ -235,7 +235,7 @@ Total: 6 passed, 0 failed, 0 errors
 To run only the browser specs:
 
 ```bash title="your shell"
-wheels test run --filter=browser
+wheels test --filter=browser
 ```
 
 The `--filter` flag narrows the run to specs whose path contains the argument. Other filters accept `models`, `controllers`, or a full directory path. The exact syntax is still settling; see [CLI Reference](/v4-0-0-snapshot/command-line-tools/) for the current options.
@@ -277,8 +277,8 @@ wheels --version
 
 Three things to verify before moving on:
 
-1. `wheels test run` passes both the model spec and the controller spec.
-2. `wheels browser install` completes without error, and `wheels test run --filter=browser` runs the browser spec green — Chromium launches, the signup-to-post-to-comment flow runs end-to-end.
+1. `wheels test` passes both the model spec and the controller spec.
+2. `wheels browser install` completes without error, and `wheels test --filter=browser` runs the browser spec green — Chromium launches, the signup-to-post-to-comment flow runs end-to-end.
 3. Click through the running app one more time: sign up, create a post, leave a comment, log out, log back in, try to edit someone else's post and get redirected. Every part of the tutorial still works end-to-end.
 
 ## Troubleshooting

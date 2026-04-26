@@ -12,7 +12,7 @@ The pattern that works for Wheels in CI is the same pattern that works locally �
 
 **You'll learn:**
 
-- A minimum-viable GitHub Actions workflow for running `wheels test run` in CI
+- A minimum-viable GitHub Actions workflow for running `wheels test` in CI
 - Which reporter names the CLI accepts today and how CI consumes the output
 - How to drive the cross-engine matrix via Docker Compose
 - How to opt browser specs in or out with `WHEELS_CI` and `WHEELS_BROWSER_CI_ENABLE`
@@ -20,7 +20,7 @@ The pattern that works for Wheels in CI is the same pattern that works locally �
 - Common CI failures and what they actually mean
 
 <Aside type="note">
-  You should already know how to run tests locally. See [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/) for `wheels test run`, `tools/test-local.sh`, and the Docker Compose map of ports and databases.
+  You should already know how to run tests locally. See [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/) for `wheels test`, `tools/test-local.sh`, and the Docker Compose map of ports and databases.
 </Aside>
 
 ## GitHub Actions — minimum viable
@@ -67,11 +67,11 @@ Three details to notice:
 - **`WHEELS_CI=true`** is a signal for the test harness — most visibly, it gates browser specs (covered below). You want it on every CI job.
 - **`tools/test-local.sh`** is the bundled shell script. It boots a LuCLI server, waits for it, warms the app, runs the suite, and prints a pass/fail summary with a non-zero exit code on failure. For most app repos, calling it is simpler than re-implementing the dance inline.
 
-If you want the raw CLI instead of the bash wrapper, the equivalent is `wheels start` followed by `wheels test run --ci`.
+If you want the raw CLI instead of the bash wrapper, the equivalent is `wheels start` followed by `wheels test --ci`.
 
 ## Reporter output for CI
 
-The `wheels test run` command accepts a `--reporter=<name>` flag, but understanding what it does today avoids a surprise: the LuCLI implementation always requests JSON from the test endpoint and then prints a human-readable summary on success or failure details on failure. The flag is parsed but does not currently select between output formats — you get the same output regardless of `--reporter` value.
+The `wheels test` command accepts a `--reporter=<name>` flag, but understanding what it does today avoids a surprise: the LuCLI implementation always requests JSON from the test endpoint and then prints a human-readable summary on success or failure details on failure. The flag is parsed but does not currently select between output formats — you get the same output regardless of `--reporter` value.
 
 | Flag | Behaviour today |
 | --- | --- |
@@ -222,7 +222,7 @@ The key hashes `box.json` so a version bump invalidates the cache, but the `rest
 
 ## Parallel execution
 
-The only parallelism the framework ships today is matrix parallelism — every cell of `strategy.matrix` runs on its own runner in GitHub Actions. There is no `--parallel` flag on `wheels test run` and no in-process parallel runner exposed through the CLI. If you need more throughput, split your matrix further (by engine, by database, by directory filter) rather than trying to parallelise a single suite.
+The only parallelism the framework ships today is matrix parallelism — every cell of `strategy.matrix` runs on its own runner in GitHub Actions. There is no `--parallel` flag on `wheels test` and no in-process parallel runner exposed through the CLI. If you need more throughput, split your matrix further (by engine, by database, by directory filter) rather than trying to parallelise a single suite.
 
 ```yaml title=".github/workflows/tests.yml (fragment)"
 strategy:
@@ -236,7 +236,7 @@ strategy:
       - tests.specs.migrator
 steps:
   - name: Run filtered suite
-    run: wheels test run --filter=${{ matrix.directory }}
+    run: wheels test --filter=${{ matrix.directory }}
 ```
 
 Each cell runs independently on its own runner with its own LuCLI server — the suites don't share state and can't collide.
@@ -260,7 +260,7 @@ GitLab CI, CircleCI, Jenkins, Buildkite — the shape is identical. Install Java
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Running Tests Locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="The fast path with wheels test run and tools/test-local.sh, plus the Docker cross-engine matrix." />
+  <LinkCard title="Running Tests Locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="The fast path with wheels test and tools/test-local.sh, plus the Docker cross-engine matrix." />
   <LinkCard title="Browser Tests" href="/v4-0-0-snapshot/testing/browser-tests/" description="Installing Playwright, writing browser specs, and the beforeEach/afterEach lifecycle." />
   <LinkCard title="Testing Overview" href="/v4-0-0-snapshot/testing/" description="The shape of the test suite and when to reach for each test type." />
   <LinkCard title="Fixtures & Test Data" href="/v4-0-0-snapshot/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle, test models, and per-spec isolation." />

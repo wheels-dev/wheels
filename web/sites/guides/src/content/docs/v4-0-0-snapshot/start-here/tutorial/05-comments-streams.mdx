@@ -301,7 +301,8 @@ A Frame (Part 4) replaces one specific region with a new version of itself. A St
        </cfloop>
    </section>
 
-   #includePartial(partial="comments/form", post=post)#
+   <cfset comment = model("Comment").new()>
+   #includePartial(partial="/comments/form", post=post, comment=comment)#
    </cfoutput>
    ```
 
@@ -311,7 +312,7 @@ A Frame (Part 4) replaces one specific region with a new version of itself. A St
 
 `post.comments()` is the association method from `hasMany`. It returns a query, which is why the loop uses `query="comments"` and accesses columns as `comments.author` rather than `comment.author`.
 
-`includePartial(partial="comments/form", post=post)` renders `app/views/comments/_form.cfm` below the list. The `comments/` prefix tells Wheels to look in the comments view folder; without it, it would look in `posts/`.
+`includePartial(partial="/comments/form", post=post, comment=comment)` renders `app/views/comments/_form.cfm` below the list. The leading slash on `/comments/form` is what tells Wheels to resolve the path from the views root rather than as a subfolder of the current controller's view folder — without it, Wheels would look for `app/views/posts/comments/_form.cfm`. The new, unsaved `Comment` is built on the line above so the form partial's `errorMessagesFor("comment")` helper has a real model object to inspect on first render.
 
 ## Fix the index to avoid N+1
 

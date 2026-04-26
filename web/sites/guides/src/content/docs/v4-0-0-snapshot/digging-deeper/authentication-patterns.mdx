@@ -143,7 +143,7 @@ Model-level hashing stays the same regardless of which strategy you use — the 
   **Bcrypt is not shipped with Wheels 4.0.** `hash(pw, "BCRYPT")` throws "bcrypt MessageDigest not available" in the bundled Lucee. Until that lands, the examples below use salted SHA-256, which is educational but **not production-grade** — SHA-256 is fast, which makes brute-force attacks cheap. For a real deployment, add a Java bcrypt library to `box.json`, use a CFX tag, or wait for the forthcoming `wheels-security` package. The mechanism (generate salt, hash `password + salt`, compare) stays the same — only the hash function changes. Tracked in the [framework gap tracker](https://github.com/wheels-dev/wheels/blob/develop/docs/superpowers/plans/2026-04-19-framework-gaps-from-guides-phase-1.md) (item 4).
 </Aside>
 
-The stopgap pattern is a `beforeSave` callback that hashes plaintext and clears it, plus an `authenticate(password)` instance method:
+The stopgap pattern is a `beforeValidation` callback that hashes plaintext and clears it, plus an `authenticate(password)` instance method. The hash callback registers `beforeValidation` rather than `beforeSave` so the NOT NULL `passwordHash` and `passwordSalt` columns are populated by the time Wheels' automatic `validatesPresenceOf` rules check them — registering on `beforeSave` causes every signup to fail with `Passwordhash can't be empty`:
 
 ```cfm {test:compile} title="app/models/User.cfc"
 component extends="Model" {
@@ -151,7 +151,7 @@ component extends="Model" {
         validatesPresenceOf("email");
         validatesUniquenessOf(property="email");
         beforeValidation("normalizeEmail");
-        beforeSave("hashPassword");
+        beforeValidation("hashPassword");
     }
 
     private function normalizeEmail() {

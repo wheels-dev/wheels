@@ -163,6 +163,7 @@ Wheels loads seed data from `app/db/seeds.cfm` (shared) and optionally `app/db/s
 1. Create `app/db/seeds.cfm`:
 
    ```cfm {test:compile}
+   <cfscript>
    seedOnce(modelName="Post", uniqueProperties="title", properties={
        title: "Hello world",
        body: "My first Wheels post.",
@@ -175,7 +176,12 @@ Wheels loads seed data from `app/db/seeds.cfm` (shared) and optionally `app/db/s
        status: "published",
        publishedAt: Now()
    });
+   </cfscript>
    ```
+
+   <Aside type="note">
+     `seeds.cfm` is parsed as CFML markup by default, so the body must be wrapped in `<cfscript>...</cfscript>` for the `seedOnce()` calls to execute. Without the wrapper, Lucee treats them as literal text and `wheels seed` reports `0 created, 0 skipped`.
+   </Aside>
 
 2. Run the seed:
 

@@ -177,7 +177,7 @@ The `new` and `edit` views both render the same form. Put the shared markup in a
            #select(objectName="post", property="status", options="draft,published,archived")#
        </label>
        <label>Published at<br>
-           #dateTimeField(objectName="post", property="publishedAt")#
+           #dateField(objectName="post", property="publishedAt")#
        </label>
        <button type="submit">Save</button>
    #endFormTag()#
@@ -191,7 +191,7 @@ Notes:
 - Partial filenames start with `_`. You reference them as `"form"` (no underscore, no extension) when including.
 - `errorMessagesFor("post")` renders a `<div class="errors">` with any validation errors on the `post` object. When there are none, it renders nothing.
 - `startFormTag` picks the right HTTP method and action URL based on whether `post.id` exists. A new `Post` has no id, so the form posts to `create`; an existing one PATCHes to `update`.
-- `textField`, `textArea`, `select`, `dateTimeField` are object-bound helpers — `objectName="post"` plus `property="title"` becomes `name="post[title]"` with the current value pre-filled.
+- `textField`, `textArea`, `select`, `dateField` are object-bound helpers — `objectName="post"` plus `property="title"` becomes `name="post[title]"` with the current value pre-filled.
 
 ### The four views
 

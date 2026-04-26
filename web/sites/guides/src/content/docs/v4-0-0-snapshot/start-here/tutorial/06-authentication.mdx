@@ -78,7 +78,7 @@ The second version (6b) replaces the session-scope mechanics with `wheels.auth.S
            validatesPresenceOf("email");
            validatesUniquenessOf(property="email");
            beforeValidation("normalizeEmail");
-           beforeSave("hashPassword");
+           beforeValidation("hashPassword");
        }
 
        private function normalizeEmail() {
@@ -112,7 +112,7 @@ The second version (6b) replaces the session-scope mechanics with `wheels.auth.S
 Four pieces to notice:
 
 - `beforeValidation("normalizeEmail")` runs before the validation pass, so the uniqueness check sees a trimmed, lowercased email. Without the normalize step, "Alice@example.com" and "alice@example.com" would look like different users to the database.
-- `beforeSave("hashPassword")` runs before every save. It only does anything when `this.password` is set — that is, when the caller just assigned a new password. It generates a per-user salt if one isn't already stored, hashes `password + salt` with SHA-256, stashes the result in `this.passwordHash`, and scrubs `this.password` so the plaintext never reaches the database.
+- `beforeValidation("hashPassword")` runs before each validation pass. It only does anything when `this.password` is set — that is, when the caller just assigned a new password. It generates a per-user salt if one isn't already stored, hashes `password + salt` with SHA-256, stashes the result in `this.passwordHash`, and scrubs `this.password` so the plaintext never reaches the database. The callback runs *before* validation (rather than `beforeSave`) because Wheels' automatic `validatesPresenceOf` rules treat the NOT NULL `passwordHash` and `passwordSalt` columns as required — they need to be populated by the time validation fires, otherwise every signup fails with `Passwordhash can't be empty`.
 - `Hash(input, "SHA-256")` returns uppercase hex — 64 characters. That's why the migration below reserves 64 chars for `passwordHash`.
 - `authenticate(password)` re-hashes the candidate password with the stored salt and compares. Equal means the user typed the right password.
 
@@ -357,7 +357,7 @@ The migration adds the `userId` column, but the models don't yet know about each
            validatesPresenceOf("email");
            validatesUniquenessOf(property="email");
            beforeValidation("normalizeEmail");
-           beforeSave("hashPassword");
+           beforeValidation("hashPassword");
        }
 
        private function normalizeEmail() {
@@ -699,7 +699,7 @@ Whether you stopped at 6a or continued to 6b, the user-facing behavior should be
 
 **"Login works, but every protected page redirects back to login."** The `authenticate` filter function is `public` instead of `private`. Public filter methods become routable actions — Wheels runs them through the action dispatcher and the filter body fires twice, and worse, a request like `/posts/authenticate` actually matches. Change the `function authenticate()` declaration to `private function authenticate()` and reload.
 
-**"The password always mismatches, even for a user I just created."** The `beforeSave` callback isn't firing, or the form is storing plaintext. Open the database and look at the `users` row directly: `passwordHash` should be exactly 64 uppercase hex characters, `passwordSalt` should be populated with a ~44-char base64 string. If either is blank, check that you named the callback correctly in `config()` (`beforeSave("hashPassword")` — case-sensitive) and that the form submits `user[password]`, not just `password`.
+**"The password always mismatches, even for a user I just created."** The `beforeValidation` callback isn't firing, or the form is storing plaintext. Open the database and look at the `users` row directly: `passwordHash` should be exactly 64 uppercase hex characters, `passwordSalt` should be populated with a ~44-char base64 string. If either is blank, check that you named the callback correctly in `config()` (`beforeValidation("hashPassword")` — case-sensitive) and that the form submits `user[password]`, not just `password`.
 
 **"6b: `authenticator` service not found."** Either `config/services.cfm` didn't load, or the app needs a reload after you added it. Run `wheels reload` and try again. If `application.wo.service("authenticator")` still throws instead of returning an object, double-check the file's contents — the `injector()` call must come first, and the `.to(...)` argument needs to match the component's exact dotted path (`wheels.auth.Authenticator`, not `Authenticator`).
 

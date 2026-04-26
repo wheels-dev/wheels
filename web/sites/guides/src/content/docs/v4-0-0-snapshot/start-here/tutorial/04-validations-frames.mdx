@@ -134,7 +134,7 @@ The form partial needs a `<turbo-frame>` with an `id` that the server will reuse
                #select(objectName="post", property="status", options="draft,published,archived")#
            </label>
            <label>Published at<br>
-               #dateTimeField(objectName="post", property="publishedAt")#
+               #dateField(objectName="post", property="publishedAt")#
            </label>
            <button type="submit">Save</button>
        #endFormTag()#
