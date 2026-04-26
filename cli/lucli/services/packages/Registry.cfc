@@ -23,10 +23,10 @@ component {
 	) {
 		variables.http = IsObject(arguments.httpClient)
 			? arguments.httpClient
-			: new cli.lucli.services.packages.HttpClient();
+			: new modules.wheels.services.packages.HttpClient();
 		variables.cache = IsObject(arguments.cache)
 			? arguments.cache
-			: new cli.lucli.services.packages.ManifestCache();
+			: new modules.wheels.services.packages.ManifestCache();
 		variables.registryRepo = Len(arguments.registryRepo)
 			? arguments.registryRepo
 			: $resolveRepo();

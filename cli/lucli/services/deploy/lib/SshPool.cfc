@@ -140,7 +140,7 @@ component {
 		}
 		// NOTE: avoid `client` — Lucee reserved scope name that blows up
 		// inside closures with "client scope is not enabled".
-		var sc = new cli.lucli.services.deploy.lib.SshClient().init(
+		var sc = new modules.wheels.services.deploy.lib.SshClient().init(
 			parsed.host,
 			{
 				user: parsed.user,
@@ -190,7 +190,7 @@ component {
 		// SshPoolTask is a proper CFC — Lucee 7 rejects struct-with-closure
 		// targets for createDynamicProxy. Each submission constructs a fresh
 		// task instance, sidestepping the shared-loop-variable closure bug.
-		var target = new cli.lucli.services.deploy.lib.SshPoolTask(this, arguments.host, arguments.cb);
+		var target = new modules.wheels.services.deploy.lib.SshPoolTask(this, arguments.host, arguments.cb);
 		var task = createDynamicProxy(target, ["java.util.concurrent.Callable"]);
 		return variables.$executor.submit(task);
 	}

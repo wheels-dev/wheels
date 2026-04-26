@@ -17,7 +17,7 @@ component {
     public DeployMainCli function init(any sshPool = "", struct opts = {}) {
         variables.sshPool = arguments.sshPool;
         variables.projectRoot = arguments.opts.projectRoot ?: expandPath("./");
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -38,7 +38,7 @@ component {
 
     public string function config(required struct opts) {
         var cfg = variables.loader.load(arguments.opts.configPath);
-        var yaml = new cli.lucli.services.deploy.lib.Yaml();
+        var yaml = new modules.wheels.services.deploy.lib.Yaml();
         var rolesMap = $roleHosts(cfg);
         return yaml.dump({
             service: cfg.service(),
@@ -60,11 +60,11 @@ component {
         var ver = arguments.opts.version ?: $gitShortSha();
         var dryRun = arguments.opts.dryRun ?: false;
 
-        var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
-        var proxy = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
-        var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
-        var lock = new cli.lucli.services.deploy.commands.LockCommands(cfg);
-        var hooks = new cli.lucli.services.deploy.commands.HookCommands(
+        var app = new modules.wheels.services.deploy.commands.AppCommands(cfg);
+        var proxy = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
+        var builder = new modules.wheels.services.deploy.commands.BuilderCommands(cfg);
+        var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
+        var hooks = new modules.wheels.services.deploy.commands.HookCommands(
             cfg,
             {projectRoot: variables.projectRoot}
         );
@@ -132,8 +132,8 @@ component {
             );
         }
         var cfg = variables.loader.load(arguments.opts.configPath);
-        var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
-        var proxy = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+        var app = new modules.wheels.services.deploy.commands.AppCommands(cfg);
+        var proxy = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
         var hostList = [];
         for (var role in cfg.roles()) {
@@ -217,8 +217,8 @@ component {
             {destination: arguments.opts.destination ?: ""}
         );
         var dryRun = arguments.opts.dryRun ?: false;
-        var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
-        var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+        var appCmds = new modules.wheels.services.deploy.commands.AppCommands(cfg);
+        var proxyCmds = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var hosts = $allHosts(cfg);
 
         // app details: docker ps filtered by service label
@@ -227,7 +227,7 @@ component {
         $dispatch(hosts, proxyCmds.details(), dryRun);
         // accessory details (if any)
         if (arrayLen(cfg.accessories())) {
-            var accCmds = new cli.lucli.services.deploy.commands.AccessoryCommands(cfg);
+            var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
             for (var acc in cfg.accessories()) {
                 $dispatch(acc.hosts(), accCmds.details(acc), dryRun);
             }
@@ -256,8 +256,8 @@ component {
             {destination: arguments.opts.destination ?: ""}
         );
         var dryRun = arguments.opts.dryRun ?: false;
-        var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
-        var regCmds = new cli.lucli.services.deploy.commands.RegistryCommands(cfg);
+        var proxyCmds = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
+        var regCmds = new modules.wheels.services.deploy.commands.RegistryCommands(cfg);
         var hosts = $allHosts(cfg);
 
         // Remove all app containers for this service, across all versions.
@@ -274,7 +274,7 @@ component {
         $dispatch(hosts, proxyCmds.remove(), dryRun);
         // Remove each accessory.
         if (arrayLen(cfg.accessories())) {
-            var accCmds = new cli.lucli.services.deploy.commands.AccessoryCommands(cfg);
+            var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
             for (var acc in cfg.accessories()) {
                 $dispatch(acc.hosts(), accCmds.remove(acc), dryRun);
             }
@@ -329,7 +329,7 @@ component {
         var imageName = arguments.opts.image ?: (serviceName & "/web");
         var registryUser = arguments.opts.registryUsername ?: "changeme";
 
-        var mustache = new cli.lucli.services.deploy.lib.Mustache();
+        var mustache = new modules.wheels.services.deploy.lib.Mustache();
         var tplDir = expandPath("/cli/lucli/templates/deploy/init");
         var ctx = {
             service_name: serviceName,

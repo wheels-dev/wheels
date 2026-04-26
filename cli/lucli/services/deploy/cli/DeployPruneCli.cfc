@@ -6,7 +6,7 @@ component {
 
     public DeployPruneCli function init(any sshPool = "") {
         variables.sshPool = arguments.sshPool;
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -24,7 +24,7 @@ component {
             {destination: arguments.opts.destination ?: ""}
         );
         var dryRun = arguments.opts.dryRun ?: false;
-        var pruneCmds = new cli.lucli.services.deploy.commands.PruneCommands(cfg);
+        var pruneCmds = new modules.wheels.services.deploy.commands.PruneCommands(cfg);
 
         var cmdStr = "";
         var keep = arguments.opts.keep ?: 5;

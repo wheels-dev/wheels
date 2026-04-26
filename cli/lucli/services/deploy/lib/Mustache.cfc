@@ -15,7 +15,7 @@ component {
 
 	public Mustache function init(any jarLoader = "") {
 		if (isSimpleValue(arguments.jarLoader) && !len(arguments.jarLoader)) {
-			variables.$jarLoader = new cli.lucli.services.deploy.lib.JarLoader();
+			variables.$jarLoader = new modules.wheels.services.deploy.lib.JarLoader();
 		} else {
 			variables.$jarLoader = arguments.jarLoader;
 		}

@@ -22,6 +22,13 @@ component output="false" {
 	this.mappings["/config"] = expandPath("../config");
 	this.mappings["/plugins"] = expandPath("../plugins");
 	this.mappings["/cli"] = expandPath("../cli/");
+	// Mirror LuCLI's runtime mapping so production code under cli/lucli/services/
+	// can resolve its own modules.wheels.X dotted-path refs when running inside
+	// the framework's own test server (e.g. via /wheels/cli/tests). The CLI
+	// services use modules.wheels.X for their internal cross-references because
+	// that prefix resolves identically across every install context (dev
+	// symlink, brew bottle, choco package). See PR #2309 for context.
+	this.mappings["/modules/wheels"] = expandPath("../cli/lucli/");
 
 	// Load app-level configuration (datasources, custom settings, etc.)
 	// This is the recommended place for developers to define this.datasources,

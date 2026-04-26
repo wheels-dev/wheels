@@ -24,7 +24,7 @@ component {
 	) {
 		variables.http = IsObject(arguments.httpClient)
 			? arguments.httpClient
-			: new cli.lucli.services.packages.HttpClient();
+			: new modules.wheels.services.packages.HttpClient();
 		variables.projectRoot = Len(arguments.projectRoot)
 			? arguments.projectRoot
 			: ExpandPath("./");

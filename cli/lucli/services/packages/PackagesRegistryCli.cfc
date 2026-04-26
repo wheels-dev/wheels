@@ -10,7 +10,7 @@ component {
 	public PackagesRegistryCli function init(any registry = "") {
 		variables.registry = IsObject(arguments.registry)
 			? arguments.registry
-			: new cli.lucli.services.packages.Registry();
+			: new modules.wheels.services.packages.Registry();
 		return this;
 	}
 

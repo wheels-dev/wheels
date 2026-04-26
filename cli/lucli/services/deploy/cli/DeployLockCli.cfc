@@ -10,7 +10,7 @@ component {
 
     public DeployLockCli function init(any sshPool = "") {
         variables.sshPool = arguments.sshPool;
-        variables.loader = new cli.lucli.services.deploy.config.ConfigLoader();
+        variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
         return this;
     }
@@ -21,7 +21,7 @@ component {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
-        var lock = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+        var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
         var cmd = lock.acquire({
             user: $currentUser(),
             message: arguments.opts.message ?: "manual acquire"
@@ -34,7 +34,7 @@ component {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
-        var lock = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+        var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
         $dispatchAny($allHosts(cfg), lock.release(), dryRun);
         return $renderResult(arguments.opts, "Released deploy lock for " & cfg.service());
     }
@@ -43,7 +43,7 @@ component {
         var cfg = $loadCfg(arguments.opts);
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
-        var lock = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+        var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
         $dispatchAny($allHosts(cfg), lock.status(), dryRun);
         return $renderResult(arguments.opts, "Checked deploy lock status for " & cfg.service());
     }

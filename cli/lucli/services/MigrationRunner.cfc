@@ -5,7 +5,7 @@
  * in-process command execution. Falls back to HTTP when a server is running.
  *
  * Usage from LuceeScriptEngine:
- *   var runner = new cli.lucli.services.MigrationRunner(projectRoot);
+ *   var runner = new modules.wheels.services.MigrationRunner(projectRoot);
  *   var result = runner.latest();
  */
 component {

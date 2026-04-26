@@ -1310,8 +1310,8 @@ component extends="modules.BaseModule" {
 		var positional = $deployStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
 
-		var dmc = new cli.lucli.services.deploy.cli.DeployMainCli(
-			new cli.lucli.services.deploy.lib.SshPool()
+		var dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
+			new modules.wheels.services.deploy.lib.SshPool()
 		);
 
 		switch (sub) {
@@ -1348,8 +1348,8 @@ component extends="modules.BaseModule" {
 					throw(message="wheels deploy app requires a verb");
 				}
 				var appVerb = positional[2];
-				var appCli = new cli.lucli.services.deploy.cli.DeployAppCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var appCli = new modules.wheels.services.deploy.cli.DeployAppCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				switch (appVerb) {
 					case "boot":
@@ -1371,8 +1371,8 @@ component extends="modules.BaseModule" {
 					throw(message="wheels deploy proxy requires a verb");
 				}
 				var proxyVerb = positional[2];
-				var proxyCli = new cli.lucli.services.deploy.cli.DeployProxyCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var proxyCli = new modules.wheels.services.deploy.cli.DeployProxyCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				switch (proxyVerb) {
 					case "boot":
@@ -1392,8 +1392,8 @@ component extends="modules.BaseModule" {
 					throw(message="wheels deploy registry requires a verb");
 				}
 				var registryVerb = positional[2];
-				var registryCli = new cli.lucli.services.deploy.cli.DeployRegistryCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var registryCli = new modules.wheels.services.deploy.cli.DeployRegistryCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				switch (registryVerb) {
 					case "setup":
@@ -1409,8 +1409,8 @@ component extends="modules.BaseModule" {
 					throw(message="wheels deploy build requires a verb");
 				}
 				var buildVerb = positional[2];
-				var buildCli = new cli.lucli.services.deploy.cli.DeployBuildCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var buildCli = new modules.wheels.services.deploy.cli.DeployBuildCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				switch (buildVerb) {
 					case "deliver":
@@ -1430,8 +1430,8 @@ component extends="modules.BaseModule" {
 				}
 				var accVerb = positional[2];
 				opts.name = arrayLen(positional) >= 3 ? positional[3] : "";
-				var accCli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var accCli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				switch (accVerb) {
 					case "boot":
@@ -1454,8 +1454,8 @@ component extends="modules.BaseModule" {
 				if (!listFindNoCase("all,images,containers", pruneVerb)) {
 					throw(message="Unknown wheels deploy prune verb: " & pruneVerb);
 				}
-				var pruneCli = new cli.lucli.services.deploy.cli.DeployPruneCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var pruneCli = new modules.wheels.services.deploy.cli.DeployPruneCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				return invoke(pruneCli, pruneVerb, [opts]);
 			case "server":
@@ -1474,8 +1474,8 @@ component extends="modules.BaseModule" {
 					}
 					opts.cmd = arrayToList(cmdParts, " ");
 				}
-				var serverCli = new cli.lucli.services.deploy.cli.DeployServerCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var serverCli = new modules.wheels.services.deploy.cli.DeployServerCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				switch (serverVerb) {
 					case "exec":
@@ -1491,8 +1491,8 @@ component extends="modules.BaseModule" {
 				if (!listFindNoCase("acquire,release,status", lockVerb)) {
 					throw(message="Unknown wheels deploy lock verb: " & lockVerb);
 				}
-				var lockCli = new cli.lucli.services.deploy.cli.DeployLockCli(
-					new cli.lucli.services.deploy.lib.SshPool()
+				var lockCli = new modules.wheels.services.deploy.cli.DeployLockCli(
+					new modules.wheels.services.deploy.lib.SshPool()
 				);
 				return invoke(lockCli, lockVerb, [opts]);
 			case "secrets":
@@ -1510,7 +1510,7 @@ component extends="modules.BaseModule" {
 				if (secVerb == "extract") {
 					opts.key = arrayLen(positional) >= 3 ? positional[3] : "";
 				}
-				var secCli = new cli.lucli.services.deploy.cli.DeploySecretsCli();
+				var secCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
 				return invoke(secCli, secVerb, [opts]);
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
@@ -1626,39 +1626,39 @@ component extends="modules.BaseModule" {
 
 		switch (sub) {
 			case "list":
-				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.list(opts);
 			case "search":
 				if (arrayLen(positional) < 2) {
 					throw(message="search requires a query: wheels packages search <query>");
 				}
 				opts.query = positional[2];
-				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.search(opts);
 			case "show":
 				if (arrayLen(positional) < 2) {
 					throw(message="show requires a name: wheels packages show <name>");
 				}
 				opts.name = positional[2];
-				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.show(opts);
 			case "install":
 				if (arrayLen(positional) < 2) {
 					throw(message="install requires a name: wheels packages install <name>[@<version>]");
 				}
 				opts.target = positional[2];
-				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.install(opts);
 			case "update":
 				opts.target = arrayLen(positional) >= 2 ? positional[2] : "";
-				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.update(opts);
 			case "remove":
 				if (arrayLen(positional) < 2) {
 					throw(message="remove requires a name: wheels packages remove <name>");
 				}
 				opts.target = positional[2];
-				var mainCli = new cli.lucli.services.packages.PackagesMainCli();
+				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.remove(opts);
 			case "registry":
 				if (arrayLen(positional) < 2) {
@@ -1668,7 +1668,7 @@ component extends="modules.BaseModule" {
 				if (!listFindNoCase("refresh,info", regVerb)) {
 					throw(message="Unknown wheels packages registry verb: #regVerb#");
 				}
-				var regCli = new cli.lucli.services.packages.PackagesRegistryCli();
+				var regCli = new modules.wheels.services.packages.PackagesRegistryCli();
 				return invoke(regCli, regVerb, [opts]);
 			default:
 				throw(message="Unknown packages subcommand: #sub#");

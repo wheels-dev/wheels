@@ -21,14 +21,14 @@ component {
 
     public DeploySecretsCli function init() {
         variables.adapters = {
-            "op":        new cli.lucli.services.deploy.secrets.OnePasswordAdapter(),
-            "1password": new cli.lucli.services.deploy.secrets.OnePasswordAdapter(),
-            "bitwarden": new cli.lucli.services.deploy.secrets.BitwardenAdapter(),
-            "bw":        new cli.lucli.services.deploy.secrets.BitwardenAdapter(),
-            "aws":       new cli.lucli.services.deploy.secrets.AwsSecretsAdapter(),
-            "lastpass":  new cli.lucli.services.deploy.secrets.LastPassAdapter(),
-            "lpass":     new cli.lucli.services.deploy.secrets.LastPassAdapter(),
-            "doppler":   new cli.lucli.services.deploy.secrets.DopplerAdapter()
+            "op":        new modules.wheels.services.deploy.secrets.OnePasswordAdapter(),
+            "1password": new modules.wheels.services.deploy.secrets.OnePasswordAdapter(),
+            "bitwarden": new modules.wheels.services.deploy.secrets.BitwardenAdapter(),
+            "bw":        new modules.wheels.services.deploy.secrets.BitwardenAdapter(),
+            "aws":       new modules.wheels.services.deploy.secrets.AwsSecretsAdapter(),
+            "lastpass":  new modules.wheels.services.deploy.secrets.LastPassAdapter(),
+            "lpass":     new modules.wheels.services.deploy.secrets.LastPassAdapter(),
+            "doppler":   new modules.wheels.services.deploy.secrets.DopplerAdapter()
         };
         return this;
     }
@@ -77,7 +77,7 @@ component {
      * Uses SecretResolver so $(cmd) subshells expand.
      */
     public string function print(required struct opts) {
-        var resolver = new cli.lucli.services.deploy.lib.SecretResolver({
+        var resolver = new modules.wheels.services.deploy.lib.SecretResolver({
             projectRoot: arguments.opts.projectRoot ?: expandPath("./"),
             destination: arguments.opts.destination ?: ""
         });
