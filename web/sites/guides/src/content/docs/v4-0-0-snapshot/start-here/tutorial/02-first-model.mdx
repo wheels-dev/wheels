@@ -25,7 +25,7 @@ Estimated time: 25 minutes.
 
 ## Where we left off
 
-At the end of Part 1 you had a running `blog` app with a `/hello` route. There's no database, no models, and no data:
+At the end of Part 1 you had a running `blog` app with a `/hello` route. There's no application schema yet, no models with data, and no `Posts` controller. The tree below highlights only the directories you'll touch in this chapter — the rest of the layout from Part 1 (`app/events/`, `app/jobs/`, `public/`, `tests/`, `vendor/`, root-level dotfiles, and so on) is unchanged and elided here for focus.
 
 <FileTree>
 - blog
@@ -33,16 +33,24 @@ At the end of Part 1 you had a running `blog` app with a `/hello` route. There's
     - controllers
       - Controller.cfc
       - Main.cfc
+    - migrator
+      - migrations
+    - models
+      - Model.cfc
     - views
+      - helpers.cfm
       - layout.cfm
       - main
         - index.cfm
         - hello.cfm
   - config
+    - app.cfm
+    - environment.cfm
     - routes.cfm
     - settings.cfm
   - db
     - development.sqlite
+    - test.sqlite
 </FileTree>
 
 `Main.cfc` has `index` and `hello` actions. `config/routes.cfm` has a `/hello` named route alongside the wildcard and root. The SQLite database file exists but has no application tables. You'll fix all of that here.
@@ -163,6 +171,7 @@ Wheels loads seed data from `app/db/seeds.cfm` (shared) and optionally `app/db/s
 1. Create `app/db/seeds.cfm`:
 
    ```cfm {test:compile}
+   <cfscript>
    seedOnce(modelName="Post", uniqueProperties="title", properties={
        title: "Hello world",
        body: "My first Wheels post.",
@@ -175,7 +184,12 @@ Wheels loads seed data from `app/db/seeds.cfm` (shared) and optionally `app/db/s
        status: "published",
        publishedAt: Now()
    });
+   </cfscript>
    ```
+
+   <Aside type="note">
+     `seeds.cfm` is parsed as CFML markup by default, so the body must be wrapped in `<cfscript>...</cfscript>` for the `seedOnce()` calls to execute. Without the wrapper, Lucee treats them as literal text and `wheels seed` reports `0 created, 0 skipped`.
+   </Aside>
 
 2. Run the seed:
 

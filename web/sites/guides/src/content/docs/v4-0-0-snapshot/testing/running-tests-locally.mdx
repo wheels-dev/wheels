@@ -8,11 +8,11 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-The fast path for day-to-day development is Lucee 7 + SQLite, driven by `wheels test run` or the one-shot script `tools/test-local.sh`. Neither needs Docker, neither needs an external database, and both finish in seconds on a warm server. The Docker matrix exists for the other reason you run tests: proving a change works across every engine and every supported database before you push. This page covers both paths, plus the filter knobs, the raw test-runner URL, and the failure modes that eat the most time.
+The fast path for day-to-day development is Lucee 7 + SQLite, driven by `wheels test` or the one-shot script `tools/test-local.sh`. Neither needs Docker, neither needs an external database, and both finish in seconds on a warm server. The Docker matrix exists for the other reason you run tests: proving a change works across every engine and every supported database before you push. This page covers both paths, plus the filter knobs, the raw test-runner URL, and the failure modes that eat the most time.
 
 **You'll learn:**
 
-- The fastest way to run the suite — `wheels test run` and `tools/test-local.sh`
+- The fastest way to run the suite — `wheels test` and `tools/test-local.sh`
 - How to filter by directory or single spec, both from the CLI and the test-runner URL
 - How to drive the Docker cross-engine matrix for pre-merge verification
 - How to target a specific database (SQLite, MySQL, Postgres, MSSQL, H2, CockroachDB)
@@ -37,37 +37,37 @@ Before either path works, you need a handful of tools on `PATH`:
 wheels --version
 ```
 
-## The fastest path — `wheels test run`
+## The fastest path — `wheels test`
 
-`wheels test run` is the single command you'll use most often. It detects a running Wheels server, reloads the app, hits the test runner, and prints pass/fail counts to your terminal. No Docker, no ceremony.
+`wheels test` is the single command you'll use most often. It detects a running Wheels server, reloads the app, hits the test runner, and prints pass/fail counts to your terminal. No Docker, no ceremony.
 
 ```bash title="your shell — in the wheels repo root"
 # Run the full suite
-wheels test run
+wheels test
 
 # Filter by directory (positional or --filter)
-wheels test run model
-wheels test run --filter=controller
+wheels test model
+wheels test --filter=controller
 
 # Pick a reporter — simple (default), verbose, or machine-readable
-wheels test run --reporter=verbose
+wheels test --reporter=verbose
 
 # Target a specific test database
-wheels test run --db=mysql
+wheels test --db=mysql
 
 # CI-friendly output (exits non-zero on failures, terse pass/fail summary)
-wheels test run --ci
+wheels test --ci
 ```
 
-The supported flags today are `--filter=<dir>`, `--reporter=<name>`, `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>`, `--verbose` / `-v`, `--ci`, and `--core` (force framework-core mode when the auto-detect doesn't pick it up). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter; there is no raw `--format=json` or `--reporter=tap` flag on `wheels test run` at the time of writing.
+The supported flags today are `--filter=<dir>`, `--reporter=<name>`, `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>`, `--verbose` / `-v`, `--ci`, and `--core` (force framework-core mode when the auto-detect doesn't pick it up). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter; there is no raw `--format=json` or `--reporter=tap` flag on `wheels test` at the time of writing.
 
 <Aside type="tip">
-  When `vendor/wheels/tests/` exists (you're hacking on framework core), `wheels test run` auto-enables `--core`. Pass `--core` explicitly if you want to force it.
+  When `vendor/wheels/tests/` exists (you're hacking on framework core), `wheels test` auto-enables `--core`. Pass `--core` explicitly if you want to force it.
 </Aside>
 
 ## LuCLI one-shot: `tools/test-local.sh`
 
-`tools/test-local.sh` is the script every framework contributor runs before pushing. It does everything `wheels test run` does, plus: creates the two SQLite test databases (`wheelstestdb.db` and `wheelstestdb_tenant_b.db`), starts a disposable LuCLI server on port 8080 if one isn't already up, downloads the SQLite JDBC driver into LuCLI's `lib/ext` if missing, runs the tests, parses the JSON, and prints coloured pass/fail output. On exit it stops the server if it started one.
+`tools/test-local.sh` is the script every framework contributor runs before pushing. It does everything `wheels test` does, plus: creates the two SQLite test databases (`wheelstestdb.db` and `wheelstestdb_tenant_b.db`), starts a disposable LuCLI server on port 8080 if one isn't already up, downloads the SQLite JDBC driver into LuCLI's `lib/ext` if missing, runs the tests, parses the JSON, and prints coloured pass/fail output. On exit it stops the server if it started one.
 
 ```bash title="your shell — in the wheels repo root"
 bash tools/test-local.sh              # run all core tests
@@ -86,7 +86,7 @@ Environment knobs:
 
 ## The test-runner URL
 
-When you need to iterate on a single spec file without rebooting anything — fastest inner loop — hit the test runner directly over HTTP. This is what `wheels test run` and `tools/test-local.sh` call under the hood.
+When you need to iterate on a single spec file without rebooting anything — fastest inner loop — hit the test runner directly over HTTP. This is what `wheels test` and `tools/test-local.sh` call under the hood.
 
 ```bash title="direct HTTP access (dev server running)"
 # Run everything
@@ -113,7 +113,7 @@ The runner accepts filters at every layer. Pick whichever matches your workflow.
 
 | Method | How |
 |--------|-----|
-| By directory (CLI) | `wheels test run model` or `wheels test run --filter=controller` |
+| By directory (CLI) | `wheels test model` or `wheels test --filter=controller` |
 | By directory (script) | `bash tools/test-local.sh model` |
 | By directory (URL) | `&directory=wheels.tests.specs.model` |
 | By single spec file (URL) | `&directory=wheels.tests.specs.model.postSpec` |
