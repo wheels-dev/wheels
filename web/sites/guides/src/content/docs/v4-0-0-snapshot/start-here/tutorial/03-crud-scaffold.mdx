@@ -70,36 +70,34 @@ Because scaffolds follow convention, a plain `.resources("posts")` line in `conf
 
 Route model binding kicks in on the actions that take a key. For `show`, `edit`, `update`, and `delete`, Wheels finds the `Post` matching `params.key` before your action runs and hands it to you as `params.post`. No `findByKey` in the controller.
 
-<Aside type="note">
-  On the `wheels` CLI version this tutorial targets (`0.3.5-SNAPSHOT`), `wheels generate scaffold` needs snippet templates that a fresh `wheels new` doesn't ship with. A future release will bundle them. For now you'll hand-write the files the generator would produce — mechanical, but it cements the shape of a scaffold in your head.
-</Aside>
-
 ## Delete Part 2's handiwork
 
 Drop the hand-written controller and views. The model, migration, seed file, and the `resources("posts")` route stay.
 
 ```bash title="your shell"
-wheels destroy controller Posts
+wheels destroy Posts controller
 ```
 
-If your CLI doesn't support `destroy` (same snippet-template gap as `generate`), remove the files directly:
+The argument order is `<name> [type]` — `Posts controller`, not `controller Posts`. If you'd rather skip the CLI and remove the files yourself:
 
 ```bash title="your shell"
 rm app/controllers/Posts.cfc
 rm -r app/views/posts
 ```
 
-Leave `app/models/Post.cfc`, `app/migrator/migrations/20260419120000_create_posts_table.cfc`, `app/db/seeds.cfm`, and `config/routes.cfm` alone.
+Leave `app/models/Post.cfc`, `app/migrator/migrations/<timestamp>_create_posts_table.cfc`, `app/db/seeds.cfm`, and `config/routes.cfm` alone.
 
 ## Generate the scaffold
 
-The one-line version — what you'd run on a future CLI with the snippets bundled:
+`wheels generate scaffold` creates the controller, the seven CRUD views, and (if it didn't already exist) the model and migration in one shot.
 
 ```bash title="your shell"
 wheels generate scaffold Post title:string body:text status:enum
 ```
 
-If that errors with `Template not found: ModelContent.txt`, hand-write the files in the sections below. They're what the generator would produce.
+<Aside type="caution">
+  The scaffold generator will refuse to overwrite an existing `app/models/Post.cfc` and bail before producing the controller and views. Since chapter 2 already wrote the model, you'll see `Scaffold failed: Model already exists`. When that happens, hand-write the files in the sections below — they're what the generator would have produced. (A future release will add a `--skip-existing` flag so the scaffold can reuse the existing model.)
+</Aside>
 
 ### The controller
 

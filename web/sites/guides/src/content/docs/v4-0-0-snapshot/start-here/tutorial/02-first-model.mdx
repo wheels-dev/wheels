@@ -55,13 +55,21 @@ At the end of Part 1 you had a running `blog` app with a `/hello` route. There's
 
 `Main.cfc` has `index` and `hello` actions. `config/routes.cfm` has a `/hello` named route alongside the wildcard and root. The SQLite database file exists but has no application tables. You'll fix all of that here.
 
-## Hand-write the Post model
+## Generate the Post model
 
-Normally you'd run `wheels generate model Post title:string body:text` and Wheels would write both the model CFC and a migration. On the `wheels` CLI version this tutorial targets (`0.3.5-SNAPSHOT`), the generator needs snippet templates that a fresh `wheels new` doesn't ship with. The generator will gain those templates in a future CLI release. For now, you'll hand-write the files — it's three small files, and it's a useful exercise.
+`wheels generate model Post title:string body:text` writes both the model CFC and a migration for you. The generator output is intentionally slim — it doesn't include the `enum` for `status` or the `publishedAt` field this tutorial uses, so you'll augment it after.
 
 <Steps>
 
-1. Create `app/models/Post.cfc`:
+1. Run the generator:
+
+   ```bash
+   wheels generate model Post title:string body:text
+   ```
+
+   That creates `app/models/Post.cfc` (a near-empty `component extends="Model"`) and a migration file under `app/migrator/migrations/` with a current timestamp.
+
+2. Replace the contents of `app/models/Post.cfc` with the version below — it adds the `status` enum we'll use to filter posts:
 
    ```cfm {test:compile}
    component extends="Model" {
@@ -82,13 +90,15 @@ Normally you'd run `wheels generate model Post title:string body:text` and Wheel
 
 You'll use the `published()` scope in a minute.
 
-## Write the migration
+## Augment the migration
 
 Migrations are ordered, reversible schema changes. Each one is a CFC in `app/migrator/migrations/` whose filename starts with a timestamp (`YYYYMMDDHHMMSS_description.cfc`). `wheels migrate latest` runs every pending migration in timestamp order.
 
+The generator already wrote a migration for you with `title` and `body` columns. We need to add `status` and `publishedAt` so the model and table line up.
+
 <Steps>
 
-1. Create `app/migrator/migrations/20260419120000_create_posts_table.cfc`:
+1. Open the migration file the generator created (it's the most recent one in `app/migrator/migrations/`, named `<timestamp>_create_posts_table.cfc`) and replace its contents with the version below. We're using a fixed timestamp here (`20260419120000`) so the filename in the rest of this tutorial matches what you have on disk — feel free to keep the generator's timestamp instead.
 
    ```cfm {test:compile}
    component extends="wheels.migrator.Migration" hint="Create posts table" {
@@ -168,9 +178,13 @@ Wheels loads seed data from `app/db/seeds.cfm` (shared) and optionally `app/db/s
 
 <Steps>
 
-1. Create `app/db/seeds.cfm`:
+1. Create the `app/db/` directory (it isn't scaffolded by `wheels new`), then create `app/db/seeds.cfm`:
 
-   ```cfm {test:compile}
+   ```bash title="your shell"
+   mkdir -p app/db
+   ```
+
+   ```cfm title="app/db/seeds.cfm" {test:compile}
    <cfscript>
    seedOnce(modelName="Post", uniqueProperties="title", properties={
        title: "Hello world",
