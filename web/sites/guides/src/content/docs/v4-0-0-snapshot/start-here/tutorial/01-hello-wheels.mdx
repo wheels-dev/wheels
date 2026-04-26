@@ -71,26 +71,51 @@ Open `http://localhost:8080` in your browser. You'll see a welcome page: "Welcom
 <FileTree>
 - blog
   - app
-    - controllers/
+    - controllers
       - Controller.cfc
       - Main.cfc
-    - models/
-    - views/
-      - layout.cfm
+    - events
+    - global
+    - jobs
+    - lib
+    - mailers
+    - migrator
+      - migrations
+    - models
+      - Model.cfc
+    - plugins
+    - snippets
+    - views
       - helpers.cfm
-      - main/
+      - layout.cfm
+      - main
         - index.cfm
-    - migrator/
   - config
+    - app.cfm
+    - environment.cfm
     - routes.cfm
     - settings.cfm
-    - environment.cfm
-  - db/
+  - db
     - development.sqlite
-  - public/
-  - tests/
+    - test.sqlite
+  - public
+    - Application.cfc
+    - index.cfm
+    - urlrewrite.xml
+    - files
+    - images
+    - javascripts
+    - miscellaneous
+    - stylesheets
+  - tests
+    - specs
+      - controllers
+      - functional
+      - models
   - vendor
-    - wheels/
+    - wheels
+  - .env
+  - .gitignore
   - lucee.json
 </FileTree>
 
@@ -101,6 +126,8 @@ Three directories matter right now:
 - `config/routes.cfm` — maps URLs to controller actions.
 
 `vendor/wheels/` is the framework itself, copied into your app. You generally don't touch it.
+
+The other top-level `app/` directories (`events/`, `global/`, `jobs/`, `lib/`, `mailers/`, `migrator/`, `models/`, `plugins/`, `snippets/`) are scaffolding for features you'll meet later — background jobs, mailers, application events, model definitions, generator templates. Leave them alone for now. The remaining root-level files are framework configuration: `lucee.json` configures the Lucee runtime, `.env` holds environment variables (the dev server's reload password lives here), and `config/app.cfm` plus the rest of `config/` configure the framework itself.
 
 <Aside type="tip">
   **On Hotwire and Basecoat:** a fresh `wheels new` ships with only the core framework. Turbo (for SPA-like page transitions) and Basecoat (for styled forms and components) arrive as packages later in the tutorial when you actually need them. For now, everything is plain server-rendered HTML.
