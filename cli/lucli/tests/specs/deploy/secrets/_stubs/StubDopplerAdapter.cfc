@@ -1,4 +1,4 @@
-component extends="modules.wheels.services.deploy.secrets.DopplerAdapter" {
+component extends="cli.lucli.services.deploy.secrets.DopplerAdapter" {
 
     this.lastArgs = [];
 

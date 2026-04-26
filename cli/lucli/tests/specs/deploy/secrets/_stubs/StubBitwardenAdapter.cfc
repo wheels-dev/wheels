@@ -1,4 +1,4 @@
-component extends="modules.wheels.services.deploy.secrets.BitwardenAdapter" {
+component extends="cli.lucli.services.deploy.secrets.BitwardenAdapter" {
 
     this.lastArgs = [];
 

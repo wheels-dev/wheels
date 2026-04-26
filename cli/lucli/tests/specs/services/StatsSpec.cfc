@@ -3,8 +3,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	function beforeAll() {
 		variables.testHelper = new cli.lucli.tests.TestHelper();
 		variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
-		variables.helpers = new modules.wheels.services.Helpers();
-		variables.stats = new modules.wheels.services.Stats(
+		variables.helpers = new cli.lucli.services.Helpers();
+		variables.stats = new cli.lucli.services.Stats(
 			helpers = variables.helpers,
 			projectRoot = variables.tempRoot
 		);

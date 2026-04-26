@@ -11,13 +11,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		variables.testHelper = new cli.lucli.tests.TestHelper();
 		variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
 		variables.moduleRoot = expandPath("/cli/lucli/");
-		variables.helpers = new modules.wheels.services.Helpers();
-		variables.templates = new modules.wheels.services.Templates(
+		variables.helpers = new cli.lucli.services.Helpers();
+		variables.templates = new cli.lucli.services.Templates(
 			helpers = variables.helpers,
 			projectRoot = variables.tempRoot,
 			moduleRoot = variables.moduleRoot
 		);
-		variables.codegen = new modules.wheels.services.CodeGen(
+		variables.codegen = new cli.lucli.services.CodeGen(
 			templateService = variables.templates,
 			helpers = variables.helpers,
 			projectRoot = variables.tempRoot

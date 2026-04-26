@@ -1,9 +1,9 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
 
     function beforeAll() {
-        variables.cfg = new modules.wheels.services.deploy.config.ConfigLoader()
+        variables.cfg = new cli.lucli.services.deploy.config.ConfigLoader()
             .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml"));
-        variables.lock = new modules.wheels.services.deploy.commands.LockCommands(variables.cfg);
+        variables.lock = new cli.lucli.services.deploy.commands.LockCommands(variables.cfg);
     }
 
     function run() {

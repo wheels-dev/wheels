@@ -81,7 +81,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					if (skipIntegration) { debug(skipReason); return; }
 
 					try {
-						var runner = new modules.wheels.services.MigrationRunner(
+						var runner = new cli.lucli.services.MigrationRunner(
 							projectRoot = projectRoot
 						);
 						var result = runner.runViaHttp(
@@ -165,8 +165,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("analyzes the real framework codebase via service", () => {
 					if (skipIntegration) { debug(skipReason); return; }
 
-					var helpers = new modules.wheels.services.Helpers();
-					var analysis = new modules.wheels.services.Analysis(
+					var helpers = new cli.lucli.services.Helpers();
+					var analysis = new cli.lucli.services.Analysis(
 						helpers = helpers,
 						projectRoot = projectRoot
 					);
@@ -184,8 +184,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("validates the real framework codebase via service", () => {
 					if (skipIntegration) { debug(skipReason); return; }
 
-					var helpers = new modules.wheels.services.Helpers();
-					var analysis = new modules.wheels.services.Analysis(
+					var helpers = new cli.lucli.services.Helpers();
+					var analysis = new cli.lucli.services.Analysis(
 						helpers = helpers,
 						projectRoot = projectRoot
 					);

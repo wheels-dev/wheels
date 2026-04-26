@@ -4,7 +4,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("AwsSecretsAdapter", () => {
 
             it("reports its name as 'aws'", () => {
-                var adapter = new modules.wheels.services.deploy.secrets.AwsSecretsAdapter();
+                var adapter = new cli.lucli.services.deploy.secrets.AwsSecretsAdapter();
                 expect(adapter.name()).toBe("aws");
             });
 

@@ -63,7 +63,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	private any function makePool() {
-		return new modules.wheels.services.deploy.lib.SshPool({
+		return new cli.lucli.services.deploy.lib.SshPool({
 			user: "deploy",
 			privateKey: variables.fixtureDir & "/test_key",
 			strictHostKeyChecking: false

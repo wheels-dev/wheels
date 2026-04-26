@@ -35,7 +35,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("downloads, verifies checksum, extracts to vendor/<name>/", () => {
 				var proj = $scratch();
 				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
-				var installer = new modules.wheels.services.packages.Installer(
+				var installer = new cli.lucli.services.packages.Installer(
 					httpClient = $seededClient(tarballHref),
 					projectRoot = proj
 				);
@@ -54,7 +54,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("aborts with ChecksumMismatch on bad sha256", () => {
 				var proj = $scratch();
 				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
-				var installer = new modules.wheels.services.packages.Installer(
+				var installer = new cli.lucli.services.packages.Installer(
 					httpClient = $seededClient(tarballHref),
 					projectRoot = proj
 				);
@@ -78,7 +78,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var proj = $scratch();
 				DirectoryCreate(proj & "vendor/wheels-fake", true);
 				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
-				var installer = new modules.wheels.services.packages.Installer(
+				var installer = new cli.lucli.services.packages.Installer(
 					httpClient = $seededClient(tarballHref),
 					projectRoot = proj
 				);
@@ -102,7 +102,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				DirectoryCreate(proj & "vendor/wheels-fake", true);
 				FileWrite(proj & "vendor/wheels-fake/leftover.txt", "old");
 				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
-				var installer = new modules.wheels.services.packages.Installer(
+				var installer = new cli.lucli.services.packages.Installer(
 					httpClient = $seededClient(tarballHref),
 					projectRoot = proj
 				);
@@ -117,7 +117,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("refuses to install a version missing tarball URL", () => {
-				var installer = new modules.wheels.services.packages.Installer(
+				var installer = new cli.lucli.services.packages.Installer(
 					httpClient = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient(),
 					projectRoot = $scratch()
 				);
@@ -135,7 +135,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var proj = $scratch();
 				DirectoryCreate(proj & "vendor/scary", true);
 				FileWrite(proj & "vendor/scary/not-a-package.txt", "x");
-				var installer = new modules.wheels.services.packages.Installer(
+				var installer = new cli.lucli.services.packages.Installer(
 					httpClient = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient(),
 					projectRoot = proj
 				);
@@ -155,7 +155,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var proj = $scratch();
 				DirectoryCreate(proj & "vendor/wheels-fake", true);
 				FileWrite(proj & "vendor/wheels-fake/package.json", "{""name"":""wheels-fake""}");
-				var installer = new modules.wheels.services.packages.Installer(
+				var installer = new cli.lucli.services.packages.Installer(
 					httpClient = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient(),
 					projectRoot = proj
 				);

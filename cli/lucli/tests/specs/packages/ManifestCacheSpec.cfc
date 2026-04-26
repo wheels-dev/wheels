@@ -10,7 +10,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("writes and reads the index round-trip", () => {
 				var root = $tmpRoot();
-				var cache = new modules.wheels.services.packages.ManifestCache(root = root);
+				var cache = new cli.lucli.services.packages.ManifestCache(root = root);
 				cache.writeIndex(["wheels-sentry", "wheels-hotwire"]);
 				expect(cache.hasFreshIndex()).toBeTrue();
 				var names = cache.readIndex();
@@ -19,13 +19,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("reports cache miss when index is absent", () => {
-				var cache = new modules.wheels.services.packages.ManifestCache(root = $tmpRoot());
+				var cache = new cli.lucli.services.packages.ManifestCache(root = $tmpRoot());
 				expect(cache.hasFreshIndex()).toBeFalse();
 			});
 
 			it("writes and reads manifests round-trip", () => {
 				var root = $tmpRoot();
-				var cache = new modules.wheels.services.packages.ManifestCache(root = root);
+				var cache = new cli.lucli.services.packages.ManifestCache(root = root);
 				var m = {name: "wheels-sentry", versions: [{version: "1.0.0"}]};
 				cache.writeManifest("wheels-sentry", m);
 				expect(cache.hasFreshManifest("wheels-sentry")).toBeTrue();
@@ -37,7 +37,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("honours TTL — index stale after expiry", () => {
 				var root = $tmpRoot();
-				var cache = new modules.wheels.services.packages.ManifestCache(root = root, ttlSeconds = 1);
+				var cache = new cli.lucli.services.packages.ManifestCache(root = root, ttlSeconds = 1);
 				cache.writeIndex(["x"]);
 				expect(cache.hasFreshIndex()).toBeTrue();
 				Sleep(1500);
@@ -47,7 +47,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("refresh() wipes the cache directory", () => {
 				var root = $tmpRoot();
-				var cache = new modules.wheels.services.packages.ManifestCache(root = root);
+				var cache = new cli.lucli.services.packages.ManifestCache(root = root);
 				cache.writeIndex(["x"]);
 				cache.writeManifest("x", {name: "x", versions: []});
 				expect(DirectoryExists(root)).toBeTrue();
@@ -57,7 +57,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("info() reports cache location and freshness", () => {
 				var root = $tmpRoot();
-				var cache = new modules.wheels.services.packages.ManifestCache(root = root);
+				var cache = new cli.lucli.services.packages.ManifestCache(root = root);
 				cache.writeIndex([]);
 				var info = cache.info();
 				expect(info.root).toBe(root);

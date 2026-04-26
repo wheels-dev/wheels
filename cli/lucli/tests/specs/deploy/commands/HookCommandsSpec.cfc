@@ -1,14 +1,14 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
 
     function beforeAll() {
-        variables.cfg = new modules.wheels.services.deploy.config.ConfigLoader()
+        variables.cfg = new cli.lucli.services.deploy.config.ConfigLoader()
             .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml"));
 
         // Isolated project root for hook file manipulation.
         variables.projectRoot = getTempDirectory() & "/wheels-deploy-hook-test-" & createUUID();
         directoryCreate(variables.projectRoot & "/.kamal/hooks", true, true);
 
-        variables.hooks = new modules.wheels.services.deploy.commands.HookCommands(
+        variables.hooks = new cli.lucli.services.deploy.commands.HookCommands(
             variables.cfg,
             {projectRoot: variables.projectRoot}
         );

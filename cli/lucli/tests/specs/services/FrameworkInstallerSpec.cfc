@@ -17,7 +17,7 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function beforeAll() {
-		variables.installer = new modules.wheels.services.FrameworkInstaller();
+		variables.installer = new cli.lucli.services.FrameworkInstaller();
 	}
 
 	private struct function buildFixture(required string rootBoxContent, required string frameworkBoxContent) {

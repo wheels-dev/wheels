@@ -4,7 +4,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("DopplerAdapter", () => {
 
             it("reports its name as 'doppler'", () => {
-                var adapter = new modules.wheels.services.deploy.secrets.DopplerAdapter();
+                var adapter = new cli.lucli.services.deploy.secrets.DopplerAdapter();
                 expect(adapter.name()).toBe("doppler");
             });
 

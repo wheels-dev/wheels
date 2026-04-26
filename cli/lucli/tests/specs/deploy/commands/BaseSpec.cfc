@@ -1,7 +1,7 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
     function run() {
         describe("Commands.Base", () => {
-            var base = new modules.wheels.services.deploy.commands.Base();
+            var base = new cli.lucli.services.deploy.commands.Base();
 
             it("docker() joins args with spaces", () => {
                 expect(base.docker("run", "-d", "alpine")).toBe("docker run -d alpine");

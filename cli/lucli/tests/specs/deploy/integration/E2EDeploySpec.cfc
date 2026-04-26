@@ -75,7 +75,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 $resetRemoteLog();
                 var pool = $makePool();
                 try {
-                    var dc = new modules.wheels.services.deploy.cli.DeployMainCli(pool);
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(pool);
                     dc.deploy({configPath: variables.deployYml, version: "v1"});
                 } finally {
                     pool.close();
@@ -101,7 +101,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 $resetRemoteLog();
                 var pool = $makePool();
                 try {
-                    var dc = new modules.wheels.services.deploy.cli.DeployMainCli(pool);
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(pool);
                     dc.deploy({configPath: variables.deployYml, version: "v1"});
                     dc.deploy({configPath: variables.deployYml, version: "v2"});
                 } finally {
@@ -126,7 +126,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 $resetRemoteLog();
                 var pool = $makePool();
                 try {
-                    var dc = new modules.wheels.services.deploy.cli.DeployMainCli(pool);
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(pool);
                     // Stage: pretend v2 is live and we're rolling back to v1.
                     dc.deploy({configPath: variables.deployYml, version: "v2"});
                     $resetRemoteLog();
@@ -145,7 +145,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     // ── helpers ────────────────────────────────────────────────────────
 
     private any function $makePool() {
-        return new modules.wheels.services.deploy.lib.SshPool({
+        return new cli.lucli.services.deploy.lib.SshPool({
             user: "deploy",
             privateKey: variables.fixtureDir & "/test_key",
             strictHostKeyChecking: false
@@ -158,7 +158,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      * assertions aren't polluted by the previous block's dispatches.
      */
     private void function $resetRemoteLog() {
-        var sc = new modules.wheels.services.deploy.lib.SshClient().init(
+        var sc = new cli.lucli.services.deploy.lib.SshClient().init(
             "localhost",
             {
                 user: "deploy",
@@ -180,7 +180,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      * connection cache the test just exercised.
      */
     private string function $readRemoteLog() {
-        var sc = new modules.wheels.services.deploy.lib.SshClient().init(
+        var sc = new cli.lucli.services.deploy.lib.SshClient().init(
             "localhost",
             {
                 user: "deploy",

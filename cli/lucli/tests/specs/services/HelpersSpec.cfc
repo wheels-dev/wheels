@@ -1,7 +1,7 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function beforeAll() {
-		variables.helpers = new modules.wheels.services.Helpers();
+		variables.helpers = new cli.lucli.services.Helpers();
 	}
 
 	function run() {

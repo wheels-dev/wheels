@@ -14,7 +14,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		describe("Doctor Service", () => {
 
 			it("reports HEALTHY for a valid project", () => {
-				var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();
 				expect(results.status).toBe("HEALTHY");
 				expect(arrayLen(results.issues)).toBe(0);
@@ -26,7 +26,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryDelete(tempRoot & "/app/controllers", true);
 				}
 
-				var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();
 				expect(results.status).toBe("CRITICAL");
 				expect(arrayLen(results.issues)).toBeGT(0);
@@ -46,7 +46,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryDelete(specsDir, true);
 				}
 
-				var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();
 
 				// Should not be CRITICAL (no required dirs missing)
@@ -67,7 +67,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					fileDelete(routesPath);
 				}
 
-				var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();
 				expect(results.status).toBe("CRITICAL");
 
@@ -82,7 +82,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var original = fileRead(routesPath);
 				fileWrite(routesPath, "// "); // less than 10 chars of content
 
-				var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();
 
 				var warningText = arrayToList(results.warnings, " ");
@@ -99,7 +99,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryDelete(specsDir, true);
 				}
 
-				var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();
 				expect(arrayLen(results.recommendations)).toBeGT(0);
 
@@ -109,7 +109,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("passes write permission check on writable directory", () => {
-				var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+				var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 				var results = doctor.runChecks();
 
 				var passedText = arrayToList(results.passed, " ");
@@ -119,7 +119,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			describe("CLI install freshness (##2223)", () => {
 
 				it("is silent when no installedModuleRoot is provided", () => {
-					var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 					var results = doctor.runChecks();
 					var combined = arrayToList(results.warnings, " ") & " " & arrayToList(results.passed, " ");
 					expect(combined).notToInclude("Installed CLI module");
@@ -131,7 +131,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(fakeInstalled, true);
 					fileWrite(fakeInstalled & "/Module.cfc", "component { }");
 
-					var doctor = new modules.wheels.services.Doctor(
+					var doctor = new cli.lucli.services.Doctor(
 						projectRoot = tempRoot,
 						installedModuleRoot = fakeInstalled
 					);
@@ -148,7 +148,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(installed, true);
 					fileWrite(installed & "/Module.cfc", "component { /* stale installed version */ }");
 
-					var doctor = new modules.wheels.services.Doctor(
+					var doctor = new cli.lucli.services.Doctor(
 						projectRoot = checkout,
 						installedModuleRoot = installed
 					);
@@ -172,7 +172,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(installed, true);
 					fileWrite(installed & "/Module.cfc", src);
 
-					var doctor = new modules.wheels.services.Doctor(
+					var doctor = new cli.lucli.services.Doctor(
 						projectRoot = checkout,
 						installedModuleRoot = installed
 					);
@@ -192,7 +192,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var checkout = makeFakeCheckout("component { }");
 					var selfInstalled = checkout & "/cli/lucli";
 
-					var doctor = new modules.wheels.services.Doctor(
+					var doctor = new cli.lucli.services.Doctor(
 						projectRoot = checkout,
 						installedModuleRoot = selfInstalled
 					);
@@ -218,7 +218,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						return;
 					}
 
-					var doctor = new modules.wheels.services.Doctor(
+					var doctor = new cli.lucli.services.Doctor(
 						projectRoot = checkout,
 						installedModuleRoot = installed
 					);
@@ -241,7 +241,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			describe("framework source bundling", () => {
 
 				it("is silent when no installedModuleRoot is provided (dev checkout)", () => {
-					var doctor = new modules.wheels.services.Doctor(projectRoot = tempRoot);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
 					var results = doctor.runChecks();
 					var combined = arrayToList(results.issues, " ") & " " & arrayToList(results.passed, " ");
 					expect(combined).notToInclude("framework source");
@@ -253,7 +253,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(installed, true);
 					fileWrite(installed & "/Module.cfc", "component { }");
 
-					var doctor = new modules.wheels.services.Doctor(
+					var doctor = new cli.lucli.services.Doctor(
 						projectRoot = checkout,
 						installedModuleRoot = installed
 					);
@@ -274,7 +274,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(fakeInstalled, true);
 					fileWrite(fakeInstalled & "/Module.cfc", "component { }");
 
-					var doctor = new modules.wheels.services.Doctor(
+					var doctor = new cli.lucli.services.Doctor(
 						projectRoot = tempRoot,
 						installedModuleRoot = fakeInstalled
 					);
@@ -297,7 +297,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				it("reports passed when no packages/plugins exist", () => {
 					var root = makeProjectRoot();
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 					expect(arrayLen(results.mixinCollisions)).toBe(0);
 					var combined = arrayToList(results.warnings, " ");
@@ -310,7 +310,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					makePackage(root, "pkgA", "controller", "$helperA", []);
 					makePackage(root, "pkgB", "controller", "$helperB", []);
 
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
 					expect(arrayLen(results.mixinCollisions)).toBe(0);
@@ -326,7 +326,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					makePackage(root, "pkgA", "controller", "$shared", []);
 					makePackage(root, "pkgB", "controller", "$shared", []);
 
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
 					// Default output: count summary only, no inline detail
@@ -356,7 +356,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					makePackage(root, "pkgA", "controller", "$shared", []);
 					makePackage(root, "pkgB", "controller", "$shared", ["$shared"]);
 
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
 					expect(arrayLen(results.mixinCollisions)).toBe(0);
@@ -385,7 +385,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						cfcBody = 'public string function $shared() mixin="model" { return "b"; }'
 					);
 
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
 					var warningText = arrayToList(results.warnings, " ");
@@ -413,7 +413,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						cfcBody = 'public string function $shared() { return "b"; }'
 					);
 
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
 					var warningText = arrayToList(results.warnings, " ");
@@ -428,7 +428,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					makePackageWithExtendsChain(root, "pkgA", "controller", "$inherited");
 					makePackageWithExtendsChain(root, "pkgB", "controller", "$inherited");
 
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
 					var warningText = arrayToList(results.warnings, " ");
@@ -458,7 +458,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						cfcBody = 'public string function $real() { return "b"; }'
 					);
 
-					var doctor = new modules.wheels.services.Doctor(projectRoot = root);
+					var doctor = new cli.lucli.services.Doctor(projectRoot = root);
 					var results = doctor.runChecks();
 
 					var warningText = arrayToList(results.warnings, " ");

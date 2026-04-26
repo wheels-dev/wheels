@@ -6,7 +6,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("prefixes every line with [host]", () => {
 				var buf = createObject("java", "java.io.ByteArrayOutputStream").init();
 				var ps = createObject("java", "java.io.PrintStream").init(buf);
-				var o = new modules.wheels.services.deploy.lib.Output(ps);
+				var o = new cli.lucli.services.deploy.lib.Output(ps);
 				o.write("host1", "hello#chr(10)#world#chr(10)#");
 				var s = buf.toString();
 				expect(find("[host1] hello", s)).toBeGT(0);
@@ -15,7 +15,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("buffers partial lines until newline", () => {
 				var buf = createObject("java", "java.io.ByteArrayOutputStream").init();
-				var o = new modules.wheels.services.deploy.lib.Output(
+				var o = new cli.lucli.services.deploy.lib.Output(
 					createObject("java", "java.io.PrintStream").init(buf));
 				o.write("h", "part1");
 				expect(buf.size()).toBe(0);
@@ -25,7 +25,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("flush() emits an unterminated buffered line", () => {
 				var buf = createObject("java", "java.io.ByteArrayOutputStream").init();
-				var o = new modules.wheels.services.deploy.lib.Output(
+				var o = new cli.lucli.services.deploy.lib.Output(
 					createObject("java", "java.io.PrintStream").init(buf));
 				o.write("h", "incomplete");
 				expect(buf.size()).toBe(0);
@@ -35,7 +35,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("interleaves two hosts cleanly (no fragment mixing)", () => {
 				var buf = createObject("java", "java.io.ByteArrayOutputStream").init();
-				var o = new modules.wheels.services.deploy.lib.Output(
+				var o = new cli.lucli.services.deploy.lib.Output(
 					createObject("java", "java.io.PrintStream").init(buf));
 				o.write("h1", "one#chr(10)#");
 				o.write("h2", "two#chr(10)#");

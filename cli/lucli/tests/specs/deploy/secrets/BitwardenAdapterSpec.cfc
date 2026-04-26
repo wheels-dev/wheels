@@ -4,7 +4,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         describe("BitwardenAdapter", () => {
 
             it("reports its name as 'bitwarden'", () => {
-                var adapter = new modules.wheels.services.deploy.secrets.BitwardenAdapter();
+                var adapter = new cli.lucli.services.deploy.secrets.BitwardenAdapter();
                 expect(adapter.name()).toBe("bitwarden");
             });
 

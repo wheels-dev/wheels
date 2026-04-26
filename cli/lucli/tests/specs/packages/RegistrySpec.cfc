@@ -5,7 +5,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			var $freshCache = () => {
 				var root = GetTempDirectory() & "wheels-registry-" & CreateUUID() & "/";
-				return new modules.wheels.services.packages.ManifestCache(root = root);
+				return new cli.lucli.services.packages.ManifestCache(root = root);
 			};
 
 			var $sentryManifest = SerializeJSON({
@@ -24,7 +24,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("lists package names, filtering out non-dirs and sorting", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cache = $freshCache();
-				var r = new modules.wheels.services.packages.Registry(
+				var r = new cli.lucli.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
 				fake.seed(
@@ -38,7 +38,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("serves the index from cache on the second call (no second HTTP hit)", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cache = $freshCache();
-				var r = new modules.wheels.services.packages.Registry(
+				var r = new cli.lucli.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
 				fake.seed(
@@ -54,7 +54,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("fetches a manifest and parses it", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cache = $freshCache();
-				var r = new modules.wheels.services.packages.Registry(
+				var r = new cli.lucli.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
 				fake.seed(
@@ -70,7 +70,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("throws Wheels.Packages.UnknownPackage on 404", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cache = $freshCache();
-				var r = new modules.wheels.services.packages.Registry(
+				var r = new cli.lucli.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
 				// No seed — FakeHttpClient returns 404 for unknown URLs.
@@ -88,7 +88,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("throws Wheels.Packages.RegistryUnavailable on other errors", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cache = $freshCache();
-				var r = new modules.wheels.services.packages.Registry(
+				var r = new cli.lucli.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
 				fake.seed(
@@ -109,7 +109,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("info() reports repo and cache details", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cache = $freshCache();
-				var r = new modules.wheels.services.packages.Registry(
+				var r = new cli.lucli.services.packages.Registry(
 					httpClient = fake, cache = cache, registryRepo = "acme/pkgs"
 				);
 				var info = r.info();
@@ -121,7 +121,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("uses default repo when env override is absent", () => {
 				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
 				var cache = $freshCache();
-				var r = new modules.wheels.services.packages.Registry(httpClient = fake, cache = cache);
+				var r = new cli.lucli.services.packages.Registry(httpClient = fake, cache = cache);
 				// We can't assert on env state, but we can assert the fallback was hit.
 				expect(Len(r.registryRepo())).toBeGT(0);
 			});

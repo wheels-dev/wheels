@@ -3,7 +3,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	function beforeAll() {
 		variables.testHelper = new cli.lucli.tests.TestHelper();
 		variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
-		variables.testRunner = new modules.wheels.services.TestRunner(projectRoot = variables.tempRoot);
+		variables.testRunner = new cli.lucli.services.TestRunner(projectRoot = variables.tempRoot);
 	}
 
 	function afterAll() {
@@ -21,7 +21,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var testsDir = tempRoot & "/vendor/wheels/tests";
 					directoryCreate(testsDir, true, true);
 
-					var runner = new modules.wheels.services.TestRunner(projectRoot = tempRoot);
+					var runner = new cli.lucli.services.TestRunner(projectRoot = tempRoot);
 					var result = runner.detectTestType();
 					expect(result).toBe("core");
 				});
@@ -32,7 +32,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(cleanRoot, true);
 					directoryCreate(cleanRoot & "/tests/specs", true);
 
-					var runner = new modules.wheels.services.TestRunner(projectRoot = cleanRoot);
+					var runner = new cli.lucli.services.TestRunner(projectRoot = cleanRoot);
 					var result = runner.detectTestType();
 					expect(result).toBe("app");
 
