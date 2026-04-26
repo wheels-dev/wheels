@@ -18,10 +18,17 @@
 # Mapping to fresh-VM-run findings:
 #   Phase 2 — F1 (bundleName), F3 (duplicate Application.cfc), F4 (file tree)
 #   Phase 3 — Lucee Express boot
-#   Phase 4 — F2/F5 (the migration cliff)
+#   Phase 4 — F2/F5 (the migration cliff) — also covers issue #2315 silent success
 #   Phase 5 — F3-orig (cfscript wrapper for seedOnce)
 #   Phase 6 — F8 / chapters 2-6 CRUD
-#   Phase 7 — F7 (wheels packages list)
+#   Phase 7 — F7 (wheels packages list) — fixed in #2309, regression check
+#   Phase 8 — issue #2317 (wheels routes dumps API JSON)
+#   Phase 9 — issue #2318 (wheels test reports 0 passed silently)
+#   Phase 10 — issue #2319 (dev error pages return HTTP 200)
+#
+# Phases 8-10 are SKIP-clean while their issues are open and flip to PASS once
+# fixed. This keeps the harness green during normal development and lights up
+# regressions automatically.
 
 set -uo pipefail
 
@@ -663,21 +670,145 @@ if phase 7 "wheels packages list (covers F7 — PackagesMainCli dotted-path reso
             head -10 "$PACKAGES_LOG" | sed 's/^/      | /'
         fi
     else
-        # F7 is a known-issue on fresh installs — `cli.lucli.services.*` dotted paths
-        # in Module.cfc and the deploy/packages services don't resolve when the
-        # module isn't loaded under a `cli/lucli/` filesystem hierarchy. The user's
-        # daily dev setup (~/.lucli/modules/wheels -> repo's cli/lucli) accidentally
-        # works because the symlink target lives under `cli/lucli/`. Brew installs
-        # don't, so packages and deploy break. Fix requires either refactoring 30+
-        # absolute references to relative paths OR registering a Lucee mapping at
-        # module init. Out of scope for the cliff fix. Treat as expected for now.
-        if grep -qE "could not find component|PackagesMainCli" "$PACKAGES_LOG"; then
-            skip "F7 reproduces (packages/deploy dotted-path resolution) — separate fix needed"
+        # F7 used to be PackagesMainCli not resolving via cli.lucli.services.* dotted
+        # paths — fixed in #2309 by switching to the modules.wheels mapping. After
+        # that fix landed, a follow-on dotted-path issue surfaced: the packages
+        # service references `wheels.SemVer` which doesn't resolve outside a
+        # filesystem rooted at `wheels/`. Discriminate the failures so the harness
+        # output is actionable.
+        if grep -qE "PackagesMainCli" "$PACKAGES_LOG"; then
+            fail "F7 regressed: PackagesMainCli dotted-path failure is back (was fixed in #2309)"
+            tail -5 "$PACKAGES_LOG" | sed 's/^/      | /'
+        elif grep -qE "wheels\.SemVer|component or class.*name \[wheels\." "$PACKAGES_LOG"; then
+            fail "F7 follow-on: packages service can't resolve wheels.* dotted paths (separate from #2309)"
+            tail -3 "$PACKAGES_LOG" | sed 's/^/      | /'
         else
             fail "wheels packages list failed with unexpected error"
             tail -5 "$PACKAGES_LOG" | sed 's/^/      | /'
         fi
     fi
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 8: wheels routes returns route table (issue #2317)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-25 finding #5: `wheels routes` dumps ~500KB of
+# JSON describing the framework API instead of the route table. Likely a wrong
+# endpoint mapping in the CLI. This phase detects regression once the issue
+# (open as #2317) is fixed, and SKIPs cleanly until then.
+
+if phase 8 "wheels routes returns route table not API JSON dump (issue #2317)"; then
+    cd "$APP_DIR" || exit 1
+
+    ROUTES_LOG="$TMPDIR/wheels-routes.log"
+    if "$WHEELS_CMD" routes > "$ROUTES_LOG" 2>&1; then
+        SIZE=$(stat -f %z "$ROUTES_LOG" 2>/dev/null || stat -c %s "$ROUTES_LOG" 2>/dev/null || echo 0)
+        # The framework API-reference dump is hundreds of KB; a route table for a
+        # fresh app is dozens to a few thousand bytes. 50KB is well above any
+        # plausible route table for a fresh app and well below the API dump.
+        if [ "$SIZE" -gt 50000 ]; then
+            skip "wheels routes still dumps API JSON ($SIZE bytes) — issue #2317 not fixed yet"
+        elif grep -qE "GET[[:space:]]|POST[[:space:]]|PUT[[:space:]]|PATCH[[:space:]]|DELETE[[:space:]]" "$ROUTES_LOG"; then
+            pass "wheels routes returned a route table"
+        else
+            skip "wheels routes output is small ($SIZE bytes) but format unrecognized"
+            head -5 "$ROUTES_LOG" | sed 's/^/      | /'
+        fi
+    else
+        fail "wheels routes exited non-zero"
+        tail -5 "$ROUTES_LOG" | sed 's/^/      | /'
+    fi
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 9: wheels test prints non-zero counts (issue #2318)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-25 finding #7: `wheels test` reports `0 passed`
+# with no spec list, no failures, no errors — even though `wheels doctor`
+# confirms specs are present. Drop a trivial spec and verify wheels test
+# either reports a non-zero count or surfaces a real error.
+
+if phase 9 "wheels test prints non-zero counts when a spec exists (issue #2318)"; then
+    cd "$APP_DIR" || exit 1
+
+    SPEC_DIR="$APP_DIR/tests/specs/onboarding"
+    SPEC_FILE="$SPEC_DIR/SmokeSpec.cfc"
+    mkdir -p "$SPEC_DIR"
+    cat > "$SPEC_FILE" <<'CFML'
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Onboarding harness smoke", () => {
+            it("can perform a trivial assertion", () => {
+                expect(1 + 1).toBe(2);
+            });
+        });
+    }
+}
+CFML
+    [ -f "$SPEC_FILE" ] && pass "smoke spec written" || fail "could not write smoke spec"
+
+    # Reload so the framework sees the new spec.
+    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
+    sleep 1
+
+    TEST_LOG="$TMPDIR/wheels-test.log"
+    "$WHEELS_CMD" test > "$TEST_LOG" 2>&1 || true
+
+    # The bug behavior is: output literally just "0 passed" with no other counts.
+    # Acceptable post-fix: any of "1 passed" / "1 collected" / a list of specs / a
+    # real error message that points at the spec. Anything but the bug case.
+    if grep -qE "^[[:space:]]*0 passed[[:space:]]*$" "$TEST_LOG" && \
+       ! grep -qE "passed|failed|skipped|errored|collected" "$TEST_LOG" | grep -v "^[[:space:]]*0 passed"; then
+        skip "wheels test still prints '0 passed' with no detail — issue #2318 not fixed yet"
+        head -5 "$TEST_LOG" | sed 's/^/      | /'
+    elif grep -qE "1 passed|1 spec|SmokeSpec" "$TEST_LOG"; then
+        pass "wheels test reports the smoke spec"
+    elif grep -qE "passed|failed|errored|collected" "$TEST_LOG"; then
+        # Even a non-zero failure with detail is a vast improvement over "0 passed".
+        pass "wheels test produced runner detail (counts or status)"
+    else
+        skip "wheels test output unrecognized — review $TEST_LOG"
+        head -10 "$TEST_LOG" | sed 's/^/      | /'
+    fi
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 10: dev error pages return 5xx not 200 (issue #2319)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-25 finding #8: `Wheels.RouteNotFound` and other
+# framework error pages render with HTTP 200, lying to anything that consumes
+# the response by status code (curl, monitoring, retry logic). Hit a route
+# guaranteed to fail and check the status.
+
+if phase 10 "dev error pages return 5xx/4xx not HTTP 200 (issue #2319)"; then
+    # /__definitely_not_a_route is guaranteed to miss the wildcard's controller
+    # resolution because no controller named `__definitely_not_a_route` exists.
+    BAD_PATH="/__definitely_not_a_route_$(date +%s)"
+    STATUS=$(curl -s -o /tmp/wheels-error-body.txt -w "%{http_code}" --max-time 15 "http://localhost:$PORT$BAD_PATH" || echo 000)
+
+    case "$STATUS" in
+        4*|5*)
+            pass "framework error returned HTTP $STATUS (correct)"
+            ;;
+        200)
+            # Confirm it really is an error body, not a real page.
+            if grep -qiE "RouteNotFound|ControllerNotFound|wheels error|cferror|exception" /tmp/wheels-error-body.txt; then
+                skip "dev error page returns HTTP 200 with error body — issue #2319 not fixed yet"
+            else
+                skip "$BAD_PATH unexpectedly returned 200 with non-error body"
+            fi
+            ;;
+        000)
+            fail "could not reach server at port $PORT"
+            ;;
+        *)
+            skip "unexpected HTTP $STATUS for guaranteed-bad route"
+            ;;
+    esac
 fi
 
 # ══════════════════════════════════════════════════

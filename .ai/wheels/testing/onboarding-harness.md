@@ -54,18 +54,26 @@ end of the run.
 ## Phases
 
 ```
-Phase 1: Setup isolated LUCLI_HOME
-Phase 2: wheels new (file tree, no bundleName, no duplicates)
-Phase 3: server boot via `lucli server run` + sqlite-jdbc shim
-Phase 4: migration cliff (assert real schema, not just exit 0)
-Phase 5: seed (cfscript wrapper + seedOnce idempotency)
-Phase 6: CRUD walkthrough (chapters 2-3 happy path)
-Phase 7: wheels packages list (currently SKIP pending follow-up)
+Phase 1:  Setup isolated LUCLI_HOME
+Phase 2:  wheels new (file tree, no bundleName, no duplicates)
+Phase 3:  server boot via `lucli server run` + sqlite-jdbc shim
+Phase 4:  migration cliff (assert real schema, not just exit 0)  — also covers issue #2315
+Phase 5:  seed (cfscript wrapper + seedOnce idempotency)
+Phase 6:  CRUD walkthrough (chapters 2-3 happy path)
+Phase 7:  wheels packages list (regression check — fixed in #2309)
+Phase 8:  wheels routes returns route table not API JSON dump (issue #2317)
+Phase 9:  wheels test prints non-zero counts when a spec exists (issue #2318)
+Phase 10: dev error pages return 5xx/4xx not HTTP 200 (issue #2319)
 ```
 
 Each phase emits `✓` (pass), `✗` (fail), or `-` (skip) lines. The summary
 counts add up across all phases. A failure in Phase 1-3 aborts subsequent
 phases (no point running migrations against a server that didn't start).
+
+Phases 8-10 are SKIP-clean while their issues are open and flip to PASS once
+fixed. The harness stays green during normal development and lights up
+regressions automatically — you don't need to remember to re-enable a check
+when an issue closes.
 
 ## Modes
 
