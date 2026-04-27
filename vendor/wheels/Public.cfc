@@ -129,7 +129,18 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 
 	function testbox(){
 		$blockInProduction();
-		include "/tests/runner.cfm";
+		// Prefer the project's own runner if it exists (advanced users who
+		// scaffolded a custom tests/runner.cfm). Otherwise fall back to a
+		// built-in app-test runner that scans tests.specs/ via TestBox and
+		// emits the same JSON shape as the framework's core runner. Without
+		// this fallback, fresh apps got "Page [/tests/runner.cfm] not found"
+		// because `wheels new` doesn't scaffold one.
+		var projectRunner = expandPath("/tests/runner.cfm");
+		if (fileExists(projectRunner)) {
+			include "/tests/runner.cfm";
+			return;
+		}
+		include "/wheels/tests/app-runner.cfm";
 	}
 
 	public function tests_testbox(){

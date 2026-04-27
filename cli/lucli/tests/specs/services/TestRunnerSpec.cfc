@@ -16,14 +16,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			describe("detectTestType()", () => {
 
-				it("returns core when vendor/wheels/tests exists", () => {
-					// Create the vendor/wheels/tests directory
-					var testsDir = tempRoot & "/vendor/wheels/tests";
-					directoryCreate(testsDir, true, true);
-
+				it("always returns app — vendor/wheels/tests existence is not a discriminator (##2318)", () => {
+					// Both with and without vendor/wheels/tests, detectTestType
+					// should return "app". Every Wheels app vendors the
+					// framework's tests, so that signal is meaningless. Users
+					// who explicitly want core tests pass --core (CLI) or
+					// type:"core" (service).
+					var withVendor = tempRoot & "/vendor/wheels/tests";
+					directoryCreate(withVendor, true, true);
 					var runner = new cli.lucli.services.TestRunner(projectRoot = tempRoot);
-					var result = runner.detectTestType();
-					expect(result).toBe("core");
+					expect(runner.detectTestType()).toBe("app");
 				});
 
 				it("returns app when vendor/wheels/tests does not exist", () => {

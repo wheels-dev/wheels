@@ -311,12 +311,13 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		// Auto-detect: if vendor/wheels/tests/ exists, default to core tests
-		if (!coreTests && len(variables.projectRoot)) {
-			if (directoryExists(variables.projectRoot & "/vendor/wheels/tests")) {
-				coreTests = true;
-			}
-		}
+		// Default to APP mode unless --core is set explicitly. The previous
+		// auto-detection ("if vendor/wheels/tests/ exists, default to core")
+		// always picked core mode for user apps because every Wheels app has
+		// the framework's tests vendored at vendor/wheels/tests/. That meant
+		// `wheels test` from a user's app pointed at framework specs instead
+		// of the user's own tests/specs/, producing "0 passed" silently with
+		// no spec discovery.
 
 		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode);
 	}

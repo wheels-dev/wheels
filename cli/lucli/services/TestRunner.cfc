@@ -121,12 +121,14 @@ component {
 	/**
 	 * Determine whether tests should run as core (framework) or app tests.
 	 *
-	 * @return "core" if vendor/wheels/tests/ exists, "app" otherwise
+	 * Always returns "app" — every Wheels app has the framework's tests
+	 * vendored at vendor/wheels/tests/, so that signal can't tell user apps
+	 * apart from the framework repo. Callers that explicitly want to run
+	 * framework specs should pass `--core` (CLI) or `type: "core"` (service).
+	 *
+	 * @return "app" — the safe default for user apps
 	 */
 	public string function detectTestType() {
-		if (directoryExists(variables.projectRoot & "/vendor/wheels/tests")) {
-			return "core";
-		}
 		return "app";
 	}
 
