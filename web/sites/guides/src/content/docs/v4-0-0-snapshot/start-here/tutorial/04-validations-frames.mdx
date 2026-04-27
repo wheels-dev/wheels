@@ -206,7 +206,7 @@ wheels reload
 
 Open `http://localhost:8080/posts/new` in your browser. Clear the Title field and click Save. The form reappears with "Title can't be empty" above the fields — the URL hasn't changed, the page didn't flash, and any text you typed in Body is still there. That's the Turbo Frame swap.
 
-Now put the title back, paste 200 characters into it, and submit again. You'll see "Title is too long (maximum is 120 characters)" — same inline replacement, no full reload.
+Now put the title back, paste 200 characters into it, and submit again. You'll see "Title is the wrong length" — same inline replacement, no full reload. (You can override the default message by passing `message="Title is too long (maximum is 120 characters)"` to `validatesLengthOf` if you want the constraint number in the error.)
 
 Fix both fields and save. Redirect to `/posts/:id`, same as before. The failure path and success path diverge only in what the controller renders; the rest is Turbo doing its job.
 
@@ -221,7 +221,7 @@ wheels --version
 Three things to verify in the browser:
 
 1. Submitting the form with an empty Title shows "Title can't be empty" inline. No page flash, URL unchanged.
-2. Submitting with a 200-character Title shows "Title is too long (maximum is 120 characters)" inline. Same behavior.
+2. Submitting with a 200-character Title shows "Title is the wrong length" inline. Same behavior.
 3. A valid submission redirects to `/posts/:id` and displays the new post.
 
 ## Troubleshooting
