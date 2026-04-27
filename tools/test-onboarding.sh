@@ -882,11 +882,17 @@ if phase 11 "wheels generate scaffold tolerates existing model (issue #2327)"; t
     "$WHEELS_CMD" generate scaffold Post title:string body:text status:enum --force \
         > "$SCAFFOLD_LOG" 2>&1 || true
 
-    if grep -qiE "Model already exists|Scaffold failed.*Model already" "$SCAFFOLD_LOG"; then
+    # Distinguish the bug shape from the fix shape:
+    #   - Bug: "Scaffold failed:" (the entire scaffold aborts)
+    #   - Fix: "Scaffold complete!" with the existing model skipped or
+    #     overwritten (with --force) and the controller/views written.
+    # Both can mention "Model already exists:" — the bug as the abort
+    # reason, the fix as part of the per-artifact "skip ..." annotation.
+    if grep -qE "Scaffold failed" "$SCAFFOLD_LOG"; then
         skip "wheels generate scaffold aborts when model exists — issue #2327 not fixed yet"
         head -8 "$SCAFFOLD_LOG" | sed 's/^/      | /'
-    elif grep -qiE "Scaffolded|Created.*controller|Generated.*controller|controller.*created" "$SCAFFOLD_LOG"; then
-        pass "wheels generate scaffold produced controller/views with existing model"
+    elif grep -qE "Scaffold complete" "$SCAFFOLD_LOG"; then
+        pass "wheels generate scaffold completed with existing model present"
     else
         skip "wheels generate scaffold output unrecognized — review $SCAFFOLD_LOG"
         head -10 "$SCAFFOLD_LOG" | sed 's/^/      | /'

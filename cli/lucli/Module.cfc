@@ -2166,7 +2166,7 @@ component extends="modules.BaseModule" {
 
 	private string function generateScaffold(required array args) {
 		if (!arrayLen(args)) {
-			out("Usage: wheels generate scaffold <Name> [properties...]", "yellow");
+			out("Usage: wheels generate scaffold <Name> [properties...] [--force]", "yellow");
 			out("  Example: wheels generate scaffold Post title body:text publishedAt:datetime");
 			return "";
 		}
@@ -2175,24 +2175,43 @@ component extends="modules.BaseModule" {
 		var controllerName = getService("helpers").pluralize(modelName);
 		var properties = args.len() > 1 ? args.slice(2) : [];
 
+		// Extract --force from args before parseGeneratorArgs (which doesn't
+		// handle flags). Issue #2327: previously --force was silently dropped,
+		// so scaffolding over an existing model was impossible from the CLI.
+		var force = false;
+		var filteredProperties = [];
+		for (var a in properties) {
+			if (a == "--force") {
+				force = true;
+			} else {
+				arrayAppend(filteredProperties, a);
+			}
+		}
+
 		out("Scaffolding #modelName#...", "cyan");
 		out("");
 
-		// Parse properties
-		var parsed = parseGeneratorArgs(properties);
+		var parsed = parseGeneratorArgs(filteredProperties);
 
 		var scaffold = getService("scaffold");
 		var results = scaffold.generateScaffold(
 			name = modelName,
 			properties = parsed.properties,
 			belongsTo = arrayToList(parsed.belongsTo),
-			hasMany = arrayToList(parsed.hasMany)
+			hasMany = arrayToList(parsed.hasMany),
+			force = force
 		);
 
 		if (results.success) {
 			for (var item in results.generated) {
 				var relPath = listLast(item.path, "/\");
 				printCreated("#item.type#: #relPath#");
+			}
+			// Issue #2327: scaffold can succeed with skipped artifacts. Surface
+			// what was skipped so users know why their existing model wasn't
+			// touched and how to force a rewrite if they wanted one.
+			for (var note in results.skipped ?: []) {
+				out("  skip    #note#", "yellow");
 			}
 
 			out("");

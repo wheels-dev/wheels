@@ -31,7 +31,7 @@ component {
 		boolean tests = true,
 		boolean force = false
 	) {
-		var results = {success: true, generated: [], errors: [], rollback: []};
+		var results = {success: true, generated: [], skipped: [], errors: [], rollback: []};
 		var pluralName = variables.helpers.pluralize(arguments.name);
 
 		try {
@@ -50,7 +50,9 @@ component {
 				}
 			}
 
-			// 1. Generate Model
+			// 1. Generate Model. Issue #2327: existing model is no longer fatal —
+			// scaffold skips and continues so users can scaffold the controller +
+			// views over a hand-edited model. Pass --force to overwrite.
 			var modelResult = variables.codeGenService.generateModel(
 				name = arguments.name,
 				properties = props,
@@ -61,16 +63,24 @@ component {
 			if (modelResult.success) {
 				arrayAppend(results.generated, {type: "model", path: modelResult.path});
 				arrayAppend(results.rollback, modelResult.path);
+			} else if (isExistsError(modelResult.error)) {
+				arrayAppend(results.skipped, "model: " & modelResult.error & " (use --force to overwrite)");
 			} else {
 				throw(type="ScaffoldError", message="Model: #modelResult.error#");
 			}
 
-			// 2. Generate Migration
-			var migrationPath = createMigrationWithProperties(arguments.name, props);
-			arrayAppend(results.generated, {type: "migration", path: migrationPath});
-			arrayAppend(results.rollback, migrationPath);
+			// 2. Generate Migration. Skip if a *_create_<plural>_table migration
+			// already exists — re-running scaffold over a hand-edited model
+			// shouldn't produce duplicate migrations.
+			if (!migrationAlreadyExists(arguments.name)) {
+				var migrationPath = createMigrationWithProperties(arguments.name, props);
+				arrayAppend(results.generated, {type: "migration", path: migrationPath});
+				arrayAppend(results.rollback, migrationPath);
+			} else {
+				arrayAppend(results.skipped, "migration: create_" & lCase(pluralName) & "_table already exists");
+			}
 
-			// 3. Generate Controller
+			// 3. Generate Controller — same skip-on-exists policy as model.
 			var controllerResult = variables.codeGenService.generateController(
 				name = pluralName,
 				crud = true,
@@ -82,6 +92,8 @@ component {
 			if (controllerResult.success) {
 				arrayAppend(results.generated, {type: "controller", path: controllerResult.path});
 				arrayAppend(results.rollback, controllerResult.path);
+			} else if (isExistsError(controllerResult.error)) {
+				arrayAppend(results.skipped, "controller: " & controllerResult.error & " (use --force to overwrite)");
 			} else {
 				throw(type="ScaffoldError", message="Controller: #controllerResult.error#");
 			}
@@ -131,6 +143,31 @@ component {
 		}
 
 		return results;
+	}
+
+	/**
+	 * Detect "already exists" errors from CodeGen so scaffolding can skip them
+	 * cleanly rather than treating them as fatal. The error message format is
+	 * stable: CodeGen emits "Model already exists: ..." / "Controller already
+	 * exists: ..." / "View already exists: ...".
+	 */
+	private boolean function isExistsError(string error = "") {
+		return reFindNoCase("\balready exists:", arguments.error) > 0;
+	}
+
+	/**
+	 * Check whether a migration that would create the resource's table is
+	 * already present. Match on the canonical filename suffix
+	 * `_create_<plural>_table.cfc` so timestamped duplicates are avoided
+	 * when a user re-runs scaffold over an existing model.
+	 */
+	private boolean function migrationAlreadyExists(required string name) {
+		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
+		if (!directoryExists(migrationDir)) return false;
+		var tableName = variables.helpers.pluralize(lCase(arguments.name));
+		var suffix = "_create_" & tableName & "_table.cfc";
+		var existing = directoryList(migrationDir, false, "name", "*" & suffix);
+		return arrayLen(existing) > 0;
 	}
 
 	/**
