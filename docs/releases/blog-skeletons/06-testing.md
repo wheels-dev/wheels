@@ -114,7 +114,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 One-time install, about 370MB for JARs plus Chromium:
 
 ```bash
-wheels browser:install
+wheels browser setup
 ```
 
 The DSL lands with roughly 60 methods across the shape you want for realistic specs: navigation (`visit`, `visitRoute`, `back`, `refresh`), interaction (`click`, `fill`, `type`, `select`, `check`, `attach`, `dragAndDrop`), keyboard (`press`, `pressEnter`, `pressTab`), waiting (`waitFor`, `waitForText`, `waitForUrl`), scoping (`within(selector, callback)`), cookies, authentication helpers (`loginAs`, `logout`), dialog handling, viewport resize for mobile/tablet/desktop shapes, screenshots, and a text-and-visibility-and-URL-and-form assertion set that covers the common ground. The shape shipped across #2113, #2115, #2116, #2121, and #2122.

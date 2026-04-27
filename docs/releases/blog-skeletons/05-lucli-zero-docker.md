@@ -106,7 +106,7 @@ The `wheels` command in 4.0 is itself a LuCLI module. The surface is broad:
 - `wheels dbmigrate latest | up | down | info | diff` handles migrations, including auto-diff for model-versus-schema drift.
 - `wheels seed` runs convention-based seeding from `app/db/seeds.cfm`.
 - `wheels jobs work | status | retry | purge | monitor` handles the background job queue.
-- `wheels browser:install` fetches the Playwright JARs and Chromium for the new browser testing DSL.
+- `wheels browser setup` fetches the Playwright JARs and Chromium for the new browser testing DSL.
 - `wheels server start | stop | status` wraps the LuCLI server lifecycle.
 - `wheels deploy` is the Kamal port — covered in [its own post](/posts/wheels-deploy-kamal-port/).
 

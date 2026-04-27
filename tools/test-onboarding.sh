@@ -912,29 +912,33 @@ fi
 # JARs or Chromium. Chapter 7's browser-spec walkthrough is unrunnable as a
 # result.
 
-if phase 12 "wheels browser install fetches Playwright (issue #2332)"; then
+if phase 12 "wheels browser setup fetches Playwright (issue #2332)"; then
     cd "$APP_DIR" || exit 1
 
-    BROWSER_LOG="$TMPDIR/wheels-browser-install.log"
-    # Don't actually wait for a 140MB Chromium download in the harness — just
-    # check whether the command appears to be doing the right thing in the
-    # first few seconds. A real install would mention 'Playwright', 'Chromium',
-    # or download a manifest within the first second.
-    "$WHEELS_CMD" browser install > "$BROWSER_LOG" 2>&1 &
+    BROWSER_LOG="$TMPDIR/wheels-browser-setup.log"
+    # `wheels browser install` was the original verb but LuCLI intercepts
+    # `install` as its built-in extension installer before module dispatch
+    # runs. The fix renamed the subcommand to `setup`. Test BOTH paths so
+    # this phase catches a regression to the broken verb name.
+    #
+    # Don't wait for a 140MB Chromium download in the harness — just check
+    # whether the command appears to be doing the right thing in the first
+    # few seconds. A real setup would mention 'Playwright', 'Chromium', or
+    # touch a manifest path within the first second.
+    "$WHEELS_CMD" browser setup > "$BROWSER_LOG" 2>&1 &
     BROWSER_PID=$!
     sleep 3
     kill "$BROWSER_PID" 2>/dev/null || true
     wait "$BROWSER_PID" 2>/dev/null || true
 
-    if grep -qiE "playwright|chromium|browser-manifest" "$BROWSER_LOG" || \
-       [ -f "$APP_DIR/browser-manifest.json" ] || \
+    if grep -qiE "playwright|chromium|browser-manifest|Install directory" "$BROWSER_LOG" || \
        ls "$APP_DIR/lib/"*playwright*.jar >/dev/null 2>&1; then
-        pass "wheels browser install references Playwright artifacts"
+        pass "wheels browser setup references Playwright artifacts"
     elif grep -qiE "No git or extension dependencies to install|Reading lucee\.json" "$BROWSER_LOG"; then
-        skip "wheels browser install runs generic dep resolver, no Playwright work — issue #2332 not fixed yet"
+        skip "wheels browser setup runs generic dep resolver, no Playwright work — issue #2332 not fixed yet"
         head -5 "$BROWSER_LOG" | sed 's/^/      | /'
     else
-        skip "wheels browser install output unrecognized — review $BROWSER_LOG"
+        skip "wheels browser setup output unrecognized — review $BROWSER_LOG"
         head -10 "$BROWSER_LOG" | sed 's/^/      | /'
     fi
 fi
