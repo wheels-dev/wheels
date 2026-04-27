@@ -3433,8 +3433,12 @@ component extends="modules.BaseModule" {
 			"openBrowser": opts.openBrowser ? "true" : "false"
 		};
 
-		// Copy template directory tree to target, processing placeholders
-		copyTemplateDir(templateDir, targetDir, appName, context);
+		// Copy template directory tree to target, processing placeholders.
+		// `rootTargetDir` is passed so recursive calls can compute paths
+		// relative to the project root, not the current recursion level —
+		// otherwise deeply-nested files print as e.g. `<app>/Model.cfc`
+		// instead of `<app>/app/models/Model.cfc`. See issue #2328.
+		copyTemplateDir(templateDir, targetDir, appName, context, targetDir);
 
 		// Copy the framework into vendor/wheels/ (source was resolved above).
 		copyFrameworkToVendor(wheelsSource, targetDir, appName);
@@ -3543,12 +3547,18 @@ component extends="modules.BaseModule" {
 		var nl = chr(10);
 		var tab = chr(9);
 
-		// Create db directory and empty SQLite files
+		// Create db directory and empty SQLite files. The template copy already
+		// emitted "create <app>/db/" if the template ships an empty db/ dir,
+		// so only log creation here when this function actually had to make
+		// the directory — avoids the duplicate "create" line. See issue #2328.
 		var dbDir = targetDir & "/db";
+		var dbDirAlreadyExisted = directoryExists(dbDir);
 		ensureDirectory(dbDir);
 		fileWrite(dbDir & "/development.sqlite", "");
 		fileWrite(dbDir & "/test.sqlite", "");
-		printCreated(appName & "/db/");
+		if (!dbDirAlreadyExisted) {
+			printCreated(appName & "/db/");
+		}
 		printCreated(appName & "/db/development.sqlite");
 		printCreated(appName & "/db/test.sqlite");
 
@@ -3726,9 +3736,18 @@ component extends="modules.BaseModule" {
 		required string sourceDir,
 		required string targetDir,
 		required string appName,
-		required struct context
+		required struct context,
+		string rootTargetDir = ""
 	) {
 		ensureDirectory(arguments.targetDir);
+
+		// `rootTargetDir` is the root of the new app on disk — it stays the
+		// same across recursion so `relativePath` is always app-relative,
+		// not relative to the current sub-directory. Without this, files
+		// emerged from deep recursion (e.g. `<app>/app/models/Model.cfc`)
+		// printed as just `<app>/Model.cfc` because the local `targetDir`
+		// stripped too much. See issue #2328.
+		var rootDir = len(arguments.rootTargetDir) ? arguments.rootTargetDir : arguments.targetDir;
 
 		var entries = directoryList(arguments.sourceDir, false, "query");
 
@@ -3741,13 +3760,14 @@ component extends="modules.BaseModule" {
 			else if (targetName == "_gitignore") targetName = ".gitignore";
 
 			var targetPath = arguments.targetDir & "/" & targetName;
-			var relativePath = arguments.appName & replace(targetPath, arguments.targetDir, "");
+			var relativePath = arguments.appName & replace(targetPath, rootDir, "");
 
 			if (entry.type == "Dir") {
 				ensureDirectory(targetPath);
 				printCreated(relativePath & "/");
-				// Recurse into subdirectory
-				copyTemplateDir(sourcePath, targetPath, arguments.appName, arguments.context);
+				// Recurse into subdirectory, carrying rootDir down so
+				// per-file relativePaths stay app-relative.
+				copyTemplateDir(sourcePath, targetPath, arguments.appName, arguments.context, rootDir);
 			} else {
 				// Skip .gitkeep files — they exist only to keep empty dirs in git
 				if (entry.name == ".gitkeep") {
