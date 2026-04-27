@@ -295,6 +295,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
+        id: gh-release-final
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.WHEELS_VERSION }}
@@ -328,6 +329,7 @@ jobs:
 
       - name: Create Snapshot Pre-Release
         if: github.ref != 'refs/heads/main'
+        id: gh-release-snapshot
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.WHEELS_VERSION }}
@@ -354,6 +356,58 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+
+      #############################################
+      # Dispatch downstream package managers
+      #
+      # Fires repository_dispatch on wheels-dev/homebrew-wheels and
+      # wheels-dev/chocolatey-wheels so their auto-update workflows pick
+      # up the new release within minutes instead of waiting up to 24h
+      # for their daily cron. Both repos have:
+      #   on:
+      #     repository_dispatch:
+      #       types: [wheels-released]
+      #
+      # Requires DOWNSTREAM_DISPATCH_TOKEN — a fine-grained PAT (or app
+      # token) with `metadata: read` + `actions: write` on the two
+      # downstream repos. If the secret is unset, this step warns and
+      # exits 0 so the release itself isn't blocked; cron will catch up.
+      #############################################
+      - name: Dispatch downstream package managers
+        if: steps.gh-release-final.outcome == 'success' || steps.gh-release-snapshot.outcome == 'success'
+        env:
+          GH_DISPATCH_TOKEN: ${{ secrets.DOWNSTREAM_DISPATCH_TOKEN }}
+          WHEELS_RELEASE_VERSION: ${{ env.WHEELS_VERSION }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_DISPATCH_TOKEN:-}" ]; then
+            echo "::warning::DOWNSTREAM_DISPATCH_TOKEN is not set on the repository — homebrew/chocolatey auto-update will fall back to the daily cron tick."
+            exit 0
+          fi
+
+          # Static event type, fixed repo list — no untrusted input flows
+          # into the curl arguments. WHEELS_RELEASE_VERSION is generated
+          # earlier in the same workflow from box.json + run number.
+          for repo in homebrew-wheels chocolatey-wheels; do
+            echo "Dispatching wheels-released to wheels-dev/${repo}..."
+            http_status=$(curl -sS -o /tmp/dispatch-resp.txt -w "%{http_code}" \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_DISPATCH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/wheels-dev/${repo}/dispatches" \
+              -d "{\"event_type\":\"wheels-released\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\"}}" )
+
+            # GitHub returns 204 No Content on success.
+            if [ "${http_status}" != "204" ]; then
+              echo "::warning::Dispatch to wheels-dev/${repo} returned HTTP ${http_status}: $(cat /tmp/dispatch-resp.txt)"
+            else
+              echo "  ✓ ${repo} dispatched"
+            fi
+          done
+
+          echo "Downstream package manager workflows dispatched (homebrew + chocolatey)."
 
   #############################################
   # Smoke-test the built module against a clean install.
