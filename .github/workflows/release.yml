@@ -14,6 +14,12 @@ on:
         required: true
       FORGEBOX_PASS:
         required: true
+      # Optional — when present, the build job's "Dispatch downstream package
+      # managers" step fires repository_dispatch on homebrew/chocolatey-wheels
+      # so their auto-update workflows pick up the new release in ~5min instead
+      # of waiting for the daily cron. When absent, the step warns and exits 0.
+      DOWNSTREAM_DISPATCH_TOKEN:
+        required: false
 
 env:
   WHEELS_PRERELEASE: false
