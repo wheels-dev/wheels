@@ -993,7 +993,7 @@ If you've held off adopting Wheels because the ORM felt thin compared to ActiveR
 ```
 Wheels 4.0's testing story got a major upgrade. Three pieces:
 
-• **Browser testing via Playwright Java** — `BrowserTest` base class, fluent DSL (visit, click, fill, assertSee, resize, screenshot, cookies, loginAs). Real Chromium under the hood. `wheels browser:install` to set up.
+• **Browser testing via Playwright Java** — `BrowserTest` base class, fluent DSL (visit, click, fill, assertSee, resize, screenshot, cookies, loginAs). Real Chromium under the hood. `wheels browser setup` to set up.
 • **HTTP test client** — `TestClient.visit("/users").assertOk().assertSee("John")`. Assertions for status, body, JSON (`assertJsonPath` with dot notation), redirects, headers, cookies across requests.
 • **Parallel test runner** — discovers bundles, partitions across N workers via round-robin, fires parallel HTTP requests, aggregates JSON results.
 
@@ -1009,7 +1009,7 @@ WheelsTest BDD is the only style for new tests. RocketUnit is legacy-only.
 ```
 The testing surface in Wheels 4.0 is one of the least-discussed but most-impactful changes in the release. Three headline additions, plus a whole inner-loop overhaul.
 
-Browser testing via Playwright Java — a new `BrowserTest` base class drives a real Chromium through a fluent DSL that looks like Laravel Dusk or Capybara if you've used those. Methods for navigation, interaction, keyboard, waiting, scoping, cookies, authentication, dialogs, viewport resize, arbitrary script evaluation, and a full assertion suite. `wheels browser:install` downloads the JARs plus Chromium. CI runs browser specs as part of the normal test suite.
+Browser testing via Playwright Java — a new `BrowserTest` base class drives a real Chromium through a fluent DSL that looks like Laravel Dusk or Capybara if you've used those. Methods for navigation, interaction, keyboard, waiting, scoping, cookies, authentication, dialogs, viewport resize, arbitrary script evaluation, and a full assertion suite. `wheels browser setup` downloads the JARs plus Chromium. CI runs browser specs as part of the normal test suite.
 
 HTTP test client — a new `TestClient` offers a fluent DSL for integration tests: `TestClient.visit("/users").assertOk().assertSee("John")`. Assertions for status codes, body content (`assertSee`, `assertDontSee`, `assertSeeInOrder`), JSON responses (`assertJson` and `assertJsonPath` with dot notation), redirects, headers, and cookies tracked across requests for session support.
 
@@ -1050,7 +1050,7 @@ WheelsTest BDD is the only style for new tests.
       .assertUrlContains("/dashboard")
       .assertSee("Welcome");
 
-`wheels browser:install` grabs JARs + Chromium (~370MB).
+`wheels browser setup` grabs JARs + Chromium (~370MB).
 ```
 
 **Reply 2:**
@@ -1109,7 +1109,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 
 DSL surface: navigation, interaction, keyboard, waiting, scoping (`within`), cookies, auth (`loginAs` / `logout`), dialogs, viewport (`resizeToMobile` / `resizeToTablet` / `resizeToDesktop`), arbitrary `script` evaluation, screenshots, and a full assertion suite (text, visibility, URL, title, query string, form values).
 
-Install: `wheels browser:install` (~370MB — Playwright JARs + Chromium). CI installs and runs browser specs automatically; specs gracefully skip when JARs are missing so local runs without Playwright stay green.
+Install: `wheels browser setup` (~370MB — Playwright JARs + Chromium). CI installs and runs browser specs automatically; specs gracefully skip when JARs are missing so local runs without Playwright stay green.
 
 ## 2. HTTP test client
 

@@ -104,7 +104,7 @@ This was the most embarrassing category in the pre-4.0 comparison tables. It is 
 
 **Parallel test runner** ([#2100](https://github.com/wheels-dev/wheels/pull/2100)) turns a serial 8-minute suite into a parallel 2-minute suite on a modern laptop, with worker-scoped database isolation handled automatically.
 
-**Browser testing via Playwright Java** ([#2113](https://github.com/wheels-dev/wheels/pull/2113) and its series, including [#2115](https://github.com/wheels-dev/wheels/pull/2115) and [#2116](https://github.com/wheels-dev/wheels/pull/2116)) lets you drive a real Chromium against your app from CFML. `this.browser.visit("/login").fill("email", "...").press("Log in").assertSee("Welcome")` runs end-to-end through a real browser. Playwright installs via `wheels browser:install` and caches through CI via a JAR manifest hash.
+**Browser testing via Playwright Java** ([#2113](https://github.com/wheels-dev/wheels/pull/2113) and its series, including [#2115](https://github.com/wheels-dev/wheels/pull/2115) and [#2116](https://github.com/wheels-dev/wheels/pull/2116)) lets you drive a real Chromium against your app from CFML. `this.browser.visit("/login").fill("email", "...").press("Log in").assertSee("Welcome")` runs end-to-end through a real browser. Playwright installs via `wheels browser setup` and caches through CI via a JAR manifest hash.
 
 The testing ecosystem around Wheels went from "what tests" to "full HTTP-plus-browser suite in one framework" in a single release.
 

@@ -932,7 +932,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 Install Playwright locally before first run (~370MB download: JARs + Chromium):
 
 ```bash
-wheels browser:install              # downloads JARs + Chromium
+wheels browser setup              # downloads JARs + Chromium
 ```
 
 Then run browser specs via the normal test suite:

@@ -1988,7 +1988,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Browser testing commands (install, test)
+	 * hint: Browser testing commands (setup, test)
 	 */
 	public string function browser() {
 		var args = getArgs(arguments);
@@ -1997,12 +1997,12 @@ component extends="modules.BaseModule" {
 			out("Usage: wheels browser <command>", "yellow");
 			out("");
 			out("Commands:", "bold");
-			out("  install  Download Playwright JARs and browser binaries");
+			out("  setup    Download Playwright JARs and browser binaries");
 			out("  test     Run browser test suite");
 			out("");
 			out("Examples:", "bold");
-			out("  wheels browser install");
-			out("  wheels browser install --force");
+			out("  wheels browser setup");
+			out("  wheels browser setup --force");
 			out("  wheels browser test");
 			out("  wheels browser test --verbose");
 			return "";
@@ -2011,13 +2011,26 @@ component extends="modules.BaseModule" {
 		var subcommand = lCase(args[1]);
 
 		switch (subcommand) {
-			case "install":
+			// `setup` is the canonical verb. `install` is accepted but warned —
+			// LuCLI intercepts `install` as its built-in extension installer
+			// before it reaches a module's dispatch, so users typing
+			// `wheels browser install` actually invoke the LuCLI built-in and
+			// see "Reading lucee.json... No git or extension dependencies to
+			// install" instead of the Playwright fetch. The case branch here
+			// only fires if the user reaches us via some other path (e.g. an
+			// argument vector that bypasses LuCLI's parsing). See issue #2332.
+			case "setup":
 				return browserInstall(args);
+			case "install":
+				out("'wheels browser install' is intercepted by LuCLI's built-in", "yellow");
+				out("extension installer and won't reach this module. Use:", "yellow");
+				out("  wheels browser setup", "bold");
+				return "";
 			case "test":
 				return browserTest(args);
 			default:
 				out("Unknown browser command: #subcommand#", "red");
-				out("Valid commands: install, test");
+				out("Valid commands: setup, test");
 				return "";
 		}
 	}
@@ -4373,7 +4386,7 @@ component extends="modules.BaseModule" {
 				out("SHA mismatch: #arrayToList(mismatchedJars, ', ')#", "yellow");
 			}
 			out("");
-			out("Run: wheels browser install");
+			out("Run: wheels browser setup");
 			return "";
 		}
 
