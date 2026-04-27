@@ -70,39 +70,63 @@ component {
 	}
 
 	/**
-	 * Destroy a model and its test, generate drop-table migration
+	 * Destroy a model and its test, generate drop-table migration.
+	 *
+	 * Uses the input name verbatim for the filename (mirroring how
+	 * `wheels generate model <Name>` writes it). Pluralisation only
+	 * applies to the table name in the drop-table migration, where
+	 * the case-preserving smart pluraliser produces the right output.
 	 */
 	public struct function destroyModel(required string name) {
 		var result = {success: true, deleted: [], warnings: [], migrationPath: ""};
-		var names = getNameVariants(arguments.name);
+		var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
+		var modelCap = variables.helpers.capitalize(clean);
 
 		deleteFileIfExists(
-			variables.projectRoot & "/app/models/" & names.singularCap & ".cfc",
+			variables.projectRoot & "/app/models/" & modelCap & ".cfc",
 			result
 		);
 		deleteFileIfExists(
-			variables.projectRoot & "/tests/specs/models/" & names.singularCap & "Spec.cfc",
+			variables.projectRoot & "/tests/specs/models/" & modelCap & "Spec.cfc",
 			result
 		);
 
-		result.migrationPath = generateRemoveTableMigration(names.plural);
+		// Table name is the lowercase plural of the model name.
+		result.migrationPath = generateRemoveTableMigration(lCase(variables.helpers.pluralize(clean)));
 
 		return result;
 	}
 
 	/**
-	 * Destroy a controller and its test
+	 * Destroy a controller, its views, and its test.
+	 *
+	 * Uses the input name verbatim (just capitalised for the filename), to
+	 * mirror how `wheels generate controller <Name>` writes the file. The
+	 * previous implementation pluralised + lowercased + recapitalised, so
+	 * `wheels destroy WidgetTest controller` looked for `Widgettests.cfc`
+	 * — which was never created. See issue #2330 and the related
+	 * name-mangling side-finding.
 	 */
 	public struct function destroyController(required string name) {
 		var result = {success: true, deleted: [], warnings: []};
-		var names = getNameVariants(arguments.name);
+		var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
+		var controllerCap = variables.helpers.capitalize(clean);
+		var viewsDir = lCase(controllerCap);
 
 		deleteFileIfExists(
-			variables.projectRoot & "/app/controllers/" & names.pluralCap & ".cfc",
+			variables.projectRoot & "/app/controllers/" & controllerCap & ".cfc",
+			result
+		);
+		// Views directory is generated alongside the controller; destroy
+		// removes it too. Issue #2330: previously views were left behind,
+		// making `wheels generate scaffold` over the same name fail with
+		// orphaned partial state.
+		deleteDirIfExists(
+			variables.projectRoot & "/app/views/" & viewsDir,
 			result
 		);
 		deleteFileIfExists(
-			variables.projectRoot & "/tests/specs/controllers/" & names.pluralCap & "Spec.cfc",
+			variables.projectRoot & "/tests/specs/controllers/" & controllerCap & "Spec.cfc",
 			result
 		);
 
@@ -167,8 +191,14 @@ component {
 				arrayAppend(preview, "Migration: drop table " & names.plural);
 				break;
 			case "controller":
-				arrayAppend(preview, "app/controllers/" & names.pluralCap & ".cfc");
-				arrayAppend(preview, "tests/specs/controllers/" & names.pluralCap & "Spec.cfc");
+				// Controller destroy uses the input verbatim (matching how
+				// `generate controller` writes the file), not the pluralised
+				// name. Views directory comes along too.
+				var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
+				var controllerCap = variables.helpers.capitalize(clean);
+				arrayAppend(preview, "app/controllers/" & controllerCap & ".cfc");
+				arrayAppend(preview, "app/views/" & lCase(controllerCap) & "/");
+				arrayAppend(preview, "tests/specs/controllers/" & controllerCap & "Spec.cfc");
 				break;
 			case "view":
 				if (find("/", arguments.name)) {
@@ -191,12 +221,18 @@ component {
 	// ── Private helpers ──────────────────────────────────────
 
 	private struct function getNameVariants(required string name) {
+		// Don't lowercase the input before singularize/pluralize. The helper's
+		// pluraliser detects PascalCase and operates on the trailing word only,
+		// preserving inner caps — so `pluralize("WidgetTest")` returns
+		// "WidgetTests", not "widgettests". Lowercasing first wrecks the
+		// inner caps (capitalize() only re-uppercases the first letter), which
+		// is the root of the destroy name-mangling bug related to #2330.
 		var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
-		var singular = variables.helpers.singularize(lCase(clean));
-		var plural = variables.helpers.pluralize(lCase(clean));
+		var singular = variables.helpers.singularize(clean);
+		var plural = variables.helpers.pluralize(clean);
 		return {
-			singular: singular,
-			plural: plural,
+			singular: lCase(singular),
+			plural: lCase(plural),
 			singularCap: variables.helpers.capitalize(singular),
 			pluralCap: variables.helpers.capitalize(plural)
 		};

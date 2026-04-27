@@ -50,21 +50,43 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			describe("destroyController()", () => {
 
-				it("deletes controller and test files", () => {
+				it("deletes controller, views directory, and test files (##2330)", () => {
 					var controllerPath = tempRoot & "/app/controllers/Deletemes.cfc";
+					var viewsDir = tempRoot & "/app/views/deletemes";
 					var testPath = tempRoot & "/tests/specs/controllers/DeletemesSpec.cfc";
 					directoryCreate(getDirectoryFromPath(controllerPath), true, true);
+					directoryCreate(viewsDir, true, true);
+					fileWrite(viewsDir & "/index.cfm", "<p>i</p>");
 					directoryCreate(getDirectoryFromPath(testPath), true, true);
 					fileWrite(controllerPath, 'component extends="Controller" {}');
 					fileWrite(testPath, 'component {}');
 
-					var result = destroy.destroyController("Deleteme");
+					// Input matches the controller filename verbatim — destroy
+					// no longer pluralises (which used to produce wrong target
+					// filenames for non-conventional names; see #2330).
+					var result = destroy.destroyController("Deletemes");
 					expect(fileExists(controllerPath)).toBeFalse();
+					expect(directoryExists(viewsDir)).toBeFalse();
 					expect(fileExists(testPath)).toBeFalse();
 				});
 
+				it("preserves PascalCase for non-conventional names (##2330 side-finding)", () => {
+					// The previous implementation pluralised + lowercased then
+					// recapitalised, mangling `WidgetTest` into `Widgettests`
+					// which never matched the actually-generated file.
+					var controllerPath = tempRoot & "/app/controllers/WidgetTest.cfc";
+					var viewsDir = tempRoot & "/app/views/widgettest";
+					directoryCreate(getDirectoryFromPath(controllerPath), true, true);
+					directoryCreate(viewsDir, true, true);
+					fileWrite(controllerPath, 'component extends="Controller" {}');
+
+					var result = destroy.destroyController("WidgetTest");
+					expect(fileExists(controllerPath)).toBeFalse();
+					expect(directoryExists(viewsDir)).toBeFalse();
+				});
+
 				it("does not generate a migration", () => {
-					var result = destroy.destroyController("Deleteme");
+					var result = destroy.destroyController("Deletemes");
 					expect(structKeyExists(result, "migrationPath")).toBeFalse();
 				});
 
@@ -157,9 +179,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayToList(preview)).toInclude("drop table");
 				});
 
-				it("returns expected items for controller type", () => {
-					var preview = destroy.previewDestroy("Product", "controller");
-					expect(arrayLen(preview)).toBe(2);
+				it("returns expected items for controller type (##2330)", () => {
+					// 3 items: controller .cfc, views/ directory, controller spec.
+					// Issue #2330 added the views directory to controller destroy.
+					var preview = destroy.previewDestroy("Products", "controller");
+					expect(arrayLen(preview)).toBe(3);
+					expect(arrayToList(preview)).toInclude("Products.cfc");
+					expect(arrayToList(preview)).toInclude("app/views/products/");
+					expect(arrayToList(preview)).toInclude("ProductsSpec.cfc");
 				});
 
 			});
