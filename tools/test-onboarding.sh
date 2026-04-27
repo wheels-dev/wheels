@@ -17,18 +17,24 @@
 #
 # Mapping to fresh-VM-run findings:
 #   Phase 2 — F1 (bundleName), F3 (duplicate Application.cfc), F4 (file tree)
-#   Phase 3 — Lucee Express boot
-#   Phase 4 — F2/F5 (the migration cliff) — also covers issue #2315 silent success
+#   Phase 3 — Lucee Express boot + DI.CircularDependency on first request (#2331)
+#   Phase 4 — migration cliff: schema verify + per-migration progress line (#2315)
 #   Phase 5 — F3-orig (cfscript wrapper for seedOnce)
-#   Phase 6 — F8 / chapters 2-6 CRUD
-#   Phase 7 — F7 (wheels packages list) — fixed in #2309, regression check
-#   Phase 8 — issue #2317 (wheels routes dumps API JSON)
-#   Phase 9 — issue #2318 (wheels test reports 0 passed silently)
-#   Phase 10 — issue #2319 (dev error pages return HTTP 200)
+#   Phase 6 — chapters 2-6 CRUD walkthrough
+#   Phase 7 — wheels packages list — PackagesMainCli (#2309) + SemVer follow-on
+#   Phase 8 — wheels routes dumps API JSON (#2317)
+#   Phase 9 — wheels test reports '0 passed' silently (#2318)
+#   Phase 10 — dev error pages return HTTP 200 (#2319)
+#   Phase 2 also covers — wheels new printed paths missing prefixes (#2328)
+#   Phase 11 — wheels generate scaffold aborts when model exists (#2327)
+#   Phase 12 — wheels browser install does nothing (#2332)
+#   Phase 13 — wheels destroy controller leaves views behind (#2330)
+#   Phase 14 — wheels generate model writes orphan blank lines (#2329)
+#   Phase 15 — dev toolbar shows 0.0.0-dev (#2333)
 #
-# Phases 8-10 are SKIP-clean while their issues are open and flip to PASS once
-# fixed. This keeps the harness green during normal development and lights up
-# regressions automatically.
+# Phases tracking known-open issues are SKIP-clean while their issues are open
+# and flip to PASS once fixed. This keeps the harness green during normal
+# development and lights up regressions automatically.
 
 set -uo pipefail
 
@@ -286,6 +292,23 @@ if phase 2 "wheels new $APP_NAME (covers F3 dup, F4 tree, F1 bundleName)"; then
         echo "$DUP_LINES" | sed 's/^/      DUP: /'
     fi
 
+    # Issue #2328: 'create' lines should reflect the real filesystem layout.
+    # Bug shape: subdirectories of app/ (migrator, mailers, models, controllers,
+    # views, lib, jobs, events, global, plugins) and key files (Model.cfc,
+    # Controller.cfc, Application.cfc) are printed at the project root rather
+    # than under their actual app/ or public/ parent. The output uses two
+    # spaces between 'create' and the path, so match [[:space:]]+ not a single
+    # literal space.
+    MISPLACED_RE="^[[:space:]]*create[[:space:]]+$APP_NAME/(migrator|migrations|mailers|plugins|models|controllers|views|lib|jobs|events|global)/?$|^[[:space:]]*create[[:space:]]+$APP_NAME/(Model|Controller|Application)\.cfc$"
+    MISPLACED_COUNT=$(grep -E "$MISPLACED_RE" "$NEW_LOG" 2>/dev/null | wc -l | tr -d ' ')
+
+    if [ "${MISPLACED_COUNT:-0}" -gt 0 ]; then
+        skip "wheels new prints ${MISPLACED_COUNT} misplaced create-line(s) (e.g. migrator/, mailers/, Model.cfc at app root) — issue #2328 not fixed yet"
+        grep -E "$MISPLACED_RE" "$NEW_LOG" | head -5 | sed 's/\x1b\[[0-9;]*m//g; s/^/      | /'
+    else
+        pass "wheels new prints paths under proper app/ public/ subdirectories"
+    fi
+
     # F4: tree shape
     [ -d "$APP_DIR" ]                       && pass "app directory created"          || fail "app directory missing"
     [ -d "$APP_DIR/app/controllers" ]       && pass "app/controllers/ exists"         || fail "app/controllers/ missing"
@@ -389,9 +412,23 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
     fi
 
     # Sanity: homepage should now load without a BundleException.
+    # Note: HTTP 200 alone is NOT proof of success — issue #2319 lets dev error
+    # pages render with HTTP 200, so we have to grep the body for known error
+    # markers too.
     http_get "/" BODY CODE
     if [ "$CODE" = "200" ]; then
-        pass "homepage returns 200"
+        if echo "$BODY" | grep -qiE "DI\.CircularDependency|Circular dependency detected"; then
+            # F1 / issue #2331: the very first request shows DI.CircularDependency
+            # with HTTP 200. The fresh-VM workaround is `wheels reload` then
+            # refresh; the harness shouldn't silently mask this if it reproduces.
+            skip "homepage returns 200 but body contains DI.CircularDependency — issue #2331 not fixed yet"
+            echo "$BODY" | grep -m1 -iE "Resolution chain|Circular dependency" | sed 's/^/      | /'
+        elif echo "$BODY" | grep -qiE "BundleException|sqlite-jdbc|sqlite\.JDBC"; then
+            fail "homepage returns 200 but body shows JDBC bundle error — sqlite-jdbc not loaded"
+            echo "$BODY" | grep -iE "BundleException|sqlite-jdbc|sqlite\.JDBC" | head -3 | sed 's/^/      /'
+        else
+            pass "homepage returns 200 with no known error markers"
+        fi
     else
         fail "homepage returns $CODE (expected 200) — sqlite-jdbc may not be loading"
         echo "$BODY" | grep -iE "BundleException|sqlite-jdbc|sqlite\.JDBC" | head -3 | sed 's/^/      /'
@@ -450,7 +487,18 @@ CFML
     # Run the migration.
     MIGRATE_LOG="$TMPDIR/wheels-migrate.log"
     if "$WHEELS_CMD" migrate latest > "$MIGRATE_LOG" 2>&1; then
-        pass "wheels migrate latest exited 0"
+        # Issue #2315: the CLI happily prints "Migration latest completed." even
+        # when the framework returned success:false (e.g. JDBC class not loaded).
+        # A real successful migration prints a per-migration progress line like
+        # "Migrating from 0 up to 20260427..." or "Created table posts". Treat
+        # exit-0-with-no-progress-line as the silent-success bug, not as success.
+        if grep -qE "Migrating (up|from|to)|Created table|Migrated|migration\.cfc" "$MIGRATE_LOG"; then
+            pass "wheels migrate latest exited 0 with per-migration progress"
+        else
+            skip "wheels migrate latest exited 0 but emitted no per-migration line — issue #2315 not fixed yet"
+            echo "      first 5 lines of output:"
+            head -5 "$MIGRATE_LOG" | sed 's/^/      | /'
+        fi
     else
         fail "wheels migrate latest exited non-zero"
         tail -20 "$MIGRATE_LOG" | sed 's/^/      /'
@@ -757,17 +805,23 @@ CFML
     TEST_LOG="$TMPDIR/wheels-test.log"
     "$WHEELS_CMD" test > "$TEST_LOG" 2>&1 || true
 
-    # The bug behavior is: output literally just "0 passed" with no other counts.
-    # Acceptable post-fix: any of "1 passed" / "1 collected" / a list of specs / a
-    # real error message that points at the spec. Anything but the bug case.
-    if grep -qE "^[[:space:]]*0 passed[[:space:]]*$" "$TEST_LOG" && \
-       ! grep -qE "passed|failed|skipped|errored|collected" "$TEST_LOG" | grep -v "^[[:space:]]*0 passed"; then
-        skip "wheels test still prints '0 passed' with no detail — issue #2318 not fixed yet"
-        head -5 "$TEST_LOG" | sed 's/^/      | /'
-    elif grep -qE "1 passed|1 spec|SmokeSpec" "$TEST_LOG"; then
+    # The bug per issue #2318: the runner reports "0 passed" with no other detail
+    # even when a discoverable spec exists. Discriminate three states:
+    #   1. Working — output includes a non-zero count or names the smoke spec.
+    #   2. Bug present — "0 passed" with no spec name, describe block, or error.
+    #   3. Unrecognized — neither pattern, probably a new failure mode.
+    # Order matters: most-specific working check first, then most-specific bug
+    # check, then a fallthrough for unrecognized output.
+    if grep -qE "(^|[^0-9])([1-9][0-9]*) passed" "$TEST_LOG" || \
+       grep -qE "SmokeSpec|Onboarding harness smoke" "$TEST_LOG"; then
         pass "wheels test reports the smoke spec"
+    elif grep -qE "0 passed" "$TEST_LOG" && \
+         ! grep -qiE "describe|spec[[:space:]]+|it[[:space:]]+\(|smoke" "$TEST_LOG"; then
+        skip "wheels test prints '0 passed' with no spec detail — issue #2318 not fixed yet"
+        head -5 "$TEST_LOG" | sed 's/^/      | /'
     elif grep -qE "passed|failed|errored|collected" "$TEST_LOG"; then
-        # Even a non-zero failure with detail is a vast improvement over "0 passed".
+        # Real runner output without a clear pass-count match (e.g. all-failed
+        # output, or a different reporter format) — better than the bug case.
         pass "wheels test produced runner detail (counts or status)"
     else
         skip "wheels test output unrecognized — review $TEST_LOG"
@@ -809,6 +863,191 @@ if phase 10 "dev error pages return 5xx/4xx not HTTP 200 (issue #2319)"; then
             skip "unexpected HTTP $STATUS for guaranteed-bad route"
             ;;
     esac
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 11: wheels generate scaffold over existing model (issue #2327)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-27 finding #3: tutorial chapter 2 has the user
+# generate a Post model, then chapter 3 asks for `wheels generate scaffold Post`
+# — but the scaffold command aborts with "Model already exists", even with
+# --force. Phase 6 has already written app/models/Post.cfc, so we can attempt
+# the scaffold here and check whether it tolerates the existing model.
+
+if phase 11 "wheels generate scaffold tolerates existing model (issue #2327)"; then
+    cd "$APP_DIR" || exit 1
+
+    SCAFFOLD_LOG="$TMPDIR/wheels-scaffold.log"
+    "$WHEELS_CMD" generate scaffold Post title:string body:text status:enum --force \
+        > "$SCAFFOLD_LOG" 2>&1 || true
+
+    if grep -qiE "Model already exists|Scaffold failed.*Model already" "$SCAFFOLD_LOG"; then
+        skip "wheels generate scaffold aborts when model exists — issue #2327 not fixed yet"
+        head -8 "$SCAFFOLD_LOG" | sed 's/^/      | /'
+    elif grep -qiE "Scaffolded|Created.*controller|Generated.*controller|controller.*created" "$SCAFFOLD_LOG"; then
+        pass "wheels generate scaffold produced controller/views with existing model"
+    else
+        skip "wheels generate scaffold output unrecognized — review $SCAFFOLD_LOG"
+        head -10 "$SCAFFOLD_LOG" | sed 's/^/      | /'
+    fi
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 12: wheels browser install fetches Playwright (issue #2332)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-27 finding #6: `wheels browser install` runs the
+# generic dependency resolver and exits 0 without downloading any Playwright
+# JARs or Chromium. Chapter 7's browser-spec walkthrough is unrunnable as a
+# result.
+
+if phase 12 "wheels browser install fetches Playwright (issue #2332)"; then
+    cd "$APP_DIR" || exit 1
+
+    BROWSER_LOG="$TMPDIR/wheels-browser-install.log"
+    # Don't actually wait for a 140MB Chromium download in the harness — just
+    # check whether the command appears to be doing the right thing in the
+    # first few seconds. A real install would mention 'Playwright', 'Chromium',
+    # or download a manifest within the first second.
+    "$WHEELS_CMD" browser install > "$BROWSER_LOG" 2>&1 &
+    BROWSER_PID=$!
+    sleep 3
+    kill "$BROWSER_PID" 2>/dev/null || true
+    wait "$BROWSER_PID" 2>/dev/null || true
+
+    if grep -qiE "playwright|chromium|browser-manifest" "$BROWSER_LOG" || \
+       [ -f "$APP_DIR/browser-manifest.json" ] || \
+       ls "$APP_DIR/lib/"*playwright*.jar >/dev/null 2>&1; then
+        pass "wheels browser install references Playwright artifacts"
+    elif grep -qiE "No git or extension dependencies to install|Reading lucee\.json" "$BROWSER_LOG"; then
+        skip "wheels browser install runs generic dep resolver, no Playwright work — issue #2332 not fixed yet"
+        head -5 "$BROWSER_LOG" | sed 's/^/      | /'
+    else
+        skip "wheels browser install output unrecognized — review $BROWSER_LOG"
+        head -10 "$BROWSER_LOG" | sed 's/^/      | /'
+    fi
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 13: wheels destroy controller removes views too (issue #2330)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-27 finding #9: `wheels destroy <Name> controller`
+# (a) silently does nothing without --force, and (b) with --force removes only
+# the .cfc but leaves the matching app/views/<plural>/ directory behind. The
+# tutorial says "Drop the hand-written controller and views" — the docs and
+# the CLI disagree.
+
+if phase 13 "wheels destroy controller removes both .cfc and views/ (issue #2330)"; then
+    cd "$APP_DIR" || exit 1
+
+    # Use a plural, conventional name. Non-conventional singular names (e.g.
+    # 'WidgetTest') trigger a separate name-mangling bug where destroy looks
+    # for 'Widgettests.cfc' and emits "Not found" — that's its own bug, but
+    # not the one we're isolating here. Stick to convention to test the
+    # views-not-removed claim cleanly.
+    "$WHEELS_CMD" generate controller Widgets index > /dev/null 2>&1 || true
+
+    if [ ! -f "$APP_DIR/app/controllers/Widgets.cfc" ]; then
+        skip "could not generate Widgets controller — skipping destroy check"
+    else
+        DESTROY_LOG="$TMPDIR/wheels-destroy.log"
+        "$WHEELS_CMD" destroy Widgets controller --force > "$DESTROY_LOG" 2>&1 || true
+
+        CONTROLLER_REMOVED="false"
+        [ ! -f "$APP_DIR/app/controllers/Widgets.cfc" ] && CONTROLLER_REMOVED="true"
+
+        VIEWS_REMOVED="true"
+        [ -d "$APP_DIR/app/views/widgets" ] && VIEWS_REMOVED="false"
+
+        if [ "$CONTROLLER_REMOVED" = "true" ] && [ "$VIEWS_REMOVED" = "true" ]; then
+            pass "wheels destroy controller removed both .cfc and views/"
+        elif [ "$CONTROLLER_REMOVED" = "true" ] && [ "$VIEWS_REMOVED" = "false" ]; then
+            skip "wheels destroy controller removed .cfc but left views/ behind — issue #2330 not fixed yet"
+            ls "$APP_DIR/app/views/widgets" 2>/dev/null | head -3 | sed 's/^/      | views\/widgets\//'
+        elif grep -qiE "Not found|skip[[:space:]]+Not found" "$DESTROY_LOG"; then
+            skip "wheels destroy reported 'Not found' on the file it just created — name-mangling bug related to #2330"
+            head -8 "$DESTROY_LOG" | sed 's/^/      | /'
+        else
+            skip "wheels destroy behavior unclear (controller_removed=$CONTROLLER_REMOVED views_removed=$VIEWS_REMOVED)"
+            head -8 "$DESTROY_LOG" | sed 's/^/      | /'
+        fi
+
+        # Belt-and-suspenders cleanup so re-runs don't accumulate stale dirs.
+        rm -rf "$APP_DIR/app/views/widgets" 2>/dev/null
+        rm -f "$APP_DIR/app/controllers/Widgets.cfc" 2>/dev/null
+        rm -f "$APP_DIR/tests/specs/controllers/WidgetsSpec.cfc" 2>/dev/null
+    fi
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 14: wheels generate model template formatting (issue #2329)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-27 finding #10: `wheels generate model` produces
+# a CFC with multiple consecutive blank lines and over-indented validation
+# lines inside config() — template-fill leftovers. The double-blank-line
+# pattern is the strongest detection signal.
+
+if phase 14 "wheels generate model produces clean output (issue #2329)"; then
+    cd "$APP_DIR" || exit 1
+
+    # The generator validates names and rejects anything ending in 'Test',
+    # 'Controller', or 'Service' — so 'FormatTest' would error out. 'FmtSample'
+    # is short, safe, and unlikely to clash with anything.
+    "$WHEELS_CMD" generate model FmtSample name:string > /dev/null 2>&1 || true
+    GEN_FILE="$APP_DIR/app/models/FmtSample.cfc"
+
+    if [ ! -f "$GEN_FILE" ]; then
+        skip "could not generate FmtSample model — skipping format check"
+    else
+        # Two or more consecutive blank lines = template-fill leftover.
+        # awk counts consecutive blanks; exit 0 if any run reached 2+.
+        if awk '/^[[:space:]]*$/{c++; if(c>=2){f=1}} !/^[[:space:]]*$/{c=0} END{exit !f+0}' "$GEN_FILE"; then
+            skip "wheels generate model output has 2+ consecutive blank lines — issue #2329 not fixed yet"
+            sed -n '1,15p' "$GEN_FILE" | sed 's/^/      | /'
+        else
+            pass "wheels generate model output has no orphan blank-line runs"
+        fi
+
+        # Clean up the model AND the matching migration file (model generate
+        # creates both); leaving the migration causes downstream phases to
+        # see an unrun migration in the migrations/ directory.
+        rm -f "$GEN_FILE"
+        rm -f "$APP_DIR/app/migrator/migrations/"*"_create_fmtsamples_table.cfc" 2>/dev/null
+    fi
+fi
+
+# ══════════════════════════════════════════════════
+#  Phase 15: dev toolbar shows real version not 0.0.0-dev (issue #2333)
+# ══════════════════════════════════════════════════
+#
+# Surfaced by fresh-VM 2026-04-27 finding #15: the dev toolbar reads "Wheels
+# Version 0.0.0-dev" regardless of which version is actually installed. The
+# CLI's `wheels --version` correctly reports the real version, so the data is
+# available — the toolbar is reading from the wrong source.
+
+if phase 15 "dev toolbar shows real version (issue #2333)"; then
+    # Earlier phases' generate/destroy probes can leave the framework in a
+    # half-reloaded state — reload first so the homepage is rendered fresh
+    # rather than from a stale-cache state.
+    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
+    sleep 2
+
+    http_get "/" BODY CODE
+    if [ "$CODE" != "200" ]; then
+        skip "homepage returned $CODE (expected 200) — cannot check toolbar version"
+    elif echo "$BODY" | grep -qiE "0\.0\.0-dev"; then
+        skip "dev toolbar still shows 0.0.0-dev — issue #2333 not fixed yet"
+        echo "$BODY" | grep -oiE "Wheels Version[^<]{0,40}" | head -1 | sed 's/^/      | /'
+    elif echo "$BODY" | grep -qiE "Wheels Version"; then
+        pass "dev toolbar shows a non-placeholder version"
+        echo "$BODY" | grep -oiE "Wheels Version[^<]{0,40}" | head -1 | sed 's/^/      | /'
+    else
+        skip "no 'Wheels Version' marker in homepage body — toolbar layout may have changed"
+    fi
 fi
 
 # ══════════════════════════════════════════════════
