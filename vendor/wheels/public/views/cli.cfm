@@ -417,14 +417,14 @@ try {
 				break;
 				
 			case "routes":
-				// Return application routes
+				// Return application routes. Routes live at application.wheels.routes
+				// (the convention every other case in this file uses); the previous
+				// `application[application.wheels.appKey]` indirection was broken
+				// because `appKey` is a function, not a property.
 				data.success = true;
 				data.routes = [];
-				
-				// Get routes from application
-				local.appKey = application.wheels.appKey;
-				if (structKeyExists(application, local.appKey) && structKeyExists(application[local.appKey], "routes")) {
-					for (local.route in application[local.appKey].routes) {
+				if (structKeyExists(application, "wheels") && structKeyExists(application.wheels, "routes")) {
+					for (local.route in application.wheels.routes) {
 						local.routeInfo = {
 							name = structKeyExists(local.route, "name") ? local.route.name : "",
 							pattern = structKeyExists(local.route, "pattern") ? local.route.pattern : "",
