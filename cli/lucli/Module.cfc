@@ -505,10 +505,68 @@ component extends="modules.BaseModule" {
 		var serverPort = $requireRunningServer();
 
 		try {
-			var routesUrl = "http://localhost:#serverPort#/wheels/ai?context=routing";
+			// /wheels/cli?command=routes returns the actual application route
+			// table as JSON. (The previous endpoint, /wheels/ai?context=routing,
+			// returns AI-documentation about routing patterns — not what users
+			// asking "what routes does my app have?" expect to see.)
+			var routesUrl = "http://localhost:#serverPort#/wheels/cli?command=routes&format=json";
 			var httpResult = makeHttpRequest(routesUrl);
 
-			out(httpResult);
+			var result = "";
+			try {
+				result = deserializeJSON(httpResult);
+			} catch (any jsonErr) {
+				out("Failed to parse routes response", "red");
+				verbose(httpResult);
+				return "";
+			}
+
+			if (!structKeyExists(result, "success") || !result.success) {
+				out("Failed to fetch routes: #result.message ?: 'unknown error'#", "red");
+				return "";
+			}
+
+			if (!structKeyExists(result, "routes") || !arrayLen(result.routes)) {
+				out("No routes configured.", "yellow");
+				return "";
+			}
+
+			// Normalise patterns so the leading "/" is shown exactly once. The
+			// framework stores routes with the leading slash already present,
+			// but defensively handle the case where it isn't.
+			var formatPattern = function(p) {
+				p = p ?: "";
+				return left(p, 1) == "/" ? p : "/" & p;
+			};
+
+			// Compute column widths from the data so the table aligns cleanly.
+			var maxMethod  = len("METHOD");
+			var maxPattern = len("PATTERN");
+			var maxAction  = len("CONTROLLER##ACTION");
+			for (var route in result.routes) {
+				var methodWidth  = len(uCase(route.methods ?: ""));
+				var patternWidth = len(formatPattern(route.pattern));
+				var actionWidth  = len((route.controller ?: "") & "##" & (route.action ?: ""));
+				if (methodWidth  > maxMethod)  maxMethod  = methodWidth;
+				if (patternWidth > maxPattern) maxPattern = patternWidth;
+				if (actionWidth  > maxAction)  maxAction  = actionWidth;
+			}
+
+			out(lJustify("METHOD", maxMethod) & "  " & lJustify("PATTERN", maxPattern) & "  " & "CONTROLLER##ACTION", "bold");
+			out(repeatString("-", maxMethod + maxPattern + maxAction + 4));
+
+			for (var route in result.routes) {
+				var line = lJustify(uCase(route.methods ?: ""), maxMethod)
+					& "  " & lJustify(formatPattern(route.pattern), maxPattern)
+					& "  " & (route.controller ?: "") & "##" & (route.action ?: "");
+				if (structKeyExists(route, "name") && len(route.name)) {
+					line &= "  (" & route.name & ")";
+				}
+				out(line);
+			}
+
+			out("");
+			out("#arrayLen(result.routes)# route(s)", "cyan");
 		} catch (any e) {
 			out("Failed to fetch routes: #e.message#", "red");
 		}
