@@ -153,6 +153,39 @@ component extends="wheels.WheelsTest" {
 					}).toThrow("Wheels.DI.CircularDependency");
 				});
 
+				it("resolving stack is request-scoped, not application-scoped (##2331)", () => {
+					// Regression: previously the resolving guard lived on the
+					// Injector instance (application scope), so concurrent
+					// requests could trip each other's guard with a spurious
+					// self-loop ("X -> X" in the chain). Verify the resolving
+					// struct is now stored on the request scope.
+					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
+					di.getInstance("simpleService");
+					// After a successful resolve, the request scope key should
+					// exist (created lazily on first getInstance) — and the
+					// instance should NOT be tracked on the Injector itself.
+					expect(structKeyExists(request, "$wheelsDIResolving")).toBeTrue();
+					// The resolved name should have been cleaned up from the
+					// stack on success, leaving an empty struct.
+					expect(structKeyExists(request.$wheelsDIResolving, "simpleService")).toBeFalse();
+				});
+
+				it("resolving stack recovers cleanly after a circular-dep error (##2331)", () => {
+					// Throwing the CircularDependency error must still pop the
+					// outer entry from the resolving stack (via the finally
+					// block) so subsequent getInstance calls in the same
+					// request can resolve the same name without false alarms.
+					di.map("circularServiceA").to("wheels.tests._assets.di.CircularServiceA");
+					di.map("circularServiceB").to("wheels.tests._assets.di.CircularServiceB");
+					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
+					try { di.getInstance("circularServiceA"); } catch (any e) {}
+					// After the error, the stack should be empty (cleanup ran)
+					// and an unrelated resolve should still work.
+					expect(structKeyExists(request.$wheelsDIResolving, "circularServiceA")).toBeFalse();
+					var svc = di.getInstance("simpleService");
+					expect(svc).notToBeNull();
+				});
+
 			});
 
 			// ===========================================================
