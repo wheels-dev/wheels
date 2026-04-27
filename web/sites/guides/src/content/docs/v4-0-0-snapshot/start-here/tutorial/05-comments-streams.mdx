@@ -346,7 +346,11 @@ Three things to verify in the browser:
 
 1. `/posts/1` renders the post, an empty `<section id="comments">`, and the comment form below it.
 2. Filling in the comment form and clicking "Post comment" causes a new comment `<article>` to appear inside the comments section. The URL doesn't change, the rest of the page doesn't flicker, and the form inputs clear.
-3. Clicking Delete on the post removes both the post and its comments — no stale `comments.postId` rows left behind.
+3. Clicking Delete on the post removes both the post and its comments — no stale `comments.postId` rows visible to your controller's `findAll()` queries.
+
+<Aside type="note" title="Soft-delete is on by default">
+`wheels generate model/scaffold` writes a `deletedAt` column on every table, so `post.delete()` actually stamps `deletedAt = now()` instead of issuing a `DELETE FROM`. The cascade does the same to `comments`. Wheels finders (`model("Post").findAll()`, `model("Comment").findAll()`) hide soft-deleted rows automatically — that's why item 3 above feels like a hard delete from the app's perspective. If you connect to the SQLite file with `sqlite3 db/development.sqlite` and run `SELECT * FROM posts`, you'll see the row is still there with `deletedAt` set. To include soft-deleted records in finder results, pass `includeSoftDeletes=true` (e.g. `findAll(includeSoftDeletes=true)`); to actually remove a row from the table, call `post.delete(softDelete=false)`.
+</Aside>
 
 ## Troubleshooting
 
