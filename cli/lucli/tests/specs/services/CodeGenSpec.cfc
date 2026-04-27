@@ -97,6 +97,64 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).notToInclude("validatesFormatOf");
 				});
 
+				it("produces no orphan whitespace-only lines (##2329)", () => {
+					codegen.generateModel(
+						name = "Layout",
+						properties = [{name: "title", type: "string"}],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/Layout.cfc");
+					var lines = listToArray(content, chr(10), true);
+					var whitespaceOnly = [];
+					for (var i = 1; i <= arrayLen(lines); i++) {
+						if (reFind("^[[:space:]]+$", lines[i])) {
+							arrayAppend(whitespaceOnly, "line " & i & ": '" & lines[i] & "'");
+						}
+					}
+					expect(arrayLen(whitespaceOnly)).toBe(0);
+				});
+
+				it("produces no consecutive blank-line runs (##2329)", () => {
+					codegen.generateModel(
+						name = "Spacer",
+						properties = [{name: "name", type: "string"}],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/Spacer.cfc");
+					// 3+ consecutive newlines = 2+ consecutive blank lines
+					expect(content).notToInclude(chr(10) & chr(10) & chr(10));
+				});
+
+				it("indents validations at 2 tabs, not 4 (##2329)", () => {
+					codegen.generateModel(
+						name = "Indent",
+						properties = [{name: "title", type: "string"}],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/Indent.cfc");
+					// 2-tab indent is correct
+					expect(content).toInclude(chr(9) & chr(9) & "validatesPresenceOf");
+					// 4-tab indent is the bug shape — must not be present
+					expect(content).notToInclude(chr(9) & chr(9) & chr(9) & chr(9) & "validatesPresenceOf");
+				});
+
+				it("indents multi-line validations consistently at 2 tabs (##2329)", () => {
+					codegen.generateModel(
+						name = "MultiVal",
+						properties = [
+							{name: "name", type: "string"},
+							{name: "email", type: "email"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/MultiVal.cfc");
+					// Both lines must be at the same 2-tab indent
+					expect(content).toInclude(chr(9) & chr(9) & "validatesPresenceOf");
+					expect(content).toInclude(chr(9) & chr(9) & "validatesFormatOf");
+					// And neither line should be at column 0 (subsequent-line bug)
+					expect(content).notToInclude(chr(10) & "validatesFormatOf");
+				});
+
 			});
 
 			describe("generateController()", () => {

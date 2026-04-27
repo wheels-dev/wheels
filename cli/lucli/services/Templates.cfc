@@ -164,7 +164,35 @@ component {
 			processed = replace(processed, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
 		}
 
+		// Final cleanup: remove orphan whitespace-only lines left behind by
+		// empty placeholders (e.g. `\t\t{{hasManyRelationships}}` when no
+		// hasMany relationships exist), and collapse runs of consecutive blank
+		// lines to a single blank line. Without this, generated files end up
+		// with 4+ blank lines inside config() — see issue #2329.
+		processed = collapseEmptyLines(processed);
+
 		return processed;
+	}
+
+	/**
+	 * Normalise whitespace-only lines to genuinely empty, then collapse runs
+	 * of 2+ consecutive empty lines down to one. Used after placeholder
+	 * substitution to clean up template-fill leftovers.
+	 */
+	private string function collapseEmptyLines(required string content) {
+		var lines = listToArray(arguments.content, chr(10), true);
+		var cleaned = [];
+		var prevWasEmpty = false;
+
+		for (var line in lines) {
+			var normalised = reFind("^[[:space:]]+$", line) ? "" : line;
+			var isEmpty = (normalised == "");
+			if (isEmpty && prevWasEmpty) continue;
+			cleaned.append(normalised);
+			prevWasEmpty = isEmpty;
+		}
+
+		return arrayToList(cleaned, chr(10));
 	}
 
 	// ── Private helpers ──────────────────────────────
@@ -275,9 +303,12 @@ component {
 	private string function generateRelationshipCode(required string type, required string names) {
 		var code = [];
 		for (var rel in listToArray(arguments.names)) {
-			arrayAppend(code, "		#arguments.type#('#trim(rel)#');");
+			arrayAppend(code, "#arguments.type#('#trim(rel)#');");
 		}
-		return arrayToList(code, chr(10));
+		// Join with newline + 2 tabs so subsequent lines align with the template's
+		// `\t\t{{...Relationships}}` placeholder indent. The first line gets its
+		// indent from the placeholder's leading whitespace at fill time.
+		return arrayToList(code, chr(10) & chr(9) & chr(9));
 	}
 
 	/**

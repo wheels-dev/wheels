@@ -77,15 +77,18 @@ component {
 			arrayAppend(presenceProps, prop.name);
 			var propType = structKeyExists(prop, "type") ? lCase(prop.type) : "string";
 			if (propType == "email") {
-				arrayAppend(formatLines, "		validatesFormatOf(property=""#prop.name#"", type=""email"");");
+				arrayAppend(formatLines, "validatesFormatOf(property=""#prop.name#"", type=""email"");");
 			} else if (propType == "url") {
-				arrayAppend(formatLines, "		validatesFormatOf(property=""#prop.name#"", type=""URL"");");
+				arrayAppend(formatLines, "validatesFormatOf(property=""#prop.name#"", type=""URL"");");
 			}
 		}
 
-		var lines = ["		validatesPresenceOf(""#arrayToList(presenceProps)#"");"];
+		var lines = ["validatesPresenceOf(""#arrayToList(presenceProps)#"");"];
 		lines.append(formatLines, true);
-		return arrayToList(lines, chr(10));
+		// Join with newline + 2 tabs so subsequent lines align with the template's
+		// `\t\t{{validations}}` placeholder indent. The first line gets its indent
+		// from the placeholder's leading whitespace at fill time.
+		return arrayToList(lines, chr(10) & chr(9) & chr(9));
 	}
 
 	/**
