@@ -2510,12 +2510,9 @@ component extends="modules.BaseModule" {
 		try {
 			var introspectUrl = "http://localhost:#serverPort#/wheels/cli?command=introspect&model=#modelName#&format=json";
 			var response = makeHttpRequest(introspectUrl);
-			var modelData = deserializeJSON(response);
-
-			if (!modelData.success) {
-				out("Error: #modelData.message#", "red");
-				return "";
-			}
+			// parseCliResponse surfaces framework errors via thrown exceptions —
+			// issue #2315.
+			var modelData = parseCliResponse(response, "Model introspection");
 		} catch (any e) {
 			out("Error introspecting model: #e.message#", "red");
 			return "";
@@ -2816,32 +2813,35 @@ component extends="modules.BaseModule" {
 
 		out("Running migration: #action#...", "cyan");
 
+		var command = "";
+		switch (action) {
+			case "latest": command = "migrateToLatest"; break;
+			case "up":     command = "migrateUp"; break;
+			case "down":   command = "migrateDown"; break;
+			case "info":   command = "info"; break;
+		}
+
+		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
+
+		var httpResult = "";
 		try {
-			var command = "";
-			switch (action) {
-				case "latest": command = "migrateToLatest"; break;
-				case "up":     command = "migrateUp"; break;
-				case "down":   command = "migrateDown"; break;
-				case "info":   command = "info"; break;
-			}
+			httpResult = makeHttpRequest(migrateUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "MigrationError",
+				message = "Migration #action# failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
 
-			var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
+		// parseCliResponse throws Wheels.Cli.CommandFailed on success:false —
+		// the previous code silently treated it as success. See issue #2315.
+		var result = parseCliResponse(httpResult, "Migration #action#");
 
-			var httpResult = makeHttpRequest(migrateUrl);
-
-			try {
-				var result = deserializeJSON(httpResult);
-				if (structKeyExists(result, "message") && len(result.message)) {
-					out(result.message, "green");
-				} else {
-					out("Migration #action# completed.", "green");
-				}
-			} catch (any jsonErr) {
-				out("Migration #action# completed.", "green");
-				verbose(httpResult);
-			}
-		} catch (any e) {
-			throw(type="MigrationError", message=e.message, detail=e.detail ?: "");
+		if (structKeyExists(result, "message") && len(result.message)) {
+			out(result.message, "green");
+		} else {
+			out("Migration #action# completed.", "green");
 		}
 
 		return "";
@@ -2857,31 +2857,31 @@ component extends="modules.BaseModule" {
 
 		out("Running database seeds...", "cyan");
 
+		var seedUrl = "http://localhost:#serverPort#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
+		if (len(environment)) {
+			seedUrl &= "&environment=#environment#";
+		}
+
+		var httpResult = "";
 		try {
-			var seedUrl = "http://localhost:#serverPort#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
-			if (len(environment)) {
-				seedUrl &= "&environment=#environment#";
-			}
+			httpResult = makeHttpRequest(seedUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "SeedError",
+				message = "Seeding failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
 
-			var httpResult = makeHttpRequest(seedUrl);
+		// parseCliResponse throws Wheels.Cli.CommandFailed on success:false.
+		// Previously the result.message check used `result.message` but the
+		// framework's outer catch sets `messages` (plural) — see issue #2315.
+		var result = parseCliResponse(httpResult, "Seeding");
 
-			try {
-				var result = deserializeJSON(httpResult);
-				if (structKeyExists(result, "success") && result.success) {
-					if (structKeyExists(result, "totalCreated")) {
-						out("Seeded: #result.totalCreated# created, #result.totalSkipped# skipped", "green");
-					} else {
-						out("Seeding completed.", "green");
-					}
-				} else {
-					out("Seeding failed: #result.message ?: 'unknown error'#", "red");
-				}
-			} catch (any jsonErr) {
-				out("Seeding completed.", "green");
-				verbose(httpResult);
-			}
-		} catch (any e) {
-			out("Seeding failed: #e.message#", "red");
+		if (structKeyExists(result, "totalCreated")) {
+			out("Seeded: #result.totalCreated# created, #result.totalSkipped# skipped", "green");
+		} else {
+			out("Seeding completed.", "green");
 		}
 
 		return "";
@@ -2940,12 +2940,10 @@ component extends="modules.BaseModule" {
 		try {
 			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
 			var response = makeHttpRequest(statusUrl);
-			var data = deserializeJSON(response);
-
-			if (!data.success) {
-				out("Error: #data.message#", "red");
-				return "";
-			}
+			// Use parseCliResponse so a framework success:false surfaces with
+			// the canonical `messages` payload instead of leaving the user
+			// guessing why the status command "failed". See issue #2315.
+			var data = parseCliResponse(response, "Database status");
 
 			out("Migration Status", "bold");
 			out(repeatString("=", 70));
@@ -2986,7 +2984,8 @@ component extends="modules.BaseModule" {
 		try {
 			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
 			var response = makeHttpRequest(versionUrl);
-			var data = deserializeJSON(response);
+			// Use parseCliResponse so framework errors surface — issue #2315.
+			var data = parseCliResponse(response, "Database version");
 
 			out("Database version: #data.version#", "bold");
 
@@ -2994,9 +2993,9 @@ component extends="modules.BaseModule" {
 				// Also fetch status for extra detail
 				var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
 				var statusResponse = makeHttpRequest(statusUrl);
-				var statusData = deserializeJSON(statusResponse);
+				var statusData = parseCliResponse(statusResponse, "Database status");
 
-				if (statusData.success && arrayLen(statusData.migrations)) {
+				if (arrayLen(statusData.migrations)) {
 					// Find last applied migration
 					var lastApplied = "";
 					for (var m in statusData.migrations) {
@@ -3964,6 +3963,64 @@ component extends="modules.BaseModule" {
 	/**
 	 * Make an HTTP GET request and return the response body
 	 */
+	/**
+	 * Parse a /wheels/cli? JSON response and surface framework errors.
+	 *
+	 * The framework's `vendor/wheels/public/views/cli.cfm` endpoint returns
+	 * HTTP 200 even when a command fails internally — it sets `success: false`
+	 * with the error in `messages` (or `message`). Without surfacing those,
+	 * the CLI silently reports "completed" while the underlying op crashed
+	 * (e.g. JDBC class not loaded). See issue #2315.
+	 *
+	 * Behaviour:
+	 *   - Returns the parsed struct on `success: true` (or no `success` key).
+	 *   - Throws `Wheels.Cli.CommandFailed` with the framework's message
+	 *     payload when `success: false`.
+	 *   - Throws `Wheels.Cli.UnparseableResponse` when the body isn't JSON
+	 *     (typically an HTML error page from a server-side exception).
+	 */
+	private struct function parseCliResponse(required string httpResult, required string operationLabel) {
+		var result = "";
+		try {
+			result = deserializeJSON(arguments.httpResult);
+		} catch (any jsonErr) {
+			var detail = reFindNoCase("<html", arguments.httpResult)
+				? "Server returned an HTML error page (first 500 chars): " & left(arguments.httpResult, 500)
+				: "Raw response (first 500 chars): " & left(arguments.httpResult, 500);
+			throw(
+				type    = "Wheels.Cli.UnparseableResponse",
+				message = "#arguments.operationLabel# returned an unparseable response.",
+				detail  = detail
+			);
+		}
+
+		if (!isStruct(result)) {
+			throw(
+				type    = "Wheels.Cli.UnparseableResponse",
+				message = "#arguments.operationLabel# returned a non-object response.",
+				detail  = "Got: " & serializeJSON(result)
+			);
+		}
+
+		if (structKeyExists(result, "success") && !result.success) {
+			var errMsg = "";
+			if (structKeyExists(result, "messages") && len(result.messages)) {
+				errMsg = result.messages;
+			} else if (structKeyExists(result, "message") && len(result.message)) {
+				errMsg = result.message;
+			} else {
+				errMsg = "framework returned success:false with no message";
+			}
+			throw(
+				type    = "Wheels.Cli.CommandFailed",
+				message = "#arguments.operationLabel# failed: #errMsg#",
+				detail  = serializeJSON(result)
+			);
+		}
+
+		return result;
+	}
+
 	private string function makeHttpRequest(required string requestUrl) {
 		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
 		var conn = javaUrl.openConnection();
