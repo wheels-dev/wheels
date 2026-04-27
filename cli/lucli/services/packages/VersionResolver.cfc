@@ -2,8 +2,12 @@
  * Picks a version from a manifest's versions[] array, filtering by
  * framework compatibility and an optional user pin.
  *
- * Reuses wheels.SemVer (shipped with #2231) so the CLI and PackageLoader
- * agree byte-for-byte on what "satisfies" means.
+ * Uses the LuCLI-local copy of SemVer (mirrored from vendor/wheels/SemVer.cfc)
+ * so this resolves cleanly in the CLI's runtime context. The dotted path
+ * `wheels.SemVer` requires a `/wheels` mapping that's only present inside
+ * a Wheels application's HTTP request context — not when the CLI is
+ * dispatching from LuCLI's LuceeScriptEngine. See the Phase 7 follow-on
+ * regression that surfaced after #2309.
  *
  * Framework version comes from wheels.Global::$readFrameworkVersion() —
  * the caller passes it in so this component stays pure and testable
@@ -14,7 +18,7 @@ component {
 	public VersionResolver function init(any semver = "") {
 		variables.semver = IsObject(arguments.semver)
 			? arguments.semver
-			: new wheels.SemVer();
+			: new modules.wheels.services.SemVer();
 		return this;
 	}
 
