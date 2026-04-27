@@ -112,6 +112,52 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				directoryDelete(root, true);
 			});
 
+			it("falls back to cliVersion when monorepo root is missing (##2333 brew/chocolatey path)", () => {
+				var f = buildFixture(
+					'{"name":"SomeUserApp","slug":"user-app","version":"2.1.0"}',
+					'{"version":"@build.version@"}'
+				);
+				var rewrote = installer.rewriteVersionPlaceholder(f.sourceWheels, f.targetWheels, "0.3.7");
+				var after = deserializeJSON(fileRead(f.targetWheels & "/box.json"));
+				expect(rewrote).toBeTrue();
+				expect(after.version).toBe("0.3.7");
+				directoryDelete(f.root, true);
+			});
+
+			it("prefers monorepo signal over cliVersion when both are available (##2333)", () => {
+				var f = buildFixture(
+					'{"name":"Wheels.fw","slug":"wheels","version":"4.2.0"}',
+					'{"version":"@build.version@"}'
+				);
+				var rewrote = installer.rewriteVersionPlaceholder(f.sourceWheels, f.targetWheels, "0.3.7");
+				var after = deserializeJSON(fileRead(f.targetWheels & "/box.json"));
+				expect(rewrote).toBeTrue();
+				expect(after.version).toBe("4.2.0-dev");
+				directoryDelete(f.root, true);
+			});
+
+			it("ignores the 'Version not specified' sentinel from BaseModule (##2333)", () => {
+				var f = buildFixture(
+					'{"name":"SomeUserApp","slug":"user-app","version":"2.1.0"}',
+					'{"version":"@build.version@"}'
+				);
+				var rewrote = installer.rewriteVersionPlaceholder(f.sourceWheels, f.targetWheels, "Version not specified");
+				expect(rewrote).toBeFalse();
+				expect(fileRead(f.targetWheels & "/box.json")).toInclude("@build.version@");
+				directoryDelete(f.root, true);
+			});
+
+			it("ignores cliVersion when it is itself the unsubstituted placeholder (##2333)", () => {
+				var f = buildFixture(
+					'{"name":"SomeUserApp","slug":"user-app","version":"2.1.0"}',
+					'{"version":"@build.version@"}'
+				);
+				var rewrote = installer.rewriteVersionPlaceholder(f.sourceWheels, f.targetWheels, "@build.version@");
+				expect(rewrote).toBeFalse();
+				expect(fileRead(f.targetWheels & "/box.json")).toInclude("@build.version@");
+				directoryDelete(f.root, true);
+			});
+
 		});
 
 	}

@@ -3653,7 +3653,8 @@ component extends="modules.BaseModule" {
 		directoryCopy(wheelsSource, vendorDir, true);
 		new services.FrameworkInstaller().rewriteVersionPlaceholder(
 			wheelsSource = wheelsSource,
-			vendorDir = vendorDir
+			vendorDir = vendorDir,
+			cliVersion = version()
 		);
 		printCreated(appName & "/vendor/wheels/");
 	}
