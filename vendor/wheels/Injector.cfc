@@ -31,9 +31,6 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 		// Track which mappings are request-scoped
 		variables.requestScopedFlags = {};
 
-		// Circular dependency guard during resolution
-		variables.resolving = {};
-
 		// Track the current mapping being built (for fluent API)
 		variables.currentMapping = "";
 
@@ -143,15 +140,23 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 			}
 		}
 
-		// Circular dependency guard
-		if (structKeyExists(variables.resolving, arguments.name)) {
+		// Circular dependency guard. The resolving struct is request-scoped —
+		// it tracks "what this thread is currently resolving" — so concurrent
+		// requests don't trip each other's guard. Application-scoping it (the
+		// previous behavior) caused spurious self-loop errors when two
+		// requests near-simultaneously hit getInstance for the same controller
+		// on a cold framework, before Lucee had compiled the CFC. The chain
+		// "X -> X" in the error message was thread A's in-flight entry being
+		// observed by thread B before B even started. See issue #2331.
+		var resolving = $getResolvingStack();
+		if (structKeyExists(resolving, arguments.name)) {
 			throw(
 				type="Wheels.DI.CircularDependency",
-				message="Circular dependency detected while resolving '#arguments.name#'. Resolution chain: #structKeyList(variables.resolving)# -> #arguments.name#"
+				message="Circular dependency detected while resolving '#arguments.name#'. Resolution chain: #structKeyList(resolving)# -> #arguments.name#"
 			);
 		}
 
-		variables.resolving[arguments.name] = true;
+		resolving[arguments.name] = true;
 
 		try {
 			// Create the component instance
@@ -188,11 +193,28 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 				local.requestCache[arguments.name] = local.instance;
 			}
 		} finally {
-			// Clean up resolving guard
-			structDelete(variables.resolving, arguments.name);
+			// Clean up resolving guard. Even on success this runs to keep the
+			// per-request stack tidy for subsequent getInstance calls in the
+			// same request.
+			var resolvingForCleanup = $getResolvingStack();
+			structDelete(resolvingForCleanup, arguments.name);
 		}
 
 		return local.instance;
+	}
+
+	/**
+	 * Per-request resolving stack. Tracks which names are currently being
+	 * resolved in THIS thread/request, so the circular-dependency guard
+	 * doesn't see entries from concurrent requests.
+	 *
+	 * Lazy-creates request.$wheelsDIResolving on first access.
+	 */
+	private struct function $getResolvingStack() {
+		if (!structKeyExists(request, "$wheelsDIResolving")) {
+			request.$wheelsDIResolving = {};
+		}
+		return request.$wheelsDIResolving;
 	}
 
 	/**
