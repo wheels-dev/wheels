@@ -82,7 +82,17 @@ component extends="wheels.migrator.Base"{
 					arguments.sql = arguments.sql & " DEFAULT NULL";
 				} else if (arguments.options.type == 'boolean') {
 					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, 1, 0)#";
-				} else if (arguments.options.type == 'string' && arguments.options.default eq "") {
+				} else if (
+					arguments.options.default eq ""
+					&& ListFindNoCase("string,text,char", arguments.options.type)
+				) {
+					// Symmetric handling for all string-like types: an empty
+					// `default=""` means "no default clause" (not `DEFAULT ''`).
+					// Without this, `t.string("a", default="")` and
+					// `t.text("b", default="")` produced asymmetric DDL and
+					// the presence-check skip in validatesPresenceOf fired
+					// inconsistently between equivalent column types. See
+					// fresh-VM journal F17.
 					arguments.sql = arguments.sql;
 				} else {
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
