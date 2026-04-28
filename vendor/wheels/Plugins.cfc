@@ -906,12 +906,17 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Returns the Wheels version string normalised for comparison.
-	 * Dev builds stamp "@build.version@" which isn't a valid semver —
-	 * treat it as 0.0.0 so compatibility checks always pass.
+	 * Dev builds surface as "0.0.0-dev" via BuildInfo. The legacy
+	 * "@build.version@" check is kept as a defensive guard for any path that
+	 * still feeds the raw placeholder in. Both normalise to "0.0.0" so plugin
+	 * compatibility checks always pass during development.
 	 */
 	private string function $normalizeWheelsVersion() {
 		local.raw = SpanExcluding(variables.$class.wheelsVersion, " ");
-		return (local.raw == "@build.version@") ? "0.0.0" : local.raw;
+		if (local.raw == "@build.version@" || local.raw == "0.0.0-dev") {
+			return "0.0.0";
+		}
+		return local.raw;
 	}
 
 	/**

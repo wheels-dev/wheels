@@ -81,7 +81,10 @@ component {
 		request.cgi = application.wo.$cgiScope();
 
 		// Set up containers for routes, caches, settings etc.
-		application.$wheels.version = application.wo.$readFrameworkVersion();
+		// BuildInfo is the authoritative source for version + build metadata.
+		// Cached on the app scope; values cannot change without a full restart.
+		application.$wheels.buildInfo = new wheels.BuildInfo();
+		application.$wheels.version = application.$wheels.buildInfo.version();
 		try {
 			application.$wheels.hostName = CreateObject("java", "java.net.InetAddress").getLocalHost().getHostName();
 		} catch (any e) {
