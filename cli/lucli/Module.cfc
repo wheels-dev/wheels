@@ -394,6 +394,31 @@ component extends="modules.BaseModule" {
 	 */
 	public string function stop() {
 		out("Stopping Wheels server...", "cyan");
+
+		// If LuCLI's stop won't find a registered server for this directory
+		// (cwd doesn't match any `.project-path`), enumerate the user's
+		// running servers and offer specific stop commands. Without this,
+		// `wheels stop` is silently a no-op when run from a parent dir, an
+		// unrelated dir, or after the project was moved/deleted — leaving
+		// orphan Java processes the user has to chase with `lsof`+`kill`.
+		// See GH #2316.
+		var match = $findServerForProject(variables.projectRoot);
+		if (!len(match)) {
+			var orphans = $listRunningWheelsServers();
+			if (arrayLen(orphans)) {
+				out("");
+				out("No registered server matches this directory.", "yellow");
+				out("Running Wheels servers:", "yellow");
+				for (var s in orphans) {
+					out("  - " & s.name & " (port " & s.port & ", project " & s.projectPath & ")");
+				}
+				out("");
+				out("To stop a specific server: wheels server stop --name <name>", "cyan");
+				out("To list all servers:      wheels server list", "cyan");
+				return "";
+			}
+		}
+
 		executeCommand("server", ["stop"], variables.projectRoot);
 		return "";
 	}
@@ -3748,6 +3773,101 @@ component extends="modules.BaseModule" {
 			// Stay out of the way — let LuCLI's server start surface the real
 			// error if the bundle was actually needed and we couldn't stage.
 		}
+	}
+
+	/**
+	 * Look up the registered LuCLI server entry whose `.project-path`
+	 * matches the given project root. Returns the server name, or empty
+	 * string if no match. Used by stop() to detect when `wheels stop`
+	 * would be a no-op (not in a registered project dir) so we can offer
+	 * the user a list of running servers to target instead.
+	 */
+	private string function $findServerForProject(required string projectRoot) {
+		if (!len(arguments.projectRoot)) return "";
+		var lucliHome = $resolveLucliHome();
+		if (!len(lucliHome)) return "";
+		var serversDir = lucliHome & "/servers";
+		if (!directoryExists(serversDir)) return "";
+
+		var canonicalCwd = arguments.projectRoot;
+		try {
+			canonicalCwd = createObject("java", "java.io.File")
+				.init(arguments.projectRoot)
+				.getCanonicalPath();
+		} catch (any e) {}
+
+		var entries = directoryList(serversDir, false, "name");
+		for (var name in entries) {
+			var pp = serversDir & "/" & name & "/.project-path";
+			if (!fileExists(pp)) continue;
+			var registered = trim(fileRead(pp));
+			if (len(registered) && registered == canonicalCwd) {
+				return name;
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * Enumerate LuCLI server registry entries that are currently running
+	 * (server.pid file present and pid is alive). Returns an array of
+	 * {name, port, projectPath} structs. Used by stop()'s no-match
+	 * recovery hint. Best-effort — entries we can't read cleanly are
+	 * silently skipped.
+	 */
+	private array function $listRunningWheelsServers() {
+		var result = [];
+		var lucliHome = $resolveLucliHome();
+		if (!len(lucliHome)) return result;
+		var serversDir = lucliHome & "/servers";
+		if (!directoryExists(serversDir)) return result;
+
+		var entries = directoryList(serversDir, false, "name");
+		for (var name in entries) {
+			var pidFile = serversDir & "/" & name & "/server.pid";
+			if (!fileExists(pidFile)) continue;
+			try {
+				// LuCLI writes "<pid>:<port>" into server.pid. Split off the
+				// pid; ignore the rest (port may be empty / different from
+				// the live socket).
+				var raw = trim(fileRead(pidFile));
+				var pid = listFirst(raw, ":");
+				var portFromPid = listLen(raw, ":") > 1 ? listGetAt(raw, 2, ":") : "";
+				if (!len(pid) || !isNumeric(pid)) continue;
+				if (!$isProcessAlive(pid)) continue;
+				var info = { name: name, port: portFromPid, projectPath: "?" };
+				var pp = serversDir & "/" & name & "/.project-path";
+				if (fileExists(pp)) info.projectPath = trim(fileRead(pp));
+				if (!len(info.port)) {
+					// Port wasn't in server.pid (older format) — try lucee.json.
+					var luceeJson = info.projectPath & "/lucee.json";
+					if (fileExists(luceeJson)) {
+						try {
+							var cfg = deserializeJSON(fileRead(luceeJson));
+							if (isStruct(cfg) && structKeyExists(cfg, "port")) info.port = cfg.port;
+						} catch (any e) {}
+					}
+				}
+				if (!len(info.port)) info.port = "?";
+				arrayAppend(result, info);
+			} catch (any e) {}
+		}
+		return result;
+	}
+
+	/**
+	 * True if the given POSIX pid is alive. Uses `kill -0` semantics via
+	 * Java's ProcessHandle (Java 9+) so we don't shell out.
+	 */
+	private boolean function $isProcessAlive(required string pid) {
+		try {
+			var ProcessHandle = createObject("java", "java.lang.ProcessHandle");
+			var optional = ProcessHandle.of(javaCast("long", arguments.pid));
+			if (optional.isPresent()) {
+				return optional.get().isAlive();
+			}
+		} catch (any e) {}
+		return false;
 	}
 
 	/**
