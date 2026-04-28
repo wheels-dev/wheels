@@ -120,6 +120,82 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  version / help — banner + command listing
+	// ─────────────────────────────────────────────────
+
+	// Produces the same output the brew/choco wrapper emits for `wheels --version`,
+	// so `wheels version` (no leading dashes) reaches the same banner via module
+	// dispatch. See cli/lucli/ARCHITECTURE.md for the two paths.
+	//
+	// Internal callers that want the bare version string use super.version() to
+	// bypass the banner formatting.
+	/**
+	 * hint: Show Wheels CLI version and banner
+	 */
+	public string function version() {
+		var v = super.version();
+		var nl = chr(10);
+		var banner = "Wheels Version: " & v & nl & nl;
+		banner &= " __        ___               _     " & nl;
+		banner &= " \ \      / / |__   ___  ___| |___ " & nl;
+		banner &= "  \ \ /\ / /| '_ \ / _ \/ _ \ / __|" & nl;
+		banner &= "   \ V  V / | | | |  __/  __/ \__ \" & nl;
+		banner &= "    \_/\_/  |_| |_|\___|\___|_|___/" & nl & nl;
+		banner &= "https://wheels.dev";
+		return banner;
+	}
+
+	// Hand-written replacement for BaseModule's auto-discovered help. Grouped by
+	// task instead of alphabetical, mirrors what `wheels --help` emits from the
+	// wrapper. `wheels help` and `wheels --help` (rewritten by LuCLI's
+	// preprocessModuleHelp) both reach this.
+	/**
+	 * hint: Show this help
+	 */
+	public string function showHelp() {
+		var v = super.version();
+		var nl = chr(10);
+		var help = "Wheels CLI " & v & nl;
+		help &= "  CFML MVC framework — code generation, migrations, testing, server management" & nl & nl;
+		help &= "Usage:" & nl;
+		help &= "  wheels <command> [options]" & nl & nl;
+		help &= "Getting Started:" & nl;
+		help &= "  new <name>          Scaffold a new Wheels application" & nl;
+		help &= "  start               Start the dev server" & nl;
+		help &= "  stop                Stop the dev server" & nl;
+		help &= "  reload              Reload the running app" & nl & nl;
+		help &= "Code Generation:" & nl;
+		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
+		help &= "  destroy (or d)      Remove generated files" & nl & nl;
+		help &= "Database:" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info)" & nl;
+		help &= "  seed                Run database seeds" & nl;
+		help &= "  db                  Database management (reset, status, version)" & nl & nl;
+		help &= "Testing & Inspection:" & nl;
+		help &= "  test                Run the test suite" & nl;
+		help &= "  browser             Browser-based tests (Playwright)" & nl;
+		help &= "  console             Open an interactive CFML REPL connected to your app" & nl;
+		help &= "  routes              Print the route table" & nl;
+		help &= "  info                Show framework version, environment, configuration" & nl;
+		help &= "  doctor              Diagnose project setup issues" & nl;
+		help &= "  validate            Validate project structure and configuration" & nl;
+		help &= "  analyze             Static analysis of project code" & nl;
+		help &= "  stats               Project statistics (lines of code, model counts, etc.)" & nl;
+		help &= "  notes               Find TODO / FIXME / HACK / OPTIMIZE comments" & nl & nl;
+		help &= "Packages & Deployment:" & nl;
+		help &= "  packages            Install, update, search Wheels packages" & nl;
+		help &= "  upgrade             Upgrade the Wheels framework version in your project" & nl;
+		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
+		help &= "Other:" & nl;
+		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
+		help &= "  version             Show Wheels CLI version" & nl;
+		help &= "  help                Show this help" & nl & nl;
+		help &= "For command-specific help: wheels <command> --help" & nl & nl;
+		help &= "More info: https://guides.wheels.dev";
+		return help;
+	}
+
+	// ─────────────────────────────────────────────────
 	//  generate — Code generation
 	// ─────────────────────────────────────────────────
 
@@ -626,7 +702,7 @@ component extends="modules.BaseModule" {
 	 * hint: Show framework version, environment, and configuration
 	 */
 	public string function info() {
-		out("Wheels CLI v#version()#", "bold");
+		out("Wheels CLI v#super.version()#", "bold");
 		out("");
 
 		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
@@ -789,7 +865,7 @@ component extends="modules.BaseModule" {
 
 		// Banner
 		out("", "");
-		out("Wheels Console v#version()#", "bold");
+		out("Wheels Console v#super.version()#", "bold");
 		out("Connected to localhost:#serverPort# (#wheelsEnv#) — Wheels #wheelsVersion#", "cyan");
 		out("Type expressions to evaluate in your app context. /help for commands.", "");
 		out("", "");
@@ -3711,7 +3787,7 @@ component extends="modules.BaseModule" {
 		new services.FrameworkInstaller().rewriteVersionPlaceholder(
 			wheelsSource = wheelsSource,
 			vendorDir = vendorDir,
-			cliVersion = version()
+			cliVersion = super.version()
 		);
 		printCreated(appName & "/vendor/wheels/");
 	}
