@@ -2753,75 +2753,15 @@ return local.$wheels;
 		return local.rv;
 	}
 
-	public string function $readFrameworkVersion(string boxJsonPath = "", string rootBoxJsonPath = "") {
-		local.path = Len(arguments.boxJsonPath)
-			? arguments.boxJsonPath
-			: GetDirectoryFromPath(GetCurrentTemplatePath()) & "box.json";
-		if (!FileExists(local.path)) {
-			Throw(
-				type = "Wheels.VersionReadFailed",
-				message = "Framework box.json not found at #local.path#.",
-				extendedInfo = "This file is expected to ship with the framework. A distributed copy of Wheels should always contain it."
-			);
-		}
-		try {
-			local.contents = FileRead(local.path);
-			local.box = DeserializeJSON(local.contents);
-		} catch (any e) {
-			Throw(
-				type = "Wheels.VersionReadFailed",
-				message = "Framework box.json at #local.path# could not be parsed as JSON.",
-				extendedInfo = e.message
-			);
-		}
-		if (!IsStruct(local.box) || !StructKeyExists(local.box, "version") || !Len(local.box.version)) {
-			Throw(
-				type = "Wheels.VersionReadFailed",
-				message = "Framework box.json at #local.path# is missing a non-empty 'version' key.",
-				extendedInfo = "The release build pipeline substitutes @build.version@; a dev checkout should still define the key with the placeholder."
-			);
-		}
-		if (local.box.version == "@build.version@") {
-			// The framework's own box.json was shipped with the placeholder
-			// unsubstituted (dev checkout, or release-pipeline gap). Try, in
-			// order: (1) the enclosing repo's root box.json — for a wheels-dev/
-			// wheels monorepo dev checkout, that resolves to a `<rootversion>-dev`
-			// version reflecting the upcoming release; (2) the app's own box.json
-			// — for an installed app scaffolded from `wheels-base-template`, that
-			// box.json carries the precise framework SNAPSHOT version stamped in
-			// at release time, so we use it verbatim. Without this second probe,
-			// the runtime returns a misleading "0.0.0-dev" on installed apps when
-			// the framework's box.json substitution slipped through (see GH #2326).
-			local.rootPath = Len(arguments.rootBoxJsonPath)
-				? arguments.rootBoxJsonPath
-				: GetDirectoryFromPath(GetCurrentTemplatePath()) & "../../box.json";
-			try {
-				if (FileExists(local.rootPath)) {
-					local.rootBox = DeserializeJSON(FileRead(local.rootPath));
-					if (IsStruct(local.rootBox) && StructKeyExists(local.rootBox, "version") && Len(local.rootBox.version) && local.rootBox.version != "@build.version@") {
-						local.isWheelsRepo = (StructKeyExists(local.rootBox, "slug") && local.rootBox.slug == "wheels")
-							|| (StructKeyExists(local.rootBox, "name") && local.rootBox.name == "Wheels.fw");
-						if (local.isWheelsRepo) {
-							return local.rootBox.version & "-dev";
-						}
-						// 2. Installed app: the parent's box.json is the user's
-						//    scaffolded app.box.json, which `wheels-base-template`
-						//    fills with the precise framework version at release
-						//    time. Recognize the template by slug so we don't pick
-						//    up a hand-rolled box.json with an unrelated version.
-						local.isBaseTemplate = (StructKeyExists(local.rootBox, "slug") && local.rootBox.slug == "wheels-base-template")
-							|| (StructKeyExists(local.rootBox, "name") && local.rootBox.name == "Wheels Base Template");
-						if (local.isBaseTemplate) {
-							return local.rootBox.version;
-						}
-					}
-				}
-			} catch (any e) {
-				// fall through to the plain dev sentinel
-			}
-			return "0.0.0-dev";
-		}
-		return local.box.version;
+	// Returns the running framework version. Delegates to BuildInfo.cfc, which
+	// is the authoritative version source. The historical box.json-reading
+	// implementation (with monorepo / wheels-base-template fallback chain)
+	// was retired when BuildInfo became the source of truth — see the BuildInfo
+	// header for migration context. Kept as a thin wrapper because callers
+	// upstream of onapplicationstart (e.g. PackageLoader, Plugins) and tests
+	// reference $readFrameworkVersion by name.
+	public string function $readFrameworkVersion() {
+		return new wheels.BuildInfo().version();
 	}
 
 	public string function $checkMinimumVersion(required string engine, required string version) {

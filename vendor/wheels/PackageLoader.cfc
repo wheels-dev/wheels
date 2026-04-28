@@ -708,12 +708,17 @@ component output="false" {
 
 	/**
 	 * Returns the runtime Wheels version normalised for semver comparison.
-	 * Dev builds ship the unresolved "@build.version@" token — treat as 0.0.0
-	 * so strict constraints don't falsely reject packages during development.
+	 * Dev builds surface as "0.0.0-dev" via BuildInfo. The legacy
+	 * "@build.version@" check is kept as a defensive guard for any path that
+	 * still feeds the raw placeholder in. Both normalise to "0.0.0" so strict
+	 * version constraints don't falsely reject packages during development.
 	 */
 	private string function $normalizeWheelsVersion() {
 		local.raw = SpanExcluding(variables.wheelsVersion, " ");
-		return (local.raw == "@build.version@") ? "0.0.0" : local.raw;
+		if (local.raw == "@build.version@" || local.raw == "0.0.0-dev") {
+			return "0.0.0";
+		}
+		return local.raw;
 	}
 
 	/**

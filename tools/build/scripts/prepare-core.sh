@@ -75,5 +75,38 @@ else
     done
 fi
 
+# Replace BuildInfo metadata placeholders. BuildInfo.cfc reads these at app
+# start to surface rich diagnostics (commit sha, run url, etc.) on the dev
+# toolbar and `wheels info`. Values come from git in the source checkout —
+# release.yml passes empty strings via env when not running on a tagged build,
+# in which case BuildInfo.cfc blanks the field at runtime. Use | as the sed
+# delimiter for fields that may contain / (URLs) or : (timestamps, refs).
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+COMMIT_SHORT=$(git rev-parse --short=7 HEAD 2>/dev/null || echo "")
+COMMIT_SUBJECT=$(git log -1 --pretty=%s 2>/dev/null | tr -d '|' || echo "")
+BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Run context comes from the GitHub Actions environment. Locally these are
+# empty and the placeholders stay unsubstituted, which BuildInfo blanks out.
+RUN_ID="${GITHUB_RUN_ID:-}"
+REPOSITORY="${GITHUB_REPOSITORY:-}"
+RUN_URL=""
+if [ -n "${RUN_ID}" ] && [ -n "${REPOSITORY}" ]; then
+    RUN_URL="https://github.com/${REPOSITORY}/actions/runs/${RUN_ID}"
+fi
+
+find "${BUILD_DIR}/wheels" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) | while read file; do
+    sed -i.bak \
+        -e "s|@build\.number@|${BUILD_NUMBER}|g" \
+        -e "s|@build\.branch@|${BRANCH}|g" \
+        -e "s|@build\.commit@|${COMMIT_SHA}|g" \
+        -e "s|@build\.commitShort@|${COMMIT_SHORT}|g" \
+        -e "s|@build\.commitSubject@|${COMMIT_SUBJECT}|g" \
+        -e "s|@build\.timestamp@|${BUILT_AT}|g" \
+        -e "s|@build\.runId@|${RUN_ID}|g" \
+        -e "s|@build\.runUrl@|${RUN_URL}|g" \
+        -e "s|@build\.repository@|${REPOSITORY}|g" \
+        "$file" && rm "${file}.bak"
+done
+
 echo "Wheels Core prepared for ForgeBox publishing!"
 echo "Directory: ${BUILD_DIR}/wheels/"
