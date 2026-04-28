@@ -20,10 +20,10 @@ component extends="wheels.WheelsTest" {
 				expect(application.wheels.version).notToBe("@build.version@");
 			});
 
-			it("caches a BuildInfo instance on application.$wheels.buildInfo at boot", () => {
-				expect(StructKeyExists(application.$wheels, "buildInfo")).toBeTrue();
-				expect(IsObject(application.$wheels.buildInfo)).toBeTrue();
-				expect(application.$wheels.buildInfo.version()).toBe(application.wheels.version);
+			it("caches a BuildInfo instance on application.wheels.buildInfo at boot", () => {
+				expect(StructKeyExists(application.wheels, "buildInfo")).toBeTrue();
+				expect(IsObject(application.wheels.buildInfo)).toBeTrue();
+				expect(application.wheels.buildInfo.version()).toBe(application.wheels.version);
 			});
 
 			it("$readFrameworkVersion delegates to BuildInfo and returns the same string as application.wheels.version", () => {
