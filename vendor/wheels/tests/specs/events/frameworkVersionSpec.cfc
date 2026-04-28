@@ -61,6 +61,54 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("$readFrameworkVersion uses wheels-base-template's version verbatim when the framework's own box.json placeholder slipped through (##2326)", () => {
+				// Installed-app path: the user's `wheels new`-scaffolded app has a
+				// box.json at the app root populated from `wheels-base-template`
+				// (slug=wheels-base-template), and that box.json carries the
+				// precise framework SNAPSHOT version stamped at release time. If
+				// the framework's own box.json substitution slipped through, we
+				// still surface the correct version instead of "0.0.0-dev".
+				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
+				var rootTmp = getTempDirectory() & "wheels-version-root-#CreateUUID()#.json";
+				fileWrite(fwTmp, '{"version":"@build.version@"}');
+				fileWrite(rootTmp, '{"name":"Wheels Base Template","slug":"wheels-base-template","version":"4.0.0-SNAPSHOT+1625"}');
+				try {
+					expect(g.$readFrameworkVersion(fwTmp, rootTmp)).toBe("4.0.0-SNAPSHOT+1625");
+				} finally {
+					fileDelete(fwTmp);
+					fileDelete(rootTmp);
+				}
+			});
+
+			it("$readFrameworkVersion ignores wheels-base-template when its own version is also the unreplaced placeholder (##2326)", () => {
+				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
+				var rootTmp = getTempDirectory() & "wheels-version-root-#CreateUUID()#.json";
+				fileWrite(fwTmp, '{"version":"@build.version@"}');
+				fileWrite(rootTmp, '{"name":"Wheels Base Template","slug":"wheels-base-template","version":"@build.version@"}');
+				try {
+					expect(g.$readFrameworkVersion(fwTmp, rootTmp)).toBe("0.0.0-dev");
+				} finally {
+					fileDelete(fwTmp);
+					fileDelete(rootTmp);
+				}
+			});
+
+			it("$readFrameworkVersion prefers the monorepo signal over the base-template signal when both could match (##2326)", () => {
+				// Defensive: if both the monorepo and base-template markers somehow
+				// coexist at the same path, the monorepo signal (a dev checkout)
+				// is the authoritative one and the suffix should be "-dev".
+				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
+				var rootTmp = getTempDirectory() & "wheels-version-root-#CreateUUID()#.json";
+				fileWrite(fwTmp, '{"version":"@build.version@"}');
+				fileWrite(rootTmp, '{"name":"Wheels.fw","slug":"wheels","version":"4.0.0"}');
+				try {
+					expect(g.$readFrameworkVersion(fwTmp, rootTmp)).toBe("4.0.0-dev");
+				} finally {
+					fileDelete(fwTmp);
+					fileDelete(rootTmp);
+				}
+			});
+
 			it("$readFrameworkVersion falls back to 0.0.0-dev when the enclosing box.json is also unreplaced", () => {
 				var fwTmp = getTempDirectory() & "wheels-version-fw-#CreateUUID()#.json";
 				var rootTmp = getTempDirectory() & "wheels-version-root-#CreateUUID()#.json";
