@@ -360,6 +360,18 @@ component extends="modules.BaseModule" {
 
 		out("Starting Wheels server...", "cyan");
 
+		// Stage required JDBC drivers into the Lucee Express lib/ext/ before
+		// LuCLI provisions/boots Lucee. Without this, fresh `wheels new` apps
+		// with the SQLite-by-default datasource hit a class-load failure on
+		// the first request because the Lucee Express distribution doesn't
+		// ship the SQLite driver and not every install path (chocolatey,
+		// dev checkout, manual) drops the JAR via a wrapper script. See
+		// GH #2326 (F8). Pre-stage (this call) covers the first-start case
+		// where the express dir already exists; post-stage (after server
+		// start, below) covers the case where express was extracted by this
+		// very LuCLI invocation.
+		$ensureWheelsBundles();
+
 		// Delegate to LuCLI's server start command
 		var cmdArgs = ["start"];
 
@@ -367,6 +379,13 @@ component extends="modules.BaseModule" {
 		cmdArgs.append(args, true);
 
 		executeCommand("server", cmdArgs, variables.projectRoot);
+
+		// Post-stage. If the express dir didn't exist at pre-stage time
+		// (very first LuCLI run on a fresh VM), the start command above just
+		// extracted it. Seed the JAR now so the *next* `wheels start` works
+		// zero-config without the user knowing the difference.
+		$ensureWheelsBundles();
+
 		return "";
 	}
 
@@ -3670,6 +3689,100 @@ component extends="modules.BaseModule" {
 			cliVersion = version()
 		);
 		printCreated(appName & "/vendor/wheels/");
+	}
+
+	// ─────────────────────────────────────────────────
+	//  Datasource bundle staging — fresh-VM F8 fix
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * Stage required JDBC drivers into every Lucee Express install's
+	 * `lib/ext/` (Tomcat classpath) so Lucee can resolve datasource driver
+	 * classes at boot time without hitting class-load failures. Lucee 7's
+	 * stock Express distribution ships drivers for MySQL/MSSQL/PostgreSQL/
+	 * HSQLDB but not SQLite — yet `wheels new` writes SQLite as the zero-
+	 * config default datasource. Without this stage, every fresh app fails
+	 * on first request with `ClassException: org.sqlite.JDBC`.
+	 *
+	 * Idempotent: if the JAR already exists in lib/ext/, skip. Best-effort:
+	 * any I/O error is swallowed because we'd rather defer to LuCLI's normal
+	 * server start error reporting than block on bundle staging.
+	 *
+	 * The bundled JAR at cli/lucli/resources/extensions/sqlite/ is the
+	 * upstream xerial sqlite-jdbc with a relaxed `Require-Capability` header
+	 * (Felix on Java 21 fails on upstream's strict `osgi.ee;version=1.8`
+	 * exact-match). See tools/lucee-extensions/sqlite/build.sh for the
+	 * patch logic. The JAR works equally well in lib/ext/ (Tomcat classpath)
+	 * and lucee-server/bundles/ (OSGi); we target lib/ext/ here to mirror
+	 * the brew formula's drop strategy and avoid the per-server `--force`
+	 * wipe that bundles/ is subject to.
+	 */
+	private void function $ensureWheelsBundles() {
+		try {
+			var stager = new services.BundleStager();
+			if (!stager.projectUsesSqliteDatasource(variables.projectRoot)) return;
+
+			var bundleSrc = variables.moduleRoot & "resources/extensions/sqlite/org.xerial.sqlite-jdbc-3.49.1.0.jar";
+			if (!fileExists(bundleSrc)) {
+				// Dev checkout without the bundle baked in. Skip silently —
+				// release tarballs always include it.
+				return;
+			}
+
+			var lucliHome = $resolveLucliHome();
+			if (!len(lucliHome)) return;
+
+			// Stage into every Lucee Express install's lib/ext/ — that's the
+			// Tomcat classpath, where Lucee 7 finds JDBC drivers when the
+			// datasource config doesn't carry an OSGi `bundleName` hint
+			// (current `wheels new`-generated app.cfm omits the hint per
+			// GH #2304). Mirrors the brew/chocolatey wrapper's drop strategy
+			// so dev-checkout, manual-install, and any other path that skips
+			// the package wrapper still gets a working zero-config SQLite.
+			stager.stageIntoLibExt(
+				bundleSrc = bundleSrc,
+				expressRoot = lucliHome & "/express",
+				jarFileName = "sqlite-jdbc-3.49.1.0.jar"
+			);
+		} catch (any e) {
+			// Stay out of the way — let LuCLI's server start surface the real
+			// error if the bundle was actually needed and we couldn't stage.
+		}
+	}
+
+	/**
+	 * Resolve the LuCLI home root. Order of resolution:
+	 *   1. $LUCLI_HOME if set (e.g. brew wrapper exports $HOME/.wheels).
+	 *   2. $HOME/.<lucli.binary.name> — LuCLI auto-roots to ~/.<binary> when
+	 *      invoked under a symlinked binary name. `wheels` resolves to
+	 *      ~/.wheels/, bare `lucli` resolves to ~/.lucli/.
+	 *   3. $HOME/.lucli — final fallback.
+	 */
+	private string function $resolveLucliHome() {
+		var javaSystem = createObject("java", "java.lang.System");
+		// 1. Explicit override.
+		try {
+			var override = javaSystem.getenv("LUCLI_HOME");
+			if (!isNull(override) && len(override)) return override;
+		} catch (any e) {}
+		// 2. Per-binary-name default. LuCLI's bootstrap exports
+		//    -Dlucli.binary.name=<name> based on how it was invoked, and
+		//    home defaults to ~/.<binary-name>/. So `wheels` invocations
+		//    resolve to ~/.wheels/ and bare `lucli` invocations to ~/.lucli/.
+		//    Match that resolution exactly so we stage into the same tree
+		//    LuCLI itself uses (catalina.base / catalina.home).
+		try {
+			var userHome = javaSystem.getProperty("user.home");
+			if (isNull(userHome) || !len(userHome)) return "";
+			try {
+				var binaryName = javaSystem.getProperty("lucli.binary.name");
+				if (!isNull(binaryName) && len(binaryName)) {
+					return userHome & "/." & binaryName;
+				}
+			} catch (any e) {}
+			return userHome & "/.lucli";
+		} catch (any e) {}
+		return "";
 	}
 
 	/**
