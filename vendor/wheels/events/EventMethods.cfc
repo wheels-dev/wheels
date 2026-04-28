@@ -68,6 +68,26 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 					}
 				}
 				if (StructKeyExists(local, "wheelsError")) {
+					// Map Wheels error types to HTTP status codes. Any
+					// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
+					// ViewNotFound, etc) is a 404; everything else is a 500.
+					// Set the status BEFORE writing the body so the response
+					// header is committed at the right code regardless of
+					// when the servlet engine flushes (HTML-format Wheels
+					// errors used to render with HTTP 200 because no
+					// $header(statusCode=...) fired before the body was
+					// written — see GH #2319). Note: $throwErrorOrShow404Page
+					// already calls $header(statusCode=404) before throwing,
+					// but onError reaches us via Application.cfc which can
+					// reset the response, so we re-assert the status here.
+					if (
+						StructKeyExists(local.wheelsError, "type")
+						&& ReFindNoCase("^Wheels\.[A-Za-z]*NotFound$", local.wheelsError.type)
+					) {
+						$header(statusCode = 404);
+					} else {
+						$header(statusCode = 500);
+					}
 					local.rv = "";
 					if (local.format == "json") {
 						$header(name = "Content-Type", value = "application/json");
