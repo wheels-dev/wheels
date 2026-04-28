@@ -2782,28 +2782,38 @@ return local.$wheels;
 			);
 		}
 		if (local.box.version == "@build.version@") {
-			// Dev checkout. Try to synthesize a more useful version by reading the
-			// enclosing repo's root box.json — when that box.json identifies itself as
-			// the wheels-dev/wheels monorepo, report "<rootversion>-dev" so the
-			// homepage shows the upcoming version rather than a blank placeholder.
+			// The framework's own box.json was shipped with the placeholder
+			// unsubstituted (dev checkout, or release-pipeline gap). Try, in
+			// order: (1) the enclosing repo's root box.json — for a wheels-dev/
+			// wheels monorepo dev checkout, that resolves to a `<rootversion>-dev`
+			// version reflecting the upcoming release; (2) the app's own box.json
+			// — for an installed app scaffolded from `wheels-base-template`, that
+			// box.json carries the precise framework SNAPSHOT version stamped in
+			// at release time, so we use it verbatim. Without this second probe,
+			// the runtime returns a misleading "0.0.0-dev" on installed apps when
+			// the framework's box.json substitution slipped through (see GH #2326).
 			local.rootPath = Len(arguments.rootBoxJsonPath)
 				? arguments.rootBoxJsonPath
 				: GetDirectoryFromPath(GetCurrentTemplatePath()) & "../../box.json";
 			try {
 				if (FileExists(local.rootPath)) {
 					local.rootBox = DeserializeJSON(FileRead(local.rootPath));
-					local.isWheelsRepo = IsStruct(local.rootBox)
-						&& (
-							(StructKeyExists(local.rootBox, "slug") && local.rootBox.slug == "wheels")
-							|| (StructKeyExists(local.rootBox, "name") && local.rootBox.name == "Wheels.fw")
-						);
-					if (
-						local.isWheelsRepo
-						&& StructKeyExists(local.rootBox, "version")
-						&& Len(local.rootBox.version)
-						&& local.rootBox.version != "@build.version@"
-					) {
-						return local.rootBox.version & "-dev";
+					if (IsStruct(local.rootBox) && StructKeyExists(local.rootBox, "version") && Len(local.rootBox.version) && local.rootBox.version != "@build.version@") {
+						local.isWheelsRepo = (StructKeyExists(local.rootBox, "slug") && local.rootBox.slug == "wheels")
+							|| (StructKeyExists(local.rootBox, "name") && local.rootBox.name == "Wheels.fw");
+						if (local.isWheelsRepo) {
+							return local.rootBox.version & "-dev";
+						}
+						// 2. Installed app: the parent's box.json is the user's
+						//    scaffolded app.box.json, which `wheels-base-template`
+						//    fills with the precise framework version at release
+						//    time. Recognize the template by slug so we don't pick
+						//    up a hand-rolled box.json with an unrelated version.
+						local.isBaseTemplate = (StructKeyExists(local.rootBox, "slug") && local.rootBox.slug == "wheels-base-template")
+							|| (StructKeyExists(local.rootBox, "name") && local.rootBox.name == "Wheels Base Template");
+						if (local.isBaseTemplate) {
+							return local.rootBox.version;
+						}
 					}
 				}
 			} catch (any e) {
