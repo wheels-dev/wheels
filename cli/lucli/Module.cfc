@@ -410,6 +410,16 @@ component extends="modules.BaseModule" {
 
 		var password = detectReloadPassword();
 
+		// F5 fix: physically wipe the Lucee compiled-class cache before
+		// triggering the framework reload. Lucee Express's default
+		// `inspectTemplate=once` means Lucee compiles each CFC once, caches
+		// the .class on disk, and never re-checks the source timestamp.
+		// `?reload=true` resets Wheels application state via applicationStop()
+		// but does not invalidate Lucee's template cache, so edits to models,
+		// controllers, and config silently miss until cfclasses is wiped.
+		// See onboarding finding F5.
+		$purgeServerCfclasses();
+
 		try {
 			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
 			var httpResult = makeHttpRequest(reloadUrl);
@@ -3863,6 +3873,35 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			// Stay out of the way — let LuCLI's server start surface the real
 			// error if the bundle was actually needed and we couldn't stage.
+		}
+	}
+
+	/**
+	 * Wipe the per-server Lucee compiled-class cache so the next request
+	 * recompiles every CFC from source. Called from `wheels reload` because
+	 * Lucee's default `inspectTemplate=once` setting prevents source-edit
+	 * detection — without a physical cache wipe, `?reload=true` only resets
+	 * Wheels' application state and edits to models, controllers, and config
+	 * keep returning the previously-compiled .class on subsequent requests.
+	 * See onboarding finding F5.
+	 *
+	 * Best-effort: silently swallows per-file failures (a Lucee-locked .class
+	 * mid-compile or a Windows file lock) rather than blocking the reload.
+	 * The cfclasses directory itself is preserved — Lucee repopulates it on
+	 * the next compile.
+	 */
+	private void function $purgeServerCfclasses() {
+		try {
+			var lucliHome = $resolveLucliHome();
+			if (!len(lucliHome)) return;
+
+			var serverName = $findServerForProject(variables.projectRoot);
+			if (!len(serverName)) return;
+
+			var cfclassesDir = lucliHome & "/servers/" & serverName & "/lucee-server/context/cfclasses";
+			new services.CfclassesPurger().purge(cfclassesDir);
+		} catch (any e) {
+			// Don't block reload on cache-purge errors.
 		}
 	}
 
