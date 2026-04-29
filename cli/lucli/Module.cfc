@@ -3797,26 +3797,26 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Stage required JDBC drivers into every Lucee Express install's
-	 * `lib/ext/` (Tomcat classpath) so Lucee can resolve datasource driver
-	 * classes at boot time without hitting class-load failures. Lucee 7's
-	 * stock Express distribution ships drivers for MySQL/MSSQL/PostgreSQL/
-	 * HSQLDB but not SQLite — yet `wheels new` writes SQLite as the zero-
-	 * config default datasource. Without this stage, every fresh app fails
-	 * on first request with `ClassException: org.sqlite.JDBC`.
+	 * Stage the SQLite JDBC driver into the two locations Lucee 7 reads from,
+	 * so a fresh `wheels new` SQLite-by-default app can boot, migrate, and
+	 * query without manual JAR drops. Idempotent and best-effort.
 	 *
-	 * Idempotent: if the JAR already exists in lib/ext/, skip. Best-effort:
-	 * any I/O error is swallowed because we'd rather defer to LuCLI's normal
-	 * server start error reporting than block on bundle staging.
+	 *   - `<express-root>/lib/ext/` — Tomcat parent classpath. Satisfies
+	 *     `Class.forName("org.sqlite.JDBC")` for any caller that uses raw
+	 *     JDBC.
 	 *
-	 * The bundled JAR at cli/lucli/resources/extensions/sqlite/ is the
+	 *   - `<server-root>/<server-name>/lucee-server/bundles/` — Lucee's OSGi
+	 *     bundle store. Required for Lucee's datasource resolver (the path
+	 *     that `cfquery` and the Wheels migrator go through). Without this,
+	 *     `lib/ext/` alone is not enough — Lucee's bundle loader does not
+	 *     fall back to the Tomcat parent classloader for datasource driver
+	 *     resolution. See onboarding finding F2.
+	 *
+	 * The bundled JAR at `cli/lucli/resources/extensions/sqlite/` is the
 	 * upstream xerial sqlite-jdbc with a relaxed `Require-Capability` header
 	 * (Felix on Java 21 fails on upstream's strict `osgi.ee;version=1.8`
-	 * exact-match). See tools/lucee-extensions/sqlite/build.sh for the
-	 * patch logic. The JAR works equally well in lib/ext/ (Tomcat classpath)
-	 * and lucee-server/bundles/ (OSGi); we target lib/ext/ here to mirror
-	 * the brew formula's drop strategy and avoid the per-server `--force`
-	 * wipe that bundles/ is subject to.
+	 * exact-match). See `tools/lucee-extensions/sqlite/build.sh` for the
+	 * patch logic.
 	 */
 	private void function $ensureWheelsBundles() {
 		try {
@@ -3833,17 +3833,32 @@ component extends="modules.BaseModule" {
 			var lucliHome = $resolveLucliHome();
 			if (!len(lucliHome)) return;
 
-			// Stage into every Lucee Express install's lib/ext/ — that's the
-			// Tomcat classpath, where Lucee 7 finds JDBC drivers when the
-			// datasource config doesn't carry an OSGi `bundleName` hint
-			// (current `wheels new`-generated app.cfm omits the hint per
-			// GH #2304). Mirrors the brew/chocolatey wrapper's drop strategy
-			// so dev-checkout, manual-install, and any other path that skips
-			// the package wrapper still gets a working zero-config SQLite.
+			// Two staging targets, both required:
+			//
+			//   1. lib/ext/ on every Lucee Express install — Tomcat classpath,
+			//      where Class.forName("org.sqlite.JDBC") resolves. Mirrors the
+			//      brew/chocolatey wrapper's drop strategy.
+			//
+			//   2. bundles/ on every per-server Lucee context — Lucee 7's
+			//      datasource resolver consults its OSGi bundle loader (NOT
+			//      the parent Tomcat classloader) when instantiating drivers
+			//      for `cfquery`. lib/ext/ alone is not enough: the very first
+			//      query against a SQLite datasource fails because Lucee's
+			//      bundle resolver can't find the driver, even though
+			//      `Class.forName` would. See onboarding finding F2.
+			//
+			// Both paths are idempotent. Pre-stage runs before LuCLI extracts
+			// Express on the very first VM run (so dirs may not exist yet);
+			// post-stage runs after, when both dirs are guaranteed to exist.
 			stager.stageIntoLibExt(
 				bundleSrc = bundleSrc,
 				expressRoot = lucliHome & "/express",
 				jarFileName = "sqlite-jdbc-3.49.1.0.jar"
+			);
+			stager.stageIntoServerBundles(
+				bundleSrc = bundleSrc,
+				serversRoot = lucliHome & "/servers",
+				jarFileName = "org.xerial.sqlite-jdbc-3.49.1.0.jar"
 			);
 		} catch (any e) {
 			// Stay out of the way — let LuCLI's server start surface the real

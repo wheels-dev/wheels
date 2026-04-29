@@ -34,6 +34,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return root;
 	}
 
+	private string function makeTempServersRoot(required array serverNames) {
+		var root = getTempDirectory() & "wheels-servers-#createUUID()#";
+		directoryCreate(root, true);
+		for (var s in arguments.serverNames) {
+			directoryCreate(root & "/" & s & "/lucee-server/bundles", true);
+		}
+		return root;
+	}
+
 	function run() {
 		describe("BundleStager.projectUsesSqliteDatasource", () => {
 
@@ -162,6 +171,77 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				} finally {
 					fileDelete(jar);
 					directoryDelete(express, true);
+				}
+			});
+		});
+
+		describe("BundleStager.stageIntoServerBundles", () => {
+
+			it("copies the bundle JAR into every server's lucee-server/bundles/", () => {
+				var jar = makeTempBundleJar();
+				var servers = makeTempServersRoot(["blog", "another-app"]);
+				try {
+					var r = variables.stager.stageIntoServerBundles(jar, servers, "org.xerial.sqlite-jdbc-3.49.1.0.jar");
+					expect(arrayLen(r.staged)).toBe(2);
+					expect(arrayLen(r.skipped)).toBe(0);
+					expect(arrayLen(r.failed)).toBe(0);
+					expect(fileExists(servers & "/blog/lucee-server/bundles/org.xerial.sqlite-jdbc-3.49.1.0.jar")).toBeTrue();
+					expect(fileExists(servers & "/another-app/lucee-server/bundles/org.xerial.sqlite-jdbc-3.49.1.0.jar")).toBeTrue();
+				} finally {
+					fileDelete(jar);
+					directoryDelete(servers, true);
+				}
+			});
+
+			it("is idempotent — already-staged JARs report as 'skipped' (no overwrite)", () => {
+				var jar = makeTempBundleJar();
+				var servers = makeTempServersRoot(["blog"]);
+				try {
+					variables.stager.stageIntoServerBundles(jar, servers, "org.xerial.sqlite-jdbc-3.49.1.0.jar");
+					var r2 = variables.stager.stageIntoServerBundles(jar, servers, "org.xerial.sqlite-jdbc-3.49.1.0.jar");
+					expect(arrayLen(r2.staged)).toBe(0);
+					expect(arrayLen(r2.skipped)).toBe(1);
+					expect(arrayLen(r2.failed)).toBe(0);
+				} finally {
+					fileDelete(jar);
+					directoryDelete(servers, true);
+				}
+			});
+
+			it("returns empty result when serversRoot is missing (no servers started yet)", () => {
+				var jar = makeTempBundleJar();
+				try {
+					var r = variables.stager.stageIntoServerBundles(jar, "/nonexistent/path", "org.xerial.sqlite-jdbc-3.49.1.0.jar");
+					expect(arrayLen(r.staged)).toBe(0);
+					expect(arrayLen(r.skipped)).toBe(0);
+				} finally {
+					fileDelete(jar);
+				}
+			});
+
+			it("returns empty result when bundleSrc is missing", () => {
+				var servers = makeTempServersRoot(["blog"]);
+				try {
+					var r = variables.stager.stageIntoServerBundles("/nonexistent.jar", servers, "org.xerial.sqlite-jdbc-3.49.1.0.jar");
+					expect(arrayLen(r.staged)).toBe(0);
+				} finally {
+					directoryDelete(servers, true);
+				}
+			});
+
+			it("skips server entries that don't have a lucee-server/bundles/ directory yet", () => {
+				var jar = makeTempBundleJar();
+				var servers = getTempDirectory() & "wheels-servers-partial-#createUUID()#";
+				directoryCreate(servers, true);
+				directoryCreate(servers & "/blog/lucee-server/bundles", true);
+				directoryCreate(servers & "/half-built", true); // no lucee-server/bundles
+				try {
+					var r = variables.stager.stageIntoServerBundles(jar, servers, "org.xerial.sqlite-jdbc-3.49.1.0.jar");
+					expect(arrayLen(r.staged)).toBe(1);
+					expect(fileExists(servers & "/blog/lucee-server/bundles/org.xerial.sqlite-jdbc-3.49.1.0.jar")).toBeTrue();
+				} finally {
+					fileDelete(jar);
+					directoryDelete(servers, true);
 				}
 			});
 		});
