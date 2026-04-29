@@ -395,7 +395,7 @@ Recommend A at minimum. C is a nice enhancement.
 
 ---
 
-### [ ] 16. BDD test fixture setup (`tests/populate.cfm`) not documented at tutorial level
+### [x] 16. BDD test fixture setup (`tests/populate.cfm`) not documented at tutorial level — **subsumed by 2026-04-29 finding #10**, shipped in batch E (commits `80be9f8cc` + `80b8c61b1`)
 
 **Problem.** CLAUDE.md documents the fixture-setup pattern, but that's contributor-facing. Guides Part 7 mentions it only in troubleshooting.
 
