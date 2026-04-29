@@ -53,6 +53,18 @@ component implements="wheels.auth.AuthenticatorInterface" output="false" {
 	 * @return An AuthResult struct.
 	 */
 	public struct function authenticate(required struct request) {
+		// Diagnostic check: zero registered strategies is almost always a wiring bug.
+		// Distinguish it from "strategies registered but none claim this request"
+		// so a misconfigured services.cfm or a missing onApplicationStart hook
+		// fails loudly instead of looking like an expired session.
+		if (ArrayLen(variables.strategies) == 0) {
+			return $authResult(
+				success = false,
+				error = "No authentication strategies registered. Check that config/services.cfm registers an Authenticator and a strategy as singletons, and that registerStrategy() is being called on the same Authenticator instance returned by service('authenticator'). See the auth chapter in the Wheels guides for the wiring.",
+				statusCode = 401
+			);
+		}
+
 		// Determine which strategies to try and in what order
 		local.toTry = $buildStrategyOrder(arguments.request);
 
