@@ -46,6 +46,18 @@ Per [batch B plan](./2026-04-29-fresh-vm-batch-b-cli-polish.md).
 | 8 | `wheels reload` notes that `onApplicationStart` does not re-fire | `b59793ca4` | wheels |
 | 7 | `wheels destroy` accepts `<type> <name>` order | `c39f5e5f4` | wheels (shipped via PR #2360, separate workstream) |
 
+### Batch C — Scaffold/tutorial alignment (2026-04-29)
+
+Per [batch C plan](./2026-04-29-fresh-vm-batch-c-scaffold-align.md).
+
+| # | Item | Commit | Repo |
+|---|------|--------|------|
+| 4 (snapshots) | 9 failing tests pin chapter-3-aligned output | `a7cf19572` | wheels |
+| 4 (controller) | Posts.cfc uses route-model-binding + new()/save() | `27092e1d6` | wheels |
+| 4 (enum) | Form generator emits select() with values | `d28f7672d` | wheels |
+| 4 (views) | _form/new/edit/index/show templates + processViewMarkers | `ed5d66d89` | wheels |
+| 4 (routes) | .resources dedupe across positional + named-arg forms | `ca813416e` | wheels |
+
 ### Batch E — Browser test infrastructure (2026-04-29)
 
 Per [batch E plan](./2026-04-29-fresh-vm-batch-e-browser-test-infra.md).
@@ -140,7 +152,7 @@ Two parts — both framework:
 
 ## P1 — Polishes the happy path
 
-### [ ] 4. `wheels generate scaffold` output disagrees with chapter 3 of the tutorial
+### [x] 4. `wheels generate scaffold` output disagrees with chapter 3 of the tutorial — **shipped in batch C** (snapshots `a7cf19572`, controller `27092e1d6`, enum select `d28f7672d`, view templates `ed5d66d89`, route dedupe `ca813416e`)
 
 **Tutorial location.** [Part 3 — CRUD scaffold](https://guides.wheels.dev/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/), sections "The controller", "The form partial", "The four views".
 
