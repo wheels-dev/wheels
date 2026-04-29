@@ -795,7 +795,12 @@ component extends="wheels.WheelsTest" {
 				migration.announce(truth)
 
 				actual = request.$wheelsMigrationOutput
-				expected = napalm & Chr(13) & truth & Chr(13)
+				// announce() emits CRLF (Chr(13) & Chr(10)) so terminals
+				// advance the line. Previously emitted bare CR which only
+				// reset the cursor and caused successive announcements to
+				// overwrite. See finding #3 in
+				// docs/superpowers/plans/2026-04-29-fresh-vm-onboarding-findings.md
+				expected = napalm & Chr(13) & Chr(10) & truth & Chr(13) & Chr(10)
 
 				expect(actual).toBe(expected)
 			})
