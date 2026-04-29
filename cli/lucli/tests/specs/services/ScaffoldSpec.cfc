@@ -80,6 +80,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayLen(files)).toBeGTE(1);
 				});
 
+				it("adds the PLURAL resource route to routes.cfm (regression for F4)", () => {
+					// Scaffold takes a singular name (`Article`) but routes.cfm
+					// must follow the plural convention. Onboarding finding F4
+					// reported the scaffold writing `.resources("post")` (singular)
+					// after `wheels generate scaffold Post`, which conflicts with
+					// any hand-added plural route and breaks the PostsController
+					// mapping.
+					var result = scaffold.generateScaffold(
+						name = "Article",
+						properties = [{name: "title", type: "string"}]
+					);
+					expect(result.success).toBeTrue();
+					var routesContent = fileRead(tempRoot & "/config/routes.cfm");
+					expect(routesContent).toInclude('.resources("articles")');
+					expect(routesContent).notToInclude('.resources("article")');
+				});
+
 				it("handles empty name gracefully", () => {
 					// Scaffold may reject or accept empty names depending on implementation
 					var result = scaffold.generateScaffold(

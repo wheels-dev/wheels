@@ -131,8 +131,13 @@ component {
 				}
 			}
 
-			// 6. Update routes
-			updateRoutes(arguments.name);
+			// 6. Update routes — pass the PLURAL form. `.resources("...")` follows
+			// Wheels' convention of plural resource names (e.g. `posts` maps to
+			// PostsController). Passing the singular `arguments.name` here was an
+			// onboarding cliff (finding F4): scaffolding `Post` produced
+			// `.resources("post")`, which conflicted with hand-added plural routes
+			// and broke the controller convention.
+			updateRoutes(pluralName);
 
 		} catch (any e) {
 			results.success = false;
