@@ -94,7 +94,9 @@ When the user types `wheels version` or `wheels help` (subcommand form, no leadi
 | `wheels --help` | wrapper intercept → exit (never reaches LuCLI) |
 | `wheels help` | wrapper sync → LuCLI → `Module.showHelp()` (overridden) |
 | `wheels generate model User` | wrapper sync → LuCLI → `Module.generate("model", "User")` |
-| `wheels migrate latest --help` | wrapper sync → LuCLI → `preprocessModuleHelp` rewrites → `Module.showHelp("migrate")` |
+| `wheels migrate --help` | wrapper intercept → exit (LuCLI's `preprocessModuleHelp` would otherwise drop "migrate" and route to top-level help — see [wheels#2313](https://github.com/wheels-dev/wheels/issues/2313)) |
+| `wheels migrate latest --help` | wrapper intercept → exit (`--help` detected anywhere in args; first arg routes to subcommand help) |
+| `wheels foo --help` (unknown sub) | wrapper sees `--help` but `case "$1"` has no match → falls through to LuCLI which reports the unknown subcommand |
 
 ## Testing the layers in isolation
 
