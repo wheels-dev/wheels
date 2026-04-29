@@ -35,7 +35,7 @@ Packages are distributed as standalone Git repositories, indexed by the [`wheels
 Install a package:
 
 ```bash title="your shell"
-wheels packages install wheels-hotwire
+wheels packages add wheels-hotwire
 wheels reload
 ```
 
@@ -45,7 +45,7 @@ Browse, search, inspect, update, or remove:
 wheels packages list                    # installed packages with versions
 wheels packages search hotwire          # match name/description/tags
 wheels packages show wheels-sentry      # registry detail page
-wheels packages install wheels-sentry@1.2.0   # pin a specific version
+wheels packages add wheels-sentry@1.2.0   # pin a specific version
 wheels packages update wheels-sentry --yes
 wheels packages update --all --yes
 wheels packages remove wheels-hotwire
@@ -295,7 +295,7 @@ Submission flow:
 4. CI validates schema, name uniqueness, that the source repo and tag resolve, the file-type allowlist, and the size cap.
 5. A maintainer reviews — they confirm the author's repo looks real and the package fits the ecosystem, then merge.
 6. The `mirror-tarball` workflow clones the tagged source, builds a deterministic tarball, uploads it to a release on the registry repo, computes a sha256, and bot-commits both back into your manifest.
-7. Users install via `wheels packages install wheels-foo`.
+7. Users install via `wheels packages add wheels-foo`.
 
 Publishing a new version is the same PR flow — append to the `versions[]` array, don't mutate previous entries. `wheels packages update` is explicit; users opt in to version bumps.
 
@@ -303,9 +303,11 @@ Publishing a new version is the same PR flow — append to the `versions[]` arra
 
 The install/update surface is covered by the commands shown earlier under [The activation model](#the-activation-model). The full set (see `wheels packages --help`):
 
-- `wheels packages list | search | show | install | update | remove` — day-to-day install and lifecycle operations.
-- `wheels packages install <name>@<version>` — pin a specific version; omit for the latest compatible.
-- `wheels packages install <name> --force` — overwrite an existing `vendor/<name>/`.
+- `wheels packages list | search | show | add | update | remove` — day-to-day install and lifecycle operations.
+- `wheels packages add <name>@<version>` — pin a specific version; omit for the latest compatible.
+- `wheels packages add <name> --force` — overwrite an existing `vendor/<name>/`.
+
+The install verb is `add`, not `install`, because LuCLI's built-in extension installer intercepts `install` across all modules — typing `wheels packages install foo` runs LuCLI's own `lucee.json` dependency resolver and never reaches the Wheels package handler. (Same trap that earlier renamed `wheels browser install` to `wheels browser setup`.) `add` is the canonical verb across the docs.
 - `wheels packages update --all --yes` — bulk-update every installed package, no prompt.
 - `wheels packages registry refresh | info` — manage the 24-hour registry cache.
 

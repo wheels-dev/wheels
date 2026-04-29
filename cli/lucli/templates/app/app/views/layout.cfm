@@ -17,7 +17,7 @@
 			      any markup changes. Form helpers like #textField()# already emit the
 			      right tags, so scaffolded views render polished out of the box.
 			      Remove this line if you're bringing your own CSS, or swap for a richer
-			      component kit — e.g. `wheels packages install wheels-basecoat`. --->
+			      component kit — e.g. `wheels packages add wheels-basecoat`. --->
 			<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
 		</head>
 
