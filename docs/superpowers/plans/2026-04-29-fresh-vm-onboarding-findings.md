@@ -46,6 +46,20 @@ Per [batch B plan](./2026-04-29-fresh-vm-batch-b-cli-polish.md).
 | 8 | `wheels reload` notes that `onApplicationStart` does not re-fire | `b59793ca4` | wheels |
 | 7 | `wheels destroy` accepts `<type> <name>` order | `c39f5e5f4` | wheels (shipped via PR #2360, separate workstream) |
 
+### Batch E — Browser test infrastructure (2026-04-29)
+
+Per [batch E plan](./2026-04-29-fresh-vm-batch-e-browser-test-infra.md).
+
+| # | Item | Commit | Repo |
+|---|------|--------|------|
+| 11 | Chapter 7 selector scoped to new-comment frame | `f274677de` | wheels |
+| 10 | `wheels test` runs against `<appname>_test` datasource by default | `80be9f8cc` | wheels |
+| 10 (doc) | Chapter 7 explains test-DB isolation | `80b8c61b1` | wheels |
+| 10 (canary) | `tools/test-tutorial-ch7.sh` regression harness | `375673f03` | wheels |
+| 12 | `Content-Type: text/vnd.turbo-stream.html` for stream responses | `21df38ac1` | wheels |
+
+Subsumes April 19 #16 (`tests/populate.cfm` not documented at tutorial level).
+
 ---
 
 ## Suggested PR-sized batches
@@ -181,7 +195,7 @@ wheels generate scaffold Post title:string body:text status:enum
 
 ---
 
-### [ ] 10. Browser-test DB collision: `tests/populate.cfm` not generated and not documented at tutorial level
+### [x] 10. Browser-test DB collision — **shipped in batch E** (commit `80be9f8cc` framework + `80b8c61b1` doc + `375673f03` canary)
 
 **Tutorial location.** [Part 7 — Testing & Deploying](https://guides.wheels.dev/v4-0-0-snapshot/start-here/tutorial/07-testing-deploying/), section "Browser spec — full signup to post to comment".
 
@@ -216,7 +230,7 @@ The tutorial mentions `tests/populate.cfm` only in troubleshooting and never ins
 
 ---
 
-### [ ] 11. Tutorial browser spec selector `button[type=submit]` is ambiguous on the post show page
+### [x] 11. Tutorial browser spec selector `button[type=submit]` is ambiguous on the post show page — **shipped in batch E** (commit `f274677de`)
 
 **Tutorial location.** Same chapter 7 section as #10.
 
@@ -243,7 +257,7 @@ The test fails before exercising the comment form.
 
 ---
 
-### [ ] 12. Tutorial browser spec final assertion (`assertSee("Great post")`) fails after submitting comment
+### [x] 12. Tutorial browser spec final assertion fails after submitting comment — **shipped in batch E** (commit `21df38ac1`, H1 fix: Content-Type for stream responses; end-to-end browser-spec verification deferred to canary harness once Playwright JARs ship in CI)
 
 **Tutorial location.** Same chapter 7 section as #10/#11.
 
