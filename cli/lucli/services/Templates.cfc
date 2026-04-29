@@ -475,12 +475,39 @@ component {
 		if (find("<!--- CLI-Appends-Here --->", processed)) {
 			if (structKeyExists(arguments.context, "action") && arguments.context.action == "show") {
 				processed = replace(processed, "<!--- CLI-Appends-Here --->", generateShowViewProperties(arguments.context.properties, arguments.context.modelName, arguments.belongsTo), "all");
+			} else if (structKeyExists(arguments.context, "action") && arguments.context.action == "index") {
+				// Inside the article-style index loop, emit per-property
+				// <p> blocks that reference the query's row columns. The
+				// caller's loop tag scopes those references.
+				processed = replace(processed, "<!--- CLI-Appends-Here --->", generateIndexArticleBody(arguments.context.properties, arguments.belongsTo), "all");
 			} else {
 				processed = replace(processed, "<!--- CLI-Appends-Here --->", "", "all");
 			}
 		}
 
 		return processed;
+	}
+
+	/**
+	 * Generate per-property <p> blocks for the article-style index view.
+	 * Inside the cfloop the column names are accessible directly (the loop
+	 * scopes them), so column references work without a query alias.
+	 */
+	private string function generateIndexArticleBody(required array properties, string belongsTo = "") {
+		var blocks = [];
+		var foreignKeys = buildForeignKeyList(arguments.belongsTo);
+
+		for (var prop in arguments.properties) {
+			var label = variables.helpers.capitalize(prop.name);
+			if (arrayFindNoCase(foreignKeys, prop.name)) {
+				var assocName = left(prop.name, len(prop.name) - 2);
+				label = variables.helpers.capitalize(assocName);
+				arrayAppend(blocks, '<p>' & label & ': ##|ObjectNamePlural|.' & assocName & '.name##</p>');
+			} else {
+				arrayAppend(blocks, '<p>' & label & ': ##|ObjectNamePlural|.' & prop.name & '##</p>');
+			}
+		}
+		return arrayToList(blocks, chr(10) & chr(9) & chr(9));
 	}
 
 	/**
@@ -540,11 +567,9 @@ component {
 			arrayAppend(displayCode, propDisplay);
 		}
 
-		arrayAppend(displayCode, '');
-		arrayAppend(displayCode, '<p>');
-		arrayAppend(displayCode, chr(9) & '##linkTo(route="edit|ObjectNameSingularC|", key=|ObjectNameSingular|.key(), text="Edit", class="btn btn-primary")##');
-		arrayAppend(displayCode, chr(9) & '##linkTo(route="|ObjectNamePlural|", text="Back to List", class="btn btn-default")##');
-		arrayAppend(displayCode, '</p>');
+		// Action footer (Edit / Delete / Back) is now part of the
+		// show.txt template directly, with no Bootstrap classes.
+		// generateShowViewProperties only emits per-property <p> blocks.
 
 		return arrayToList(displayCode, chr(10));
 	}

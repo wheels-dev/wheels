@@ -1,5 +1,8 @@
-<!--- |ObjectNameSingularC| Form Contents --->
+<cfparam name="|ObjectNameSingular|" default="">
 <cfoutput>
-|FormFields|
-<!--- CLI-Appends-Here --->
+#errorMessagesFor("|ObjectNameSingular|")#
+#startFormTag(action=IsNumeric(|ObjectNameSingular|.id ?: "") ? "update" : "create", key=|ObjectNameSingular|.id ?: "")#
+	|FormFields|
+	<button type="submit">Save</button>
+#endFormTag()#
 </cfoutput>
