@@ -3573,6 +3573,19 @@ component extends="modules.BaseModule" {
 		// non-zero exit code instead of a silent success.
 		var wheelsSource = resolveFrameworkSourceOrFail(appName);
 
+		// Open a printCreated() dedup session for the duration of this
+		// scaffold. See issue #2311 — the duplicate
+		// "create blog/Application.cfc" line was a side-effect of the
+		// copyTemplateDir() recursion bug fixed in #2342, but the guard
+		// stays here so any future code path that double-emits the same
+		// path in one `wheels new` run surfaces as a verbose() diagnostic
+		// instead of a confusing user-visible duplicate. Cleanup runs in
+		// the finally below so generator commands later in the same
+		// process (MCP server, REPL) emit unconditionally.
+		variables.$createdPathTracker = {};
+
+		try {
+
 		out("Creating new Wheels application: #appName#...", "cyan");
 		out("");
 
@@ -3650,6 +3663,12 @@ component extends="modules.BaseModule" {
 		out("  cd #appName#");
 		out("  wheels start");
 		return "";
+
+		} finally {
+			// Always close the dedup session so subsequent commands in the
+			// same process (long-lived MCP / REPL contexts) emit normally.
+			structDelete(variables, "$createdPathTracker");
+		}
 	}
 
 	/**
@@ -4611,9 +4630,26 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Print a "create" action line with green formatting
+	 * Print a "create" action line with green formatting.
+	 *
+	 * When a tracking session is active (started by scaffoldNewApp via
+	 * `variables.$createdPathTracker`), duplicate emissions of the same path
+	 * are suppressed and surfaced as a verbose() diagnostic instead. This is
+	 * defense-in-depth for issue #2311 — the original duplicate
+	 * "create blog/Application.cfc" line was a side effect of the
+	 * copyTemplateDir() recursion bug fixed in #2342, but if any future
+	 * regression re-emits a path twice, users see one cosmetic line rather
+	 * than a confusing duplicate. Generator commands (which don't open a
+	 * tracking session) emit unconditionally.
 	 */
 	private void function printCreated(required string path) {
+		if (structKeyExists(variables, "$createdPathTracker")) {
+			if (structKeyExists(variables.$createdPathTracker, arguments.path)) {
+				verbose("printCreated: duplicate emit suppressed for #arguments.path#");
+				return;
+			}
+			variables.$createdPathTracker[arguments.path] = true;
+		}
 		out("  create  #path#", "green");
 	}
 

@@ -49,6 +49,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayToList(missing)).toBe("");
 			});
 
+			it("ships both public/Application.cfc and public/miscellaneous/Application.cfc", () => {
+				// Issue #2311 reported a duplicate "create blog/Application.cfc"
+				// line. The root cause was the copyTemplateDir() recursion bug
+				// fixed in #2342 — both files exist on purpose (the empty one
+				// in public/miscellaneous/ overrides the parent so requests to
+				// that subtree don't run through Wheels) but flattened paths
+				// printed both as the same string. This guards against a
+				// future "cleanup" that mistakenly deletes one as a duplicate.
+				expect(fileExists(templateRoot & "public/Application.cfc")).toBeTrue();
+				expect(fileExists(templateRoot & "public/miscellaneous/Application.cfc")).toBeTrue();
+			});
+
 		});
 
 	}
