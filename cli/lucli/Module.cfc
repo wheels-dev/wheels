@@ -444,6 +444,20 @@ component extends="modules.BaseModule" {
 	public string function start() {
 		var args = getArgs(arguments);
 
+		// Refuse to start from a non-Wheels-project directory. LuCLI's
+		// `server start` derives the server name from the cwd basename and
+		// silently registers a new context — running `wheels start` in the
+		// wrong directory leaves orphan registrations like `ws` or
+		// `Downloads`. Onboarding finding F6.
+		if (!$isWheelsProjectDir(variables.projectRoot)) {
+			out("This directory does not look like a Wheels project.", "yellow");
+			out("  Expected: config/settings.cfm under the current directory.", "yellow");
+			out("");
+			out("Tip: cd into your project directory, or run `wheels new <appname>`", "cyan");
+			out("     to scaffold one.", "cyan");
+			return "";
+		}
+
 		out("Starting Wheels server...", "cyan");
 
 		// Stage required JDBC drivers into the Lucee Express lib/ext/ before
@@ -503,6 +517,15 @@ component extends="modules.BaseModule" {
 				out("To list all servers:      wheels server list", "cyan");
 				return "";
 			}
+			// No registered server AND no others running. Don't fall through
+			// to LuCLI's `server stop` — it would create a phantom server
+			// registration named after the cwd basename. Onboarding finding F6.
+			out("");
+			out("No Wheels server is registered for this directory, and none are running elsewhere.", "yellow");
+			if (!$isWheelsProjectDir(variables.projectRoot)) {
+				out("Tip: run this from inside your Wheels project directory.", "cyan");
+			}
+			return "";
 		}
 
 		executeCommand("server", ["stop"], variables.projectRoot);
@@ -3874,6 +3897,23 @@ component extends="modules.BaseModule" {
 			// Stay out of the way — let LuCLI's server start surface the real
 			// error if the bundle was actually needed and we couldn't stage.
 		}
+	}
+
+	/**
+	 * True when the given directory has the structural fingerprint of a
+	 * Wheels project — currently presence of `config/settings.cfm`, the file
+	 * `wheels new` always writes and that no other tool creates. Used by
+	 * `start()` and `stop()` to refuse silent fallthrough to LuCLI's `server`
+	 * subcommands, which would otherwise register a phantom server context
+	 * named after the cwd basename. See onboarding finding F6.
+	 *
+	 * `box.json` alone is not enough — too many non-Wheels CommandBox
+	 * projects ship one — and `Application.cfc` is not enough either since
+	 * any CFML codebase has one.
+	 */
+	private boolean function $isWheelsProjectDir(required string path) {
+		if (!len(arguments.path)) return false;
+		return fileExists(arguments.path & "/config/settings.cfm");
 	}
 
 	/**
