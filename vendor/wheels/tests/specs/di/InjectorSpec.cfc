@@ -29,6 +29,32 @@ component extends="wheels.WheelsTest" {
 					expect(first).toBe(second);
 				});
 
+				it("asSingleton flag survives the existing framework Bindings (regression: 2026-04-29 fresh-VM)", () => {
+					// The container starts with the framework's bindings already loaded
+					// (~20 of them from wheels.Bindings). When the user calls
+					// .map(X).to(Y).asSingleton() in services.cfm, the flag must land
+					// on X regardless of how many keys preceded it.
+					//
+					// Regression: a previous implementation walked variables.mappings
+					// via for-in to find the "last-mapped" key. Lucee's HashMap-backed
+					// struct doesn't iterate in insertion order once enough keys are
+					// registered to span multiple buckets — the just-added key ends up
+					// in the middle of iteration, and asSingleton flagged the wrong
+					// binding.
+					//
+					// Use the production Bindings here (not the empty TestBindings)
+					// to exercise the real-world key count.
+					var realDi = new wheels.Injector(binderPath="wheels.Bindings");
+
+					realDi.map("userAuthenticator").to("wheels.tests._assets.di.SimpleService").asSingleton();
+
+					expect(realDi.isSingleton("userAuthenticator")).toBeTrue();
+
+					var first = realDi.getInstance("userAuthenticator");
+					var second = realDi.getInstance("userAuthenticator");
+					expect(first).toBe(second);
+				});
+
 				it("creates new transient instances each call", () => {
 					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
 					var first = di.getInstance("simpleService");
