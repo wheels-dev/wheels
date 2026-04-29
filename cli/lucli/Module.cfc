@@ -3430,7 +3430,10 @@ component extends="modules.BaseModule" {
 			// Try to parse JSON result
 			if (isJSON(httpResult)) {
 				var result = deserializeJSON(httpResult);
-				displayTestResults(result, verboseOutput);
+				var resolvedDir = len(filter)
+					? filter
+					: (coreTests ? "wheels.tests.specs" : "tests.specs");
+				displayTestResults(result, verboseOutput, resolvedDir);
 			} else {
 				// Could be an HTML error page
 				if (reFindNoCase("<html", httpResult)) {
@@ -3448,7 +3451,11 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
-	private void function displayTestResults(required any result, boolean verboseOutput = false) {
+	private void function displayTestResults(
+		required any result,
+		boolean verboseOutput = false,
+		string testDirectory = ""
+	) {
 		if (!isStruct(result)) {
 			out(serializeJSON(result));
 			return;
@@ -3460,6 +3467,52 @@ component extends="modules.BaseModule" {
 		var totalError = result.totalError ?: (result.totalErrors ?: 0);
 		var totalDuration = result.totalDuration ?: 0;
 		var total = totalPass + totalFail + totalError;
+
+		// Detect specs that failed to compile. TestBox silently skips bundles
+		// it can't load, so its "totalPass: 0, totalFail: 0, totalError: 0"
+		// reply is indistinguishable from "you have no specs" or "all specs
+		// passed an empty run." We probe the disk and warn if the loaded
+		// bundle count is lower than the on-disk *Spec.cfc count. See
+		// finding #2 in the 2026-04-29 fresh-VM triage.
+		var specsFailedToLoad = 0;
+		var unloadedSpecPaths = [];
+		if (len(arguments.testDirectory)) {
+			try {
+				var runner = new cli.lucli.services.TestRunner(projectRoot = variables.projectRoot);
+				var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
+				var loadedCount = (structKeyExists(result, "bundleStats") && isArray(result.bundleStats))
+					? arrayLen(result.bundleStats)
+					: 0;
+				if (diskCount > loadedCount) {
+					specsFailedToLoad = diskCount - loadedCount;
+					var diskSpecs = runner.listSpecsOnDisk(arguments.testDirectory);
+					var loadedNames = {};
+					if (loadedCount > 0) {
+						for (var b in result.bundleStats) {
+							loadedNames[b.name ?: ""] = true;
+						}
+					}
+					for (var p in diskSpecs) {
+						if (!structKeyExists(loadedNames, p)) {
+							arrayAppend(unloadedSpecPaths, p);
+						}
+					}
+				}
+			} catch (any probeErr) {
+				// Probe is best-effort — never let it crash the test report.
+				verbose("Failed-to-load probe failed: #probeErr.message#");
+			}
+		}
+
+		if (specsFailedToLoad > 0) {
+			out("");
+			out("WARN  #specsFailedToLoad# spec file(s) failed to compile and were silently skipped:", "yellow");
+			for (var unloaded in unloadedSpecPaths) {
+				out("        #unloaded#", "yellow");
+			}
+			out("        Visit /wheels/app/tests in a browser for the parse-error details.", "yellow");
+			out("");
+		}
 
 		// Display bundle/suite/spec tree if verbose and bundles exist
 		if (arguments.verboseOutput && structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
@@ -3478,9 +3531,14 @@ component extends="modules.BaseModule" {
 		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
 
 		if (totalFail == 0 && totalError == 0) {
-			out("#totalPass# passed#duration#", "green");
+			if (specsFailedToLoad > 0) {
+				out("#totalPass# passed, #specsFailedToLoad# failed to load#duration#", "yellow");
+			} else {
+				out("#totalPass# passed#duration#", "green");
+			}
 		} else {
-			out("#totalPass# passed, #totalFail# failed, #totalError# error(s)#duration#", "red");
+			var failedToLoadStr = specsFailedToLoad > 0 ? ", #specsFailedToLoad# failed to load" : "";
+			out("#totalPass# passed, #totalFail# failed, #totalError# error(s)#failedToLoadStr##duration#", "red");
 			out("");
 
 			// Show failure details (skip if verbose already displayed them via displaySuite)
