@@ -91,6 +91,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(tempRoot & "/app/models/Destroyable.cfc")).toBeTrue();
 			});
 
+			// Issue #2313 (F16): the v3 docs index and `wheels generate` both use
+			// `<type> <name>` order. The CLI used to reject this form with
+			// "Unknown type: ...". These specs guard the smart-parse fix.
+			it("accepts <type> <name> order (matches wheels generate)", () => {
+				mod.__arguments = ["model", "Destroyable", "--force"];
+				mod.destroy();
+				expect(fileExists(tempRoot & "/app/models/Destroyable.cfc")).toBeFalse();
+			});
+
+			it("accepts <type> <name> for controller", () => {
+				mod.__arguments = ["controller", "Destroyable", "--force"];
+				mod.destroy();
+				expect(fileExists(tempRoot & "/app/controllers/Destroyables.cfc")).toBeFalse();
+			});
+
+			it("accepts <type> <name> for resource", () => {
+				mod.__arguments = ["resource", "Destroyable", "--force"];
+				mod.destroy();
+				expect(fileExists(tempRoot & "/app/models/Destroyable.cfc")).toBeFalse();
+				expect(fileExists(tempRoot & "/app/controllers/Destroyables.cfc")).toBeFalse();
+				expect(directoryExists(tempRoot & "/app/views/destroyables")).toBeFalse();
+			});
+
 		});
 
 	}
