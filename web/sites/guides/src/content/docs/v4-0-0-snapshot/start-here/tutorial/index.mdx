@@ -1,6 +1,6 @@
 ---
 title: "Tutorial: Build a Blog"
-description: A 7-part narrative tutorial. Build a complete Wheels 4.0 blog with Turbo, Basecoat, and built-in auth. Takes about 3.5 hours.
+description: A 7-part narrative tutorial. Build a complete Wheels 4.0 blog with Turbo and built-in auth. Takes about 3.5 hours.
 type: tutorial
 sidebar:
   order: 5
@@ -34,8 +34,8 @@ A blog for an individual author. The final app supports:
 
 - **Framework:** Wheels 4.0 on Lucee 7 (via the bundled `wheels` CLI)
 - **Database:** SQLite, zero setup. Same engine the tutorial runs against in CI.
-- **Frontend:** Turbo Drive for page transitions, Turbo Frames for inline errors, Turbo Streams for comment updates. All arrive via the `hotwire` package partway through.
-- **Styling:** Basecoat UI on scaffolded forms and views. Arrives via the `basecoat` package.
+- **Frontend:** Turbo Drive for page transitions, Turbo Frames for inline errors, Turbo Streams for comment updates. Loaded from a CDN script tag in Part 4; the `hotwire` package is the eventual canonical home.
+- **Styling:** [simple.css](https://simplecss.org/), wired into the generated `app/views/layout.cfm` by `wheels new`. Classless — semantic HTML renders polished without any markup changes. The [`wheels-basecoat`](https://github.com/wheels-dev/wheels-basecoat) package is available as an optional shadcn/ui-quality component-kit upgrade after the tutorial.
 - **Auth:** Wheels' built-in `SessionStrategy` for session cookies. Hand-rolled version shown first for understanding, built-in version shown second for shipping.
 - **Tests:** WheelsTest (BDD), plus one Playwright-driven browser spec.
 
@@ -45,7 +45,7 @@ A blog for an individual author. The final app supports:
 |------|-------|------|
 | [1. Hello, Wheels](/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/) | Scaffold an app. Add a route, a controller action, a view. | 20 min |
 | [2. Your First Model](/v4-0-0-snapshot/start-here/tutorial/02-first-model/) | Generate a Post model. Run a migration. Seed data. Build the index and show actions by hand. | 25 min |
-| [3. CRUD Scaffold](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/) | Throw it away. Run `wheels generate scaffold`. Activate Hotwire and Basecoat. Tour the generated files. | 25 min |
+| [3. CRUD Scaffold](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/) | Throw it away. Run `wheels generate scaffold`. Tour the generated files and meet Wheels' package system. | 25 min |
 | [4. Validations and Turbo Frames](/v4-0-0-snapshot/start-here/tutorial/04-validations-frames/) | Add model validations. Wrap the form in a `<turbo-frame>` so errors come back inline. | 30 min |
 | [5. Comments and Turbo Streams](/v4-0-0-snapshot/start-here/tutorial/05-comments-streams/) | Add a Comment model. Associate it with Post. Nested routes. Submit comments via Turbo Streams. | 35 min |
 | [6. Authentication](/v4-0-0-snapshot/start-here/tutorial/06-authentication/) | Hand-roll sessions first to understand the mental model. Then replace with `wheels.auth.SessionStrategy`. | 45 min |
