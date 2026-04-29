@@ -383,7 +383,7 @@ Common column types available in migrations:
 | `t.datetime()` | DATETIME | `t.datetime(columnNames='registeredAt')` |
 | `t.time()` | TIME | `t.time(columnNames='startTime')` |
 | `t.binary()` | BLOB | `t.binary(columnNames='avatar')` |
-| `t.timestamps()` | DATETIME | Creates createdAt and updatedAt |
+| `t.timestamps()` | DATETIME | Creates createdAt, updatedAt, and deletedAt (soft-delete marker) |
 
 ## Best Practices
 

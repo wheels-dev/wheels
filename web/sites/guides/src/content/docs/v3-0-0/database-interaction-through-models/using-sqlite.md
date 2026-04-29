@@ -288,7 +288,7 @@ component extends="wheels.migrator.Migration" {
         t.string("email", limit=100, null=false);
         t.boolean("active", default=true);
         t.datetime("lastLoginAt");  // Stored as TEXT
-        t.timestamps();  // Creates createdAt and updatedAt as TEXT
+        t.timestamps();  // Creates createdAt, updatedAt, and deletedAt as TEXT
         t.create();
 
         // Indexes work normally
