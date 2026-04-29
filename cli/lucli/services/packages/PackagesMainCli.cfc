@@ -5,10 +5,18 @@
  *   list [--tag=<tag>]
  *   search <query>
  *   show <name>
- *   install <name>[@<version>] [--force]
+ *   add <name>[@<version>] [--force]
  *   update <name> [--yes]
  *   update --all --yes
  *   remove <name>
+ *
+ * `add` (not `install`!) is the install verb because LuCLI's built-in
+ * extension installer intercepts the literal subcommand `install`
+ * across all modules — same trap that bit `wheels browser install`
+ * (renamed to `wheels browser setup` in #2345). User input
+ * `wheels packages install <name>` never reaches Module.cfc; LuCLI
+ * runs its own dependency installer against `lucee.json` instead and
+ * prints "No git or extension dependencies to install".
  *
  * Outputs plain text suitable for a terminal. Exit-code semantics are
  * the caller's job (Module.cfc throws to signal non-zero on fatal error;
@@ -140,14 +148,24 @@ component {
 		return ArrayToList(local.buf, Chr(10)) & Chr(10);
 	}
 
-	public string function install(struct opts = {}) {
+	public string function add(struct opts = {}) {
 		local.target = Trim(arguments.opts.target ?: "");
 		if (!Len(local.target)) {
-			Throw(type = "Wheels.Packages.BadInput", message = "install requires a package name: wheels packages install <name>[@<version>]");
+			Throw(type = "Wheels.Packages.BadInput", message = "add requires a package name: wheels packages add <name>[@<version>]");
 		}
 		local.parsed = $parseTarget(local.target);
 		local.force = arguments.opts.force ?: false;
 		return $doInstall(local.parsed.name, local.parsed.pin, local.force);
+	}
+
+	// `install` is preserved as an alias for any in-process callers
+	// (specs, scripted clients) that haven't migrated to `add`. Note
+	// that the public CLI surface — `wheels packages install <name>` —
+	// never reaches this method because LuCLI's built-in extension
+	// installer intercepts the literal `install` subcommand before
+	// Module.cfc dispatches. See the component header.
+	public string function install(struct opts = {}) {
+		return add(argumentCollection = arguments);
 	}
 
 	public string function update(struct opts = {}) {
@@ -161,7 +179,7 @@ component {
 		if (!variables.installer.isInstalled(local.name)) {
 			Throw(
 				type = "Wheels.Packages.NotInstalled",
-				message = "Package '#local.name#' is not installed. Use `wheels packages install #local.name#`."
+				message = "Package '#local.name#' is not installed. Use `wheels packages add #local.name#`."
 			);
 		}
 		if (!(arguments.opts.yes ?: false)) {
@@ -258,7 +276,7 @@ component {
 			// rather than crashing on Left(str, 0) (a documented Lucee 7 hazard).
 			Throw(
 				type = "Wheels.Packages.BadInput",
-				message = "Package name is required before '@'. Use: wheels packages install <name>[@<version>]"
+				message = "Package name is required before '@'. Use: wheels packages add <name>[@<version>]"
 			);
 		}
 		if (local.at > 1) {

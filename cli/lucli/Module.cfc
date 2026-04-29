@@ -1855,7 +1855,7 @@ component extends="modules.BaseModule" {
 	 *   wheels packages list [--tag=<tag>]
 	 *   wheels packages search <query>
 	 *   wheels packages show <name>
-	 *   wheels packages install <name>[@<version>] [--force]
+	 *   wheels packages add <name>[@<version>] [--force]
 	 *   wheels packages update <name> --yes
 	 *   wheels packages update --all --yes
 	 *   wheels packages remove <name>
@@ -1886,13 +1886,27 @@ component extends="modules.BaseModule" {
 				opts.name = positional[2];
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.show(opts);
-			case "install":
+			case "add":
 				if (arrayLen(positional) < 2) {
-					throw(message="install requires a name: wheels packages install <name>[@<version>]");
+					throw(message="add requires a name: wheels packages add <name>[@<version>]");
 				}
 				opts.target = positional[2];
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.install(opts);
+				return mainCli.add(opts);
+			case "install":
+				// Dead code on the CLI surface: LuCLI's built-in extension
+				// installer intercepts the literal verb `install` across
+				// all modules before dispatch reaches Module.cfc — the
+				// same trap that bit `wheels browser install` (renamed
+				// to `wheels browser setup` in #2345). Kept as a
+				// documentation marker for future maintainers; if LuCLI
+				// ever stops intercepting, this case keeps a friendly
+				// redirect for users still typing the historic verb.
+				out("'wheels packages install' is intercepted by LuCLI's", "yellow");
+				out("built-in extension installer and won't reach this module.", "yellow");
+				out("Use:", "yellow");
+				out("  wheels packages add " & (arrayLen(positional) >= 2 ? positional[2] : "<name>"), "bold");
+				return "";
 			case "update":
 				opts.target = arrayLen(positional) >= 2 ? positional[2] : "";
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
