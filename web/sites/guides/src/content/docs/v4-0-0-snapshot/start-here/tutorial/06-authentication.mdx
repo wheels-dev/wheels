@@ -527,7 +527,7 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
 }
 ```
 
-On a cold reload this registers the strategy exactly once. The `hasStrategy` check keeps a second reload from stacking duplicates.
+On a *cold* reload — meaning `wheels stop` followed by `wheels start`, which re-fires `onApplicationStart` — this registers the strategy exactly once. (Plain `wheels reload` does **not** re-run `onApplicationStart`; if you edit init code, restart the server.) The `hasStrategy` check keeps a second cold reload from stacking duplicates.
 
 ### Rewrite the Sessions controller
 
