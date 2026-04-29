@@ -649,6 +649,31 @@ component extends="wheels.WheelsTest" {
 
 				expect(ListFindNoCase(actual, expected)).toBeTrue()
 			})
+
+			// Issue 2313 F19: the framework default used to be "lower", silently
+			// rewriting `t.string("publishedAt")` into `publishedat` on case-
+			// preserving engines (notably SQLite). Default is now "" (preserve).
+			it("ships migratorObjectCase = '' as the framework default (issue 2313 F19)", () => {
+				// originalMigratorObjectCase is captured in beforeAll() at line 7
+				// before any test in this spec mutates the application setting.
+				// If a future change reverts the default to "lower" or "upper",
+				// this assertion fails immediately.
+				expect(originalMigratorObjectCase).toBe("")
+			})
+
+			it("preserves column case in DDL with default migratorObjectCase (issue 2313 F19)", () => {
+				// Companion to the assertion above — verifies the case-
+				// preservation BEHAVIOR end-to-end at the SQL-emission layer.
+				// Engine-independent because we inspect the generated DDL
+				// string, not the actual storage.
+				application.wheels.migratorObjectCase = ""
+				adapter = migration.adapter
+				col = CreateObject("component", "wheels.migrator.ColumnDefinition")
+					.init(adapter = adapter, name = "publishedAt", type = "datetime")
+				// toIncludeWithCase is case-sensitive — fails if the column
+				// name was folded to "publishedat" anywhere in the DDL.
+				expect(col.toSQL()).toIncludeWithCase("publishedAt")
+			})
 		})
 
 		describe("Tests addForeignKey", () => {

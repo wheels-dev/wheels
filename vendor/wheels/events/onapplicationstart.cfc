@@ -248,7 +248,14 @@ component {
 		application.$wheels.migratorTableName = "c_o_r_e_migrator_versions";
 		application.$wheels.createMigratorTable = true;
 		application.$wheels.writeMigratorSQLFiles = false;
-		application.$wheels.migratorObjectCase = "lower";
+		// Preserve column / table / index name case as written in the migration.
+		// Set to "lower" or "upper" to fold names. Issue #2313 (F19): the
+		// previous "lower" default silently rewrote `t.string("publishedAt")`
+		// into a `publishedat` column on case-preserving engines (notably
+		// SQLite), which surprised users. Apps that depended on the old
+		// behavior can opt back in via `set("migratorObjectCase", "lower")`
+		// in `config/settings.cfm`.
+		application.$wheels.migratorObjectCase = "";
 		application.$wheels.allowMigrationDown = false;
 		application.$wheels.migrationLevel = 1;
 		if (application.$wheels.environment == "development") {
