@@ -202,7 +202,7 @@ The installer downloads the JARs into `lib/`, Chromium into `~/Library/Caches` (
                    this.browser
                        .fill("input[name='comment[author]']", "Bob")
                        .fill("textarea[name='comment[body]']", "Great post")
-                       .click("button[type=submit]")
+                       .click("turbo-frame##new_comment button[type=submit]")
                        .assertSee("Great post");
                });
            });
@@ -216,6 +216,7 @@ Four things to notice:
 
 - `browserDescribe` wraps `describe` with a `beforeEach`/`afterEach` pair that creates a fresh Playwright page for every `it`. Without it, one test's navigation state would leak into the next.
 - `##post-title` is CFML escaping a literal `#` inside a string. At runtime the selector is `#post-title` — the CSS id the `textField(objectName="post", property="title")` helper emits (Wheels joins object + property with a dash). Without the double `##`, CFML would try to evaluate `post-title` as an expression and throw.
+- `turbo-frame##new_comment button[type=submit]` is the same `##` escape applied to a frame-scoped selector. The post show page has two submit buttons — the `Delete` button and the `Post comment` button — so a bare `button[type=submit]` would match both and Playwright's strict-mode locator would refuse to act. Scoping to the new-comment frame makes the click unambiguous.
 - The signup form uses plain `<input name="user[email]">` without an id, so the spec targets it by attribute selector instead. Attribute selectors like `input[name='user[email]']` are robust against future form refactors.
 - The fluent DSL chains: `.visitRoute("signup").fill(...).click(...).assertUrlContains("/posts")` is one statement. Each method returns the browser object, so the chain keeps going until you call a terminal like `.assertSee(...)` or let the statement end.
 - `if (this.browserTestSkipped) return;` keeps the spec green on machines without Playwright installed — fresh CI runners before `wheels browser install`, for example. The flag is set by `beforeAll` when the JARs can't be loaded.
