@@ -285,14 +285,47 @@ component {
 	}
 
 	private string function $detectRuntime() {
+		// Three-tier fallback. The original implementation tried to
+		// instantiate `wheels.Global` and call `$readFrameworkVersion()`,
+		// but in the LuCLI context the only registered mapping for the
+		// framework is `modules.wheels.*` — `wheels.Global` doesn't
+		// resolve, so every CLI invocation fell through to the catch
+		// and returned the `0.0.0-dev` sentinel. That made the package
+		// system version-blind from the CLI: `wheels packages show`
+		// reported every released runtime as out-of-range for every
+		// published package's wheelsVersion constraint. See PR #XXXX.
+
+		// Tier 1 — read .module-version text file (brew/chocolatey
+		// installs write this at install time with the exact module
+		// version). Plain text; no CFML compilation, no mapping lookup,
+		// and immune to BuildInfo.cfc bugs like the self-substituting
+		// sentinel issue fixed in #2368.
 		try {
-			local.global = CreateObject("component", "wheels.Global");
-			return local.global.$readFrameworkVersion();
+			local.versionFile = ExpandPath("/modules/wheels/.module-version");
+			if (FileExists(local.versionFile)) {
+				local.v = Trim(FileRead(local.versionFile));
+				if (Len(local.v)) return local.v;
+			}
 		} catch (any e) {
-			// In test contexts the framework may not be discoverable from
-			// the webroot. Fall back to a permissive sentinel that matches
-			// any wheelsVersion constraint (SemVer's "*" behaviour).
-			return "0.0.0-dev";
+			// ExpandPath may throw in unusual contexts (e.g. the file
+			// system mapping isn't yet wired). Fall through.
 		}
+
+		// Tier 2 — instantiate the bundled BuildInfo.cfc directly via
+		// the `modules.wheels.*` mapping that LuCLI guarantees. This
+		// covers ForgeBox installs and dev checkouts where the
+		// .module-version marker isn't written.
+		try {
+			local.bi = new modules.wheels.vendor.wheels.BuildInfo();
+			local.v = local.bi.version();
+			if (Len(local.v) && local.v != "0.0.0-dev") return local.v;
+		} catch (any e) {
+			// BuildInfo unreachable; fall through.
+		}
+
+		// Tier 3 — sentinel. Matches "*" against any wheelsVersion
+		// constraint via the SemVer comparator (treated as a
+		// permissive dev build).
+		return "0.0.0-dev";
 	}
 }
