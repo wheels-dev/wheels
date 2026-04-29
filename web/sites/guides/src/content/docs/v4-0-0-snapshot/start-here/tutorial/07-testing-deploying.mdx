@@ -162,10 +162,14 @@ Browser specs drive a real Chromium through the rendered HTML. Behind the scenes
 Playwright ships as a set of JARs plus a Chromium binary, ~370MB in total. Install it once:
 
 ```bash title="your shell"
-wheels browser install
+wheels browser setup
 ```
 
 The installer downloads the JARs into `lib/`, Chromium into `~/Library/Caches` (macOS) or `~/.cache` (Linux), and writes a manifest so CI knows what's cached.
+
+<Aside type="note">
+  The verb is `setup`, not `install`. `wheels browser install` reaches LuCLI's generic extension installer first and prints `No git or extension dependencies to install` — looks like success but does nothing. Always use `setup`.
+</Aside>
 
 <Steps>
 
@@ -278,14 +282,14 @@ wheels --version
 Three things to verify before moving on:
 
 1. `wheels test` passes both the model spec and the controller spec.
-2. `wheels browser install` completes without error, and `wheels test --filter=browser` runs the browser spec green — Chromium launches, the signup-to-post-to-comment flow runs end-to-end.
+2. `wheels browser setup` completes without error, and `wheels test --filter=browser` runs the browser spec green — Chromium launches, the signup-to-post-to-comment flow runs end-to-end.
 3. Click through the running app one more time: sign up, create a post, leave a comment, log out, log back in, try to edit someone else's post and get redirected. Every part of the tutorial still works end-to-end.
 
 ## Troubleshooting
 
 **"Model spec fails with `cannot find Post.cfc`."** The test runner boots a fresh schema from `tests/populate.cfm`, which you haven't set up yet. See [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) for the standard `populate.cfm` that mirrors your development schema into the test database.
 
-**"Browser spec hangs for thirty seconds, then times out."** Playwright isn't installed. Run `wheels browser install` — it downloads ~370MB and prints a progress bar. Once it completes, re-run the spec. If it still hangs, check that `this.browserTestSkipped` isn't incorrectly set; the guard clause should short-circuit when the JARs are missing, not when they're present.
+**"Browser spec hangs for thirty seconds, then times out."** Playwright isn't installed. Run `wheels browser setup` — it downloads ~370MB and prints a progress bar. Once it completes, re-run the spec. If it still hangs, check that `this.browserTestSkipped` isn't incorrectly set; the guard clause should short-circuit when the JARs are missing, not when they're present.
 
 **"`expect(...).toBeTrue is not a function`."** The spec CFC extends the wrong base. Use `component extends="wheels.WheelsTest"` — with a capital T in `WheelsTest`. The legacy `wheels.Test` is the RocketUnit base and doesn't have the BDD matchers.
 

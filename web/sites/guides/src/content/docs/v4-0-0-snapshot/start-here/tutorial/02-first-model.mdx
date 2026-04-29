@@ -67,9 +67,9 @@ At the end of Part 1 you had a running `blog` app with a `/hello` route. There's
    wheels generate model Post title:string body:text
    ```
 
-   That creates `app/models/Post.cfc` (a near-empty `component extends="Model"`) and a migration file under `app/migrator/migrations/` with a current timestamp.
+   That creates `app/models/Post.cfc` and a migration file under `app/migrator/migrations/` with a current timestamp. The generated model is short but not empty — it ships with `validatesPresenceOf("title,body")` already populated for the two columns you passed in.
 
-2. Replace the contents of `app/models/Post.cfc` with the version below — it adds the `status` enum we'll use to filter posts:
+2. Replace the contents of `app/models/Post.cfc` with the version below — we drop the auto-generated validations for now (Part 4 brings them back) and add the `status` enum we'll use to filter posts:
 
    ```cfm {test:compile}
    component extends="Model" {

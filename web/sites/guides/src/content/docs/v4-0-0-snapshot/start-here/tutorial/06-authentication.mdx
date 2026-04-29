@@ -202,7 +202,8 @@ Four pieces to notice:
        }
 
        function create() {
-           user = model("User").findOne(where="email = :email", values={email: LCase(Trim(params.email ?: ""))});
+           emailVal = LCase(Trim(params.email ?: ""));
+           user = model("User").findOneByEmail(emailVal);
            if (IsObject(user) && user.authenticate(params.password ?: "")) {
                session.userId = user.id;
                redirectTo(route="posts", success="Welcome back.");
@@ -224,8 +225,12 @@ Four pieces to notice:
 Three actions, three responsibilities:
 
 - `new` renders the login form. No setup needed; the view uses no dynamic data.
-- `create` is the login POST. It normalizes the submitted email the same way the model does on save, looks up the user via a parameterized finder (`:email` placeholder plus `values` struct — this is injection-safe; never interpolate user input into a `where` string), and calls `user.authenticate(password)`. Success sets `session.userId` and redirects; failure flashes an error and sends the browser back to the login form.
+- `create` is the login POST. It normalizes the submitted email the same way the model does on save, looks up the user via the dynamic finder `findOneByEmail` — Wheels generates `findOneBy<Property>` for every column, and the value is bound as a parameter so this is injection-safe. Then it calls `user.authenticate(password)`. Success sets `session.userId` and redirects; failure flashes an error and sends the browser back to the login form.
 - `delete` is the logout action. It clears `session.userId` and redirects.
+
+<Aside type="tip" title="Why a dynamic finder, not a `where=` string">
+  You'll see two patterns in older code: dynamic finders like `findOneByEmail(value)` and explicit `where=` finders. The dynamic finders parameterize the value automatically — Wheels turns `findOneByEmail(emailVal)` into a prepared statement with a bound parameter. Writing `findOne(where="email = '#emailVal#'")` would interpolate the user input straight into SQL, which is a SQL injection vulnerability. Stick to dynamic finders for single-column lookups; reach for `where=` only when you need an operator other than equality, and always use `cfqueryparam`-style binding via the [chainable query builder](/v4-0-0-snapshot/basics/models-and-the-orm/#chainable-query-builder).
+</Aside>
 
 ### Protect the Posts controller
 
@@ -478,6 +483,12 @@ Then walk through the flow in the browser:
 
 That's the hand-rolled version. Thirty-ish lines of logic total, no hidden machinery. Now let's see what the framework gives you for free.
 
+<Aside type="caution" title="Scripting smoke tests with curl? Read this first.">
+**CSRF token rotation**: Wheels rotates the CSRF token after each accepted POST. A scraped token is single-use — re-POSTing with the same token fails with `Wheels.InvalidAuthenticityToken`. To script a flow, fetch a fresh form before every write. The signup form has a hidden `authenticityToken` input you can scrape from the response body; the login form (which uses raw `<input>` tags rather than form helpers) doesn't, so scrape from the layout's `<meta name="csrf-token">` tag instead.
+
+**curl `--data-urlencode` and `@`**: `curl --data-urlencode "user[email]=test@example.com"` correctly URL-encodes the `@` to `%40`. But `curl --data-urlencode "user[email][test@example.com]"` (no `=` separator) gets misread by Lucee's form parser as a nested-bracket key path — `params.user.email` arrives as `{"test@example.com": ""}` instead of the string. The cause is curl + Lucee form encoding, not Wheels — but it surfaces as a confusing `Can't cast Complex Object Type Struct to String` error. Browsers always %-encode `@`, so this is curl-only. Always include the `=` and let `--data-urlencode` encode the value side: `--data-urlencode "user[email]=test@example.com"`.
+</Aside>
+
 ---
 
 ## Part 6b: The Built-in Way
@@ -530,7 +541,8 @@ On a cold reload this registers the strategy exactly once. The `hasStrategy` che
        }
 
        function create() {
-           user = model("User").findOne(where="email = :email", values={email: LCase(Trim(params.email ?: ""))});
+           emailVal = LCase(Trim(params.email ?: ""));
+           user = model("User").findOneByEmail(emailVal);
            if (IsObject(user) && user.authenticate(params.password ?: "")) {
                var sessionStrategy = application.wo.service("sessionStrategy");
                sessionStrategy.login(principal={id: user.id, email: user.email});
