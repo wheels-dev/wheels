@@ -294,13 +294,34 @@ merge_pr() {
     fi
 
     info "merging PR #$pr ($tier tier)..."
-    if gh pr merge "$pr" "${merge_args[@]}" 2>&1; then
+    local merge_output
+    merge_output=$(gh pr merge "$pr" "${merge_args[@]}" 2>&1)
+    local merge_rc=$?
+
+    # `gh pr merge` can exit non-zero even when the server-side merge AND
+    # branch deletion both succeeded. The most common cause: gh's
+    # post-merge step that fast-forwards the local default branch fails
+    # because that branch is checked out in a sibling git worktree
+    # ("fatal: 'develop' is already used by worktree at..."). Treating
+    # that exit code as failure would break every cron-driven merge in
+    # any setup that uses worktrees. Disambiguate by re-querying state.
+    local actual_state
+    actual_state=$(gh pr view "$pr" --json state --jq .state 2>/dev/null)
+
+    if [[ "$actual_state" == "MERGED" ]]; then
         local sha
         sha=$(gh pr view "$pr" --json mergeCommit --jq '.mergeCommit.oid // ""' 2>/dev/null)
         ok "PR #$pr merged${sha:+ — $sha}"
+        if [[ "$merge_rc" -ne 0 ]]; then
+            # Surface the cosmetic error so the operator can see it, but
+            # don't treat the merge itself as failed.
+            warn "  gh exited $merge_rc (cosmetic local-git error; remote merge + branch delete succeeded):"
+            echo "$merge_output" | sed 's/^/    /' >&2
+        fi
         return 0
     else
-        warn "PR #$pr merge command failed"
+        warn "PR #$pr merge command failed (state=$actual_state, gh exit=$merge_rc):"
+        echo "$merge_output" | sed 's/^/    /' >&2
         return 1
     fi
 }
