@@ -424,6 +424,12 @@ component extends="modules.BaseModule" {
 			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
 			var httpResult = makeHttpRequest(reloadUrl);
 			out("Application reloaded successfully.", "green");
+			// Surface the hot-vs-cold reload contract — Wheels does NOT
+			// re-fire onApplicationStart on `?reload=true`. Users editing
+			// app/events/onapplicationstart.cfm or config/services.cfm need
+			// a full restart. See finding #8 in the 2026-04-29 fresh-VM
+			// triage.
+			out("Note: onApplicationStart does NOT re-fire. For init-code edits, run `wheels stop && wheels start`.", "cyan");
 			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
