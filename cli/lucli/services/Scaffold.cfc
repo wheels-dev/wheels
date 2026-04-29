@@ -212,8 +212,18 @@ component {
 			var resourceName = lCase(arguments.name);
 			var resourceRoute = '.resources("' & resourceName & '")';
 
-			// Skip if route already exists
+			// Skip if route already exists in any of the canonical forms.
+			// The user might have typed .resources("posts") (positional),
+			// .resources(name="posts", only="...") (named-arg, from
+			// tutorial chapter 2), .resources(name='posts', ...)
+			// (single-quoted), or any combination with whitespace.
 			if (findNoCase(resourceRoute, content)) return false;
+			// Named-arg form (double or single quotes around the resource
+			// name). Match .resources( ... name = "<resource>" ... ) — the
+			// regex tolerates leading whitespace, varying attribute order,
+			// and ignores anything past the closing paren.
+			var namedArgPattern = "\.resources\s*\([^)]*name\s*=\s*[""']" & resourceName & "[""']";
+			if (REFindNoCase(namedArgPattern, content)) return false;
 
 			// Try CLI-Appends-Here marker first
 			var markerPattern = '// CLI-Appends-Here';
