@@ -61,6 +61,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & "public/miscellaneous/Application.cfc")).toBeTrue();
 			});
 
+			it("ships .gitkeep files in tests/specs subfolders so empty dirs survive git", () => {
+				// Templates check — confirms the .gitkeep files exist on disk
+				// in the template tree. Their copying into the scaffolded app
+				// is verified by NewCommandGitkeepSpec. Three representative
+				// paths chosen here; the same .gitkeep mechanism preserves
+				// app/lib, app/jobs, app/mailers, public/images, etc. Found
+				// during batch B (2026-04-29 fresh-VM triage sub-finding).
+				expect(fileExists(templateRoot & "tests/specs/controllers/.gitkeep")).toBeTrue();
+				expect(fileExists(templateRoot & "tests/specs/functional/.gitkeep")).toBeTrue();
+				expect(fileExists(templateRoot & "tests/specs/models/.gitkeep")).toBeTrue();
+			});
+
 		});
 
 	}

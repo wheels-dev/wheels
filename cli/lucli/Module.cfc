@@ -4228,8 +4228,18 @@ component extends="modules.BaseModule" {
 				// per-file relativePaths stay app-relative.
 				copyTemplateDir(sourcePath, targetPath, arguments.appName, arguments.context, rootDir);
 			} else {
-				// Skip .gitkeep files — they exist only to keep empty dirs in git
+				// .gitkeep files are deliberately preserved as-is — they
+				// exist to keep otherwise-empty directories tracked once
+				// the user runs `git init && git add -A`. Copy them
+				// byte-for-byte (no placeholder processing — they are
+				// intentionally empty and have no template syntax).
+				// Earlier code skipped them entirely, which defeated their
+				// purpose: empty directories vanished on first commit,
+				// surprising users who followed the tutorial's chapter 1
+				// file tree. See batch B fresh-VM sub-finding (2026-04-29).
 				if (entry.name == ".gitkeep") {
+					fileCopy(sourcePath, targetPath);
+					printCreated(relativePath);
 					continue;
 				}
 				// Read template, process placeholders, write to target
