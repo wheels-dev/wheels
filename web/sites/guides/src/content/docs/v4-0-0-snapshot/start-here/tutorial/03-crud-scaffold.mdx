@@ -75,10 +75,10 @@ Route model binding kicks in on the actions that take a key. For `show`, `edit`,
 Drop the hand-written controller and views. The model, migration, seed file, and the `resources("posts")` route stay.
 
 ```bash title="your shell"
-wheels destroy Posts controller
+wheels destroy Posts controller --force
 ```
 
-The argument order is `<name> [type]` — `Posts controller`, not `controller Posts`. If you'd rather skip the CLI and remove the files yourself:
+The argument order is `<name> [type]` — `Posts controller`, not `controller Posts`. The `--force` flag skips the interactive confirmation; without it, `destroy` prints `Use --force to confirm deletion.` and exits without touching anything. If you'd rather skip the CLI and remove the files yourself:
 
 ```bash title="your shell"
 rm app/controllers/Posts.cfc
@@ -96,7 +96,9 @@ wheels generate scaffold Post title:string body:text status:enum
 ```
 
 <Aside type="caution">
-  The scaffold generator will refuse to overwrite an existing `app/models/Post.cfc` and bail before producing the controller and views. Since chapter 2 already wrote the model, you'll see `Scaffold failed: Model already exists`. When that happens, hand-write the files in the sections below — they're what the generator would have produced. (A future release will add a `--skip-existing` flag so the scaffold can reuse the existing model.)
+  The scaffold generator skips files that already exist rather than failing the whole run. Since chapter 2 already wrote `app/models/Post.cfc` and the migration, you'll see `skip model: Model already exists` and `skip migration: create_posts_table already exists` in the output — but the controller, views, and tests will still be generated. The scaffold also appends `.resources("posts")` to `config/routes.cfm`; we'll replace the resulting routes file in a few steps anyway.
+
+  The generator's emitted controller uses `findByKey(params.key)` everywhere and emits Bootstrap-flavored views — perfectly fine, but a different shape from this tutorial. Replace the scaffold's output with the code in the sections below to follow along; pass `--force` next time if you want the scaffold to overwrite. Or compare the two — generator vs. tutorial — to see two equally valid CRUD shapes.
 </Aside>
 
 ### The controller
@@ -165,18 +167,10 @@ The `new` and `edit` views both render the same form. Put the shared markup in a
    <cfoutput>
    #errorMessagesFor("post")#
    #startFormTag(action=IsNumeric(post.id ?: "") ? "update" : "create", key=post.id ?: "")#
-       <label>Title<br>
-           #textField(objectName="post", property="title")#
-       </label>
-       <label>Body<br>
-           #textArea(objectName="post", property="body")#
-       </label>
-       <label>Status<br>
-           #select(objectName="post", property="status", options="draft,published,archived")#
-       </label>
-       <label>Published at<br>
-           #dateField(objectName="post", property="publishedAt")#
-       </label>
+       #textField(objectName="post", property="title", label="Title")#
+       #textArea(objectName="post", property="body", label="Body")#
+       #select(objectName="post", property="status", options="draft,published,archived", label="Status")#
+       #dateField(objectName="post", property="publishedAt", label="Published at")#
        <button type="submit">Save</button>
    #endFormTag()#
    </cfoutput>
@@ -189,7 +183,7 @@ Notes:
 - Partial filenames start with `_`. You reference them as `"form"` (no underscore, no extension) when including.
 - `errorMessagesFor("post")` renders a `<div class="errors">` with any validation errors on the `post` object. When there are none, it renders nothing.
 - `startFormTag` picks the right HTTP method and action URL based on whether `post.id` exists. A new `Post` has no id, so the form posts to `create`; an existing one PATCHes to `update`.
-- `textField`, `textArea`, `select`, `dateField` are object-bound helpers — `objectName="post"` plus `property="title"` becomes `name="post[title]"` with the current value pre-filled.
+- `textField`, `textArea`, `select`, `dateField` are object-bound helpers — `objectName="post"` plus `property="title"` becomes `name="post[title]"` with the current value pre-filled. Each helper emits its own `<label>` wrapper around the input; pass `label="Title"` to set the visible text. Don't wrap them in another `<label>` — that produces nested `<label>` elements, which browsers handle inconsistently.
 
 ### The four views
 
