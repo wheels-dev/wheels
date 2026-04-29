@@ -410,6 +410,16 @@ component extends="modules.BaseModule" {
 
 		var password = detectReloadPassword();
 
+		// F5 fix: physically wipe the Lucee compiled-class cache before
+		// triggering the framework reload. Lucee Express's default
+		// `inspectTemplate=once` means Lucee compiles each CFC once, caches
+		// the .class on disk, and never re-checks the source timestamp.
+		// `?reload=true` resets Wheels application state via applicationStop()
+		// but does not invalidate Lucee's template cache, so edits to models,
+		// controllers, and config silently miss until cfclasses is wiped.
+		// See onboarding finding F5.
+		$purgeServerCfclasses();
+
 		try {
 			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
 			var httpResult = makeHttpRequest(reloadUrl);
@@ -433,6 +443,20 @@ component extends="modules.BaseModule" {
 	 */
 	public string function start() {
 		var args = getArgs(arguments);
+
+		// Refuse to start from a non-Wheels-project directory. LuCLI's
+		// `server start` derives the server name from the cwd basename and
+		// silently registers a new context — running `wheels start` in the
+		// wrong directory leaves orphan registrations like `ws` or
+		// `Downloads`. Onboarding finding F6.
+		if (!$isWheelsProjectDir(variables.projectRoot)) {
+			out("This directory does not look like a Wheels project.", "yellow");
+			out("  Expected: config/settings.cfm under the current directory.", "yellow");
+			out("");
+			out("Tip: cd into your project directory, or run `wheels new <appname>`", "cyan");
+			out("     to scaffold one.", "cyan");
+			return "";
+		}
 
 		out("Starting Wheels server...", "cyan");
 
@@ -493,6 +517,15 @@ component extends="modules.BaseModule" {
 				out("To list all servers:      wheels server list", "cyan");
 				return "";
 			}
+			// No registered server AND no others running. Don't fall through
+			// to LuCLI's `server stop` — it would create a phantom server
+			// registration named after the cwd basename. Onboarding finding F6.
+			out("");
+			out("No Wheels server is registered for this directory, and none are running elsewhere.", "yellow");
+			if (!$isWheelsProjectDir(variables.projectRoot)) {
+				out("Tip: run this from inside your Wheels project directory.", "cyan");
+			}
+			return "";
 		}
 
 		executeCommand("server", ["stop"], variables.projectRoot);
@@ -3797,26 +3830,26 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Stage required JDBC drivers into every Lucee Express install's
-	 * `lib/ext/` (Tomcat classpath) so Lucee can resolve datasource driver
-	 * classes at boot time without hitting class-load failures. Lucee 7's
-	 * stock Express distribution ships drivers for MySQL/MSSQL/PostgreSQL/
-	 * HSQLDB but not SQLite — yet `wheels new` writes SQLite as the zero-
-	 * config default datasource. Without this stage, every fresh app fails
-	 * on first request with `ClassException: org.sqlite.JDBC`.
+	 * Stage the SQLite JDBC driver into the two locations Lucee 7 reads from,
+	 * so a fresh `wheels new` SQLite-by-default app can boot, migrate, and
+	 * query without manual JAR drops. Idempotent and best-effort.
 	 *
-	 * Idempotent: if the JAR already exists in lib/ext/, skip. Best-effort:
-	 * any I/O error is swallowed because we'd rather defer to LuCLI's normal
-	 * server start error reporting than block on bundle staging.
+	 *   - `<express-root>/lib/ext/` — Tomcat parent classpath. Satisfies
+	 *     `Class.forName("org.sqlite.JDBC")` for any caller that uses raw
+	 *     JDBC.
 	 *
-	 * The bundled JAR at cli/lucli/resources/extensions/sqlite/ is the
+	 *   - `<server-root>/<server-name>/lucee-server/bundles/` — Lucee's OSGi
+	 *     bundle store. Required for Lucee's datasource resolver (the path
+	 *     that `cfquery` and the Wheels migrator go through). Without this,
+	 *     `lib/ext/` alone is not enough — Lucee's bundle loader does not
+	 *     fall back to the Tomcat parent classloader for datasource driver
+	 *     resolution. See onboarding finding F2.
+	 *
+	 * The bundled JAR at `cli/lucli/resources/extensions/sqlite/` is the
 	 * upstream xerial sqlite-jdbc with a relaxed `Require-Capability` header
 	 * (Felix on Java 21 fails on upstream's strict `osgi.ee;version=1.8`
-	 * exact-match). See tools/lucee-extensions/sqlite/build.sh for the
-	 * patch logic. The JAR works equally well in lib/ext/ (Tomcat classpath)
-	 * and lucee-server/bundles/ (OSGi); we target lib/ext/ here to mirror
-	 * the brew formula's drop strategy and avoid the per-server `--force`
-	 * wipe that bundles/ is subject to.
+	 * exact-match). See `tools/lucee-extensions/sqlite/build.sh` for the
+	 * patch logic.
 	 */
 	private void function $ensureWheelsBundles() {
 		try {
@@ -3833,21 +3866,82 @@ component extends="modules.BaseModule" {
 			var lucliHome = $resolveLucliHome();
 			if (!len(lucliHome)) return;
 
-			// Stage into every Lucee Express install's lib/ext/ — that's the
-			// Tomcat classpath, where Lucee 7 finds JDBC drivers when the
-			// datasource config doesn't carry an OSGi `bundleName` hint
-			// (current `wheels new`-generated app.cfm omits the hint per
-			// GH #2304). Mirrors the brew/chocolatey wrapper's drop strategy
-			// so dev-checkout, manual-install, and any other path that skips
-			// the package wrapper still gets a working zero-config SQLite.
+			// Two staging targets, both required:
+			//
+			//   1. lib/ext/ on every Lucee Express install — Tomcat classpath,
+			//      where Class.forName("org.sqlite.JDBC") resolves. Mirrors the
+			//      brew/chocolatey wrapper's drop strategy.
+			//
+			//   2. bundles/ on every per-server Lucee context — Lucee 7's
+			//      datasource resolver consults its OSGi bundle loader (NOT
+			//      the parent Tomcat classloader) when instantiating drivers
+			//      for `cfquery`. lib/ext/ alone is not enough: the very first
+			//      query against a SQLite datasource fails because Lucee's
+			//      bundle resolver can't find the driver, even though
+			//      `Class.forName` would. See onboarding finding F2.
+			//
+			// Both paths are idempotent. Pre-stage runs before LuCLI extracts
+			// Express on the very first VM run (so dirs may not exist yet);
+			// post-stage runs after, when both dirs are guaranteed to exist.
 			stager.stageIntoLibExt(
 				bundleSrc = bundleSrc,
 				expressRoot = lucliHome & "/express",
 				jarFileName = "sqlite-jdbc-3.49.1.0.jar"
 			);
+			stager.stageIntoServerBundles(
+				bundleSrc = bundleSrc,
+				serversRoot = lucliHome & "/servers",
+				jarFileName = "org.xerial.sqlite-jdbc-3.49.1.0.jar"
+			);
 		} catch (any e) {
 			// Stay out of the way — let LuCLI's server start surface the real
 			// error if the bundle was actually needed and we couldn't stage.
+		}
+	}
+
+	/**
+	 * True when the given directory has the structural fingerprint of a
+	 * Wheels project — currently presence of `config/settings.cfm`, the file
+	 * `wheels new` always writes and that no other tool creates. Used by
+	 * `start()` and `stop()` to refuse silent fallthrough to LuCLI's `server`
+	 * subcommands, which would otherwise register a phantom server context
+	 * named after the cwd basename. See onboarding finding F6.
+	 *
+	 * `box.json` alone is not enough — too many non-Wheels CommandBox
+	 * projects ship one — and `Application.cfc` is not enough either since
+	 * any CFML codebase has one.
+	 */
+	private boolean function $isWheelsProjectDir(required string path) {
+		if (!len(arguments.path)) return false;
+		return fileExists(arguments.path & "/config/settings.cfm");
+	}
+
+	/**
+	 * Wipe the per-server Lucee compiled-class cache so the next request
+	 * recompiles every CFC from source. Called from `wheels reload` because
+	 * Lucee's default `inspectTemplate=once` setting prevents source-edit
+	 * detection — without a physical cache wipe, `?reload=true` only resets
+	 * Wheels' application state and edits to models, controllers, and config
+	 * keep returning the previously-compiled .class on subsequent requests.
+	 * See onboarding finding F5.
+	 *
+	 * Best-effort: silently swallows per-file failures (a Lucee-locked .class
+	 * mid-compile or a Windows file lock) rather than blocking the reload.
+	 * The cfclasses directory itself is preserved — Lucee repopulates it on
+	 * the next compile.
+	 */
+	private void function $purgeServerCfclasses() {
+		try {
+			var lucliHome = $resolveLucliHome();
+			if (!len(lucliHome)) return;
+
+			var serverName = $findServerForProject(variables.projectRoot);
+			if (!len(serverName)) return;
+
+			var cfclassesDir = lucliHome & "/servers/" & serverName & "/lucee-server/context/cfclasses";
+			new services.CfclassesPurger().purge(cfclassesDir);
+		} catch (any e) {
+			// Don't block reload on cache-purge errors.
 		}
 	}
 
@@ -4648,7 +4742,13 @@ component extends="modules.BaseModule" {
 	private string function browserTest(array args = []) {
 		var format = "text";
 		var verboseOutput = false;
-		var directory = "wheels.tests.specs.wheelstest";
+		// Default to the APP's browser specs (tests/specs/browser/) — not the
+		// framework's internal browser specs. Onboarding finding F11 reported
+		// `wheels browser test` running 0 tests because it pointed at
+		// `wheels.tests.specs.wheelstest`, the framework's own browser-DSL
+		// test directory, which contains no app code. Override with
+		// `--directory=...` for advanced use.
+		var directory = "tests.specs.browser";
 
 		for (var i = 2; i <= arrayLen(args); i++) {
 			var arg = args[i];
@@ -4704,7 +4804,11 @@ component extends="modules.BaseModule" {
 		out("");
 
 		var serverPort = $getServerPort();
-		var testUrl = "http://localhost:#serverPort#/wheels/core/tests?db=sqlite&format=json&directory=#directory#";
+		// Hit the APP test runner (`/wheels/app/tests`), not the framework's
+		// core test runner (`/wheels/core/tests`). The latter only knows
+		// about specs under `vendor/wheels/tests/specs/`. Apps live under
+		// `tests/specs/`, mounted by the app runner. F11.
+		var testUrl = "http://localhost:#serverPort#/wheels/app/tests?db=sqlite&format=json&directory=#directory#";
 
 		try {
 			var httpResult = makeHttpRequest(testUrl);

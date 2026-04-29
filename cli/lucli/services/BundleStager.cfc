@@ -89,4 +89,58 @@ component {
 		return result;
 	}
 
+	/**
+	 * Copy the given JAR into every per-server Lucee bundles directory
+	 * beneath `serversRoot` (i.e. LUCLI_HOME/servers/<name>/lucee-server/bundles).
+	 * Idempotent — skips destinations that already have the JAR. Best-effort —
+	 * silently swallows per-server copy failures.
+	 *
+	 * Why this is necessary on top of `stageIntoLibExt`: Lucee 7's datasource
+	 * subsystem resolves JDBC drivers through its OSGi bundle loader, not the
+	 * Tomcat parent classloader. A JAR on the Tomcat `lib/ext/` classpath is
+	 * visible to `Class.forName()` but not to Lucee's datasource resolver,
+	 * which means SQLite-by-default apps fail at the first `cfquery` even when
+	 * `lib/ext/` has the driver. Onboarding finding F2 documents this — every
+	 * fresh `wheels migrate latest` against a SQLite app fails until the JAR
+	 * lands in bundles/. MySQL and PostgreSQL avoid the issue because their
+	 * bundles ship inside `lucee-7.x.x.jar` and Lucee auto-deploys them; the
+	 * SQLite extension is third-party and doesn't get the same treatment.
+	 *
+	 * @bundleSrc   Absolute path to the source JAR (typically the OSGi-named
+	 *              variant, e.g. `org.xerial.sqlite-jdbc-3.49.1.0.jar`, since
+	 *              Lucee's bundle loader uses the symbolic name).
+	 * @serversRoot Absolute path to LUCLI_HOME/servers/ — staging looks at
+	 *              every immediate child directory and treats it as a server
+	 *              context.
+	 * @jarFileName Filename to use at the destination. Should match the OSGi
+	 *              symbolic name + version (e.g. `org.xerial.sqlite-jdbc-3.49.1.0.jar`).
+	 */
+	public struct function stageIntoServerBundles(
+		required string bundleSrc,
+		required string serversRoot,
+		required string jarFileName
+	) {
+		var result = { staged: [], skipped: [], failed: [] };
+		if (!fileExists(arguments.bundleSrc)) return result;
+		if (!directoryExists(arguments.serversRoot)) return result;
+
+		var servers = directoryList(arguments.serversRoot, false, "name");
+		for (var s in servers) {
+			var bundlesDir = arguments.serversRoot & "/" & s & "/lucee-server/bundles";
+			if (!directoryExists(bundlesDir)) continue;
+			var dest = bundlesDir & "/" & arguments.jarFileName;
+			if (fileExists(dest)) {
+				arrayAppend(result.skipped, dest);
+				continue;
+			}
+			try {
+				fileCopy(arguments.bundleSrc, dest);
+				arrayAppend(result.staged, dest);
+			} catch (any e) {
+				arrayAppend(result.failed, dest);
+			}
+		}
+		return result;
+	}
+
 }
