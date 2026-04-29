@@ -39,6 +39,30 @@ component extends="wheels.WheelsTest" {
 					expect(new wheels.BuildInfo({version: "4.0.0-SNAPSHOT+1628"}).isDev()).toBeFalse();
 				});
 
+				it("source contains the @build.version@ sentinel exactly once (regression guard)", () => {
+					// The release pipeline (tools/build/scripts/prepare-core.sh) does a
+					// GLOBAL `sed s/@build.version@/<version>/g` over BuildInfo.cfc at
+					// artifact-construction time. If the sentinel appears anywhere
+					// other than the `version:` field of init()'s `variables.info`
+					// struct — say, inside isDev()'s equality comparison — that
+					// occurrence is rewritten too, silently turning every released
+					// build into a self-reported "0.0.0-dev" build. This test reads
+					// the source and asserts the structural invariant: exactly one
+					// literal occurrence, no more.
+					//
+					// If this fails, you almost certainly added a comparison like
+					//     return variables.info.version == "@build.version@";
+					// somewhere. Use the prefix/suffix structural check that
+					// $blankIfPlaceholder() uses instead.
+					var src = fileRead(expandPath("/wheels/BuildInfo.cfc"));
+					var token = "@" & "build.version" & "@"; // split so this file isn't itself a sentinel
+					var occurrences = (len(src) - len(replace(src, token, "", "all"))) / len(token);
+					expect(occurrences).toBe(
+						1,
+						"BuildInfo.cfc must contain exactly one '" & token & "' literal (found " & occurrences & "). A second occurrence is rewritten by prepare-core.sh's global sed and breaks dev detection on every released build."
+					);
+				});
+
 				it("isSnapshot() is true for SNAPSHOT versions", () => {
 					expect(new wheels.BuildInfo({version: "4.0.0-SNAPSHOT+1628"}).isSnapshot()).toBeTrue();
 				});
