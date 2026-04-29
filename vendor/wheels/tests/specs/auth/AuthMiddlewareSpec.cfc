@@ -277,7 +277,7 @@ component extends="wheels.WheelsTest" {
 
 			describe("No registered strategies", function() {
 
-				it("fails when authenticator has no strategies", function() {
+				it("fails with a diagnostic message when authenticator has no strategies", function() {
 					var auth = new wheels.auth.Authenticator();
 					var mw = new wheels.middleware.AuthMiddleware(authenticator = auth);
 					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
@@ -288,7 +288,7 @@ component extends="wheels.WheelsTest" {
 
 					var parsed = DeserializeJSON(result);
 					expect(parsed.status).toBe(401);
-					expect(parsed.error).toInclude("No authentication strategy");
+					expect(parsed.error).toInclude("No authentication strategies registered");
 				});
 
 			});

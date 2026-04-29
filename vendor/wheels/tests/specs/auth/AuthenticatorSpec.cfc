@@ -76,19 +76,31 @@ component extends="wheels.WheelsTest" {
 
 			describe("Authentication", function() {
 
-				it("returns failure when no strategies are registered", function() {
+				it("returns a diagnostic failure when no strategies are registered", function() {
+					// Bug-driven: the previous generic "No authentication strategy
+					// supports this request" was indistinguishable from the case
+					// where strategies are registered but none claim the request.
+					// A user wired up via services.cfm + onApplicationStart who hit
+					// the DI singleton bug saw the same message they'd get for an
+					// expired session — costing ~30 minutes of wrong-trail debugging.
+					// The zero-strategies case now points at the wiring.
 					var result = auth.authenticate(request = {});
 					expect(result.success).toBeFalse();
 					expect(result.statusCode).toBe(401);
-					expect(result.error).toInclude("No authentication strategy");
+					expect(result.error).toInclude("No authentication strategies registered");
+					expect(result.error).toInclude("registerStrategy");
 				});
 
-				it("returns failure when no strategy supports the request", function() {
+				it("returns the strategy-supports message when strategies are registered but none claim the request", function() {
+					// Pins down the existing behavior so it doesn't collide with
+					// the new no-strategies diagnostic. With at least one strategy
+					// registered, the message stays generic.
 					auth.registerStrategy(name = "unsupported", strategy = new wheels.tests._assets.auth.UnsupportedStrategy());
 
 					var result = auth.authenticate(request = {});
 					expect(result.success).toBeFalse();
 					expect(result.statusCode).toBe(401);
+					expect(result.error).toBe("No authentication strategy supports this request");
 				});
 
 				it("returns success from the first supporting strategy that passes", function() {
