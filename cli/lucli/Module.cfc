@@ -4385,12 +4385,28 @@ component extends="modules.BaseModule" {
 				var rels = listToArray(valueAfterEquals(arg));
 				result.hasOne.append(rels, true);
 			} else if (!arg.startsWith("--")) {
-				// Property: name or name:type
+				// Property: name, name:type, or name:enum:value1,value2,...
+				// Split on the FIRST two colons only — any additional colons
+				// (e.g. inside the comma-separated value list) belong in the
+				// values segment.
 				var parts = listToArray(arg, ":");
-				arrayAppend(result.properties, {
+				var prop = {
 					name: parts[1],
 					type: arrayLen(parts) > 1 ? parts[2] : "string"
-				});
+				};
+				if (lCase(prop.type) == "enum" && arrayLen(parts) > 2) {
+					// Re-join everything after the second colon so values
+					// like "draft,published,archived" land in a single
+					// segment. Most cases are arrayLen==3 (no embedded
+					// colons), so this is just parts[3] — defensive against
+					// pathological inputs.
+					var valueSegments = [];
+					for (var i = 3; i <= arrayLen(parts); i++) {
+						arrayAppend(valueSegments, parts[i]);
+					}
+					prop.values = arrayToList(valueSegments, ":");
+				}
+				arrayAppend(result.properties, prop);
 			}
 		}
 

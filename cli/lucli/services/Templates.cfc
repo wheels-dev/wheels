@@ -431,6 +431,24 @@ component {
 					case "time":
 						fieldCode = '##timeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
 						break;
+					case "enum":
+						// Render a <select> with the enum's values. The
+						// values come from either the inline form
+						// (status:enum:draft,published,archived) or, when
+						// missing, from the existing model's enum(...)
+						// declaration via $resolveEnumValuesFromModel.
+						var enumValues = prop.keyExists("values") ? prop.values : "";
+						if (!len(enumValues)) {
+							enumValues = $resolveEnumValuesFromModel(arguments.modelName, fieldName);
+						}
+						if (len(enumValues)) {
+							fieldCode = '##select(objectName="|ObjectNameSingular|", property="#fieldName#", options="#enumValues#", label="#fieldLabel#")##';
+						} else {
+							// Fall back to a textField if we couldn't find
+							// the values — better than crashing the scaffold.
+							fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+						}
+						break;
 					default:
 						fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
 				}
@@ -564,6 +582,45 @@ component {
 			}
 		}
 		return foreignKeys;
+	}
+
+	/**
+	 * Read app/models/<ModelName>.cfc and look for an enum(property="<prop>", values="...")
+	 * declaration. Returns the comma-separated values list or "" when not
+	 * found. Lets `wheels generate scaffold Post status:enum` (the
+	 * tutorial's chapter 3 command) emit a <select> populated from the
+	 * model's chapter-2 enum() declaration without requiring the user to
+	 * re-type values on the command line.
+	 *
+	 * @modelName Capitalized model name (e.g. "Post")
+	 * @propertyName Lowercase property name (e.g. "status")
+	 */
+	private string function $resolveEnumValuesFromModel(
+		required string modelName,
+		required string propertyName
+	) {
+		var modelPath = variables.projectRoot & "/app/models/" & arguments.modelName & ".cfc";
+		if (!fileExists(modelPath)) return "";
+
+		var modelSource = fileRead(modelPath);
+		// Match either order of property= / values= attributes. Captures
+		// only the values-list payload (string-form). Struct-form (e.g.
+		// {low:0, high:1}) isn't supported here — the scaffold falls back
+		// to a textField when this returns empty.
+		var pattern = 'enum\([^)]*property\s*=\s*"' & arguments.propertyName & '"[^)]*values\s*=\s*"([^"]+)"';
+		var match = REFindNoCase(pattern, modelSource, 1, true);
+		if (match.pos[1] > 0 && arrayLen(match.len) > 1) {
+			return mid(modelSource, match.pos[2], match.len[2]);
+		}
+
+		// Try the reversed argument order (values= before property=).
+		pattern = 'enum\([^)]*values\s*=\s*"([^"]+)"[^)]*property\s*=\s*"' & arguments.propertyName & '"';
+		match = REFindNoCase(pattern, modelSource, 1, true);
+		if (match.pos[1] > 0 && arrayLen(match.len) > 1) {
+			return mid(modelSource, match.pos[2], match.len[2]);
+		}
+
+		return "";
 	}
 
 }
