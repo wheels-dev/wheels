@@ -30,13 +30,6 @@ component output="false" {
 	// symlink, brew bottle, choco package). See PR #2309 for context.
 	this.mappings["/modules/wheels"] = expandPath("../cli/lucli/");
 
-	// Load app-level configuration (datasources, custom settings, etc.)
-	// This is the recommended place for developers to define this.datasources,
-	// this.sessionManagement overrides, and other Application.cfc-level config.
-	if (FileExists(expandPath("../config/app.cfm"))) {
-		include "../config/app.cfm";
-	}
-
 	// We turn on "sessionManagement" by default since the Flash uses it.
 	this.sessionManagement = true;
 
@@ -103,6 +96,9 @@ component output="false" {
 
 	function onServerStart() {}
 
+	// Load app-level configuration (datasources, custom settings, etc.). This
+	// must run AFTER this.env is initialized above so user code in
+	// config/app.cfm can reference this.env safely (issue #2325).
 	include "../config/app.cfm";
 
 	function onApplicationStart() {
