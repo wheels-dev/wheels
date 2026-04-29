@@ -81,6 +81,50 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("countSpecsOnDisk()", () => {
+
+				it("returns the count of *Spec.cfc files in the requested dotted directory", () => {
+					// Arrange — drop two specs into a temp tests/specs/models dir.
+					var specsDir = tempRoot & "/tests/specs/countme";
+					directoryCreate(specsDir, true, true);
+					fileWrite(specsDir & "/AlphaSpec.cfc", "component {}");
+					fileWrite(specsDir & "/BetaSpec.cfc",  "component {}");
+					// A non-Spec file should not be counted.
+					fileWrite(specsDir & "/Helper.cfc", "component {}");
+
+					var runner = new cli.lucli.services.TestRunner(projectRoot = tempRoot);
+					expect(runner.countSpecsOnDisk("tests.specs.countme")).toBe(2);
+				});
+
+				it("returns 0 for a missing directory", () => {
+					var runner = new cli.lucli.services.TestRunner(projectRoot = tempRoot);
+					expect(runner.countSpecsOnDisk("tests.specs.does.not.exist")).toBe(0);
+				});
+
+			});
+
+			describe("listSpecsOnDisk()", () => {
+
+				it("returns dotted bundle names for every *Spec.cfc on disk", () => {
+					var specsDir = tempRoot & "/tests/specs/listme";
+					directoryCreate(specsDir, true, true);
+					fileWrite(specsDir & "/OneSpec.cfc", "component {}");
+					fileWrite(specsDir & "/TwoSpec.cfc", "component {}");
+
+					var runner = new cli.lucli.services.TestRunner(projectRoot = tempRoot);
+					var names = runner.listSpecsOnDisk("tests.specs.listme");
+					expect(arrayLen(names)).toBe(2);
+					expect(arrayContains(names, "tests.specs.listme.OneSpec")).toBeTrue();
+					expect(arrayContains(names, "tests.specs.listme.TwoSpec")).toBeTrue();
+				});
+
+				it("returns empty array for a missing directory", () => {
+					var runner = new cli.lucli.services.TestRunner(projectRoot = tempRoot);
+					expect(runner.listSpecsOnDisk("tests.specs.does.not.exist")).toHaveLength(0);
+				});
+
+			});
+
 		});
 
 	}

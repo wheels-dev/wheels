@@ -22,7 +22,29 @@ Per [batch A plan](./2026-04-29-fresh-vm-batch-a-doc-sweep.md).
 | 6 | Cold reload defined inline in chapter 6 | `6a9a6d848` | wheels |
 | 1 (doc) | Install page version-surface callout | `96ee165e6` | wheels |
 
-**New sub-finding surfaced during batch A reconnaissance:** `wheels new` creates `tests/specs/{controllers,functional,models}/` directories but does **not** copy the `.gitkeep` files from `cli/lucli/templates/app/tests/specs/*/.gitkeep`. Empty directories won't survive a git commit. Filed as a CLI fix, batch B candidate.
+**New sub-finding surfaced during batch A reconnaissance:** `wheels new` creates `tests/specs/{controllers,functional,models}/` directories but does **not** copy the `.gitkeep` files from `cli/lucli/templates/app/tests/specs/*/.gitkeep`. Empty directories won't survive a git commit. Shipped in batch B.
+
+### Batch D — Auth + DI blocker (2026-04-29)
+
+Per [batch D plan](./2026-04-29-fresh-vm-batch-d-di-singleton.md).
+
+| # | Item | Commit (squash) | Repo |
+|---|------|--------|------|
+| 9 | `asSingleton()` survives framework Bindings | `cbd18c56b` | wheels |
+| 9 (error msg) | Diagnostic error when no strategies registered | `cbd18c56b` | wheels |
+| 9 (regression) | InjectorLifecycleSpec + iteration-order smoke | `cbd18c56b` | wheels |
+
+### Batch B — CLI output polish (2026-04-29)
+
+Per [batch B plan](./2026-04-29-fresh-vm-batch-b-cli-polish.md).
+
+| # | Item | Commit | Repo |
+|---|------|--------|------|
+| sub | `.gitkeep` files copied so empty test dirs survive git | `3d72fa272` | wheels |
+| 3 | `wheels migrate` emits CRLF | `f9bf3e239` | wheels |
+| 2 | `wheels test` surfaces silent compile errors | `aa557a229` | wheels |
+| 8 | `wheels reload` notes that `onApplicationStart` does not re-fire | `b59793ca4` | wheels |
+| 7 | `wheels destroy` accepts `<type> <name>` order | `c39f5e5f4` | wheels (shipped via PR #2360, separate workstream) |
 
 ---
 
@@ -43,7 +65,7 @@ These are scoping suggestions only — re-batch as needed when picking work.
 
 ## P0 — Blocks the tutorial for real users
 
-### [ ] 9. `wheels.auth.SessionStrategy` cannot be wired up — `asSingleton()` does not return a singleton
+### [x] 9. `wheels.auth.SessionStrategy` cannot be wired up — **shipped in batch D** (squash commit `cbd18c56b`)
 
 **Tutorial location.** [Part 6b — The Built-in Way](https://guides.wheels.dev/v4-0-0-snapshot/start-here/tutorial/06-authentication/), sections "Register the authenticator" through end of chapter.
 
@@ -244,7 +266,7 @@ The test fails before exercising the comment form.
 
 ---
 
-### [ ] 2. `wheels test` reports "0 passed" when a spec fails to compile
+### [x] 2. `wheels test` reports "0 passed" when a spec fails to compile — **shipped in batch B** (commit `aa557a229`)
 
 **Tutorial location.** Chapter 7 (also a general framework concern).
 
@@ -276,7 +298,7 @@ Anything that distinguishes "all clear" from "your spec is broken and we silentl
 
 ---
 
-### [ ] 3. `wheels migrate` output mis-formatted (no newlines between sections)
+### [x] 3. `wheels migrate` output mis-formatted — **shipped in batch B** (commit `f9bf3e239`)
 
 **Tutorial location.** [Part 2 — First model](https://guides.wheels.dev/v4-0-0-snapshot/start-here/tutorial/02-first-model/), section "Run the migration."
 
@@ -349,7 +371,7 @@ Multi-migration runs (chapter 6) are even worse — both migrations on one line.
 
 ---
 
-### [ ] 7. `wheels destroy` argument-order callout is good — minor enhancement opportunity
+### [x] 7. `wheels destroy` accepts `<type> <name>` order — **shipped via PR #2360** (commit `c39f5e5f4`, separate workstream from #2313 F16)
 
 **Tutorial location.** [Part 3](https://guides.wheels.dev/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/), section "Delete Part 2's handiwork."
 
@@ -372,7 +394,7 @@ $ wheels destroy controller Posts
 
 ---
 
-### [ ] 8. `wheels reload` doesn't re-fire `onApplicationStart` (related to #6)
+### [x] 8. `wheels reload` doesn't re-fire `onApplicationStart` — **shipped in batch B** (commit `b59793ca4`)
 
 Captured separately from #6 because #6 is the doc fix and this is the framework consideration.
 

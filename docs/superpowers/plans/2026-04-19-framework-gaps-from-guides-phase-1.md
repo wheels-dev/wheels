@@ -385,7 +385,7 @@ Recommend A at minimum. C is a nice enhancement.
 
 ---
 
-### [ ] 15. `wheels test run` output format needs verification
+### [x] 15. `wheels test run` output format needs verification — **subsumed by 2026-04-29 finding #2** (silent compile-error swallow), shipped in batch B (commit `aa557a229`)
 
 **Problem.** Guides Part 7 describes the expected output of `wheels test run` without ever executing the command end-to-end in the probe environment. The tutorial's "Expected output (illustrative)" placeholder is a hand-wave.
 

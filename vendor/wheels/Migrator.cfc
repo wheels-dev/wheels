@@ -40,13 +40,13 @@ component output="false" extends="wheels.Global"{
 		}
 
 		if (local.currentVersion == arguments.version && !local.hasPendingMigrations) {
-			local.rv = "Database is currently at version #arguments.version#. No migration required.#Chr(13)#";
+			local.rv = "Database is currently at version #arguments.version#. No migration required.#Chr(13) & Chr(10)#";
 		} else {
 			if (!DirectoryExists(this.paths.sql) && application[local.appKey].writeMigratorSQLFiles) {
 				DirectoryCreate(this.paths.sql);
 			}
 			if (local.currentVersion > arguments.version && arguments.missingMigFlag == false) {
-				local.rv = "Migrating from #local.currentVersion# down to #arguments.version#.#Chr(13)#";
+				local.rv = "Migrating from #local.currentVersion# down to #arguments.version#.#Chr(13) & Chr(10)#";
 				for (local.i = ArrayLen(local.migrations); local.i >= 1; local.i--) {
 					local.migration = local.migrations[local.i];
 					if (local.migration.version <= arguments.version) {
@@ -59,7 +59,7 @@ component output="false" extends="wheels.Global"{
 								if (structKeyExists(server, "boxlang")) {
 									$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
 								}
-								local.rv = local.rv & "#Chr(13)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
+								local.rv = local.rv & "#Chr(13) & Chr(10)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
 								request.$wheelsMigrationOutput = "";
 								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_down.sql";
 								if (application[local.appKey].writeMigratorSQLFiles) {
@@ -69,7 +69,7 @@ component output="false" extends="wheels.Global"{
 								local.rv = local.rv & request.$wheelsMigrationOutput;
 								$removeVersionAsMigrated(local.migration.version);
 							} catch (any e) {
-								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
+								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 								transaction action="rollback";
 								break;
 							}
@@ -79,10 +79,10 @@ component output="false" extends="wheels.Global"{
 				}
 			} else {
 				if(arguments.missingMigFlag){
-					local.rv = "Migrating remaining migrations till #arguments.version#.#Chr(13)#";
+					local.rv = "Migrating remaining migrations till #arguments.version#.#Chr(13) & Chr(10)#";
 					$removeVersionAsMigrated(local.currentVersion);
 				} else {
-					local.rv = "Migrating from #local.currentVersion# up to #arguments.version#.#Chr(13)#";
+					local.rv = "Migrating from #local.currentVersion# up to #arguments.version#.#Chr(13) & Chr(10)#";
 				}
 				for (local.migration in local.migrations) {
 					if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
@@ -92,7 +92,7 @@ component output="false" extends="wheels.Global"{
 								if (structKeyExists(server, "boxlang")) {
 									$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
 								}
-								local.rv = local.rv & "#Chr(13)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
+								local.rv = local.rv & "#Chr(13) & Chr(10)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
 								request.$wheelsMigrationOutput = "";
 								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_up.sql";
 								if (application[local.appKey].writeMigratorSQLFiles) {
@@ -102,7 +102,7 @@ component output="false" extends="wheels.Global"{
 								local.rv = local.rv & request.$wheelsMigrationOutput;
 								$setVersionAsMigrated(local.migration.version);
 							} catch (any e) {
-								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
+								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 								transaction action="rollback";
 								break;
 							}
@@ -138,22 +138,22 @@ component output="false" extends="wheels.Global"{
 			return i.version == version;
 		});
 		if (!ArrayLen(local.migrationArray)) {
-			return "Error: Migration version #arguments.version# was not found.#Chr(13)#";
+			return "Error: Migration version #arguments.version# was not found.#Chr(13) & Chr(10)#";
 		}
 		local.migration = local.migrationArray[1];
 		if (local.migration.status == "migrated") {
-			return "Migration #arguments.version# has already been applied.#Chr(13)#";
+			return "Migration #arguments.version# has already been applied.#Chr(13) & Chr(10)#";
 		}
 		if (!DirectoryExists(this.paths.sql) && application[local.appKey].writeMigratorSQLFiles) {
 			DirectoryCreate(this.paths.sql);
 		}
-		local.rv = "Running individual migration #arguments.version#.#Chr(13)#";
+		local.rv = "Running individual migration #arguments.version#.#Chr(13) & Chr(10)#";
 		transaction {
 			try {
 				if (structKeyExists(server, "boxlang")) {
 					$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
 				}
-				local.rv = local.rv & "#Chr(13)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
+				local.rv = local.rv & "#Chr(13) & Chr(10)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
 				request.$wheelsMigrationOutput = "";
 				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_up.sql";
 				if (application[local.appKey].writeMigratorSQLFiles) {
@@ -163,7 +163,7 @@ component output="false" extends="wheels.Global"{
 				local.rv = local.rv & request.$wheelsMigrationOutput;
 				$setVersionAsMigrated(local.migration.version);
 			} catch (any e) {
-				local.rv = local.rv & "Error migrating #local.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
+				local.rv = local.rv & "Error migrating #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 				transaction action="rollback";
 			}
 			transaction action="commit";
@@ -283,13 +283,13 @@ component output="false" extends="wheels.Global"{
 			return i.version == currentVersion;
 		});
 		if (!ArrayLen(local.migrationArray)) {
-			return "Error re-running #arguments.version#.#Chr(13)#This version was not found#Chr(13)#";
+			return "Error re-running #arguments.version#.#Chr(13) & Chr(10)#This version was not found#Chr(13) & Chr(10)#";
 		}
 
 		local.migration = local.migrationArray[1];
 		local.rv = "";
 		try {
-			local.rv = local.rv & "#Chr(13)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
+			local.rv = local.rv & "#Chr(13) & Chr(10)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
 			request.$wheelsMigrationOutput = "";
 			request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_redo.sql";
 			if (application[local.appKey].writeMigratorSQLFiles) {
@@ -301,7 +301,7 @@ component output="false" extends="wheels.Global"{
 			local.migration.cfc.up();
 			local.rv = local.rv & request.$wheelsMigrationOutput;
 		} catch (any e) {
-			local.rv = local.rv & "Error re-running #local.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
+			local.rv = local.rv & "Error re-running #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 		}
 		return local.rv;
 	}

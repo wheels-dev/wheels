@@ -152,4 +152,54 @@ component {
 		return replace(filter, "/", ".", "all");
 	}
 
+	/**
+	 * Count *Spec.cfc files on disk in the given test directory.
+	 *
+	 * Used by the CLI to detect TestBox silently swallowing unloadable
+	 * specs: when this count exceeds the TestBox bundle count, at least
+	 * one spec failed to compile.
+	 *
+	 * @testDirectory Dotted-path directory (e.g. "tests.specs" or
+	 *                "wheels.tests.specs.model")
+	 * @return Numeric count, or 0 if the directory doesn't exist.
+	 */
+	public numeric function countSpecsOnDisk(required string testDirectory) {
+		// Resolve dotted path -> filesystem path under projectRoot.
+		var fsPath = variables.projectRoot & "/" & replace(arguments.testDirectory, ".", "/", "all");
+		if (!directoryExists(fsPath)) {
+			return 0;
+		}
+		var specs = directoryList(fsPath, true, "name", "*Spec.cfc");
+		return arrayLen(specs);
+	}
+
+	/**
+	 * List the on-disk spec file paths as dotted bundle names.
+	 *
+	 * Returned paths are dotted, matching TestBox's bundle-name convention,
+	 * so a caller can compute "specs-on-disk minus bundles-loaded" to find
+	 * which specific specs failed to compile.
+	 *
+	 * @testDirectory Dotted-path directory.
+	 * @return Array of dotted bundle names.
+	 */
+	public array function listSpecsOnDisk(required string testDirectory) {
+		var fsPath = variables.projectRoot & "/" & replace(arguments.testDirectory, ".", "/", "all");
+		if (!directoryExists(fsPath)) {
+			return [];
+		}
+		var specs = directoryList(fsPath, true, "path", "*Spec.cfc");
+		var rv = [];
+		for (var spec in specs) {
+			// Convert filesystem path back to dotted bundle name.
+			var rel = replace(spec, fsPath, "");
+			rel = reReplace(rel, "^[\\/]+", "");
+			rel = reReplace(rel, "\.cfc$", "");
+			rel = replace(rel, "/", ".", "all");
+			rel = replace(rel, "\", ".", "all");
+			arrayAppend(rv, arguments.testDirectory & "." & rel);
+		}
+		return rv;
+	}
+
 }
