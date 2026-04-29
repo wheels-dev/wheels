@@ -359,6 +359,7 @@ component extends="modules.BaseModule" {
 		var ciMode = false;
 		var coreTests = false;
 		var db = "sqlite";
+		var useTestDB = true;
 
 		// Parse named arguments from --key=value or --key value
 		for (var i = 1; i <= arrayLen(args); i++) {
@@ -381,6 +382,8 @@ component extends="modules.BaseModule" {
 				ciMode = true;
 			} else if (arg == "--core") {
 				coreTests = true;
+			} else if (arg == "--no-test-db") {
+				useTestDB = false;
 			} else if (!arg.startsWith("--")) {
 				// Positional arg is the filter directory
 				filter = arg;
@@ -395,7 +398,7 @@ component extends="modules.BaseModule" {
 		// of the user's own tests/specs/, producing "0 passed" silently with
 		// no spec discovery.
 
-		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode);
+		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -3415,7 +3418,8 @@ component extends="modules.BaseModule" {
 		boolean verboseOutput = false,
 		boolean coreTests = false,
 		string db = "sqlite",
-		boolean ciMode = false
+		boolean ciMode = false,
+		boolean useTestDB = true
 	) {
 		var serverPort = $requireRunningServer([
 			"Start one with: wheels start",
@@ -3427,6 +3431,13 @@ component extends="modules.BaseModule" {
 
 		try {
 			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
+			// App tests default to running against the <appname>_test
+			// datasource so chapter-6-style manual signups in the dev DB
+			// don't bleed into chapter-7 specs. Core tests already pick
+			// datasources from url.db so leave them alone.
+			if (!coreTests && useTestDB) {
+				testUrl &= "&useTestDB=true";
+			}
 			if (len(filter)) {
 				testUrl &= "&directory=#filter#";
 			}
