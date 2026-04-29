@@ -83,7 +83,23 @@ fi
 # delimiter for fields that may contain / (URLs) or : (timestamps, refs).
 COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
 COMMIT_SHORT=$(git rev-parse --short=7 HEAD 2>/dev/null || echo "")
-COMMIT_SUBJECT=$(git log -1 --pretty=%s 2>/dev/null | tr -d '|' || echo "")
+COMMIT_SUBJECT=$(git log -1 --pretty=%s 2>/dev/null || echo "")
+# Strip newlines defensively (commit subjects shouldn't have any).
+COMMIT_SUBJECT=$(printf '%s' "${COMMIT_SUBJECT}" | tr -d '\r\n')
+# Escape for CFML double-quoted string literal (BuildInfo.cfc embeds this
+# value inside one). # is CFML's variable-interpolation delimiter and "
+# closes the string — leaving either unescaped breaks compilation. The
+# common case is a PR-suffixed subject like "feat(x): foo (#1234)".
+# Note: \# in the pattern is required because bash treats a leading
+# unescaped # as an anchor-to-start operator inside ${var//...}.
+COMMIT_SUBJECT="${COMMIT_SUBJECT//\#/##}"
+COMMIT_SUBJECT="${COMMIT_SUBJECT//\"/\"\"}"
+# Escape for sed replacement (\, &) and strip the sed delimiter (|), which
+# has no clean representation here. Apply after CFML escaping so the layers
+# don't interfere.
+COMMIT_SUBJECT="${COMMIT_SUBJECT//\\/\\\\}"
+COMMIT_SUBJECT="${COMMIT_SUBJECT//&/\\&}"
+COMMIT_SUBJECT="${COMMIT_SUBJECT//|/}"
 BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # Run context comes from the GitHub Actions environment. Locally these are
 # empty and the placeholders stay unsubstituted, which BuildInfo blanks out.
@@ -107,6 +123,25 @@ find "${BUILD_DIR}/wheels" -type f \( -name "*.json" -o -name "*.md" -o -name "*
         -e "s|@build\.repository@|${REPOSITORY}|g" \
         "$file" && rm "${file}.bak"
 done
+
+# Sanity check: BuildInfo.cfc commitSubject must not contain unescaped #
+# (CFML's variable-interpolation delimiter) or unescaped " (string close).
+# Fail loud here so a build pipeline regression surfaces before the artifact
+# ever reaches users — an unescaped # bricks every fresh app on first request.
+BUILDINFO_CFC="${BUILD_DIR}/wheels/BuildInfo.cfc"
+if [ -f "${BUILDINFO_CFC}" ]; then
+    cs_line=$(grep -E '^[[:space:]]*commitSubject:' "${BUILDINFO_CFC}" | head -1 || true)
+    # Strip the prefix and trailing "," to get the bare string literal contents.
+    cs_literal=$(printf '%s' "${cs_line}" | sed -E 's/^[[:space:]]*commitSubject:[[:space:]]*"//; s/",[[:space:]]*$//')
+    # Collapse properly-escaped pairs; any remaining # or " is a defect.
+    cs_collapsed=$(printf '%s' "${cs_literal}" | sed -e 's/##//g' -e 's/""//g')
+    if printf '%s' "${cs_collapsed}" | grep -qE '[#"]'; then
+        echo "ERROR: BuildInfo.cfc commitSubject contains an unescaped # or \" — would break CFML compilation." >&2
+        echo "       Literal:   ${cs_literal}" >&2
+        echo "       Remaining: ${cs_collapsed}" >&2
+        exit 1
+    fi
+fi
 
 echo "Wheels Core prepared for ForgeBox publishing!"
 echo "Directory: ${BUILD_DIR}/wheels/"
