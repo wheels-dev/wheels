@@ -4742,7 +4742,13 @@ component extends="modules.BaseModule" {
 	private string function browserTest(array args = []) {
 		var format = "text";
 		var verboseOutput = false;
-		var directory = "wheels.tests.specs.wheelstest";
+		// Default to the APP's browser specs (tests/specs/browser/) — not the
+		// framework's internal browser specs. Onboarding finding F11 reported
+		// `wheels browser test` running 0 tests because it pointed at
+		// `wheels.tests.specs.wheelstest`, the framework's own browser-DSL
+		// test directory, which contains no app code. Override with
+		// `--directory=...` for advanced use.
+		var directory = "tests.specs.browser";
 
 		for (var i = 2; i <= arrayLen(args); i++) {
 			var arg = args[i];
@@ -4798,7 +4804,11 @@ component extends="modules.BaseModule" {
 		out("");
 
 		var serverPort = $getServerPort();
-		var testUrl = "http://localhost:#serverPort#/wheels/core/tests?db=sqlite&format=json&directory=#directory#";
+		// Hit the APP test runner (`/wheels/app/tests`), not the framework's
+		// core test runner (`/wheels/core/tests`). The latter only knows
+		// about specs under `vendor/wheels/tests/specs/`. Apps live under
+		// `tests/specs/`, mounted by the app runner. F11.
+		var testUrl = "http://localhost:#serverPort#/wheels/app/tests?db=sqlite&format=json&directory=#directory#";
 
 		try {
 			var httpResult = makeHttpRequest(testUrl);
