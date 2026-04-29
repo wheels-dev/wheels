@@ -1329,7 +1329,8 @@ component extends="modules.BaseModule" {
 			else { arrayAppend(positional, a); }
 		}
 		if (!arrayLen(positional)) {
-			out("Usage: wheels destroy <name> [type]", "yellow");
+			out("Usage: wheels destroy <type> <name>", "yellow");
+			out("       wheels destroy <name>          (type defaults to 'resource')", "yellow");
 			out("");
 			out("Types:", "bold");
 			out("  resource    Remove model + controller + views + tests + route + migration (default)");
@@ -1338,16 +1339,38 @@ component extends="modules.BaseModule" {
 			out("  view        Remove view directory (or single file with controller/view syntax)");
 			out("");
 			out("Examples:", "bold");
-			out("  wheels destroy User");
-			out("  wheels destroy Products controller");
-			out("  wheels destroy Product model");
-			out("  wheels destroy products/index view");
+			out("  wheels destroy User                   (remove the User resource)");
+			out("  wheels destroy controller Products    (remove just the Products controller)");
+			out("  wheels destroy model Product          (remove just the Product model)");
+			out("  wheels destroy view products/index    (remove a single view)");
 			return "";
 		}
-		var name = trim(positional[1]);
-		var type = arrayLen(positional) > 1 ? lCase(trim(positional[2])) : "resource";
 
-		if (!listFindNoCase("resource,model,controller,view", type)) {
+		// Smart-parse positionals to support both orderings:
+		//   `<type> <name>` — preferred, matches `wheels generate <type> <name>` and v3 docs index
+		//   `<name> [type]` — legacy form documented in earlier CLI builds
+		// Issue #2313 (F16): users following the docs hit "Unknown type: posts" before this.
+		var validTypes = "resource,model,controller,view";
+		var name = "";
+		var type = "resource";
+		if (arrayLen(positional) == 1) {
+			name = trim(positional[1]);
+		} else {
+			var firstArg = trim(positional[1]);
+			var secondArg = trim(positional[2]);
+			if (listFindNoCase(validTypes, firstArg)) {
+				type = lCase(firstArg);
+				name = secondArg;
+			} else if (listFindNoCase(validTypes, secondArg)) {
+				name = firstArg;
+				type = lCase(secondArg);
+			} else {
+				name = firstArg;
+				type = lCase(secondArg);
+			}
+		}
+
+		if (!listFindNoCase(validTypes, type)) {
 			out("Unknown type: #type#. Valid types: resource, model, controller, view", "red");
 			return "";
 		}
