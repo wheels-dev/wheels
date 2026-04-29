@@ -1,6 +1,10 @@
-<!--- |ObjectNameSingularC| Show --->
-<cfparam name="|ObjectNameSingular|">
+<cfparam name="|ObjectNameSingular|" default="">
 <cfoutput>
-<h1>View |ObjectNameSingularC|</h1>
+<h1>#|ObjectNameSingular|.id#</h1>
 <!--- CLI-Appends-Here --->
+<p>
+	#linkTo(route="edit|ObjectNameSingularC|", key=|ObjectNameSingular|.id, text="Edit")# ·
+	#buttonTo(route="|ObjectNameSingular|", key=|ObjectNameSingular|.id, text="Delete", method="delete")# ·
+	#linkTo(route="|ObjectNamePlural|", text="← all |ObjectNamePlural|")#
+</p>
 </cfoutput>
