@@ -44,7 +44,17 @@ component {
 	}
 
 	public boolean function isDev() {
-		return variables.info.version == "@build.version@";
+		// Detect dev checkouts by structural shape (prefix `@build.` + suffix
+		// `@`), NOT by literal equality with the version placeholder. The
+		// release pipeline (prepare-core.sh) does a global sed pass that
+		// rewrites every literal occurrence of the version placeholder in
+		// this file at artifact-construction time — if such a literal
+		// appeared inside a comparison here, it would be rewritten too,
+		// silently turning every released build into a self-reported dev
+		// build. (Even comments are not safe; sed is line-oriented text and
+		// does not respect CFML syntax.) Mirrors $blankIfPlaceholder() below.
+		var v = variables.info.version;
+		return left(v, 7) == "@build." && right(v, 1) == "@";
 	}
 
 	public boolean function isSnapshot() {
