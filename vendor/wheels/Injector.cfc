@@ -34,6 +34,13 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 		// Track the current mapping being built (for fluent API)
 		variables.currentMapping = "";
 
+		// Track the most recently completed mapping name. Used by asSingleton()
+		// and asRequestScoped() so they flag the just-mapped key rather than
+		// whichever key iterates last in variables.mappings — Lucee's HashMap-backed
+		// struct walks keys in hash-bucket order once enough keys are registered to
+		// span multiple buckets, so for-in iteration is not insertion-ordered at scale.
+		variables.lastMappedName = "";
+
 		// Register self at application.wheelsdi for framework-wide access
 		application.wheelsdi = this;
 
@@ -73,30 +80,29 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 			throw(type="Wheels.Injector", message="to() called without a preceding map() call.");
 		}
 		variables.mappings[variables.currentMapping] = arguments.componentPath;
+		variables.lastMappedName = variables.currentMapping;
 		variables.currentMapping = "";
 		return this;
 	}
 
 	/**
-	 * Mark the current or last mapping as a singleton.
+	 * Mark the most recently completed mapping as a singleton.
 	 * When getInstance() is called for a singleton, the instance is cached.
 	 */
 	public Injector function asSingleton() {
-		local.lastKey = $findLastMappingKey();
-		if (len(local.lastKey)) {
-			variables.singletonFlags[local.lastKey] = true;
+		if (len(variables.lastMappedName)) {
+			variables.singletonFlags[variables.lastMappedName] = true;
 		}
 		return this;
 	}
 
 	/**
-	 * Mark the current or last mapping as request-scoped.
+	 * Mark the most recently completed mapping as request-scoped.
 	 * When getInstance() is called, the instance is cached per-request in request.$wheelsDICache.
 	 */
 	public Injector function asRequestScoped() {
-		local.lastKey = $findLastMappingKey();
-		if (len(local.lastKey)) {
-			variables.requestScopedFlags[local.lastKey] = true;
+		if (len(variables.lastMappedName)) {
+			variables.requestScopedFlags[variables.lastMappedName] = true;
 		}
 		return this;
 	}
@@ -263,17 +269,6 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 			return variables.mappings[arguments.name];
 		}
 		return arguments.name;
-	}
-
-	/**
-	 * Find the last key added to the mappings struct (used by asSingleton/asRequestScoped).
-	 */
-	private string function $findLastMappingKey() {
-		local.lastKey = "";
-		for (local.key in variables.mappings) {
-			local.lastKey = local.key;
-		}
-		return local.lastKey;
 	}
 
 	/**
