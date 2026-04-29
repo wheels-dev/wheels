@@ -103,7 +103,7 @@ function up() {
         t.uniqueidentifier(columnNames="uniqueId");
         
         // Special columns
-        t.timestamps(); // Creates createdAt and updatedAt
+        t.timestamps(); // Creates createdAt, updatedAt, and deletedAt (soft-delete marker)
         t.references(referenceNames="user"); // Creates userId foreign key
         
         // Create the table
