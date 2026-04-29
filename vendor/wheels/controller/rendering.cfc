@@ -138,10 +138,37 @@ component {
 		if (arguments.$returnAs == "string") {
 			local.rv = local.partial;
 		} else {
+			// When the rendered body is a Turbo Stream payload, advertise
+			// the Turbo 7+ Content-Type so the browser-side runtime
+			// processes <turbo-stream> elements instead of doing a full
+			// navigation. Sniffs the first non-whitespace bytes — only
+			// activates when the partial is unambiguously a stream
+			// response. See finding #12 in
+			// docs/superpowers/plans/2026-04-29-fresh-vm-onboarding-findings.md
+			$applyTurboStreamContentType(body = local.partial);
 			variables.$instance.response = local.partial;
 		}
 		if (StructKeyExists(local, "rv")) {
 			return local.rv;
+		}
+	}
+
+	/**
+	 * Set Content-Type to text/vnd.turbo-stream.html when the body starts
+	 * with a <turbo-stream> opening tag. Public so it's reachable from
+	 * controller actions that want to opt in for renderText / renderWith
+	 * paths too.
+	 *
+	 * Uses the response object's setContentType — cfheader doesn't
+	 * reliably set Content-Type on Lucee. Mirrors the pattern in
+	 * vendor/wheels/controller/sse.cfc.
+	 *
+	 * @body The rendered body to inspect.
+	 */
+	public void function $applyTurboStreamContentType(required string body) {
+		if (REFindNoCase("^\s*<turbo-stream\b", arguments.body)) {
+			var response = getPageContext().getResponse();
+			response.setContentType("text/vnd.turbo-stream.html; charset=utf-8");
 		}
 	}
 
