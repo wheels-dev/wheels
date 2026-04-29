@@ -50,6 +50,10 @@ Install the `wheels` CLI. Five minutes.
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
 
+   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
+   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
+   </Aside>
+
 </Steps>
 
 </TabItem>
@@ -86,6 +90,10 @@ The `wheels` package on the public Chocolatey feed is still the v1.x legacy (Com
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
 
+   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
+   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
+   </Aside>
+
 </Steps>
 
 Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI Installation → Manual JAR install](/v4-0-0-snapshot/command-line-tools/installation/#manual-jar-install) for the canonical version-pairing source.
@@ -117,6 +125,10 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
    ```
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
+
+   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
+   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
+   </Aside>
 
 </Steps>
 
