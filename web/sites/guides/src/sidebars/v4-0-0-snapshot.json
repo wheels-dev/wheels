@@ -17,7 +17,8 @@
           { "label": "4. Validations + Turbo Frames", "link": "/v4-0-0-snapshot/start-here/tutorial/04-validations-frames/" },
           { "label": "5. Comments + Turbo Streams", "link": "/v4-0-0-snapshot/start-here/tutorial/05-comments-streams/" },
           { "label": "6. Authentication", "link": "/v4-0-0-snapshot/start-here/tutorial/06-authentication/" },
-          { "label": "7. Testing + Deploying", "link": "/v4-0-0-snapshot/start-here/tutorial/07-testing-deploying/" }
+          { "label": "7. Testing + Deploying", "link": "/v4-0-0-snapshot/start-here/tutorial/07-testing-deploying/" },
+          { "label": "8. Bonus: wheels-basecoat", "link": "/v4-0-0-snapshot/start-here/tutorial/08-bonus-basecoat/" }
         ]
       }
     ]
