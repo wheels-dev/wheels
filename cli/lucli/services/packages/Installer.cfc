@@ -6,9 +6,13 @@
  *   1. Refuse if vendor/<name>/ already exists, unless force=true.
  *   2. Download tarball URL from the version entry to a temp file.
  *   3. Compute SHA-256, compare to the manifest's sha256. Mismatch = hard abort.
- *   4. Extract via `tar -xzf` into vendor/. The tarball's top-level dir
+ *   4. Extract via `tar -xzmf` into vendor/. The tarball's top-level dir
  *      is the package name by construction (mirror-tarball.yml
  *      `mv src/ <name>/` before taring), so vendor/<name>/ appears naturally.
+ *      `-m` is required: source tarballs are built with `--mtime=@0` for
+ *      reproducible sha256, but Lucee 7 cannot compile CFCs whose mtime is
+ *      epoch-0. Without `-m` the package "extracts cleanly" but every helper
+ *      call 500s with a misleading "invalid component definition" error.
  *   5. Clean up the temp file.
  *
  * Tarball extraction shells out to `tar`. All target platforms (macOS,
@@ -161,12 +165,20 @@ component {
 	}
 
 	private void function $extract(required string tarballPath, required string destDir) {
-		// Wrap in a try so a missing `tar` produces a clear error message.
+		// `-m` (--touch) discards the tarball's stored mtime and stamps each
+		// extracted file with the current time. Critical because mirror-tarball
+		// builds packages with `--mtime=@0` for reproducible sha256 — and
+		// Lucee 7's class-resolver treats epoch-0 CFCs as unloadable, surfacing
+		// the failure as the very generic "invalid component definition, can't
+		// find component [vendor.NAME.CFC]" error. Using `-m` here avoids
+		// the issue without giving up determinism in the source tarballs.
+		// Both GNU tar (Linux) and BSD tar (macOS bundled) accept `-m` with the
+		// same "extract with current mtime" semantics.
 		local.result = {};
 		try {
 			cfexecute(
 				name = "tar",
-				arguments = "-xzf #arguments.tarballPath# -C #arguments.destDir#",
+				arguments = "-xzmf #arguments.tarballPath# -C #arguments.destDir#",
 				timeout = 120,
 				variable = "local.stdout",
 				errorVariable = "local.stderr",
