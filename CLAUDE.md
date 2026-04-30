@@ -993,13 +993,70 @@ Deeper documentation lives in `.ai/` — Claude will search it automatically whe
 
 ## Commit Message Conventions
 
-This repo uses commitlint. Commit messages must follow: `type(scope): lowercase subject`
+This repo uses commitlint. The canonical rules live in `commitlint.config.js`; this section reflects them. If the two ever disagree, the config wins — open a PR updating this section to match.
 
-**Valid scopes:** `model`, `controller`, `view`, `router`, `middleware`, `migration`, `cli`, `test`, `config`, `di`, `job`, `mailer`, `plugin`, `sse`, `seed`, `docs`
+### Format
 
-**Invalid scope:** `security` — use the layer it touches (e.g., `model` for SQL injection fix, `view` for XSS fix, `config` for consoleeval hardening, `cli` for MCP server fixes).
+`type(scope): subject`
 
-**Subject must be lowercase.** No sentence-case, start-case, or pascal-case. Write `fix(model): validate index names` not `fix(model): Validate index names`.
+- **type** is required.
+- **scope** is optional. Omit it when no allowed scope fits cleanly (this is normal — many commits don't need one).
+- **subject** is required, must not be empty, and must not be ALL-CAPS.
+
+### Valid types
+
+`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+
+### Valid scopes (full list)
+
+Framework layers:
+`model`, `controller`, `view`, `router`, `middleware`, `migration`, `cli`, `test`, `config`, `di`, `job`, `mailer`, `plugin`, `sse`, `seed`, `docs`
+
+Static-site monorepo (under `web/`):
+`web`, `web/ui`, `web/landing`, `web/blog`, `web/guides`, `web/api`, `web/starlight`
+
+When a change spans multiple layers or doesn't map cleanly, **use no scope** — `docs: …`, `fix: …`, `ci: …` are all valid bare forms. Prefer no scope over guessing.
+
+### Common scope choices by file path
+
+| You touched | Scope to use |
+|---|---|
+| `web/sites/guides/...` (tutorial, guides content) | `docs` (preferred for prose) or `web/guides` (preferred for site infra) |
+| `web/sites/landing/...` | `web/landing` |
+| `web/sites/blog/...` | `web/blog` |
+| `web/sites/api/...` | `web/api` |
+| `web/sites/packages/...` | `web` |
+| `web/tests/visual-baselines/...` | `web` |
+| `app/views/...`, `vendor/wheels/view/...` | `view` |
+| `app/models/...`, `vendor/wheels/model/...` | `model` |
+| `cli/...`, `vendor/wheels/cli/...` | `cli` |
+| `config/...` | `config` |
+| `tests/...` | `test` |
+| `.github/workflows/...` | type `ci`, no scope (e.g. `ci: pin softprops…`) |
+| `CLAUDE.md`, `README.md`, root docs | type `docs`, no scope |
+
+### Invalid scopes
+
+- `security` — use the layer it touches (e.g., `model` for SQL injection fix, `view` for XSS fix, `config` for consoleeval hardening).
+- Anything not in the lists above. Specifically **do not invent scopes** like `tutorial`, `package`, `release` — commitlint will reject them.
+
+### Subject rules
+
+- Must not be empty.
+- Must not be ALL-CAPS (e.g., `fix: FIX BUG` is rejected).
+- Sentence-case, start-case, and pascal-case **are allowed** — proper nouns like `Giscus`, `CockroachDB`, `Buttondown` may keep their canonical capitalization.
+- Header (`type(scope): subject`) capped at 100 chars.
+
+### When you forget and CI rejects the commit
+
+`gh pr checks <PR>` shows `Validate Commit Messages | fail`. The fix:
+
+```bash
+git commit --amend -m "<corrected message>"
+git push --force-with-lease origin <branch>
+```
+
+CI re-runs on the new commit. No need for a separate "fix commit message" commit on a single-commit PR.
 
 ## Branding
 
