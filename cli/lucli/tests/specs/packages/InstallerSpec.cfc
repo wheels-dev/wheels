@@ -51,6 +51,37 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				DirectoryDelete(proj, true);
 			});
 
+			it("stamps extracted files with current mtime (Lucee 7 rejects mtime=0)", () => {
+				// Production tarballs are built with `tar --mtime=@0` for
+				// deterministic sha256. Lucee 7's class-resolver cannot compile
+				// CFCs whose mtime is epoch-0 — it silently aborts with the
+				// generic "invalid component definition, can't find component
+				// [...]" error. The fixture's mtime is many days old (Apr 23
+				// 2026), but with the `-m` flag on extract, every file lands
+				// with current mtime. Assert that here so a regression that
+				// drops `-m` (or swaps it for `--touch=once`) trips loudly.
+				var proj = $scratch();
+				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
+				var installer = new cli.lucli.services.packages.Installer(
+					httpClient = $seededClient(tarballHref),
+					projectRoot = proj
+				);
+				var path = installer.install("wheels-fake", {
+					version: "1.0.0",
+					tarball: tarballHref,
+					sha256: $sha(fixturePath)
+				});
+				var pkgInfo = GetFileInfo(path & "/package.json");
+				var nowMs = Now().getTime();
+				var pkgMs = pkgInfo.lastModified.getTime();
+				// The fixture's stored mtime is well over a day ago. If `-m`
+				// is dropped, lastModified will be the fixture's old time and
+				// (now - lastModified) will be tens of thousands of seconds.
+				// 60s window is generous for a single test run.
+				expect(nowMs - pkgMs).toBeLT(60000);
+				DirectoryDelete(proj, true);
+			});
+
 			it("aborts with ChecksumMismatch on bad sha256", () => {
 				var proj = $scratch();
 				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
