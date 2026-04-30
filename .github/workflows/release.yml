@@ -309,69 +309,90 @@ jobs:
           echo "Release notes extracted to release-notes.md"
           cat release-notes.md
 
+      # Wrapped in Wandalen/wretry.action@v3 to recover from transient
+      # GitHub Actions artifact-upload flakes — observed pattern is
+      # `##[error]other side closed` mid-stream after most assets upload
+      # successfully (e.g. SNAPSHOT+1655 lost wheels-core-*.zip while 17/18
+      # other assets uploaded fine). softprops/action-gh-release@v3 is
+      # safe to retry because `overwrite_files: true` makes it idempotent:
+      # on retry it attaches to the existing release and only re-uploads
+      # missing or stale assets. attempt_delay is in milliseconds.
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
         id: gh-release-final
-        uses: softprops/action-gh-release@v3
+        uses: Wandalen/wretry.action@v3
         with:
-          tag_name: v${{ env.WHEELS_VERSION }}
-          name: Wheels ${{ env.WHEELS_VERSION }}
-          body_path: release-notes.md
-          draft: false
-          prerelease: ${{ env.WHEELS_PRERELEASE }}
-          files: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+          action: softprops/action-gh-release@v3
+          attempt_limit: 3
+          attempt_delay: 30000
+          with: |
+            tag_name: v${{ env.WHEELS_VERSION }}
+            name: Wheels ${{ env.WHEELS_VERSION }}
+            body_path: release-notes.md
+            draft: false
+            prerelease: ${{ env.WHEELS_PRERELEASE }}
+            overwrite_files: true
+            files: |
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
 
       #############################################
       # Create Snapshot Pre-Release (develop only)
       #############################################
 
+      # Same retry-wrap rationale as the stable Create-GitHub-Release step
+      # above. Both branches need the wrap because the same flake fires on
+      # any release upload regardless of branch.
       - name: Create Snapshot Pre-Release
         if: github.ref != 'refs/heads/main'
         id: gh-release-snapshot
-        uses: softprops/action-gh-release@v3
+        uses: Wandalen/wretry.action@v3
         with:
-          tag_name: v${{ env.WHEELS_VERSION }}
-          name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
-          body: "Snapshot build from develop. Not for production use."
-          draft: false
-          prerelease: true
-          files: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+          action: softprops/action-gh-release@v3
+          attempt_limit: 3
+          attempt_delay: 30000
+          with: |
+            tag_name: v${{ env.WHEELS_VERSION }}
+            name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
+            body: "Snapshot build from develop. Not for production use."
+            draft: false
+            prerelease: true
+            overwrite_files: true
+            files: |
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
 
       #############################################
       # Dispatch downstream package managers
