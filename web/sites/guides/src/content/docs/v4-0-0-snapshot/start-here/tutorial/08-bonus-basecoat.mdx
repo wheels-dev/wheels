@@ -124,14 +124,18 @@ basecoat ships CFML view helpers — but the actual styling is provided by `base
 
 <Steps>
 
-1. Download the latest basecoat CSS from the [Basecoat UI releases page](https://basecoatui.com/) (look for `basecoat.min.css`).
+1. Download the latest basecoat CSS from jsdelivr (a CDN-mirrored copy of the [Basecoat UI](https://basecoatui.com/) npm package).
 
 2. Save it to `public/assets/basecoat.min.css`. Create the `assets/` directory if it doesn't exist:
 
    ```bash title="your shell"
    mkdir -p public/assets
-   curl -o public/assets/basecoat.min.css https://basecoatui.com/dist/basecoat.min.css
+   curl -o public/assets/basecoat.min.css https://cdn.jsdelivr.net/npm/basecoat-css/dist/basecoat.min.css
    ```
+
+   :::note
+   Don't use `https://basecoatui.com/dist/basecoat.min.css` directly — that hostname serves the project's docs site, and the path returns the HTML landing page (with `Content-Type: text/html`), not the stylesheet. Use the jsdelivr (or unpkg) URL above.
+   :::
 
 3. Confirm the file:
 
@@ -294,10 +298,9 @@ Three things to verify:
 
 ## Troubleshooting
 
-**`No matching function [UIBUTTON] found`** — the package didn't activate. Two common causes:
+**`No matching function [UIBUTTON] found`** — the package didn't activate. Most common cause: you ran `wheels reload` instead of `wheels stop && wheels start`. PackageLoader runs in `onApplicationStart` which a full restart triggers; reload doesn't.
 
-1. You ran `wheels reload` instead of `wheels stop && wheels start`. PackageLoader runs in `onApplicationStart` which a full restart triggers; reload doesn't.
-2. The runtime is older than `wheels-basecoat 1.0.2`. Earlier basecoat versions had a `component mixin="controller,view"` declaration that fails to load on Lucee 7. Run `wheels packages show wheels-basecoat` and verify the installed version is ≥ 1.0.2.
+**`No matching function [$UIBUILDID] found`** (or `[$UILUCIDEICON]`) — the package activated but its internal helpers can't be found. Fixed in `wheels-basecoat 1.0.3`. Older versions declared the `$`-prefixed helpers `private`, but Wheels' `PackageLoader` only carries PUBLIC methods across the mixin boundary, so public callers like `uiField` couldn't reach them. Run `wheels packages update wheels-basecoat --yes && wheels stop && wheels start`.
 
 **`No version of 'wheels-basecoat' satisfies runtime '0.0.0-dev'`** — the framework can't read its own version. Likely on a Wheels release older than `4.0.0-SNAPSHOT+1670` (the snapshot that includes the runtime-detection fix). Upgrade with `brew upgrade wheels` or `choco upgrade wheels` and re-run.
 

@@ -276,10 +276,16 @@ component {
 
 		// Load general developer settings first, then override with environment specific ones.
 		// Track the initial default so we can detect if the developer explicitly overrides it.
+		// $includeConfig captures any output the file produces and warns via the application
+		// log if non-empty — usually the signal that a config/*.cfm file is missing its
+		// cfscript wrapper, in which case the engine parses cfscript-style code as markup
+		// and the registrations silently never run. (Note: Lucee 7's tag scanner reads
+		// CFC comments before compilation and treats literal cf-tags as unclosed errors,
+		// so this comment deliberately avoids putting the angle-bracketed form inline.)
 		local.envSwitchDefault = application.$wheels.allowEnvironmentSwitchViaUrl;
-		application.wo.$include(template = "/config/settings.cfm");
+		application.wo.$includeConfig(template = "/config/settings.cfm");
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
-			application.wo.$include(template = "/config/#application.$wheels.environment#/settings.cfm");
+			application.wo.$includeConfig(template = "/config/#application.$wheels.environment#/settings.cfm");
 		}
 
 		// In production-like environments, disable URL-based environment switching by default.
@@ -299,13 +305,14 @@ component {
 			} catch (any e) {}
 		}
 
-		// Load DI service registrations.
+		// Load DI service registrations. $includeConfig captures any output the file
+		// produces — see the matching note on the settings.cfm include above.
 		if (FileExists(ExpandPath("/config/services.cfm"))) {
-			application.wo.$include(template = "/config/services.cfm");
+			application.wo.$includeConfig(template = "/config/services.cfm");
 		}
 		// Environment-specific services override.
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/services.cfm"))) {
-			application.wo.$include(template = "/config/#application.$wheels.environment#/services.cfm");
+			application.wo.$includeConfig(template = "/config/#application.$wheels.environment#/services.cfm");
 		}
 
 		// Clear query (cfquery) and page (cfcache) caches.

@@ -188,7 +188,7 @@ component output="false" {
 			WriteLog(
 				text = "[Wheels] Package '#local.err.package#' failed: #local.err.message#",
 				type = "error",
-				file = "application"
+				file = "wheels"
 			);
 		}
 
@@ -197,7 +197,7 @@ component output="false" {
 			WriteLog(
 				text = "[Wheels] Package '#local.dirName#' excluded: #local.resolution.excluded[local.dirName]#",
 				type = "information",
-				file = "application"
+				file = "wheels"
 			);
 		}
 
@@ -217,7 +217,7 @@ component output="false" {
 				WriteLog(
 					text = "[Wheels] Package '#local.dirName#' failed to load: #e.message#",
 					type = "error",
-					file = "application"
+					file = "wheels"
 				);
 			}
 		}
@@ -270,7 +270,7 @@ component output="false" {
 				WriteLog(
 					text = "[Wheels] Package '#local.dirName#' manifest error: #e.message#",
 					type = "error",
-					file = "application"
+					file = "wheels"
 				);
 			}
 		}
@@ -303,7 +303,7 @@ component output="false" {
 			WriteLog(
 				text = "[Wheels] Package '#arguments.dirName#' skipped: requires Wheels #local.constraint#, running #local.runtime#",
 				type = "warning",
-				file = "application"
+				file = "wheels"
 			);
 			return;
 		}
@@ -359,7 +359,7 @@ component output="false" {
 			WriteLog(
 				text = "[Wheels] Package '#arguments.dirName#' v#variables.packageMeta[arguments.dirName].version# registered (lazy)",
 				type = "information",
-				file = "application"
+				file = "wheels"
 			);
 			return;
 		}
@@ -432,7 +432,7 @@ component output="false" {
 		WriteLog(
 			text = "[Wheels] Package '#arguments.dirName#' v#variables.packageMeta[arguments.dirName].version# loaded (#arguments.mixinTargets# mixins)",
 			type = "information",
-			file = "application"
+			file = "wheels"
 		);
 	}
 
@@ -464,7 +464,7 @@ component output="false" {
 		WriteLog(
 			text = "[Wheels] Lazy package '#arguments.dirName#' instantiated on demand",
 			type = "information",
-			file = "application"
+			file = "wheels"
 		);
 	}
 
@@ -571,13 +571,13 @@ component output="false" {
 			WriteLog(
 				type = "information",
 				text = "[Wheels] Package '#arguments.secondProvider#' intentionally overrides method '#arguments.method#' on target '#arguments.target#' (previously provided by '#arguments.firstProvider#')",
-				file = "application"
+				file = "wheels"
 			);
 		} else {
 			WriteLog(
 				type = "warning",
 				text = "[Wheels] Mixin collision: method '#arguments.method#' on target '#arguments.target#' provided by package '#arguments.firstProvider#' is being overwritten by package '#arguments.secondProvider#'. Declare the method in the overwriting package's provides.overrides to acknowledge this.",
-				file = "application"
+				file = "wheels"
 			);
 		}
 	}

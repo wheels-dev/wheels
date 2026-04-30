@@ -147,6 +147,57 @@ component output="false" {
 return local.$wheels;
 	}
 
+	/**
+	 * Includes a config file like /config/settings.cfm or /config/services.cfm
+	 * during application start, capturing any output it produces.
+	 *
+	 * If the captured output is non-empty — almost always a sign that the file
+	 * is missing a cfscript wrapper, so Lucee/Adobe parse the body as markup
+	 * and any cfscript-style code becomes literal output text that never
+	 * executes — log a clear warning pointing the developer at the most likely
+	 * cause, and discard the output so it doesn't leak into the response of
+	 * whichever request happened to trigger onApplicationStart (which would
+	 * otherwise manifest as raw `var di = ...` text spilling onto every page
+	 * until the next cold restart).
+	 *
+	 * The function never throws on output; missing-wrapper mistakes are
+	 * recoverable (the file just registered nothing) and a hard error during
+	 * onApplicationStart is worse than a warning + downstream failure.
+	 *
+	 * Note for maintainers: deliberately avoids putting any literal cf-tags
+	 * in this docblock — Lucee 7's tag scanner reads CFC comments before
+	 * compilation and treats unclosed tags as an error.
+	 *
+	 * @template Mapping-relative path like "/config/services.cfm".
+	 */
+	public void function $includeConfig(required string template) {
+		// cfformat-ignore-start
+  	savecontent variable="local.$wheelsConfigOutput" {
+  	  include "#LCase(arguments.template)#"
+  	};
+		// cfformat-ignore-end
+		if (Len(Trim(local.$wheelsConfigOutput))) {
+			local.preview = Left(Trim(local.$wheelsConfigOutput), 200);
+			local.scriptOpen = Chr(60) & "cfscript" & Chr(62);
+			local.scriptClose = Chr(60) & "/cfscript" & Chr(62);
+			try {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels: " & arguments.template & " produced output during onApplicationStart"
+						& " — this almost always means the file body is missing a "
+						& local.scriptOpen & "..." & local.scriptClose & " wrapper, so the engine is"
+						& " parsing CFScript-style code as literal markup (registrations like"
+						& " var di = injector(); never execute, and the bare lines would leak onto"
+						& " every response if not captured here)."
+						& " First 200 chars of captured output: " & local.preview
+				);
+			} catch (any e) {
+				// Logging is best-effort during application start.
+			}
+		}
+	}
+
 	public any function $directory() {
 		local.rv = "";
 		arguments.name = "rv";
@@ -2916,6 +2967,41 @@ return local.$wheels;
 		application[local.appKey].packages = application[local.appKey].PackageLoaderObj.getPackages();
 		application[local.appKey].packageMeta = application[local.appKey].PackageLoaderObj.getPackageMeta();
 		application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
+
+		// Surface an aggregate summary when any packages failed to load. Without
+		// this, PackageLoader records each failure in variables.failedPackages and
+		// emits per-package WriteLog calls — but a developer who hits a downstream
+		// "No matching function [BASECOATINCLUDES]" error has no obvious place to
+		// look. Logging a single high-visibility WARN to wheels.log + a stronger
+		// one to wheels-errors.log gives a clear breadcrumb back to the root cause.
+		if (ArrayLen(application[local.appKey].failedPackages)) {
+			local.failNames = "";
+			local.failDetail = "";
+			for (local.fp in application[local.appKey].failedPackages) {
+				local.failNames = ListAppend(local.failNames, local.fp.name);
+				local.failDetail &= "  - " & local.fp.name & ": " & local.fp.error & Chr(10);
+			}
+			try {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
+						& " package(s) failed to load: " & local.failNames
+						& ". Helpers / services these packages provide will be unavailable —"
+						& " calling code typically surfaces this as 'No matching function [...]"
+						& "' or 'No service registered with the name [...]'."
+						& " Per-package detail in wheels-errors.log."
+				);
+				writeLog(
+					file = "wheels-errors",
+					type = "error",
+					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
+						& " package(s) failed to load:" & Chr(10) & local.failDetail
+				);
+			} catch (any e) {
+				// Logging is best-effort during application start.
+			}
+		}
 
 		// Ensure mixinCollisions exists (unset when no plugins loaded before packages)
 		if (!StructKeyExists(application[local.appKey], "mixinCollisions")) {
