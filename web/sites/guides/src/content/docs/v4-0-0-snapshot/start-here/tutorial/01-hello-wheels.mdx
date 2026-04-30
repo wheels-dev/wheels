@@ -28,6 +28,15 @@ This is Part 1. You're starting with nothing. By the end, you'll have a working 
 
 If you haven't yet, see [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) for macOS, Windows, and Linux.
 
+<Aside type="tip" title="Already installed? Make sure you're on the latest snapshot.">
+  Wheels 4.0 ships frequent snapshot releases — the tutorial assumes you're on the current one. If you installed a while back, refresh first:
+
+  - **macOS / Linux (Homebrew):** `brew update && brew upgrade wheels`
+  - **Windows / other:** see [Installing → Upgrading](/v4-0-0-snapshot/start-here/installing/#upgrading)
+
+  Then re-run `wheels --version` and confirm the version matches the [latest release](https://github.com/wheels-dev/wheels/releases).
+</Aside>
+
 Verify:
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
