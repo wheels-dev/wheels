@@ -78,7 +78,7 @@ Wheels runs validations when you call `.save()` or `.update()`. If any rule fail
        function config() {
            enum(property="status", values="draft,published,archived");
            validatesPresenceOf("title,body");
-           validatesLengthOf(property="title", maximum=120);
+           validatesLengthOf(property="title", maximum=120, allowBlank=true);
        }
    }
    ```
@@ -88,7 +88,9 @@ Wheels runs validations when you call `.save()` or `.update()`. If any rule fail
 Two new lines, two rules:
 
 - `validatesPresenceOf("title,body")` — both `title` and `body` must be non-empty strings. The comma-separated form is a shortcut for "apply this validation to each of these properties with no extra options." When you need per-property options (a custom message, a condition), switch to `property="title"` (singular) and add them as named arguments.
-- `validatesLengthOf(property="title", maximum=120)` — `title` can't exceed 120 characters. `property` is singular here because you're passing options — mixing positional and named arguments isn't allowed in Wheels.
+- `validatesLengthOf(property="title", maximum=120, allowBlank=true)` — `title` can't exceed 120 characters. `property` is singular here because you're passing options — mixing positional and named arguments isn't allowed in Wheels.
+
+The `allowBlank=true` on `validatesLengthOf` matters: without it, *every* validation in Wheels treats a blank value as a failure of itself (not just `validatesPresenceOf`), so submitting an empty title would raise BOTH `Title can't be empty` AND `Title is the wrong length` even though zero characters is well under the 120-character cap. Setting `allowBlank=true` on the length rule says "let the presence rule handle the empty case; only fire when there's actually a value to measure." Carry the same pattern to other secondary validations (`validatesFormatOf`, `validatesInclusionOf`, etc.) when you also have a `validatesPresenceOf` on the same property.
 
 When someone submits the form with a blank title, `post.save()` returns `false` and `post.errors()` contains an entry like `{property: "title", message: "Title can't be empty"}`. `errorMessagesFor("post")` in the form partial renders that as a list.
 
