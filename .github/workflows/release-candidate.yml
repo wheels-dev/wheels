@@ -240,8 +240,10 @@ jobs:
           echo "Release notes extracted to release-notes.md"
           cat release-notes.md
 
+      # Pinned to v2.6.2: see release.yml Create-GitHub-Release for the
+      # full v3.0.0 ArrayBuffer-regression rationale.
       - name: Create GitHub Prerelease
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2.6.2
         with:
           tag_name: v${{ env.WHEELS_VERSION }}
           name: Wheels ${{ env.WHEELS_VERSION }} (Release Candidate)

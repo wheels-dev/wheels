@@ -313,16 +313,28 @@ jobs:
       # GitHub Actions artifact-upload flakes — observed pattern is
       # `##[error]other side closed` mid-stream after most assets upload
       # successfully (e.g. SNAPSHOT+1655 lost wheels-core-*.zip while 17/18
-      # other assets uploaded fine). softprops/action-gh-release@v3 is
-      # safe to retry because `overwrite_files: true` makes it idempotent:
-      # on retry it attaches to the existing release and only re-uploads
+      # other assets uploaded fine). softprops/action-gh-release is safe
+      # to retry because `overwrite_files: true` makes it idempotent: on
+      # retry it attaches to the existing release and only re-uploads
       # missing or stale assets. attempt_delay is in milliseconds.
+      #
+      # Pinned to v2.6.2: softprops/action-gh-release@v3.0.0 (released
+      # 2026-04-12) introduced a regression where `.zip.sha512` asset
+      # uploads fail deterministically with `##[error]The "chunk"
+      # argument must be of type string or an instance of Buffer,
+      # TypedArray, or DataView. Received an instance of ArrayBuffer`.
+      # Because the error is deterministic, the Wandalen retry-wrap
+      # above runs all 3 attempts with the same result and exits 1.
+      # First seen on SNAPSHOT+1656; same error on +1657. Re-pin to @v3
+      # once upstream ships a fix. v2.6.2 was cut on the same day as
+      # v3.0.0 and is the last known-good release for this repo's
+      # upload pattern.
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
         id: gh-release-final
         uses: Wandalen/wretry.action@v3
         with:
-          action: softprops/action-gh-release@v3
+          action: softprops/action-gh-release@v2.6.2
           attempt_limit: 3
           attempt_delay: 30000
           with: |
@@ -364,7 +376,7 @@ jobs:
         id: gh-release-snapshot
         uses: Wandalen/wretry.action@v3
         with:
-          action: softprops/action-gh-release@v3
+          action: softprops/action-gh-release@v2.6.2
           attempt_limit: 3
           attempt_delay: 30000
           with: |
