@@ -138,7 +138,7 @@ A few things to notice:
 
 - `up()` runs when applying the migration; `down()` reverses it.
 - `createTable(name="posts")` returns a builder. You add typed columns on it, then call `t.create()` to emit the DDL.
-- `t.timestamps()` adds both `createdAt` and `updatedAt` as `datetime` columns — don't add them yourself.
+- `t.timestamps()` adds three `datetime` columns at once: `createdAt`, `updatedAt`, and `deletedAt`. The first two are obvious bookkeeping; `deletedAt` is the soft-delete marker (covered in [Part 5](/v4-0-0-snapshot/start-here/tutorial/05-comments-streams/#checkpoint)). Don't add any of them by hand.
 - `status` is stored as a short string matching the enum values. Wheels doesn't require a database-level enum type.
 - The `transaction { try ... catch ... }` shape looks verbose. It's what the generator produces too; it ensures partial schema changes roll back cleanly.
 
@@ -166,7 +166,16 @@ A few things to notice:
    wheels migrate latest
    ```
 
-   Expected output includes `Migrating up 20260419120000_create_posts_table.cfc` followed by `Migration complete.`
+   Expected output looks roughly like:
+
+   ```text
+   Migrating from 0 up to 20260419120000.
+
+   -------- 20260419120000_create_posts_table -----------------
+   Created table posts
+   ```
+
+   The exact wording can drift across snapshots; what matters is that you see `Created table posts`.
 
 </Steps>
 

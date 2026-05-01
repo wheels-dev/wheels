@@ -71,6 +71,10 @@ You should see a Wheels version number. If not, revisit the install guide.
 
    The server boots in a few seconds and prints the URL it's listening on (default: `http://localhost:8080`).
 
+   <Aside type="note" title="First start downloads ~74 MB">
+     The very first `wheels start` on a fresh machine downloads Lucee Express (~74 MB). You'll see a progress bar; expect ~30 seconds on a typical connection. Subsequent starts skip the download and boot immediately.
+   </Aside>
+
 </Steps>
 
 Open `http://localhost:8080` in your browser. You'll see a welcome page: "Welcome to blog. Your Wheels application is running."
@@ -81,7 +85,6 @@ Open `http://localhost:8080` in your browser. You'll see a welcome page: "Welcom
 - blog
   - app
     - controllers
-      - Controller.cfc
       - Main.cfc
     - events
     - global
@@ -91,7 +94,6 @@ Open `http://localhost:8080` in your browser. You'll see a welcome page: "Welcom
     - migrator
       - migrations
     - models
-      - Model.cfc
     - plugins
     - snippets
     - views
@@ -116,6 +118,7 @@ Open `http://localhost:8080` in your browser. You'll see a welcome page: "Welcom
     - javascripts
     - miscellaneous
     - stylesheets
+  - rewrite.config
   - tests
     - specs
       - controllers

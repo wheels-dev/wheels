@@ -96,9 +96,9 @@ wheels generate scaffold Post title:string body:text status:enum
 ```
 
 <Aside type="caution">
-  The scaffold generator skips files that already exist rather than failing the whole run. Since chapter 2 already wrote `app/models/Post.cfc` and the migration, you'll see `skip model: Model already exists` and `skip migration: create_posts_table already exists` in the output — but the controller, views, and tests will still be generated. The scaffold also appends `.resources("posts")` to `config/routes.cfm`; we'll replace the resulting routes file in a few steps anyway.
+  The scaffold generator skips files that already exist rather than failing the whole run. Since chapter 2 already wrote `app/models/Post.cfc` and the migration, you'll see `skip model: Model already exists` and `skip migration: create_posts_table already exists` in the output — but the controller, views, and tests will still be generated. The scaffold appends `.resources("posts")` to `config/routes.cfm` *only if no resources line for `posts` already exists* — chapter 2 added one, so the routes file is left alone. Either way, we'll replace `config/routes.cfm` in a few steps below.
 
-  The generator's emitted controller uses `findByKey(params.key)` everywhere and emits Bootstrap-flavored views — perfectly fine, but a different shape from this tutorial. Replace the scaffold's output with the code in the sections below to follow along; pass `--force` next time if you want the scaffold to overwrite. Or compare the two — generator vs. tutorial — to see two equally valid CRUD shapes.
+  The generator's emitted controller is the same shape as this tutorial's — it uses `params.post` (route model binding) on key-scoped actions and `findByKey(params.key)` only when binding isn't enabled. The cosmetic differences are extra javadoc-style comments and Bootstrap-flavored views. Replace the scaffold's output with the code in the sections below to follow along, or compare the two to see what convention drift looks like; pass `--force` next time if you want the scaffold to overwrite.
 </Aside>
 
 ### The controller
