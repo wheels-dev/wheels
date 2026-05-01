@@ -3532,7 +3532,22 @@ component extends="modules.BaseModule" {
 				var resolvedDir = len(filter)
 					? filter
 					: (coreTests ? "wheels.tests.specs" : "tests.specs");
-				displayTestResults(result, verboseOutput, resolvedDir);
+
+				// Reporter dispatch. `--reporter=json` and `--reporter=tap` are
+				// the CI-friendly modes; `simple` (default) keeps the colorful
+				// human-readable rollup. Without this branch the reporter flag
+				// was parsed and passed in but never used (onboarding F12).
+				switch (lCase(arguments.reporter)) {
+					case "json":
+						out(httpResult);
+						break;
+					case "tap":
+						emitTapResults(result);
+						break;
+					case "simple":
+					default:
+						displayTestResults(result, verboseOutput, resolvedDir);
+				}
 			} else {
 				// Could be an HTML error page
 				if (reFindNoCase("<html", httpResult)) {
@@ -3548,6 +3563,95 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	/**
+	 * Emit results in TAP (Test Anything Protocol) v13 format. Used by CI
+	 * tooling that consumes a flat list of `ok`/`not ok` lines plus an
+	 * optional YAML diagnostic block per failure.
+	 *
+	 * Spec: https://testanything.org/tap-version-13-specification.html
+	 */
+	private void function emitTapResults(required any result) {
+		if (!isStruct(arguments.result)) {
+			out("TAP version 13");
+			out("1..0");
+			out("##  Bail out! Test runner returned non-struct payload.");
+			return;
+		}
+
+		// Flatten: walk every spec across every bundle/suite into a sequential
+		// list. TAP requires monotonically-numbered tests starting at 1.
+		// Mutable state lives on a parent struct so the recursive walker sees
+		// it by reference on Adobe CF (closures capture struct refs reliably
+		// but plain `var` captures can copy on Adobe — see CLAUDE.md).
+		var ctx = {tests: []};
+		var walkSuite = function(suite) {
+			for (var sp in (suite.specStats ?: [])) {
+				arrayAppend(ctx.tests, {
+					name: sp.name ?: "(unnamed)",
+					status: sp.status ?: "Failed",
+					failMessage: sp.failMessage ?: "",
+					failOrigin: sp.failOrigin ?: "",
+					skipped: (sp.status ?: "") == "Skipped"
+				});
+			}
+			// Suite-level errors (e.g. spec-file failed to compile, beforeAll
+			// threw) are reported on the suite itself with empty specStats —
+			// surface them as a synthetic test so they don't disappear.
+			if (
+				arrayIsEmpty(suite.specStats ?: [])
+				&& listFindNoCase("Failed,Error", suite.status ?: "")
+			) {
+				arrayAppend(ctx.tests, {
+					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
+					status: suite.status,
+					failMessage: suite.globalException ?: "",
+					failOrigin: "",
+					skipped: false
+				});
+			}
+			for (var inner in (suite.suiteStats ?: [])) {
+				walkSuite(inner);
+			}
+		};
+		for (var bundle in (arguments.result.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				walkSuite(suite);
+			}
+		}
+
+		out("TAP version 13");
+		out("1..#arrayLen(ctx.tests)#");
+		var i = 0;
+		for (var t in ctx.tests) {
+			i++;
+			var ok = (t.status == "Passed") ? "ok" : "not ok";
+			var directive = t.skipped ? " ## SKIP" : "";
+			out("#ok# #i# - #t.name##directive#");
+			if (t.status != "Passed" && !t.skipped && len(t.failMessage)) {
+				// YAML diagnostic block, indented per TAP spec.
+				out("  ---");
+				out("  message: " & tapEscapeYaml(t.failMessage));
+				if (len(t.failOrigin)) {
+					out("  origin: " & tapEscapeYaml(t.failOrigin));
+				}
+				out("  ...");
+			}
+		}
+	}
+
+	/**
+	 * Quote a string for safe inclusion in a TAP YAML diagnostic block.
+	 * Single-quoted YAML escapes `'` as `''` and forbids unescaped newlines,
+	 * so we collapse them to spaces — TAP consumers don't render block scalars.
+	 */
+	private string function tapEscapeYaml(required string value) {
+		var v = replace(arguments.value, chr(13) & chr(10), " ", "all");
+		v = replace(v, chr(10), " ", "all");
+		v = replace(v, chr(13), " ", "all");
+		v = replace(v, "'", "''", "all");
+		return "'" & v & "'";
 	}
 
 	private void function displayTestResults(
@@ -5074,21 +5178,82 @@ component extends="modules.BaseModule" {
 			out("Pass: #totalPass#  Fail: #totalFail#  Error: #totalError#");
 			out("");
 
-			for (var bundle in (data.bundleStats ?: [])) {
-				for (var suite in (bundle.suiteStats ?: [])) {
-					for (var spec in (suite.specStats ?: [])) {
-						if (listFindNoCase("Failed,Error", spec.status ?: "")) {
-							out("  #spec.status ?: ''#: #spec.name ?: 'unknown'#", "red");
-							if (verboseOutput && len(spec.failMessage ?: "")) {
-								out("    #left(spec.failMessage, 200)#", "yellow");
+			// Recursive walk so we catch nested suites and surface failures
+			// at the suite level (empty specStats but status == Failed/Error)
+			// as well as per-spec failures. Playwright failures often error
+			// out before any `it` runs — the only artifact is on the suite,
+			// which the previous loop ignored. Onboarding F13.
+			// Mutable state on a parent struct so closures see it by reference
+			// on Adobe CF — see CLAUDE.md cross-engine notes.
+			var ctx = {failureCount: 0, verbose: verboseOutput};
+			var walkSuite = function(suite) {
+				var specs = suite.specStats ?: [];
+				for (var sp in specs) {
+					if (listFindNoCase("Failed,Error", sp.status ?: "")) {
+						ctx.failureCount++;
+						out("  #sp.status ?: ''#: #sp.name ?: 'unknown'#", "red");
+						var msg = sp.failMessage ?: "";
+						if (len(msg)) {
+							// Print failMessage by default. Without --verbose
+							// truncate to 400 chars (enough to see the
+							// assertion + selector context). With --verbose
+							// dump the whole thing.
+							var shown = ctx.verbose ? msg : left(msg, 400);
+							out("    #shown#", "yellow");
+							if (!ctx.verbose && len(msg) > 400) {
+								out("    (truncated; pass --verbose for full output)", "yellow");
 							}
 						}
+						if (len(sp.failOrigin ?: "")) {
+							out("    at: #sp.failOrigin#", "yellow");
+						}
+					}
+				}
+				// Suite-level errors (no spec ever ran — e.g. compile error,
+				// beforeAll threw, Playwright init blew up).
+				if (
+					arrayIsEmpty(specs)
+					&& listFindNoCase("Failed,Error", suite.status ?: "")
+				) {
+					ctx.failureCount++;
+					out("  #suite.status#: #suite.name ?: '(unnamed suite)'# (suite-level)", "red");
+					var sg = suite.globalException ?: "";
+					if (len(sg)) {
+						var shown = ctx.verbose ? sg : left(sg, 400);
+						out("    #shown#", "yellow");
+						if (!ctx.verbose && len(sg) > 400) {
+							out("    (truncated; pass --verbose for full output)", "yellow");
+						}
+					}
+				}
+				for (var inner in (suite.suiteStats ?: [])) {
+					walkSuite(inner);
+				}
+			};
+			for (var bundle in (data.bundleStats ?: [])) {
+				for (var suite in (bundle.suiteStats ?: [])) {
+					walkSuite(suite);
+				}
+				// Bundle-level error (compile error in spec file).
+				if (len(bundle.globalException ?: "")) {
+					ctx.failureCount++;
+					out("  Bundle error: #bundle.name ?: '(unnamed)'#", "red");
+					var bg = bundle.globalException;
+					var shown = ctx.verbose ? bg : left(bg, 400);
+					out("    #shown#", "yellow");
+					if (!ctx.verbose && len(bg) > 400) {
+						out("    (truncated; pass --verbose for full output)", "yellow");
 					}
 				}
 			}
 
 			if (totalFail == 0 && totalError == 0) {
 				out("All browser tests passed.", "green");
+			} else if (ctx.failureCount > 0 && (totalError + totalFail) > 0) {
+				out("");
+				out("If failure messages above don't show selector/Playwright detail,", "yellow");
+				out("the BrowserTest spec may need explicit try/catch around .click() /", "yellow");
+				out(".fill() to surface Playwright exceptions into failMessage.", "yellow");
 			}
 		} catch (any e) {
 			out("Failed to parse test results: #e.message#", "red");
