@@ -45,6 +45,21 @@ try {
 			case "migrateToLatest":
 				data.message = migrator.migrateToLatest();
 				break;
+			case "renameSystemTables":
+				// F15 Phase 2: opt-in rename of legacy c_o_r_e_* system tables.
+				// Returns the full result struct (success/renamed/skipped/errors/sql)
+				// rather than a flat message — the CLI decodes and prints each field.
+				local.dryRun = (StructKeyExists(request.wheels.params, "dryRun") && request.wheels.params.dryRun == "true");
+				data.renameResult = migrator.renameSystemTables(dryRun = local.dryRun);
+				data.success = data.renameResult.success;
+				if (Len(data.renameResult.skipped)) {
+					data.message = data.renameResult.skipped;
+				} else if (ArrayLen(data.renameResult.renamed)) {
+					data.message = "Renamed: " & ArrayToList(data.renameResult.renamed, "; ");
+				} else if (local.dryRun && ArrayLen(data.renameResult.sql)) {
+					data.message = "Dry run — SQL that would execute:" & Chr(10) & ArrayToList(data.renameResult.sql, ";" & Chr(10)) & ";";
+				}
+				break;
 			case "diff":
 				try {
 					local.autoMigrator = CreateObject("component", "wheels.migrator.AutoMigrator");

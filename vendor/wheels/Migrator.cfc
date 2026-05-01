@@ -597,6 +597,153 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * F15 Phase 2: rename legacy `c_o_r_e_*` system tables to `wheels_*`.
+	 *
+	 * Public API for the `wheels migrate rename-system-tables` CLI command.
+	 * Reads the current schema, generates per-adapter rename SQL, and
+	 * (unless `dryRun` is true) executes it inside a transaction. After
+	 * a successful rename, updates `application.wheels.{levelsTableName,
+	 * migratorTableName}` to the new names so the running app picks them
+	 * up without a restart.
+	 *
+	 * Result struct:
+	 *   - success: boolean
+	 *   - renamed: array of "old -> new" strings (empty if no-op)
+	 *   - skipped: human message when there's nothing to do
+	 *   - errors: array of error messages (when success=false)
+	 *   - sql: array of SQL statements that would run / did run
+	 *
+	 * Refuses to run (returns success=false) when both `c_o_r_e_*` AND
+	 * `wheels_*` versions of either table coexist — that's a partial-
+	 * rename state which warrants manual cleanup, not silent destruction.
+	 *
+	 * @dryRun When true, returns the SQL that would run without executing.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function renameSystemTables(boolean dryRun = false) {
+		var rv = {
+			success: true,
+			renamed: [],
+			skipped: "",
+			errors: [],
+			sql: []
+		};
+		var appKey = $appKey();
+		var dsn = application[appKey].dataSourceName;
+
+		// Inline probe (CFML closures don't inherit parent `arguments`, so
+		// `dsn` is captured via lexical scope — see $detectSystemTables for
+		// the same pattern).
+		var probe = function(tableName) {
+			try {
+				$query(datasource = dsn, sql = "SELECT 1 FROM #arguments.tableName# WHERE 1=0");
+				return true;
+			} catch (any e) {
+				return false;
+			}
+		};
+
+		var hasLegacyLevels   = probe("c_o_r_e_levels");
+		var hasLegacyVersions = probe("c_o_r_e_migrator_versions");
+		var hasNewLevels      = probe("wheels_levels");
+		var hasNewVersions    = probe("wheels_migrator_versions");
+
+		// Nothing to rename — already on `wheels_*` or fresh DB.
+		if (!hasLegacyLevels && !hasLegacyVersions) {
+			rv.skipped = "Nothing to rename. Legacy c_o_r_e_* tables are not present.";
+			return rv;
+		}
+
+		// Refuse on partial-rename state. Renaming `c_o_r_e_levels` →
+		// `wheels_levels` when `wheels_levels` already exists would either
+		// fail with a "table exists" error mid-transaction or silently
+		// corrupt one of them depending on adapter. Better to stop and let
+		// the user reconcile manually.
+		if (
+			(hasLegacyLevels && hasNewLevels)
+			|| (hasLegacyVersions && hasNewVersions)
+		) {
+			rv.success = false;
+			ArrayAppend(
+				rv.errors,
+				"Both legacy c_o_r_e_* and new wheels_* system tables exist. "
+				& "Manual cleanup required to avoid data loss — drop whichever set is empty before re-running."
+			);
+			return rv;
+		}
+
+		// Build per-adapter rename SQL. The migrator-versions table is
+		// renamed first so any FK constraint pointing at c_o_r_e_levels
+		// follows naturally when levels is renamed last (every supported
+		// engine auto-updates FK references on table rename).
+		var info = $dbinfo(
+			type = "version",
+			datasource = dsn,
+			username = application.wheels.dataSourceUserName,
+			password = application.wheels.dataSourcePassword
+		);
+		var dbType = info.database_productname;
+
+		if (FindNoCase("MySQL", dbType)) {
+			// MySQL atomic multi-rename — both pairs in one statement.
+			var pairs = [];
+			if (hasLegacyVersions) ArrayAppend(pairs, "c_o_r_e_migrator_versions TO wheels_migrator_versions");
+			if (hasLegacyLevels)   ArrayAppend(pairs, "c_o_r_e_levels TO wheels_levels");
+			ArrayAppend(rv.sql, "RENAME TABLE " & ArrayToList(pairs, ", "));
+		} else if (FindNoCase("SQLServer", dbType) || FindNoCase("SQL Server", dbType)) {
+			if (hasLegacyVersions) ArrayAppend(rv.sql, "EXEC sp_rename 'c_o_r_e_migrator_versions', 'wheels_migrator_versions'");
+			if (hasLegacyLevels)   ArrayAppend(rv.sql, "EXEC sp_rename 'c_o_r_e_levels', 'wheels_levels'");
+		} else if (FindNoCase("Oracle", dbType)) {
+			if (hasLegacyVersions) ArrayAppend(rv.sql, "RENAME c_o_r_e_migrator_versions TO wheels_migrator_versions");
+			if (hasLegacyLevels)   ArrayAppend(rv.sql, "RENAME c_o_r_e_levels TO wheels_levels");
+		} else {
+			// SQLite, PostgreSQL, H2, CockroachDB
+			if (hasLegacyVersions) ArrayAppend(rv.sql, "ALTER TABLE c_o_r_e_migrator_versions RENAME TO wheels_migrator_versions");
+			if (hasLegacyLevels)   ArrayAppend(rv.sql, "ALTER TABLE c_o_r_e_levels RENAME TO wheels_levels");
+		}
+
+		// Dry-run returns the plan without executing.
+		if (arguments.dryRun) {
+			return rv;
+		}
+
+		// Execute. Wrap in a transaction so a partial failure rolls back
+		// rather than leaving a half-renamed schema. Note: DDL inside a
+		// transaction is a no-op on Oracle (auto-commits) and MSSQL has
+		// adapter-specific behavior, but on the engines that DO honor it
+		// (Postgres, SQLite via SAVEPOINT, MySQL on InnoDB) we get atomicity.
+		try {
+			transaction action="begin" {
+				try {
+					for (var sql in rv.sql) {
+						$query(datasource = dsn, sql = sql);
+					}
+					transaction action="commit";
+				} catch (any e) {
+					transaction action="rollback";
+					rethrow;
+				}
+			}
+
+			if (hasLegacyLevels)   ArrayAppend(rv.renamed, "c_o_r_e_levels -> wheels_levels");
+			if (hasLegacyVersions) ArrayAppend(rv.renamed, "c_o_r_e_migrator_versions -> wheels_migrator_versions");
+
+			// Update in-memory settings so the running app uses the new names
+			// without a restart. (Settings are reloaded from
+			// onapplicationstart on next reload anyway.)
+			application[appKey].levelsTableName    = "wheels_levels";
+			application[appKey].migratorTableName  = "wheels_migrator_versions";
+		} catch (any e) {
+			rv.success = false;
+			ArrayAppend(rv.errors, e.message);
+		}
+
+		return rv;
+	}
+
+	/**
 	 * Ensures a version as user input is numeric.
 	 */
 	private string function $sanitiseVersion(required string version) {
