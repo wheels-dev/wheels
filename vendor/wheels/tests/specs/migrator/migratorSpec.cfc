@@ -158,6 +158,83 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("F15 Phase 1: system-table naming + legacy detection", () => {
+
+			beforeEach(() => {
+				origMigratorTableName_F15 = Duplicate(application.wheels.migratorTableName);
+				origLevelsTableName_F15 = StructKeyExists(application.wheels, "levelsTableName")
+					? Duplicate(application.wheels.levelsTableName)
+					: "wheels_levels";
+				origCreateMigratorTable_F15 = Duplicate(application.wheels.createMigratorTable);
+				// Wipe both naming families so detection runs from scratch.
+				for (local.t in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
+					try { migration.dropTable(local.t); } catch (any e) {}
+				}
+			});
+
+			afterEach(() => {
+				application.wheels.migratorTableName = origMigratorTableName_F15;
+				application.wheels.levelsTableName = origLevelsTableName_F15;
+				application.wheels.createMigratorTable = origCreateMigratorTable_F15;
+				for (local.t in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
+					try { migration.dropTable(local.t); } catch (any e) {}
+				}
+			});
+
+			it("creates wheels_levels and wheels_migrator_versions on a fresh DB", () => {
+				if (_isCockroachDB) return;
+				application.wheels.migratorTableName = "wheels_migrator_versions";
+				application.wheels.levelsTableName = "wheels_levels";
+				application.wheels.createMigratorTable = true;
+
+				// Trigger the migrator's bootstrap path (it lazy-creates the
+				// system tables when neither variant exists).
+				migrator.getCurrentMigrationVersion();
+
+				var info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables");
+				var tables = ValueList(info.table_name);
+
+				expect(ListFindNoCase(tables, "wheels_levels")).toBeGT(0);
+				expect(ListFindNoCase(tables, "wheels_migrator_versions")).toBeGT(0);
+				expect(ListFindNoCase(tables, "c_o_r_e_levels")).toBe(0);
+				expect(ListFindNoCase(tables, "c_o_r_e_migrator_versions")).toBe(0);
+			});
+
+			it("falls back to c_o_r_e_levels when only legacy tables exist", () => {
+				if (_isCockroachDB) return;
+				application.wheels.migratorTableName = "wheels_migrator_versions";
+				application.wheels.levelsTableName = "wheels_levels";
+				application.wheels.createMigratorTable = true;
+
+				// Pre-create the legacy table to simulate an existing 4.0-SNAPSHOT
+				// install. The framework's own bootstrap (Migrator.cfc:433) uses
+				// raw SQL with the same shape across adapters.
+				queryExecute(
+					"CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+				queryExecute(
+					"INSERT INTO c_o_r_e_levels (id, name, description) VALUES (1, 'App', 'Application level migrations')",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+
+				migrator.getCurrentMigrationVersion();
+
+				// The detection helper should have flipped the application
+				// settings back to the legacy names.
+				expect(application.wheels.levelsTableName).toBe("c_o_r_e_levels");
+				expect(application.wheels.migratorTableName).toBe("c_o_r_e_migrator_versions");
+
+				// The new wheels_levels table should NOT have been created
+				// alongside the existing legacy table.
+				var info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables");
+				var tables = ValueList(info.table_name);
+				expect(ListFindNoCase(tables, "wheels_levels")).toBe(0);
+			});
+		})
+
 		describe("Tests that redomigration", () => {
 
 			beforeEach(() => {
