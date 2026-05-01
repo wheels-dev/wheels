@@ -55,6 +55,16 @@ Install the `wheels` CLI. Five minutes.
     On Intel, replace `/opt/homebrew` with `/usr/local`.
 
   Confirm with `brew --version` before continuing to step 1 below.
+
+  <Aside type="caution" title="Headless / non-interactive installs">
+    The official installer requires a TTY: it shells out to `sudo -n true` to check admin rights, which always prompts for a password and never succeeds in a non-interactive context (CI runners, provisioning scripts, agent shells, packer builds). Setting `NONINTERACTIVE=1` doesn't help — the sudo gate still fires. If you need to install Homebrew without a human at the keyboard, the supported options are:
+
+    - **User-prefix install (no sudo)**: `git clone https://github.com/Homebrew/brew ~/homebrew`, then add `~/homebrew/bin` to your `PATH`. Officially "unsupported" by the Homebrew team but works fine — the trade-off is no pre-built bottles, so every install becomes a source build (slower, sometimes much slower).
+    - **Pre-bake the image**: install Homebrew once interactively on a base image (Vagrant / Packer / Tart / Anka / VM template) and clone from there for headless work.
+    - **Provisioning frameworks**: Ansible's `community.general.homebrew` module and similar can drive an `expect`-style password prompt if you have a way to feed sudo credentials.
+
+    On a fresh agent/CI VM with no admin access, the path of least resistance is the user-prefix `git clone` install.
+  </Aside>
 </Aside>
 
 <Steps>
