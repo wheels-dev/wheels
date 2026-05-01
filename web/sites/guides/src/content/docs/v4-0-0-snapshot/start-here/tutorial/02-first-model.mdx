@@ -31,12 +31,10 @@ At the end of Part 1 you had a running `blog` app with a `/hello` route. There's
 - blog
   - app
     - controllers
-      - Controller.cfc
       - Main.cfc
     - migrator
       - migrations
-    - models
-      - Model.cfc
+    - models/
     - views
       - helpers.cfm
       - layout.cfm
@@ -54,6 +52,8 @@ At the end of Part 1 you had a running `blog` app with a `/hello` route. There's
 </FileTree>
 
 `Main.cfc` has `index` and `hello` actions. `config/routes.cfm` has a `/hello` named route alongside the wildcard and root. The SQLite database file exists but has no application tables. You'll fix all of that here.
+
+The `Controller` and `Model` base classes that your code extends (e.g. `component extends="Controller"`) live under `vendor/wheels/`, not in `app/`. They're framework files; `wheels new` doesn't put them in your project tree. You won't need to touch them.
 
 ## Generate the Post model
 
