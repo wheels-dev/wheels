@@ -368,6 +368,16 @@ component extends="modules.BaseModule" {
 				filter = args[++i];
 			} else if (reFindNoCase("^--filter=", arg)) {
 				filter = valueAfterEquals(arg);
+			} else if (arg == "--directory" && i < arrayLen(args)) {
+				// `--directory` is an alias for `--filter`. Documented in
+				// chapter 7 of the tutorial and historically referenced in
+				// `wheels test --help`; without this branch it would fall
+				// through to the positional fallback below and be silently
+				// dropped (it starts with `--` so the positional check
+				// excludes it). Onboarding finding #2.
+				filter = args[++i];
+			} else if (reFindNoCase("^--directory=", arg)) {
+				filter = valueAfterEquals(arg);
 			} else if (arg == "--reporter" && i < arrayLen(args)) {
 				reporter = args[++i];
 			} else if (reFindNoCase("^--reporter=", arg)) {
@@ -398,7 +408,52 @@ component extends="modules.BaseModule" {
 		// of the user's own tests/specs/, producing "0 passed" silently with
 		// no spec discovery.
 
+		// Normalize short filter names to dotted paths the test runner
+		// accepts. The app-runner regex (`^tests(\.[a-zA-Z0-9_]+)*$`) and
+		// core-runner regex (`^(wheels\.tests|vendor\.<pkg>\.tests)...$`)
+		// both reject bare names like "browser" or "models" and silently
+		// fall back to the default scope, running the entire suite. The
+		// CLI normalizes here so `--filter=browser` does what the user
+		// expects. Onboarding finding #2.
+		filter = $normalizeTestFilter(filter, coreTests);
+
 		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB);
+	}
+
+	/**
+	 * Normalize a short filter name to a path the test runner's directory
+	 * regex will accept. App mode prepends `tests.specs.`; core mode
+	 * prepends `wheels.tests.specs.`. Already-qualified inputs pass through
+	 * unchanged. Empty input stays empty (server applies its default).
+	 *
+	 * Examples:
+	 *   "" → ""                                      (default scope)
+	 *   "browser" → "tests.specs.browser"            (app mode)
+	 *   "browser" → "wheels.tests.specs.browser"     (core mode)
+	 *   "tests.specs.browser" → "tests.specs.browser"
+	 *   "wheels.tests.specs.model" → "wheels.tests.specs.model"
+	 *   "vendor.wheels-sentry.tests" → "vendor.wheels-sentry.tests"
+	 */
+	public string function $normalizeTestFilter(
+		required string filter,
+		boolean coreTests = false
+	) {
+		var f = trim(arguments.filter);
+		if (!len(f)) return "";
+
+		if (arguments.coreTests) {
+			// Core runner accepts wheels.tests.* or vendor.<pkg>.tests.*
+			if (reFindNoCase("^(wheels\.tests|vendor\.[a-z0-9][a-z0-9\-]*\.tests)(\.[a-zA-Z0-9_]+)*$", f)) {
+				return f;
+			}
+			return "wheels.tests.specs." & f;
+		}
+
+		// App runner accepts tests.* (and treats `tests` alone as a valid root)
+		if (reFindNoCase("^tests(\.[a-zA-Z0-9_]+)*$", f)) {
+			return f;
+		}
+		return "tests.specs." & f;
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1849,13 +1904,19 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Install, update, and list packages from the wheels-packages registry
+	 * hint: Install, update, and list Wheels packages — use `add` (not `install`) to install
+	 *
+	 * The verb is `add`, NOT `install`. Typing `wheels packages install <name>`
+	 * is intercepted by LuCLI's built-in extension installer before dispatch
+	 * reaches this module, and prints `[INFO] No git or extension dependencies
+	 * to install` without actually installing anything. See chapter 8 of the
+	 * tutorial for the explanation.
 	 *
 	 * Usage:
 	 *   wheels packages list [--tag=<tag>]
 	 *   wheels packages search <query>
 	 *   wheels packages show <name>
-	 *   wheels packages add <name>[@<version>] [--force]
+	 *   wheels packages add <name>[@<version>] [--force]    ← install verb
 	 *   wheels packages update <name> --yes
 	 *   wheels packages update --all --yes
 	 *   wheels packages remove <name>
@@ -3442,6 +3503,13 @@ component extends="modules.BaseModule" {
 
 		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
 		out("Running #(coreTests ? 'core' : 'app')# tests (#db#)...", "cyan");
+		if (len(filter)) {
+			// Surface the resolved filter so users see what the auto-prefix
+			// (`browser` → `tests.specs.browser`) actually scoped to. Also
+			// makes silent server-side fallback visible if anything slips
+			// through.
+			out("Scope: #filter#", "cyan");
+		}
 
 		try {
 			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
