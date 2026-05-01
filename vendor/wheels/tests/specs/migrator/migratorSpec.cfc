@@ -235,6 +235,129 @@ component extends="wheels.WheelsTest" {
 			});
 		})
 
+		describe("F15 Phase 2: renameSystemTables() opt-in rename", () => {
+
+			beforeEach(() => {
+				origMigratorTableName_F15P2 = Duplicate(application.wheels.migratorTableName);
+				origLevelsTableName_F15P2 = StructKeyExists(application.wheels, "levelsTableName")
+					? Duplicate(application.wheels.levelsTableName)
+					: "wheels_levels";
+				for (local.t in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
+					try { migration.dropTable(local.t); } catch (any e) {}
+				}
+			});
+
+			afterEach(() => {
+				application.wheels.migratorTableName = origMigratorTableName_F15P2;
+				application.wheels.levelsTableName = origLevelsTableName_F15P2;
+				for (local.t in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
+					try { migration.dropTable(local.t); } catch (any e) {}
+				}
+			});
+
+			it("returns a no-op result when neither legacy nor new tables exist", () => {
+				if (_isCockroachDB) return;
+				application.wheels.levelsTableName = "wheels_levels";
+				application.wheels.migratorTableName = "wheels_migrator_versions";
+
+				var result = migrator.renameSystemTables();
+				expect(result.success).toBeTrue();
+				expect(arrayLen(result.renamed)).toBe(0);
+				expect(result.skipped).toInclude("Nothing to rename");
+			});
+
+			it("renames c_o_r_e_levels -> wheels_levels and c_o_r_e_migrator_versions -> wheels_migrator_versions", () => {
+				if (_isCockroachDB) return;
+
+				// Pre-create both legacy tables so renameSystemTables has work to do.
+				queryExecute(
+					"CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+				queryExecute(
+					"INSERT INTO c_o_r_e_levels (id, name, description) VALUES (1, 'App', 'Application level migrations')",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+				queryExecute(
+					"CREATE TABLE c_o_r_e_migrator_versions (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+				application.wheels.levelsTableName = "c_o_r_e_levels";
+				application.wheels.migratorTableName = "c_o_r_e_migrator_versions";
+
+				var result = migrator.renameSystemTables();
+				expect(result.success).toBeTrue();
+				expect(arrayLen(result.renamed)).toBe(2);
+
+				var info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables");
+				var tables = ValueList(info.table_name);
+				expect(ListFindNoCase(tables, "wheels_levels")).toBeGT(0);
+				expect(ListFindNoCase(tables, "wheels_migrator_versions")).toBeGT(0);
+				expect(ListFindNoCase(tables, "c_o_r_e_levels")).toBe(0);
+				expect(ListFindNoCase(tables, "c_o_r_e_migrator_versions")).toBe(0);
+
+				// And application settings should now point at the new names.
+				expect(application.wheels.levelsTableName).toBe("wheels_levels");
+				expect(application.wheels.migratorTableName).toBe("wheels_migrator_versions");
+			});
+
+			it("refuses to rename when both legacy and new tables exist (partial-rename safeguard)", () => {
+				if (_isCockroachDB) return;
+
+				// Simulate a half-renamed state: both versions of the levels
+				// table coexist. This shouldn't happen in practice but guards
+				// against silent data loss if a previous rename was interrupted.
+				queryExecute(
+					"CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50))",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+				queryExecute(
+					"CREATE TABLE wheels_levels (id INT PRIMARY KEY, name VARCHAR(50))",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+
+				var result = migrator.renameSystemTables();
+				expect(result.success).toBeFalse();
+				expect(arrayLen(result.errors)).toBeGT(0);
+				// Both tables should still exist — no destructive change.
+				var info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables");
+				var tables = ValueList(info.table_name);
+				expect(ListFindNoCase(tables, "c_o_r_e_levels")).toBeGT(0);
+				expect(ListFindNoCase(tables, "wheels_levels")).toBeGT(0);
+			});
+
+			it("dryRun=true returns the SQL list without executing", () => {
+				if (_isCockroachDB) return;
+
+				queryExecute(
+					"CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50))",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+				queryExecute(
+					"CREATE TABLE c_o_r_e_migrator_versions (version VARCHAR(25), core_level INT)",
+					{},
+					{ datasource = application.wheels.dataSourceName }
+				);
+
+				var result = migrator.renameSystemTables(dryRun = true);
+				expect(result.success).toBeTrue();
+				expect(arrayLen(result.sql)).toBeGT(0);
+
+				// Tables should remain untouched.
+				var info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables");
+				var tables = ValueList(info.table_name);
+				expect(ListFindNoCase(tables, "c_o_r_e_levels")).toBeGT(0);
+				expect(ListFindNoCase(tables, "c_o_r_e_migrator_versions")).toBeGT(0);
+				expect(ListFindNoCase(tables, "wheels_levels")).toBe(0);
+			});
+		})
+
 		describe("Tests that redomigration", () => {
 
 			beforeEach(() => {

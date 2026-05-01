@@ -168,7 +168,7 @@ component extends="modules.BaseModule" {
 		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
 		help &= "  destroy (or d)      Remove generated files" & nl & nl;
 		help &= "Database:" & nl;
-		help &= "  migrate             Run database migrations (latest, up, down, info)" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info, rename-system-tables)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
@@ -310,9 +310,23 @@ component extends="modules.BaseModule" {
 					out("Migration failed: #e.message#", "red");
 					return "";
 				}
+			case "rename-system-tables":
+				// F15 Phase 2: opt-in one-shot rename of legacy c_o_r_e_*
+				// system tables to wheels_*. Idempotent (no-op when nothing
+				// to rename); refuses to run on a partial-rename state.
+				var dryRun = false;
+				for (var i = 2; i <= arrayLen(args); i++) {
+					if (args[i] == "--dry-run") dryRun = true;
+				}
+				try {
+					return runRenameSystemTables(dryRun);
+				} catch (MigrationError e) {
+					out("Rename failed: #e.message#", "red");
+					return "";
+				}
 			default:
 				out("Unknown migration action: #action#", "red");
-				out("Usage: wheels migrate [latest|up|down|info]");
+				out("Usage: wheels migrate [latest|up|down|info|rename-system-tables]");
 				return "";
 		}
 	}
@@ -3135,6 +3149,69 @@ component extends="modules.BaseModule" {
 		} else {
 			out("Migration #action# completed.", "green");
 		}
+
+		return "";
+	}
+
+	private string function runRenameSystemTables(boolean dryRun = false) {
+		var serverPort = $requireRunningServer([
+			"Renaming system tables requires a running server.",
+			"Start one with: wheels start"
+		]);
+
+		out(arguments.dryRun ? "Previewing system-table rename..." : "Renaming legacy c_o_r_e_* system tables to wheels_*...", "cyan");
+
+		var renameUrl = "http://localhost:#serverPort#/wheels/cli?command=renameSystemTables&format=json"
+			& (arguments.dryRun ? "&dryRun=true" : "");
+
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest(renameUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "MigrationError",
+				message = "Rename failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {};
+		var success = parsed.success ?: false;
+		var message = parsed.message ?: "";
+		var renameResult = parsed.renameResult ?: {renamed: [], errors: [], sql: [], skipped: ""};
+
+		if (!success) {
+			out("Rename failed.", "red");
+			for (var err in (renameResult.errors ?: [])) {
+				out("  #err#", "red");
+			}
+			return "";
+		}
+
+		// No-op path: legacy tables not present.
+		if (Len(renameResult.skipped ?: "")) {
+			out(renameResult.skipped, "yellow");
+			return "";
+		}
+
+		// Dry-run path: print SQL.
+		if (arguments.dryRun) {
+			if (ArrayLen(renameResult.sql ?: [])) {
+				out("Would execute:");
+				for (var sql in renameResult.sql) {
+					out("  " & sql, "cyan");
+				}
+			}
+			return "";
+		}
+
+		// Success path: print what was renamed.
+		out("Renamed:", "green");
+		for (var rename in (renameResult.renamed ?: [])) {
+			out("  " & rename, "green");
+		}
+		out("");
+		out("Note: the foreign-key constraint name is still `fk_core_level`. Constraint names are scoped to their table and only rename via DROP/CREATE; this is cosmetic and will not affect functionality.", "yellow");
 
 		return "";
 	}
