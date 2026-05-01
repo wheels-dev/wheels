@@ -312,7 +312,6 @@ Three actions, three responsibilities:
 The first line of `config()` is `super.config();`. If you skip it, you silently disable everything `app/controllers/Controller.cfc` does in *its* `config()` — most importantly, `protectsFromForgery()`, which makes Wheels reject `POST`/`PATCH`/`DELETE` requests that don't carry a valid CSRF token. Without that call, `startFormTag` won't emit the hidden `authenticityToken` input, and your forms silently lose CSRF protection. If you ever notice some forms have a hidden `authenticityToken` and others don't, this is the first thing to check.
 </Aside>
 
-
 The filter is `private`. This is critical: **public filter methods become routable actions**, which means Wheels would happily respond to `/posts/authenticate` and run the filter body as an action. Private filters are invisible to the router.
 
 `ownershipCheck` is called explicitly at the top of `edit`, `update`, and `delete`. It's not a filter because filters run on every matching action uniformly — ownership checks need the loaded post, which only the specific action has. A helper function keeps the three call sites from diverging.
