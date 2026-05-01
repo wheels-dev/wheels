@@ -126,23 +126,17 @@ The form partial needs a `<turbo-frame>` with an `id` that the server will reuse
    <turbo-frame id="post_form">
        #errorMessagesFor("post")#
        #startFormTag(action=IsNumeric(post.id ?: "") ? "update" : "create", key=post.id ?: "")#
-           <label>Title<br>
-               #textField(objectName="post", property="title")#
-           </label>
-           <label>Body<br>
-               #textArea(objectName="post", property="body")#
-           </label>
-           <label>Status<br>
-               #select(objectName="post", property="status", options="draft,published,archived")#
-           </label>
-           <label>Published at<br>
-               #dateField(objectName="post", property="publishedAt")#
-           </label>
+           #textField(objectName="post", property="title", label="Title")#
+           #textArea(objectName="post", property="body", label="Body")#
+           #select(objectName="post", property="status", options="draft,published,archived", label="Status")#
+           #dateField(objectName="post", property="publishedAt", label="Published at")#
            <button type="submit">Save</button>
        #endFormTag()#
    </turbo-frame>
    </cfoutput>
    ```
+
+   Same shape as Part 3's `_form.cfm`, just wrapped in a `<turbo-frame>`. The form helpers emit their own `<label>` wrappers; passing `label="..."` sets the visible text. Don't add an outer `<label>` around them — that produces nested `<label>` elements (the gotcha called out in [Part 3](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/#the-form-partial)).
 
 </Steps>
 
