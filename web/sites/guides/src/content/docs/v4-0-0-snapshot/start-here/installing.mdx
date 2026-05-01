@@ -28,6 +28,35 @@ Install the `wheels` CLI. Five minutes.
 
 <TabItem label="macOS" icon="apple">
 
+<Aside type="tip" title="Don't have Homebrew yet?">
+  The macOS steps below assume [Homebrew](https://brew.sh/) is installed. Check with:
+
+  ```bash title="your shell"
+  brew --version
+  ```
+
+  If you see "command not found", install Homebrew first using the official installer:
+
+  ```bash title="your shell"
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  ```
+
+  Heads-up while it runs:
+
+  - The installer asks for your account password — it needs `sudo` to create `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel).
+  - If Xcode Command Line Tools aren't already installed, the installer triggers them. That opens a system dialog and takes ~5–10 minutes before the brew install resumes.
+  - When the installer finishes, it prints a "Next steps" block with two commands you must run so `brew` lands on your `PATH`. On Apple Silicon those are:
+
+    ```bash title="your shell"
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+    ```
+
+    On Intel, replace `/opt/homebrew` with `/usr/local`.
+
+  Confirm with `brew --version` before continuing to step 1 below.
+</Aside>
+
 <Steps>
 
 1. Tap the Wheels Homebrew repo:
