@@ -229,11 +229,12 @@ basecoat ships CFML view helpers — but the actual styling is provided by `base
        #uiCardHeader(title="Comments")#
        #uiCardContent()#
            <section id="comments">
-               <cfloop query="post.comments()">
+               <cfset comments = post.comments()>
+               <cfloop query="comments">
                    <article style="margin-bottom: 1em;">
-                       <strong>#post.comments.author#</strong>
-                       <span style="color: var(--bc-muted-foreground);">· #DateFormat(post.comments.createdAt, "mmm d")#</span>
-                       <p>#post.comments.body#</p>
+                       <strong>#comments.author#</strong>
+                       <span style="color: var(--bc-muted-foreground);">· #DateFormat(comments.createdAt, "mmm d")#</span>
+                       <p>#comments.body#</p>
                    </article>
                </cfloop>
            </section>
@@ -241,7 +242,7 @@ basecoat ships CFML view helpers — but the actual styling is provided by `base
    #uiCardEnd()#
 
    <turbo-frame id="new_comment">
-       #startFormTag(route="postComments", key=post.id)#
+       #startFormTag(route="postComments", postKey=post.id)#
            #uiField(label="Your name", name="comment[author]", type="text", required=true)#
            #uiField(label="Your comment", name="comment[body]", type="textarea", required=true, rows=4)#
            #uiButton(text="Post comment", variant="primary", type="submit")#
