@@ -208,8 +208,13 @@ component {
 		local.manifest = variables.registry.fetchManifest(arguments.name);
 		local.picked = variables.resolver.pick(local.manifest, variables.runtime, arguments.pin);
 		local.vendor = variables.installer.install(arguments.name, local.picked, arguments.force);
+		// Activation requires a cold restart, not a soft reload: PackageLoader
+		// runs in onApplicationStart and `wheels reload` doesn't re-fire that
+		// hook. Telling users to `wheels reload` here directly contradicts
+		// the chapter-8 caveat and produces "uiCard not defined"-style errors
+		// when the helper resolution fails. Onboarding F14.
 		return "Installed " & arguments.name & "@" & local.picked.version & " → " & local.vendor & Chr(10)
-			& "Run `wheels reload` to activate it." & Chr(10);
+			& "Run `wheels stop && wheels start` to activate it." & Chr(10);
 	}
 
 	private string function $updateAll(struct opts) {

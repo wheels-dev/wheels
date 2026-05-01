@@ -81,6 +81,15 @@ component output="false" extends="wheels.Global"{
 				if(arguments.missingMigFlag){
 					local.rv = "Migrating remaining migrations till #arguments.version#.#Chr(13) & Chr(10)#";
 					$removeVersionAsMigrated(local.currentVersion);
+				} else if (local.currentVersion gte arguments.version && local.hasPendingMigrations) {
+					// Out-of-order pending migrations: a migration with a
+					// timestamp earlier than currentVersion is still pending
+					// (e.g. tutorial chapter 5 hardcodes 20260419130000 while
+					// the user's chapter 2 posts migration sits at the
+					// generator's current-day timestamp). The "from N up to N"
+					// framing reads as a no-op even though new migrations are
+					// about to run, so emit a clearer message. Onboarding F16.
+					local.rv = "Applying pending migration(s) up to #arguments.version#.#Chr(13) & Chr(10)#";
 				} else {
 					local.rv = "Migrating from #local.currentVersion# up to #arguments.version#.#Chr(13) & Chr(10)#";
 				}
