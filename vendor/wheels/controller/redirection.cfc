@@ -42,7 +42,31 @@ component {
 		boolean delay,
 		boolean encode
 	) {
+		// F5: capture whether the caller explicitly passed `statusCode` BEFORE
+		// $args copies the framework default (302) in. Used below to upgrade
+		// the default to 303 for non-idempotent request methods without
+		// overriding an explicit user choice.
+		local.userPassedStatusCode = StructKeyExists(arguments, "statusCode");
+
 		$args(name = "redirectTo", args = arguments);
+
+		// F5: When redirecting after a POST/PUT/PATCH/DELETE without an
+		// explicit statusCode, upgrade the default 302 ("Found", historically
+		// ambiguous on method handling) to 303 ("See Other", which always
+		// downgrades the next request to GET regardless of the original
+		// method). RFC 7231 §6.4.4 specifies 303 for the "redirect after
+		// POST" pattern. Browsers treat 302 as 303 for compat, but scripted
+		// clients (curl with -L, programmatic HTTP libs) follow the spec
+		// literally — so the upgrade makes scripted smoke tests work
+		// correctly without method-replay surprises.
+		if (
+			!local.userPassedStatusCode
+			&& StructKeyExists(request, "cgi")
+			&& StructKeyExists(request.cgi, "request_method")
+			&& ListFindNoCase("POST,PUT,PATCH,DELETE", request.cgi.request_method)
+		) {
+			arguments.statusCode = 303;
+		}
 
 		// Set flash if passed in.
 		// If more than the arguments listed in the function declaration was passed in it's possible that one of them is intended for the flash.

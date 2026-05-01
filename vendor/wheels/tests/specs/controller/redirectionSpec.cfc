@@ -131,6 +131,64 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("F5: 303 See Other after non-idempotent methods", () => {
+
+			beforeEach(() => {
+				params = {controller = "test", action = "testRedirect"};
+				_controller = application.wo.controller("test", params);
+				copies.request.cgi = request.cgi;
+				$origMethod_F5 = request.cgi.request_method ?: "GET";
+			});
+
+			afterEach(() => {
+				request.cgi = copies.request.cgi;
+				request.cgi.request_method = $origMethod_F5;
+			});
+
+			it("upgrades default 302 to 303 on POST", () => {
+				request.cgi.request_method = "POST";
+				_controller.redirectTo(action = "test");
+				expect(_controller.getRedirect().statusCode).toBe(303);
+			});
+
+			it("upgrades default 302 to 303 on PUT", () => {
+				request.cgi.request_method = "PUT";
+				_controller.redirectTo(action = "test");
+				expect(_controller.getRedirect().statusCode).toBe(303);
+			});
+
+			it("upgrades default 302 to 303 on PATCH", () => {
+				request.cgi.request_method = "PATCH";
+				_controller.redirectTo(action = "test");
+				expect(_controller.getRedirect().statusCode).toBe(303);
+			});
+
+			it("upgrades default 302 to 303 on DELETE", () => {
+				request.cgi.request_method = "DELETE";
+				_controller.redirectTo(action = "test");
+				expect(_controller.getRedirect().statusCode).toBe(303);
+			});
+
+			it("keeps default 302 on GET", () => {
+				request.cgi.request_method = "GET";
+				_controller.redirectTo(action = "test");
+				expect(_controller.getRedirect().statusCode).toBe(302);
+			});
+
+			it("respects an explicit statusCode override on POST", () => {
+				// User explicitly requested 302 — don't second-guess.
+				request.cgi.request_method = "POST";
+				_controller.redirectTo(action = "test", statusCode = 302);
+				expect(_controller.getRedirect().statusCode).toBe(302);
+			});
+
+			it("respects an explicit statusCode override on POST (301)", () => {
+				request.cgi.request_method = "POST";
+				_controller.redirectTo(action = "test", statusCode = 301);
+				expect(_controller.getRedirect().statusCode).toBe(301);
+			});
+		})
+
 		describe("Tests that redirectto prevents open redirect", () => {
 
 			beforeEach(() => {
