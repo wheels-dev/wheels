@@ -241,6 +241,7 @@ Three actions, three responsibilities:
    ```cfm {test:compile}
    component extends="Controller" {
        function config() {
+           super.config();
            filters(through="authenticate", except="index,show");
        }
 
@@ -306,6 +307,10 @@ Three actions, three responsibilities:
 </Steps>
 
 `config()` runs once when the controller is instantiated. `filters(through="authenticate", except="index,show")` says: "run the `authenticate` method before every action, except `index` and `show`." So anyone can browse the blog, but only logged-in users can create, edit, or delete posts.
+
+<Aside type="caution" title="Always call `super.config()` when overriding">
+The first line of `config()` is `super.config();`. If you skip it, you silently disable everything `app/controllers/Controller.cfc` does in *its* `config()` — most importantly, `protectsFromForgery()`, which makes Wheels reject `POST`/`PATCH`/`DELETE` requests that don't carry a valid CSRF token. Without that call, `startFormTag` won't emit the hidden `authenticityToken` input, and your forms silently lose CSRF protection. If you ever notice some forms have a hidden `authenticityToken` and others don't, this is the first thing to check.
+</Aside>
 
 The filter is `private`. This is critical: **public filter methods become routable actions**, which means Wheels would happily respond to `/posts/authenticate` and run the filter body as an action. Private filters are invisible to the router.
 
@@ -624,6 +629,7 @@ One change from 6a: the post-save `session.userId = user.id;` line is replaced w
    ```cfm {test:compile}
    component extends="Controller" {
        function config() {
+           super.config();
            filters(through="authenticate", except="index,show");
        }
 

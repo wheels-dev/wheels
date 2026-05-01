@@ -1,6 +1,10 @@
 component extends="Controller" {
 
 	function config() {
+		// Inherit CSRF protection (and other defaults) from
+		// app/controllers/Controller.cfc. Login forms in particular need
+		// CSRF or they're trivially target-able.
+		super.config();
 		verifies(only="create", params="username,password");
 	}
 

@@ -1,6 +1,10 @@
 component extends="Controller" {
 
 	function config() {
+		// Inherit CSRF protection (and any other defaults) from
+		// app/controllers/Controller.cfc. Skipping super.config() silently
+		// disables protectsFromForgery() for this controller.
+		super.config();
 		verifies(params="key", paramsTypes="integer", only="show,edit,update,delete");
 		filters(through="findRecord", only="show,edit,update,delete");
 	}
