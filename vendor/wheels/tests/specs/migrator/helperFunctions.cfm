@@ -1,16 +1,26 @@
 <cfscript>
 
 	public void function deleteMigratorVersions(required numeric levelId) {
-		queryExecute(
-			"DELETE FROM c_o_r_e_migrator_versions WHERE core_level = :levelId",
-			{
-				levelId = {
-					value      = arguments.levelId,
-					cfsqltype  = "cf_sql_integer"
-				}
-        	},
-			{ datasource = application.wheels.dataSourceName }
-		);
+		// Use the configured table name so the helper works regardless of
+		// whether this app is on the new `wheels_*` defaults or a legacy
+		// `c_o_r_e_*` install detected by Migrator's $detectSystemTables.
+		var tableName = application.wheels.migratorTableName;
+		try {
+			queryExecute(
+				"DELETE FROM #tableName# WHERE core_level = :levelId",
+				{
+					levelId = {
+						value      = arguments.levelId,
+						cfsqltype  = "cf_sql_integer"
+					}
+				},
+				{ datasource = application.wheels.dataSourceName }
+			);
+		} catch (any e) {
+			// Table may not exist yet on the very first migrator-spec run
+			// (the migrator creates it lazily on first migrateTo). The
+			// DELETE-against-nothing semantics are vacuously satisfied.
+		}
 	}
 
 	public any function $cleanSqlDirectory() {

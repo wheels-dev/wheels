@@ -245,7 +245,13 @@ component {
 
 		// Create migrations object and set default settings.
 		application.$wheels.autoMigrateDatabase = false;
-		application.$wheels.migratorTableName = "c_o_r_e_migrator_versions";
+		// New default names (F15 Phase 1). The migrator's $detectSystemTables()
+		// helper at runtime will flip these back to the legacy `c_o_r_e_*`
+		// names if it finds those tables already in the database, so existing
+		// 4.0-SNAPSHOT apps continue to work without manual intervention.
+		// New installs get the clean `wheels_*` prefix.
+		application.$wheels.migratorTableName = "wheels_migrator_versions";
+		application.$wheels.levelsTableName = "wheels_levels";
 		application.$wheels.createMigratorTable = true;
 		application.$wheels.writeMigratorSQLFiles = false;
 		// Preserve column / table / index name case as written in the migration.

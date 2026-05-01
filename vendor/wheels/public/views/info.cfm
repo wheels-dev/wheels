@@ -94,6 +94,7 @@ settings = [
 		values = [
 			'autoMigrateDatabase',
 			'migratorTableName',
+			'levelsTableName',
 			'createMigratorTable',
 			'writeMigratorSQLFiles',
 			'migratorObjectCase',

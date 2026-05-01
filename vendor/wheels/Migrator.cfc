@@ -406,6 +406,12 @@ component output="false" extends="wheels.Global"{
 	private string function $getVersionsPreviouslyMigrated() {
 		local.appKey = $appKey();
 
+		// F15 Phase 1: detect whether this app's system tables already exist
+		// under the legacy `c_o_r_e_*` names; if so, flip the configured names
+		// back so subsequent SQL targets the existing tables. New installs
+		// keep the `wheels_*` defaults from onapplicationstart.cfc.
+		$detectSystemTables(appKey = local.appKey);
+
 		/* Choose appropriate SQL syntax for LIMIT based on database engine */
 		local.info = $dbinfo(
 			type = "version",
@@ -413,12 +419,13 @@ component output="false" extends="wheels.Global"{
 			username = application.wheels.dataSourceUserName,
 			password = application.wheels.dataSourcePassword
 		);
+		local.levelsTable = application[local.appKey].levelsTableName;
 		if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)){
-			local.sql = "SELECT TOP 1 * FROM c_o_r_e_levels";
+			local.sql = "SELECT TOP 1 * FROM #local.levelsTable#";
 		} else if(FindNoCase("Oracle", local.info.database_productname)){
-			local.sql = "SELECT * FROM c_o_r_e_levels FETCH FIRST 1 ROWS ONLY";
+			local.sql = "SELECT * FROM #local.levelsTable# FETCH FIRST 1 ROWS ONLY";
 		} else{
-			local.sql = "SELECT * FROM c_o_r_e_levels LIMIT 1";
+			local.sql = "SELECT * FROM #local.levelsTable# LIMIT 1";
 		}
 
 		try {
@@ -430,15 +437,15 @@ component output="false" extends="wheels.Global"{
 			if (application[local.appKey].createMigratorTable) {
 				$query(
 					datasource = application[local.appKey].dataSourceName,
-					sql = "CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))"
+					sql = "CREATE TABLE #local.levelsTable# (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))"
 				);
 				$query(
 					datasource = application[local.appKey].dataSourceName,
-					sql = "INSERT INTO c_o_r_e_levels (id, name, description) VALUES (1, 'App', 'Application level migrations')"
+					sql = "INSERT INTO #local.levelsTable# (id, name, description) VALUES (1, 'App', 'Application level migrations')"
 				);
 				$query(
 					datasource = application[local.appKey].dataSourceName,
-					sql = "INSERT INTO c_o_r_e_levels (id, name, description) VALUES (2, 'Test', 'Test level migrations')"
+					sql = "INSERT INTO #local.levelsTable# (id, name, description) VALUES (2, 'Test', 'Test level migrations')"
 				);
 			}
 		}
@@ -456,6 +463,11 @@ component output="false" extends="wheels.Global"{
 			if (application[local.appKey].createMigratorTable) {
 				local.dbType = local.info.database_productname;
 				local.tableName = application[local.appKey].migratorTableName;
+				// FK constraint name follows the levels-table prefix so a
+				// fresh install gets `fk_wheels_level` and a legacy install
+				// keeps `fk_core_level`. Constraint names are scoped to
+				// their tables, so this only matters for new bootstraps.
+				local.fkName = (local.levelsTable == "c_o_r_e_levels") ? "fk_core_level" : "fk_wheels_level";
 
 				// SQLite: skip rename / ALTER, create table with constraint in one query
 				if (FindNoCase("SQLite", local.dbType)) {
@@ -463,7 +475,7 @@ component output="false" extends="wheels.Global"{
 						CREATE TABLE #local.tableName# (
 							version VARCHAR(25),
 							core_level INT NOT NULL DEFAULT 1,
-							CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)
+							CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)
 						)
 					";
 					$query(
@@ -492,32 +504,96 @@ component output="false" extends="wheels.Global"{
 							sql="SELECT version FROM migratorversions"
 						);
 						$query(
-							datasource=application[local.appKey].dataSourceName, 
+							datasource=application[local.appKey].dataSourceName,
 							sql=local.renameSQL
 						);
 						$query(
-							datasource=application[local.appKey].dataSourceName, 
+							datasource=application[local.appKey].dataSourceName,
 							sql=local.addColumnSQL
 						);
 						$query(
-							datasource=application[local.appKey].dataSourceName, 
-							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
+							datasource=application[local.appKey].dataSourceName,
+							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)"
 						);
 					} catch (any e) {
 						// If rename fails, create table instead
 						$query(
-							datasource=application[local.appKey].dataSourceName, 
+							datasource=application[local.appKey].dataSourceName,
 							sql=local.createSQL
 						);
 						$query(
-							datasource=application[local.appKey].dataSourceName, 
-							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
+							datasource=application[local.appKey].dataSourceName,
+							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)"
 						);
 					}
 				}
 			}
 			return 0;
 		}
+	}
+
+	/**
+	 * F15 Phase 1: detect which system-table naming family this app's database
+	 * already uses, and flip the configured names if needed.
+	 *
+	 * Decision tree:
+	 *   1. If `wheels_levels` exists, keep the new defaults (no-op).
+	 *   2. Else if `c_o_r_e_levels` exists, override application settings to
+	 *      point at the legacy names AND log a one-time deprecation warning.
+	 *   3. Else (neither exists, fresh DB), keep the new defaults — the
+	 *      bootstrap below will create `wheels_*` tables.
+	 *
+	 * Step 2 is the migration-friendly path: existing 4.0-SNAPSHOT apps that
+	 * already have `c_o_r_e_*` tables continue to read/write them without
+	 * any code or data changes. Phase 2 will ship a CLI command to do the
+	 * rename when the user is ready.
+	 *
+	 * Idempotent and stateless — re-runs every call. The probe is two cheap
+	 * SELECTs each returning 0 rows; per-request caching breaks test isolation
+	 * (the spec suite shares a request scope across tests) so we just don't.
+	 */
+	private void function $detectSystemTables(required string appKey) {
+		// Cache the datasource locally — the inline closure below uses its
+		// own `arguments` scope (CFML closures don't inherit the parent's
+		// `arguments` struct), so we need to pull the value out by reference
+		// before the closure sees it.
+		var dsn = application[arguments.appKey].dataSourceName;
+
+		// Always probe with a no-rows query so we don't load data unnecessarily.
+		// `WHERE 1=0` is portable across every adapter we support.
+		var probe = function(tableName) {
+			try {
+				$query(
+					datasource = dsn,
+					sql = "SELECT 1 FROM #arguments.tableName# WHERE 1=0"
+				);
+				return true;
+			} catch (any e) {
+				return false;
+			}
+		};
+
+		if (probe(application[arguments.appKey].levelsTableName)) {
+			// Configured name exists — nothing to do.
+			return;
+		}
+
+		if (probe("c_o_r_e_levels")) {
+			// Legacy install. Override settings to match what's actually on disk.
+			application[arguments.appKey].levelsTableName = "c_o_r_e_levels";
+			application[arguments.appKey].migratorTableName = "c_o_r_e_migrator_versions";
+			// Quiet stderr warning — fires once per migrator run, not per request.
+			if (StructKeyExists(server, "system") && StructKeyExists(server.system, "out")) {
+				server.system.out.println(
+					"[wheels] Legacy c_o_r_e_* migration tables detected. "
+					& "These will be renamed to wheels_* in a future Wheels release; "
+					& "see the upgrade guide for the rename procedure."
+				);
+			}
+		}
+
+		// If neither exists, we leave the configured `wheels_*` defaults in
+		// place; the bootstrap path below will create them.
 	}
 
 	/**
