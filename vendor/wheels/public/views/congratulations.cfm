@@ -1,5 +1,9 @@
 <!--- cfformat-ignore-start --->
-<cfinclude template="../layout/_header.cfm">
+<!--- Use the slimmed _simple header (no top nav). Navigation to /wheels/info,
+      /wheels/routes, /wheels/api, etc. is provided by the dev-mode debug bar
+      emitted at onrequestend, so the welcome page only needs doctype/head/body
+      chrome here. --->
+<cfinclude template="../layout/_header_simple.cfm">
 <cfscript>
 	// Runtime info
 	local.wheelsVersion = get("version");
@@ -408,5 +412,5 @@ function wheelsCliTab(el, cmd, prompt) {
 </script>
 </cfoutput>
 
-<cfinclude template="../layout/_footer.cfm">
+<cfinclude template="../layout/_footer_simple.cfm">
 <!--- cfformat-ignore-end --->
