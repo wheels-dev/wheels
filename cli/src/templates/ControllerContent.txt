@@ -1,10 +1,17 @@
 |DescriptionComment|component extends="Controller" {
 
   /**
-	* Controller config settings
+	* Controller config settings.
+	*
+	* The `super.config()` call inherits CSRF protection (via
+	* `protectsFromForgery()`) and any other defaults set in
+	* `app/controllers/Controller.cfc`. Don't remove it unless
+	* you really mean to opt out of those defaults — without it,
+	* `startFormTag` will silently stop emitting the hidden
+	* `authenticityToken` input for this controller's forms.
 	**/
 	function config() {
-
+		super.config();
 	}
 |Actions|
 }

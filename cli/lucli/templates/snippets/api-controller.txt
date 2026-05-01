@@ -1,6 +1,12 @@
 component extends="Controller" {
 
 	function config() {
+		// API controllers usually authenticate via API keys / bearer tokens
+		// rather than session cookies, so the session-based CSRF check from
+		// app/controllers/Controller.cfc doesn't apply. Either skip the
+		// super.config() call (as below) or call protectsFromForgery(with="ignore")
+		// to make the opt-out explicit.
+		protectsFromForgery(with="ignore");
 		provides("json");
 		verifies(params="key", paramsTypes="integer", only="show,update,delete");
 		filters(through="findRecord", only="show,update,delete");
