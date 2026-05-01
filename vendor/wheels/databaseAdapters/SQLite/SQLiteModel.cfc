@@ -47,6 +47,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 			case "datetime":
 			case "timestamp":
+				// SQLite stores datetimes as TEXT (see SQLiteMigrator's
+				// sqlTypes mapping). Bind as varchar; date objects are
+				// pre-formatted to ISO-8601 in $buildQueryParamValues
+				// before they reach the bind layer.
 				local.rv = "cf_sql_varchar";
 				break;
 
