@@ -283,6 +283,24 @@ component {
 		local.rv.scale = variables.wheels.class.properties[arguments.property].scale;
 		local.rv.null = (!Len(this[arguments.property]) && variables.wheels.class.properties[arguments.property].nullable);
 
+		// SQLite stores datetimes as TEXT and binds as varchar. CFML's default
+		// toString of a date object is "{ts '...'}" — that string gets stored
+		// verbatim in the TEXT column, breaking DateFormat() and direct DB
+		// inspection on read. Pre-format any date-shaped value as ISO-8601 so
+		// the column ends up with clean human-readable values. The format is
+		// idempotent for already-clean strings, so re-running is safe.
+		if (
+			$get("adapterName") eq "SQLiteModel"
+			&& local.rv.type eq "cf_sql_varchar"
+			&& !local.rv.null
+			&& IsSimpleValue(local.rv.value)
+			&& Len(local.rv.value)
+			&& IsDate(local.rv.value)
+			&& !IsNumeric(local.rv.value)
+		) {
+			local.rv.value = DateFormat(local.rv.value, "yyyy-mm-dd") & " " & TimeFormat(local.rv.value, "HH:mm:ss");
+		}
+
 		// Convert date strings to proper date for datetime types (engine-specific parsing)
 		if ($engineAdapter().isBoxLang() && (Len(local.rv.value) && !local.rv.null && 
 		    (local.rv.type == "CF_SQL_DATE" || local.rv.type == "CF_SQL_TIME" || local.rv.type == "CF_SQL_TIMESTAMP") &&

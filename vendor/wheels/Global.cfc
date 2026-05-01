@@ -1907,11 +1907,13 @@ return local.$wheels;
 			$set(adapterName = "#local.dbType#Model");
 		}
 
-		// Handle SQLite (TEXT storage)
+		// SQLite stores datetimes as TEXT. Format as a clean ISO-8601 string
+		// (no surrounding quotes — those are SQL-literal syntax, not data) so
+		// the value lands in the TEXT column verbatim and round-trips through
+		// IsDate/DateFormat without quote-stripping.
 		if ($get("adapterName") == "SQLiteModel") {
-			// Store as quoted ISO 8601 string (standard for SQLite)
 			if (IsDate(local.rv)) {
-				local.rv = "'#DateFormat(local.rv, 'yyyy-mm-dd')# #TimeFormat(local.rv, 'HH:mm:ss')#'";
+				local.rv = DateFormat(local.rv, "yyyy-mm-dd") & " " & TimeFormat(local.rv, "HH:mm:ss");
 			}
 		}
 

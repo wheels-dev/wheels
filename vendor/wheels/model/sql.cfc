@@ -20,13 +20,15 @@ component {
 			} else {
 				ArrayAppend(arguments.sql, "UPDATE #local.qTable# SET #local.qColumn# = ");
 			}
-			// Use cf_sql_varchar in SQLite for TEXT timestamps
-			if(get("adapterName") eq "SQLiteModel") {
-				local.type = "cf_sql_varchar";
+			// SQLite stores timestamps as TEXT and $timestamp() returns a
+			// pre-formatted ISO-8601 string for that adapter; bind as varchar
+			// so the string is stored verbatim. Other adapters get the date
+			// object and bind as timestamp.
+			if (get("adapterName") eq "SQLiteModel") {
+				local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = "cf_sql_varchar"};
 			} else {
-				local.type = "cf_sql_timestamp";
+				local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = "cf_sql_timestamp"};
 			}
-			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = local.type};
 			ArrayAppend(arguments.sql, local.param);
 		} else {
 			local.qTable = $quotedTableName();
