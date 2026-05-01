@@ -98,14 +98,29 @@ component {
 				throw(type="ScaffoldError", message="Controller: #controllerResult.error#");
 			}
 
-			// 4. Generate Views (unless API-only)
+			// 4. Generate Views (unless API-only).
+			// If a migration exists on disk, parse it for columns the CLI
+			// args don't know about (e.g. user followed chapter 2 to add
+			// `publishedAt` to the migration, then ran `generate scaffold`
+			// in chapter 3 with only the original `title:string body:text
+			// status:enum` args — without this merge, the form silently
+			// omits `publishedAt`). Onboarding F3.
+			var viewProps = props;
+			var existingMigration = findExistingMigration(arguments.name);
+			if (len(existingMigration)) {
+				var migrationCols = parseMigrationColumns(existingMigration);
+				if (arrayLen(migrationCols)) {
+					viewProps = mergePropsWithMigrationColumns(props, migrationCols);
+				}
+			}
+
 			if (!arguments.api) {
 				for (var action in ["index", "show", "new", "edit", "_form"]) {
 					var viewResult = variables.codeGenService.generateView(
 						name = pluralName,
 						action = action,
 						force = arguments.force,
-						properties = props,
+						properties = viewProps,
 						belongsTo = arguments.belongsTo,
 						hasMany = arguments.hasMany
 					);
@@ -167,12 +182,89 @@ component {
 	 * when a user re-runs scaffold over an existing model.
 	 */
 	private boolean function migrationAlreadyExists(required string name) {
+		return len(findExistingMigration(arguments.name)) > 0;
+	}
+
+	/**
+	 * Return the absolute path to the existing `_create_<plural>_table.cfc`
+	 * migration for this resource, or "" if none. Used to merge hand-edited
+	 * migration columns back into the scaffold's properties list.
+	 */
+	private string function findExistingMigration(required string name) {
 		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
-		if (!directoryExists(migrationDir)) return false;
+		if (!directoryExists(migrationDir)) return "";
 		var tableName = variables.helpers.pluralize(lCase(arguments.name));
 		var suffix = "_create_" & tableName & "_table.cfc";
 		var existing = directoryList(migrationDir, false, "name", "*" & suffix);
-		return arrayLen(existing) > 0;
+		if (!arrayLen(existing)) return "";
+		return migrationDir & "/" & existing[1];
+	}
+
+	/**
+	 * Parse a migration file for `t.<type>(columnNames="<name>", ...)` calls
+	 * and return them as an array of {name, type} structs. Used to discover
+	 * columns added by hand-editing the migration after the original CLI
+	 * scaffold call. Onboarding F3.
+	 *
+	 * Recognized types match what `generateFormFieldsCode` knows how to render:
+	 * string / text / longtext / boolean / integer / float / decimal /
+	 * date / datetime / timestamp / time / binary / enum.
+	 *
+	 * Conservative parser — only matches lines that already use the
+	 * scaffold-generated shape (`t.string(columnNames="title", ...)`). Custom
+	 * column-construction patterns are silently skipped.
+	 */
+	private array function parseMigrationColumns(required string migrationPath) {
+		var result = [];
+		if (!fileExists(arguments.migrationPath)) return result;
+		var content = fileRead(arguments.migrationPath);
+
+		// Match `t.<type>(columnNames = "<name>"...` allowing optional whitespace
+		// and either single or double quotes around the column name.
+		var pattern = "t\.([a-zA-Z]+)\s*\(\s*columnNames\s*=\s*[""']([^""']+)[""']";
+		var pos = 1;
+		var match = reFindNoCase(pattern, content, pos, true);
+		while (isStruct(match) && arrayLen(match.pos) > 1 && match.pos[1] > 0) {
+			var fnType = lCase(mid(content, match.pos[2], match.len[2]));
+			var colName = mid(content, match.pos[3], match.len[3]);
+			// Skip the helper that doesn't take columnNames in the same way
+			// (we already filter via the regex requiring columnNames= but
+			// belt-and-braces if a future helper grows that arg).
+			if (
+				fnType != "timestamps"
+				&& fnType != "create"
+				&& fnType != "primarykey"
+				&& fnType != "references"
+			) {
+				arrayAppend(result, {name: colName, type: fnType});
+			}
+			pos = match.pos[1] + match.len[1];
+			match = reFindNoCase(pattern, content, pos, true);
+		}
+		return result;
+	}
+
+	/**
+	 * Merge migration-derived columns into the CLI-provided properties list.
+	 * CLI args win on name conflict (they may carry enum values etc. that the
+	 * parser can't recover). New columns from the migration are appended.
+	 */
+	private array function mergePropsWithMigrationColumns(
+		required array cliProps,
+		required array migrationCols
+	) {
+		var merged = duplicate(arguments.cliProps);
+		var seen = {};
+		for (var p in arguments.cliProps) {
+			seen[lCase(p.name)] = true;
+		}
+		for (var col in arguments.migrationCols) {
+			if (!structKeyExists(seen, lCase(col.name))) {
+				arrayAppend(merged, col);
+				seen[lCase(col.name)] = true;
+			}
+		}
+		return merged;
 	}
 
 	/**

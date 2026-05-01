@@ -1,6 +1,6 @@
 <cfparam name="|ObjectNameSingular|" default="">
 <cfoutput>
-<h1>#|ObjectNameSingular|.id#</h1>
+<h1>#|ObjectNameSingular|.|DisplayProperty|#</h1>
 <!--- CLI-Appends-Here --->
 <p>
 	#linkTo(route="edit|ObjectNameSingularC|", key=|ObjectNameSingular|.id, text="Edit")# ·

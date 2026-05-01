@@ -142,6 +142,80 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude("hasMany");
 				});
 
+				it("show.cfm heading uses first string column, not id (F4)", () => {
+					// Scaffolding a model with a string column should put that
+					// column in the <h1> heading instead of the numeric primary
+					// key. Onboarding F4: scaffolded show.cfm previously rendered
+					// `<h1>#post.id#</h1>` even though `title` was available.
+					scaffold.generateScaffold(
+						name = "Headline",
+						properties = [{name: "title", type: "string"}, {name: "body", type: "text"}],
+						force = true
+					);
+					var showContent = fileRead(tempRoot & "/app/views/headlines/show.cfm");
+					expect(showContent).toInclude("##headline.title##");
+					expect(showContent).notToInclude("<h1>##headline.id##</h1>");
+				});
+
+				it("index.cfm link text uses first string column, not id (F4)", () => {
+					scaffold.generateScaffold(
+						name = "Tagline",
+						properties = [{name: "label", type: "string"}, {name: "weight", type: "integer"}],
+						force = true
+					);
+					var indexContent = fileRead(tempRoot & "/app/views/taglines/index.cfm");
+					expect(indexContent).toInclude("text=taglines.label");
+				});
+
+				it("falls back to id when no string column is provided (F4)", () => {
+					// Defensive fallback: a scaffold with only numeric/boolean
+					// columns has nothing user-facing to put in the heading,
+					// so we keep the legacy `id` behavior.
+					scaffold.generateScaffold(
+						name = "Counter",
+						properties = [{name: "value", type: "integer"}],
+						force = true
+					);
+					var showContent = fileRead(tempRoot & "/app/views/counters/show.cfm");
+					expect(showContent).toInclude("##counter.id##");
+				});
+
+				it("merges hand-edited migration columns into the form (F3)", () => {
+					// Scenario from chapter 2/3 of the tutorial: user creates
+					// a model with the generator, then hand-edits the migration
+					// to add `publishedAt`, then scaffolds with the original
+					// CLI args (no `publishedAt`). The form should still pick
+					// up `publishedAt` by parsing the existing migration.
+					var migrationDir = tempRoot & "/app/migrator/migrations";
+					if (!directoryExists(migrationDir)) directoryCreate(migrationDir, true);
+					var migrationPath = migrationDir & "/20260419120000_create_articulars_table.cfc";
+					fileWrite(migrationPath, '
+						component extends="wheels.migrator.Migration" {
+							function up() {
+								t = createTable(name="articulars");
+								t.string(columnNames="title", default="", allowNull=true, limit=255);
+								t.text(columnNames="body", default="", allowNull=true);
+								t.datetime(columnNames="publishedAt", allowNull=true);
+								t.timestamps();
+								t.create();
+							}
+						}
+					');
+
+					scaffold.generateScaffold(
+						name = "Articular",
+						properties = [{name: "title", type: "string"}, {name: "body", type: "text"}],
+						force = true
+					);
+
+					var formContent = fileRead(tempRoot & "/app/views/articulars/_form.cfm");
+					// CLI-arg columns still present
+					expect(formContent).toInclude('property="title"');
+					expect(formContent).toInclude('property="body"');
+					// Migration-only column merged in
+					expect(formContent).toInclude('property="publishedAt"');
+				});
+
 			});
 
 			describe("createMigrationWithProperties()", () => {

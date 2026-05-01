@@ -144,6 +144,18 @@ component {
 			processed = replace(processed, "|FormFields|", "", "all");
 		}
 
+		// Process |DisplayProperty| — the column name used for human-readable
+		// scaffold headings/links. Defaults to `id` (matches legacy behavior),
+		// but if the properties list contains a string column we use that
+		// instead so scaffolded show.cfm/index.cfm don't lead with a numeric
+		// primary key. Onboarding F4.
+		processed = replace(
+			processed,
+			"|DisplayProperty|",
+			pickDisplayProperty(arguments.context.properties ?: []),
+			"all"
+		);
+
 		// Process controller includes for associations
 		if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
 			processed = addControllerIncludes(processed, arguments.context.belongsTo);
@@ -395,6 +407,34 @@ component {
 			}
 		}
 		return arrayToList(code, chr(10));
+	}
+
+	/**
+	 * Pick the best column to use as a human-readable display name in scaffold
+	 * views. Preference order:
+	 *   1. First property typed `string` (Rails-style — `title`, `name`, etc.)
+	 *   2. First property typed `text`
+	 *   3. Fallback to `id` so legacy templates without scaffold context still
+	 *      render (and so non-scaffold users of the placeholder don't break).
+	 */
+	private string function pickDisplayProperty(required array properties) {
+		// First pass: prefer a `string` column. Skip foreign-key-shaped names
+		// (ending in "Id") which are typically not user-facing labels.
+		for (var prop in arguments.properties) {
+			var t = lCase(prop.type ?: "string");
+			var n = prop.name ?: "";
+			if (t == "string" && right(n, 2) != "Id" && n != "id") {
+				return n;
+			}
+		}
+		// Second pass: text columns. Useful when the user only provides
+		// `body:text`-shaped scaffolds with no string column at all.
+		for (var prop in arguments.properties) {
+			if (lCase(prop.type ?: "string") == "text") {
+				return prop.name ?: "id";
+			}
+		}
+		return "id";
 	}
 
 	/**
