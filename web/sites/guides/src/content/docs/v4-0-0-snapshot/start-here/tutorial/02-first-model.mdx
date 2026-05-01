@@ -98,7 +98,11 @@ The generator already wrote a migration for you with `title` and `body` columns.
 
 <Steps>
 
-1. Open the migration file the generator created (it's the most recent one in `app/migrator/migrations/`, named `<timestamp>_create_posts_table.cfc`) and replace its contents with the version below. We're using a fixed timestamp here (`20260419120000`) so the filename in the rest of this tutorial matches what you have on disk — feel free to keep the generator's timestamp instead.
+1. Open the migration file the generator created (it's the most recent one in `app/migrator/migrations/`, named `<timestamp>_create_posts_table.cfc`). Rename it to `20260419120000_create_posts_table.cfc` and replace its contents with the version below.
+
+   <Aside type="caution" title="Why rename, not just use the generator timestamp?">
+     Later chapters add more migrations with hardcoded timestamps that *follow* `20260419120000`: chapter 5 adds comments at `20260419130000`, chapter 6 adds users at `20260419140000` and `add_user_to_posts` at `20260419150000`. Migrations apply in timestamp order, and `add_user_to_posts` references the `posts` table — so the posts migration **must** sort before all of them. Keeping the generator's current timestamp (e.g. May 2026) sneaks past chapter 5 and 6 because the dev DB applies migrations incrementally as you write them, but it bites in chapter 7 when the *test* DB runs them all from scratch in timestamp order and `add_user_to_posts` blows up against a non-existent `posts` table.
+   </Aside>
 
    ```cfm {test:compile}
    component extends="wheels.migrator.Migration" hint="Create posts table" {

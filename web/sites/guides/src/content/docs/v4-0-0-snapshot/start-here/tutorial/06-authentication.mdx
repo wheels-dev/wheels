@@ -489,11 +489,13 @@ That's the hand-rolled version. Thirty-ish lines of logic total, no hidden machi
 **curl `--data-urlencode` and `@`**: build the body with raw `--data` and pre-encode the brackets and the `@`. Lucee's form parser interprets any URL key with brackets as a nested-struct path — `user[email]=alice@example.com` arrives in your controller as `params.user.email = {"alice@example.com": ""}`, which then fails with the confusing `Can't cast Complex Object Type Struct to String` when Wheels' `normalizeEmail()` calls `LCase()` on it. The reliable shape is:
 
 ```bash title="known-working signup smoke test"
-TOKEN=$(curl -s http://localhost:8080/signup | grep -oE 'name="csrf-token" content="[^"]+"' | sed 's/.*content="\([^"]*\)"/\1/')
+TOKEN=$(curl -s http://localhost:8080/signup | grep -oE 'content="[^"]+" name="csrf-token"' | sed -E 's/.*content="([^"]+)".*/\1/')
 curl -s -X POST http://localhost:8080/signup \
   -H "X-CSRF-Token: $TOKEN" \
   --data "user%5Bemail%5D=alice%40example.com&user%5Bpassword%5D=secret123&user%5BpasswordConfirmation%5D=secret123"
 ```
+
+The regex matches `content="..." name="csrf-token"` — Wheels' `$tag` helper sorts attributes alphabetically for deterministic test output, so `content` comes before `name` even though the framework code constructs the struct in the opposite order. Earlier drafts of this chapter assumed `name`-first; if your scraped `$TOKEN` is ever empty, attribute order is the first thing to check.
 
 Browsers always %-encode `@` and emit form bodies that Lucee parses correctly, so this is curl-only.
 </Aside>
