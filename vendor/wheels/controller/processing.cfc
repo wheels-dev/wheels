@@ -61,7 +61,7 @@ component {
 
 					// Evaluate variables and append to the cache key when specified.
 					if (Len(local.appendToKey)) {
-						for (local.item in local.appendToKey) {
+						for (local.item in ListToArray(local.appendToKey)) {
 							if (IsDefined(local.item)) {
 								scopeMap = {
 									"request": request,
