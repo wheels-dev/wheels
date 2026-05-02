@@ -57,7 +57,7 @@ The `Controller` and `Model` base classes that your code extends (e.g. `componen
 
 ## Generate the Post model
 
-`wheels generate model Post title:string body:text` writes both the model CFC and a migration for you. The generator output is intentionally slim — it doesn't include the `enum` for `status` or the `publishedAt` field this tutorial uses, so you'll augment it after.
+`wheels generate model Post title:string body:text` writes both the model CFC and a migration for you. The generator output is intentionally slim relative to what this tutorial needs — it doesn't include the `enum` for `status` or the `publishedAt` field, and it ships with default `validatesPresenceOf` rules on the columns you passed in that we'll drop now and bring back in Part 4 once we've got more validation context. You'll augment it after.
 
 <Steps>
 
@@ -95,6 +95,10 @@ You'll use the `published()` scope in a minute.
 Migrations are ordered, reversible schema changes. Each one is a CFC in `app/migrator/migrations/` whose filename starts with a timestamp (`YYYYMMDDHHMMSS_description.cfc`). `wheels migrate latest` runs every pending migration in timestamp order.
 
 The generator already wrote a migration for you with `title` and `body` columns. We need to add `status` and `publishedAt` so the model and table line up.
+
+<Aside type="tip">
+  You don't have to go through `wheels generate model` to get a migration. `wheels generate migration <Name>` (alias `wheels g migration`) writes a fresh migration CFC with a current timestamp and an empty `up()`/`down()`, which is what you'd reach for in real work when adding columns or tables to an existing schema. Chapter 5 will use it.
+</Aside>
 
 <Steps>
 
