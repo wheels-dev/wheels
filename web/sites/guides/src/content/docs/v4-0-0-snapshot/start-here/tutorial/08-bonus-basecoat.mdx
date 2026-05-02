@@ -62,11 +62,11 @@ The canonical way to install a Wheels package is `wheels packages add <name>`. T
    wheels packages add wheels-basecoat
    ```
 
-   Expected output:
+   Expected output (version may differ — the registry serves the latest compatible version):
 
    ```
-   Installed wheels-basecoat@1.0.2 → /your/path/blog/vendor/wheels-basecoat
-   Run `wheels reload` to activate it.
+   Installed wheels-basecoat@<version> → /your/path/blog/vendor/wheels-basecoat
+   Run `wheels stop && wheels start` to activate it.
    ```
 
 2. Verify the install:
@@ -91,10 +91,10 @@ The canonical way to install a Wheels package is `wheels packages add <name>`. T
 
 Look at `vendor/wheels-basecoat/package.json`:
 
-```json title="vendor/wheels-basecoat/package.json"
+```json title="vendor/wheels-basecoat/package.json (version may differ)"
 {
   "name": "wheels-basecoat",
-  "version": "1.0.2",
+  "version": "3.0.0",
   "description": "Basecoat UI component helpers for Wheels...",
   "wheelsVersion": ">=4.0",
   "provides": {
@@ -118,37 +118,36 @@ The `Basecoat.cfc` file alongside the manifest is the package's entry point. Pac
   No `register-this-package` step. No `set("plugins", "...")` in `config/`. The filesystem layout *is* the activation: a directory under `vendor/` containing a valid `package.json` is the registration. Remove the directory, the package is gone. This is a deliberate departure from the Wheels 3.x `app/plugins/` model.
 </Aside>
 
-## Serve the basecoat CSS asset
+## Publish the basecoat assets
 
-basecoat ships CFML view helpers — but the actual styling is provided by `basecoat.min.css`, a separate CSS file you serve from your app. The package doesn't bundle it (CSS asset distribution is a separate concern from CFML packaging).
+The package ships its CSS+JS bundle at `vendor/wheels-basecoat/assets/basecoat/`. PackageLoader activates the CFML helpers automatically, but it doesn't expose `vendor/` at any URL — so you publish the static assets to `public/` once and the dev server takes care of the rest. This is the same copy-or-symlink pattern Rails, Django, and Phoenix use for npm-distributed frontend packages.
 
 <Steps>
 
-1. Download the latest basecoat CSS from jsdelivr (a CDN-mirrored copy of the [Basecoat UI](https://basecoatui.com/) npm package).
-
-2. Save it to `public/assets/basecoat.min.css`. Create the `assets/` directory if it doesn't exist:
+1. Copy the bundled assets into `public/`:
 
    ```bash title="your shell"
-   mkdir -p public/assets
-   curl -o public/assets/basecoat.min.css https://cdn.jsdelivr.net/npm/basecoat-css/dist/basecoat.min.css
+   cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat
    ```
 
-   :::note
-   Don't use `https://basecoatui.com/dist/basecoat.min.css` directly — that hostname serves the project's docs site, and the path returns the HTML landing page (with `Content-Type: text/html`), not the stylesheet. Use the jsdelivr (or unpkg) URL above.
-   :::
+   This is a one-shot operation. If you upgrade the package later (`wheels packages update wheels-basecoat`), re-run the copy to refresh the bundled CSS+JS.
 
-3. Confirm the file:
+2. Confirm the copy:
 
    ```bash title="your shell"
-   ls -la public/assets/basecoat.min.css
+   ls public/assets/basecoat/basecoat.min.css
    ```
 
 </Steps>
 
-`public/` is served by the dev server at the root URL, so this file becomes available at `http://localhost:8080/assets/basecoat.min.css`.
+`public/` is served by the dev server at the root URL, so the CSS is now available at `http://localhost:8080/assets/basecoat/basecoat.min.css`.
 
 <Aside type="tip">
-  In production you'd serve `basecoat.min.css` from a CDN (Cloudflare, Bunny, S3+CloudFront) instead of from your app's `public/` directory. For a tutorial, local-serve is fine.
+  In production you'd serve these assets from a CDN (Cloudflare, Bunny, S3+CloudFront) instead of from your app's `public/` directory. For a tutorial, local-serve is fine.
+</Aside>
+
+<Aside type="note">
+  Always check `vendor/wheels-basecoat/INSTALL.md` after installing — the package's own install instructions are the source of truth for whichever version you have. Future major versions may change the asset layout.
 </Aside>
 
 ## Wire basecoat into your layout
@@ -169,7 +168,7 @@ basecoat ships CFML view helpers — but the actual styling is provided by `base
    </head>
    ```
 
-2. Replace the simple.css link with `#basecoatIncludes(...)#`:
+2. Replace the simple.css link with `#basecoatIncludes()#`:
 
    ```cfm title="app/views/layout.cfm — after"
    <head>
@@ -178,16 +177,12 @@ basecoat ships CFML view helpers — but the actual styling is provided by `base
        <title>blog</title>
        <cfoutput>
            #csrfMetaTags()#
-           #basecoatIncludes(basecoatCSSPath="/assets/basecoat.min.css")#
+           #basecoatIncludes()#
        </cfoutput>
    </head>
    ```
 
-   `basecoatIncludes()` emits three things:
-
-   - `<meta name="turbo-cache-control" content="no-preview">` — prevents Turbo Drive from rendering stale previews of pages with interactive basecoat widgets.
-   - `<link rel="stylesheet" href="/assets/basecoat.min.css">` — the CSS you just downloaded.
-   - `<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js">` — Alpine.js for interactive components.
+   `basecoatIncludes()` reads bundled defaults and emits the `<link>` for the CSS you just published, plus the `<script>` tags that power basecoat's interactive components (dropdowns, dialogs, tabs) and the Turbo cache-control hint that prevents stale previews of those widgets. If you publish to a non-default path, pass `basecoatCSSPath="/your/path/basecoat.min.css"` to override.
 
 3. Reload the server (full restart isn't needed for a view-only change):
 
@@ -305,9 +300,9 @@ Three things to verify:
 
 **`No version of 'wheels-basecoat' satisfies runtime '0.0.0-dev'`** — the framework can't read its own version. Likely on a Wheels release older than `4.0.0-SNAPSHOT+1670` (the snapshot that includes the runtime-detection fix). Upgrade with `brew upgrade wheels` or `choco upgrade wheels` and re-run.
 
-**Page renders unstyled** — `basecoat.min.css` isn't being served. Check `public/assets/basecoat.min.css` exists and `curl -I http://localhost:8080/assets/basecoat.min.css` returns 200. Adjust the `basecoatCSSPath` argument to match your actual path.
+**Page renders unstyled** — the bundled CSS isn't being served. Check `public/assets/basecoat/basecoat.min.css` exists (re-run the `cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat` step if not) and `curl -I http://localhost:8080/assets/basecoat/basecoat.min.css` returns 200.
 
-**Card content is wrapped in a frame but no styling** — Alpine.js is failing to load. The `defer` attribute means Alpine runs after parse; check the browser console for a network error on the jsdelivr CDN.
+**Card content is wrapped in a frame but no styling** — basecoat's JS bundle is failing to load. Check `public/assets/basecoat/basecoat.min.js` exists and look in the browser console for a network error on `/assets/basecoat/`.
 
 ## What's next
 
