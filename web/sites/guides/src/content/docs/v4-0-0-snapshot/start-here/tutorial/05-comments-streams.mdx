@@ -96,7 +96,7 @@ On the post show page, a form at the bottom posts to a nested route, `/posts/:po
            enum(property="status", values="draft,published,archived");
            hasMany(name="comments", dependent="delete");
            validatesPresenceOf("title,body");
-           validatesLengthOf(property="title", maximum=120);
+           validatesLengthOf(property="title", maximum=120, allowBlank=true);
        }
    }
    ```
@@ -155,7 +155,7 @@ On the post show page, a form at the bottom posts to a nested route, `/posts/:po
 
 </Steps>
 
-In real work you'd generate this with `wheels g migration createCommentsTable` and get a fresh timestamp automatically. The hardcoded `20260419130000` is fine for the tutorial — just pick a value later than your posts migration so the order is stable.
+In real work you'd generate this migration with `wheels g migration createCommentsTable` (the same generator chapter 2 introduced), and the timestamp would be assigned automatically from the current time. The hardcoded `20260419130000` is fine for the tutorial — just pick a value later than your posts migration so the order is stable.
 
 ## Nested routes
 

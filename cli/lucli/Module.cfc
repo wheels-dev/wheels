@@ -5283,7 +5283,8 @@ component extends="modules.BaseModule" {
 		}
 
 		out("");
-		out("Browser testing ready. Run: wheels browser test", "green");
+		out("Browser testing ready.", "green");
+		out("Run: wheels test --filter=browser  (or: wheels browser test)", "green");
 		return "";
 	}
 

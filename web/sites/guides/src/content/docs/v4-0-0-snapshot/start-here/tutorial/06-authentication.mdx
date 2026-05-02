@@ -483,8 +483,16 @@ Then walk through the flow in the browser:
 
 1. Visit `/signup`, create an account with any email and password. You're redirected to `/posts` and logged in.
 2. Click "New post" — it works. The newly-created post has `post.userId` set from `session.userId`.
-3. Visit `/logout` (or submit a logout form) and then try `/posts/new` — you're redirected to `/login`.
+3. Submit a logout form, then try `/posts/new` — you're redirected to `/login`.
 4. Log back in. Try editing a post that belongs to a different user — the ownership check redirects you back to the index.
+
+The `/logout` route is a `DELETE`, so a plain `<a href>` won't reach it — you need a small form. Drop this anywhere in your layout (or any view) for a working "Log out" button:
+
+```cfm
+#buttonTo(text="Log out", route="logout", method="delete")#
+```
+
+`buttonTo` emits a one-button form with the CSRF token included and the right `method` set; `route="logout"` resolves to the named route from `routes.cfm`, so it stays correct if the URL pattern changes. The same shape works for any non-GET destructive action — that's how chapter 3's "Delete" buttons on the post show page work too.
 
 That's the hand-rolled version. Thirty-ish lines of logic total, no hidden machinery. Now let's see what the framework gives you for free.
 

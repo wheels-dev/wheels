@@ -17,7 +17,11 @@ Install the `wheels` CLI. Five minutes.
 - How to upgrade later
 
 <Aside type="note">
-  **Prerequisite:** Java 21 or newer. `wheels` bundles a CFML runtime (Lucee) that targets JDK 21. Install it from [Adoptium](https://adoptium.net/) if you don't already have it. On macOS: `brew install openjdk@21`.
+  **Prerequisite:** Java 21 or newer. `wheels` bundles a CFML runtime (Lucee) that targets JDK 21. Install it from [Adoptium](https://adoptium.net/) if you don't already have it, or on macOS:
+
+  ```bash title="your shell"
+  brew install openjdk@21
+  ```
 
   On macOS, `openjdk@21` is keg-only — Homebrew won't symlink it into `/opt/homebrew`. The `wheels` CLI handles this itself, but if you want to call `java` directly (or use it from an IDE, Maven, Gradle, etc.) you'll also need to set `JAVA_HOME` and add it to your `PATH`. See [Troubleshooting](#troubleshooting) below.
 </Aside>
