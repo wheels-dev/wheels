@@ -140,7 +140,7 @@ component {
 	 * Subscribes to the Channel singleton, buffers events in a synchronized
 	 * array, and streams them to the client via SSE.
 	 */
-	private void function $subscribeMemory(
+	public void function $subscribeMemory(
 		required string channel,
 		required array eventFilter,
 		required string lastEventId,
@@ -223,7 +223,7 @@ component {
 	 * Polls the DatabaseAdapter at regular intervals and streams
 	 * matching events to the client via SSE.
 	 */
-	private void function $subscribeDatabase(
+	public void function $subscribeDatabase(
 		required string channel,
 		required array eventFilter,
 		required string lastEventId,
