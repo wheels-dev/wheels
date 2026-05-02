@@ -536,6 +536,46 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		// Detect a stale `<lucliHome>/servers/<basename>/` registration before
+		// delegating to LuCLI. Without this intercept, LuCLI emits a numbered
+		// recovery prompt referencing `lucli server start --force`, but `lucli`
+		// isn't on PATH after `brew install wheels` — the user gets an
+		// unactionable error from a fresh `wheels start`. Onboarding F1/F2.
+		var force = false;
+		var passThrough = [];
+		for (var a in args) {
+			if (a == "--force") { force = true; }
+			else { arrayAppend(passThrough, a); }
+		}
+		var registry = getService("serverRegistry");
+		var serverName = registry.serverNameFor(variables.projectRoot);
+		var reg = registry.inspect(serverName, variables.projectRoot);
+
+		if (reg.alive) {
+			out("Server '" & serverName & "' is already running.", "yellow");
+			out("To restart: wheels stop && wheels start", "cyan");
+			return "";
+		}
+
+		if (reg.exists && !reg.ours && !force) {
+			out("");
+			out("Server name '" & serverName & "' is registered to a different project:", "yellow");
+			out("  registered: " & (len(reg.registeredPath) ? reg.registeredPath : "<unknown>"), "yellow");
+			out("  this dir:   " & variables.projectRoot, "yellow");
+			out("");
+			out("Options:", "bold");
+			out("  - Pass --force to replace the registration:");
+			out("      wheels start --force", "cyan");
+			out("  - Or rename your project directory so it gets a unique server name.");
+			return "";
+		}
+
+		// Stale-but-ours, or --force was passed: wipe the dead registration so
+		// LuCLI's `server start` doesn't trip its "already exists" prompt.
+		if (reg.exists) {
+			registry.clean(serverName);
+		}
+
 		out("Starting Wheels server...", "cyan");
 
 		// Stage required JDBC drivers into the Lucee Express lib/ext/ before
@@ -550,11 +590,10 @@ component extends="modules.BaseModule" {
 		// very LuCLI invocation.
 		$ensureWheelsBundles();
 
-		// Delegate to LuCLI's server start command
+		// Delegate to LuCLI's server start command. Forward only args we
+		// haven't consumed ourselves (--force is wheels-side, not LuCLI-side).
 		var cmdArgs = ["start"];
-
-		// Pass through any extra args (--port, --version, etc.)
-		cmdArgs.append(args, true);
+		cmdArgs.append(passThrough, true);
 
 		executeCommand("server", cmdArgs, variables.projectRoot);
 
@@ -595,6 +634,28 @@ component extends="modules.BaseModule" {
 				out("To list all servers:      wheels server list", "cyan");
 				return "";
 			}
+
+			// Final fallback: scan live JVMs for processes whose catalina.base
+			// points into this user's LuCLI servers tree but whose registration
+			// was wiped (`rm -rf ~/.wheels/servers/<name>` is the user's only
+			// recovery from the F1/F2 stale-server prompt; it leaves the
+			// process orphaned). Without this scan, `wheels stop` falsely
+			// claims "no server is running" while the port is still held.
+			// Onboarding F3.
+			var stranded = $findStrandedLuceeProcesses();
+			if (arrayLen(stranded)) {
+				out("");
+				out("Found Lucee processes from prior sessions (LuCLI registration is gone):", "yellow");
+				var pids = [];
+				for (var p in stranded) {
+					out("  - PID " & p.pid & " (was server '" & p.serverName & "')");
+					arrayAppend(pids, p.pid);
+				}
+				out("");
+				out("To stop them: kill " & arrayToList(pids, " "), "cyan");
+				return "";
+			}
+
 			// No registered server AND no others running. Don't fall through
 			// to LuCLI's `server stop` — it would create a phantom server
 			// registration named after the cwd basename. Onboarding finding F6.
@@ -4421,6 +4482,65 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Scan live JVMs for processes whose `-Dcatalina.base=<lucliHome>/servers/<name>/`
+	 * points into this user's LuCLI tree. Used by stop() (onboarding F3) when
+	 * neither $findServerForProject nor $listRunningWheelsServers turns up a
+	 * match — the registration may have been wiped (`rm -rf ~/.wheels/servers/foo`)
+	 * while the underlying java process is still listening on the port. Without
+	 * this fallback, `wheels stop` would falsely claim "no server is running."
+	 *
+	 * Returns an array of `{pid, serverName, registeredPath}` structs. Best-effort
+	 * — processes the JVM can't introspect (denied by the OS, missing command
+	 * line) are silently skipped.
+	 */
+	private array function $findStrandedLuceeProcesses() {
+		var result = [];
+		try {
+			var lucliHome = $resolveLucliHome();
+			if (!len(lucliHome)) return result;
+
+			// Normalize so the substring match works on Windows backslashes too.
+			var serversPrefix = lucliHome & "/servers/";
+
+			var ProcessHandle = createObject("java", "java.lang.ProcessHandle");
+			var iter = ProcessHandle.allProcesses().iterator();
+			while (iter.hasNext()) {
+				try {
+					var ph = iter.next();
+					var info = ph.info();
+					var optCmd = info.commandLine();
+					if (!optCmd.isPresent()) continue;
+					var cmd = optCmd.get();
+					// Match against both "/" and "\" forms — same -D arg, two encodings.
+					var marker = "-Dcatalina.base=" & serversPrefix;
+					var winMarker = "-Dcatalina.base=" & replace(serversPrefix, "/", "\", "all");
+					var hitPos = find(marker, cmd);
+					var prefixLen = len(marker);
+					if (!hitPos) {
+						hitPos = find(winMarker, cmd);
+						prefixLen = len(winMarker);
+					}
+					if (!hitPos) continue;
+
+					var rest = mid(cmd, hitPos + prefixLen, len(cmd));
+					// Take everything up to the next whitespace OR path separator that
+					// closes the server-name segment.
+					var stop = reFind("[\s/\\]", rest);
+					var serverName = stop > 0 ? left(rest, stop - 1) : rest;
+					if (!len(serverName)) continue;
+
+					arrayAppend(result, {
+						pid: ph.pid(),
+						serverName: serverName,
+						registeredPath: lucliHome & "/servers/" & serverName
+					});
+				} catch (any e2) {}
+			}
+		} catch (any e) {}
+		return result;
+	}
+
+	/**
 	 * Resolve the LuCLI home root. Order of resolution:
 	 *   1. $LUCLI_HOME if set (e.g. brew wrapper exports $HOME/.wheels).
 	 *   2. $HOME/.<lucli.binary.name> — LuCLI auto-roots to ~/.<binary> when
@@ -4991,6 +5111,11 @@ component extends="modules.BaseModule" {
 						helpers = getService("helpers"),
 						projectRoot = variables.projectRoot,
 						moduleRoot = variables.moduleRoot
+					);
+					break;
+				case "serverRegistry":
+					variables.services.serverRegistry = new services.ServerRegistry(
+						lucliHome = $resolveLucliHome()
 					);
 					break;
 				default:
