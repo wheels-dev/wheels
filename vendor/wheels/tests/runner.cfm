@@ -122,10 +122,15 @@
     }
 
     try {
-        // Try to create TestBox instance with coverage disabled
+        // Try to create TestBox instance with coverage disabled.
+        // Build the options struct outside the `new` expression: Adobe CF's
+        // compiler raises an ArrayStoreException on inline nested struct
+        // literals passed as named arguments to `new` (the same family of
+        // ASTcffunction issues documented in SessionStrategySpec.cfc).
+        local.testboxOptions = { coverage = { enabled = false } };
         testBox = new wheels.wheelstest.system.TestBox(
             directory=local.testDirectory,
-            options={ coverage = { enabled = false } }
+            options=local.testboxOptions
         );
     } catch (any e) {
         cfheader(statuscode="500");
