@@ -13,7 +13,9 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
-		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
+		var _adapterName = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName();
+		var _isCockroachDB = _adapterName == "CockroachDB";
+		var _isOracle = _adapterName == "Oracle";
 
 		describe("Tests that adapter", () => {
 
@@ -269,6 +271,12 @@ component extends="wheels.WheelsTest" {
 			it("renames c_o_r_e_levels -> wheels_levels and c_o_r_e_migrator_versions -> wheels_migrator_versions", () => {
 				if (_isCockroachDB) return;
 
+				// Oracle requires DEFAULT before NOT NULL in column definitions
+				// (`ORA-03076: unexpected item DEFAULT`), and uses VARCHAR2.
+				var migratorVersionsCreate = _isOracle
+					? "CREATE TABLE c_o_r_e_migrator_versions (version VARCHAR2(25), core_level NUMBER DEFAULT 1 NOT NULL)"
+					: "CREATE TABLE c_o_r_e_migrator_versions (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
+
 				// Pre-create both legacy tables so renameSystemTables has work to do.
 				queryExecute(
 					"CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))",
@@ -281,7 +289,7 @@ component extends="wheels.WheelsTest" {
 					{ datasource = application.wheels.dataSourceName }
 				);
 				queryExecute(
-					"CREATE TABLE c_o_r_e_migrator_versions (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)",
+					migratorVersionsCreate,
 					{},
 					{ datasource = application.wheels.dataSourceName }
 				);

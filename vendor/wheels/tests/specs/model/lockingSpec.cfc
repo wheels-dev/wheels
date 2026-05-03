@@ -5,10 +5,14 @@ component extends="wheels.WheelsTest" {
 		g = application.wo
 		var _adapterName = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName();
 		var _isCockroachDB = _adapterName == "CockroachDB";
-		// H2 raises "H2 does not support advisory locks." by design (the
-		// engine has no equivalent of pg_advisory_lock / GET_LOCK), so the
-		// advisory-lock tests are not applicable on H2.
-		var _skipAdvisoryLock = _isCockroachDB || _adapterName == "H2";
+		// Skip the advisory-lock specs on engines that legitimately don't
+		// support them (and the framework correctly throws):
+		//   - H2: no pg_advisory_lock / GET_LOCK equivalent
+		//   - Oracle: requires DBMS_LOCK package setup (off by default in
+		//     Oracle Free image)
+		var _skipAdvisoryLock = _isCockroachDB
+			|| _adapterName == "H2"
+			|| _adapterName == "Oracle";
 
 		describe("Tests that withAdvisoryLock", () => {
 
