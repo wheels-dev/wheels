@@ -221,29 +221,36 @@ component {
 		local.visited = {};
 		local.visited[arguments.entrypoint] = true;
 		if (StructKeyExists(local.entry, "imports") && IsArray(local.entry.imports)) {
+			// Adobe CF passes arrays by value when bound as named arguments,
+			// so the walker mutating arguments.preloads/styles wouldn't affect
+			// our local.rv. Pass the parent struct instead — struct refs are
+			// stable, and the walker appends to ctx.preloads / ctx.styles.
+			local.ctx = {preloads: local.rv.preloads, styles: local.rv.styles};
 			$viteWalkImports(
 				importKeys=local.entry.imports,
 				manifest=local.manifest,
 				visited=local.visited,
-				preloads=local.rv.preloads,
-				styles=local.rv.styles
+				ctx=local.ctx
 			);
+			local.rv.preloads = local.ctx.preloads;
+			local.rv.styles = local.ctx.styles;
 		}
 
 		return local.rv;
 	}
 
 	/**
-	 * Depth-first walks a list of chunk import keys, mutating the passed-in
-	 * preloads and styles arrays as it visits each chunk. The visited struct
-	 * prevents cycles and dedupes diamond dependencies.
+	 * Depth-first walks a list of chunk import keys, mutating the
+	 * `ctx.preloads` and `ctx.styles` arrays as it visits each chunk. The
+	 * arrays live inside a struct so Adobe CF (which passes arrays by value
+	 * across named-argument boundaries) propagates mutations to the caller.
+	 * The visited struct prevents cycles and dedupes diamond dependencies.
 	 */
 	public void function $viteWalkImports(
 		required array importKeys,
 		required struct manifest,
 		required struct visited,
-		required array preloads,
-		required array styles
+		required struct ctx
 	) {
 		for (local.key in arguments.importKeys) {
 			if (StructKeyExists(arguments.visited, local.key)) {
@@ -254,10 +261,10 @@ component {
 				continue;
 			}
 			local.chunk = arguments.manifest[local.key];
-			ArrayAppend(arguments.preloads, local.chunk.file);
+			ArrayAppend(arguments.ctx.preloads, local.chunk.file);
 			if (StructKeyExists(local.chunk, "css") && IsArray(local.chunk.css)) {
 				for (local.cssFile in local.chunk.css) {
-					ArrayAppend(arguments.styles, local.cssFile);
+					ArrayAppend(arguments.ctx.styles, local.cssFile);
 				}
 			}
 			if (StructKeyExists(local.chunk, "imports") && IsArray(local.chunk.imports)) {
@@ -265,8 +272,7 @@ component {
 					importKeys=local.chunk.imports,
 					manifest=arguments.manifest,
 					visited=arguments.visited,
-					preloads=arguments.preloads,
-					styles=arguments.styles
+					ctx=arguments.ctx
 				);
 			}
 		}

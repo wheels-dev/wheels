@@ -475,7 +475,12 @@ return local.$wheels;
 	 * @name The environment variable name to look up.
 	 * @default Value to return if the variable is not found.
 	 */
-	public any function env(required string name, any default = "") {
+	public any function env(required string name, any defaultValue = "") {
+		// Note: Adobe CF treats `default` as a reserved word in argument
+		// position (it's a switch/case keyword) and silently skips the
+		// default-value assignment, leaving `arguments.default` undefined
+		// at runtime. Use `defaultValue` to dodge the reserved-word
+		// collision and keep behavior identical across engines.
 		if (StructKeyExists(application, "env") && StructKeyExists(application.env, arguments.name)) {
 			return application.env[arguments.name];
 		}
@@ -486,7 +491,7 @@ return local.$wheels;
 		) {
 			return server.system.environment[arguments.name];
 		}
-		return arguments.default;
+		return arguments.defaultValue;
 	}
 
 	/**
