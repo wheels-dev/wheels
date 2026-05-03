@@ -472,6 +472,18 @@ component output=false extends="wheels.Global"{
 
 	/**
 	 * Internal function.
+	 *
+	 * For integer/float/boolean columns this returns the value unquoted so the
+	 * downstream WHERE-clause regex can re-extract bare numerics into
+	 * cfqueryparam placeholders. That contract is unsafe by itself — a string
+	 * like "0 OR 1=1" would land verbatim in the SQL — so we validate the value
+	 * shape here before passing it through. This closes SQL injection across
+	 * every caller (chainable QueryBuilder, $keyWhereString used by findByKey/
+	 * updateByKey/deleteByKey, dynamic finders findByX/findOneByX/findAllByX,
+	 * the uniqueness-check $buildWhereClausePart, and any future caller).
+	 *
+	 * String columns are unaffected — the adapter still wraps and escapes the
+	 * value, so classic single-quote payloads land harmlessly inside a literal.
 	 */
 	public string function $quoteValue(required string str, string sqlType = "CF_SQL_VARCHAR", string type) {
 		if (!StructKeyExists(arguments, "type")) {
@@ -480,9 +492,48 @@ component output=false extends="wheels.Global"{
 		if (!ListFindNoCase("integer,float,boolean", arguments.type) || !Len(arguments.str)) {
 			local.rv = "'#Replace(arguments.str, "'", "''", "all")#'";
 		} else {
+			$validateValueShape(arguments.str, arguments.type);
 			local.rv = arguments.str;
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Validate that a value matches the shape this adapter expects for its
+	 * declared column type. Throws Wheels.InvalidValue when the shape doesn't
+	 * match — closing the SQL-injection vector through which strings like
+	 * "0 OR 1=1" would otherwise land in the unquoted numeric/boolean path.
+	 *
+	 * Intentionally narrow: only fires for integer/float/boolean columns,
+	 * which is exactly the set of types $quoteValue passes through unquoted.
+	 * String columns are wrapped + escaped above and don't need this check.
+	 */
+	public void function $validateValueShape(required string str, required string type) {
+		switch (arguments.type) {
+			case "integer":
+				if (!ReFind("^-?[0-9]+$", arguments.str)) {
+					$throwInvalidValue(arguments.str, "integer");
+				}
+				break;
+			case "float":
+				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.str)) {
+					$throwInvalidValue(arguments.str, "float");
+				}
+				break;
+			case "boolean":
+				if (!ListFindNoCase("0,1,true,false,yes,no", arguments.str)) {
+					$throwInvalidValue(arguments.str, "boolean");
+				}
+				break;
+		}
+	}
+
+	public void function $throwInvalidValue(required string str, required string expectedType) {
+		Throw(
+			type = "Wheels.InvalidValue",
+			message = "The value `#EncodeForHTML(arguments.str)#` is not a valid #arguments.expectedType#.",
+			extendedInfo = "Values bound to #arguments.expectedType# columns must be valid #arguments.expectedType# literals so they can be safely interpolated into the WHERE clause. This check protects every Wheels query path against SQL injection through typed-numeric/boolean payloads."
+		);
 	}
 
 	/**
