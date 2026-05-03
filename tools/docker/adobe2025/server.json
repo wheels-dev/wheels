@@ -19,7 +19,9 @@
 			"serverHomeDirectory":".engine/adobe2025"
 	},
 	"jvm":{
-        "javaVersion":"openjdk21_jdk"
+        "javaVersion":"openjdk21_jdk",
+        "heapSize":2048,
+        "minHeapSize":512
     },
 	"runwar":{
        		"version":"^6.0.0"
