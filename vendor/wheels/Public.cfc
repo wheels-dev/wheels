@@ -97,38 +97,38 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 	function info() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/info.cfm";
 		return "";
 	}
 	function routes() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/routes.cfm";
 		return "";
 	}
 	function routetester(verb, path) {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/routetester.cfm";
 		return "";
 	}
 	function routetesterprocess(verb, path) {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "views/routetesterprocess.cfm";
 		return "";
 	}
 	function api() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/api.cfm";
 		return "";
 	}
 	function runner(){
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/runner.cfm";
 		return "";
 	}
 
 	function testbox(){
-		$blockInProduction();
+		this.$blockInProduction();
 		// Prefer the project's own runner if it exists (advanced users who
 		// scaffolded a custom tests/runner.cfm). Otherwise fall back to a
 		// built-in app-test runner that scans tests.specs/ via TestBox and
@@ -144,7 +144,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	public function tests_testbox(){
-		$blockInProduction();
+		this.$blockInProduction();
 		// Delegate to RocketUnit if testFramework setting says so
 		if (
 			structKeyExists(application, "wheels")
@@ -179,78 +179,78 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		abort;
 	}
 	public function clitests() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/clitests.cfm";
 		abort;
 	}
 
 	function packages() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/packages.cfm";
 		return "";
 	}
 	function tests() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/tests.cfm";
 		return "";
 	}
 	function migrator() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/migrator.cfm";
 		return "";
 	}
 	function migratortemplates() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/templating.cfm";
 		return "";
 	}
 	function migratortemplatescreate() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/migrator/templating.cfm";
 		return "";
 	}
 	function migratorcommand() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/migrator/command.cfm";
 		return "";
 	}
 	function migratorsql() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/migrator/sql.cfm";
 		return "";
 	}
 	function consoleeval() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/consoleeval.cfm";
 		return "";
 	}
 	function cli() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/cli.cfm";
 		return "";
 	}
 	function packagelist() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/packagelist.cfm";
 		return "";
 	}
 	function packageentry() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/packageentry.cfm";
 		return "";
 	}
 	function plugins() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/plugins.cfm";
 		return "";
 	}
 	function pluginentry() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/pluginentry.cfm";
 		return "";
 	}
 	function build() {
-		$blockInProduction();
+		this.$blockInProduction();
 		setting requestTimeout=10000 showDebugOutput=false;
 		zipPath = $buildReleaseZip();
 		$header(name = "Content-disposition", value = "inline; filename=#GetFileFromPath(zipPath)#");
@@ -279,7 +279,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			view=tests&type=[PLUGIN]
 		*/
 	function wheels() {
-		$blockInProduction();
+		this.$blockInProduction();
 		local.action = StructKeyExists(request.wheels.params, "action") ? request.wheels.params.action : "";
 		local.view = StructKeyExists(request.wheels.params, "view") ? request.wheels.params.view : "";
 		local.type = StructKeyExists(request.wheels.params, "type") ? request.wheels.params.type : "";
@@ -309,25 +309,25 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 	
 	function legacy() {
-		$blockInProduction();
+		this.$blockInProduction();
 		// Handle legacy ?controller=wheels&action=wheels&view=xxx URLs
 		return wheels();
 	}
 
 	function guides() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/guides.cfm";
 		return "";
 	}
 
 	function ai() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/ai.cfm";
 		return "";
 	}
 
 	function guideImage() {
-		$blockInProduction();
+		this.$blockInProduction();
 		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
 
 		file = getFileFromPath(file);
@@ -370,7 +370,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	function mcp() {
-		$blockInProduction();
+		this.$blockInProduction();
 		include "/wheels/public/views/mcp.cfm";
 		return "";
 	}
