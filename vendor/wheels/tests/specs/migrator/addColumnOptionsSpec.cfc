@@ -75,9 +75,20 @@ component extends="wheels.WheelsTest" {
 				expect(sql).toInclude("DEFAULT NULL");
 			});
 
-			it("boolean with default=true emits DEFAULT 1 (unchanged behavior)", () => {
+			it("boolean with default=true emits a truthy DEFAULT (unchanged behavior)", () => {
+				// Adapter-specific: PostgreSQL/CockroachDB emit DEFAULT true (the
+				// engine rejects integer literals on BOOLEAN columns); other
+				// engines emit DEFAULT 1 from the Abstract adapter. Either is
+				// the documented "unchanged after F17" behavior — assert on the
+				// DEFAULT keyword and a truthy literal rather than hardcoding.
 				var sql = buildOptions(type = "boolean", default = true);
-				expect(sql).toInclude("DEFAULT 1");
+				expect(sql).toInclude("DEFAULT");
+				var emitsBoolean = ListFindNoCase("PostgreSQL,CockroachDB", variables.adapter.adapterName());
+				if (emitsBoolean) {
+					expect(sql).toInclude("DEFAULT true");
+				} else {
+					expect(sql).toInclude("DEFAULT 1");
+				}
 			});
 		});
 	}

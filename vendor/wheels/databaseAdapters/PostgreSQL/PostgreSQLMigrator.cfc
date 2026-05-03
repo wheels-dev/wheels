@@ -53,10 +53,11 @@ component extends="wheels.databaseAdapters.Abstract" {
 				) {
 					arguments.sql = arguments.sql & " DEFAULT NULL";
 				} else if (arguments.options.type == 'boolean') {
-					// Use 1/0 to match the Abstract adapter — PostgreSQL accepts both
-					// `1`/`0` and `true`/`false` for BOOLEAN defaults, and aligning
-					// keeps cross-adapter migrations consistent.
-					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, 1, 0)#";
+					// PostgreSQL's BOOLEAN type rejects integer literals as DEFAULT
+					// (`column "x" is of type boolean but default expression is of
+					// type integer`), so emit native true/false. CockroachDB
+					// inherits this adapter and behaves the same.
+					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, true, false)#";
 				} else if (
 					arguments.options.default eq ""
 					&& ListFindNoCase("string,text,char", arguments.options.type)
