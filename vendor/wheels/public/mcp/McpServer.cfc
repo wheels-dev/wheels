@@ -1112,7 +1112,9 @@ Provide migration code following Wheels conventions."
 			local.fullTargetDir = replace(local.fullTargetDir, "//", "/", "all");
 
 			if (!directoryExists(local.fullTargetDir)) {
-				directoryCreate(local.fullTargetDir, true);
+				// Use cfdirectory tag form so Adobe CF's compile-time
+				// validator doesn't reject the 2-arg directoryCreate().
+				cfdirectory(action="create", directory=local.fullTargetDir, createPath=true);
 			}
 
 			// Generate test file content
