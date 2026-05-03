@@ -213,22 +213,28 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Acquire a SQL Server application lock using sp_getapplock.
-	 * The lock is scoped to the current session.
+	 * The lock is scoped to the current session. `@LockOwner = 'Session'` is
+	 * required so the call works outside of an explicit user transaction —
+	 * without it SQL Server defaults to `Transaction` ownership and raises
+	 * "The statement or function must be executed in the context of a user
+	 * transaction."
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
 		queryExecute(
-			"EXEC sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockTimeout = ?",
+			"EXEC sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockTimeout = ?, @LockOwner = 'Session'",
 			[arguments.name, arguments.timeout * 1000],
 			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);
 	}
 
 	/**
-	 * Release a SQL Server application lock.
+	 * Release a SQL Server application lock. Must match the owner used in
+	 * $acquireAdvisoryLock (`Session`), otherwise SQL Server treats it as a
+	 * different lock and raises an error.
 	 */
 	public void function $releaseAdvisoryLock(required string name) {
 		queryExecute(
-			"EXEC sp_releaseapplock @Resource = ?",
+			"EXEC sp_releaseapplock @Resource = ?, @LockOwner = 'Session'",
 			[arguments.name],
 			{datasource: variables.dataSource, username: variables.username, password: variables.password}
 		);

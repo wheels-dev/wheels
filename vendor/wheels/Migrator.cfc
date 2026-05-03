@@ -465,9 +465,15 @@ component output="false" extends="wheels.Global"{
 				local.tableName = application[local.appKey].migratorTableName;
 				// FK constraint name follows the levels-table prefix so a
 				// fresh install gets `fk_wheels_level` and a legacy install
-				// keeps `fk_core_level`. Constraint names are scoped to
-				// their tables, so this only matters for new bootstraps.
-				local.fkName = (local.levelsTable == "c_o_r_e_levels") ? "fk_core_level" : "fk_wheels_level";
+				// keeps `fk_core_level`. We append a short hash of the
+				// migrator table name so multiple migrator tables can coexist
+				// in the same schema (MySQL/H2/SQLServer all enforce FK names
+				// schema-wide, so the bare `fk_wheels_level` would collide
+				// when tests or admins point a non-default migratorTableName
+				// at the same database). Suffix is 6 hex chars → fits Oracle's
+				// 30-char identifier limit even with the longer base prefix.
+				local.fkBase = (local.levelsTable == "c_o_r_e_levels") ? "fk_core_level" : "fk_wheels_level";
+				local.fkName = local.fkBase & "_" & Left(LCase(Hash(local.tableName, "MD5", "UTF-8")), 6);
 
 				// SQLite: skip rename / ALTER, create table with constraint in one query
 				if (FindNoCase("SQLite", local.dbType)) {

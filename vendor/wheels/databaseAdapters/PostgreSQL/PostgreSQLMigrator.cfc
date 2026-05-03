@@ -53,9 +53,20 @@ component extends="wheels.databaseAdapters.Abstract" {
 				) {
 					arguments.sql = arguments.sql & " DEFAULT NULL";
 				} else if (arguments.options.type == 'boolean') {
-					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, true, false)#";
-				} else if (arguments.options.type == 'string' && arguments.options.default eq "") {
-					arguments.sql = arguments.sql & "DEFAULT ''";
+					// Use 1/0 to match the Abstract adapter — PostgreSQL accepts both
+					// `1`/`0` and `true`/`false` for BOOLEAN defaults, and aligning
+					// keeps cross-adapter migrations consistent.
+					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, 1, 0)#";
+				} else if (
+					arguments.options.default eq ""
+					&& ListFindNoCase("string,text,char", arguments.options.type)
+				) {
+					// Symmetric handling for all string-like types: `default=""` means
+					// "no default clause" (not `DEFAULT ''`). Mirrors fresh-VM journal
+					// F17 fix in Abstract.cfc — without this, PostgreSQL/CockroachDB
+					// would still emit `DEFAULT ''` and break presence-validation skip
+					// consistency.
+					arguments.sql = arguments.sql;
 				} else {
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
 				}

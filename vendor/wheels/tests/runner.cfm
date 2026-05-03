@@ -1,5 +1,11 @@
 ﻿<cfsetting requestTimeOut="1800">
 <cfscript>
+    // Flag this request as a test harness run so framework internals (e.g. flash
+    // cookie writes) can short-circuit operations that are unsafe after the
+    // response buffer auto-commits mid-suite. Mirrors what Test.cfc::$wheelsRunner
+    // does for the legacy RocketUnit path.
+    request.$wheelsTestRun = true;
+
     // Define helper functions as variables-scoped closures to avoid Adobe CF's
     // DuplicateFunctionDefinitionException (this file can be included from multiple
     // CFC methods via different include paths)

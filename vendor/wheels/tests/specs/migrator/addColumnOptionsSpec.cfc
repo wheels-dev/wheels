@@ -59,6 +59,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("text with a real default (non-empty) still emits DEFAULT", () => {
+				// MySQL pre-8.0.13 doesn't allow DEFAULT on TEXT columns, so the
+				// MySQL adapter intentionally drops DEFAULT for text via
+				// optionsIncludeDefault. Skip the assertion in that case.
+				if (variables.adapter.adapterName() == "MySQL") {
+					return;
+				}
 				var sql = buildOptions(type = "text", default = "long body");
 				expect(sql).toInclude("DEFAULT");
 				expect(sql).toInclude("'long body'");
