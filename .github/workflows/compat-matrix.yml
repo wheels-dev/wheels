@@ -497,8 +497,10 @@ jobs:
           echo "=== Docker Container Status ==="
           docker ps -a
 
-          echo -e "\n=== CF Engine Logs ==="
-          docker logs $(docker ps -aq -f "name=${{ matrix.cfengine }}") 2>&1 | tail -100 || echo "Could not get logs"
+          echo -e "\n=== CF Engine Logs (head, for actual error message) ==="
+          docker logs $(docker ps -aq -f "name=${{ matrix.cfengine }}") 2>&1 | grep -E "ERROR|Exception|FATAL|Caused by|java\.lang\." | head -100 || echo "No error patterns found"
+          echo -e "\n=== CF Engine Logs (tail) ==="
+          docker logs $(docker ps -aq -f "name=${{ matrix.cfengine }}") 2>&1 | tail -200 || echo "Could not get logs"
 
           echo -e "\n=== Database Container Logs ==="
           for container in mysql postgres sqlserver cockroachdb oracle; do
