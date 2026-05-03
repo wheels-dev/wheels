@@ -262,12 +262,12 @@ component extends="wheels.WheelsTest" {
                 ?: expandPath("/tests/_output/browser");
 
             if (!directoryExists(artifactDir)) {
-                // Adobe CF's compile-time validator rejects positional
-                // arg #2 to directoryCreate() ("function takes 1 parameter"),
-                // even though both Adobe and Lucee support a `createPath`
-                // arg at runtime. Use the cfdirectory tag form which has
-                // identical semantics on every engine.
-                cfdirectory(action="create", directory=artifactDir, createPath=true);
+                // Use the 3-arg `directoryCreate(path, ignoreExists,
+                // createPath)` form so Adobe CF's compile-time validator
+                // (which insists the function takes 1 parameter, then 3,
+                // never 2) accepts it. Lucee/BoxLang also accept this
+                // signature.
+                directoryCreate(artifactDir, false, true);
             }
 
             var rawName = arguments.spec.name ?: "unknown_spec";
