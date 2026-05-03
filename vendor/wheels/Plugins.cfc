@@ -662,7 +662,18 @@ component output="false" extends="wheels.Global"{
 		if (!StructKeyExists(arguments.plugin, "onPluginLoad") || !IsCustomFunction(arguments.plugin.onPluginLoad)) {
 			return;
 		}
-		local.loadContext = Duplicate(application);
+		// Shallow-copy the application scope into the context struct rather
+		// than `Duplicate(application)`. Adobe CF 2025's deep-duplicate
+		// recurses through every object reachable from `application` —
+		// including the wheelsdi/injector graph, package loader caches, the
+		// engine adapter's compiled artifacts, and any custom application
+		// state — which blows the JVM heap (`java.lang.OutOfMemoryError:
+		// Java heap space` at ObjectDuplicator._duplicate). The plugin's
+		// onPluginLoad contract only needs to read app state and write
+		// scalar / struct entries back through the context, so a shallow
+		// copy is sufficient and ~100× cheaper. Lucee/Adobe 2018-2023
+		// behave identically with the shallow copy.
+		local.loadContext = StructCopy(application);
 		$installPluginLoadAPI(arguments.pluginKey, local.loadContext);
 		arguments.plugin.onPluginLoad(local.loadContext);
 		// Sync non-function keys back to application scope. Closures injected
