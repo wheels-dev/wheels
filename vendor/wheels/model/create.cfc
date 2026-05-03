@@ -263,7 +263,7 @@ component {
 
 				while (true) {
 					local.exists = this.findOne(
-						where = "#local.primaryKey# = '#local.newUUID#'"
+						where = "#local.key# = '#local.newUUID#'"
 					);
 
 					if (!local.exists) {
