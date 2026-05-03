@@ -475,6 +475,13 @@ component output="false" {
 
 	/**
 	 * Quote a value using the model's adapter for SQL injection safety.
+	 *
+	 * For integer/float/boolean columns the adapter's $quoteValue passes the value
+	 * through unquoted (the downstream WHERE-clause regex re-extracts bare numerics
+	 * into cfqueryparam). That contract assumes the caller has already constrained
+	 * the value to a numeric/boolean shape — so we enforce that here at the only
+	 * untrusted entry point. String columns are wrapped and escaped by the adapter,
+	 * so they don't need this check.
 	 */
 	private string function $quoteValue(required string property, required any value) {
 		local.type = "string";
@@ -482,7 +489,47 @@ component output="false" {
 		if (StructKeyExists(local.classData.properties, arguments.property)) {
 			local.type = local.classData.properties[arguments.property].validationtype;
 		}
-		return local.classData.adapter.$quoteValue(str = ToString(arguments.value), type = local.type);
+		local.strValue = ToString(arguments.value);
+		$validateValueShape(arguments.property, local.strValue, local.type);
+		return local.classData.adapter.$quoteValue(str = local.strValue, type = local.type);
+	}
+
+	/**
+	 * Validate that a value matches the shape the adapter expects for its declared
+	 * column type. Throws Wheels.InvalidValue when the shape doesn't match — closing
+	 * the SQL-injection vector through which strings like "0 OR 1=1" would otherwise
+	 * land in the unquoted numeric/boolean path of the adapter.
+	 */
+	private void function $validateValueShape(required string property, required string value, required string type) {
+		// Empty values fall through to the adapter's empty-string quoting branch.
+		if (!Len(arguments.value)) {
+			return;
+		}
+		switch (arguments.type) {
+			case "integer":
+				if (!ReFind("^-?[0-9]+$", arguments.value)) {
+					$throwInvalidValue(arguments.property, arguments.value, "integer");
+				}
+				break;
+			case "float":
+				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.value)) {
+					$throwInvalidValue(arguments.property, arguments.value, "float");
+				}
+				break;
+			case "boolean":
+				if (!ListFindNoCase("0,1,true,false,yes,no", arguments.value)) {
+					$throwInvalidValue(arguments.property, arguments.value, "boolean");
+				}
+				break;
+		}
+	}
+
+	private void function $throwInvalidValue(required string property, required string value, required string expectedType) {
+		Throw(
+			type = "Wheels.InvalidValue",
+			message = "The value `#EncodeForHTML(arguments.value)#` for property `#EncodeForHTML(arguments.property)#` is not a valid #arguments.expectedType#.",
+			extendedInfo = "Values bound to #arguments.expectedType# columns must be valid #arguments.expectedType# literals so they can be safely interpolated into the WHERE clause. This check protects the chainable query builder against SQL injection through typed-numeric/boolean payloads."
+		);
 	}
 
 	/**
