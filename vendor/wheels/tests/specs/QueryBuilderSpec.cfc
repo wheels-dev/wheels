@@ -265,6 +265,150 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("value validation for typed columns rejects SQL injection", function() {
+
+				// The post model has integer columns (id, authorid, views) and a float column
+				// (averagerating). The adapter's $quoteValue passes integer/float/boolean values
+				// through unquoted, so without value-shape validation the QueryBuilder leaks
+				// injected SQL fragments into the WHERE clause. These tests pin down the fix.
+
+				it("rejects tautology injection on integer column via where(prop, op, val)", function() {
+					expect(function() {
+						qb.where("views", ">", "0 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects UNION SELECT injection on integer column", function() {
+					expect(function() {
+						qb.where("views", "=", "1 UNION SELECT password FROM c_o_r_e_users");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects comment-truncation on integer column", function() {
+					expect(function() {
+						qb.where("views", "=", "1 --");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects stacked-statement injection on integer column", function() {
+					expect(function() {
+						qb.where("views", "=", "1; DROP TABLE c_o_r_e_posts");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection on float column", function() {
+					expect(function() {
+						qb.where("averagerating", ">", "3.14 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection in whereBetween low bound", function() {
+					expect(function() {
+						qb.whereBetween(property = "views", low = "0 OR 1=1", high = 10);
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection in whereBetween high bound", function() {
+					expect(function() {
+						qb.whereBetween(property = "views", low = 0, high = "10 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection in whereIn list element", function() {
+					expect(function() {
+						qb.whereIn(property = "views", values = "1,2,3 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection in whereIn array element", function() {
+					expect(function() {
+						qb.whereIn(property = "views", values = [1, 2, "3 OR 1=1"]);
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection in whereNotIn list element", function() {
+					expect(function() {
+						qb.whereNotIn(property = "views", values = "1,2,3 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection via two-argument where()", function() {
+					expect(function() {
+						qb.where("views", "0 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection via three-argument orWhere()", function() {
+					expect(function() {
+						qb.orWhere("views", ">", "0 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("rejects injection via two-argument orWhere()", function() {
+					expect(function() {
+						qb.orWhere("views", "0 OR 1=1");
+					}).toThrow("Wheels.InvalidValue");
+				});
+
+				it("accepts plain integer values", function() {
+					expect(function() {
+						qb.where("views", ">", 18);
+					}).notToThrow();
+				});
+
+				it("accepts integer-shaped strings", function() {
+					expect(function() {
+						qb.where("views", "=", "42");
+					}).notToThrow();
+				});
+
+				it("accepts negative integer values", function() {
+					expect(function() {
+						qb.where("views", ">=", "-1");
+					}).notToThrow();
+				});
+
+				it("accepts plain float values", function() {
+					expect(function() {
+						qb.where("averagerating", ">", 3.14);
+					}).notToThrow();
+				});
+
+				it("accepts float-shaped strings", function() {
+					expect(function() {
+						qb.where("averagerating", ">", "3.14");
+					}).notToThrow();
+				});
+
+				it("accepts negative float values", function() {
+					expect(function() {
+						qb.where("averagerating", ">", "-2.5");
+					}).notToThrow();
+				});
+
+				it("accepts integer values in whereBetween", function() {
+					expect(function() {
+						qb.whereBetween(property = "views", low = 1, high = 10);
+					}).notToThrow();
+				});
+
+				it("accepts integer values in whereIn", function() {
+					expect(function() {
+						qb.whereIn(property = "views", values = "1,2,3");
+					}).notToThrow();
+				});
+
+				it("does not validate string columns (adapter quotes them safely)", function() {
+					// String columns get quoted with single-quote escaping by the adapter,
+					// so classic value-injection payloads are rendered harmless without
+					// needing a regex check at the builder layer.
+					expect(function() {
+						qb.where("title", "=", "anything' OR '1'='1");
+					}).notToThrow();
+				});
+
+			});
+
 		});
 
 	}
