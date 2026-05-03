@@ -1112,10 +1112,10 @@ Provide migration code following Wheels conventions."
 			local.fullTargetDir = replace(local.fullTargetDir, "//", "/", "all");
 
 			if (!directoryExists(local.fullTargetDir)) {
-				// 3-arg `directoryCreate(path, ignoreExists, createPath)` is
-				// accepted by Adobe CF's compile-time validator; the 2-arg
-				// form is rejected with "function takes 1 parameter".
-				directoryCreate(local.fullTargetDir, false, true);
+				// Adobe CF 2023's strict validator only accepts 1-arg
+				// directoryCreate(); use Java's File.mkdirs() instead so
+				// missing parent directories are created on every engine.
+				createObject("java", "java.io.File").init(local.fullTargetDir).mkdirs();
 			}
 
 			// Generate test file content

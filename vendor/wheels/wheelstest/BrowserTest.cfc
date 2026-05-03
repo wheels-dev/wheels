@@ -262,12 +262,13 @@ component extends="wheels.WheelsTest" {
                 ?: expandPath("/tests/_output/browser");
 
             if (!directoryExists(artifactDir)) {
-                // Use the 3-arg `directoryCreate(path, ignoreExists,
-                // createPath)` form so Adobe CF's compile-time validator
-                // (which insists the function takes 1 parameter, then 3,
-                // never 2) accepts it. Lucee/BoxLang also accept this
-                // signature.
-                directoryCreate(artifactDir, false, true);
+                // Adobe CF 2023's compile-time validator hard-codes
+                // directoryCreate as 1-arg only and rejects both the 2- and
+                // 3-arg forms that Lucee/Adobe-2025/BoxLang accept; the
+                // cfdirectory tag's `createPath` attribute is also
+                // Adobe-2025+ only. Use Java's File.mkdirs() which is
+                // identical across every engine and creates the full path.
+                createObject("java", "java.io.File").init(artifactDir).mkdirs();
             }
 
             var rawName = arguments.spec.name ?: "unknown_spec";
