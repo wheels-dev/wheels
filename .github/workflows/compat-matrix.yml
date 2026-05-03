@@ -315,8 +315,26 @@ jobs:
               fi
 
               if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
-                echo "Transient error (HTTP ${HTTP_CODE}), waiting 15 seconds before retry..."
-                sleep 15
+                echo "Transient error (HTTP ${HTTP_CODE}), restarting CF engine + warming up before retry..."
+                # Restart the CF engine before retry — Adobe 2025 + Oracle in
+                # particular accumulates non-recoverable state (cursors / cached
+                # statements / heap pressure) after a failed test run, so
+                # subsequent retries against the same engine instance hang
+                # rather than producing a clean retry. Restart gives each retry
+                # a fresh engine.
+                docker restart "wheels-${{ matrix.cfengine }}-1" >/dev/null 2>&1 || true
+                # Wait for the engine port to come back up before retrying.
+                ENGINE_WAIT=0
+                while [ "$ENGINE_WAIT" -lt 30 ]; do
+                  ENGINE_WAIT=$((ENGINE_WAIT + 1))
+                  if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -qE "200|404|302"; then
+                    break
+                  fi
+                  sleep 2
+                done
+                # Warm up the framework after restart.
+                curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
+                sleep 5
               fi
             done
 
