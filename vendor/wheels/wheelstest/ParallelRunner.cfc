@@ -270,12 +270,17 @@ component {
 					for (var bs in d.bundleStats) {
 						arrayAppend(aggregated.bundleStats, bs);
 
-						// Collect failures from bundle suiteStats
+						// Collect failures from bundle suiteStats. Pass the
+						// `aggregated` struct itself rather than the bare
+						// .failures array — Adobe CF copies arrays by value
+						// when bound as named arguments, so the recursion
+						// must mutate through a stable struct reference to
+						// be visible here.
 						if (structKeyExists(bs, "suiteStats") && isArray(bs.suiteStats)) {
 							$collectFailures(
 								suiteStats = bs.suiteStats,
 								bundleName = structKeyExists(bs, "name") ? bs.name : "unknown",
-								failures = aggregated.failures
+								ctx = aggregated
 							);
 						}
 					}
@@ -348,19 +353,22 @@ component {
 	}
 
 	/**
-	 * Recursively collect failure/error specs from suiteStats.
+	 * Recursively collect failure/error specs from suiteStats. Mutates
+	 * `arguments.ctx.failures` in place — `ctx` is a struct rather than
+	 * an array because Adobe CF copies arrays by value across named-arg
+	 * boundaries, which would silently drop appends on the recursion.
 	 */
 	private void function $collectFailures(
 		required array suiteStats,
 		required string bundleName,
-		required array failures
+		required struct ctx
 	) {
 		for (var suite in arguments.suiteStats) {
 			if (structKeyExists(suite, "specStats") && isArray(suite.specStats)) {
 				for (var spec in suite.specStats) {
 					var status = structKeyExists(spec, "status") ? spec.status : "";
 					if (status == "Failed" || status == "Error") {
-						arrayAppend(arguments.failures, {
+						arrayAppend(arguments.ctx.failures, {
 							bundle = arguments.bundleName,
 							spec = structKeyExists(spec, "name") ? spec.name : "unknown",
 							status = status,
@@ -374,7 +382,7 @@ component {
 				$collectFailures(
 					suiteStats = suite.suiteStats,
 					bundleName = arguments.bundleName,
-					failures = arguments.failures
+					ctx = arguments.ctx
 				);
 			}
 		}

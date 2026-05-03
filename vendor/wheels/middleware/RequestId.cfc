@@ -10,14 +10,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	public string function handle(required struct request, required any next) {
 		// Generate a unique request ID.
 		local.requestId = CreateUUID();
-		// Adobe CF doesn't auto-vivify the parent struct on nested
-		// assignment; ensure `request.wheels` exists before writing so
-		// the middleware works outside the normal Wheels dispatch context
-		// (e.g. in pipeline-only test harnesses).
-		if (!StructKeyExists(request, "wheels")) {
-			request.wheels = {};
+		// The middleware contract: the passed-in `request` struct carries
+		// per-request context. Use `arguments.request` rather than bare
+		// `request` so Adobe (which shadows the request SCOPE with the
+		// function parameter of the same name) writes to the same struct
+		// that Lucee/BoxLang see.
+		if (!StructKeyExists(arguments.request, "wheels")) {
+			arguments.request.wheels = {};
 		}
-		request.wheels.requestId = local.requestId;
+		arguments.request.wheels.requestId = local.requestId;
+		// Also mirror to the CFML `request` scope so legacy callers
+		// reading `request.wheels.requestId` outside the middleware
+		// continue to work. Use `cfset` via tag form so the scope lookup
+		// is unambiguous on every engine.
+		$writeRequestScopeRequestId(local.requestId);
 
 		// Call the next middleware / controller dispatch.
 		local.response = arguments.next(arguments.request);
@@ -30,6 +36,19 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		return local.response;
+	}
+
+	/**
+	 * Helper: write the requestId to the `request` SCOPE. Pulled into a
+	 * separate function so bare `request` resolves to the scope (no
+	 * parameter named `request` shadows it here), making the assignment
+	 * stable on Adobe / Lucee / BoxLang.
+	 */
+	private void function $writeRequestScopeRequestId(required string requestId) {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		request.wheels.requestId = arguments.requestId;
 	}
 
 }

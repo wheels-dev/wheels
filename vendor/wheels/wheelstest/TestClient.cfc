@@ -502,9 +502,14 @@ component {
 				cfhttpparam(type = "cookie", name = cName, value = variables.cookies[cName]);
 			}
 
-			// Add body for POST/PUT/PATCH
-			if (ListFindNoCase("POST,PUT,PATCH", arguments.method) && !StructIsEmpty(arguments.body)) {
-				if (variables.sendAsJson) {
+			// Add body for POST/PUT/PATCH. Adobe CF requires at least one
+			// cfhttpparam of type "body" or "formfield" for POST/PUT/PATCH
+			// (even an empty body), so always emit a body param on those
+			// methods — Lucee/BoxLang don't mind the no-op empty body.
+			if (ListFindNoCase("POST,PUT,PATCH", arguments.method)) {
+				if (StructIsEmpty(arguments.body)) {
+					cfhttpparam(type = "body", value = "");
+				} else if (variables.sendAsJson) {
 					cfhttpparam(type = "body", value = SerializeJSON(arguments.body));
 				} else {
 					for (var fName in arguments.body) {
