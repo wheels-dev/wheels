@@ -555,60 +555,68 @@ bash tools/test-local.sh dispatch     # vendor/wheels/tests/specs/dispatch/
 bash tools/test-local.sh migrator     # vendor/wheels/tests/specs/migrator/
 ```
 
-## Running Tests Locally (Docker — Legacy)
+## Running Tests Locally (Docker matrix)
 
-Docker is still supported for cross-engine testing (Adobe CF, multiple Lucee versions, multiple databases). For day-to-day development, use the LuCLI method above.
+Docker is the authoritative way to reproduce CI's `compat-matrix.yml` workflow
+(every engine × every database) before pushing. Source is bind-mounted via
+[compose.yml](compose.yml) at `./:/wheels-test-suite`, so edit-reload-test
+cycles don't require image rebuilds — only the Wheels application reloads
+between iterations.
 
-### Minimum: test both Lucee AND Adobe before pushing
-Lucee and Adobe CF have different runtime behaviors (struct member functions,
-application scope, closure scoping). Always test at least **two engines**:
+### `tools/test-matrix.sh` — local mirror of `compat-matrix.yml`
+
 ```bash
-cd /path/to/wheels/rig    # must be in the repo root with compose.yml
-
-# Start both engines (SQLite is built-in on all engines, no external DB needed)
-docker compose up -d lucee6 adobe2025
-
-# Wait ~60s for startup, then run both:
-curl -s -o /tmp/lucee6-results.json "http://localhost:60006/wheels/core/tests?db=sqlite&format=json"
-curl -s -o /tmp/adobe2025-results.json "http://localhost:62025/wheels/core/tests?db=sqlite&format=json"
-
-# Check results (HTTP 200=pass, 417=failures)
-for f in /tmp/lucee6-results.json /tmp/adobe2025-results.json; do
-  python3 -c "
-import json
-d = json.load(open('$f'))
-engine = '$f'.split('/')[-1].replace('-results.json','')
-print(f'{engine}: {d[\"totalPass\"]} pass, {d[\"totalFail\"]} fail, {d[\"totalError\"]} error')
-for b in d.get('bundleStats',[]):
-  for s in b.get('suiteStats',[]):
-    for sp in s.get('specStats',[]):
-      if sp.get('status') in ('Failed','Error'):
-        print(f'  {sp[\"status\"]}: {sp[\"name\"]}: {sp.get(\"failMessage\",\"\")[:120]}')
-"
-done
+tools/test-matrix.sh                       # Lucee 7 + SQLite (happy path, fastest)
+tools/test-matrix.sh lucee7 mysql          # Lucee 7 + MySQL
+tools/test-matrix.sh lucee7 sqlite,mysql   # Multiple DBs against one engine
+tools/test-matrix.sh lucee6,lucee7 sqlite  # Multiple engines against one DB
+tools/test-matrix.sh --all                 # Full matrix (every engine × every DB)
+tools/test-matrix.sh --rebuild lucee7      # Force `docker compose build` (image cache stale)
+tools/test-matrix.sh --down                # Tear everything down
 ```
 
-### Engine ports
+Mirrors CI exactly: engine + DB containers come up under
+`COMPOSE_PROJECT_NAME=wheels` (so containers are named `wheels-<service>-1`,
+matching every assertion in `compat-matrix.yml`); engine restarts between DB
+runs to clear cached model metadata; warmup curl before each test run; same
+test URL (`/wheels/core/tests?db=<db>&format=json`); same JSON parsing.
+
+Default behavior: containers stay running between invocations (fast iteration
+for repeated runs against the same engine/DB). Edit framework code → `--reload`
+isn't needed if you're hitting the test endpoint, since `wheels/core/tests`
+re-evaluates each request. For full app reload (model metadata, package
+discovery): `curl "http://localhost:<port>/?reload=true&password=wheels"`.
+
+### Engines and ports (mirror `compat-matrix.yml` matrix)
 | Engine | Port |
 |--------|------|
-| lucee5 | 60005 |
 | lucee6 | 60006 |
 | lucee7 | 60007 |
-| adobe2018 | 62018 |
-| adobe2021 | 62021 |
 | adobe2023 | 62023 |
 | adobe2025 | 62025 |
 | boxlang | 60001 |
 
-### Test with a specific database
-```bash
-docker compose up -d lucee6 mysql
-curl -sf "http://localhost:60006/wheels/core/tests?db=mysql&format=json" > /tmp/results.json
-```
+`compose.yml` also defines `lucee5`, `adobe2018`, `adobe2021` services for
+historical reasons; they are NOT in the CI matrix and should be considered
+unsupported for new development.
 
-### Run a specific test directory
+### Databases (mirror `compat-matrix.yml` DATABASES env)
+
+`sqlite`, `h2` (Lucee only), `mysql`, `postgres`, `sqlserver`, `cockroachdb`,
+`oracle`. SQLite and H2 are file-based (no container needed). The rest spawn
+their own service containers.
+
+### Manual ad-hoc invocations (skip the wrapper)
+
+If you want to script something the wrapper doesn't cover, the underlying
+moves are documented in [.github/workflows/compat-matrix.yml](.github/workflows/compat-matrix.yml).
+Always set `COMPOSE_PROJECT_NAME=wheels` first so container names match CI.
+
 ```bash
-curl "http://localhost:60006/wheels/core/tests?db=sqlite&format=json&directory=tests.specs.controller"
+export COMPOSE_PROJECT_NAME=wheels
+docker compose up -d lucee7 mysql
+# wait for ready (see compat-matrix.yml lines 79-124 for canonical readiness check)
+curl -s "http://localhost:60007/wheels/core/tests?db=mysql&format=json&directory=tests.specs.controller" > /tmp/results.json
 ```
 
 ### Known cross-engine gotchas
@@ -631,7 +639,7 @@ curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
 
 ### Cleanup
 ```bash
-docker compose down    # Stop all containers
+tools/test-matrix.sh --down    # Stop and remove all containers + network
 ```
 
 ## Local Onboarding Harness
