@@ -1,6 +1,16 @@
 <!---
 Static simple version of the header/navigation for output on error screens
 --->
+<cfscript>
+// Opt the request into the dev debug bar emitted at onrequestend.
+// Public.cfc::index() <cfinclude>s congratulations.cfm directly (bypassing
+// renderView, which is what normally flips this flag), so without this
+// the bar wouldn't appear on the welcome page when served from the
+// framework's Public dispatcher. Same opt-in pattern as _header.cfm.
+if (StructKeyExists(request, "wheels") && IsStruct(request.wheels)) {
+	request.wheels.showDebugInformation = true;
+}
+</cfscript>
 <cfoutput>
 <!--- cfformat-ignore-start --->
 <!DOCTYPE html>

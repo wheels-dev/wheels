@@ -7,6 +7,17 @@ if (!IsDefined("pageHeader")) {
 // Css Path
 request.wheelsInternalAssetPath = application.wheels.webpath & "wheels/public/assets";
 
+// Opt the request into the dev debug bar emitted at onrequestend.
+// Public.cfc handlers <cfinclude> these views directly (bypassing
+// renderView, which is what normally flips this flag), so without this
+// the bar wouldn't appear on /wheels/info, /wheels/routes, etc. — which
+// is exactly where developers expect dev-tools nav. Setting it during
+// view rendering (here) instead of in the controller preamble avoids
+// touching request scope before the framework is fully wired.
+if (StructKeyExists(request, "wheels") && IsStruct(request.wheels)) {
+	request.wheels.showDebugInformation = true;
+}
+
 // Primary Navigation
 request.navigation = [
 	{
@@ -440,12 +451,10 @@ if (StructKeyExists(url, "refresh")) {
 	<body>
 	<cfif request.isFluid>
 		<div id="main" class="ui grid stackable h-100">
-		<cfinclude template="_navigation.cfm">
 		<div id="top" class="sixteen wide stretched column ">
 		<div class="ui grid stackable">
 	<cfelse>
 		<div id="main">
-		<cfinclude template="_navigation.cfm">
 		<div id="top" class="margin-top">
 	</cfif>
 	<!--- cfformat-ignore-end --->
