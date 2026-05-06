@@ -356,23 +356,24 @@ readiness_delay: 5
 
 ## Variable interpolation
 
-`deploy.yml` supports a restricted subset of Mustache. Three variables are exposed in the rendering context:
+`deploy.yml` supports a single, deliberately small interpolation form: `${UPPER_SNAKE}` env-var tokens. This is the same syntax Ruby Kamal supports natively, with the same lookup order:
 
-| Variable | Value |
-|----------|-------|
-| `env.*` | Any environment variable or `.kamal/secrets` entry. |
-| `destination` | Current `--destination` flag, or empty. |
-| `hostname` | Local hostname of the machine running `wheels deploy`. |
+1. CLI `--env` overrides (test/CI shims).
+2. `.kamal/secrets` (and `.kamal/secrets.<destination>` when `--destination` is set).
+3. `System.getenv(VAR)` on the machine running `wheels deploy`.
+4. Empty string for unset vars.
 
 ```yaml title="config/deploy.yml (illustrative — do not type)"
-service: {{env.APP_NAME}}
-image: {{env.REGISTRY}}/{{env.APP_NAME}}
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
 ```
 
-No loops, conditionals, or method calls. If you need logic, resolve it in `.kamal/secrets` first and reference the result via `env.*`.
+Only uppercase-and-underscore tokens are expanded — `${APP_NAME}` matches; lowercase `${service}` is left alone, which keeps shell-style placeholders elsewhere in the config from being captured by accident.
+
+No loops, conditionals, or method calls. If you need logic (e.g. different values per destination), resolve it in `.kamal/secrets` or a `.kamal/secrets.<destination>` overlay first and reference the result with `${VAR}`.
 
 <Aside type="caution" title="No ERB">
-Ruby Kamal supports `<%= ... %>` ERB inside `deploy.yml`. Wheels does not — we substitute a restricted Mustache. This is the single schema divergence. See [Migrating from Kamal](/v4-0-0-snapshot/deployment/migrating-from-kamal/) for conversion patterns.
+Ruby Kamal supports `<%= ... %>` ERB inside `deploy.yml`. Wheels does not — rendering ERB would require embedding a Ruby runtime in the CFML CLI. This is the single schema divergence. Most ERB-using configs convert mechanically by replacing `<%= ENV["X"] %>` with `${X}`. See [Migrating from Kamal](/v4-0-0-snapshot/deployment/migrating-from-kamal/) for the full conversion patterns.
 </Aside>
 
 ## Destination overlays

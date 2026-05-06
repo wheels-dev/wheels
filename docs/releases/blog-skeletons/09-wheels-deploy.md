@@ -1,7 +1,7 @@
 ---
 title: 'Porting Kamal to CFML: How wheels deploy Ships 4.0 Apps Without Ruby'
 slug: wheels-deploy-kamal-port
-publishedAt: '2026-04-27T07:00:00.000Z'
+publishedAt: '2026-05-06T07:00:00.000Z'
 updatedAt: null
 author: Peter Amiri
 tags:
@@ -76,14 +76,18 @@ service: <%= ENV["APP_NAME"] %>
 image: <%= ENV["REGISTRY"] %>/<%= ENV["APP_NAME"] %>
 ```
 
-ERB is Ruby template code. The template engine runs arbitrary Ruby at render time. To support it, `wheels deploy` would need to embed a Ruby runtime — which is the thing the whole port exists to avoid. So we replaced ERB with a restricted Mustache context.
+ERB is Ruby template code. The template engine runs arbitrary Ruby at render time. To support it, `wheels deploy` would need to embed a Ruby runtime — which is the thing the whole port exists to avoid.
+
+What `wheels deploy` *keeps* is Kamal's other built-in interpolation syntax — `${UPPER_SNAKE}` env-var tokens — completely unchanged. Most ERB-using configs convert mechanically by stripping the `<%= ENV["..."] %>` wrapper:
 
 ```yaml
-service: {{env.APP_NAME}}
-image: {{env.REGISTRY}}/{{env.APP_NAME}}
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
 ```
 
-The context is deliberately small: `{{env.FOO}}` for environment variables, `{{destination}}` for the destination name, `{{hostname}}` for the target hostname. No function calls, no conditionals, no interpolated Ruby. For most `deploy.yml` files in the wild the conversion is mechanical — `<%= ENV["X"] %>` becomes `{{env.X}}`. For the handful of cases that use ERB for control flow or computed values, the migration is more involved, and the [migrating-from-kamal guide](https://guides.wheels.dev/v4-0-0-snapshot/deployment/migrating-from-kamal/) walks through each pattern.
+`${VAR}` references resolve through the same lookup chain Kamal uses: CLI `--env` overrides → `.kamal/secrets` (with destination overlay) → `System.getenv` → empty string. Only uppercase-and-underscore tokens are expanded, so shell-style `${service}` placeholders elsewhere in the config aren't captured by accident. For the handful of cases that use ERB for control flow or computed values, the resolution moves into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and the result is referenced back through `${VAR}`. The [migrating-from-kamal guide](https://guides.wheels.dev/v4-0-0-snapshot/deployment/migrating-from-kamal/) walks through each pattern.
+
+The net effect is that `wheels deploy` is *more* schema-compatible with Kamal than the "we replaced X with Y" framing would suggest. There is no new syntax to learn. The single change is a removal — ERB out, everything else identical.
 
 We considered preserving ERB by shelling out to a system Ruby. The problem is that it turns a single-binary install into a "works if you also have Ruby" story, and every user who does not have Ruby installed gets a cryptic error the first time they deploy. The divergence felt worth naming up front.
 
@@ -134,7 +138,7 @@ It is not Ruby-Kamal-plugin-compatible. Ruby plugins use `Kamal::Commands` exten
 
 A few details for readers curious about the port itself.
 
-The CFML code lives in `cli/lucli/services/deploy/`. Three required JARs — `snakeyaml` for YAML, `jmustache` for template rendering, `sshj` with BouncyCastle transitives for SSH — load through a URL-isolated classloader so they do not collide with the rest of the JVM. Every command is a plain string returned by a pure function; only the CLI layer and the orchestrator actually execute them. That is what makes `--dry-run` trivial and what lets the test suite run without network.
+The CFML code lives in `cli/lucli/services/deploy/`. Three direct dependencies — `snakeyaml` for YAML, `sshj` for SSH transport (with BouncyCastle and SLF4J transitives), and `jmustache` for `wheels deploy init` scaffolding — bundle as ten JARs total in `cli/lucli/lib/deploy/`. They all load through a URL-isolated classloader so they do not collide with whatever copies of those libraries the host CFML engine ships. Every command is a plain string returned by a pure function; only the CLI layer and the orchestrator actually execute them. That is what makes `--dry-run` trivial and what lets the test suite run without network.
 
 Tests live in `cli/lucli/tests/specs/deploy/` and extend the same `wheels.wheelstest` base class the rest of the framework uses. A `FakeSshPool` records every command for offline assertions. A real-SSH fixture (`tools/deploy-sshd-up.sh`) brings up a disposable sshd for the couple of specs that need to exercise real transport.
 

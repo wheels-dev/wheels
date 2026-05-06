@@ -864,12 +864,12 @@ Commands-are-strings invariant: every `*Commands.cfc` method returns a shell-com
 
 ### Critical gotchas
 
-1. **Kamal-compatible schema, ONE divergence.** ERB in `deploy.yml` is NOT supported. Use the restricted Mustache context `{{env.FOO}}`, `{{destination}}`, `{{hostname}}` instead. Everything else in `config/deploy.yml` is byte-identical to Kamal 2.4.0.
+1. **Kamal-compatible schema, ONE divergence.** ERB in `deploy.yml` is NOT supported (rendering it would require embedding a Ruby runtime). Kamal's native `${VAR}` env-var interpolation is preserved unchanged — uppercase-snake tokens resolve via `envOverride → .kamal/secrets → System.getenv → ""` (see `ConfigLoader.$interpolate`). Mustache (`{{...}}`) is used only by `wheels deploy init` to scaffold a fresh `deploy.yml`/`secrets`; it is NOT applied to `deploy.yml` at runtime. Everything else in `config/deploy.yml` is byte-identical to Kamal 2.4.0.
 2. **Hook env prefix is `KAMAL_`, not `WHEELS_`.** This is deliberate — it means Ruby Kamal users' existing `.kamal/hooks/` scripts work unchanged.
 3. **`app live` / `app maintenance` use a marker file** (`/tmp/kamal-maintenance-<svc>`) rather than kamal-proxy native maintenance mode. Phase 2 simplification; Phase 3 follow-up will align with Kamal's proxy-native semantics.
 4. **`wheels deploy remove` is destructive and requires `--confirm`.** Bare `wheels deploy remove` throws without touching anything.
 5. **Lucee reserved scope names in subagent-authored deploy code.** `client`, `session`, `application` — use `ssh`/`sc`, `sess`, `app` instead. Bit us multiple times during the port.
-6. **No `--dry-run` flag in Ruby Kamal 2.8.2.** The `tools/deploy-config-diff.sh` harness compares config-layer output only. Byte-identical command-string parity is aspirational; see `tools/deploy-dry-run-diff.sh` for the plan.
+6. **No `--dry-run` flag in Ruby Kamal 2.4.0.** The `tools/deploy-config-diff.sh` harness compares config-layer output only. Byte-identical command-string parity is aspirational; see `tools/deploy-dry-run-diff.sh` for the plan.
 
 ### Testing
 
