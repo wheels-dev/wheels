@@ -1,5 +1,25 @@
 {
   "version": 1,
-  "items": {},
+  "items": {
+    "function:associationInfo": {
+      "kind": "function",
+      "id": "associationInfo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-06T23:00:18.793Z",
+      "summary": "Created the reference example for `associationInfo()` at `vendor/wheels/public/docs/reference/model/associationinfo.txt`. The file includes three idiomatic examples: basic struct inspection with field commentary, checking for a specific association by key, and iterating over all associations to produce a summary. No docblock or code changes were needed — the source and documented hint were already consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/associationinfo.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 30491,
+        "output_tokens": 701,
+        "cache_creation_input_tokens": 4083,
+        "cache_read_input_tokens": 5834
+      }
+    }
+  },
   "runs": []
 }

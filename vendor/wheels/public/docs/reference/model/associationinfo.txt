@@ -1,0 +1,21 @@
+// 1. Get all association definitions for a model and inspect them
+info = model("post").associationInfo();
+// info is a struct where each key is an association name, e.g.:
+// info.comments.type        -> "hasMany"
+// info.comments.modelName   -> "Comment"
+// info.comments.foreignKey  -> "postId"
+// info.comments.dependent   -> "delete"
+// info.author.type          -> "belongsTo"
+// info.author.modelName     -> "Author"
+
+// 2. Check whether a specific association is defined on the model
+info = model("user").associationInfo();
+if (StructKeyExists(info, "profile")) {
+    writeOutput("User has a profile association of type: " & info.profile.type);
+}
+
+// 3. Iterate over all associations to build a summary
+info = model("article").associationInfo();
+for (assocName in info) {
+    writeOutput(assocName & " -> " & info[assocName].type & " " & info[assocName].modelName & "<br>");
+}
