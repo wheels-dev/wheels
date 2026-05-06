@@ -7,6 +7,20 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		describe("Test harness wiring", () => {
+
+			// Regression: the cookie-write shim in flash.cfc depends on
+			// request.$wheelsTestRun being set. It was originally set in
+			// Test.cfc::$wheelsRunner but the current TestBox pipeline runs
+			// through tests/runner.cfm instead and never invokes $wheelsRunner.
+			// The shim was dormant until the flag was wired into runner.cfm —
+			// the symptom was 9 IllegalStateException errors in the
+			// flashMessages describe (cookie writes after Undertow auto-commit).
+			it("flags the request as a test harness run for the cookie-write shim", () => {
+				expect(_controller.$inTestHarness()).toBeTrue();
+			});
+		})
+
 		describe("Tests that flashStorage", () => {
 
 			it("should be enabled in cookies", () => {

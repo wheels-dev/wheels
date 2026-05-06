@@ -216,7 +216,7 @@ component {
 
 	/**
 	 * Internal function. Returns true when running inside the Wheels test
-	 * harness. Set by `Test.cfc::$wheelsRunner` for every core test request.
+	 * harness. Set by `wheels/tests/runner.cfm` for every core test request.
 	 * Pure CFML — no engine-specific Java calls — so it is safe on
 	 * Lucee 5/6/7, Adobe 2018-2025, and BoxLang.
 	 */
