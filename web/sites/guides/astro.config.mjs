@@ -78,6 +78,12 @@ export default defineConfig({
 		// documented Phase 0 URLs are redirected.
 		'/v4-0-0-snapshot/cli-reference': '/v4-0-0-snapshot/command-line-tools/',
 		'/v4-0-0-snapshot/cli-reference/info': '/v4-0-0-snapshot/command-line-tools/',
+		// Astro/Starlight slugs the dotted filename `3.0.0-config-migration.md`
+		// down to `300-config-migration` (github-slugger strips dots). The file
+		// was renamed to `3-0-0-config-migration.md` so the URL matches every
+		// other doc in the tree; this redirect preserves the original ugly slug
+		// for any external bookmarks accumulated while it was live.
+		'/v3-0-0/upgrading/300-config-migration': '/v3-0-0/upgrading/3-0-0-config-migration/',
 	},
 	integrations: [
 		starlight({

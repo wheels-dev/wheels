@@ -42,7 +42,13 @@
       },
       {
         "label": "Upgrading",
-        "link": "/v3-0-0/introduction/upgrading/"
+        "link": "/v3-0-0/introduction/upgrading/",
+        "items": [
+          {
+            "label": "Config Directory Migration (3.0.0)",
+            "link": "/v3-0-0/upgrading/3-0-0-config-migration/"
+          }
+        ]
       },
       {
         "label": "Screencasts",
