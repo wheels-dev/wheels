@@ -1,5 +1,5 @@
 ---
-title: Porting Kamal to CFML: How wheels deploy Ships 4.0 Apps Without Ruby
+title: 'Porting Kamal to CFML: How wheels deploy Ships 4.0 Apps Without Ruby'
 slug: wheels-deploy-kamal-port
 publishedAt: '2026-05-06T14:00:00.000Z'
 updatedAt: '2026-05-06T21:55:16.000Z'
