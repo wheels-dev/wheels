@@ -393,7 +393,7 @@ It's a port of Basecamp's Kamal into the Wheels CLI — zero-downtime Dockerized
 
 What you get:
 • One command from laptop to production: `wheels deploy`
-• Full Kamal subcommand surface (~25 verbs): app, proxy, accessory, build, registry, secrets, server, prune, lock, rollback, audit
+• Full Kamal subcommand surface (50+ commands across 9 sub-command groups): app, proxy, accessory, build, registry, secrets, server, prune, lock, plus rollback/audit/details at the top level
 • Zero-downtime rollover via kamal-proxy (the same Go binary Kamal uses)
 • Secret adapters out of the box: 1Password, Bitwarden, AWS Secrets Manager, LastPass, Doppler
 • `--dry-run` on every verb
@@ -517,7 +517,7 @@ service: ${APP_NAME}
 image: ${REGISTRY}/${APP_NAME}
 ```
 
-`${VAR}` references resolve through the same lookup chain Kamal uses (CLI overrides → `.kamal/secrets` → `System.getenv` → empty string). For ERB blocks that did real logic — conditionals, ternaries, computed values — the resolution moves into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and the result is referenced back through `${VAR}`.
+`${VAR}` references resolve through the same lookup chain Kamal uses (`.kamal/secrets` → process environment variables → empty string). For ERB blocks that did real logic — conditionals, ternaries, computed values — the resolution moves into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and the result is referenced back through `${VAR}`.
 
 Net effect: there is no new syntax to learn. The single change is a removal — ERB out, everything else identical.
 
