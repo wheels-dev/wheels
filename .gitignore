@@ -30,6 +30,9 @@ settings.xml
 
 # Node.js (dev tooling: husky, commitlint)
 node_modules/
+
+# Issue-resolver — local resource IDs from setup.ts
+tools/issue-resolver/.env.local
 # CLI test output (but track spec sources)
 cli/tests/*
 !cli/tests/specs/

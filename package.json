@@ -5,14 +5,18 @@
   "type": "module",
   "description": "Wheels CFML MVC Framework — dev tooling only",
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "issue-resolver:setup": "tsx tools/issue-resolver/setup.ts",
+    "issue-resolver:run": "tsx tools/issue-resolver/run.ts"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.88.0",
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
     "husky": "^9.0.0",
-    "dotenv": "^17.4.1"
+    "dotenv": "^17.4.1",
+    "tsx": "^4.19.0"
   }
 }
