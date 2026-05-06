@@ -1,5 +1,14 @@
 {
   "version": 1,
-  "items": {},
+  "items": {
+    "function:associationInfo": {
+      "kind": "function",
+      "id": "associationInfo",
+      "status": "failed",
+      "attempts": 1,
+      "updatedAt": "2026-05-06T21:07:50.437Z",
+      "summary": "agent error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011Camzr5YY2GNjQSxjXajAT\"}"
+    }
+  },
   "runs": []
 }
