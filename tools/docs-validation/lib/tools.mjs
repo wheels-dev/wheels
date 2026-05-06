@@ -118,11 +118,22 @@ export const TOOLS = [
   },
 ];
 
-export function makeExecutor({ outcome }) {
+export function makeExecutor({ outcome, runState }) {
   return async function execute(name, input) {
     if (name === 'read_file') return doRead(input.path);
-    if (name === 'write_file') return doWrite(input.path, input.content);
-    if (name === 'edit_file') return doEdit(input.path, input.old_string, input.new_string);
+    if (name === 'write_file') {
+      const r = await doWrite(input.path, input.content);
+      if (r.ok && runState) {
+        runState.filesChanged.add(r.path);
+        runState.referencesWritten.add(r.path);
+      }
+      return r;
+    }
+    if (name === 'edit_file') {
+      const r = await doEdit(input.path, input.old_string, input.new_string);
+      if (r.ok && runState) runState.filesChanged.add(r.path);
+      return r;
+    }
     if (name === 'run_bash') return doBash(input.command, input.timeout_seconds);
     if (name === 'report_outcome') {
       outcome.value = {

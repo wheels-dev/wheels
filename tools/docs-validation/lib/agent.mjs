@@ -80,7 +80,8 @@ export async function runAgentForFunction(fn, { logger = console.log } = {}) {
   const client = new Anthropic();
   const system = await getSystemPrompt();
   const outcome = { value: null };
-  const exec = makeExecutor({ outcome });
+  const runState = { filesChanged: new Set(), referencesWritten: new Set() };
+  const exec = makeExecutor({ outcome, runState });
 
   const messages = [{ role: 'user', content: await userPayload(fn) }];
   let turn = 0;
@@ -131,12 +132,35 @@ export async function runAgentForFunction(fn, { logger = console.log } = {}) {
   }
 
   if (!outcome.value) {
-    outcome.value = {
-      status: 'failed',
-      summary: `Agent did not call report_outcome within ${MAX_TURNS} turns.`,
-      files_changed: [],
-      notes: '',
-    };
+    const filesChanged = [...runState.filesChanged];
+    const refsWritten = [...runState.referencesWritten];
+    const exhausted = turn >= MAX_TURNS;
+    const cause = exhausted
+      ? `exhausted turn budget (${MAX_TURNS})`
+      : `stopped at turn ${turn}/${MAX_TURNS} (model returned no tool_use)`;
+
+    if (refsWritten.length > 0) {
+      outcome.value = {
+        status: 'done',
+        summary: `Auto-finalized: agent wrote ${refsWritten.length} reference file(s) but ${cause} before calling report_outcome.`,
+        files_changed: filesChanged,
+        notes: `auto_finalized=true; review the diff carefully — agent did not self-validate before stopping. references=${refsWritten.join(',')}`,
+      };
+    } else if (filesChanged.length > 0) {
+      outcome.value = {
+        status: 'needs_human',
+        summary: `Edits made to ${filesChanged.length} file(s) but no reference example was written; ${cause} before report_outcome.`,
+        files_changed: filesChanged,
+        notes: `auto_finalized=true; CFC-only edits without a reference write. Possible causes: edit→revert flow, partial work, or agent stopped early. Review and decide.`,
+      };
+    } else {
+      outcome.value = {
+        status: 'failed',
+        summary: `Agent did not call report_outcome and produced no file edits; ${cause}.`,
+        files_changed: [],
+        notes: '',
+      };
+    }
   }
 
   return { outcome: outcome.value, usage, turns: turn };

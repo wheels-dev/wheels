@@ -104,6 +104,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           WHEELS_DOCS_MODEL: ${{ inputs.model }}
+          WHEELS_DOCS_MAX_TURNS: '24'
           LUCLI_HOME: ${{ runner.temp }}/.wheels
         run: |
           ARGS=(--section "${{ inputs.section }}")
@@ -146,7 +147,7 @@ jobs:
           Agent-driven docs validation for the **${{ inputs.section }}** section.
 
           - Snapshot: `docs/api/v4.0.0.json`
-          - Edits scoped to: `vendor/wheels/**/*.cfc` (docblocks + narrow body fixes) and `vendor/wheels/public/docs/reference/<scope>/<name>.txt`
+          - Edits scoped to: `vendor/wheels/**/*.cfc` (docblocks + narrow body fixes) and `vendor/wheels/public/docs/reference/{scope}/{name}.txt`
           - Per-function status tracked in `tools/docs-validation/state.json`
 
           ## Review checklist
