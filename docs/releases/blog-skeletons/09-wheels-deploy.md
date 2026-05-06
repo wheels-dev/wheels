@@ -18,12 +18,6 @@ excerpt: >-
 coverImage: null
 ---
 
-# Porting Kamal to CFML: How `wheels deploy` Ships 4.0 Apps Without Ruby
-
-_Peter Amiri, Wheels Core Team_
-
----
-
 You just finished a Wheels app. You have a Docker image. You have a Linux server. You want to ship.
 
 Before Wheels 4.0 the answer was whatever you had cobbled together — a shell script that SSHs in and runs `docker pull`, an Ansible playbook, maybe Capistrano if you had one lying around. The framework did not have an opinion about this step.
