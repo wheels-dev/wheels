@@ -15,12 +15,6 @@ coverImage: null
 legacyId: '1165378763664687105'
 ---
 
-# Why We Rebuilt Our CI Pipeline From 40 Minutes to 82 Seconds
-
-_April 9, 2026 — Peter Amiri, Wheels Core Team_
-
----
-
 For years, the Wheels CI pipeline ran every commit through a gauntlet: five CFML engines, seven databases, Docker Compose orchestrating it all. It was thorough. It was comprehensive. And it was killing our velocity.
 
 Today we shipped a fundamentally different approach. Our primary CI now runs in **82 seconds**. No Docker. No CommandBox. Just LuCLI, Lucee 7, and SQLite — the same tools a developer uses on their laptop.
