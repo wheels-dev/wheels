@@ -1,0 +1,170 @@
+name: Docs validation (agent)
+
+on:
+  workflow_dispatch:
+    inputs:
+      section:
+        description: 'API section to validate'
+        required: true
+        type: choice
+        options:
+          - 'Configuration'
+          - 'Controller'
+          - 'Global Helpers'
+          - 'Migrator'
+          - 'Model Class'
+          - 'Model Configuration'
+          - 'Model Object'
+          - 'View Helpers'
+      limit:
+        description: 'Max functions to validate this run (blank = all pending)'
+        required: false
+        type: string
+        default: ''
+      model:
+        description: 'Anthropic model id'
+        required: false
+        type: string
+        default: 'claude-sonnet-4-6'
+      dry_run:
+        description: 'List targets without invoking the agent'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: docs-validation-${{ inputs.section }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install tools/docs-validation deps
+        working-directory: tools/docs-validation
+        run: npm install --no-audit --no-fund
+
+      - name: Set up Linuxbrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install Wheels CLI
+        run: |
+          brew tap wheels-dev/wheels || true
+          brew install wheels
+
+      - name: Patch wheels wrapper JAVA_HOME for Linux
+        run: |
+          WRAPPER="$(brew --prefix wheels)/bin/wheels"
+          sed -i 's|/openjdk.jdk/Contents/Home||g' "$WRAPPER"
+          grep JAVA_HOME "$WRAPPER"
+
+      - name: Warm up wheels module
+        run: wheels --version >/dev/null
+
+      - name: Compute branch name
+        id: branch
+        run: |
+          slug=$(echo "${{ inputs.section }}" | tr '[:upper:] ' '[:lower:]-')
+          echo "name=docs-validation/${slug}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git
+        run: |
+          git config user.name "wheels-docs-validator[bot]"
+          git config user.email "wheels-docs-validator@users.noreply.github.com"
+          git checkout -b "${{ steps.branch.outputs.name }}"
+
+      - name: List targets (dry-run)
+        if: ${{ inputs.dry_run }}
+        working-directory: tools/docs-validation
+        run: node orchestrate.mjs --section "${{ inputs.section }}" --dry-run
+
+      - name: Run agent
+        if: ${{ !inputs.dry_run }}
+        working-directory: tools/docs-validation
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          WHEELS_DOCS_MODEL: ${{ inputs.model }}
+          LUCLI_HOME: ${{ runner.temp }}/.wheels
+        run: |
+          ARGS=(--section "${{ inputs.section }}")
+          if [[ -n "${{ inputs.limit }}" ]]; then
+            ARGS+=(--limit "${{ inputs.limit }}")
+          fi
+          node orchestrate.mjs "${ARGS[@]}"
+
+      - name: Show diff
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git status
+          git --no-pager diff --stat
+          echo "---"
+          git --no-pager diff | head -500 || true
+
+      - name: Commit + push if changes
+        if: ${{ !inputs.dry_run }}
+        id: commit
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes produced by the agent."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add -A
+          MSG="docs(api): validate ${{ inputs.section }} section (run ${{ github.run_id }})"
+          git commit -m "$MSG"
+          git push -u origin "${{ steps.branch.outputs.name }}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open draft PR
+        if: ${{ !inputs.dry_run && steps.commit.outputs.changed == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BODY=$(cat <<'EOF'
+          ## Summary
+
+          Agent-driven docs validation for the **${{ inputs.section }}** section.
+
+          - Snapshot: `docs/api/v4.0.0.json`
+          - Edits scoped to: `vendor/wheels/**/*.cfc` (docblocks + narrow body fixes) and `vendor/wheels/public/docs/reference/<scope>/<name>.txt`
+          - Per-function status tracked in `tools/docs-validation/state.json`
+
+          ## Review checklist
+
+          - [ ] Each `state.json` entry with `status: done` has a sensible reference example file added or updated
+          - [ ] No CFC function signature changes (agent is forbidden from changing them — verify anyway)
+          - [ ] Any docblock/body edits hold up against the test suite
+          - [ ] `state.json` items with `status: needs_human` describe the open question in `notes`
+          EOF
+          )
+          gh pr create \
+            --base develop \
+            --head "${{ steps.branch.outputs.name }}" \
+            --title "docs(api): validate ${{ inputs.section }} section" \
+            --body "$BODY" \
+            --draft
+
+      - name: Upload state artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-validation-state-${{ github.run_id }}
+          path: tools/docs-validation/state.json
+          if-no-files-found: ignore

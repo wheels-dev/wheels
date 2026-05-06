@@ -1,0 +1,17 @@
+{
+  "name": "@wheels/docs-validation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent-driven validation of Wheels API docs and guides",
+  "scripts": {
+    "validate": "node orchestrate.mjs",
+    "status": "node orchestrate.mjs --status"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
