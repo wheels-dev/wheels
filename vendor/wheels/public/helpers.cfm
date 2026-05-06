@@ -472,7 +472,7 @@ struct function $parseMetaData(required struct meta, required string doctype, re
 		}
 	}
 	// Check for extended documentation: note this is not looked for by slug, i.e. controller/humanize.txt
-	local.rv["extended"] = $getExtendedCodeExamples("wheels/public/docs/reference/", local.rv.slug);
+	local.rv["extended"] = $getExtendedCodeExamples("/wheels/public/docs/reference/", local.rv.slug);
 	return local.rv;
 }
 
