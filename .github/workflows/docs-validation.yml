@@ -46,10 +46,13 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Checkout develop
+      - name: Checkout dispatching ref
+        # We check out the ref this workflow was dispatched against (typically
+        # `develop` once merged, but a feature branch during initial testing).
+        # The agent's edits land in a per-run branch derived from this ref;
+        # the resulting PR always targets `develop`.
         uses: actions/checkout@v6
         with:
-          ref: develop
           fetch-depth: 0
 
       - name: Set up Node.js
