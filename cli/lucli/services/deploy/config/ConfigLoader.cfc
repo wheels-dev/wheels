@@ -4,7 +4,7 @@
  * Pipeline (mirrors Kamal's lib/kamal/configuration.rb#load):
  *   1. parse YAML                        (Yaml.parse)
  *   2. merge destination overlay          (Yaml.deepMerge, if destination set)
- *   3. interpolate ${VAR} tokens          (envOverride → System.getenv → "")
+ *   3. interpolate ${VAR} tokens          (envOverride → .kamal/secrets → System.getenv → "")
  *   4. validate schema                    (Validator)
  *   5. wrap in typed Config object
  *
