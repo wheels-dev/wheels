@@ -123,7 +123,10 @@ export function makeExecutor({ outcome, runState }) {
     if (name === 'read_file') return doRead(input.path);
     if (name === 'write_file') {
       const r = await doWrite(input.path, input.content);
-      if (r.ok && runState) runState.filesChanged.add(r.path);
+      if (r.ok && runState) {
+        runState.filesChanged.add(r.path);
+        runState.referencesWritten.add(r.path);
+      }
       return r;
     }
     if (name === 'edit_file') {
