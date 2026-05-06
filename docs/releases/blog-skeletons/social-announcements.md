@@ -25,13 +25,15 @@
 |---|---|---|
 | 09 — `wheels deploy` (Kamal port) | 2026-05-06 | Social 4 |
 | 03 — Security hardening | 2026-05-07 | Social 5 |
-| 06 — Testing in 4.0 | 2026-05-09 | Social 7 |
-| 04 — Background jobs without Redis | 2026-05-10 | Social 8 |
-| 07 — Multi-tenancy built in | 2026-05-10 | Social 8 (same day, double pairing) |
+| 06 — Testing in 4.0 | 2026-05-08 | (Social 6 covers Data layer that day — slight topic mismatch) |
+| 04 — Background jobs without Redis | 2026-05-09 | (Social 7 covers Testing that day — slight topic mismatch) |
+| 07 — Multi-tenancy built in | 2026-05-10 | Social 8 (Multi-tenancy + background jobs) — partial match |
 | 05 — LuCLI zero-Docker DX | 2026-05-11 | Social 9 |
 | 01 — Closing the maturity gap (lead) | 2026-05-12 | Social 10 / GA |
-| 02 — Upgrading from 3.x | 2026-05-12 | Social 10 / GA |
-| 08 — WireBox → wheelsdi (contributor) | 2026-05-13 | Post-GA |
+| 02 — Upgrading from 3.x | 2026-05-13 | Post-GA migration companion |
+| 08 — WireBox → wheelsdi (contributor) | 2026-05-14 | Post-GA |
+
+**Note on the spread-out blog schedule:** the campaign was originally planned with same-day social/blog pairings (Social 8 paired with Blogs 04+07; Social 10 paired with Blogs 01+02). Spreading the blogs to one-per-day for clearer publishing cadence introduces social/blog topic mismatches on 2026-05-08 (Social=Data layer, Blog=Testing) and 2026-05-09 (Social=Testing, Blog=Background jobs). At post time, decide per-day whether to re-theme the social to the blog topic, swap social order, or accept the cross-pollination as feature-density evidence.
 
 **Framing:** 4.0 is *in the works* — release candidate, not GA. Phrasing throughout uses "coming" / "on the way" / "preview" rather than "shipped." Swap to present tense on GA day.
 
