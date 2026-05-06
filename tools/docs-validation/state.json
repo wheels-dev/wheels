@@ -1,5 +1,23 @@
 {
   "version": 1,
-  "items": {},
+  "items": {
+    "function:associationInfo": {
+      "kind": "function",
+      "id": "associationInfo",
+      "status": "failed",
+      "attempts": 1,
+      "updatedAt": "2026-05-06T21:17:10.257Z",
+      "summary": "Agent did not call report_outcome within 16 turns.",
+      "files_changed": [],
+      "notes": "",
+      "turns": 16,
+      "usage": {
+        "input_tokens": 90667,
+        "output_tokens": 2558,
+        "cache_creation_input_tokens": 47947,
+        "cache_read_input_tokens": 521501
+      }
+    }
+  },
   "runs": []
 }

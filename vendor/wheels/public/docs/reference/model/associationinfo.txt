@@ -1,0 +1,14 @@
+// 1. Get all association definitions for the Post model.
+assocInfo = model("Post").associationInfo();
+
+// 2. Check whether a specific association exists and inspect its type.
+assocInfo = model("Post").associationInfo();
+if (StructKeyExists(assocInfo, "comments")) {
+    writeOutput(assocInfo.comments.type); // "hasMany"
+}
+
+// 3. Loop over every association to list names and their types.
+assocInfo = model("Post").associationInfo();
+for (assocName in assocInfo) {
+    writeOutput(assocName & ": " & assocInfo[assocName].type & "<br>");
+}
