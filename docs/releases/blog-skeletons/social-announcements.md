@@ -389,7 +389,7 @@ Wheels 4.0 brings a new command: `wheels deploy`.
 
 It's a port of Basecamp's Kamal into the Wheels CLI — zero-downtime Dockerized deploys to Linux servers over plain SSH. No Ruby runtime, no gem install, no second tool to learn.
 
-<https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/index.mdx|Deployment guide>
+<https://blog.wheels.dev/posts/wheels-deploy-kamal-port/|Read the full post> · <https://guides.wheels.dev/v4-0-0-snapshot/deployment/|Deployment guide>
 
 What you get:
 • One command from laptop to production: `wheels deploy`
@@ -420,8 +420,9 @@ What `wheels deploy` is not: it is not a Kubernetes integration, not a systemd-n
 
 If you're shipping a Dockerized Wheels app to one or more Linux hosts and you want zero-downtime rollover out of the box, this is the shortest path in 4.0.
 
-Guide: https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/index.mdx
-Migrating from Kamal: https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/migrating-from-kamal.mdx
+Read the full post: https://blog.wheels.dev/posts/wheels-deploy-kamal-port/
+Deployment guide: https://guides.wheels.dev/v4-0-0-snapshot/deployment/
+Migrating from Kamal: https://guides.wheels.dev/v4-0-0-snapshot/deployment/migrating-from-kamal/
 
 #CFML #Wheels #Kamal #DevOps #Deployment #OpenSource
 ```
@@ -469,8 +470,8 @@ No new syntax. Just ERB out — `${VAR}` is something Kamal already supports too
 
 Secret adapters: 1Password, Bitwarden, AWS, LastPass, Doppler.
 
-Guide:
-https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/index.mdx
+Full post:
+https://blog.wheels.dev/posts/wheels-deploy-kamal-port/
 ```
 
 ### GitHub Discussions
@@ -479,6 +480,8 @@ https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/d
 
 ```markdown
 Wheels 4.0 introduces a new built-in command: `wheels deploy`. It is a port of [Basecamp's Kamal](https://kamal-deploy.org/) — the container-based deployer — into the Wheels CLI. This post is for anyone currently running ad-hoc deploy scripts (or running Ruby Kamal alongside Wheels) who wants to understand what's shipping and what the contract is.
+
+> **Full blog post:** https://blog.wheels.dev/posts/wheels-deploy-kamal-port/
 
 ## Why a port, not a plugin
 
@@ -549,10 +552,10 @@ Every verb supports `--dry-run` — prints the exact shell commands that would r
 
 ## Docs
 
-- [Deployment landing page](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/index.mdx) — start here for context and when-to-use guidance
-- [Your first deploy](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/first-deploy.mdx) — hands-on walkthrough
-- [Migrating from Kamal](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/migrating-from-kamal.mdx) — the full compatibility contract and switch-over checklist
-- [Config reference](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/config-reference.mdx), [secrets](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/secrets.mdx), [hooks](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/hooks.mdx), [accessories](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/accessories.mdx)
+- [Deployment landing page](https://guides.wheels.dev/v4-0-0-snapshot/deployment/) — start here for context and when-to-use guidance
+- [Your first deploy](https://guides.wheels.dev/v4-0-0-snapshot/deployment/first-deploy/) — hands-on walkthrough
+- [Migrating from Kamal](https://guides.wheels.dev/v4-0-0-snapshot/deployment/migrating-from-kamal/) — the full compatibility contract and switch-over checklist
+- [Config reference](https://guides.wheels.dev/v4-0-0-snapshot/deployment/config-reference/), [secrets](https://guides.wheels.dev/v4-0-0-snapshot/deployment/secrets/), [hooks](https://guides.wheels.dev/v4-0-0-snapshot/deployment/hooks/), [accessories](https://guides.wheels.dev/v4-0-0-snapshot/deployment/accessories/)
 
 ## Question for the thread
 
