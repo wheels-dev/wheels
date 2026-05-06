@@ -1,6 +1,6 @@
 ---
 title: Architecture of wheels deploy
-description: How the wheels deploy CLI is structured — the port strategy, the byte-compatibility contract with Ruby Kamal, the commands-are-strings invariant that makes --dry-run and offline tests trivial, and the URLClassLoader-isolated JAR loading for snakeyaml, jmustache, and sshj.
+description: How the wheels deploy CLI is structured — the port strategy, the byte-compatibility contract with Ruby Kamal, the commands-are-strings invariant that makes --dry-run and offline tests trivial, and the URLClassLoader-isolated JAR loading for snakeyaml, sshj, and jmustache.
 type: reference
 sidebar:
   order: 13
@@ -14,7 +14,7 @@ This page is for readers who want to understand how `wheels deploy` is put toget
 
 - Why `wheels deploy` is a port of [Basecamp's Kamal](https://kamal-deploy.org/) rather than a new tool
 - The byte-compatibility contract that makes a Kamal-managed server takeoverable by `wheels deploy` without cleanup
-- The one deliberate divergence from Kamal's config schema (ERB → Mustache) and why
+- The one deliberate divergence from Kamal's config schema (ERB removed; `${VAR}` interpolation kept unchanged) and why
 - The commands-are-strings invariant that makes `--dry-run` trivial and lets the test suite run offline
 - How the three third-party JARs load in isolation so they don't collide with the rest of the JVM
 
@@ -55,7 +55,7 @@ If you have a working Ruby Kamal setup, you can run `wheels deploy config` again
 
 See [Migrating from Kamal](/v4-0-0-snapshot/deployment/migrating-from-kamal/) for the complete switch-over checklist.
 
-## The one divergence: ERB → Mustache
+## The one divergence: ERB removed
 
 `config/deploy.yml` does not support ERB. This is the only schema-level incompatibility with Ruby Kamal, and it's deliberate.
 
@@ -69,22 +69,29 @@ image: <%= ENV["REGISTRY"] %>/<%= ENV["APP_NAME"] %>
 
 ERB is a Ruby template language — it executes arbitrary Ruby at render time. To support it, `wheels deploy` would need to embed a Ruby runtime, which defeats the purpose of the port.
 
-`wheels deploy` replaces ERB with a restricted Mustache context:
+What `wheels deploy` keeps unchanged is Kamal's other built-in interpolation: `${UPPER_SNAKE}` env-var tokens. Most ERB-using configs convert mechanically by dropping the `<%= ENV["..."] %>` wrapper:
 
 ```yaml
-service: {{env.APP_NAME}}
-image: {{env.REGISTRY}}/{{env.APP_NAME}}
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
 ```
 
-Available context is small on purpose:
+The interpolator (`ConfigLoader.$interpolate`) walks the parsed YAML tree and resolves each `${VAR}` token through this lookup chain:
 
-- `{{env.FOO}}` — environment variable `FOO`
-- `{{destination}}` — the destination name (e.g. `staging`, `production`)
-- `{{hostname}}` — the current target hostname during command execution
+1. CLI `--env` overrides (test/CI shims).
+2. `.kamal/secrets`, then `.kamal/secrets.<destination>` overlay if `--destination` is set.
+3. `System.getenv(VAR)` on the machine running `wheels deploy`.
+4. Empty string for unset vars (matching Kamal's behavior).
 
-No function calls, no conditionals, no computed expressions. For most `deploy.yml` files the conversion is mechanical: `<%= ENV["X"] %>` becomes `{{env.X}}`.
+Only uppercase-and-underscore tokens are expanded — the regex is `\$\{([A-Z_][A-Z0-9_]*)\}`. That keeps shell-style `${service}` placeholders elsewhere in the config from being captured by accident, the same rule Kamal applies.
 
-We considered preserving ERB by shelling out to a system Ruby. The problem is that it turns a single-binary install into a "works if you also have Ruby" story, and every user without Ruby installed gets a cryptic error on their first deploy. Naming the divergence up front is the honest trade-off.
+No conditionals, no method calls, no computed expressions. If your existing config uses ERB logic (`<%= ... if ENV["ROLE"] == "staging" %>`), move that logic into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and reference the resolved value with `${VAR}`.
+
+We considered preserving ERB by shelling out to a system Ruby. The problem is that it turns a single-binary install into a "works if you also have Ruby" story, and every user without Ruby installed gets a cryptic error on their first deploy. Naming the divergence up front — and keeping Kamal's `${VAR}` syntax untouched — is the honest trade-off.
+
+<Aside type="note" title="Mustache is used elsewhere — not in deploy.yml at runtime">
+The `cli/lucli/services/deploy/lib/Mustache.cfc` wrapper is a thin facade over jmustache, but it is **not** applied to `deploy.yml` at runtime. It's used by `wheels deploy init` to render the initial scaffolding templates (`config/deploy.yml` and `.kamal/secrets`) when a project doesn't have one yet. Once those files exist, `${VAR}` is the only interpolation that runs.
+</Aside>
 
 ## Commands-are-strings invariant
 
@@ -128,8 +135,8 @@ The separation of `cli/` (user-facing orchestration) from `commands/` (pure comm
 `wheels deploy` depends on three third-party libraries:
 
 - **snakeyaml** — YAML parsing for `config/deploy.yml`
-- **jmustache** — Mustache template rendering for the restricted context in `deploy.yml` and the `wheels deploy init` scaffolding
 - **sshj** (with BouncyCastle transitives) — SSH transport
+- **jmustache** — template rendering for the `wheels deploy init` scaffolding (`deploy.yml.mustache`, `secrets.mustache`); not applied to `deploy.yml` at runtime
 
 These JARs load through a dedicated `URLClassLoader` isolated from the main JVM classpath. That isolation matters because CFML engines (Lucee, Adobe CF) ship their own copies of some transitive dependencies (older BouncyCastle versions, in particular). Without isolation, class-resolution order would be nondeterministic and you'd get obscure `NoSuchMethodError` failures depending on load order.
 

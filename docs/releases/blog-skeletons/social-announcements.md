@@ -2,36 +2,36 @@
 
 **Status:** Copy-paste ready. Ten posts, four channels each. Runs as a drumbeat from first pre-announce to GA day.
 
-**Campaign start:** 2026-04-21 (Post 1 posted). **GA target:** 2026-05-09.
+**Campaign start:** 2026-04-21 (Posts 1–3 posted). **GA target:** 2026-05-12.
 
-**Posting schedule (every 2 days, 2026-04-21 → 2026-05-09):**
+**Posting schedule:** Posts 1–3 ran on the original every-2-days cadence (2026-04-21 → 2026-04-25). Posts 4–10 were postponed for last-mile framework work and have been compressed to a daily cadence resuming **2026-05-06**, landing GA on **2026-05-12**.
 
 | # | Date | Post | Angle |
 |---|---|---|---|
 | 1 | 2026-04-21 | Parity story | Broadest audience. Posted. |
-| 2 | 2026-04-23 | The full audit | Spec-and-receipts crowd. |
-| 3 | 2026-04-25 | 3.0 → 4.0 delta | Existing users planning the upgrade. |
-| 4 | 2026-04-27 | `wheels deploy` | Marquee-feature spotlight; wholly new CLI surface. |
-| 5 | 2026-04-29 | Security hardening | 40+ hardening PRs, "secure by default" story. |
-| 6 | 2026-05-01 | Data layer modernization | "Rails parity made concrete" for ORM-curious devs. |
-| 7 | 2026-05-03 | Testing | Browser testing + parallel runner + HTTP client + zero-Docker inner loop. |
-| 8 | 2026-05-05 | Multi-tenancy + background jobs | The "what makes Wheels different" beat. |
-| 9 | 2026-05-07 | LuCLI / zero-Docker DX | Inner-loop developer-experience closer. |
-| 10 | **2026-05-09 (GA)** | Release announcement | Recaps the arc, swap all "coming" → present tense. |
+| 2 | 2026-04-23 | The full audit | Spec-and-receipts crowd. Posted. |
+| 3 | 2026-04-25 | 3.0 → 4.0 delta | Existing users planning the upgrade. Posted. |
+| 4 | **2026-05-06** | `wheels deploy` | Marquee-feature spotlight; wholly new CLI surface. (Resume) |
+| 5 | 2026-05-07 | Security hardening | 40+ hardening PRs, "secure by default" story. |
+| 6 | 2026-05-08 | Data layer modernization | "Rails parity made concrete" for ORM-curious devs. |
+| 7 | 2026-05-09 | Testing | Browser testing + parallel runner + HTTP client + zero-Docker inner loop. |
+| 8 | 2026-05-10 | Multi-tenancy + background jobs | The "what makes Wheels different" beat. |
+| 9 | 2026-05-11 | LuCLI / zero-Docker DX | Inner-loop developer-experience closer. |
+| 10 | **2026-05-12 (GA)** | Release announcement | Recaps the arc, swap all "coming" → present tense. |
 
 **Companion long-form blog posts** (in [docs/releases/blog-skeletons/](.) — drop `NN-` prefix on move to `web/content/blog/posts/`):
 
 | Blog post | Date | Paired with |
 |---|---|---|
-| 09 — `wheels deploy` (Kamal port) | 2026-04-27 | Social 4 |
-| 03 — Security hardening | 2026-04-29 | Social 5 |
-| 06 — Testing in 4.0 | 2026-05-03 | Social 7 |
-| 04 — Background jobs without Redis | 2026-05-05 | Social 8 |
-| 07 — Multi-tenancy built in | 2026-05-06 | Social 8 (day after) |
-| 05 — LuCLI zero-Docker DX | 2026-05-07 | Social 9 |
-| 01 — Closing the maturity gap (lead) | 2026-05-09 | Social 10 / GA |
-| 02 — Upgrading from 3.x | 2026-05-09 | Social 10 / GA |
-| 08 — WireBox → wheelsdi (contributor) | 2026-05-11 | Post-GA |
+| 09 — `wheels deploy` (Kamal port) | 2026-05-06 | Social 4 |
+| 03 — Security hardening | 2026-05-07 | Social 5 |
+| 06 — Testing in 4.0 | 2026-05-09 | Social 7 |
+| 04 — Background jobs without Redis | 2026-05-10 | Social 8 |
+| 07 — Multi-tenancy built in | 2026-05-10 | Social 8 (same day, double pairing) |
+| 05 — LuCLI zero-Docker DX | 2026-05-11 | Social 9 |
+| 01 — Closing the maturity gap (lead) | 2026-05-12 | Social 10 / GA |
+| 02 — Upgrading from 3.x | 2026-05-12 | Social 10 / GA |
+| 08 — WireBox → wheelsdi (contributor) | 2026-05-13 | Post-GA |
 
 **Framing:** 4.0 is *in the works* — release candidate, not GA. Phrasing throughout uses "coming" / "on the way" / "preview" rather than "shipped." Swap to present tense on GA day.
 
@@ -400,7 +400,7 @@ What you get:
 
 Byte-compatible with Ruby Kamal on the server side — container names, labels, Docker network, lock paths, `.kamal/secrets`, `.kamal/hooks/*` all match exactly. A host managed by Ruby Kamal can be taken over by `wheels deploy` without cleanup.
 
-One deliberate divergence: `deploy.yml` uses Mustache (`{{env.APP_NAME}}`) instead of ERB. We can't render Ruby from a CFML CLI.
+One deliberate divergence: `deploy.yml` does not support ERB. Kamal's native `${VAR}` env-var interpolation is preserved unchanged, so most ERB-using configs convert mechanically — `<%= ENV["APP_NAME"] %>` becomes `${APP_NAME}`.
 ```
 
 ### LinkedIn
@@ -412,7 +412,7 @@ It's a port of Basecamp's Kamal — the Ruby-world container deployer — into t
 
 The design goal was byte-compatibility with Ruby Kamal on the server side. Container names (`<service>-<role>-<version>`), labels, Docker network name (`kamal`), proxy config directory, lock file path, `.kamal/secrets`, `.kamal/hooks/*` — all match the Kamal 2.4.0 contract exactly. A host that has been managed by Ruby Kamal can be taken over by `wheels deploy` without any cleanup, and vice versa. Teams evaluating the switch can sit on both tools simultaneously.
 
-There is exactly one deliberate divergence: `config/deploy.yml` does not support ERB. ERB is Ruby template code, and rendering it would require embedding a Ruby runtime — which is the thing we were trying to avoid. Wheels uses a restricted Mustache context instead: `{{env.APP_NAME}}`, `{{destination}}`, `{{hostname}}`. The migration from ERB is mechanical for most `deploy.yml` files.
+There is exactly one deliberate divergence: `config/deploy.yml` does not support ERB. ERB is Ruby template code, and rendering it would require embedding a Ruby runtime — which is the thing we were trying to avoid. What Wheels keeps unchanged is Kamal's other built-in interpolation, the `${VAR}` env-var syntax. So `<%= ENV["APP_NAME"] %>` becomes `${APP_NAME}` — a strict subset of the syntax Kamal itself already supports. The migration from ERB is mechanical for most `deploy.yml` files.
 
 The subcommand surface mirrors Kamal's top-level verbs: `init`, `setup`, `rollback`, `config`, `app`, `proxy`, `accessory`, `build`, `registry`, `secrets`, `server`, `prune`, `lock`, `audit`, `details`, `remove`. Secret management ships with adapters for 1Password, Bitwarden, AWS Secrets Manager, LastPass, and Doppler.
 
@@ -450,17 +450,17 @@ A Kamal-managed host can be taken over by `wheels deploy` without cleanup. Sit o
 
 **Reply 2:**
 ```
-2/ One deliberate divergence: `deploy.yml` uses Mustache, not ERB.
+2/ One deliberate divergence: `deploy.yml` does not support ERB. Kamal's native `${VAR}` env-var interpolation is preserved.
 
 ```yaml
 # Kamal
 service: <%= ENV["APP_NAME"] %>
 
 # wheels deploy
-service: {{env.APP_NAME}}
+service: ${APP_NAME}
 ```
 
-We can't render Ruby from a CFML CLI without embedding a Ruby runtime — which defeats the point.
+No new syntax. Just ERB out — `${VAR}` is something Kamal already supports too.
 ```
 
 **Reply 3:**
@@ -505,14 +505,21 @@ A server managed by Ruby Kamal can be taken over by `wheels deploy` during evalu
 
 ## The one divergence
 
-`config/deploy.yml` does not support ERB. ERB is Ruby template code; rendering it from a CFML CLI would require embedding a Ruby runtime, which defeats the purpose of the port. Wheels uses a restricted Mustache context instead:
+`config/deploy.yml` does not support ERB. ERB is Ruby template code; rendering it from a CFML CLI would require embedding a Ruby runtime, which defeats the purpose of the port. What Wheels keeps unchanged is Kamal's other built-in interpolation — `${UPPER_SNAKE}` env-var tokens — so most ERB-using configs convert mechanically:
 
 ```yaml
-service: {{env.APP_NAME}}
-image: {{env.REGISTRY}}/{{env.APP_NAME}}
+# Ruby Kamal — NOT SUPPORTED
+service: <%= ENV["APP_NAME"] %>
+image: <%= ENV["REGISTRY"] %>/<%= ENV["APP_NAME"] %>
+
+# wheels deploy — and also valid Kamal syntax
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
 ```
 
-Available context: `{{env.FOO}}`, `{{destination}}`, `{{hostname}}`. For most `deploy.yml` files the conversion is mechanical.
+`${VAR}` references resolve through the same lookup chain Kamal uses (CLI overrides → `.kamal/secrets` → `System.getenv` → empty string). For ERB blocks that did real logic — conditionals, ternaries, computed values — the resolution moves into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and the result is referenced back through `${VAR}`.
+
+Net effect: there is no new syntax to learn. The single change is a removal — ERB out, everything else identical.
 
 ## Subcommand surface
 

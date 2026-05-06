@@ -9,9 +9,14 @@
  *   5. wrap in typed Config object
  *
  * Interpolation is deliberately simple: only ${UPPER_SNAKE} tokens are
- * expanded. ERB-style `<%= %>` tags (Kamal's native syntax) are NOT
- * supported — that's a deliberate divergence. Mustache-style `{{env.FOO}}`
- * is handled by the Mustache layer later, not here.
+ * expanded — same syntax Kamal supports natively, with the same lookup
+ * order (envOverride → .kamal/secrets → System.getenv → ""). ERB-style
+ * `<%= %>` tags are NOT supported; that's the one deliberate divergence
+ * from Ruby Kamal, since rendering ERB would require embedding a Ruby
+ * runtime in the CLI. The Mustache layer in this package is used only
+ * by `wheels deploy init` to scaffold the initial deploy.yml/secrets
+ * files (see DeployMainCli.$init); it is NOT applied to deploy.yml at
+ * runtime.
  */
 component {
 

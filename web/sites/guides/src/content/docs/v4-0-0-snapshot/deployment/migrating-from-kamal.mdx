@@ -13,12 +13,12 @@ This page is for teams already running Ruby Kamal who want to replace `kamal` wi
 **You'll learn:**
 
 - What `wheels deploy` keeps byte-compatible with Ruby Kamal
-- The one deliberate schema divergence (ERB → Mustache) and how to convert
+- The one deliberate schema divergence — ERB removed; Kamal's `${VAR}` interpolation kept unchanged
 - The coexistence guarantee — running both tools against the same host during evaluation
 - A concrete switch-over checklist
 
 <Aside type="caution" title="ERB is not supported">
-`deploy.yml` in Ruby Kamal supports embedded ERB. `wheels deploy` does not. This is the only schema-level incompatibility. If you use ERB anywhere in your deploy config, you will need to convert it to Mustache. See [The one divergence](#the-one-divergence) below.
+`deploy.yml` in Ruby Kamal supports embedded ERB. `wheels deploy` does not. This is the only schema-level incompatibility. If you use ERB anywhere in your deploy config, you will need to convert it to `${VAR}` env-var interpolation (which Kamal already supports too) or move the logic into `.kamal/secrets`. See [The one divergence](#the-one-divergence) below.
 </Aside>
 
 ## What's byte-compatible
@@ -54,31 +54,32 @@ image: <%= ENV["REGISTRY"] %>/<%= ENV["APP_NAME"] %>
 
 ERB is a Ruby template language — it calls into Ruby code at render time. We can't render ERB from a CFML CLI without embedding a Ruby runtime, which defeats the purpose of the port.
 
-`wheels deploy` replaces ERB with a restricted Mustache context:
+What `wheels deploy` keeps unchanged is Kamal's other built-in interpolation syntax — `${UPPER_SNAKE}` env-var tokens — so most ERB-using configs convert mechanically by dropping the `<%= ENV["..."] %>` wrapper and using a bare `${VAR}` reference:
 
 ```yaml title="config/deploy.yml (illustrative — do not type)"
-service: {{env.APP_NAME}}
-image: {{env.REGISTRY}}/{{env.APP_NAME}}
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
 ```
 
-Three variables are available in the rendering context:
+`${VAR}` references resolve in this order:
 
-| Variable | Value |
-|----------|-------|
-| `env.*` | Any environment variable or `.kamal/secrets` entry. |
-| `destination` | Current `--destination` flag, or empty. |
-| `hostname` | Local hostname of the machine running `wheels deploy`. |
+1. CLI `--env` overrides (test/CI shims).
+2. `.kamal/secrets` (and the destination overlay `.kamal/secrets.<destination>` when `--destination` is set).
+3. `System.getenv(VAR)` on the machine running `wheels deploy`.
+4. Empty string (Kamal's behavior for unset vars).
 
-No loops, no conditionals, no method calls. If your existing config uses ERB logic — `<%= "blue" if ENV["ROLE"] == "staging" %>` — move that logic into a shell wrapper or into `.kamal/secrets` first, and reference the resolved value via `{{env.*}}`.
+Only uppercase-and-underscore tokens are expanded — `${APP_NAME}` matches; lowercase `${service}` is left alone (this prevents accidental capture of shell-style placeholders elsewhere in the config). This is the same rule Kamal applies.
 
-### Common ERB → Mustache conversions
+If your existing config uses ERB logic — `<%= "blue" if ENV["ROLE"] == "staging" %>` — move that logic into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay), or into a shell wrapper that exports the resolved value, then reference the result with `${ROLE}`.
 
-| Ruby Kamal ERB | `wheels deploy` Mustache |
-|----------------|--------------------------|
-| `<%= ENV["FOO"] %>` | `{{env.FOO}}` |
-| `<%= ENV.fetch("FOO", "bar") %>` | `{{env.FOO}}` (set `FOO=bar` in `.kamal/secrets` for the default) |
-| `<%= `git rev-parse --short HEAD`.chomp %>` | pass `--version=$(git rev-parse --short HEAD)` on the CLI, or set `VERSION` in `.kamal/secrets` and use `{{env.VERSION}}` |
-| `<%= ENV["STAGE"] == "prod" ? 1 : 0 %>` | Set the resolved value in `.kamal/secrets.production` or `.kamal/secrets.staging` — destination overlays replace in-file logic |
+### Common ERB → `${VAR}` conversions
+
+| Ruby Kamal ERB | `wheels deploy` |
+|----------------|-----------------|
+| `<%= ENV["FOO"] %>` | `${FOO}` |
+| `<%= ENV.fetch("FOO", "bar") %>` | `${FOO}` — set `FOO=bar` in `.kamal/secrets` for the default |
+| `<%= `git rev-parse --short HEAD`.chomp %>` | pass `--version=$(git rev-parse --short HEAD)` on the CLI, or set `VERSION` in `.kamal/secrets` and use `${VERSION}` |
+| `<%= ENV["STAGE"] == "prod" ? 1 : 0 %>` | set the resolved value in `.kamal/secrets.production` or `.kamal/secrets.staging` — destination overlays replace in-file logic |
 
 ## What changes in the CLI
 
@@ -139,7 +140,7 @@ These Ruby Kamal features have no `wheels deploy` equivalent and won't get one:
   <LinkCard
     title="deploy.yml Reference"
     href="/v4-0-0-snapshot/deployment/config-reference/"
-    description="Every key in the schema, with the Mustache interpolation rules."
+    description="Every key in the schema, with the ${VAR} interpolation rules."
   />
   <LinkCard
     title="Your First Deploy"
