@@ -59,7 +59,7 @@ jobs:
 
       - name: Install tools/docs-validation deps
         working-directory: tools/docs-validation
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Set up Linuxbrew
         uses: Homebrew/actions/setup-homebrew@master
