@@ -13,8 +13,8 @@
 | 3 | 2026-04-25 | 3.0 → 4.0 delta | Existing users planning the upgrade. Posted. |
 | 4 | **2026-05-06** | `wheels deploy` | Marquee-feature spotlight; wholly new CLI surface. (Resume) |
 | 5 | 2026-05-07 | Security hardening | 40+ hardening PRs, "secure by default" story. |
-| 6 | 2026-05-08 | Data layer modernization | "Rails parity made concrete" for ORM-curious devs. |
-| 7 | 2026-05-09 | Testing | Browser testing + parallel runner + HTTP client + zero-Docker inner loop. |
+| 7 | 2026-05-08 | Testing | Browser testing + parallel runner + HTTP client + zero-Docker inner loop. |
+| 6 | 2026-05-09 | Data layer modernization | "Rails parity made concrete" for ORM-curious devs. |
 | 8 | 2026-05-10 | Multi-tenancy + background jobs | The "what makes Wheels different" beat. |
 | 9 | 2026-05-11 | LuCLI / zero-Docker DX | Inner-loop developer-experience closer. |
 | 10 | **2026-05-12 (GA)** | Release announcement | Recaps the arc, swap all "coming" → present tense. |
@@ -25,13 +25,15 @@
 |---|---|---|
 | 09 — `wheels deploy` (Kamal port) | 2026-05-06 | Social 4 |
 | 03 — Security hardening | 2026-05-07 | Social 5 |
-| 06 — Testing in 4.0 | 2026-05-09 | Social 7 |
-| 04 — Background jobs without Redis | 2026-05-10 | Social 8 |
-| 07 — Multi-tenancy built in | 2026-05-10 | Social 8 (same day, double pairing) |
+| 06 — Testing in 4.0 | 2026-05-08 | Social 7 (Testing) — match |
+| 04 — Background jobs without Redis | 2026-05-09 | Social 6 (Data layer) — distinct topics, parallel "ground gained" beats |
+| 07 — Multi-tenancy built in | 2026-05-10 | Social 8 (Multi-tenancy + background jobs) — partial match |
 | 05 — LuCLI zero-Docker DX | 2026-05-11 | Social 9 |
 | 01 — Closing the maturity gap (lead) | 2026-05-12 | Social 10 / GA |
-| 02 — Upgrading from 3.x | 2026-05-12 | Social 10 / GA |
-| 08 — WireBox → wheelsdi (contributor) | 2026-05-13 | Post-GA |
+| 02 — Upgrading from 3.x | 2026-05-13 | Post-GA migration companion |
+| 08 — WireBox → wheelsdi (contributor) | 2026-05-14 | Post-GA |
+
+**Note on the swapped social order on 2026-05-08 / 09:** Social 7 (Testing) and Social 6 (Data layer modernization) had their dates swapped from the original campaign plan so Social 7 lands on the same day as Blog 06 (Testing), giving 5/8 a clean topic match. 5/9 then has Social 6 (Data layer) firing alongside Blog 04 (Background jobs) — two unrelated-but-related "ground gained in 4.0" beats, different audience angles. The social copy itself is unchanged from the original plan; only the dates moved.
 
 **Framing:** 4.0 is *in the works* — release candidate, not GA. Phrasing throughout uses "coming" / "on the way" / "preview" rather than "shipped." Swap to present tense on GA day.
 
