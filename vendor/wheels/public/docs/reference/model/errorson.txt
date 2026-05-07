@@ -1,2 +1,13 @@
-// Get all errors related to the email address of the user object
+// 1. Get all errors associated with the emailAddress property
 errors = user.errorsOn("emailAddress");
+// errors -> [{property: "emailAddress", message: "is invalid", name: ""}, ...]
+
+// 2. Get only errors on emailAddress that were set with a specific error name
+errors = user.errorsOn(property="emailAddress", name="formatCheck");
+// errors -> [{property: "emailAddress", message: "must be a valid email", name: "formatCheck"}]
+
+// 3. Check errors on a property and loop over them
+errors = user.errorsOn("username");
+for (error in errors) {
+    writeOutput(error.message);
+}

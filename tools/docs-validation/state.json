@@ -1333,6 +1333,558 @@
         "cache_creation_input_tokens": 1677,
         "cache_read_input_tokens": 17889
       }
+    },
+    "function:addError": {
+      "kind": "function",
+      "id": "addError",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:39:50.848Z",
+      "summary": "Updated the `addError` reference example to include three examples: the original basic usage, a second showing the optional `name` parameter for distinguishing errors, and a third demonstrating how `hasErrors` can be used with both `property` and `name` to check for a specifically named error. The docblock was already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/adderror.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5947,
+        "output_tokens": 545,
+        "cache_creation_input_tokens": 4636,
+        "cache_read_input_tokens": 6532
+      }
+    },
+    "function:addErrorToBase": {
+      "kind": "function",
+      "id": "addErrorToBase",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:40:09.869Z",
+      "summary": "Fixed the misleading docblock for `addErrorToBase` (changed \"Adds an error on a specific property\" to \"Adds an error on the object as a whole (not tied to any specific property)\") and rewrote the reference example with three idiomatic usages covering basic use, named errors, and use inside a custom validation method.",
+      "files_changed": [
+        "vendor/wheels/model/errors.cfc",
+        "vendor/wheels/public/docs/reference/model/adderrortobase.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 6697,
+        "output_tokens": 958,
+        "cache_creation_input_tokens": 3848,
+        "cache_read_input_tokens": 13801
+      }
+    },
+    "function:allAssociationErrors": {
+      "kind": "function",
+      "id": "allAssociationErrors",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:40:22.549Z",
+      "summary": "Created reference example for `allAssociationErrors()` in `vendor/wheels/public/docs/reference/model/allassociationerrors.txt`. Three examples demonstrate: collecting errors from associated objects, the preferred `allErrors(includeAssociations=true)` shorthand, and a practical guard check before saving.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/allassociationerrors.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5908,
+        "output_tokens": 610,
+        "cache_creation_input_tokens": 1086,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:allChanges": {
+      "kind": "function",
+      "id": "allChanges",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:40:36.304Z",
+      "summary": "Updated the `allChanges` reference example with three idiomatic examples: one showing the struct return shape with before/after values, one demonstrating usage inside an `hasChanged()` guard with iteration, and one showing the empty-struct case when no properties have changed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/allchanges.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28840,
+        "output_tokens": 659,
+        "cache_creation_input_tokens": 1212,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:allErrors": {
+      "kind": "function",
+      "id": "allErrors",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:40:49.445Z",
+      "summary": "Rewrote the allErrors reference example with three idiomatic examples: basic usage after failed validation, iterating over errors, and using the `includeAssociations=true` parameter to collect errors from associated models. The docblock in the CFC was already consistent with the documented hint and parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/allerrors.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 6085,
+        "output_tokens": 601,
+        "cache_creation_input_tokens": 1448,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:changedFrom": {
+      "kind": "function",
+      "id": "changedFrom",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:41:06.978Z",
+      "summary": "Reviewed the `changedFrom` function source in `vendor/wheels/model/properties.cfc`. The docblock matches the documented hint and parameters exactly. Wrote a clean reference example with three numbered examples: basic usage with return value comment, the dynamic shorthand method variant, and a practical pattern combining `hasChanged` with `changedFrom`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/changedfrom.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28956,
+        "output_tokens": 721,
+        "cache_creation_input_tokens": 1388,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:changedProperties": {
+      "kind": "function",
+      "id": "changedProperties",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:41:21.353Z",
+      "summary": "Rewrote the reference example for `changedProperties()` with three idiomatic examples: basic inspection of which properties changed, a conditional save guard, and an audit-log pattern combining `changedProperties()` with `changedFrom()`. The docblock and function signature were already accurate and needed no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/changedproperties.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28801,
+        "output_tokens": 631,
+        "cache_creation_input_tokens": 1218,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:clearChangeInformation": {
+      "kind": "function",
+      "id": "clearChangeInformation",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:41:41.635Z",
+      "summary": "Rewrote the reference example for `clearChangeInformation` with three idiomatic examples: clearing a single property, clearing all properties, and a realistic `afterFind` callback pattern. The function source confirmed the behaviour — with no argument it resets all properties, with `property=` it resets only that one.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/clearchangeinformation.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 29107,
+        "output_tokens": 873,
+        "cache_creation_input_tokens": 1374,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:clearErrors": {
+      "kind": "function",
+      "id": "clearErrors",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:41:56.958Z",
+      "summary": "Updated the clearErrors reference example to cover all four use cases: clearing all errors, clearing by property, clearing by name, and clearing by both property and name together. The docblock in errors.cfc already matched the documented hint and parameters exactly — no CFC changes needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/clearerrors.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5918,
+        "output_tokens": 518,
+        "cache_creation_input_tokens": 1302,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:compareTo": {
+      "kind": "function",
+      "id": "compareTo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:42:10.634Z",
+      "summary": "Authored a new reference example for `compareTo` at `vendor/wheels/public/docs/reference/model/compareto.txt`. The two examples illustrate that the method compares object identity (not just data equality) and show a practical use-case of skipping the current user in a loop. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/compareto.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11510,
+        "output_tokens": 608,
+        "cache_creation_input_tokens": 1088,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:delete": {
+      "kind": "function",
+      "id": "delete",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:42:27.424Z",
+      "summary": "Rewrote the reference example for `model.delete` to include four idiomatic examples: basic delete, permanent delete bypassing soft deletes, delete without callbacks, and the scoped association pattern. Model names updated to PascalCase per conventions.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/delete.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 7976,
+        "output_tokens": 586,
+        "cache_creation_input_tokens": 1812,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:errorCount": {
+      "kind": "function",
+      "id": "errorCount",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:42:39.366Z",
+      "summary": "Reviewed the `errorCount` function source (errors.cfc:113). Docblock, hint, and parameters all match the snapshot exactly. Rewrote the reference example to cover all three call variants: no arguments (total count), filtering by `property`, and filtering by `name`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/errorcount.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5968,
+        "output_tokens": 517,
+        "cache_creation_input_tokens": 1424,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:errorsOn": {
+      "kind": "function",
+      "id": "errorsOn",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:42:50.382Z",
+      "summary": "Updated the `errorsOn` reference example to demonstrate three usage scenarios: basic property error retrieval, filtering by both property and error name, and iterating over the returned error array. The docblock in the CFC already matched the documented hint and parameters, so no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/errorson.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5900,
+        "output_tokens": 518,
+        "cache_creation_input_tokens": 1268,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:errorsOnBase": {
+      "kind": "function",
+      "id": "errorsOnBase",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:43:03.933Z",
+      "summary": "Expanded the `errorsOnBase` reference from a single line to three idiomatic examples covering: basic usage after validation, filtering by error name using the `name` parameter, and iterating over base errors. No CFC changes were needed — the docblock and implementation are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/errorsonbase.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5971,
+        "output_tokens": 616,
+        "cache_creation_input_tokens": 1214,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:hasChanged": {
+      "kind": "function",
+      "id": "hasChanged",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:43:22.037Z",
+      "summary": "Rewrote the `hasChanged` reference example with four clear, idiomatic scenarios: checking a specific property, checking any property (no argument), using the auto-generated dynamic shorthand (`statusHasChanged()`), and demonstrating that new unsaved objects always return `true`. The docblock and function signature were already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/haschanged.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28961,
+        "output_tokens": 703,
+        "cache_creation_input_tokens": 1418,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:hasErrors": {
+      "kind": "function",
+      "id": "hasErrors",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:43:32.567Z",
+      "summary": "Updated the `hasErrors` reference example to cover three cases: basic error check, property-specific check, and name-specific check, matching the two documented optional parameters (`property` and `name`).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/haserrors.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5910,
+        "output_tokens": 483,
+        "cache_creation_input_tokens": 1290,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:hasProperty": {
+      "kind": "function",
+      "id": "hasProperty",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:43:46.505Z",
+      "summary": "Rewrote the `hasProperty` reference example with three clear, idiomatic examples: checking a set vs. unset property, the equivalent dynamic `has<PropertyName>()` method, and a guard-logic pattern before accessing a property. The docblock and function signature are already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/hasproperty.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28727,
+        "output_tokens": 538,
+        "cache_creation_input_tokens": 1252,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:isNew": {
+      "kind": "function",
+      "id": "isNew",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:44:02.555Z",
+      "summary": "Rewrote the `isNew` reference example with three idiomatic, well-commented examples covering: a newly instantiated (unsaved) object, a finder-loaded (persisted) object, and the primary use-case of branching logic inside a model callback. The original example had a syntax error (`model(\"employee\").new()>`) and was minimal; the new version is clean and covers real-world usage.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/isnew.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11594,
+        "output_tokens": 641,
+        "cache_creation_input_tokens": 1246,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:isPersisted": {
+      "kind": "function",
+      "id": "isPersisted",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:44:13.872Z",
+      "summary": "Created the reference example file for `isPersisted()` at `vendor/wheels/public/docs/reference/model/ispersisted.txt` with three idiomatic examples covering: a new unsaved object (returns false), an object loaded via a finder (returns true), and a new object after saving (returns true). No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/ispersisted.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11435,
+        "output_tokens": 532,
+        "cache_creation_input_tokens": 1098,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:key": {
+      "kind": "function",
+      "id": "key",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:44:29.742Z",
+      "summary": "Wrote an improved reference example for `model.key` covering single primary key retrieval, dynamic programming usage, and composite keys. The existing one-liner was replaced with three numbered examples that illustrate the function's core value proposition as described in the docblock.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/key.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28790,
+        "output_tokens": 527,
+        "cache_creation_input_tokens": 1374,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:properties": {
+      "kind": "function",
+      "id": "properties",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:44:44.582Z",
+      "summary": "Expanded the reference example for `model.properties` from a single basic usage to three idiomatic examples covering: basic struct retrieval, excluding nested association properties with `returnIncluded=false`, and passing the struct to a service layer. No docblock or code changes were needed — the source and documentation are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/properties.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28802,
+        "output_tokens": 643,
+        "cache_creation_input_tokens": 1192,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:propertyIsBlank": {
+      "kind": "function",
+      "id": "propertyIsBlank",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:44:57.632Z",
+      "summary": "Created the reference example file for `propertyIsBlank` at `vendor/wheels/public/docs/reference/model/propertyisblank.txt` with three idiomatic examples demonstrating blank-check before notification, setting a default value, and branching logic contrasting with `propertyIsPresent`. No docblock or code changes were needed — the source matches the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/propertyisblank.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28754,
+        "output_tokens": 632,
+        "cache_creation_input_tokens": 1178,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:propertyIsPresent": {
+      "kind": "function",
+      "id": "propertyIsPresent",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:45:11.957Z",
+      "summary": "Rewrote the reference example for `propertyIsPresent` to fix a syntax error in the original (malformed `\">` on the empty-string line), remove non-idiomatic `return` statements, and add a third example demonstrating the false-when-property-missing case. Three clean numbered examples now cover: present value → true, empty string → false, missing property → false.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/propertyispresent.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28864,
+        "output_tokens": 681,
+        "cache_creation_input_tokens": 1314,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:reload": {
+      "kind": "function",
+      "id": "reload",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:45:25.332Z",
+      "summary": "Wrote an updated reference example for `model.reload` with two idiomatic scenarios: reloading after an external DB-mutating call, and discarding in-memory property changes. The existing single example was preserved as example 1 (with minor capitalization fix to `Employee`) and a second example added to illustrate discarding unsaved changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/reload.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 29845,
+        "output_tokens": 503,
+        "cache_creation_input_tokens": 1154,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:setProperties": {
+      "kind": "function",
+      "id": "setProperties",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:45:37.619Z",
+      "summary": "Expanded the `setProperties` reference example to three idioms: updating from a form post struct, passing a struct literal, and using named arguments (as supported by the `$setProperties` internals). No docblock or code changes were needed — the existing source and documentation are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/setproperties.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28738,
+        "output_tokens": 541,
+        "cache_creation_input_tokens": 1254,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:toggle": {
+      "kind": "function",
+      "id": "toggle",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:45:55.352Z",
+      "summary": "Updated the toggle reference example to add a `save=false` usage (memory-only flip) and clarify the boolean return value. No CFC edits were made; the docblock hint about \"Returns this object\" is slightly misleading (code returns `true`, not `this`), but the discrepancy is minor and the example accurately reflects the actual boolean return behavior.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/toggle.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28970,
+        "output_tokens": 752,
+        "cache_creation_input_tokens": 1342,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:update": {
+      "kind": "function",
+      "id": "update",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:46:11.319Z",
+      "summary": "Rewrote the reference example for `model.update` with 6 clean, numbered examples covering basic update, multi-property update with params, skipping validation, and the three association-scoped call patterns (hasOne setBio, hasMany addCar, hasMany removeComment). Fixed the existing file's formatting issue where `toggle` content was erroneously appended to the end of the `removeComment` line.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/update.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12754,
+        "output_tokens": 805,
+        "cache_creation_input_tokens": 2658,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:updateProperty": {
+      "kind": "function",
+      "id": "updateProperty",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:46:23.672Z",
+      "summary": "Expanded the `updateProperty` reference example from one basic case to three idiomatic examples: a boolean flag use case (the documented primary purpose), marking a record active, and skipping callbacks. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/updateproperty.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11938,
+        "output_tokens": 504,
+        "cache_creation_input_tokens": 1540,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:valid": {
+      "kind": "function",
+      "id": "valid",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:46:38.167Z",
+      "summary": "Rewrote the reference example for `valid()` with three idiomatic examples covering basic validation, skipping callbacks, and validating associations. Fixed the original's missing parentheses around the `if` condition and improved code style throughout.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/valid.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 33648,
+        "output_tokens": 566,
+        "cache_creation_input_tokens": 1336,
+        "cache_read_input_tokens": 9798
+      }
     }
   },
   "runs": []

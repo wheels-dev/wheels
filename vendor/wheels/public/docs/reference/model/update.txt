@@ -1,28 +1,26 @@
-// Get a post object and then update its title in the database
-post = model("post").findByKey(33);
+// 1. Find a post and update its title
+post = model("Post").findByKey(33);
 post.update(title="New version of Wheels just released");
 
-// Get a post object and then update its title and other properties based on what is passed in from the URL/form
-post = model("post").findByKey(params.key);
-post.update(title="New version of Wheels just released", properties=params.post);
+// 2. Update multiple properties from form/URL params on an existing object
+post = model("Post").findByKey(params.key);
+isSuccess = post.update(title="New version of Wheels just released", properties=params.post);
 
-// If you have a `hasOne` association setup from `author` to `bio`, you can do a scoped call. (The `setBio` method below will call `bio.update(authorId=anAuthor.id)` internally.)
-author = model("author").findByKey(params.authorId); 
-bio = model("bio").findByKey(params.bioId); 
-author.setBio(bio); 
+// 3. Skip validations when updating (useful for admin operations)
+post = model("Post").findByKey(params.key);
+isSuccess = post.update(properties=params.post, validate=false);
 
-// If you have a `hasMany` association setup from `owner` to `car`, you can do a scoped call. (The `addCar` method below will call `car.update(ownerId=anOwner.id)` internally.)
-anOwner = model("owner").findByKey(params.ownerId); 
-aCar = model("car").findByKey(params.carId); 
-anOwner.addCar(aCar); 
+// 4. Scoped call via a hasOne association (setBio calls bio.update(authorId=author.id) internally)
+author = model("Author").findByKey(params.authorId);
+bio = model("Bio").findByKey(params.bioId);
+author.setBio(bio);
 
-// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `removeComment` method below will call `comment.update(postId="")` internally.)
-aPost = model("post").findByKey(params.postId); 
-aComment = model("comment").findByKey(params.commentId); 
-aPost.removeComment(aComment); // Get an object, and toggle a boolean property
-user = model("user").findByKey(58); 
-isSuccess = user.toggle("isActive"); // returns whether the object was saved properly
+// 5. Scoped call via a hasMany association (addCar calls car.update(ownerId=owner.id) internally)
+anOwner = model("Owner").findByKey(params.ownerId);
+aCar = model("Car").findByKey(params.carId);
+anOwner.addCar(aCar);
 
-// You can also use a dynamic helper for this
-isSuccess = user.toggleIsActive(); 
-
+// 6. Scoped call to disassociate a record (removeComment calls comment.update(postId="") internally)
+aPost = model("Post").findByKey(params.postId);
+aComment = model("Comment").findByKey(params.commentId);
+aPost.removeComment(aComment);

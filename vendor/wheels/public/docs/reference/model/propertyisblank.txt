@@ -1,0 +1,22 @@
+// 1. Check if a property is blank before sending a notification
+user = model("User").findByKey(params.userId);
+if (user.propertyIsBlank("email")) {
+    flashInsert(error="Please provide an email address before continuing.");
+}
+
+// 2. Conditionally set a default value when a property is blank
+product = model("Product").findByKey(params.id);
+if (product.propertyIsBlank("description")) {
+    product.description = "No description available.";
+    product.save();
+}
+
+// 3. Use propertyIsBlank alongside its inverse propertyIsPresent for branching logic
+post = model("Post").findByKey(params.postId);
+if (post.propertyIsBlank("publishedAt")) {
+    // post has never been published
+    writeOutput("Draft");
+} else {
+    // propertyIsPresent("publishedAt") would return true here
+    writeOutput("Published on #post.publishedAt#");
+}

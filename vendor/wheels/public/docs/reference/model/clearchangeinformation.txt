@@ -1,7 +1,28 @@
-// Convert startTime to UTC (maybe done in an "after find" call back) but then tell CFWheels to clear the information about this change (but not the change itself) so that it won't attempt to save the new value to the database, report it as being changed when calling hasChanged() etc.
-
-this.startTime = DateConvert("Local2UTC", this.startTime);
+// 1. Clear change tracking for a single property
+// Convert startTime to UTC in an afterFind callback, then tell Wheels to treat
+// the converted value as the "original" so it won't be flagged as changed or
+// saved unnecessarily.
+this.startTime = dateConvert("Local2UTC", this.startTime);
 this.clearChangeInformation(property="startTime");
 
-// Clear information for all properties
+// 2. Clear change tracking for all properties at once
+// After manually adjusting values in an afterFind callback, reset Wheels'
+// internal state so none of the touched properties appear as dirty.
 this.clearChangeInformation();
+
+// 3. Typical afterFind callback usage in a model
+// In User.cfc config():
+//   afterFind("normalizeTimestamps");
+// The callback method:
+function normalizeTimestamps() {
+    if (structKeyExists(this, "createdAt")) {
+        this.createdAt = dateConvert("Local2UTC", this.createdAt);
+    }
+    if (structKeyExists(this, "updatedAt")) {
+        this.updatedAt = dateConvert("Local2UTC", this.updatedAt);
+    }
+    // Mark both properties as clean so hasChanged() returns false
+    // and save() won't push them back to the database.
+    this.clearChangeInformation(property="createdAt");
+    this.clearChangeInformation(property="updatedAt");
+}

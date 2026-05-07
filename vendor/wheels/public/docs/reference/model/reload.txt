@@ -1,4 +1,10 @@
-// Get an object, call a method on it that could potentially change values, and then reload the values from the database
-employee = model("employee").findByKey(params.key);
+// 1. Reload after a call that may have changed values in the database
+employee = model("Employee").findByKey(params.key);
 employee.someCallThatChangesValuesInTheDatabase();
 employee.reload();
+
+// 2. Discard in-memory changes and restore the current database values
+post = model("Post").findByKey(params.id);
+post.title = "Draft title that we want to discard";
+post.reload();
+// post.title now reflects the value stored in the database

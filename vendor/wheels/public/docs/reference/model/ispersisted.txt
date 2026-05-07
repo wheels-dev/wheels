@@ -1,0 +1,12 @@
+// 1. Check if a newly created (unsaved) object has been persisted
+user = model("User").new(firstName="Jane", lastName="Doe");
+writeOutput(user.isPersisted()); // -> false
+
+// 2. Check if an object loaded from the database is persisted
+user = model("User").findByKey(1);
+writeOutput(user.isPersisted()); // -> true
+
+// 3. Check persistence after saving a new object
+post = model("Post").new(title="Hello World", body="First post.");
+post.save();
+writeOutput(post.isPersisted()); // -> true
