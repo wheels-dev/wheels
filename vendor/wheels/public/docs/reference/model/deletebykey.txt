@@ -1,2 +1,12 @@
-// Delete the user with the primary key value of `1`.
-result = model("user").deleteByKey(1);
+// 1. Delete the user with the primary key value of 1.
+result = model("User").deleteByKey(1);
+// result -> true (if the row was deleted), false otherwise
+
+// 2. Permanently delete a soft-deletable record (bypass soft delete).
+result = model("User").deleteByKey(key=1, softDelete=false);
+
+// 3. Delete using a composite primary key (comma-separated values).
+result = model("OrderItem").deleteByKey("42,7");
+
+// 4. Delete within a transaction that can be rolled back (useful for testing).
+result = model("User").deleteByKey(key=1, transaction="rollback");

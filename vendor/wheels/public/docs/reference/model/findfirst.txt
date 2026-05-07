@@ -1,0 +1,12 @@
+// 1. Get the first user record (ordered by primary key ascending)
+user = model("User").findFirst();
+// Returns the model object with the lowest primary key value, or false if no records exist.
+
+// 2. Get the first user ordered by a specific property
+user = model("User").findFirst(property="createdAt");
+// Returns the oldest user (lowest createdAt value).
+
+// 3. Get the first active user ordered by last name, then first name
+user = model("User").findFirst(properties="lastName,firstName", where="active = 1");
+// Equivalent to: ORDER BY lastName ASC, firstName ASC with a WHERE clause applied.
+// Returns a model object, or false if no matching record is found.

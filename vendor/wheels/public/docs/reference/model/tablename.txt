@@ -1,2 +1,13 @@
-// Check what table the user model uses
-whatAmIMappedTo = model("user").tableName();
+// 1. Check what table the User model is mapped to (Wheels convention: singular model -> plural table)
+name = model("User").tableName();
+// name -> "users"
+
+// 2. Check the table for a model that uses a custom table name (set via table() in config())
+// In models/StaffMember.cfc: table("employees");
+name = model("StaffMember").tableName();
+// name -> "employees"
+
+// 3. Use the table name dynamically in a log message or custom SQL fragment
+tableUsed = model("Order").tableName();
+writeOutput("Querying table: " & tableUsed);
+// Outputs: Querying table: orders

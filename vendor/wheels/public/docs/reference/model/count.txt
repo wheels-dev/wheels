@@ -1,13 +1,17 @@
-// Count how many authors there are in the table
+// 1. Count all rows in the authors table
 authorCount = model("author").count();
 
-// Count how many authors that have a last name starting with an "A"
+// 2. Count authors whose last name starts with "A"
 authorOnACount = model("author").count(where="lastName LIKE 'A%'");
 
-// Count how many authors that have written books starting with an "A"
-authorWithBooksOnACount = model("author").count(include="books", where="booktitle LIKE 'A%'");
+// 3. Count authors who have written books with titles starting with "A" (requires a hasMany association from author to book)
+authorWithBooksOnACount = model("author").count(include="books", where="books.title LIKE 'A%'");
 
-// Count the number of comments on a specific post (a `hasMany` association from `post` to `comment` is required)
-// The `commentCount` method will call `model("comment").count(where="postId=#post.id#")` internally
+// 4. Count posts grouped by status, returning a query with one row per status
+statusCounts = model("post").count(group="status");
+// statusCounts is a query with columns: count, status
+
+// 5. Count the number of comments on a specific post using a dynamic counter method
+// (requires a hasMany association from post to comment)
 aPost = model("post").findByKey(params.postId);
-amount = aPost.commentCount();
+commentCount = aPost.commentCount();

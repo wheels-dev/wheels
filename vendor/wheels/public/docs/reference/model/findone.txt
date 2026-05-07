@@ -1,16 +1,32 @@
-// Getting the most recent order as an object from the database
-order = model("order").findOne(order="datePurchased DESC");
+// 1. Get the most recent order as an object from the database
+order = model("Order").findOne(order="datePurchased DESC");
 
-// Using a dynamic finder to get the first person with the last name `Smith`. Same as calling `model("user").findOne(where"lastName='Smith'")`
-person = model("user").findOneByLastName("Smith");
+// 2. Use a where clause to find the first user with a specific email address
+user = model("User").findOne(where="email='someone@example.com'");
 
-// Getting a specific user using a dynamic finder. Same as calling `model("user").findOne(where"email='someone@somewhere.com' AND password='mypass'")`
-user = model("user").findOneByEmailAndPassword("someone@somewhere.com,mypass");
+// 3. Use a dynamic finder to get the first person with the last name Smith.
+// Equivalent to: model("User").findOne(where="lastName='Smith'")
+person = model("User").findOneByLastName("Smith");
 
-// If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `profile` method below will call `model("profile").findOne(where="userId=#user.id#")` internally)
-user = model("user").findByKey(params.userId);
+// 4. Use a dynamic finder to match on two columns.
+// Equivalent to: model("User").findOne(where="email='someone@example.com' AND password='mypass'")
+user = model("User").findOneByEmailAndPassword("someone@example.com", "mypass");
+
+// 5. Return false when no matching record is found (the default returnAs="object" behavior)
+user = model("User").findOne(where="email='unknown@example.com'");
+if (!isObject(user)) {
+    writeOutput("No user found.");
+}
+
+// 6. Return as a query result set instead of an object
+userQuery = model("User").findOne(where="role='admin'", returnAs="query");
+
+// 7. Use a scoped call via a hasOne association from User to Profile.
+// The profile() method calls model("Profile").findOne(where="userId=#user.id#") internally.
+user = model("User").findByKey(params.userId);
 profile = user.profile();
 
-// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `findOneComment` method below will call `model("comment").findOne(where="postId=#post.id#")` internally)
-post = model("post").findByKey(params.postId);
-comment = post.findOneComment(where="text='I Love Wheels!'");
+// 8. Use a scoped call via a hasMany association from Post to Comment.
+// The findOneComment() method calls model("Comment").findOne(where="postId=#post.id#") internally.
+post = model("Post").findByKey(params.postId);
+comment = post.findOneComment(where="approved=1");

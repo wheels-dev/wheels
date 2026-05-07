@@ -1,0 +1,18 @@
+// 1. Inspect all named scopes defined on a model
+info = model("Article").scopeInfo();
+// info -> {
+//   active:    { where: "status = 'active'" },
+//   recent:    { where: "publishedAt > ?", order: "publishedAt DESC" },
+//   published: { where: "status = 'published'", order: "publishedAt DESC" }
+// }
+
+// 2. Check whether a specific scope is defined before using it
+info = model("User").scopeInfo();
+if (structKeyExists(info, "admins")) {
+    admins = model("User").admins().findAll();
+}
+
+// 3. List all scope names registered on a model
+info = model("Post").scopeInfo();
+writeOutput(structKeyList(info));
+// -> "featured,archived,byDate"

@@ -1,8 +1,31 @@
-// Use the passed in `id` when we're not already in an instance
-function memberIsAdmin(){
-	if(isInstance()){
+// 1. Branch logic inside a shared model method based on class vs. instance context
+function memberIsAdmin() {
+	if (isInstance()) {
+		// Called on an instance object — property is already loaded
 		return this.admin;
 	} else {
+		// Called on the class — look up the record first
 		return this.findByKey(arguments.id).admin;
 	}
+}
+
+// 2. Use isInstance() in config() to guard instance-only setup
+component extends="Model" {
+	function config() {
+		if (isInstance()) {
+			// Instance-specific initialization (rarely needed; shown for contrast)
+		} else {
+			// Class-level configuration: validations, associations, callbacks
+			validatesPresenceOf(properties="username,email");
+			hasMany(name="posts");
+		}
+	}
+}
+
+// 3. Pair with isClass() to make the intent explicit
+function label() {
+	if (isClass()) {
+		return "User (class)";
+	}
+	return "User #this.id#";
 }

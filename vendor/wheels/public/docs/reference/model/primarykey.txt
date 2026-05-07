@@ -1,2 +1,15 @@
-// Get the name of the primary key of the table mapped to the `employee` model (which is the `employees` table by default)
+// 1. Get the name of the primary key for the `employee` model (maps to the `employees` table by default)
 keyName = model("employee").primaryKey();
+// keyName -> "id"
+
+// 2. Get all primary key column names for a model with a composite primary key
+keys = model("orderItem").primaryKey();
+// keys -> "orderId,productId"
+
+// 3. Get only the first key of a composite primary key using the `position` argument
+firstKey = model("orderItem").primaryKey(1);
+// firstKey -> "orderId"
+
+// 4. Use the `primaryKeys()` alias (preferred for readability with composite keys)
+keys = model("orderItem").primaryKeys();
+// keys -> "orderId,productId"

@@ -1,6 +1,13 @@
-// Sets the `new` property to `1` on the most recently released product
-result = model("product").updateOne(order="releaseDate DESC", new=1);
+// 1. Update the most recently released product by setting its `featured` flag
+result = model("Product").updateOne(order="releaseDate DESC", featured=1);
 
-// If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `removeProfile` method below will call `model("profile").updateOne(where="userId=#aUser.id#", userId="")` internally.)
-aUser = model("user").findByKey(params.userId);
+// 2. Update a specific record matching a `where` clause
+result = model("Order").updateOne(where="status='pending' AND createdAt < '#DateAdd('d', -7, Now())#'", status="expired");
+
+// 3. Skip validations when updating, e.g. to force a status change
+result = model("Article").updateOne(where="status='draft'", order="createdAt ASC", status="published", validate=false);
+
+// 4. Scoped call via a `hasOne` association (calls `updateOne` internally)
+// Given `hasOne(name="profile")` on the User model:
+aUser = model("User").findByKey(params.userId);
 aUser.removeProfile();

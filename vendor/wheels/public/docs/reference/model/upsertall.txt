@@ -1,0 +1,28 @@
+// 1. Upsert a batch of products using their SKU as the unique constraint
+records = [
+    {sku: "WIDGET-001", name: "Widget Standard", price: 9.99, stock: 100},
+    {sku: "WIDGET-002", name: "Widget Deluxe",   price: 19.99, stock: 50},
+    {sku: "GADGET-001", name: "Gadget Pro",       price: 49.99, stock: 25}
+];
+result = model("Product").upsertAll(records=records, uniqueBy="sku");
+// result -> {upsertedCount: 3}
+
+// 2. Upsert with a composite unique constraint (e.g., userId + date for daily stats)
+stats = [
+    {userId: 1, reportDate: "2024-06-01", pageViews: 42, clicks: 7},
+    {userId: 2, reportDate: "2024-06-01", pageViews: 18, clicks: 3}
+];
+result = model("DailyStat").upsertAll(records=stats, uniqueBy="userId,reportDate");
+// result -> {upsertedCount: 2}
+
+// 3. Upsert without automatic timestamps (e.g., when importing legacy data)
+imports = [
+    {externalId: "EXT-100", title: "Legacy Record A", status: "active"},
+    {externalId: "EXT-101", title: "Legacy Record B", status: "archived"}
+];
+result = model("ImportedRecord").upsertAll(
+    records    = imports,
+    uniqueBy   = "externalId",
+    timestamps = false
+);
+// result -> {upsertedCount: 2}

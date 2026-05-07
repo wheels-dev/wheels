@@ -1,5 +1,11 @@
-// basic usage
+// 1. Get a comma-delimited list of all primary key values for the Artist model
 primaryKeyList = model("artist").findAllKeys();
+// primaryKeyList -> "1,2,3,4,5"
 
-// Quote values, use a different delimiter and filter results with the "where" argument
-primaryKeyList = model("artist").findAllKeys(quoted=true, delimiter="-", where="active=1");
+// 2. Get keys for active artists only, enclosed in single quotes, separated by a pipe
+primaryKeyList = model("artist").findAllKeys(quoted=true, delimiter="|", where="active=1");
+// primaryKeyList -> "'1'|'3'|'5'"
+
+// 3. Use the result directly in a SQL IN clause for a subsequent query
+keyList = model("artist").findAllKeys(quoted=true, where="genreId=7");
+albums = model("album").findAll(where="artistId IN (#keyList#)");

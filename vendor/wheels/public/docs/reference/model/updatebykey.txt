@@ -1,5 +1,11 @@
-// Updates the object with `33` as the primary key value with values passed in through the URL/form
+// 1. Update a post using a positional key and a params struct
 result = model("post").updateByKey(33, params.post);
 
-// Updates the object with `33` as the primary key using named arguments
+// 2. Update a post using named arguments
 result = model("post").updateByKey(key=33, title="New version of Wheels just released", published=1);
+
+// 3. Skip validations when updating a record (useful for admin operations)
+result = model("post").updateByKey(key=33, validate=false, status="archived");
+
+// 4. Include soft-deleted records when looking up the key to update
+result = model("post").updateByKey(key=33, includeSoftDeletes=true, restoredAt=Now());

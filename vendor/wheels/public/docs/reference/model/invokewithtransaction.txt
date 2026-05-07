@@ -1,4 +1,5 @@
-// This is the method to be run inside a transaction.
+// 1. Run a custom model method inside a database transaction.
+// Define the method on the model (e.g. Person.cfc):
 public boolean function transferFunds(required any personFrom, required any personTo, required numeric amount) {
 	if (arguments.personFrom.withdraw(arguments.amount) && arguments.personTo.deposit(arguments.amount)) {
 		return true;
@@ -7,6 +8,13 @@ public boolean function transferFunds(required any personFrom, required any pers
 	}
 }
 
+// Then invoke it wrapped in a transaction from a controller action:
 local.david = model("Person").findOneByName("David");
 local.mary = model("Person").findOneByName("Mary");
-invokeWithTransaction(method="transferFunds", personFrom=local.david, personTo=local.mary, amount=100);
+local.success = model("Person").invokeWithTransaction(method="transferFunds", personFrom=local.david, personTo=local.mary, amount=100);
+
+// 2. Run in rollback mode to test queries without committing changes.
+local.success = model("Person").invokeWithTransaction(method="transferFunds", personFrom=local.david, personTo=local.mary, amount=100, transaction="rollback");
+
+// 3. Run with a stricter isolation level (e.g. serializable) to prevent phantom reads.
+local.success = model("Person").invokeWithTransaction(method="transferFunds", personFrom=local.david, personTo=local.mary, amount=100, isolation="serializable");

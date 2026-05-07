@@ -1,6 +1,21 @@
-// Update the `published` and `publishedAt` properties for all records that have `published=0`  
-recordsUpdated = model("post").updateAll( published=1, publishedAt=Now(), where="published=0" );
+// 1. Update a single property on all matching records (returns count of updated rows)
+recordsUpdated = model("post").updateAll(published=1, where="published=0");
 
-// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `removeAllComments` method below will call `model("comment").updateAll(postid="", where="postId=#post.id#")` internally.)  
+// 2. Update multiple properties on matching records using named arguments
+recordsUpdated = model("post").updateAll(
+	published=1,
+	publishedAt=Now(),
+	where="published=0"
+);
+
+// 3. Update using a properties struct instead of named arguments
+props = {status="archived", updatedBy="system"};
+recordsUpdated = model("post").updateAll(properties=props, where="createdAt < '#DateAdd("yyyy", -2, Now())#'");
+
+// 4. Instantiate each matching object so that callbacks and validations run
+recordsUpdated = model("user").updateAll(active=0, where="lastLoginAt < '#DateAdd("d", -365, Now())#'", instantiate=true);
+
+// 5. Scoped call via a hasMany association — equivalent to
+//    model("comment").updateAll(postId="", where="postId=#post.id#")
 post = model("post").findByKey(params.postId);
 post.removeAllComments();

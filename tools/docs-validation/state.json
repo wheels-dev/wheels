@@ -114,6 +114,786 @@
         "cache_creation_input_tokens": 1518,
         "cache_read_input_tokens": 9798
       }
+    },
+    "function:columnForProperty": {
+      "kind": "function",
+      "id": "columnForProperty",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:11:53.158Z",
+      "summary": "Created the reference example file for `columnForProperty` at `vendor/wheels/public/docs/reference/model/columnforproperty.txt`. Three examples cover: the common case of retrieving a mapped column name, a practical guard pattern checking the return value before use, and the `false` return when the property doesn't exist on the model.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/columnforproperty.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28625,
+        "output_tokens": 523,
+        "cache_creation_input_tokens": 4356,
+        "cache_read_input_tokens": 6532
+      }
+    },
+    "function:columnNames": {
+      "kind": "function",
+      "id": "columnNames",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:12:04.058Z",
+      "summary": "Created the reference example for `columnNames()` at `vendor/wheels/public/docs/reference/model/columnnames.txt`. Three examples cover basic usage, checking for a specific column with `listFindNoCase`, and iterating over each column name. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/columnnames.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11403,
+        "output_tokens": 506,
+        "cache_creation_input_tokens": 1056,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:columns": {
+      "kind": "function",
+      "id": "columns",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:12:16.961Z",
+      "summary": "Authored the reference example for `model.columns()` at `vendor/wheels/public/docs/reference/model/columns.txt`. Three examples demonstrate: getting the full column list, checking for a specific column with `arrayFindNoCase`, and iterating over all columns.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/columns.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28605,
+        "output_tokens": 511,
+        "cache_creation_input_tokens": 1044,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:count": {
+      "kind": "function",
+      "id": "count",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:12:38.314Z",
+      "summary": "Removed the stale `@reload` docblock entry from `count()` in calculations.cfc (the parameter doesn't exist in the function signature). Updated the reference example to fix a minor inaccuracy in example 3 (books.title instead of booktitle) and added a `group` example demonstrating grouped counts.",
+      "files_changed": [
+        "vendor/wheels/model/calculations.cfc",
+        "vendor/wheels/public/docs/reference/model/count.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 10950,
+        "output_tokens": 1006,
+        "cache_creation_input_tokens": 6876,
+        "cache_read_input_tokens": 14353
+      }
+    },
+    "function:create": {
+      "kind": "function",
+      "id": "create",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:12:54.194Z",
+      "summary": "Rewrote the `model/create.txt` reference with 7 idiomatic examples covering basic struct/named-argument usage, skipping validation, rollback transactions, explicit timestamps, and scoped association creation. No CFC edits were needed — the docblock and signature match the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/create.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12936,
+        "output_tokens": 720,
+        "cache_creation_input_tokens": 2214,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:deleteAll": {
+      "kind": "function",
+      "id": "deleteAll",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:13:07.728Z",
+      "summary": "Rewrote the `deleteAll` reference example with four idiomatic examples covering: basic usage (no instantiation), running callbacks via `instantiate=true`, bypassing soft deletes with `softDelete=false`, and using a scoped `hasMany` association call. No docblock or code changes were needed — the source matches the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/deleteall.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8500,
+        "output_tokens": 617,
+        "cache_creation_input_tokens": 2842,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:deleteByKey": {
+      "kind": "function",
+      "id": "deleteByKey",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:13:21.921Z",
+      "summary": "Enhanced the `deleteByKey` reference example with four idiomatic examples covering basic deletion, bypassing soft deletes with `softDelete=false`, composite primary keys, and transaction rollback mode. No docblock or code changes were needed — source and docs are aligned.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/deletebykey.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 7857,
+        "output_tokens": 529,
+        "cache_creation_input_tokens": 1692,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:deleteOne": {
+      "kind": "function",
+      "id": "deleteOne",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:13:35.896Z",
+      "summary": "Rewrote the `deleteOne` reference example with four idiomatic examples covering: basic order-based deletion, combined `where`+`order` filtering, permanent deletion via `softDelete=false`, and a `hasOne` scoped association call. No docblock or code changes were needed — the source matches the documented signature and hint exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/deleteone.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8198,
+        "output_tokens": 627,
+        "cache_creation_input_tokens": 2210,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:enumInfo": {
+      "kind": "function",
+      "id": "enumInfo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:13:50.066Z",
+      "summary": "Authored `vendor/wheels/public/docs/reference/model/enuminfo.txt` with three examples demonstrating how `enumInfo()` returns the enum struct, how to iterate over enum-mapped properties, and how to use the metadata to build a select list. No CFC changes were needed — the docblock matches the implementation.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/enuminfo.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28710,
+        "output_tokens": 601,
+        "cache_creation_input_tokens": 1096,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:exists": {
+      "kind": "function",
+      "id": "exists",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:14:11.670Z",
+      "summary": "Rewrote the `exists` reference example with 8 numbered examples covering: checking if any record exists, key-based lookup, WHERE condition, conditional use, soft-deleted records, and all three association-scoped call patterns (belongsTo, hasOne, hasMany). Fixed typo `keyparams.key` → `params.key`, switched to named `key=` argument, and updated model names to PascalCase. No docblock changes were needed — the source and snapshot match.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/exists.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 13579,
+        "output_tokens": 1004,
+        "cache_creation_input_tokens": 2612,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findAll": {
+      "kind": "function",
+      "id": "findAll",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:14:34.904Z",
+      "summary": "Rewrote the `findall.txt` reference file with 15 clean, numbered examples covering the key features of `findAll`: basic ordering, maxRows, include associations (belongsTo and hasMany), pagination, returnAs (objects/structs/sql), dynamic finders, scoped calls, GROUP BY with calculated properties, soft deletes, caching, and index hints. Fixed the formatting issues in the original file where several examples were incorrectly concatenated onto a single line.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findall.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34459,
+        "output_tokens": 1276,
+        "cache_creation_input_tokens": 5568,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findAllKeys": {
+      "kind": "function",
+      "id": "findAllKeys",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:14:50.090Z",
+      "summary": "Rewrote the `findAllKeys` reference example with three numbered examples: basic usage with inline return value comment, filtered usage with `quoted` and `delimiter` arguments, and a practical example demonstrating use of the quoted result in a SQL `IN` clause. The docblock and function signature were correct and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findallkeys.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 30036,
+        "output_tokens": 585,
+        "cache_creation_input_tokens": 1380,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findByKey": {
+      "kind": "function",
+      "id": "findByKey",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:15:08.452Z",
+      "summary": "Reviewed the `findByKey` docblock and source — they match the documented parameters exactly. Updated the reference example file with 6 idiomatic examples covering basic key lookup, not-found handling, column selection, association includes, caching with soft deletes, and scoped association calls.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findbykey.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 30967,
+        "output_tokens": 683,
+        "cache_creation_input_tokens": 3032,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findEach": {
+      "kind": "function",
+      "id": "findEach",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:15:24.566Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/model/findeach.txt` with three idiomatic examples covering: (1) basic object-mode iteration for bulk email, (2) struct-mode iteration with where/order filtering, and (3) a smaller batchSize with record mutation. No docblock or code changes were needed — the source and documented parameters match.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findeach.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 30683,
+        "output_tokens": 639,
+        "cache_creation_input_tokens": 2616,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findFirst": {
+      "kind": "function",
+      "id": "findFirst",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:15:37.111Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/model/findfirst.txt` with three idiomatic examples showing basic usage (order by primary key), ordering by a specific property, and combining multiple properties with a `where` clause. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findfirst.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 37286,
+        "output_tokens": 564,
+        "cache_creation_input_tokens": 1236,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findInBatches": {
+      "kind": "function",
+      "id": "findInBatches",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:15:56.018Z",
+      "summary": "Created the reference example file for `findInBatches` at `vendor/wheels/public/docs/reference/model/findinbatches.txt` with 5 idiomatic examples covering the default query batch mode, filtered/ordered batches, `returnAs=\"objects\"`, `returnAs=\"structs\"`, and `includeSoftDeletes`. No docblock or source changes were needed — the existing docblock matches the documented hint and parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findinbatches.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 33045,
+        "output_tokens": 922,
+        "cache_creation_input_tokens": 2576,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findLastOne": {
+      "kind": "function",
+      "id": "findLastOne",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:16:08.609Z",
+      "summary": "Created reference examples for `findLastOne` at `vendor/wheels/public/docs/reference/model/findlastone.txt`. Three examples demonstrate: default primary-key-descending lookup, ordering by a custom property (createdAt), and combining a custom property order with a where clause.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findlastone.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 29936,
+        "output_tokens": 545,
+        "cache_creation_input_tokens": 1224,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:findOne": {
+      "kind": "function",
+      "id": "findOne",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:16:30.892Z",
+      "summary": "Rewrote the `findOne` reference example to fix two bugs in the original: the dynamic finder for email+password was incorrectly passing both values as one comma-separated string argument (should be two separate positional args), and the comment code snippets had missing `=` signs in `where` argument calls. Added clear numbered examples covering basic where clause, dynamic finders, return-value checking, returnAs=\"query\", and association-scoped calls.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/findone.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 31665,
+        "output_tokens": 1023,
+        "cache_creation_input_tokens": 3814,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:getTableNamePrefix": {
+      "kind": "function",
+      "id": "getTableNamePrefix",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:16:43.711Z",
+      "summary": "Rewrote the reference example for `getTableNamePrefix()` to use modern CFML style (`queryExecute` instead of `<cffunction>`/`<cfquery>` tags) and added a second example showing how to inspect the prefix value at the class level.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/gettablenameprefix.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11512,
+        "output_tokens": 511,
+        "cache_creation_input_tokens": 1278,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:insertAll": {
+      "kind": "function",
+      "id": "insertAll",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:16:58.496Z",
+      "summary": "Created the reference example file for `insertAll` at `vendor/wheels/public/docs/reference/model/insertall.txt` with three examples: basic batch insert, skipping timestamps, and a large dataset insert with selective parameterize and explicit transaction. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/insertall.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 9909,
+        "output_tokens": 704,
+        "cache_creation_input_tokens": 1476,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:invokeWithTransaction": {
+      "kind": "function",
+      "id": "invokeWithTransaction",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:17:13.902Z",
+      "summary": "Updated the reference example for `invokeWithTransaction` to include three examples: basic transaction usage with a fund transfer scenario, rollback mode for dry-run testing, and a stricter isolation level. The existing example was preserved and expanded to demonstrate all key parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/invokewithtransaction.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 4361,
+        "output_tokens": 745,
+        "cache_creation_input_tokens": 1618,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:isClass": {
+      "kind": "function",
+      "id": "isClass",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:17:31.579Z",
+      "summary": "Rewrote the `isClass()` reference example with two clear, idiomatic examples: one showing class-vs-instance branching for a record lookup, and one showing how to guard a class-only operation. The existing example's logic was correct but lacked clarity; the new examples are more readable and cover an additional use case.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/isclass.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11741,
+        "output_tokens": 795,
+        "cache_creation_input_tokens": 1168,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:isInstance": {
+      "kind": "function",
+      "id": "isInstance",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:17:48.346Z",
+      "summary": "Wrote enhanced reference examples for `isInstance()` covering the canonical class-vs-instance branching pattern, a config() guard example, and a pairing with `isClass()` for clarity. No docblock changes were needed — the source function is correct.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/isinstance.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11647,
+        "output_tokens": 689,
+        "cache_creation_input_tokens": 1170,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:maximum": {
+      "kind": "function",
+      "id": "maximum",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:18:01.877Z",
+      "summary": "Updated the reference example for `model.maximum` with four idiomatic examples covering basic usage, filtered maximum, the `ifNull` fallback, and the `group` parameter. The source docblock has a minor formatting nit (`@parameterize[see:findAll].` missing a space) but it does not affect runtime behavior so it was left as-is.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/maximum.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10166,
+        "output_tokens": 618,
+        "cache_creation_input_tokens": 2374,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:minimum": {
+      "kind": "function",
+      "id": "minimum",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:18:14.385Z",
+      "summary": "The existing reference examples were already correct and well-aligned with the source implementation and documented parameters. Rewrote the file with numbered comment headings (`// 1.`, `// 2.`, `// 3.`) to match the standard reference example format.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/minimum.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10152,
+        "output_tokens": 541,
+        "cache_creation_input_tokens": 2450,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:new": {
+      "kind": "function",
+      "id": "new",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:18:29.533Z",
+      "summary": "Updated the reference example for `model.new` to include numbered headings and added examples demonstrating the `callbacks=false` and `allowExplicitTimestamps=true` parameters. The docblock in the CFC matches the documented hint and parameters, so no source edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/new.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12618,
+        "output_tokens": 646,
+        "cache_creation_input_tokens": 1736,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:onMissingMethod": {
+      "kind": "function",
+      "id": "onMissingMethod",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:18:48.684Z",
+      "summary": "Created vendor/wheels/public/docs/reference/model/onmissingmethod.txt with 7 idiomatic examples covering the main dynamic-method patterns that onMissingMethod() powers: dynamic finders (findOneBy, findAllBy, multi-property And), findOrCreate, hasMany association helpers, property change helpers, and enum boolean checkers. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/onmissingmethod.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 30554,
+        "output_tokens": 897,
+        "cache_creation_input_tokens": 1274,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:primaryKey": {
+      "kind": "function",
+      "id": "primaryKey",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:19:01.285Z",
+      "summary": "Rewrote the `primaryKey` reference example to include four idiomatic examples: basic single-key usage, composite key (all keys), composite key with `position` argument, and the `primaryKeys()` alias. The docblock in the CFC already matched the documented hint and parameters exactly, so no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/primarykey.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11592,
+        "output_tokens": 562,
+        "cache_creation_input_tokens": 1374,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:primaryKeys": {
+      "kind": "function",
+      "id": "primaryKeys",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:19:13.823Z",
+      "summary": "Rewrote the `primaryKeys` reference example to cover three cases: basic single-key usage, fetching the first key of a composite primary key by position, and fetching the second key. The docblock was already accurate and needed no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/primarykeys.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11552,
+        "output_tokens": 543,
+        "cache_creation_input_tokens": 1260,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:propertyNames": {
+      "kind": "function",
+      "id": "propertyNames",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:19:26.577Z",
+      "summary": "Rewrote the reference example for `propertyNames()` with three idiomatic examples: basic usage showing the returned comma-delimited list, checking membership with `listFindNoCase`, and demonstrating that calculated properties (defined via `property(sql=...)`) are appended to the list.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/propertynames.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28723,
+        "output_tokens": 591,
+        "cache_creation_input_tokens": 1158,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:save": {
+      "kind": "function",
+      "id": "save",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:19:40.530Z",
+      "summary": "Rewrote the `save()` reference example with 5 clear, idiomatic examples covering basic usage, conditional branching on result, skipping validations, selective parameterization with a property list, and forced reload after save. All examples align with the documented parameters and function behavior.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/save.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12621,
+        "output_tokens": 613,
+        "cache_creation_input_tokens": 1808,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:scopeInfo": {
+      "kind": "function",
+      "id": "scopeInfo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:19:53.813Z",
+      "summary": "Authored the reference example for `scopeInfo()` covering three idiomatic use cases: inspecting the full scope struct, checking for a specific scope before calling it, and listing all scope names via `structKeyList`. No docblock changes were needed — the source and hint are in agreement.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/scopeinfo.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28726,
+        "output_tokens": 601,
+        "cache_creation_input_tokens": 1114,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:sum": {
+      "kind": "function",
+      "id": "sum",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:20:09.622Z",
+      "summary": "Updated the `sum` reference example to preserve the existing 3 idiomatic examples while adding two new ones demonstrating the `distinct` and `group` parameters, which were documented but not previously shown. No docblock or code changes were needed — the CFC source matches the documented signature exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/sum.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10334,
+        "output_tokens": 705,
+        "cache_creation_input_tokens": 2498,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:tableName": {
+      "kind": "function",
+      "id": "tableName",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:20:22.711Z",
+      "summary": "Wrote an enhanced reference example for `tableName()` with three idiomatic examples: the default convention mapping (singular model → plural table), a custom table override set via `table()`, and a dynamic use of the return value. The docblock in the CFC matches the documented hint exactly — no edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/tablename.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11442,
+        "output_tokens": 538,
+        "cache_creation_input_tokens": 1102,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:updateAll": {
+      "kind": "function",
+      "id": "updateAll",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:20:40.223Z",
+      "summary": "Rewrote the `updateAll` reference examples with five clear, idiomatic examples covering: single-property update, multi-property named-argument update, struct-based properties, instantiated update (callbacks/validations enabled), and the scoped hasMany association call. No docblock or code changes were needed — the source and documented parameters match.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/updateall.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12786,
+        "output_tokens": 657,
+        "cache_creation_input_tokens": 2978,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:updateByKey": {
+      "kind": "function",
+      "id": "updateByKey",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:20:52.208Z",
+      "summary": "Updated the `updateByKey` reference file with four idiomatic examples: positional key with params struct, named arguments, skipping validation, and including soft-deleted records. The docblock and function signature in the CFC were already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/updatebykey.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12177,
+        "output_tokens": 535,
+        "cache_creation_input_tokens": 1970,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:updateOne": {
+      "kind": "function",
+      "id": "updateOne",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:21:05.613Z",
+      "summary": "Rewrote the `updateone.txt` reference with four idiomatic examples covering basic ordering, `where` filtering, skipping validations, and the `hasOne` scoped call. No CFC changes were needed — the docblock and function signature are accurate.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/updateone.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12388,
+        "output_tokens": 569,
+        "cache_creation_input_tokens": 2334,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:upsertAll": {
+      "kind": "function",
+      "id": "upsertAll",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:21:19.925Z",
+      "summary": "Created the reference example file for `upsertAll` at `vendor/wheels/public/docs/reference/model/upsertall.txt` with three idiomatic examples covering: basic upsert with a single unique property, upsert with a composite unique constraint, and upsert with timestamps disabled for legacy data imports. No docblock or code changes were needed — the source and documented parameters are aligned.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/upsertall.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10031,
+        "output_tokens": 806,
+        "cache_creation_input_tokens": 1566,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:validationInfo": {
+      "kind": "function",
+      "id": "validationInfo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:21:34.099Z",
+      "summary": "Authored the reference example for `validationInfo()` at `vendor/wheels/public/docs/reference/model/validationinfo.txt`. Three examples demonstrate: (1) inspecting the full struct keyed by trigger, (2) counting rules on save, and (3) iterating all triggers and rules to output method/property pairs. No docblock or body edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validationinfo.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28711,
+        "output_tokens": 589,
+        "cache_creation_input_tokens": 1148,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:validationTypeForProperty": {
+      "kind": "function",
+      "id": "validationTypeForProperty",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:21:47.399Z",
+      "summary": "Rewrote the reference example for `validationTypeForProperty` with four idiomatic numbered examples covering string, numeric, and date column types, plus the default fallback when the property doesn't exist. Replaced the old CFML-comment-tag style with modern inline comments and variable assignment style.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validationtypeforproperty.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28802,
+        "output_tokens": 627,
+        "cache_creation_input_tokens": 1216,
+        "cache_read_input_tokens": 9798
+      }
+    },
+    "function:withAdvisoryLock": {
+      "kind": "function",
+      "id": "withAdvisoryLock",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:22:00.550Z",
+      "summary": "Created the reference example file for `withAdvisoryLock` with three idiomatic examples covering basic job deduplication, custom timeout usage, and batch assignment serialization. The docblock in the CFC already matched the snapshot exactly — no edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/withadvisorylock.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 2836,
+        "output_tokens": 619,
+        "cache_creation_input_tokens": 1640,
+        "cache_read_input_tokens": 9798
+      }
     }
   },
   "runs": []
