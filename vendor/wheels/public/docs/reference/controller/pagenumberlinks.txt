@@ -1,0 +1,51 @@
+//--------------------------------------------------------------------
+// Example 1: Basic page number links for a paginated query
+
+// Controller code
+param name="params.page" type="integer" default="1";
+posts = model("Post").findAll(page=params.page, perPage=10, order="createdAt DESC");
+
+// View code — renders links like: 1 2 [3] 4 5  (current page as a span)
+<cfoutput>#pageNumberLinks()#</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 2: Widen the window around the current page and add CSS classes
+
+// View code — shows 5 pages on each side of the current page,
+// styling each link and the current-page span differently
+<cfoutput>
+    #pageNumberLinks(windowSize=5, class="page-link", classForCurrent="active")#
+</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 3: Wrap each page number in a list item
+
+// View code
+<ul>
+    <cfoutput>
+        #pageNumberLinks(prependToPage="<li>", appendToPage="</li>")#
+    </cfoutput>
+</ul>
+
+
+//--------------------------------------------------------------------
+// Example 4: Make the current page a link (useful for reloading)
+
+// View code
+<cfoutput>#pageNumberLinks(linkToCurrentPage=true)#</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 5: Multiple paginated queries — reference each by its handle
+
+// Controller code
+authors = model("Author").findAll(handle="authorQuery", page=params.page, perPage=20, order="lastName");
+posts   = model("Post").findAll(handle="postQuery",   page=params.page, perPage=5,  order="createdAt");
+
+// View code
+<cfoutput>
+    Authors: #pageNumberLinks(handle="authorQuery")#
+    Posts:   #pageNumberLinks(handle="postQuery")#
+</cfoutput>

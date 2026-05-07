@@ -1,2 +1,11 @@
-<!--- Basic usage usually involves a `label`, `name`, and `value` --->
-#textFieldTag(label="Search", name="q", value=params.q)#
+// 1. Basic search field with a label and a pre-filled value from params
+#textFieldTag(name="q", label="Search", value=params.q)#
+
+// 2. Email input using the HTML5 type attribute
+#textFieldTag(name="email", label="Email address", type="email", value=params.email)#
+
+// 3. Field with label placed before the input and extra HTML attributes
+#textFieldTag(name="username", label="Username", labelPlacement="before", class="form-control", placeholder="Enter username")#
+
+// 4. Wrapping the input with Bootstrap input-group markup using prepend and append
+#textFieldTag(name="website", label="Website", type="url", prepend="<div class=""input-group"">", append="</div>")#

@@ -1,0 +1,10 @@
+// 1. Basic color picker bound to a model object property
+#colorField(objectName="product", property="themeColor")#
+
+// 2. Color picker with a custom label and a CSS class
+#colorField(objectName="user", property="profileColor", label="Profile Color", class="color-picker")#
+
+// 3. Color pickers for nested properties on a hasMany association (e.g., palette swatches)
+<cfloop from="1" to="#ArrayLen(design.swatches)#" index="i">
+	#colorField(objectName="design", association="swatches", position="#i#", property="hexValue", label="Swatch ##i#")#
+</cfloop>

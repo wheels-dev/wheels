@@ -1,12 +1,8 @@
-<!--- In your view template, let's say `app/views/blog/post.cfm--->
-contentFor(head='<meta name="robots" content="noindex,nofollow">');
-contentFor(head='<meta name="author" content="wheelsdude@wheelsify.com">');
-
-// In `app/views/layout.cfm`
+// 1. Output the main page body inside a layout (default section is "body")
+// In `app/views/layout.cfm`:
 <html>
 	<head>
-	    <title>My Site</title>
-	    #includeContent("head")#
+		<title>My Site</title>
 	</head>
 	<body>
 		<cfoutput>
@@ -14,3 +10,23 @@ contentFor(head='<meta name="author" content="wheelsdude@wheelsify.com">');
 		</cfoutput>
 	</body>
 </html>
+
+// 2. Define a named section in a view, then render it in the layout
+// In `app/views/blog/show.cfm`:
+contentFor(head='<meta name="description" content="Read our latest post">');
+
+// In `app/views/layout.cfm`:
+<html>
+	<head>
+		<title>My Site</title>
+		<cfoutput>#includeContent("head")#</cfoutput>
+	</head>
+	<body>
+		<cfoutput>#includeContent()#</cfoutput>
+	</body>
+</html>
+
+// 3. Provide a default value when a section may not have been defined
+<cfoutput>
+	#includeContent(name="sidebar", defaultValue="<p>No sidebar content.</p>")#
+</cfoutput>

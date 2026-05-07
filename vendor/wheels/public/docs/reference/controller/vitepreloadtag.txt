@@ -1,0 +1,16 @@
+// 1. Emit modulepreload tags into <head> for a JS entrypoint (default behavior)
+// In production, injects <link rel="modulepreload"> for the entrypoint and all
+// transitive chunk imports into <head>. Returns an empty string.
+// In development, returns an empty string (Vite handles modules dynamically).
+vitePreloadTag("src/main.js");
+
+// 2. Return modulepreload markup inline instead of injecting into <head>
+// Pass head=false to receive the raw HTML for manual placement, for example
+// inside a Turbo Drive hover-preload data attribute or a custom <head> partial.
+preloadMarkup = vitePreloadTag(entrypoint="src/main.js", head=false);
+// preloadMarkup -> '<link rel="modulepreload" href="/dist/assets/main-Dz8C9a3m.js" />\n<link rel="modulepreload" href="/dist/assets/vendor-BpC2d1a0.js" />\n'
+
+// 3. Warm assets for a page the user is likely to navigate to next
+// Call from a controller action to preload a separate route's entry module
+// so the browser fetches chunks before the user clicks the link.
+vitePreloadTag("src/checkout.js");

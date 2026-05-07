@@ -1,8 +1,11 @@
-<!--- Needed here because we're not using `startFormTag`. --->
+// 1. Include CSRF token in a plain HTML form that POSTs data
+//    (use this when you are not using startFormTag())
 <form action="#urlFor(route='posts')#" method="post">
   #authenticityTokenField()#
+  <!--- other fields here --->
 </form>
-  
-<!--- Not needed here because we're not POSTing the form. --->
-<form action="#urlFor(route='invoices')#" method="get">
+
+// 2. Not needed for GET forms — GET requests are not CSRF-protected
+<form action="#urlFor(route='posts')#" method="get">
+  <!--- no token required --->
 </form>

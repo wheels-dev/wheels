@@ -831,7 +831,7 @@ component {
 	 * @property [see:textField].
 	 * @association [see:textField].
 	 * @position [see:textField].
-	 * @value Value of check box in its checked state.
+	 * @checkedValue Value of check box in its checked state.
 	 * @uncheckedValue The value of the check box when it's on the unchecked state.
 	 * @label [see:textField].
 	 * @labelPlacement [see:textField].

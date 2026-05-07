@@ -1,5 +1,21 @@
-<!--- View Code --->
-#startFormTag(action="something")#
-    <!--- Form Controls go here --->
-    #buttonTag(content="Submit this form", value="save")#
+// 1. Basic submit button inside a form
+#startFormTag(action="create")#
+    #buttonTag(content="Save changes", value="save")#
 #endFormTag()#
+<!--- Produces: <button type="submit" value="save">Save changes</button> --->
+
+// 2. Reset button to clear form fields
+#buttonTag(content="Clear form", type="reset")#
+<!--- Produces: <button type="reset" value="save">Clear form</button> --->
+
+// 3. Plain button (no form submission) with a CSS class and id
+#buttonTag(content="Open dialog", type="button", value="open", class="btn btn-secondary", id="openDialogBtn")#
+<!--- Produces: <button type="button" value="open" class="btn btn-secondary" id="openDialogBtn">Open dialog</button> --->
+
+// 4. Submit button wrapped in a paragraph using prepend and append
+#buttonTag(content="Submit", value="submit", prepend="<p>", append="</p>")#
+<!--- Produces: <p><button type="submit" value="submit">Submit</button></p> --->
+
+// 5. Image button (renders an img tag inside the button element)
+#buttonTag(content="", image="submit-icon.png", value="save")#
+<!--- Produces: <button type="submit" value="save"><img src="/images/submit-icon.png" alt="Submit Icon" /></button> --->

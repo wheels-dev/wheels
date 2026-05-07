@@ -199,6 +199,7 @@ component {
 	 * @prepend String or HTML to be prepended before result.
 	 * @append String or HTML to be appended after result.
 	 * @prependToPage String or HTML to be prepended before each page number.
+	 * @addActiveClassToPrependedParent Whether or not to add an active class to the parent element of the current page link (requires prependToPage to contain a class attribute).
 	 * @prependOnFirst Whether or not to prepend the prependToPage string on the first page in the list.
 	 * @prependOnAnchor Whether or not to prepend the prependToPage string on the anchors.
 	 * @appendToPage String or HTML to be appended after each page number.

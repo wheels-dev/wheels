@@ -1,24 +1,46 @@
+// 1. Include a partial from the current controller's view folder.
+//    When in the "sessions" controller, Wheels looks for "app/views/sessions/_login.cfm".
+#includePartial("login")#
 
-// If we're in the "sessions" controller, CFWheels will include the file "app/views/sessions/_login.cfm".  
-#includePartial("login")# 
+// 2. Include a partial relative to the root views folder using a leading slash.
+//    Wheels looks for "app/views/shared/_button.cfm".
+#includePartial(partial="/shared/button")#
 
-// CFWheels will include the file "app/views/shared/_button.cfm".  
-#includePartial(partial="/shared/button")# 
+// 3. Pass a query to loop through records automatically.
+//    Wheels loops through the result set and renders "app/views/posts/_post.cfm" for each row.
+posts = model("Post").findAll();
+#includePartial(posts)#
 
-// If we're in the "posts" controller and the "posts" variable includes a query result set, CFWheels will loop through the record set and include the file "app/views/posts/_post.cfm" for each record.  
-<cfset posts = model("post").findAll()> 
-#includePartial(posts)# 
+// 4. Override the template when rendering a query.
+//    Provide the template path via partial and pass the query separately.
+posts = model("Post").findAll();
+#includePartial(partial="/shared/post", query=posts)#
 
-// We can also override the template file loaded for the example above.  
-#includePartial(partial="/shared/post", query=posts)# 
+// 5. Pass a single model object — Wheels renders the matching partial for its model type.
+post = model("Post").findByKey(params.key);
+#includePartial(post)#
 
-// The same works when passing a model instance.  
-<cfset post = model("post").findByKey(params.key)> #includePartial(post)# 
-#includePartial(partial="/shared/post", object=post)# 
+// 6. Override the template when rendering a single model object.
+post = model("Post").findByKey(params.key);
+#includePartial(partial="/shared/post", object=post)#
 
-// The same works when passing an array of model objects.  
-<cfset posts = model("post").findAll(returnAs="objects")> 
-#includePartial(posts)# 
-#includePartial(partial="/shared/post", objects=posts)# 
-</cfoutput>
+// 7. Pass an array of model objects — Wheels iterates and renders the partial for each.
+posts = model("Post").findAll(returnAs="objects");
+#includePartial(posts)#
 
+// 8. Override the template when rendering an array of model objects.
+posts = model("Post").findAll(returnAs="objects");
+#includePartial(partial="/shared/post", objects=posts)#
+
+// 9. Cache the partial output for 30 minutes to reduce processing overhead.
+#includePartial(partial="sidebar", cache=30)#
+
+// 10. Group a query result set by a column before rendering.
+//     Wheels splits the query into sub-queries grouped by "categoryId"
+//     and passes each sub-query into "app/views/products/_product.cfm".
+products = model("Product").findAll(order="categoryId");
+#includePartial(partial="product", query=products, group="categoryId")#
+
+// 11. Insert a separator string between each rendered partial in a loop.
+posts = model("Post").findAll();
+#includePartial(partial="post", query=posts, spacer="<hr>")#

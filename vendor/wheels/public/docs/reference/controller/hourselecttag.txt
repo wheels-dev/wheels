@@ -1,5 +1,8 @@
-<!---This "Tag" version of the function accepts a `name` and `selected` instead of binding to a model object --->
+// 1. Basic usage — render a select control for hours of the day
 #hourSelectTag(name="hourOfMeeting", selected=params.hourOfMeeting)#
 
-<!---Show 12 hours instead of 24 --->
+// 2. Show hours in 12-hour (AM/PM) format instead of 24-hour format
 #hourSelectTag(name="hourOfMeeting", selected=params.hourOfMeeting, twelveHour=true)#
+
+// 3. Include a blank option as a placeholder prompt and add a label
+#hourSelectTag(name="startHour", selected=params.startHour, includeBlank="-- Select Hour --", label="Start Hour")#

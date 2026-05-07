@@ -1,0 +1,12 @@
+// 1. Get the resolved URL for a Vite JS entrypoint
+// In production, returns a fingerprinted path like "/dist/assets/main-Dz8C9a3m.js"
+// In development, returns the Vite dev server URL like "http://localhost:5173/src/main.js"
+assetUrl = viteAsset("src/main.js");
+
+// 2. Use the resolved URL directly in an image or font tag
+logoUrl = viteAsset("src/images/logo.png");
+writeOutput('<img src="#logoUrl#" alt="Logo">');
+
+// 3. Resolve a CSS entrypoint URL for manual use (e.g. a preload hint)
+cssUrl = viteAsset("src/main.css");
+writeOutput('<link rel="preload" as="style" href="#cssUrl#">');

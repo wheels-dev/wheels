@@ -1,0 +1,8 @@
+// 1. Basic color picker with a default value
+#colorFieldTag(name="brandColor", value="##FF5733")#
+
+// 2. Color picker with a label and a CSS class
+#colorFieldTag(name="themeColor", value="##336699", label="Theme Color", class="color-input")#
+
+// 3. Color picker with label placement and prepend/append wrappers
+#colorFieldTag(name="highlightColor", label="Highlight", labelPlacement="before", prepend="<div class=""field"">", append="</div>")#

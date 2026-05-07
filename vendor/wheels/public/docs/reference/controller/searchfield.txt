@@ -1,0 +1,8 @@
+// 1. Basic search field bound to a model object
+#searchField(objectName="searchForm", property="query")#
+
+// 2. Search field with a custom label and placeholder attribute
+#searchField(objectName="searchForm", property="query", label="Search", placeholder="Enter keywords...")#
+
+// 3. Search field with label placement after the input and a CSS class
+#searchField(objectName="searchForm", property="query", label="Search", labelPlacement="after", class="search-input")#

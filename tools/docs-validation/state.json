@@ -5195,6 +5195,1683 @@
         "cache_creation_input_tokens": 8927,
         "cache_read_input_tokens": 26899
       }
+    },
+    "function:authenticityTokenField": {
+      "kind": "function",
+      "id": "authenticityTokenField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:49:35.638Z",
+      "summary": "Updated the reference example for `authenticityTokenField()` to use numbered comment headings per the documentation style convention. The function source matches the documented hint and has no parameters; no docblock changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/authenticitytokenfield.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 2624,
+        "output_tokens": 610,
+        "cache_creation_input_tokens": 5470,
+        "cache_read_input_tokens": 11501
+      }
+    },
+    "function:autoLink": {
+      "kind": "function",
+      "id": "autoLink",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:49:52.794Z",
+      "summary": "Rewrote the autolink.txt reference with 4 idiomatic examples covering: default behavior (links both URLs and emails), linking email addresses only, linking URLs only, and disabling relative URL auto-linking. No CFC changes were needed — the docblock matches the documented parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/autolink.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 25018,
+        "output_tokens": 717,
+        "cache_creation_input_tokens": 1672,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:buttonTag": {
+      "kind": "function",
+      "id": "buttonTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:50:12.695Z",
+      "summary": "Rewrote the `buttonTag` reference example to cover five idiomatic use cases: basic submit, reset, plain button with CSS class/id, prepend/append wrapping, and image button. No docblock or source changes were needed — the existing CFC docblock matches the documented parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/buttontag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 18111,
+        "output_tokens": 867,
+        "cache_creation_input_tokens": 1714,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:buttonTo": {
+      "kind": "function",
+      "id": "buttonTo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:50:30.653Z",
+      "summary": "Rewrote the `buttonTo` reference examples to cover basic usage, same-controller shorthand, HTTP method override (DELETE with hidden `_method` field), named routes, `input`-prefixed attribute pass-through, and image button usage. The existing two-line example was replaced with six idiomatic, well-commented examples matching the style of `linkto.txt`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/buttonto.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 26888,
+        "output_tokens": 888,
+        "cache_creation_input_tokens": 2430,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:checkBox": {
+      "kind": "function",
+      "id": "checkBox",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:50:50.305Z",
+      "summary": "Rewrote the `checkBox` reference example using numbered comment headings and modern idiomatic style (no HTML wrappers, no CFM-style comments). Also fixed the docblock `@value` annotation to `@checkedValue` to match the actual parameter name in the function signature.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/checkbox.txt",
+        "vendor/wheels/view/formsobject.cfc"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 40005,
+        "output_tokens": 947,
+        "cache_creation_input_tokens": 21725,
+        "cache_read_input_tokens": 15823
+      }
+    },
+    "function:checkBoxTag": {
+      "kind": "function",
+      "id": "checkBoxTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:51:11.933Z",
+      "summary": "Rewrote the `checkBoxTag` reference example with three clean, idiomatic examples covering basic usage, the `uncheckedValue` parameter, and a query loop with dynamic checked state. Fixed the existing example's issues: mixed comment styles, missing closing parenthesis, incorrect use of `YesNoFormat()` (replaced with `listFindNoCase(...) GT 0`), and a semantically wrong `value=\"true\"` in the multi-checkbox loop.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/checkboxtag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 19158,
+        "output_tokens": 1124,
+        "cache_creation_input_tokens": 10975,
+        "cache_read_input_tokens": 15714
+      }
+    },
+    "function:colorField": {
+      "kind": "function",
+      "id": "colorField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:51:26.075Z",
+      "summary": "Created the reference example file for `colorField` at `vendor/wheels/public/docs/reference/controller/colorfield.txt` with three idiomatic examples: basic usage, a labeled picker with a CSS class, and a nested hasMany association loop. No docblock or code changes were needed — the source and documented parameters match exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/colorfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39216,
+        "output_tokens": 593,
+        "cache_creation_input_tokens": 2228,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:colorFieldTag": {
+      "kind": "function",
+      "id": "colorFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:51:43.942Z",
+      "summary": "Created the reference example file for `colorFieldTag` at `vendor/wheels/public/docs/reference/controller/colorfieldtag.txt` with three idiomatic examples: a basic color picker with a default value, one with a label and CSS class, and one demonstrating label placement and prepend/append wrappers. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/colorfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 18273,
+        "output_tokens": 868,
+        "cache_creation_input_tokens": 10034,
+        "cache_read_input_tokens": 28147
+      }
+    },
+    "function:contentFor": {
+      "kind": "function",
+      "id": "contentFor",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:52:02.897Z",
+      "summary": "Rewrote the `contentFor` reference example to cover all documented parameters: basic usage with `includeContent`, appending to a stack (default behavior), `position=\"first\"` to prepend, `overwrite=\"all\"` to replace an entire section, and `position=N, overwrite=true` to replace a specific stack slot.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/contentfor.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 27038,
+        "output_tokens": 947,
+        "cache_creation_input_tokens": 14054,
+        "cache_read_input_tokens": 15271
+      }
+    },
+    "function:contentForLayout": {
+      "kind": "function",
+      "id": "contentForLayout",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:52:19.370Z",
+      "summary": "Wrote an enhanced reference example for `contentForLayout()` showing its primary use in a layout file to render the view body, plus a second example combining it with `includeContent()` for named sections. No docblock or code changes were needed — the function is simple, correct, and well-documented.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/contentforlayout.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 25957,
+        "output_tokens": 550,
+        "cache_creation_input_tokens": 1120,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:csrfMetaTags": {
+      "kind": "function",
+      "id": "csrfMetaTags",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:52:40.013Z",
+      "summary": "Rewrote the reference example for `csrfMetaTags()` to show (1) how to include it in a layout `<head>` section and (2) what the rendered meta tags look like and how JavaScript can read the token from them for AJAX POST requests. No CFC changes were needed — the docblock and function body are correct.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/csrfmetatags.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 3734,
+        "output_tokens": 914,
+        "cache_creation_input_tokens": 2253,
+        "cache_read_input_tokens": 25069
+      }
+    },
+    "function:cycle": {
+      "kind": "function",
+      "id": "cycle",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:52:59.516Z",
+      "summary": "Rewrote the cycle.txt reference example with three clean, idiomatic examples: basic row alternation, using multiple named cycles simultaneously, and resetting a cycle between grouped query iterations. Fixed several bugs in the original: missing `<cfset>` tags around assignments, wrong cycle name in resetCycle call, and a reference to a non-existent `categories` variable.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/cycle.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 27562,
+        "output_tokens": 940,
+        "cache_creation_input_tokens": 1704,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:dateField": {
+      "kind": "function",
+      "id": "dateField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:53:15.754Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/datefield.txt` with three idiomatic examples covering basic usage, min/max date constraints with a CSS class, and nested hasMany association usage. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/datefield.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 40017,
+        "output_tokens": 759,
+        "cache_creation_input_tokens": 21293,
+        "cache_read_input_tokens": 39251
+      }
+    },
+    "function:dateFieldTag": {
+      "kind": "function",
+      "id": "dateFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:53:31.418Z",
+      "summary": "Created a new reference example file for `dateFieldTag` at `vendor/wheels/public/docs/reference/controller/datefieldtag.txt` with three idiomatic examples covering basic usage, pre-filled value with min/max constraints, and extra HTML attribute pass-through. No docblock or code changes were needed — the source and documented parameters are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/datefieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 17588,
+        "output_tokens": 624,
+        "cache_creation_input_tokens": 9931,
+        "cache_read_input_tokens": 15489
+      }
+    },
+    "function:dateSelect": {
+      "kind": "function",
+      "id": "dateSelect",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:53:49.421Z",
+      "summary": "Updated the `dateselect.txt` reference file with four idiomatic examples demonstrating basic usage, order restriction (month/year only), includeBlank with numeric month display, and year range restriction with abbreviated month names. No docblock or code changes were needed — the source and documented parameters are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/dateselect.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 9338,
+        "output_tokens": 848,
+        "cache_creation_input_tokens": 6369,
+        "cache_read_input_tokens": 24395
+      }
+    },
+    "function:dateSelectTags": {
+      "kind": "function",
+      "id": "dateSelectTags",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:54:02.639Z",
+      "summary": "Updated the `dateSelectTags` reference example from old CFML comment/interpolation style to numbered heading style with three idiomatic examples covering basic usage, custom field order, and custom year range with label and blank option. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/dateselecttags.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 14794,
+        "output_tokens": 598,
+        "cache_creation_input_tokens": 2650,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:dateTimeSelect": {
+      "kind": "function",
+      "id": "dateTimeSelect",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:54:19.760Z",
+      "summary": "Wrote an improved reference example for `dateTimeSelect` with four idiomatic examples covering basic usage, custom date/time order, 12-hour format with blank option, and minuteStep/monthDisplay customization. Also fixed a docblock typo in the CFC where `@startYear` was listed twice — the second occurrence (for \"Last year in select list.\") was corrected to `@endYear`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/datetimeselect.txt",
+        "vendor/wheels/view/formsdateobject.cfc"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 8937,
+        "output_tokens": 878,
+        "cache_creation_input_tokens": 6582,
+        "cache_read_input_tokens": 16153
+      }
+    },
+    "function:dateTimeSelectTags": {
+      "kind": "function",
+      "id": "dateTimeSelectTags",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:54:36.784Z",
+      "summary": "Rewrote the `datetimeselecttags.txt` reference example to use the correct `// N. description` heading style with three idiomatic examples: basic usage, custom date/time order, and a combined example with year range, minuteStep, twelveHour, and label. No CFC changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/datetimeselecttags.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 16212,
+        "output_tokens": 891,
+        "cache_creation_input_tokens": 9834,
+        "cache_read_input_tokens": 27882
+      }
+    },
+    "function:daySelectTag": {
+      "kind": "function",
+      "id": "daySelectTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:54:54.005Z",
+      "summary": "Fixed the docblock hint from \"days of the week\" to \"days of the month\" (the code validates a 0–31 range, not days of the week), and expanded the reference example with three idiomatic usages covering basic, pre-selected with blank prompt, and label/wrap scenarios.",
+      "files_changed": [
+        "vendor/wheels/view/formsdateplain.cfc",
+        "vendor/wheels/public/docs/reference/controller/dayselecttag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 15158,
+        "output_tokens": 966,
+        "cache_creation_input_tokens": 8691,
+        "cache_read_input_tokens": 15532
+      }
+    },
+    "function:emailField": {
+      "kind": "function",
+      "id": "emailField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:55:05.864Z",
+      "summary": "Created the reference example file for `emailField()` at `vendor/wheels/public/docs/reference/controller/emailfield.txt`. The file includes three idiomatic examples: a basic usage, a version with a custom label and CSS class, and a nested form example using a hasMany association — mirroring the style of the existing `textField` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/emailfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39208,
+        "output_tokens": 592,
+        "cache_creation_input_tokens": 2230,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:emailFieldTag": {
+      "kind": "function",
+      "id": "emailFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:55:27.458Z",
+      "summary": "Authored a new reference example file for `emailFieldTag` at `vendor/wheels/public/docs/reference/controller/emailfieldtag.txt` with three idiomatic examples covering basic usage, a labeled field with a params-bound value, and extra HTML attributes (class, placeholder). No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/emailfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 18349,
+        "output_tokens": 716,
+        "cache_creation_input_tokens": 10247,
+        "cache_read_input_tokens": 40806
+      }
+    },
+    "function:endFormTag": {
+      "kind": "function",
+      "id": "endFormTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:55:41.004Z",
+      "summary": "Rewrote the reference examples for `endFormTag` to cover: (1) basic usage paired with `startFormTag`, (2) using the `append` parameter to add text after the closing tag, and (3) using both `prepend` and `append` for structural markup wrapping.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/endformtag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17333,
+        "output_tokens": 523,
+        "cache_creation_input_tokens": 1514,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:errorMessageOn": {
+      "kind": "function",
+      "id": "errorMessageOn",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:55:59.989Z",
+      "summary": "Created reference example file for `errorMessageOn` at `vendor/wheels/public/docs/reference/controller/errormessageon.txt` with three examples demonstrating basic usage, prepend/append text, and custom wrapper element with CSS class. No docblock or code changes were needed — the source and documented parameters matched exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/errormessageon.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6452,
+        "output_tokens": 791,
+        "cache_creation_input_tokens": 3883,
+        "cache_read_input_tokens": 21838
+      }
+    },
+    "function:errorMessagesFor": {
+      "kind": "function",
+      "id": "errorMessagesFor",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:56:15.971Z",
+      "summary": "Created vendor/wheels/public/docs/reference/controller/errormessagesfor.txt with four idiomatic examples covering basic usage, custom CSS class, suppressing duplicate messages, and including association errors. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/errormessagesfor.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6346,
+        "output_tokens": 824,
+        "cache_creation_input_tokens": 3754,
+        "cache_read_input_tokens": 21789
+      }
+    },
+    "function:fileField": {
+      "kind": "function",
+      "id": "fileField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:56:28.392Z",
+      "summary": "Rewrote the `fileField` reference example at `vendor/wheels/public/docs/reference/controller/filefield.txt` using numbered comment headings and idiomatic style: a basic usage example, a custom label example, and a nested hasMany association example. No CFC changes were needed — the docblock and implementation are consistent with the documented parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/filefield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39520,
+        "output_tokens": 651,
+        "cache_creation_input_tokens": 2600,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:fileFieldTag": {
+      "kind": "function",
+      "id": "fileFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:56:47.744Z",
+      "summary": "Rewrote the reference examples for `fileFieldTag` to remove the incorrect `value=params.photo` argument (the function has no `value` parameter, unlike other tag helpers), and replaced it with three idiomatic examples showing basic usage, extra HTML attributes, and label placement with wrapper strings.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/filefieldtag.txt"
+      ],
+      "notes": "The existing example passed `value=params.photo` which is not a parameter of `fileFieldTag` (the CFC signature has no `value` argument, consistent with how HTML file inputs work — they cannot have a pre-set value for security reasons). The new examples use only valid parameters.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17233,
+        "output_tokens": 604,
+        "cache_creation_input_tokens": 1934,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:firstPageLink": {
+      "kind": "function",
+      "id": "firstPageLink",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:57:04.454Z",
+      "summary": "Created a new reference example file for `firstPageLink` at `vendor/wheels/public/docs/reference/controller/firstpagelink.txt` with four idiomatic examples covering basic usage, custom text/CSS classes, hiding the disabled element, and using a named route for path-based pagination. No docblock or code changes were needed — the source and documented parameters are fully aligned.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/firstpagelink.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16559,
+        "output_tokens": 895,
+        "cache_creation_input_tokens": 1618,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:flashMessages": {
+      "kind": "function",
+      "id": "flashMessages",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:57:30.516Z",
+      "summary": "Updated the flashMessages reference example to reflect the current implementation: CSS classes are now hyphenated (`flash-messages`, `alert-message`, `error-message`, `success-message`) rather than the old camelCase style shown in the previous example. Added examples for `key` alias, `keys` ordering, `includeEmptyContainer`, and custom `class`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashmessages.txt"
+      ],
+      "notes": "The existing reference example was outdated — it showed old camelCase CSS class names (e.g. `alertMessage`, `flashMessages`) but the source code generates hyphenated classes (e.g. `alert-message`, `flash-messages`) via `LCase(local.item) & \"-message\"`. The default class in the documented parameters also confirms `flash-messages`. No CFC edits were needed.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 27024,
+        "output_tokens": 1219,
+        "cache_creation_input_tokens": 2192,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:h": {
+      "kind": "function",
+      "id": "h",
+      "status": "needs_human",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:58:19.750Z",
+      "summary": "The `h()` function reference file cannot be written because the write-allow regex requires filenames matching `[a-z][a-z0-9]+` (2+ chars), but the function name is a single character `h`, making `h.txt` an invalid path. A human needs to either update the WRITE_GLOBS regex in `tools/docs-validation/lib/tools.mjs` to allow single-character names (e.g., `[a-z][a-z0-9]*`) or create the file `vendor/wheels/public/docs/reference/controller/h.txt` manually with the following content:",
+      "files_changed": [],
+      "notes": "Proposed file content for vendor/wheels/public/docs/reference/controller/h.txt:\n\n// 1. Safely output user-supplied text in a view template\nwriteOutput(h(user.name));\n// If user.name is \"<script>alert('xss')</script>\", outputs:\n// &lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;\n\n// 2. Encode a variable inline in a cfoutput block\n// Instead of: <cfoutput>#user.bio#</cfoutput>\n// Use:        <cfoutput>#h(user.bio)#</cfoutput>\nencodedBio = h(user.bio);\n\n// 3. Encode a non-string value (converted to string automatically)\nrating = 4.5;\nwriteOutput(h(rating));\n// -> \"4.5\"\n\nThe fix needed in tools/docs-validation/lib/tools.mjs is to change the WRITE_GLOBS regex from:\n  /^vendor\\/wheels\\/public\\/docs\\/reference\\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\\/[a-z][a-z0-9]+\\.txt$/\nto:\n  /^vendor\\/wheels\\/public\\/docs\\/reference\\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\\/[a-z][a-z0-9]*\\.txt$/\n(changing `+` to `*` to allow single-character names)",
+      "turns": 18,
+      "usage": {
+        "input_tokens": 8781,
+        "output_tokens": 2200,
+        "cache_creation_input_tokens": 5290,
+        "cache_read_input_tokens": 105998
+      }
+    },
+    "function:hasManyCheckBox": {
+      "kind": "function",
+      "id": "hasManyCheckBox",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:58:34.067Z",
+      "summary": "Updated the `hasManyCheckBox` reference file with three examples: the original basic association loop, a version showing `prepend`/`append`/`labelPlacement`, and a version demonstrating explicit `id` and error styling options. The docblock in the CFC matches the documented parameters — no source edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/hasmanycheckbox.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 7870,
+        "output_tokens": 817,
+        "cache_creation_input_tokens": 2316,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:hasManyRadioButton": {
+      "kind": "function",
+      "id": "hasManyRadioButton",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:58:56.490Z",
+      "summary": "Rewrote the `hasManyRadioButton` reference example to include all required parameters (`property` and `tagValue`) that were missing from the original. Added a second example demonstrating the `checkIfBlank` option.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/hasmanyradiobutton.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 9163,
+        "output_tokens": 924,
+        "cache_creation_input_tokens": 5501,
+        "cache_read_input_tokens": 31132
+      }
+    },
+    "function:hAttr": {
+      "kind": "function",
+      "id": "hAttr",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:59:16.237Z",
+      "summary": "Created the reference example for `hAttr()` at `vendor/wheels/public/docs/reference/controller/hattr.txt`. The file demonstrates encoding user-supplied values for safe use inside HTML attribute contexts, covering both a standalone variable and an inline view template usage.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/hattr.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 4374,
+        "output_tokens": 885,
+        "cache_creation_input_tokens": 2867,
+        "cache_read_input_tokens": 31691
+      }
+    },
+    "function:hiddenField": {
+      "kind": "function",
+      "id": "hiddenField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:59:29.291Z",
+      "summary": "Rewrote the `hiddenField` reference example with three idiomatic examples covering basic usage, extra HTML attributes, and nested association usage. No docblock or code changes were needed — the source and documented parameters are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/hiddenfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 38818,
+        "output_tokens": 653,
+        "cache_creation_input_tokens": 1790,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:hiddenFieldTag": {
+      "kind": "function",
+      "id": "hiddenFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:59:41.101Z",
+      "summary": "Rewrote the `hiddenFieldTag` reference example with three idiomatic examples covering basic usage, a CSRF token embed, and passing extra HTML attributes. No docblock or code changes were needed — the source and documented parameters are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/hiddenfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17068,
+        "output_tokens": 536,
+        "cache_creation_input_tokens": 1556,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:highlight": {
+      "kind": "function",
+      "id": "highlight",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:59:53.203Z",
+      "summary": "Rewrote the highlight reference example with three numbered examples: basic single-phrase highlighting, multiple comma-delimited phrases, and a custom tag/class override. The previous example had a truncated HTML comment and only one case.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/highlight.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 26600,
+        "output_tokens": 617,
+        "cache_creation_input_tokens": 1634,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:hourSelectTag": {
+      "kind": "function",
+      "id": "hourSelectTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:00:11.926Z",
+      "summary": "Updated the `@selected` docblock for `hourSelectTag` (was incorrectly \"The day that should be selected initially\"; corrected to \"The hour that should be selected initially\"). Rewrote the reference example with three idiomatic numbered examples covering basic usage, 12-hour format, and includeBlank with a label.",
+      "files_changed": [
+        "vendor/wheels/view/formsdateplain.cfc",
+        "vendor/wheels/public/docs/reference/controller/hourselecttag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 15127,
+        "output_tokens": 1024,
+        "cache_creation_input_tokens": 8612,
+        "cache_read_input_tokens": 15628
+      }
+    },
+    "function:imageTag": {
+      "kind": "function",
+      "id": "imageTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:00:24.112Z",
+      "summary": "Rewrote the `imageTag` reference example using numbered comment headings and idiomatic Wheels style, replacing the old HTML-comment format. Added four examples covering: local image with auto-detected dimensions, external URL image, extra HTML attributes, and the `required=false` option.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/imagetag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 13042,
+        "output_tokens": 519,
+        "cache_creation_input_tokens": 1978,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:includeContent": {
+      "kind": "function",
+      "id": "includeContent",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:00:40.636Z",
+      "summary": "Rewrote the `includeContent` reference example with three clear examples: basic body output in a layout, a named `head` section with `contentFor`, and use of the `defaultValue` parameter. The previous example had mixed comment/code syntax; the new one follows standard Wheels reference style.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/includecontent.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 26291,
+        "output_tokens": 696,
+        "cache_creation_input_tokens": 1496,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:includedInObject": {
+      "kind": "function",
+      "id": "includedInObject",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:01:00.551Z",
+      "summary": "Rewrote the reference example for `includedInObject` with three numbered examples covering: (1) a boolean true/false check with subscription context, (2) demonstrating the numeric return value (array position), and (3) guarding against duplicate association entries. The docblock matches the snapshot — no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/includedinobject.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 7394,
+        "output_tokens": 745,
+        "cache_creation_input_tokens": 4381,
+        "cache_read_input_tokens": 15265
+      }
+    },
+    "function:includeLayout": {
+      "kind": "function",
+      "id": "includeLayout",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:01:23.927Z",
+      "summary": "Rewrote the `includeLayout` reference example using the modern numbered `//` comment style with three idiomatic examples: default usage, explicit path usage, and the common pattern of populating a content section before including the parent layout. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/includelayout.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 28041,
+        "output_tokens": 953,
+        "cache_creation_input_tokens": 14274,
+        "cache_read_input_tokens": 32257
+      }
+    },
+    "function:includePartial": {
+      "kind": "function",
+      "id": "includePartial",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:01:45.693Z",
+      "summary": "Rewrote the `includePartial` reference file with 11 numbered, idiomatic examples covering all major use cases: basic partial inclusion, root-relative paths, query/object/objects looping, template overrides, caching, grouping, and spacers. Removed the erroneous `</cfoutput>` tag present in the original file and added proper numbered comment headings throughout.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/includepartial.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28218,
+        "output_tokens": 1189,
+        "cache_creation_input_tokens": 2504,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:javaScriptIncludeTag": {
+      "kind": "function",
+      "id": "javaScriptIncludeTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:02:09.042Z",
+      "summary": "Updated the `javaScriptIncludeTag` reference example to align with the `styleSheetLinkTag` style (lowercase `<!--- view code --->`), updated the external jQuery URL to a more current version, and added a fourth example demonstrating the `delim` parameter with a pipe-separated list. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/javascriptincludetag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 14165,
+        "output_tokens": 1007,
+        "cache_creation_input_tokens": 7976,
+        "cache_read_input_tokens": 15505
+      }
+    },
+    "function:lastPageLink": {
+      "kind": "function",
+      "id": "lastPageLink",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:02:21.127Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/lastpagelink.txt` with four examples covering basic usage, custom text/CSS classes, hiding the disabled span, and using a named route for clean URL pagination. No docblock or code changes were needed — the source and documented parameters are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/lastpagelink.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16371,
+        "output_tokens": 906,
+        "cache_creation_input_tokens": 1630,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:linkTo": {
+      "kind": "function",
+      "id": "linkTo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:02:45.785Z",
+      "summary": "Rewrote the `linkTo` reference example with 10 clear, idiomatic examples covering the common use cases: basic controller/action, omitting the controller, key routing, query params, named routes, external hrefs, extra HTML attributes, icon markup with encode=\"attributes\", absolute URLs, and anchor links. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/linkto.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 26200,
+        "output_tokens": 1190,
+        "cache_creation_input_tokens": 3160,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:mailTo": {
+      "kind": "function",
+      "id": "mailTo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:02:56.612Z",
+      "summary": "Wrote three idiomatic reference examples for `mailTo()` covering: basic usage (email as link text), custom display name, and additional HTML attributes passed through to the anchor tag.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/mailto.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 24798,
+        "output_tokens": 543,
+        "cache_creation_input_tokens": 1532,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:minuteSelectTag": {
+      "kind": "function",
+      "id": "minuteSelectTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:03:14.166Z",
+      "summary": "Fixed the reference example (changed incorrect `value=` parameter to the correct `selected=`) and corrected the docblock `@selected` hint from \"The day that should be selected initially\" to \"The minute that should be selected initially\". Added a third example demonstrating `includeBlank` and `label`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/minuteselecttag.txt",
+        "vendor/wheels/view/formsdateplain.cfc"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 15702,
+        "output_tokens": 1119,
+        "cache_creation_input_tokens": 8946,
+        "cache_read_input_tokens": 15645
+      }
+    },
+    "function:monthSelectTag": {
+      "kind": "function",
+      "id": "monthSelectTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:03:36.526Z",
+      "summary": "Expanded the `monthSelectTag` reference example from one basic usage to three examples demonstrating: basic usage with a form param, month abbreviations with a blank prompt, and month numbers with a label. No docblock or code changes were needed — the source matched the documented parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/monthselecttag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 14638,
+        "output_tokens": 642,
+        "cache_creation_input_tokens": 2340,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:nextPageLink": {
+      "kind": "function",
+      "id": "nextPageLink",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:03:55.004Z",
+      "summary": "Created vendor/wheels/public/docs/reference/controller/nextpagelink.txt with four idiomatic examples covering basic usage, custom text/CSS classes, hiding the disabled state, and route-based pagination. No docblock or code changes were needed — the source and documented parameters were already consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/nextpagelink.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 17381,
+        "output_tokens": 1111,
+        "cache_creation_input_tokens": 9022,
+        "cache_read_input_tokens": 38387
+      }
+    },
+    "function:numberField": {
+      "kind": "function",
+      "id": "numberField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:04:07.929Z",
+      "summary": "Created the reference example file for `numberField()` at `vendor/wheels/public/docs/reference/controller/numberfield.txt` with three idiomatic examples: a basic bound field, a constrained field with min/max/step and a label, and a nested association loop.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/numberfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39241,
+        "output_tokens": 563,
+        "cache_creation_input_tokens": 2322,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:numberFieldTag": {
+      "kind": "function",
+      "id": "numberFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:04:22.315Z",
+      "summary": "Created a new reference example file for `numberFieldTag` at `vendor/wheels/public/docs/reference/controller/numberfieldtag.txt` with three idiomatic examples demonstrating basic usage, min/max/step constraints with a label, and an additional HTML attribute (`class`). No docblock or code changes were needed — the source and documented parameters are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/numberfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17604,
+        "output_tokens": 596,
+        "cache_creation_input_tokens": 1968,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:pageNumberLinks": {
+      "kind": "function",
+      "id": "pageNumberLinks",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:04:39.871Z",
+      "summary": "Created vendor/wheels/public/docs/reference/controller/pagenumberlinks.txt with five idiomatic examples covering basic usage, windowSize/CSS classes, list-item wrapping with prependToPage/appendToPage, linkToCurrentPage=true, and multiple paginated queries identified by handle. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/pagenumberlinks.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16688,
+        "output_tokens": 935,
+        "cache_creation_input_tokens": 1780,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:paginationInfo": {
+      "kind": "function",
+      "id": "paginationInfo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:05:10.871Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/paginationinfo.txt` with three idiomatic examples covering default usage, a custom format string with all available tokens, and multiple paginated queries on the same page using named handles. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/paginationinfo.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 17207,
+        "output_tokens": 1086,
+        "cache_creation_input_tokens": 8873,
+        "cache_read_input_tokens": 38143
+      }
+    },
+    "function:paginationLinks": {
+      "kind": "function",
+      "id": "paginationLinks",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:05:37.030Z",
+      "summary": "Fixed the existing reference file by correcting wrong argument names `prependToLink`/`appendToLink` → `prependToPage`/`appendToPage` in Example 3, added Example 5 demonstrating `classForCurrent` and `addActiveClassToPrependedParent`, and added the missing `@addActiveClassToPrependedParent` param annotation to the docblock in links.cfc.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/paginationlinks.txt",
+        "vendor/wheels/view/links.cfc"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 28734,
+        "output_tokens": 1659,
+        "cache_creation_input_tokens": 16441,
+        "cache_read_input_tokens": 33897
+      }
+    },
+    "function:paginationNav": {
+      "kind": "function",
+      "id": "paginationNav",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:05:58.791Z",
+      "summary": "Created the reference example file for `paginationNav` at `vendor/wheels/public/docs/reference/controller/paginationnav.txt` with 5 idiomatic examples covering basic usage, info text with custom CSS class, minimal (no first/last) nav, multiple handles, and the `showSinglePage` option. No docblock or code changes were needed — the implementation and documented parameters are in full agreement.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/paginationnav.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 17322,
+        "output_tokens": 1194,
+        "cache_creation_input_tokens": 9050,
+        "cache_read_input_tokens": 38391
+      }
+    },
+    "function:passwordField": {
+      "kind": "function",
+      "id": "passwordField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:06:15.277Z",
+      "summary": "Updated the `passwordField` reference example with four numbered, idiomatic examples covering basic usage, confirmation fields, nested association (hasMany), and prepend/append wrapping. The CFC source and documented parameters are consistent — no docblock or body edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/passwordfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39654,
+        "output_tokens": 852,
+        "cache_creation_input_tokens": 2546,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:passwordFieldTag": {
+      "kind": "function",
+      "id": "passwordFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:06:29.902Z",
+      "summary": "Rewrote the reference example for `passwordFieldTag` with three numbered examples: basic name-only usage, with label and value, and with `labelPlacement`/`prepend`/`append` for layout control. No docblock or code changes were needed — the source and documented parameters are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/passwordfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17804,
+        "output_tokens": 743,
+        "cache_creation_input_tokens": 2010,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:previousPageLink": {
+      "kind": "function",
+      "id": "previousPageLink",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:06:42.660Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/previouspagelink.txt` with four idiomatic examples covering basic usage in a pagination bar, custom text/CSS classes, hiding the disabled element on the first page, and using a named route with page numbers in the URL path. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/previouspagelink.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16336,
+        "output_tokens": 891,
+        "cache_creation_input_tokens": 1614,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:radioButton": {
+      "kind": "function",
+      "id": "radioButton",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:07:08.213Z",
+      "summary": "Rewrote the `radioButton` reference example with three properly numbered examples: basic gender radio buttons, radio buttons with `labelPlacement` and `class` options, and the nested `hasMany` association pattern. The docblock in the CFC was already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/radiobutton.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39264,
+        "output_tokens": 875,
+        "cache_creation_input_tokens": 2834,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:radioButtonTag": {
+      "kind": "function",
+      "id": "radioButtonTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:07:27.084Z",
+      "summary": "Rewrote the `radioButtonTag` reference example to follow the numbered-heading style used by `checkBoxTag` and other Form Tag Function references: removed raw `<br>` HTML, added a `labelPlacement` example, and added a query-loop example. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/radiobuttontag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 19053,
+        "output_tokens": 970,
+        "cache_creation_input_tokens": 10411,
+        "cache_read_input_tokens": 15560
+      }
+    },
+    "function:rangeField": {
+      "kind": "function",
+      "id": "rangeField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:07:42.998Z",
+      "summary": "Created a new reference example file for `rangeField` at `vendor/wheels/public/docs/reference/controller/rangefield.txt`. The three examples demonstrate basic usage, min/max/step constraints, and a nested-association (hasMany) scenario — mirroring the style of the adjacent `numberfield.txt` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/rangefield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39332,
+        "output_tokens": 629,
+        "cache_creation_input_tokens": 2344,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:rangeFieldTag": {
+      "kind": "function",
+      "id": "rangeFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:07:59.048Z",
+      "summary": "Created the reference example file for `rangeFieldTag` at `vendor/wheels/public/docs/reference/controller/rangefieldtag.txt` with three idiomatic examples covering basic usage, min/max/step constraints with a label, and a CSS class with an appended hint. No docblock changes were needed — the source matches the documented parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/rangefieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 18503,
+        "output_tokens": 748,
+        "cache_creation_input_tokens": 10281,
+        "cache_read_input_tokens": 28257
+      }
+    },
+    "function:resetCycle": {
+      "kind": "function",
+      "id": "resetCycle",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:08:13.199Z",
+      "summary": "Rewrote the broken `resetcycle.txt` reference example with three clean, idiomatic examples showing: resetting the default cycle between grouped query sections, resetting a named cycle for each group, and explicitly resetting multiple named cycles. Removed the malformed syntax (missing `=` assignments, wrong variable references, stray `>` characters) present in the original file.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/resetcycle.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 26790,
+        "output_tokens": 678,
+        "cache_creation_input_tokens": 1424,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:searchField": {
+      "kind": "function",
+      "id": "searchField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:08:24.155Z",
+      "summary": "Created the reference example file for `searchField()` at `vendor/wheels/public/docs/reference/controller/searchfield.txt` with three idiomatic examples demonstrating basic usage, a custom label with a placeholder attribute, and label placement with a CSS class. No docblock or body changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/searchfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39186,
+        "output_tokens": 558,
+        "cache_creation_input_tokens": 2230,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:searchFieldTag": {
+      "kind": "function",
+      "id": "searchFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:08:39.553Z",
+      "summary": "Created a new reference example file for `searchFieldTag` at `vendor/wheels/public/docs/reference/controller/searchfieldtag.txt` with three idiomatic examples showing basic usage with a label, usage with extra HTML attributes (placeholder, class), and a label-less variant. No docblock or code changes were needed — the source and documented parameters are in alignment.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/searchfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 17516,
+        "output_tokens": 611,
+        "cache_creation_input_tokens": 9803,
+        "cache_read_input_tokens": 15428
+      }
+    },
+    "function:secondSelectTag": {
+      "kind": "function",
+      "id": "secondSelectTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:08:55.509Z",
+      "summary": "Rewrote the reference example for `secondSelectTag` to fix a stray `</cfoutput>` tag, replace the invalid `value=` parameter with the correct `selected=`, and add a third example demonstrating `includeBlank` and `label`. Also fixed the docblock `@selected` hint which incorrectly said \"day\" instead of \"second\".",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/secondselecttag.txt",
+        "vendor/wheels/view/formsdateplain.cfc"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 15104,
+        "output_tokens": 848,
+        "cache_creation_input_tokens": 8921,
+        "cache_read_input_tokens": 15622
+      }
+    },
+    "function:select": {
+      "kind": "function",
+      "id": "select",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:09:14.511Z",
+      "summary": "Rewrote the `select` reference example with 6 clean, idiomatic examples covering basic usage, custom valueField/textField, includeBlank with a placeholder string, simple list options, multi-select, and nested association usage. Removed the inconsistent mixed HTML/CFScript comment style from the old example.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/select.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 40577,
+        "output_tokens": 994,
+        "cache_creation_input_tokens": 3340,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:selectTag": {
+      "kind": "function",
+      "id": "selectTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:09:28.277Z",
+      "summary": "Rewrote the selectTag reference example with 4 clean, idiomatic examples covering a simple string list, a query-backed select with valueField/textField, pre-selection with a blank option, and multiple selection. Fixed the existing file's stray `>` character and mixed CFScript/CFM-tag style.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/selecttag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 18240,
+        "output_tokens": 739,
+        "cache_creation_input_tokens": 2586,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:simpleFormat": {
+      "kind": "function",
+      "id": "simpleFormat",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:09:46.315Z",
+      "summary": "Rewrote the `simpleFormat` reference example using modern CFML comment style with numbered headings. The four examples cover: basic usage formatting a body text, a literal demonstration showing exact HTML output, using `wrap=false` to skip the paragraph wrapper, and using `encode=false` for pre-trusted content.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/simpleformat.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 26399,
+        "output_tokens": 679,
+        "cache_creation_input_tokens": 1754,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:startFormTag": {
+      "kind": "function",
+      "id": "startFormTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:10:02.552Z",
+      "summary": "Expanded the `startFormTag` reference from a single minimal example to five idiomatic examples covering basic POST, GET with different controller/action, multipart file upload, named route with HTML attributes, and a PUT update form. No docblock or source changes were needed — the documented parameters match the function signature.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/startformtag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 18276,
+        "output_tokens": 714,
+        "cache_creation_input_tokens": 2432,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:stripLinks": {
+      "kind": "function",
+      "id": "stripLinks",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:10:21.649Z",
+      "summary": "Rewrote the stripLinks reference example with three numbered examples: basic usage removing a single link, stripping multiple links, and using `encode=false` to skip XSS encoding. The existing single-line example lacked numbered headings and didn't demonstrate the `encode` parameter.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/striplinks.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 3433,
+        "output_tokens": 655,
+        "cache_creation_input_tokens": 1466,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:stripTags": {
+      "kind": "function",
+      "id": "stripTags",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:10:34.778Z",
+      "summary": "Rewrote the `stripTags` reference file with three numbered idiomatic examples: basic tag stripping, stripping from a richer HTML fragment, and disabling XSS encoding. Format matches the sibling `stripLinks` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/striptags.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 3744,
+        "output_tokens": 633,
+        "cache_creation_input_tokens": 2368,
+        "cache_read_input_tokens": 15224
+      }
+    },
+    "function:styleSheetLinkTag": {
+      "kind": "function",
+      "id": "styleSheetLinkTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:10:49.181Z",
+      "summary": "Rewrote the styleSheetLinkTag reference example using the modern numbered-comment style, covering single file, comma-delimited list, print media, external URL, head injection, and custom delimiter use cases. No docblock or code changes were needed — the source and documented parameters are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/stylesheetlinktag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 14019,
+        "output_tokens": 719,
+        "cache_creation_input_tokens": 2194,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:submitTag": {
+      "kind": "function",
+      "id": "submitTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:11:02.941Z",
+      "summary": "Rewrote the `submitTag` reference example with five idiomatic examples covering basic usage, custom label, image button, extra HTML attributes, and prepend/append wrapping. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/submittag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17527,
+        "output_tokens": 632,
+        "cache_creation_input_tokens": 1646,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:telField": {
+      "kind": "function",
+      "id": "telField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:11:14.540Z",
+      "summary": "Created the reference example for `telField` at `vendor/wheels/public/docs/reference/controller/telfield.txt`. The file includes three examples: basic usage with a label, adding a CSS class and placeholder attribute, and a nested association loop — all mirroring the style of the existing `textfield.txt` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/telfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39257,
+        "output_tokens": 636,
+        "cache_creation_input_tokens": 2234,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:telFieldTag": {
+      "kind": "function",
+      "id": "telFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:11:45.076Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/telfieldtag.txt` with three idiomatic examples demonstrating basic usage (name + value), labelled field with CSS class, and label placement with prepend/append wrappers. The docblock and function signature matched the snapshot with no drift requiring fixes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/telfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 9,
+      "usage": {
+        "input_tokens": 20296,
+        "output_tokens": 1524,
+        "cache_creation_input_tokens": 10822,
+        "cache_read_input_tokens": 81412
+      }
+    },
+    "function:textArea": {
+      "kind": "function",
+      "id": "textArea",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:11:59.283Z",
+      "summary": "Rewrote the `textArea` reference file with numbered comment headings and idiomatic examples covering basic usage, custom HTML attributes, nested hasMany associations, and label placement options. The docblock in the CFC was already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/textarea.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39643,
+        "output_tokens": 762,
+        "cache_creation_input_tokens": 2594,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:textAreaTag": {
+      "kind": "function",
+      "id": "textAreaTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:12:13.073Z",
+      "summary": "Rewrote the `textAreaTag` reference example with three numbered, idiomatic examples covering basic usage with pre-populated content, extra HTML attributes, and label placement with prepend/append. Removed the misleading \"password\" comment from the original file.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/textareatag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17636,
+        "output_tokens": 601,
+        "cache_creation_input_tokens": 1986,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:textField": {
+      "kind": "function",
+      "id": "textField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:12:28.120Z",
+      "summary": "Rewrote the `textField` reference example in the modern numbered-comment style, covering basic usage, HTML5 `type` argument, nested association/position, and prepend/append wrapping. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/textfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39594,
+        "output_tokens": 762,
+        "cache_creation_input_tokens": 2616,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:textFieldTag": {
+      "kind": "function",
+      "id": "textFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:12:40.145Z",
+      "summary": "Rewrote the reference example for `textFieldTag` with four numbered examples demonstrating basic usage, HTML5 `type` attribute, custom `labelPlacement` with extra HTML attributes, and `prepend`/`append` for wrapper markup. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/textfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17697,
+        "output_tokens": 626,
+        "cache_creation_input_tokens": 2050,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:timeSelect": {
+      "kind": "function",
+      "id": "timeSelect",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:12:55.318Z",
+      "summary": "Updated the `timeSelect` reference example file with five examples covering basic usage, limiting to hour/minute only, 15-minute intervals, 12-hour format with AM/PM, and a blank option with custom separator. The CFC docblock and signature were already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/timeselect.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 9021,
+        "output_tokens": 807,
+        "cache_creation_input_tokens": 6212,
+        "cache_read_input_tokens": 15942
+      }
+    },
+    "function:timeSelectTags": {
+      "kind": "function",
+      "id": "timeSelectTags",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:13:08.005Z",
+      "summary": "Rewrote the reference example for `timeSelectTags` using numbered comment headings and idiomatic CFML style. Fixed a missing comma in the original example 1 and added two additional examples demonstrating `twelveHour`, `minuteStep`, `includeBlank`, and `label` parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/timeselecttags.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 14866,
+        "output_tokens": 700,
+        "cache_creation_input_tokens": 2546,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:urlField": {
+      "kind": "function",
+      "id": "urlField",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:13:20.235Z",
+      "summary": "Created the reference example file for `urlField` at `vendor/wheels/public/docs/reference/controller/urlfield.txt` with three idiomatic examples mirroring the `emailField` reference style: a basic object-bound field, one with a custom label and CSS class, and a nested hasMany association usage.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/urlfield.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 39217,
+        "output_tokens": 585,
+        "cache_creation_input_tokens": 2238,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:urlFieldTag": {
+      "kind": "function",
+      "id": "urlFieldTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:13:33.531Z",
+      "summary": "Created the reference example file for `urlFieldTag` at `vendor/wheels/public/docs/reference/controller/urlfieldtag.txt` with four idiomatic examples covering basic usage, pre-filled value with placeholder, label placement, and prepend/append wrapping. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/urlfieldtag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17934,
+        "output_tokens": 609,
+        "cache_creation_input_tokens": 1868,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:viteAsset": {
+      "kind": "function",
+      "id": "viteAsset",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:13:46.639Z",
+      "summary": "Created the reference example file for `viteAsset()` at `vendor/wheels/public/docs/reference/controller/viteasset.txt` with three examples demonstrating: resolving a JS entrypoint URL, using the resolved URL in an image tag, and resolving a CSS entrypoint URL for a preload hint. No docblock or code changes were needed — the source matched the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/viteasset.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11885,
+        "output_tokens": 636,
+        "cache_creation_input_tokens": 1208,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:vitePreloadTag": {
+      "kind": "function",
+      "id": "vitePreloadTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:14:10.302Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/vitepreloadtag.txt` with three idiomatic examples covering: default head-injection usage, inline markup retrieval via `head=false`, and warming assets for anticipated navigations. No docblock or body changes were needed — the source and documented hint are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/vitepreloadtag.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 12172,
+        "output_tokens": 831,
+        "cache_creation_input_tokens": 6536,
+        "cache_read_input_tokens": 24657
+      }
+    },
+    "function:viteScriptTag": {
+      "kind": "function",
+      "id": "viteScriptTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:14:25.884Z",
+      "summary": "Created vendor/wheels/public/docs/reference/controller/vitescripttag.txt with three idiomatic examples covering inline default usage, head placement, and a page-specific entrypoint. No docblock or code changes were needed — the source and documented hint/parameters are in full agreement.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/vitescripttag.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 11879,
+        "output_tokens": 665,
+        "cache_creation_input_tokens": 6333,
+        "cache_read_input_tokens": 15141
+      }
+    },
+    "function:viteStyleTag": {
+      "kind": "function",
+      "id": "viteStyleTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:14:48.253Z",
+      "summary": "Authored the reference example file for `viteStyleTag` at `vendor/wheels/public/docs/reference/controller/vitestyletag.txt`. Three examples cover: inline production link tag, head-buffered placement, and a page-specific CSS entrypoint — modelled on the existing `vitescripttag.txt` sibling. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/vitestyletag.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 12371,
+        "output_tokens": 814,
+        "cache_creation_input_tokens": 6585,
+        "cache_read_input_tokens": 24670
+      }
+    },
+    "function:yearSelectTag": {
+      "kind": "function",
+      "id": "yearSelectTag",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T06:15:03.160Z",
+      "summary": "Rewrote the reference example for `yearSelectTag` with three numbered, idiomatic examples. Fixed the incorrect date arithmetic (`Now() - 50` subtracts days, not years) by using `Year(Now()) - 50` and `Year(Now()) - 18` to correctly produce numeric year values that match the `startYear`/`endYear` parameter types. Added a third example demonstrating `includeBlank` and label placement.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/yearselecttag.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 14886,
+        "output_tokens": 744,
+        "cache_creation_input_tokens": 2372,
+        "cache_read_input_tokens": 10821
+      }
     }
   },
   "runs": []

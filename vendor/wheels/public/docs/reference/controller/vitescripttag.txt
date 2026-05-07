@@ -1,0 +1,14 @@
+// 1. Emit a script tag for a Vite JS entrypoint inline (default)
+// In development, also injects the Vite HMR client.
+// In production, emits <link> tags for any associated CSS and a <script type="module"> tag.
+writeOutput(viteScriptTag("src/main.js"));
+
+// 2. Place the script tag in the <head> instead of inline
+// Passes the generated markup to $htmlHead() so it is buffered into the page <head>.
+// Returns an empty string; nothing is printed at the call site.
+viteScriptTag(entrypoint="src/main.js", head=true);
+
+// 3. Emit a script tag for a page-specific entrypoint
+// Each entrypoint gets its own script tag; CSS chunks discovered in the
+// manifest are automatically included as <link rel="stylesheet"> tags.
+writeOutput(viteScriptTag("src/checkout.js"));

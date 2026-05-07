@@ -1,0 +1,8 @@
+// 1. Basic telephone field with a pre-filled value
+#telFieldTag(name="phone", value="555-867-5309")#
+
+// 2. Telephone field with a label and a CSS class
+#telFieldTag(name="mobilePhone", value="", label="Mobile Phone", class="tel-input")#
+
+// 3. Telephone field with label placement and prepend/append wrappers
+#telFieldTag(name="officePhone", label="Office Phone", labelPlacement="before", prepend="<div class=""field"">", append="</div>")#

@@ -1,8 +1,14 @@
-<!---View code --->
+<!--- Basic time select bound to a model object (hour, minute, second) --->
 #timeSelect(objectName="business", property="openUntil")#
 
-<!---Show fields for hour and minute --->
+<!--- Show fields for hour and minute only --->
 #timeSelect(objectName="business", property="openUntil", order="hour,minute")#
 
-<!---Only show 15-minute intervals --->
+<!--- Only show 15-minute intervals --->
 #timeSelect(objectName="appointment", property="dateTimeStart", minuteStep=15)#
+
+<!--- Display in 12-hour format with AM/PM --->
+#timeSelect(objectName="appointment", property="dateTimeStart", twelveHour=true)#
+
+<!--- Include a blank option and use a custom separator --->
+#timeSelect(objectName="shift", property="startTime", includeBlank="- Select -", separator=" | ")#

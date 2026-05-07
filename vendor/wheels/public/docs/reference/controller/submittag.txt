@@ -1,4 +1,22 @@
-#startFormTag(action="something")#
+// 1. Basic submit button inside a form
+#startFormTag(action="save")#
     <!--- form controls go here --->
     #submitTag()#
 #endFormTag()#
+// -> <form action="/products/save" method="post">...<input type="submit" value="Save changes"></form>
+
+// 2. Custom button label
+#submitTag(value="Create Account")#
+// -> <input type="submit" value="Create Account">
+
+// 3. Image submit button
+#submitTag(image="submit-button.png")#
+// -> <input type="image" src="/images/submit-button.png">
+
+// 4. Submit button with extra HTML attributes (class and id)
+#submitTag(value="Place Order", class="btn btn-primary", id="order-submit")#
+// -> <input type="submit" value="Place Order" class="btn btn-primary" id="order-submit">
+
+// 5. Submit button wrapped with HTML using prepend and append
+#submitTag(value="Save", prepend="<div class=""actions"">", append="</div>")#
+// -> <div class="actions"><input type="submit" value="Save"></div>

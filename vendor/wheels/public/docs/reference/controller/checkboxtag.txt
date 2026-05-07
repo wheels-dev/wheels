@@ -1,16 +1,24 @@
-<!--- Example 1: Basic usage involves a `label`, `name`, and `value` --->
-#checkBoxTag(name="subscribe", value="true", label="Subscribe to our newsletter", checked=false)#
+// 1. Basic usage with a label and a pre-checked state
+<cfoutput>
+	#checkBoxTag(name="subscribe", value="1", label="Subscribe to our newsletter", checked=true)#
+</cfoutput>
 
-<!--- Example 2: Loop over a query to display choices and whether or not they are checked --->
-// Controller code
-pizza = model("pizza").findByKey(session.pizzaId);
-selectedToppings = pizza.toppings();
-toppings = model("topping").findAll(order="name");
+// 2. Render an unchecked check box that also submits a value when unchecked
+<cfoutput>
+	#checkBoxTag(name="agreeToTerms", value="1", uncheckedValue="0", label="I agree to the terms")#
+</cfoutput>
 
-<!--- View code --->
-<fieldset>
-	<legend>Toppings</legend>
-	<cfoutput query="toppings">
-		#checkBoxTag(name="toppings", value="true", label=toppings.name, checked=YesNoFormat(ListFind(ValueList(selectedToppings.id), toppings.id))#
-	</cfoutput>
-</fieldset>
+// 3. Loop over a query to render one check box per option, checking those already selected
+// Controller
+toppings = model("Topping").findAll(order="name");
+selectedIds = "2,5,9"; // e.g. previously saved topping IDs as a comma-delimited list
+
+// View
+<cfoutput query="toppings">
+	#checkBoxTag(
+		name    = "toppingIds",
+		value   = toppings.id,
+		label   = toppings.name,
+		checked = listFindNoCase(selectedIds, toppings.id) GT 0
+	)#
+</cfoutput>

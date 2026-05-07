@@ -1,2 +1,11 @@
-<!--- Will output: CFWheels is a framework for ColdFusion. --->
-#stripTags('<strong>Wheels</strong> is a framework for <a href="http://www.adobe.com/products/coldfusion">ColdFusion</a>.')#
+// 1. Strip all HTML tags from a string, leaving plain text
+result = stripTags('<strong>CFWheels</strong> is a framework for <a href="http://www.adobe.com/products/coldfusion">ColdFusion</a>.');
+// result -> "CFWheels is a framework for ColdFusion."
+
+// 2. Strip tags from a richer HTML fragment
+result = stripTags('<h1>Welcome</h1><p>This is a <em>great</em> framework.</p>');
+// result -> "WelcomeThis is a great framework."
+
+// 3. Strip tags while skipping XSS encoding (e.g. when you trust the source HTML)
+result = stripTags('<p>Hello, <strong>world</strong>!</p>', encode=false);
+// result -> "Hello, world!"

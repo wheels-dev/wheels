@@ -1,5 +1,11 @@
-<!--- View code --->
+<!--- Basic date select bound to a model object --->
 #dateSelect(objectName="user", property="dateOfBirth")#
 
-<!--- Show fields to select month and year --->
+<!--- Show fields to select only month and year --->
 #dateSelect(objectName="order", property="expirationDate", order="month,year")#
+
+<!--- Display month as numbers and include a blank option --->
+#dateSelect(objectName="event", property="startDate", monthDisplay="numbers", includeBlank=true)#
+
+<!--- Restrict year range and use abbreviated month names --->
+#dateSelect(objectName="reservation", property="checkInDate", startYear=2024, endYear=2030, monthDisplay="abbreviations")#

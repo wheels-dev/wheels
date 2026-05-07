@@ -1,5 +1,11 @@
-<!--- View code --->
+// 1. Basic date and time select for an article's published date
 #dateTimeSelect(objectName="article", property="publishedAt")#
 
-<!--- Show fields for month, day, hour, and minute --->
+// 2. Show only month, day, hour, and minute (exclude year and second)
 #dateTimeSelect(objectName="appointment", property="dateTimeStart", dateOrder="month,day", timeOrder="hour,minute")#
+
+// 3. Use 12-hour time format with a blank option and a custom year range
+#dateTimeSelect(objectName="event", property="startsAt", twelveHour=true, includeBlank=true, startYear=2020, endYear=2030)#
+
+// 4. Display month as numbers, step minutes by 15, and add a label
+#dateTimeSelect(objectName="meeting", property="scheduledAt", monthDisplay="numbers", minuteStep=15, label="Scheduled Date & Time")#

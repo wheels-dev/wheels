@@ -1,18 +1,43 @@
-<!--- In your view --->
+// 1. Store sidebar content for use in the layout
 <cfsavecontent variable="mySidebar">
-<h1>My Sidebar Text</h1>
+  <nav>Recent Posts</nav>
 </cfsavecontent>
 <cfset contentFor(sidebar=mySidebar)>
 
-<!--- In your layout --->
-<html>
-	<head>
-	    <title>My Site</title>
-	</head>
-	<body>
-		<cfoutput>
-			#includeContent("sidebar")#
-			#includeContent()#
-		</cfoutput>
-	</body>
-</html>
+<!--- In your layout, output the stored section --->
+<cfoutput>
+  #includeContent("sidebar")#
+  #includeContent()#
+</cfoutput>
+
+// 2. Push content onto a stack — multiple calls append by default
+<cfsavecontent variable="firstScript">
+  <script src="/js/base.js"></script>
+</cfsavecontent>
+<cfset contentFor(scripts=firstScript)>
+
+<cfsavecontent variable="secondScript">
+  <script src="/js/page.js"></script>
+</cfsavecontent>
+<cfset contentFor(scripts=secondScript)>
+
+<!--- Both scripts are rendered in order --->
+<cfoutput>#includeContent("scripts")#</cfoutput>
+
+// 3. Prepend content to an existing section using position="first"
+<cfsavecontent variable="criticalScript">
+  <script src="/js/critical.js"></script>
+</cfsavecontent>
+<cfset contentFor(position="first", scripts=criticalScript)>
+
+// 4. Overwrite an entire section with overwrite="all"
+<cfsavecontent variable="replacementSidebar">
+  <nav>Admin Sidebar</nav>
+</cfsavecontent>
+<cfset contentFor(overwrite="all", sidebar=replacementSidebar)>
+
+// 5. Overwrite a specific position in the stack (position=1, overwrite=true)
+<cfsavecontent variable="updatedScript">
+  <script src="/js/updated.js"></script>
+</cfsavecontent>
+<cfset contentFor(position=1, overwrite=true, scripts=updatedScript)>

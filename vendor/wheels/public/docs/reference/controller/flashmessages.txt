@@ -1,45 +1,52 @@
-// In the controller action
+// 1. Display all Flash messages in a view
+// In the controller action:
 flashInsert(success="Your post was successfully submitted.");
 flashInsert(alert="Don't forget to tweet about this post!");
 flashInsert(error="This is an error message.");
 
-<!--- In the layout or view --->
-#flashMessages()#
+// In the layout or view:
+writeOutput(flashMessages());
 
-<!--- Generates this (sorted alphabetically):--->
-<div class="flashMessages">
-	<p class="alertMessage">
-		Don't forget to tweet about this post!
-	</p>
-	<p class="errorMessage">
-		This is an error message.
-	</p>
-	<p class="successMessage">
-		Your post was successfully submitted.
-	</p>
-</div>
+// Generates (keys sorted alphabetically):
+// <div class="flash-messages">
+//   <p class="alert-message">Don't forget to tweet about this post!</p>
+//   <p class="error-message">This is an error message.</p>
+//   <p class="success-message">Your post was successfully submitted.</p>
+// </div>
 
 
-<!---  Only show the "success" key in the view --->
-#flashMessages(key="success")#
+// 2. Show only a single Flash key using the `key` alias
+writeOutput(flashMessages(key="success"));
 
-<!--- Generates this: --->
-<div class="flashMessage">
-	<p class="successMessage">
-		Your post was successfully submitted.
-	</p>
-</div>
+// Generates:
+// <div class="flash-messages">
+//   <p class="success-message">Your post was successfully submitted.</p>
+// </div>
 
 
-<!--- Show only the "success" and "alert" keys in the view, in that order --->
-#flashMessages(keys="success,alert")#
+// 3. Show a specific set of keys in a defined order using `keys`
+writeOutput(flashMessages(keys="success,alert"));
 
-<!--- Generates this (sorted alphabetically):--->
-<div class="flashMessages">
-	<p class="successMessage">
-		Your post was successfully submitted.
-	</p>
-	<p class="alertMessage">
-		Don't forget to tweet about this post!
-	</p>
-</div>
+// Generates (in the order supplied, not alphabetically):
+// <div class="flash-messages">
+//   <p class="success-message">Your post was successfully submitted.</p>
+//   <p class="alert-message">Don't forget to tweet about this post!</p>
+// </div>
+
+
+// 4. Always render the container div, even when the Flash is empty
+writeOutput(flashMessages(includeEmptyContainer=true));
+
+// Generates:
+// <div class="flash-messages"></div>
+
+
+// 5. Use a custom CSS class on the outer container
+writeOutput(flashMessages(class="notifications"));
+
+// Generates:
+// <div class="notifications">
+//   <p class="alert-message">Don't forget to tweet about this post!</p>
+//   <p class="error-message">This is an error message.</p>
+//   <p class="success-message">Your post was successfully submitted.</p>
+// </div>

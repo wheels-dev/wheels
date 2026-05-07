@@ -1,8 +1,11 @@
-<!--- Outputs an `img` tag for `images/logo.png` --->
-#imageTag("logo.png")#
+// 1. Output an img tag for a local image (width, height, and alt are auto-detected)
+writeOutput(imageTag("logo.png"));
 
-<!--- Outputs an `img` tag for `http://cfwheels.org/images/logo.png` --->
-#imageTag(source="http://cfwheels.org/images/logo.png", alt="ColdFusion on Wheels")#
+// 2. Output an img tag for an image hosted on an external server
+writeOutput(imageTag(source="https://example.com/images/logo.png", alt="Company Logo"));
 
-<!--- Outputs an `img` tag with the `class` attribute set --->
-#imageTag(source="logo.png", class="logo")#
+// 3. Output an img tag with additional HTML attributes
+writeOutput(imageTag(source="logo.png", class="logo", id="mainLogo"));
+
+// 4. Output an img tag without requiring the file to exist locally (useful in development)
+writeOutput(imageTag(source="placeholder.png", required=false));

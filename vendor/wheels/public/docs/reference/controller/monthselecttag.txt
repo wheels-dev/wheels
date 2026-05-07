@@ -1,4 +1,24 @@
-// This "Tag" version of the function accepts a `name` and `selected` instead of binding to a model object 
+// 1. Basic usage: render a month select tag bound to a form param
 <cfoutput>
     #monthSelectTag(name="monthOfBirthday", selected=params.monthOfBirthday)#
+</cfoutput>
+
+// 2. Display month abbreviations instead of full names and include a blank prompt
+<cfoutput>
+    #monthSelectTag(
+        name="month",
+        selected=params.month,
+        monthDisplay="abbreviations",
+        includeBlank="- Select Month -"
+    )#
+</cfoutput>
+
+// 3. Display month numbers with a label wrapped around the control
+<cfoutput>
+    #monthSelectTag(
+        name="expirationMonth",
+        selected=params.expirationMonth,
+        monthDisplay="numbers",
+        label="Expiration Month"
+    )#
 </cfoutput>

@@ -1,0 +1,8 @@
+// 1. Basic search field with a label and pre-populated value
+#searchFieldTag(name="q", value=params.q, label="Search")#
+
+// 2. Search field with a placeholder and CSS class (extra HTML attributes are passed through)
+#searchFieldTag(name="keywords", label="Keywords", placeholder="Enter keywords...", class="search-input")#
+
+// 3. Search field without a label, value carried from params
+#searchFieldTag(name="q", value=params.q)#

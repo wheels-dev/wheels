@@ -1,11 +1,17 @@
-<!--- 	Provide `label` and required `objectName` and `property` --->
-#textArea(label="Overview", objectName="article", property="overview")#
+// 1. Basic text area bound to a model object property
+#textArea(objectName="article", property="overview", label="Overview")#
 
-<!--- Display fields for photos provided by the `screenshots` association and nested properties --->
+// 2. Text area with custom rows/cols attributes and a placeholder
+#textArea(objectName="post", property="body", label="Body", rows=10, cols=60, placeholder="Write your post here...")#
+
+// 3. Text areas for a nested hasMany association (screenshots)
 <fieldset>
 	<legend>Screenshots</legend>
 	<cfloop from="1" to="#ArrayLen(site.screenshots)#" index="i">
-		#fileField(label="File #i#", objectName="site", association="screenshots", position=i, property="file")#
-		#textArea(label="Caption ##i#", objectName="site", association="screenshots", position=i, property="caption")#
+		#fileField(objectName="site", association="screenshots", position=i, property="file", label="File ##i#")#
+		#textArea(objectName="site", association="screenshots", position=i, property="caption", label="Caption ##i#")#
 	</cfloop>
 </fieldset>
+
+// 4. Text area with label placement after and appended helper text
+#textArea(objectName="user", property="bio", label="Bio", labelPlacement="before", append="<small>Max 500 characters</small>")#
