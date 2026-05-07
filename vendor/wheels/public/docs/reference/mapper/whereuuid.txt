@@ -1,0 +1,21 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a single route variable to UUID values only
+    //    The [id] segment will only match values like "550e8400-e29b-41d4-a716-446655440000"
+    .get(name="document", pattern="documents/[id]", to="documents##show")
+    .whereUuid("id")
+
+    // 2. Constrain multiple variables to UUID format using a comma-delimited list
+    //    Both [userId] and [sessionId] must be valid UUID values
+    .get(name="userSession", pattern="users/[userId]/sessions/[sessionId]", to="sessions##show")
+    .whereUuid("userId,sessionId")
+
+    // 3. Chain with other constraint helpers for mixed-type route variables
+    //    [type] must be alphabetic; [id] must be a UUID
+    .get(name="typedResource", pattern="resources/[type]/[id]", to="resources##show")
+    .whereAlpha("type")
+    .whereUuid("id")
+.end();
+
+</cfscript>

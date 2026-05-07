@@ -1,0 +1,26 @@
+<cfscript>
+
+mapper()
+    // 1. Register the default health check route at /health.
+    // Responds with {"status":"ok","timestamp":"..."} — no controller needed.
+    .health()
+
+    .root(to="home##index")
+    .wildcard()
+.end();
+
+// 2. Override the URL path and route name.
+// Accessible at /healthz instead of /health.
+mapper()
+    .health(path="healthz", name="healthz")
+    .root(to="home##index")
+.end();
+
+// 3. Delegate to a custom controller action for advanced health checks
+// (e.g. database ping, cache connectivity).
+mapper()
+    .health(to="system##health")
+    .root(to="home##index")
+.end();
+
+</cfscript>

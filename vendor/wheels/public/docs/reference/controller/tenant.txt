@@ -1,0 +1,17 @@
+// 1. Get the active tenant struct (when a tenant is set)
+t = tenant();
+// t -> {id: "acme", dataSource: "tenant_db_acme", config: {}, $locked: true}
+
+// 2. Check whether a tenant is active before using its properties
+t = tenant();
+if (!structIsEmpty(t)) {
+    writeOutput("Current tenant: " & t.id);
+} else {
+    writeOutput("No tenant active — using application defaults.");
+}
+
+// 3. Access a per-tenant config value set via switchTenant()
+t = tenant();
+if (structKeyExists(t, "config") && structKeyExists(t.config, "timeZone")) {
+    writeOutput("Tenant time zone: " & t.config.timeZone);
+}

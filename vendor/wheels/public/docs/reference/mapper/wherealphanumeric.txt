@@ -1,0 +1,17 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a single route variable to alphanumeric characters only
+    .get(name="profile", pattern="profiles/[username]", to="profiles##show")
+    .whereAlphaNumeric("username")
+
+    // 2. Constrain multiple variables to alphanumeric in one call (comma-delimited list)
+    .get(name="teamMember", pattern="teams/[teamCode]/members/[memberCode]", to="teams##member")
+    .whereAlphaNumeric("teamCode,memberCode")
+
+    // 3. Chain whereAlphaNumeric with a resources block to restrict the key variable
+    .resources(name="products")
+    .whereAlphaNumeric("key")
+.end();
+
+</cfscript>

@@ -1,0 +1,52 @@
+<cfscript>
+
+// 1. Group routes under a shared path prefix (open/close style)
+mapper()
+    .group(path="admin")
+        // Route URL: /admin/dashboard
+        .get(name="dashboard", to="dashboard##index")
+        // Route URL: /admin/reports
+        .get(name="reports", to="reports##index")
+    .end()
+.end();
+
+// 2. Group with both a path prefix and a name prefix
+mapper()
+    .group(path="account", name="account")
+        // Route name:  accountSettings
+        // Example URL: /account/settings
+        .get(name="settings", to="settings##show")
+
+        // Route name:  accountBilling
+        // Example URL: /account/billing
+        .get(name="billing", to="billing##show")
+    .end()
+.end();
+
+// 3. Group with regex constraints applied to all child routes
+mapper()
+    .group(path="products", constraints={id: "\d+"})
+        // Only matches numeric :id segments
+        .get(name="productShow", pattern="[id]", to="products##show")
+        .put(name="productUpdate", pattern="[id]", to="products##update")
+    .end()
+.end();
+
+// 4. Group using a callback function (auto-closes the group)
+mapper()
+    .group(
+        path    = "reports",
+        name    = "report",
+        callback = function(mapper) {
+            // Route name:  reportSales
+            // Example URL: /reports/sales
+            mapper.get(name="sales", to="reports##sales");
+
+            // Route name:  reportExpenses
+            // Example URL: /reports/expenses
+            mapper.get(name="expenses", to="reports##expenses");
+        }
+    )
+.end();
+
+</cfscript>

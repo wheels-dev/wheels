@@ -1,0 +1,37 @@
+// 1. Register a simple error-notification callback in config/settings.cfm
+registerOnError(function(exception) {
+    writeLog(
+        file = "app-errors",
+        type = "error",
+        text = "Unhandled error: #exception.message# | Type: #exception.type#"
+    );
+});
+
+// 2. Register multiple callbacks — they fire in registration order
+registerOnError(function(exception) {
+    // Notify an external monitoring service
+    local.payload = serializeJSON({
+        message = exception.message,
+        type    = exception.type,
+        detail  = exception.detail
+    });
+    // cfhttp call to monitoring endpoint would go here
+});
+
+registerOnError(function(exception) {
+    // Store the last error in the application scope for the admin dashboard
+    application.lastError = {
+        message   = exception.message,
+        type      = exception.type,
+        timestamp = now()
+    };
+});
+
+// 3. Guard against slow operations — callbacks must complete quickly
+registerOnError(function(exception) {
+    // Do NOT perform long-running tasks here (database queries, large file I/O).
+    // A failing callback is caught, logged, and skipped so other callbacks still run.
+    if (structKeyExists(exception, "message") && len(exception.message)) {
+        writeLog(file = "wheels", type = "error", text = "App error: #exception.message#");
+    }
+});

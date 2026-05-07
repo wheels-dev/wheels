@@ -36,12 +36,16 @@ mapper()
         package="orders"
     )
 
+    // Redirect a legacy PATCH endpoint to the canonical URL
+    // Example URL: /accounts/[key]/edit -> redirects to /users/[key]/edit
+    .patch(name="legacyAccount", pattern="accounts/[key]/edit", redirect="/users/[key]/edit")
+
     // Example scoping within a nested resource
     .resources(name="subscribers", nested=true)
         // Route name:  launchSubscribers
         // Example URL: /subscribers/3209/launch
         // Controller:  Subscribers
-        // Action:      launch
+        // Action:      update
         .patch(name="launch", to="subscribers##update", on="collection")
 
         // Route name:  discontinueSubscriber

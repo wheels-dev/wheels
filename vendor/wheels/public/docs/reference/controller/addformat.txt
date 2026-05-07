@@ -1,6 +1,9 @@
-// Add the `js` format
+// 1. Add the `js` format
 addFormat(extension="js", mimeType="text/javascript");
 
-// Add the `ppt` and `pptx` formats
+// 2. Add the `ppt` and `pptx` formats
 addFormat(extension="ppt", mimeType="application/vnd.ms-powerpoint");
 addFormat(extension="pptx", mimeType="application/vnd.ms-powerpoint");
+
+// 3. Add a custom `csv` format so controllers can respond with `responds(formats="csv")`
+addFormat(extension="csv", mimeType="text/csv");

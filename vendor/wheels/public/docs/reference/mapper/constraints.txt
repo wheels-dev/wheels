@@ -1,0 +1,16 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a dynamic segment to digits only
+    .constraints(id="[0-9]+")
+        .resources(name="articles")
+    .end()
+
+    // 2. Constrain multiple segments — numeric id and lowercase-only slug
+    .constraints(id="[0-9]+", slug="[a-z\-]+")
+        .get(name="article", to="articles##show")
+        .get(name="articleBySlug", to="articles##showBySlug")
+    .end()
+.end();
+
+</cfscript>

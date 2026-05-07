@@ -1,10 +1,20 @@
 <cfscript>
 
+// 1. Add a preview route acting on a single photo (GET /photos/1/preview)
 mapper()
-    // Create a route like `photos/1/preview`
     .resources(name="photos", nested=true)
         .member()
             .get("preview")
+        .end()
+    .end()
+.end();
+
+// 2. Add multiple member routes (GET /articles/1/publish, DELETE /articles/1/archive)
+mapper()
+    .resources(name="articles", nested=true)
+        .member()
+            .get("publish")
+            .delete("archive")
         .end()
     .end()
 .end();

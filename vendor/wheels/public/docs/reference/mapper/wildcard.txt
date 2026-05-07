@@ -1,22 +1,26 @@
 <cfscript>
 
 mapper()
-    // Enables `[controller]` and `[controller]/[action]`, only via `GET` requests.
+    // 1. Basic wildcard: enables `[controller]` and `[controller]/[action]`
+    //    patterns via GET requests only.
     .wildcard()
 
-    // Enables `[controller]/[action]/[key]` as well.
+    // 2. Also enable a `[controller]/[action]/[key]` pattern.
     .wildcard(mapKey=true)
 
-    // Also enables patterns like `[controller].[format]` and
-    // `[controller]/[action].[format]`
+    // 3. Add an optional `.[format]` suffix to every generated pattern,
+    //    e.g. `[controller]/[action].json`.
     .wildcard(mapFormat=true)
 
-    // Allow additional methods beyond just `GET`
-    //
-    // Note that this can open some serious security holes unless you use `verifies`
-    // in the controller to make sure that requests changing data can only occur
-    // with a `POST` method.
-    .wildcard(methods="get,post")
+    // 4. Change the default action when only `[controller]` is matched.
+    //    Requests to `/photos` will route to `photos##home` instead of
+    //    `photos##index`.
+    .wildcard(action="home")
+
+    // 5. Allow additional HTTP methods beyond GET.
+    //    Note: opening up extra methods can create security holes unless
+    //    you use `verifies` in your controller to guard data-changing actions.
+    .wildcard(method="get,post")
 .end();
 
 </cfscript>
