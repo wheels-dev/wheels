@@ -40,7 +40,10 @@ export default {
         'web/blog',
         'web/guides',
         'web/api',
-        'web/starlight'
+        'web/starlight',
+        // Dependabot-generated bumps
+        'deps',
+        'deps-dev'
       ]
     ],
     // Allow empty scope (scope is optional)
