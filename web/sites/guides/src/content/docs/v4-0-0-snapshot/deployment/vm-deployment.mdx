@@ -40,7 +40,7 @@ The trade-off is manual work at setup and upgrade time. You install the JRE, you
 
 Install the JDK from your distro's package manager:
 
-```bash
+```bash title="Install Java 21 and dependencies"
 # Ubuntu / Debian
 sudo apt-get update
 sudo apt-get install -y openjdk-21-jre-headless rsync nginx logrotate
@@ -51,7 +51,7 @@ sudo dnf install -y java-21-openjdk-headless rsync nginx logrotate
 
 Verify:
 
-```bash
+```bash title="Verify Java installation"
 java -version
 # openjdk version "21.0.x" ...
 ```
@@ -80,7 +80,7 @@ After install, confirm Lucee is listening on a local port (`8888` is a common de
 
 Lay the app out under `/opt/myapp` so releases are immutable, shared state lives outside any release, and `current` is a symlink you swap atomically.
 
-```
+```text title="App directory layout"
 /opt/myapp/
 ├── current          -> releases/20260421T143022Z   (symlink)
 ├── releases/
@@ -100,14 +100,14 @@ Lay the app out under `/opt/myapp` so releases are immutable, shared state lives
 
 Create the layout once:
 
-```bash
+```bash title="Create directory layout"
 sudo mkdir -p /opt/myapp/releases /opt/myapp/shared/{logs,uploads,sessions}
 sudo chown -R lucee:lucee /opt/myapp
 ```
 
 Put the production `.env` in `/opt/myapp/shared/.env` and lock its permissions:
 
-```bash
+```bash title="Write the .env file"
 sudo install -m 600 -o lucee -g lucee /dev/stdin /opt/myapp/shared/.env <<'EOF'
 WHEELS_ENV=production
 DB_PASSWORD=...
@@ -121,7 +121,7 @@ Wheels reads these at boot via `application.wo.env("VAR_NAME")`. See [Environmen
 
 Run Lucee as a systemd service so it starts on boot, restarts on crash, and logs through journald. Create `/etc/systemd/system/myapp.service`:
 
-```ini
+```ini title="/etc/systemd/system/myapp.service"
 [Unit]
 Description=MyApp Wheels application (Lucee 7)
 After=network.target
@@ -153,7 +153,7 @@ Key pieces:
 
 Enable and start:
 
-```bash
+```bash title="Enable and start the service"
 sudo systemctl daemon-reload
 sudo systemctl enable --now myapp
 sudo systemctl status myapp
@@ -161,7 +161,7 @@ sudo systemctl status myapp
 
 Lucee should now be listening on `127.0.0.1:8888` (or whatever port your install uses). Curl it locally to confirm:
 
-```bash
+```bash title="Verify Lucee is listening"
 curl -I http://127.0.0.1:8888/
 ```
 
@@ -169,7 +169,7 @@ curl -I http://127.0.0.1:8888/
 
 nginx terminates TLS, serves static assets out of `public/`, and proxies everything else to Lucee on loopback. Create `/etc/nginx/sites-available/myapp.conf`:
 
-```nginx
+```nginx title="/etc/nginx/sites-available/myapp.conf"
 upstream myapp_lucee {
     server 127.0.0.1:8888;
     keepalive 32;
@@ -214,7 +214,7 @@ server {
 
 Enable the site and reload:
 
-```bash
+```bash title="Enable nginx site and reload"
 sudo ln -s /etc/nginx/sites-available/myapp.conf /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
@@ -222,7 +222,7 @@ sudo systemctl reload nginx
 
 Get a TLS cert with Let's Encrypt:
 
-```bash
+```bash title="Obtain TLS certificate with Let's Encrypt"
 sudo certbot --nginx -d myapp.example.com
 ```
 
@@ -236,7 +236,7 @@ Certbot edits the nginx config to wire the cert paths and installs a renewal tim
 
 Only 443 (and 80 for the Let's Encrypt redirect) should be open to the internet. Lucee stays on loopback.
 
-```bash
+```bash title="Configure firewall rules"
 # Ubuntu / Debian (ufw)
 sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
@@ -263,7 +263,7 @@ From your build machine or CI runner:
 
 2. **rsync to a new timestamped directory.**
 
-   ```bash
+   ```bash title="rsync release to VM"
    RELEASE=$(date -u +%Y%m%dT%H%M%SZ)
    rsync -az --delete \
        --exclude='.env' \
@@ -273,7 +273,7 @@ From your build machine or CI runner:
 
 3. **Wire the shared paths in.** On the VM, replace per-release log/upload/session directories and `.env` with symlinks into `shared/`.
 
-   ```bash
+   ```bash title="Wire shared paths into the release"
    ssh lucee@myapp.example.com bash -s <<EOF
    set -eu
    cd /opt/myapp/releases/$RELEASE
@@ -285,7 +285,7 @@ From your build machine or CI runner:
 
 4. **Run migrations against the new release.** Point the CLI at the new release so it reads the new migration files.
 
-   ```bash
+   ```bash title="Run database migrations on the new release"
    ssh lucee@myapp.example.com "cd /opt/myapp/releases/$RELEASE && wheels dbmigrate latest"
    ```
 
@@ -293,7 +293,7 @@ From your build machine or CI runner:
 
 5. **Flip the symlink.**
 
-   ```bash
+   ```bash title="Flip the symlink to the new release"
    ssh lucee@myapp.example.com "ln -sfn /opt/myapp/releases/$RELEASE /opt/myapp/current"
    ```
 
@@ -301,7 +301,7 @@ From your build machine or CI runner:
 
 6. **Reload nginx and the app.**
 
-   ```bash
+   ```bash title="Reload nginx and restart Lucee"
    ssh lucee@myapp.example.com "sudo systemctl reload nginx && sudo systemctl restart myapp"
    ```
 
@@ -309,7 +309,7 @@ From your build machine or CI runner:
 
 7. **Prune old releases.**
 
-   ```bash
+   ```bash title="Prune old releases (keep 5 most recent)"
    ssh lucee@myapp.example.com "cd /opt/myapp/releases && ls -1t | tail -n +6 | xargs -r rm -rf"
    ```
 
@@ -323,7 +323,7 @@ From your build machine or CI runner:
 
 Lucee and nginx both write into `/opt/myapp/shared/logs/`. Rotate them weekly with logrotate. Create `/etc/logrotate.d/myapp`:
 
-```ini
+```ini title="/etc/logrotate.d/myapp"
 /opt/myapp/shared/logs/*.log {
     weekly
     rotate 8

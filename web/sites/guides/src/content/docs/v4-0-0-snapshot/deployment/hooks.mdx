@@ -105,7 +105,7 @@ EOF
 
 Hook stdout and stderr are merged and prefixed with `[hook:<name>]` in the deploy log:
 
-```
+```text title="deploy log output (illustrative)"
 [hook:pre-deploy] staging check passed
 [hook:post-deploy] slack notification sent
 ```
@@ -127,7 +127,7 @@ env | grep ^KAMAL_
 
 To run a hook manually with the expected env:
 
-```bash
+```bash title="manual hook invocation (illustrative — do not type)"
 KAMAL_VERSION=abc1234 \
 KAMAL_HOSTS=192.0.2.10 \
 KAMAL_RUNTIME=42 \

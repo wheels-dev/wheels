@@ -96,7 +96,7 @@ Each host gets its own independent container. There is no clustering, no replica
 
 Every accessory has an independent lifecycle, scoped by name:
 
-```bash
+```bash title="illustrative — do not type"
 wheels deploy accessory boot db              # first-time install
 wheels deploy accessory reboot db            # stop + remove + boot
 wheels deploy accessory start db             # docker start
@@ -109,7 +109,7 @@ wheels deploy accessory remove db            # stop + rm
 
 Pass `all` instead of a specific name to fan out:
 
-```bash
+```bash title="illustrative — do not type"
 wheels deploy accessory boot all
 wheels deploy accessory stop all
 ```

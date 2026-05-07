@@ -95,7 +95,7 @@ new wheels.middleware.SecurityHeaders(
 <Aside type="tip">
   **Suppressing HSTS entirely.** When your TLS-terminating proxy (load balancer, CDN, reverse proxy) already emits `Strict-Transport-Security`, pass `hsts=false` so the app does not emit a competing header:
 
-  ```cfm title="config/settings.cfm"
+  ```cfm {test:compile} title="config/settings.cfm"
   set(middleware = [
       new wheels.middleware.SecurityHeaders(hsts=false)
   ]);

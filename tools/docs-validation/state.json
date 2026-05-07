@@ -7457,6 +7457,243 @@
         "cache_creation_input_tokens": 2020,
         "cache_read_input_tokens": 8277
       }
+    },
+    "guide:deployment/accessories.mdx": {
+      "kind": "guide",
+      "id": "deployment/accessories.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:38:30.103Z",
+      "summary": "All 5 code blocks on this page are illustrative (deployment YAML configs and multi-command bash lifecycle examples requiring a live deploy environment). Added `title=\"illustrative — do not type\"` to the two previously-undecorated bash blocks (lines 99 and 112); no `{test:*}` annotations were appropriate. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/accessories.mdx"
+      ],
+      "notes": "Blocks 1–3 were already marked illustrative via title. Blocks 4–5 (bash lifecycle verbs) cannot be tested via {test:cli} because they are multi-line independent commands requiring a configured Kamal/wheels deploy environment. Marked illustrative.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 9347,
+        "output_tokens": 1328,
+        "cache_creation_input_tokens": 8132,
+        "cache_read_input_tokens": 16666
+      }
+    },
+    "guide:deployment/architecture.mdx": {
+      "kind": "guide",
+      "id": "deployment/architecture.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:39:17.745Z",
+      "summary": "Annotated all 5 code blocks on the architecture page: 1 CFML function definition tagged `{test:compile}` (passes), and 4 illustrative blocks (ERB anti-pattern YAML, `${VAR}` YAML, bash dry-run examples, directory tree) given descriptive `title=` attributes so the harness skips them cleanly. No prose drift found.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/architecture.mdx"
+      ],
+      "notes": "1 block tested (compile), 4 illustrative, 0 CFC docblock fixes. Harness reported: 1 passed, 0 failed.",
+      "turns": 9,
+      "usage": {
+        "input_tokens": 13198,
+        "output_tokens": 2108,
+        "cache_creation_input_tokens": 8452,
+        "cache_read_input_tokens": 57176
+      }
+    },
+    "guide:deployment/config-reference.mdx": {
+      "kind": "guide",
+      "id": "deployment/config-reference.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:39:40.211Z",
+      "summary": "All 26 blocks on this reference page are illustrative YAML/text snippets showing config schema shapes — none are executable CFML or runnable CLI commands. Block #1 (the plain unlanguaged allowlist) was given a `text` language tag and an explicit `title=\"Allowed top-level keys (illustrative — do not type)\"` attribute to match the harness's illustrative pattern used by all other blocks. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/config-reference.mdx"
+      ],
+      "notes": "0 blocks tested (all illustrative), 26 blocks illustrative, 0 CFC docblock fixes, 0 prose drift fixes. Block #1 only needed a language identifier + title to be consistent with the other 25 blocks.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 12254,
+        "output_tokens": 974,
+        "cache_creation_input_tokens": 8008,
+        "cache_read_input_tokens": 12705
+      }
+    },
+    "guide:deployment/docker-deployment.mdx": {
+      "kind": "guide",
+      "id": "deployment/docker-deployment.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:39:51.778Z",
+      "summary": "All 9 blocks were already correctly triaged: 3 `{test:compile}` blocks (environment config, Health controller, routes) pass the harness, and 6 illustrative blocks (Dockerfile, .dockerignore, docker-compose.yml, shell commands) are appropriately left untagged. No changes needed; harness reports 3 passed, 0 failed.",
+      "files_changed": [],
+      "notes": "3 blocks tested (compile), 6 illustrative (dockerfile/yaml/bash infrastructure blocks that require a running Docker environment), 0 CFC docblock fixes, 0 prose drift.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1154,
+        "output_tokens": 481,
+        "cache_creation_input_tokens": 950,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:deployment/first-deploy.mdx": {
+      "kind": "guide",
+      "id": "deployment/first-deploy.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:41:43.281Z",
+      "summary": "Annotated the deployment/first-deploy.mdx page: 1 CLI block tagged as `{test:cli cmd=\"wheels deploy server bootstrap\"}` (which passes), and 9 blocks marked illustrative with descriptive titles. All deploy subcommands (init, setup, app details, deploy, rollback) require real servers/config and cannot run in the fixture environment, so they are correctly treated as illustrative.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/first-deploy.mdx"
+      ],
+      "notes": "Blocks 1, 6, 7, 8, 10 (deploy init/setup/app details/deploy/rollback) failed in the harness because: deploy init needs Kamal templates not in fixture, all other deploy commands need config/deploy.yml which only exists after `deploy init` completes successfully. Block 10 (rollback --version=abc1234) also conflicted with lucli's own --version flag. Block 5 (wheels deploy server bootstrap) passed and remains as the single tested block. 3 blocks were already illustrative per the task input (yaml config files and secrets file). Block 9 (multi-command introspection) was marked illustrative due to containing multiple commands and --follow flag. No prose drift or CFC docblock fixes needed.",
+      "turns": 17,
+      "usage": {
+        "input_tokens": 20026,
+        "output_tokens": 3680,
+        "cache_creation_input_tokens": 12107,
+        "cache_read_input_tokens": 154340
+      }
+    },
+    "guide:deployment/hooks.mdx": {
+      "kind": "guide",
+      "id": "deployment/hooks.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:42:11.861Z",
+      "summary": "All 6 code blocks on this page are illustrative — they demonstrate shell scripts requiring external services (Slack, PagerDuty, a live hook file) or show deploy log output. The two previously untagged non-illustrative blocks (the plain-text deploy log output at line 108 and the manual hook invocation at line 130) were given descriptive `title=\"... (illustrative)\"` attributes so the harness skips them cleanly. No `{test:*}` annotations were added because none of the blocks are executable in isolation.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/hooks.mdx"
+      ],
+      "notes": "0 blocks tested, 6 illustrative, 0 CFC docblock fixes. Harness result: 0 passed, 0 failed (clean).",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 10394,
+        "output_tokens": 1378,
+        "cache_creation_input_tokens": 6273,
+        "cache_read_input_tokens": 27593
+      }
+    },
+    "guide:deployment/index.mdx": {
+      "kind": "guide",
+      "id": "deployment/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:42:19.723Z",
+      "summary": "The page contains zero code blocks — it is entirely prose, Aside components, and LinkCard navigation. No annotations were needed, no prose drift was found, and no framework CFC changes were required.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes. Page is a pure overview/navigation page with no executable content.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 3647,
+        "output_tokens": 332,
+        "cache_creation_input_tokens": 626,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:deployment/migrating-from-kamal.mdx": {
+      "kind": "guide",
+      "id": "deployment/migrating-from-kamal.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:42:27.419Z",
+      "summary": "All 2 code blocks on this page were already correctly marked illustrative via their `title=\"... (illustrative — do not type)\"` meta strings; no new annotations were needed. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 2 illustrative (pre-existing), 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 948,
+        "output_tokens": 346,
+        "cache_creation_input_tokens": 742,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:deployment/observability-and-logging.mdx": {
+      "kind": "guide",
+      "id": "deployment/observability-and-logging.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:42:37.434Z",
+      "summary": "All 10 compile-tagged CFML blocks already pass the harness. The 1 bash block (line 214) is correctly marked illustrative (shell output, not runnable). No changes were needed.",
+      "files_changed": [],
+      "notes": "10 blocks tested (all compile), 1 illustrative (bash shell output), 0 prose drift fixes, 0 CFC docblock changes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1310,
+        "output_tokens": 356,
+        "cache_creation_input_tokens": 1075,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:deployment/production-config.mdx": {
+      "kind": "guide",
+      "id": "deployment/production-config.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:42:48.508Z",
+      "summary": "All 4 code blocks on this page were already correctly handled: 3 CFML blocks tagged `{test:compile}` all pass the harness (3/3), and the 1 shell `.env.production` block is appropriately left as illustrative. No changes were needed.",
+      "files_changed": [],
+      "notes": "3 compile-tested blocks, 1 illustrative shell block, 0 prose drift fixes, 0 CFC docblock changes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 998,
+        "output_tokens": 372,
+        "cache_creation_input_tokens": 801,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:deployment/secrets.mdx": {
+      "kind": "guide",
+      "id": "deployment/secrets.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:44:11.525Z",
+      "summary": "All 5 untested blocks on the secrets page are genuinely illustrative: they require real vault credentials (1Password/Bitwarden/AWS), use shell pipes (|), show command output, or are ASCII flow diagrams. Added descriptive `title=\"... (illustrative — ...)\"` attributes to blocks 5, 6, 8, 9, and 10 to make their illustrative nature explicit. No blocks were tagged for testing (0 compile, 0 cli, 0 tutorial). Harness passes with 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/secrets.mdx"
+      ],
+      "notes": "Block 5 (secrets fetch): requires vault credentials — illustrative. Block 6 (output): plain text output — illustrative. Block 8 (extract): uses pipe (|) which test:cli disallows — illustrative. Block 9 (secrets print): requires real .kamal/secrets — illustrative. Block 10 (ASCII diagram): flow diagram — illustrative.",
+      "turns": 18,
+      "usage": {
+        "input_tokens": 19103,
+        "output_tokens": 4399,
+        "cache_creation_input_tokens": 9964,
+        "cache_read_input_tokens": 151882
+      }
+    },
+    "guide:deployment/security-hardening.mdx": {
+      "kind": "guide",
+      "id": "deployment/security-hardening.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:44:33.977Z",
+      "summary": "Added `{test:compile}` to the one untagged non-illustrative block (line 98, the `hsts=false` Aside example). The preload-tradeoff block (line 89) was already correctly marked illustrative. All 9 tagged blocks now pass the verify-docs harness.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/security-hardening.mdx"
+      ],
+      "notes": "9 blocks tested (compile), 1 illustrative, 0 CFC docblock fixes, no prose drift detected.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 11790,
+        "output_tokens": 1028,
+        "cache_creation_input_tokens": 7085,
+        "cache_read_input_tokens": 12115
+      }
+    },
+    "guide:deployment/vm-deployment.mdx": {
+      "kind": "guide",
+      "id": "deployment/vm-deployment.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:46:09.680Z",
+      "summary": "All 19 code blocks on this VM deployment how-to page are genuinely illustrative — system shell commands (apt/dnf, systemctl, nginx, rsync, ssh, certbot, ufw/firewalld), configuration files (systemd unit, nginx vhost, logrotate), and a directory-layout diagram — none of which can run in the test harness's fixture environment. Added descriptive `title=\"...\"` attributes to all 19 blocks to make their illustrative intent explicit and aid readability. Harness confirms 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/deployment/vm-deployment.mdx"
+      ],
+      "notes": "0 blocks tested (all illustrative), 19 blocks marked with title= attributes, 0 CFC docblock fixes, 0 prose drift fixes. The harness correctly skips all blocks and exits 0.",
+      "turns": 22,
+      "usage": {
+        "input_tokens": 22861,
+        "output_tokens": 5358,
+        "cache_creation_input_tokens": 18512,
+        "cache_read_input_tokens": 261465
+      }
     }
   },
   "runs": []

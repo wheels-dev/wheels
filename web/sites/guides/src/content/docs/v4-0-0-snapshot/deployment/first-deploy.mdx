@@ -37,7 +37,7 @@ Three quick checks before running anything:
 
    From your project root:
 
-   ```bash
+   ```bash title="Run from project root"
    wheels deploy init
    ```
 
@@ -117,7 +117,7 @@ Three quick checks before running anything:
 
    If Docker is already installed on the target, skip this step. Otherwise:
 
-   ```bash
+   ```bash {test:cli cmd="wheels deploy server bootstrap"}
    wheels deploy server bootstrap
    ```
 
@@ -125,7 +125,7 @@ Three quick checks before running anything:
 
 6. **Run setup once.**
 
-   ```bash
+   ```bash title="First-time deploy"
    wheels deploy setup
    ```
 
@@ -139,7 +139,7 @@ Three quick checks before running anything:
 
    Check the container state:
 
-   ```bash
+   ```bash title="Check container state"
    wheels deploy app details
    ```
 
@@ -149,7 +149,7 @@ Three quick checks before running anything:
 
    Commit a change, then:
 
-   ```bash
+   ```bash title="Rolling redeploy"
    wheels deploy
    ```
 
@@ -163,7 +163,7 @@ Three quick checks before running anything:
 
 A successful deploy leaves you with a handful of useful introspection commands:
 
-```bash
+```bash title="Introspection commands"
 wheels deploy details                     # everything — app, proxy, accessories
 wheels deploy app containers              # just app containers across hosts
 wheels deploy app logs --follow           # tail every app log, prefixed by host
@@ -177,7 +177,7 @@ If something looks wrong, `wheels deploy details` is always the first stop.
 
 Every deploy tags its container with the version label (git sha by default). To roll back, you point `wheels deploy rollback` at a previous version:
 
-```bash
+```bash title="Roll back to a previous version"
 wheels deploy rollback --version=abc1234
 ```
 
