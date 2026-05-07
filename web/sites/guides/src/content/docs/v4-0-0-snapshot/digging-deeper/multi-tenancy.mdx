@@ -170,7 +170,7 @@ Row scoping gives you the simplest deployment (one DB, one migration run), but t
 
 For schema-per-tenant and database-per-tenant layouts, you don't need to touch your model code. When `TenantResolver` sets `request.wheels.tenant.dataSource`, the framework's `$performQuery()` routes every non-shared model's queries to that datasource automatically:
 
-```
+``` title="query routing flow (illustrative)"
 model("Post").findAll()
   → $performQuery()
     → sees request.wheels.tenant.dataSource = "acme_ds"

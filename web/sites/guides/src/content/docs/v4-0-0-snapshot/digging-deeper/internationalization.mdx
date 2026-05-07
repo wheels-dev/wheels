@@ -71,7 +71,7 @@ Downstream code reads `request.locale` — no more header parsing.
 
 Keep translations out of CFCs. Per-locale JSON files are the path of least pain: diffable, easy to hand off to a translation service, trivial to hot-reload in dev.
 
-```
+```txt title="illustrative — directory layout"
 config/
   locales/
     en.json

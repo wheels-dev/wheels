@@ -172,7 +172,7 @@ A worker process picks up the job and runs `perform()`; retries happen automatic
 
 Some clients — screen readers, plain-text mail apps, spam filters — prefer a plain-text body. Ship both. Pass two templates to `sendEmail()` as a comma-separated list:
 
-```
+```text title="app/views/mailers/user/"
 app/views/mailers/user/
   welcome.cfm        # HTML body
   welcome.txt.cfm    # plain-text body
