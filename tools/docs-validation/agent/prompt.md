@@ -107,6 +107,29 @@ If you find yourself wanting to re-read a file you've already read,
 
 Use this instead of reading CLAUDE.md.
 
+**Reference example style** (lock these in for every example you write)
+- **camelCase for ALL CFML builtins.** `writeOutput`, `arrayLen`,
+  `structKeyExists`, `listFindNoCase`, `listToArray`, `isStruct`,
+  `arrayToList`, `serializeJSON`, etc. CFML is case-insensitive but
+  the docs render exactly what you write — pick one casing per file
+  and stay consistent.
+- **No HTML output in examples.** Don't write `writeOutput("...<br>")`
+  or other HTML tags. To demonstrate return shapes, use a CFML
+  comment block above or after the call:
+  ```
+  // 1. Get the columns for the User model
+  cols = model("User").columns();
+  // cols -> "id,firstName,lastName,email,createdAt,updatedAt"
+  ```
+  When iteration is the point, just iterate; the example doesn't need
+  to "render" anything. If output really matters for the demo, use
+  `writeOutput(value)` (no HTML) or assign to a variable.
+- **Numbered comment headings** for each example: `// 1. <one-line
+  description>`, `// 2. ...`. One CFML fragment per heading.
+- **Mimic existing files in the same scope** for tone — short,
+  idiomatic, no `<cfcomponent>` wrappers unless the example IS a
+  component definition.
+
 **Naming**
 - Models: singular PascalCase (`User.cfc`); table name plural lowercase (`users`)
 - Controllers: plural PascalCase (`Users.cfc`)
