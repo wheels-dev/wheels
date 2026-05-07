@@ -899,20 +899,19 @@
       "kind": "function",
       "id": "capitalize",
       "status": "done",
-      "attempts": 1,
-      "updatedAt": "2026-05-07T01:57:00.066Z",
-      "summary": "Fixed the misleading docblock hint (which described `titleize()` behaviour — capitalizing all words — rather than `capitalize()`'s actual behaviour of capitalizing only the first character). Updated the reference example with three clear, idiomatic examples that accurately reflect the function's real behaviour.",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T02:17:03.146Z",
+      "summary": "Confirmed that the `capitalize` function only capitalizes the first character of the full string (not all words — that is `titleize`). The CFC docblock is correct; the snapshot hint was wrong. The existing reference examples accurately demonstrate the real behavior and were kept as-is.",
       "files_changed": [
-        "vendor/wheels/Global.cfc",
         "vendor/wheels/public/docs/reference/controller/capitalize.txt"
       ],
-      "notes": "The docblock previously said \"Capitalizes all words in the text to create a nicer looking title\" (which describes titleize()). The actual code only capitalises the first character of the whole string. The @string param name was also corrected to @text to match the actual parameter name.",
-      "turns": 5,
+      "notes": "The documented hint in the task snapshot (\"Capitalizes all words in the text to create a nicer looking title\") is incorrect — that describes `titleize()`. The actual CFC docblock correctly says \"Capitalizes the first character of the supplied string.\" No CFC edit was needed since the source docblock is already accurate.",
+      "turns": 4,
       "usage": {
-        "input_tokens": 126704,
-        "output_tokens": 1079,
-        "cache_creation_input_tokens": 67239,
-        "cache_read_input_tokens": 14442
+        "input_tokens": 126168,
+        "output_tokens": 818,
+        "cache_creation_input_tokens": 4687,
+        "cache_read_input_tokens": 10523
       }
     },
     "function:controller": {
