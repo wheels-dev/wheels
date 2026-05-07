@@ -124,7 +124,7 @@ component {
 	 * @dateOrder Use to change the order of or exclude date select tags.
 	 * @dateseparator Use to change the character that is displayed between the date select tags.
 	 * @startYear First year in select list.
-	 * @startYear Last year in select list.
+	 * @endYear Last year in select list.
 	 * @monthDisplay Pass in names, numbers, or abbreviations to control display.
 	 * @timeOrder Use to change the order of or exclude time select tags.
 	 * @timeSeparator Use to change the character that is displayed between the time select tags.

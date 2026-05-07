@@ -1,9 +1,35 @@
-<!--- Show check boxes for associating authors with the current book --->
+// 1. Show check boxes for associating authors with the current book
 <cfloop query="authors">
     #hasManyCheckBox(
         label=authors.fullName,
         objectName="book",
         association="bookAuthors",
         keys="#book.key()#,#authors.id#"
+    )#
+</cfloop>
+
+// 2. Wrap each checkbox and label in a div using prepend/append
+<cfloop query="authors">
+    #hasManyCheckBox(
+        label=authors.fullName,
+        labelPlacement="after",
+        objectName="book",
+        association="bookAuthors",
+        keys="#book.key()#,#authors.id#",
+        prepend="<div class=""author-option"">",
+        append="</div>"
+    )#
+</cfloop>
+
+// 3. Supply an explicit ID and custom error styling
+<cfloop query="tags">
+    #hasManyCheckBox(
+        label=tags.name,
+        objectName="post",
+        association="postTags",
+        keys="#post.key()#,#tags.id#",
+        id="tag-#tags.id#",
+        errorElement="span",
+        errorClass="field-error"
     )#
 </cfloop>

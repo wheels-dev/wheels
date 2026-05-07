@@ -36,8 +36,8 @@ authors = model("author").findAll(handle="authQuery", page=5, order="id");
         #paginationLinks(
             route="authors",
             handle="authQuery",
-            prependToLink="<li>",
-            appendToLink="</li>"
+            prependToPage="<li>",
+            appendToPage="</li>"
         )#
     </cfoutput>
 </ul>
@@ -64,6 +64,26 @@ comments = model("comment").findAll(page=params.page, order="createdAt");
             year=2009,
             month="feb",
             day=10
+        )#
+    </cfoutput>
+</ul>
+
+
+//--------------------------------------------------------------------
+// Example 5: Highlight the current page with a CSS class and wrap
+// each page number in a Bootstrap-style list item, marking the active
+// item's parent with an "active" class
+
+// View code
+<ul class="pagination">
+    <cfoutput>
+        #paginationLinks(
+            route="articles",
+            prependToPage='<li class="page-item">',
+            appendToPage="</li>",
+            classForCurrent="page-link active",
+            addActiveClassToPrependedParent=true,
+            linkToCurrentPage=true
         )#
     </cfoutput>
 </ul>

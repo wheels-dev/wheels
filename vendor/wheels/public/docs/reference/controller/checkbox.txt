@@ -1,12 +1,10 @@
-<!--- Basic example of a check box for a boolean field --->
+// 1. Basic check box bound to a boolean model property
 #checkBox(objectName="photo", property="isPublic", label="Display this photo publicly.")#
 
-<!--- Shows check boxes for selecting public access for all photos provided by the `photos` association and nested properties --->
+// 2. Custom checked and unchecked values (e.g. "yes" / "no" instead of 1 / 0)
+#checkBox(objectName="user", property="agreedToTerms", checkedValue="yes", uncheckedValue="no", label="I agree to the terms of service.")#
+
+// 3. Check boxes for a nested association (photos belonging to a user)
 <cfloop from="1" to="#ArrayLen(user.photos)#" index="i">
-    <div>
-        <h3>#user.photos[i].title#:</h3>
-        <div>
-            #checkBox(objectName="user", association="photos", position=i, property="isPublic", label="Display this photo publicly.")#
-        </div>
-    </div>
+    #checkBox(objectName="user", association="photos", position=i, property="isPublic", label="Make public: #user.photos[i].title#")#
 </cfloop>

@@ -1,0 +1,58 @@
+//--------------------------------------------------------------------
+// Example 1: Basic usage — show a "Previous" link above a paginated list;
+// renders a disabled span when already on the first page
+
+// Controller code
+param name="params.page" type="integer" default="1";
+posts = model("Post").findAll(page=params.page, perPage=10, order="createdAt DESC");
+
+// View code
+<cfoutput>
+    #firstPageLink()#
+    #previousPageLink()#
+    #pageNumberLinks()#
+    #nextPageLink()#
+    #lastPageLink()#
+</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 2: Custom link text and CSS classes
+
+// View code
+<cfoutput>
+    #previousPageLink(
+        text="&laquo; Previous",
+        class="page-link",
+        disabledClass="page-link disabled"
+    )#
+</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 3: Hide the disabled element entirely when on the first page
+
+// View code
+<cfoutput>
+    #previousPageLink(showDisabled=false)#
+</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 4: Use a named route so page numbers appear in the URL path
+// instead of as a query-string param (e.g. /articles/page/2)
+
+// Route setup in app/config/routes.cfm
+mapper()
+    .get(name="paginatedArticles", pattern="articles/page/[page]", to="articles##index")
+    .get(name="articles", pattern="articles", to="articles##index")
+.end();
+
+// Controller code
+param name="params.page" type="integer" default="1";
+articles = model("Article").findAll(page=params.page, perPage=20, order="title");
+
+// View code
+<cfoutput>
+    #previousPageLink(route="paginatedArticles", pageNumberAsParam=false)#
+</cfoutput>

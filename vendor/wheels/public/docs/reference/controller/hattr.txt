@@ -1,0 +1,7 @@
+// 1. Safely encode a user-supplied string inside an HTML attribute
+userBio = "Say ""hello"" & <wave>";
+writeOutput('<div title="#hAttr(userBio)#">Hover me</div>');
+<!--- Renders: <div title="Say &#x22;hello&#x22; &amp; &lt;wave&gt;">Hover me</div> --->
+
+// 2. Use directly in a view template to prevent XSS in attribute values
+writeOutput('<input type="text" placeholder="#hAttr(params.search)#">');

@@ -1,9 +1,28 @@
-<!--- Show radio buttons for associating a default address with the current author --->
-<cfloop query="addresses">
-    #hasManyRadioButton(
-        label=addresses.title,
-        objectName="author",
-        association="authorsDefaultAddresses",
-        keys="#author.key()#,#addresses.id#"
-    )#
-</cfloop>
+// 1. Show radio buttons for selecting a default address for the current author (loops over a query of addresses)
+<cfoutput>
+	<cfloop query="addresses">
+		#hasManyRadioButton(
+			objectName="author",
+			association="addresses",
+			property="isDefault",
+			keys="#author.key()#,#addresses.id#",
+			tagValue="1",
+			label=addresses.title
+		)#
+	</cfloop>
+</cfoutput>
+
+// 2. Same loop, but mark the radio button as checked when the property is blank (no default set yet)
+<cfoutput>
+	<cfloop query="addresses">
+		#hasManyRadioButton(
+			objectName="author",
+			association="addresses",
+			property="isDefault",
+			keys="#author.key()#,#addresses.id#",
+			tagValue="1",
+			checkIfBlank=true,
+			label=addresses.title
+		)#
+	</cfloop>
+</cfoutput>

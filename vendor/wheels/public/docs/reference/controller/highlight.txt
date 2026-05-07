@@ -1,2 +1,11 @@
-<!--- Will output: You searched for: <span class="highlight">CFWheels --->
-#highlight(text="You searched for: CFWheels", phrases="CFWheels")#
+// 1. Highlight a single phrase in text
+// Outputs: You searched for: <span class="highlight">CFWheels</span> framework
+result = highlight(text="You searched for: CFWheels framework", phrase="CFWheels");
+
+// 2. Highlight multiple phrases using a comma-delimited list
+// Outputs: <span class="highlight">Open</span> source <span class="highlight">CFML</span> framework
+result = highlight(text="Open source CFML framework", phrase="Open,CFML");
+
+// 3. Highlight with a custom tag and CSS class
+// Outputs: Learn <strong class="match">ColdFusion</strong> today
+result = highlight(text="Learn ColdFusion today", phrase="ColdFusion", tag="strong", class="match");

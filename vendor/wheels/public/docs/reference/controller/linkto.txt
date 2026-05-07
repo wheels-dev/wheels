@@ -1,27 +1,41 @@
-#linkTo(text="Log Out", controller="account", action="logout")#
-<!--- Outputs: <a href="/account/logout">Log Out</a> --->
+// 1. Link to a controller/action pair
+writeOutput(linkTo(text="Log Out", controller="account", action="logout"));
+// -> <a href="/account/logout">Log Out</a>
 
-<!--- If you're already in the `account` controller, CFWheels will assume that's where you want the link to point --->
-#linkTo(text="Log Out", action="logout")#
-<!--- Outputs: <a href="/account/logout">Log Out</a> --->
+// 2. Omit the controller when linking within the same controller
+// (CFWheels uses the current controller automatically)
+writeOutput(linkTo(text="Log Out", action="logout"));
+// -> <a href="/account/logout">Log Out</a>
 
-#linkTo(text="View Post", controller="blog", action="post", key=99)#
-<!--- Outputs: <a href="/blog/post/99">View Post</a> --->
+// 3. Link to a specific record using a key
+writeOutput(linkTo(text="View Post", controller="blog", action="post", key=99));
+// -> <a href="/blog/post/99">View Post</a>
 
-#linkTo(text="View Settings", action="settings", params="show=all&amp;sort=asc")#
-<!--- Outputs: <a href="/account/settings?show=all&amp;amp;sort=asc">View Settings</a> --->
+// 4. Pass extra query string parameters
+writeOutput(linkTo(text="View Settings", action="settings", params="show=all&sort=asc"));
+// -> <a href="/account/settings?show=all&amp;sort=asc">View Settings</a>
 
-<!--- Given that a `userProfile` route has been configured in `app/config/routes.cfm` --->
-#linkTo(text="Joe's Profile", route="userProfile", userName="joe")#
-<!--- Outputs: <a href="/user/joe">Joe's Profile</a> --->
+// 5. Use a named route (configured in app/config/routes.cfm)
+writeOutput(linkTo(text="Joe's Profile", route="userProfile", userName="joe"));
+// -> <a href="/user/joe">Joe's Profile</a>
 
-<!--- Link to an external website --->
-#linkTo(text="ColdFusion Framework", href="http://cfwheels.org/")#
-<!--- Outputs: <a href="http://cfwheels.org/">ColdFusion Framework</a> --->
+// 6. Link to an external URL, bypassing the routing system
+writeOutput(linkTo(text="ColdFusion on Wheels", href="https://cfwheels.org/"));
+// -> <a href="https://cfwheels.org/">ColdFusion on Wheels</a>
 
-<!--- Give the link `class` and `id` attributes --->
-#linkTo(text="Delete Post", action="delete", key=99, class="delete", id="delete-99")#
-<!--- Outputs: <a class="delete" href="/blog/delete/99" id="delete-99">Delete Post</a> --->
+// 7. Add HTML attributes (class, id, rel, etc.) via extra arguments
+writeOutput(linkTo(text="Delete Post", action="delete", key=99, class="delete", id="delete-99"));
+// -> <a class="delete" href="/blog/delete/99" id="delete-99">Delete Post</a>
 
-<!--- Using icons like Font Awesome in the text attribute, notice the use of encode="attributes" --->
-#linkTo(text="<i class='fa fa-trash' aria-hidden='true'></i> " & "Delete Post", encode="attributes", action="delete", key=99, class="delete", id="delete-99")#
+// 8. Include icon markup in link text; use encode="attributes" to encode
+//    only attribute values and leave the tag content (the icon HTML) untouched
+writeOutput(linkTo(text="<i class='fa fa-trash'></i> Delete Post", encode="attributes", action="delete", key=99));
+// -> <a href="/blog/delete/99"><i class='fa fa-trash'></i> Delete Post</a>
+
+// 9. Build an absolute URL by turning off onlyPath and setting a protocol/host
+writeOutput(linkTo(text="Home", action="index", onlyPath=false, protocol="https", host="www.example.com"));
+// -> <a href="https://www.example.com/home/index">Home</a>
+
+// 10. Link to an anchor on the target page
+writeOutput(linkTo(text="Jump to Comments", controller="blog", action="post", key=99, anchor="comments"));
+// -> <a href="/blog/post/99#comments">Jump to Comments</a>

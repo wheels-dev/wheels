@@ -1,0 +1,10 @@
+// 1. Basic email field bound to an object property
+#emailField(objectName="user", property="emailAddress")#
+
+// 2. Email field with a custom label and a CSS class
+#emailField(label="Email Address", objectName="user", property="emailAddress", class="form-control")#
+
+// 3. Nested email field for a contacts association (hasMany)
+<cfloop from="1" to="#ArrayLen(account.contacts)#" index="i">
+	#emailField(label="Contact Email ##i#", objectName="account", association="contacts", position=i, property="email")#
+</cfloop>

@@ -1,4 +1,17 @@
-// Check to see if the customer is subscribed to the Swimsuit Edition. Note that the order of the `keys` argument should match the order of the `customerid` and `publicationid` columns in the `subscriptions` join table
-if(!includedInObject(objectName="customer", association="subscriptions", keys="#customer.key()#,#swimsuitEdition.id#")){
-    assignSalesman(customer);
+// 1. Check whether a customer is already subscribed to a particular publication via a hasMany join
+// (Note: keys should be listed in the order they appear in the join table columns)
+if (includedInObject(objectName="customer", association="subscriptions", keys="#customer.key()#,#swimsuitEdition.id#")) {
+    writeOutput("Already subscribed.");
+} else {
+    writeOutput("Not yet subscribed.");
+}
+
+// 2. Use the return value to find the position of the associated object in the array
+position = includedInObject(objectName="order", association="lineItems", keys="#lineItem.key()#");
+// Returns false when not found, or the 1-based index position when found
+// position -> 3 (the associated lineItem is at index 3 in order.lineItems)
+
+// 3. Guard against adding duplicate associations before creating a new join record
+if (!includedInObject(objectName="student", association="courses", keys="#course.key()#")) {
+    student.courses = ArrayAppend(student.courses, course);
 }

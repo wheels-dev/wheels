@@ -1,4 +1,20 @@
-#buttonTo(text="Delete Account", action="perFormDelete", disable="Wait...")#
+// 1. Basic button that submits to a controller/action
+#buttonTo(text="Delete Account", controller="account", action="delete")#
+<!--- Outputs: <form action="/account/delete" method="post"><button type="submit">Delete Account</button></form> --->
 
-<!--- apply attributes to the input element by prefixing any arguments with "input"--->
-#buttonTo(text="Edit", action="edit", inputId="edit-button", inputClass="edit-button-class")#
+// 2. If you're already in the `account` controller, CFWheels will assume the current controller
+#buttonTo(text="Delete Account", action="delete")#
+<!--- Outputs: <form action="/account/delete" method="post"><button type="submit">Delete Account</button></form> --->
+
+// 3. Use `method` to send a DELETE request (a hidden `_method` field is added automatically)
+#buttonTo(text="Remove Post", controller="blog", action="delete", key=99, method="delete")#
+<!--- Outputs: <form action="/blog/delete/99" method="post"><input type="hidden" name="_method" value="delete" /><button type="submit">Remove Post</button></form> --->
+
+// 4. Use a named route configured in `config/routes.cfm`
+#buttonTo(text="Archive", route="archivePost", postId=12)#
+
+// 5. Show a "please wait" state by disabling the button on click — pass extra attributes to the button using the `input` prefix
+#buttonTo(text="Place Order", action="checkout", inputId="checkout-btn", inputClass="btn btn-primary", inputData-disable-with="Processing...")#
+
+// 6. Use an image instead of text for the button
+#buttonTo(image="icons/trash.png", action="destroy", key=params.id, method="delete")#

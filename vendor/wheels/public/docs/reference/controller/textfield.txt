@@ -1,10 +1,13 @@
-<!--- Provide a `label` and the required `objectName` and `property` --->
-#textField(label="First Name", objectName="user", property="firstName")#
+// 1. Basic text field bound to an object property
+#textField(objectName="user", property="firstName", label="First Name")#
 
-<!--- Display fields for phone numbers provided by the `phoneNumbers` association and nested properties --->
-<fieldset>
-	<legend>Phone Numbers</legend>
-	<cfloop from="1" to="#ArrayLen(contact.phoneNumbers)#" index="i">
-		#textField(label="Phone ##i#", objectName="contact", association="phoneNumbers", position=i, property="phoneNumber")#
-	</cfloop>
-</fieldset>
+// 2. Use an HTML5 input type (email, tel, url, etc.) via the `type` argument
+#textField(objectName="user", property="email", label="Email Address", type="email")#
+
+// 3. Render fields for a hasMany association using `association` and `position`
+<cfloop from="1" to="#ArrayLen(contact.phoneNumbers)#" index="i">
+	#textField(objectName="contact", association="phoneNumbers", position=i, property="phoneNumber", label="Phone ##i#")#
+</cfloop>
+
+// 4. Wrap the field with extra markup using `prepend` and `append`
+#textField(objectName="user", property="username", label="Username", prepend="<div class=""field"">", append="</div>")#

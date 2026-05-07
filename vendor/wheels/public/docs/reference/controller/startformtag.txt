@@ -1,4 +1,24 @@
-<!--- View Code --->
+// 1. Basic form posting to a specific action in the current controller
 #startFormTag(action="create")#
-    <!--- your form controls --->
+    <!--- form controls go here --->
+#endFormTag()#
+
+// 2. Form targeting a different controller and action, using HTTP GET
+#startFormTag(controller="search", action="results", method="get")#
+    <!--- search fields --->
+#endFormTag()#
+
+// 3. Multipart form for file uploads
+#startFormTag(action="upload", multipart=true)#
+    <!--- file input and other controls --->
+#endFormTag()#
+
+// 4. Form using a named route with extra HTML attributes (id, class)
+#startFormTag(route="newRegistration", id="registration-form", class="form-horizontal")#
+    <!--- registration fields --->
+#endFormTag()#
+
+// 5. Form that sends a PUT request (e.g., update an existing record)
+#startFormTag(action="update", key=params.key, method="put")#
+    <!--- edit fields --->
 #endFormTag()#

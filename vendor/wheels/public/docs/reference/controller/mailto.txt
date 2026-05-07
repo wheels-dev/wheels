@@ -1,2 +1,11 @@
-#mailTo(emailAddress="webmaster@yourdomain.com", name="Contact our Webmaster")#
-<!--- Outputs: <a href="mailto:webmaster@yourdomain.com">Contact our Webmaster</a> --->
+// 1. Basic mailto link using the email address as the link text
+mailTo(emailAddress="webmaster@example.com");
+// -> <a href="mailto:webmaster@example.com">webmaster@example.com</a>
+
+// 2. Mailto link with a custom display name
+mailTo(emailAddress="support@example.com", name="Contact Support");
+// -> <a href="mailto:support@example.com">Contact Support</a>
+
+// 3. Mailto link with additional HTML attributes (class, title)
+mailTo(emailAddress="info@example.com", name="Email Us", class="email-link", title="Send us a message");
+// -> <a href="mailto:info@example.com" class="email-link" title="Send us a message">Email Us</a>

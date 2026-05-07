@@ -1,2 +1,8 @@
-<!--- Basic usage usually involves a `label`, `name`, and `password` --->
-#textAreaTag(label="Description", name="description", content=params.description)#
+// 1. Basic textarea with a label and pre-populated content from params
+#textAreaTag(name="description", label="Description", content=params.description)#
+
+// 2. Textarea without a label, adding extra HTML attributes via additional arguments
+#textAreaTag(name="bio", rows="6", cols="40")#
+
+// 3. Textarea with label placement controlled and content wrapped with HTML using prepend/append
+#textAreaTag(name="notes", label="Notes", labelPlacement="before", prepend="<div class=""field"">", append="</div>")#

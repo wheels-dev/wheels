@@ -1,12 +1,19 @@
-<!--- Make sure that the `sidebar` value is provided for the parent layout --->
-<cfsavecontent variable="categoriesSidebar">
-	<cfoutput>
-		<ul>
-			#includePartial(categories)#
-		</ul>
-	</cfoutput>
-</cfsavecontent>
-contentFor(sidebar=categoriesSidebar);
+// 1. Include the default parent layout from within a child layout
+// (looks for `app/views/layout.cfm` by default)
+#includeLayout()#
 
-<!---Include parent layout at `app/views/layout.cfm`--->
-#includeLayout("/layout.cfm")#
+// 2. Include a specific parent layout by path
+// (looks for `app/views/layouts/application.cfm`)
+#includeLayout("/layouts/application.cfm")#
+
+// 3. Pass section content to the parent layout before including it
+// Capture sidebar markup to make it available in the parent layout
+<cfsavecontent variable="sidebar">
+  <nav>
+    #includePartial("categories")#
+  </nav>
+</cfsavecontent>
+<cfset contentFor(sidebar=sidebar)>
+
+// Then pull in the parent layout that renders the sidebar via includeContent()
+#includeLayout("/layouts/application.cfm")#

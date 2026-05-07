@@ -1,0 +1,10 @@
+// 1. Basic number field bound to a model object
+#numberField(objectName="product", property="price")#
+
+// 2. Number field with a label and min/max/step constraints
+#numberField(label="Quantity", objectName="orderItem", property="quantity", min="1", max="100", step="1")#
+
+// 3. Number field for a nested association (line items in an order)
+<cfloop from="1" to="#ArrayLen(order.lineItems)#" index="i">
+	#numberField(label="Amount ##i#", objectName="order", association="lineItems", position=i, property="amount", min="0")#
+</cfloop>

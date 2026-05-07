@@ -1,2 +1,11 @@
-<!--- Basic usage usually involves a `name` and `value` --->
+// 1. Basic usage with a name and value
 #hiddenFieldTag(name="userId", value=user.id)#
+// -> <input type="hidden" name="userId" value="42">
+
+// 2. Embed a CSRF token in a standalone form
+#hiddenFieldTag(name="csrfToken", value=session.csrfToken)#
+// -> <input type="hidden" name="csrfToken" value="a1b2c3d4...">
+
+// 3. Pass extra HTML attributes via additional arguments
+#hiddenFieldTag(name="returnTo", value="/dashboard", id="returnToField")#
+// -> <input type="hidden" name="returnTo" value="/dashboard" id="returnToField">

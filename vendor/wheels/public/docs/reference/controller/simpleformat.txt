@@ -1,22 +1,20 @@
-<!--- How most of your calls will look. --->
-#simpleFormat(post.bodyText)#
+// 1. Format a blog post body — newlines become <br> and blank lines become paragraph breaks
+writeOutput(simpleFormat(post.bodyText));
+// A single newline becomes <br>
+// A blank line (two newlines) becomes </p><p>
+// The result is wrapped in <p>...</p> by default
 
-<!--- Demonstrates what output looks like with specific data. --->
-<cfsavecontent variable="comment">
-	I love this post!
+// 2. Demonstrate the HTML output with literal input
+text = "I love this post!" & Chr(10) & Chr(10) & "Here's why:" & Chr(10) & "* Short" & Chr(10) & "* Succinct";
+writeOutput(simpleFormat(text));
+// -> <p>I love this post!</p>
+//
+//    <p>Here's why:<br>
+//    * Short<br>
+//    * Succinct</p>
 
-	Here's why:
-	* Short
-	* Succinct
-	* Awesome
-</cfsavecontent>
-#simpleFormat(comment)#
+// 3. Skip the wrapping paragraph tag (wrap=false) when you are composing markup yourself
+writeOutput("<div>" & simpleFormat(text=post.excerpt, wrap=false) & "</div>");
 
-<!---
-	<p>I love this post!</p>
-
-	<p>Here's why:<br>
-	* Short<br>
-	* Succinct<br>
-	* Awesome</p>
---->
+// 4. Disable XSS encoding when the text is already trusted/pre-encoded HTML
+writeOutput(simpleFormat(text=post.bodyText, encode=false));

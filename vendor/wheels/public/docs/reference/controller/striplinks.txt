@@ -1,2 +1,11 @@
-<!--- Will output: <strong>Wheels</strong> is a framework for ColdFusion. --->
-#stripLinks('<strong>Wheels</strong> is a framework for <a href="http://www.adobe.com/products/coldfusion">ColdFusion</a>.')#
+// 1. Remove a link from an HTML string, leaving only the link text
+result = stripLinks('<strong>Wheels</strong> is a framework for <a href="http://www.adobe.com/products/coldfusion">ColdFusion</a>.');
+// result -> "<strong>Wheels</strong> is a framework for ColdFusion."
+
+// 2. Strip multiple links from a string
+result = stripLinks('Visit <a href="https://cfwheels.org">CFWheels</a> or read the <a href="https://cfwheels.org/docs">docs</a> for more info.');
+// result -> "Visit CFWheels or read the docs for more info."
+
+// 3. Strip links while skipping XSS encoding (e.g. when you trust the source HTML)
+result = stripLinks('<p>Check out <a href="https://cfwheels.org">CFWheels</a>!</p>', encode=false);
+// result -> "<p>Check out CFWheels!</p>"
