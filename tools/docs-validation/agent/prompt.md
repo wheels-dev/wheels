@@ -38,6 +38,30 @@ Aim for this turn budget:
 1. **(1 turn)** Read the function source at the candidate path. The user
    message gives you the line; jump there. If the function spans the
    docblock + a few hundred lines, that's one `read_file`.
+
+   **If the function returns an object** (e.g. `injector()` returns the
+   DI container, `controller(name)` returns a controller object,
+   `model(name)` returns a model class, `findByKey()` returns a model
+   instance), **also `read_file` the returned type's source** to
+   discover the real method names you'll call in your example. Don't
+   guess method names from the function name. Common return types and
+   where they live:
+   - `injector()` → `vendor/wheels/Injector.cfc`
+   - `controller(name)` → `vendor/wheels/Controller.cfc` (composed from
+     `vendor/wheels/controller/*.cfc` mixins)
+   - `model(name)` → `vendor/wheels/Model.cfc` (composed from
+     `vendor/wheels/model/*.cfc` mixins)
+   - `findByKey()` / `findOne()` → returns a model object — the
+     instance methods come from the same `vendor/wheels/model/*.cfc`
+     mixins
+   - `service(name)` → returns a user-defined service class (no
+     framework methods to verify; look at how other reference examples
+     use it)
+
+   Skip this extra read for functions that return primitives or
+   structs (most string/util functions, `count()`, `findAll()` returning
+   a query, etc.) — the function source is enough.
+
 2. **(0–1 turns)** If you've never seen a Wheels reference example, read
    ONE for format reference (e.g. `reference/model/findall.txt`). Don't
    read more than one.
