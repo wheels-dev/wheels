@@ -10,12 +10,12 @@ info = model("post").associationInfo();
 
 // 2. Check whether a specific association is defined on the model
 info = model("user").associationInfo();
-if (StructKeyExists(info, "profile")) {
+if (structKeyExists(info, "profile")) {
     writeOutput("User has a profile association of type: " & info.profile.type);
 }
 
 // 3. Iterate over all associations to build a summary
 info = model("article").associationInfo();
 for (assocName in info) {
-    writeOutput(assocName & " -> " & info[assocName].type & " " & info[assocName].modelName & "<br>");
+    writeOutput(assocName & " -> " & info[assocName].type & " " & info[assocName].modelName);
 }
