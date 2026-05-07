@@ -1,2 +1,19 @@
-// Get all general type errors for the user object
+// 1. Get all general (base) errors for a model object after validation
+user = model("User").new(params.user);
+user.valid();
 errors = user.errorsOnBase();
+// errors -> [{property: "", message: "Account has been suspended", name: ""}]
+
+// 2. Filter base errors by a specific error name
+user.addErrorToBase(message="Account has been suspended", name="suspended");
+user.addErrorToBase(message="Please accept the terms", name="terms");
+suspendedErrors = user.errorsOnBase(name="suspended");
+// suspendedErrors -> [{property: "", message: "Account has been suspended", name: "suspended"}]
+
+// 3. Check for base errors and display them
+errors = user.errorsOnBase();
+if (arrayLen(errors)) {
+    for (e in errors) {
+        writeOutput(e.message);
+    }
+}

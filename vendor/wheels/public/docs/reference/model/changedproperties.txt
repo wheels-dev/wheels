@@ -1,5 +1,22 @@
-// Get an object, change it, and then ask for its changes (will return a list of the property names that have changed, not the values themselves)
+// 1. Find a member, change some properties, then inspect which ones have changed
 member = model("member").findByKey(params.memberId);
 member.firstName = params.newFirstName;
 member.email = params.newEmail;
-changedProperties = member.changedProperties();
+changed = member.changedProperties();
+// changed -> "firstName,email"
+
+// 2. Only save when there are actually unsaved changes
+user = model("User").findByKey(params.userId);
+user.lastName = params.lastName;
+if (Len(user.changedProperties())) {
+    user.save();
+}
+
+// 3. Use changedProperties() alongside changedFrom() to build an audit log entry
+post = model("Post").findByKey(params.postId);
+post.title = params.title;
+post.body = params.body;
+changedList = post.changedProperties();
+for (prop in ListToArray(changedList)) {
+    writeOutput("Property '#prop#' was '#post.changedFrom(prop)#', now '#post[prop]#'.");
+}

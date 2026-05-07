@@ -1,5 +1,28 @@
-// Create a new object and then check if it is new (yes, this example is ridiculous. It makes more sense in the context of callbacks for example)
-employee = model("employee").new()>
-<cfif employee.isNew()>
-    // Do something...
-</cfif>
+// 1. Check if a newly instantiated object has been saved to the database
+employee = model("Employee").new(firstName="Jane", lastName="Doe");
+if (employee.isNew()) {
+    // employee.save() has not been called yet, so no DB record exists
+    employee.save();
+}
+
+// 2. Check after loading from the database (isNew() returns false for persisted records)
+employee = model("Employee").findOne(where="firstName='Jane'");
+if (!employee.isNew()) {
+    // record already exists in the database
+    employee.firstName = "Janet";
+    employee.save();
+}
+
+// 3. Useful inside a before/after callback to branch logic for new vs. existing records
+// In Employee.cfc:
+component extends="Model" {
+    function config() {
+        beforeSave("stampAuditFields");
+    }
+    private function stampAuditFields() {
+        if (isNew()) {
+            this.createdBy = request.currentUserId;
+        }
+        this.updatedBy = request.currentUserId;
+    }
+}

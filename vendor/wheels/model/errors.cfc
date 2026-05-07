@@ -14,7 +14,7 @@ component {
 	}
 
 	/**
-	 * Adds an error on a specific property.
+	 * Adds an error on the object as a whole (not tied to any specific property).
 	 *
 	 * [section: Model Object]
 	 * [category: Error Functions]

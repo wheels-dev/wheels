@@ -1,3 +1,11 @@
-// Sets the `new` property to `1` through updateProperty()
-product = model("product").findByKey(56);
+// 1. Set a boolean flag on an existing record (the primary use case)
+product = model("Product").findByKey(56);
 product.updateProperty("new", 1);
+
+// 2. Mark a user account as active without triggering validations
+user = model("User").findByKey(params.userId);
+user.updateProperty("active", true);
+
+// 3. Update a property and skip callbacks
+post = model("Post").findByKey(params.id);
+post.updateProperty(property="featured", value=true, callbacks=false);

@@ -1,2 +1,17 @@
-// Add an error on the object that's not specific to a single property.
-this.addErrorToBase(message="Your email address must be the same as your domain name.");
+// 1. Add a general error on the object (not tied to any single property)
+user = model("User").findByKey(params.userId);
+user.addErrorToBase(message="Your account has been locked. Please contact support.");
+
+// 2. Add a named base error so it can be targeted or cleared later
+order = model("Order").findByKey(params.orderId);
+order.addErrorToBase(message="This order cannot be placed outside business hours.", name="businessHoursViolation");
+if (order.hasErrors(name="businessHoursViolation")) {
+    // handle the named error
+}
+
+// 3. Use addErrorToBase inside a custom validation method on the model
+function validate() {
+    if (this.totalAmount > creditLimit()) {
+        this.addErrorToBase(message="The total amount exceeds your available credit limit.");
+    }
+}

@@ -1,0 +1,21 @@
+// 1. Check if two model objects are the same instance
+user1 = model("User").findByKey(1);
+user2 = model("User").findByKey(1);
+user3 = user1;
+
+isSame = user1.compareTo(user2);
+// isSame -> false (two separate fetches produce distinct instances)
+
+isSame = user1.compareTo(user3);
+// isSame -> true (user3 is the same object reference as user1)
+
+// 2. Guard against processing the same object twice in a loop
+users = model("User").findAll(returnAs="objects");
+currentUser = model("User").findByKey(session.userId);
+
+for (u in users) {
+    if (!u.compareTo(currentUser)) {
+        // process all users except the currently logged-in one
+        sendNotification(u);
+    }
+}

@@ -1,4 +1,14 @@
-// Check if the post object has any errors set on it 
-if(post.hasErrors()){
-    // Send user to a form to correct the errors... 
+// 1. Check if a post object has any errors at all
+if (post.hasErrors()) {
+    // Redirect user back to the form to correct errors
+}
+
+// 2. Check if a specific property has errors
+if (post.hasErrors(property="title")) {
+    // The title field has at least one error
+}
+
+// 3. Check if any errors were set with a specific name
+if (post.hasErrors(name="uniquenessViolation")) {
+    // Handle uniqueness error specifically
 }
