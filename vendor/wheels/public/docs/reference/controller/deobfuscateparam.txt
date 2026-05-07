@@ -1,2 +1,13 @@
-// Get the original value from an obfuscated one
-originalValue = deobfuscateParam("b7ab9a50");
+// 1. Deobfuscate a URL parameter to get the original numeric ID
+// (Wheels automatically obfuscates numeric URL params when obfuscateUrls is enabled)
+originalId = deobfuscateParam("b7ab9a50");
+// originalId -> "35"
+
+// 2. Round-trip: obfuscate a value, then deobfuscate it back
+obfuscated = obfuscateParam("100");
+original = deobfuscateParam(obfuscated);
+// original -> "100"
+
+// 3. Non-obfuscated values (e.g. already plain integers) are returned as-is
+passthrough = deobfuscateParam("42");
+// passthrough -> "42"

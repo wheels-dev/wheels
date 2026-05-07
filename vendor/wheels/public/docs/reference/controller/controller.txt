@@ -1,1 +1,12 @@
-testController = controller("users", params);
+// 1. Create a controller object for testing (no params)
+usersController = controller("users");
+
+// 2. Create a controller object with simulated request params for testing
+params = {controller = "users", action = "show", key = 1};
+usersController = controller(name = "users", params = params);
+
+// 3. Use with processAction to test an action end-to-end
+params = {controller = "users", action = "index"};
+usersController = controller(name = "users", params = params);
+usersController.processAction();
+body = usersController.response();

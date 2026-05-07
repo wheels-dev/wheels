@@ -894,6 +894,445 @@
         "cache_creation_input_tokens": 1640,
         "cache_read_input_tokens": 9798
       }
+    },
+    "function:capitalize": {
+      "kind": "function",
+      "id": "capitalize",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:57:00.066Z",
+      "summary": "Fixed the misleading docblock hint (which described `titleize()` behaviour — capitalizing all words — rather than `capitalize()`'s actual behaviour of capitalizing only the first character). Updated the reference example with three clear, idiomatic examples that accurately reflect the function's real behaviour.",
+      "files_changed": [
+        "vendor/wheels/Global.cfc",
+        "vendor/wheels/public/docs/reference/controller/capitalize.txt"
+      ],
+      "notes": "The docblock previously said \"Capitalizes all words in the text to create a nicer looking title\" (which describes titleize()). The actual code only capitalises the first character of the whole string. The @string param name was also corrected to @text to match the actual parameter name.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126704,
+        "output_tokens": 1079,
+        "cache_creation_input_tokens": 67239,
+        "cache_read_input_tokens": 14442
+      }
+    },
+    "function:controller": {
+      "kind": "function",
+      "id": "controller",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:57:29.715Z",
+      "summary": "Wrote three idiomatic examples for the `controller()` global helper in `vendor/wheels/public/docs/reference/controller/controller.txt`. Examples show: (1) basic usage with just a name, (2) named-argument usage with a params struct, and (3) using the returned object with `processAction()` and `response()` for end-to-end testing — matching the function's documented testing-focused purpose.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/controller.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 133526,
+        "output_tokens": 870,
+        "cache_creation_input_tokens": 4995,
+        "cache_read_input_tokens": 21238
+      }
+    },
+    "function:deobfuscateParam": {
+      "kind": "function",
+      "id": "deobfuscateParam",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:57:48.013Z",
+      "summary": "Rewrote the `deobfuscateParam` reference example with three clear examples: deobfuscating a real obfuscated value to show the expected output, a round-trip example pairing `obfuscateParam`/`deobfuscateParam`, and a passthrough case showing that plain numeric strings are returned unchanged.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/deobfuscateparam.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126259,
+        "output_tokens": 728,
+        "cache_creation_input_tokens": 1564,
+        "cache_read_input_tokens": 17775
+      }
+    },
+    "function:distanceOfTimeInWords": {
+      "kind": "function",
+      "id": "distanceOfTimeInWords",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:58:09.535Z",
+      "summary": "Rewrote the reference example for `distanceOfTimeInWords` with three examples covering seconds-level precision (`includeSeconds=true`), minute/hour/day/year ranges, and the basic month comparison from the original. No docblock or code changes were needed — the source and documented parameters match perfectly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/distanceoftimeinwords.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126600,
+        "output_tokens": 855,
+        "cache_creation_input_tokens": 1836,
+        "cache_read_input_tokens": 17968
+      }
+    },
+    "function:excerpt": {
+      "kind": "function",
+      "id": "excerpt",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:58:34.883Z",
+      "summary": "Wrote three idiomatic examples for `excerpt()` to `vendor/wheels/public/docs/reference/controller/excerpt.txt`, demonstrating a short custom radius, the default radius, and a custom `excerptString`. The docblock in `Global.cfc` matches the documented parameters exactly — no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/excerpt.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126269,
+        "output_tokens": 726,
+        "cache_creation_input_tokens": 1671,
+        "cache_read_input_tokens": 17883
+      }
+    },
+    "function:generateUUID": {
+      "kind": "function",
+      "id": "generateUUID",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:59:02.558Z",
+      "summary": "Authored the reference example for `generateUUID()` at `vendor/wheels/public/docs/reference/controller/generateuuid.txt`. The file includes three idiomatic examples: basic usage, assigning a UUID before saving a model record, and a note about SQL Server `uniqueidentifier` compatibility.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/generateuuid.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 126153,
+        "output_tokens": 707,
+        "cache_creation_input_tokens": 1233,
+        "cache_read_input_tokens": 13661
+      }
+    },
+    "function:humanize": {
+      "kind": "function",
+      "id": "humanize",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:59:27.874Z",
+      "summary": "Rewrote the `humanize` reference example from old CFM tag-comment style to modern numbered CFML comment style with three idiomatic examples demonstrating basic camelCase humanization, the `except` argument for abbreviations, and a typical model attribute use case. No docblock or code changes were needed — the source was already consistent with the documented hint and parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/humanize.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126633,
+        "output_tokens": 862,
+        "cache_creation_input_tokens": 64119,
+        "cache_read_input_tokens": 17913
+      }
+    },
+    "function:hyphenize": {
+      "kind": "function",
+      "id": "hyphenize",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T01:59:50.344Z",
+      "summary": "Rewrote the `hyphenize` reference example with three numbered, idiomatic examples demonstrating basic camelCase conversion, single-word pass-through, and a URL slug use case. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/hyphenize.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126323,
+        "output_tokens": 649,
+        "cache_creation_input_tokens": 63789,
+        "cache_read_input_tokens": 17756
+      }
+    },
+    "function:injector": {
+      "kind": "function",
+      "id": "injector",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:00:21.327Z",
+      "summary": "Authored the reference example for `injector()` at `vendor/wheels/public/docs/reference/controller/injector.txt`. The file shows three idiomatic usages: basic service registration, singleton registration with constructor arguments (as typically done in `config/services.cfm`), and runtime container introspection via `containsInstance()`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/injector.txt"
+      ],
+      "notes": "",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 128628,
+        "output_tokens": 1059,
+        "cache_creation_input_tokens": 64853,
+        "cache_read_input_tokens": 218594
+      }
+    },
+    "function:mimeTypes": {
+      "kind": "function",
+      "id": "mimeTypes",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:00:50.572Z",
+      "summary": "Reviewed the `mimeTypes` function in `Global.cfc` — the docblock and signature are perfectly aligned with the documented parameters. Wrote a clean 3-example reference file demonstrating: (1) looking up a known extension, (2) using a dynamic extension with a custom fallback, and (3) relying on the default `application/octet-stream` fallback for unknown extensions.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/mimetypes.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 126174,
+        "output_tokens": 706,
+        "cache_creation_input_tokens": 1496,
+        "cache_read_input_tokens": 13817
+      }
+    },
+    "function:model": {
+      "kind": "function",
+      "id": "model",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:01:06.177Z",
+      "summary": "Expanded the `model()` reference example from a single one-liner to four idiomatic examples covering findByKey, findAll, new/save, and count — all demonstrating the core use case of calling class-level methods on a model reference returned by `model()`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/model.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 125997,
+        "output_tokens": 588,
+        "cache_creation_input_tokens": 1373,
+        "cache_read_input_tokens": 13764
+      }
+    },
+    "function:obfuscateParam": {
+      "kind": "function",
+      "id": "obfuscateParam",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:01:28.558Z",
+      "summary": "Wrote three idiomatic examples for `obfuscateParam` covering basic usage, use in a URL redirect, and reversal with `deobfuscateParam`. The docblock in Global.cfc accurately matches the documented hint and parameter.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/obfuscateparam.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126463,
+        "output_tokens": 720,
+        "cache_creation_input_tokens": 1683,
+        "cache_read_input_tokens": 17814
+      }
+    },
+    "function:pluginNames": {
+      "kind": "function",
+      "id": "pluginNames",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:01:48.707Z",
+      "summary": "Rewrote the pluginNames() reference example with three idiomatic examples. Fixed the pre-existing argument-order bug in the `listFindNoCase` call (the original had the list and value swapped — correct form is `listFindNoCase(list, value)`).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/pluginnames.txt"
+      ],
+      "notes": "The original example called `ListFindNoCase(\"scaffold\", pluginNames())` which has the arguments reversed. CFML's `ListFindNoCase(list, value)` signature requires the list as the first argument, so the correct call is `listFindNoCase(pluginNames(), \"scaffold\")`.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126192,
+        "output_tokens": 855,
+        "cache_creation_input_tokens": 1431,
+        "cache_read_input_tokens": 17657
+      }
+    },
+    "function:pluralize": {
+      "kind": "function",
+      "id": "pluralize",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:02:11.142Z",
+      "summary": "Rewrote the `pluralize` reference example with three clear examples covering: basic word pluralization, count-based pluralization (showing both singular and plural cases), and using `returnCount=false` to omit the count from the output. The docblock in Global.cfc already matches the documented hint and parameters — no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/pluralize.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126885,
+        "output_tokens": 766,
+        "cache_creation_input_tokens": 2220,
+        "cache_read_input_tokens": 18409
+      }
+    },
+    "function:publish": {
+      "kind": "function",
+      "id": "publish",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:02:31.856Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/publish.txt` with three idiomatic examples demonstrating publishing to a user-specific channel (in-memory), using the database adapter, and broadcasting a chat message. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/publish.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 127158,
+        "output_tokens": 854,
+        "cache_creation_input_tokens": 1962,
+        "cache_read_input_tokens": 18317
+      }
+    },
+    "function:service": {
+      "kind": "function",
+      "id": "service",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:02:52.526Z",
+      "summary": "Authored the reference example for `service()` at `vendor/wheels/public/docs/reference/controller/service.txt`. Three examples demonstrate: resolving a mailer service, using a payment gateway service, and calling a service from inside a model callback.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/service.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 126819,
+        "output_tokens": 746,
+        "cache_creation_input_tokens": 63851,
+        "cache_read_input_tokens": 84113
+      }
+    },
+    "function:singularize": {
+      "kind": "function",
+      "id": "singularize",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:03:15.717Z",
+      "summary": "Fixed the docblock parameter name from `@string` to `@word` (matching the actual function signature) in Global.cfc, and rewrote the reference example with three idiomatic examples covering regular plurals, irregular plurals, and camelCase input.",
+      "files_changed": [
+        "vendor/wheels/Global.cfc",
+        "vendor/wheels/public/docs/reference/controller/singularize.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 126903,
+        "output_tokens": 1031,
+        "cache_creation_input_tokens": 64138,
+        "cache_read_input_tokens": 21873
+      }
+    },
+    "function:timeAgoInWords": {
+      "kind": "function",
+      "id": "timeAgoInWords",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:03:37.841Z",
+      "summary": "Rewrote the `timeAgoInWords` reference example with three idiomatic examples covering basic usage, the `includeSeconds` parameter for recent timestamps, and the optional `toTime` argument for comparing against a specific reference date.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/timeagoinwords.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126420,
+        "output_tokens": 749,
+        "cache_creation_input_tokens": 1727,
+        "cache_read_input_tokens": 17904
+      }
+    },
+    "function:timeUntilInWords": {
+      "kind": "function",
+      "id": "timeUntilInWords",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:04:01.363Z",
+      "summary": "Rewrote the reference example for `timeUntilInWords` with three clear examples demonstrating: (1) basic usage with a date one year ahead, (2) including seconds for a near-future time, and (3) using a custom `fromTime` to compare two explicit dates.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/timeuntilinwords.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126483,
+        "output_tokens": 818,
+        "cache_creation_input_tokens": 1751,
+        "cache_read_input_tokens": 17934
+      }
+    },
+    "function:titleize": {
+      "kind": "function",
+      "id": "titleize",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:04:21.261Z",
+      "summary": "Wrote three idiomatic examples for `titleize` covering plain sentence capitalization, mixed-case input, and a real-world model display use case. No docblock or code changes were needed — the source and documentation are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/titleize.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126114,
+        "output_tokens": 638,
+        "cache_creation_input_tokens": 1514,
+        "cache_read_input_tokens": 17737
+      }
+    },
+    "function:truncate": {
+      "kind": "function",
+      "id": "truncate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:04:47.677Z",
+      "summary": "Rewrote the reference example for `truncate()` with three numbered examples using the standard comment-based output style: truncating to a specific length, using a custom truncate string, and showing that short text is returned unchanged. The docblock in Global.cfc matches the documented hint and parameters exactly — no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/truncate.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126304,
+        "output_tokens": 738,
+        "cache_creation_input_tokens": 1724,
+        "cache_read_input_tokens": 17939
+      }
+    },
+    "function:URLFor": {
+      "kind": "function",
+      "id": "URLFor",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:05:16.828Z",
+      "summary": "Rewrote the `URLFor` reference example from the old `<!--- --->` comment style to the modern `// N. Description` numbered format. Added two additional examples demonstrating the `onlyPath=false` / absolute URL use case (common for emails) and the `params` query string argument.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/urlfor.txt"
+      ],
+      "notes": "",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 129864,
+        "output_tokens": 1178,
+        "cache_creation_input_tokens": 66431,
+        "cache_read_input_tokens": 159618
+      }
+    },
+    "function:wordTruncate": {
+      "kind": "function",
+      "id": "wordTruncate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T02:05:37.918Z",
+      "summary": "Updated the `wordTruncate` reference example with three clear, idiomatic examples demonstrating basic truncation with a custom length, using a custom truncate string, and the passthrough behavior when text has fewer words than the limit.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/wordtruncate.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126329,
+        "output_tokens": 759,
+        "cache_creation_input_tokens": 1677,
+        "cache_read_input_tokens": 17889
+      }
     }
   },
   "runs": []
