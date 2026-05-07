@@ -1,0 +1,15 @@
+// 1. Rename a table from its old name to a new name
+renameTable(oldName="blogPosts", newName="posts");
+
+// 2. Rename a table as part of a migration up/down pair
+component extends="wheels.Migrator" {
+
+    function up() {
+        renameTable(oldName="members", newName="users");
+    }
+
+    function down() {
+        renameTable(oldName="users", newName="members");
+    }
+
+}

@@ -1,3 +1,33 @@
-// Migrate to a specific version
-// Returns a message with the result
-result=application.wheels.migrator.migrateTo(version);
+// 1. Migrate up to a specific version
+result = application.wheels.migrator.migrateTo("20240315120000");
+// result -> "Migrating from 20231201000000 up to 20240315120000.
+// -------- 20240315120000_add_status_to_orders --------------------
+// "
+
+// 2. Migrate down to an earlier version (rolls back newer migrations)
+result = application.wheels.migrator.migrateTo("20230601000000");
+// result -> "Migrating from 20240315120000 down to 20230601000000.
+// ------- 20240315120000_add_status_to_orders ---------------------
+// "
+
+// 3. Migrate to version 0 (rolls back all migrations)
+result = application.wheels.migrator.migrateTo("0");
+// result -> "Migrating from 20240315120000 down to 0.
+// ..."
+
+// 4. Check the result string for errors before proceeding
+result = application.wheels.migrator.migrateTo("20240315120000");
+if (FindNoCase("Error", result)) {
+    writeOutput("Migration failed: " & result);
+} else {
+    writeOutput("Migration result: " & result);
+}
+
+// 5. Apply a missing (out-of-order gap) migration using missingMigFlag
+// Use this when a migration with a timestamp earlier than the current version
+// was never applied in your environment.
+result = application.wheels.migrator.migrateTo(
+    version = "20231205083000",
+    missingMigFlag = true
+);
+writeOutput(result);

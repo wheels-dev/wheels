@@ -1,0 +1,21 @@
+// 1. Create a simple database view that joins users and roles
+v = createView(name="userRoles");
+v.selectStatement(sql="SELECT u.id, u.firstName, u.lastName, r.name AS roleName FROM users u INNER JOIN roles r ON u.roleId = r.id");
+v.create();
+
+// 2. Create a view for active (non-deleted) users using method chaining
+createView(name="activeUsers")
+    .selectStatement(sql="SELECT id, firstName, lastName, email FROM users WHERE deletedAt IS NULL")
+    .create();
+
+// 3. Full up/down migration using createView and dropView
+component extends="wheels.migrator.Migration" {
+    function up() {
+        createView(name="publishedArticles")
+            .selectStatement(sql="SELECT id, title, body, authorId, publishedAt FROM articles WHERE publishedAt IS NOT NULL")
+            .create();
+    }
+    function down() {
+        dropView(name="publishedArticles");
+    }
+}

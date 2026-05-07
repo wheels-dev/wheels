@@ -1,8 +1,32 @@
-addRecord(table='people',
-		id = 1,
-		title = "Mr",
-		firstname = "Bruce",
-		lastname = "Wayne", 
-		email = "bruce@wayneenterprises.com",
-		tel = "555-67869099", 
+// 1. Insert a simple seed record into a settings table
+addRecord(
+    table = "settings",
+    name = "siteName",
+    value = "My Wheels App"
 );
+
+// 2. Insert a record with multiple columns (extra keyword arguments become column/value pairs)
+addRecord(
+    table = "people",
+    id = 1,
+    title = "Mr",
+    firstName = "Bruce",
+    lastName = "Wayne",
+    email = "bruce@wayneenterprises.com",
+    phone = "555-678-9099"
+);
+
+// 3. Seed an admin user role during a migration's up() function
+component extends="wheels.migrator.Migration" {
+    function up() {
+        addRecord(
+            table = "roles",
+            id = 1,
+            name = "admin",
+            active = true
+        );
+    }
+    function down() {
+        removeRecord(table = "roles", where = "id = 1");
+    }
+}

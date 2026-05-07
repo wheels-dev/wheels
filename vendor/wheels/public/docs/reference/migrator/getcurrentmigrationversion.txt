@@ -1,2 +1,11 @@
-// Get current database version
+// 1. Get current database version
 currentVersion = application.wheels.migrator.getCurrentMigrationVersion();
+// currentVersion -> "20240315120000"  (timestamp-style version string, or "0" if no migrations have run)
+
+// 2. Display version status in a maintenance view
+currentVersion = application.wheels.migrator.getCurrentMigrationVersion();
+if (currentVersion == "0") {
+    writeOutput("No migrations have been applied yet.");
+} else {
+    writeOutput("Database is at version: " & currentVersion);
+}

@@ -1,0 +1,31 @@
+// 1. Add a foreign key from orders.customerId to customers.id
+addForeignKey(
+    table="orders",
+    referenceTable="customers",
+    column="customerId",
+    referenceColumn="id"
+);
+
+// 2. Add a foreign key from comments.postId to posts.id
+addForeignKey(
+    table="comments",
+    referenceTable="posts",
+    column="postId",
+    referenceColumn="id"
+);
+
+// 3. Use addForeignKey in a migration's up() and remove it in down()
+// In your migration CFC:
+//
+// public void function up() {
+//     addForeignKey(
+//         table="order_items",
+//         referenceTable="orders",
+//         column="orderId",
+//         referenceColumn="id"
+//     );
+// }
+//
+// public void function down() {
+//     dropForeignKey(table="order_items", keyName="FK_order_items_orders");
+// }

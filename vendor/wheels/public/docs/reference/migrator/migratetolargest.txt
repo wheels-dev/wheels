@@ -1,0 +1,17 @@
+// 1. Run all pending migrations to bring the database up to the latest version
+result = application.wheels.migrator.migrateToLatest();
+// result -> "Migrating from 20240101000000 up to 20240315120000.
+// -------- 20240315120000_add_status_to_orders --------------------
+// "
+
+// 2. Already at the latest version — no migration required
+result = application.wheels.migrator.migrateToLatest();
+// result -> "Database is currently at version 20240315120000. No migration required."
+
+// 3. Check for errors after migrating to latest
+result = application.wheels.migrator.migrateToLatest();
+if (FindNoCase("Error", result)) {
+    writeOutput("Migration failed: " & result);
+} else {
+    writeOutput("All migrations applied successfully.");
+}

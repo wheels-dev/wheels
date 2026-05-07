@@ -1,0 +1,19 @@
+// 1. Redo the current (most recent) migration — rolls it back then re-applies it
+result = application.wheels.migrator.redoMigration();
+// result -> "
+// ------- 20240315120000_add_status_to_orders ----------------------
+// "
+
+// 2. Redo a specific migration version
+result = application.wheels.migrator.redoMigration(version="20240101000000");
+// result -> "
+// ------- 20240101000000_create_users ------------------------------
+// "
+
+// 3. Check for errors after redoing a migration
+result = application.wheels.migrator.redoMigration(version="20240315120000");
+if (FindNoCase("Error", result)) {
+    writeOutput("Redo failed: " & result);
+} else {
+    writeOutput("Migration redone successfully.");
+}

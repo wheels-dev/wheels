@@ -1,1 +1,11 @@
-changeColumn(table='members', columnType='string', columnName='status', limit=50);
+// 1. Change a string column's length limit
+changeColumn(table="members", columnName="status", columnType="string", limit=50);
+
+// 2. Change a column type and set a default value
+changeColumn(table="orders", columnName="quantity", columnType="integer", default=1);
+
+// 3. Change a decimal column with precision and scale
+changeColumn(table="products", columnName="price", columnType="decimal", precision=10, scale=2, allowNull=false);
+
+// 4. Change a text column and explicitly allow NULL values
+changeColumn(table="articles", columnName="summary", columnType="text", allowNull=true);

@@ -1,0 +1,22 @@
+// 1. Add a single text column to a table
+t.text("body");
+
+// 2. Add multiple text columns at once
+t.text("summary,description,notes");
+
+// 3. Add a text column that defaults to an empty string and disallows nulls
+t.text(columnNames="bio", default="", allowNull=false);
+
+// 4. Add a MEDIUMTEXT column in MySQL (16MB capacity; ignored on other databases)
+t.text(columnNames="content", size="mediumtext");
+
+// 5. Add a LONGTEXT column in MySQL (4GB capacity; ignored on other databases)
+t.text(columnNames="rawHtml", size="longtext");
+
+// 6. Full migration example using text() inside createTable
+createTable("articles") {
+	t.string("title");
+	t.text("body");
+	t.text(columnNames="excerpt", allowNull=true);
+	t.timestamps();
+};

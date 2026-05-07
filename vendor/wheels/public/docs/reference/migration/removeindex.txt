@@ -1,1 +1,16 @@
-removeIndex(table='members',indexName='members_username');
+// 1. Remove an index by its name
+removeIndex(table="members", indexName="members_username");
+
+// 2. Remove a compound index created on multiple columns
+// (index was previously added as "orders_customerid_createdat")
+removeIndex(table="orders", indexName="orders_customerid_createdat");
+
+// 3. Typical down() migration reversing an addIndex call
+component extends="wheels.Migrator" {
+    function up() {
+        addIndex(table="articles", columnNames="slug", unique=true, indexName="articles_slug");
+    }
+    function down() {
+        removeIndex(table="articles", indexName="articles_slug");
+    }
+}

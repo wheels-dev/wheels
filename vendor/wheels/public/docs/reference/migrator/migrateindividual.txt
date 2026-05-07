@@ -1,0 +1,22 @@
+// 1. Run a specific migration by version number (out-of-sequence)
+result = application.wheels.migrator.migrateIndividual("20240315120000");
+// result -> "Running individual migration 20240315120000.
+// -------- 20240315120000_add_status_to_orders --------------------
+// "
+
+// 2. Check the result string for errors or success messages
+result = application.wheels.migrator.migrateIndividual("20240101000000");
+if (FindNoCase("Error", result)) {
+    writeOutput("Migration failed: " & result);
+} else if (FindNoCase("already been applied", result)) {
+    writeOutput("Skipped: migration was already applied.");
+} else {
+    writeOutput("Migration applied successfully.");
+}
+
+// 3. Apply an individual colleague's migration without advancing the version pointer
+// This is useful when a team member's migration has a lower timestamp than
+// the current version but was not yet applied in your environment.
+colVersion = "20231205083000";
+result = application.wheels.migrator.migrateIndividual(colVersion);
+writeOutput(result);

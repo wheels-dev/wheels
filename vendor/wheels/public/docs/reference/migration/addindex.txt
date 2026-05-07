@@ -1,1 +1,12 @@
-addIndex(table='members', columnNames='username', unique=true);
+// 1. Add a basic index on a single column
+addIndex(table="users", columnNames="email");
+
+// 2. Add a unique index to enforce uniqueness on a column
+addIndex(table="members", columnNames="username", unique=true);
+
+// 3. Add a composite index on multiple columns
+addIndex(table="orders", columnNames="customerId,createdAt");
+
+// 4. Add an index with a custom index name
+// (defaults to tableName_firstColumnName, e.g. "posts_publishedAt")
+addIndex(table="posts", columnNames="publishedAt", indexName="idx_posts_published");

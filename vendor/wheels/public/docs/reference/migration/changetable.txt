@@ -1,3 +1,15 @@
-t = changeTable(name='employees');
-t.string(columnNames="fullName", default="", allowNull=true, limit="255");
+// 1. Add a new string column to an existing table
+t = changeTable(name="employees");
+t.string(columnNames="fullName", default="", allowNull=true, limit=255);
 t.change();
+
+// 2. Modify multiple columns at once (change type and nullability)
+t = changeTable(name="products");
+t.integer(columnNames="stock", default=0, allowNull=false);
+t.boolean(columnNames="active", default=true, allowNull=false);
+t.change();
+
+// 3. Add a new column using addColumns=true so the migration fails gracefully if the column already exists
+t = changeTable(name="orders");
+t.datetime(columnNames="shippedAt", allowNull=true);
+t.change(addColumns=true);

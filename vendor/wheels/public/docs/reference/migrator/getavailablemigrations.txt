@@ -1,8 +1,20 @@
-// Get array of available migrations
+// 1. Get all available migrations and find the latest version
 migrations = application.wheels.migrator.getAvailableMigrations();
 
-if(ArrayLen(migrations)){
-	 latestVersion = migrations[ArrayLen(migrations)].version;
+if (arrayLen(migrations)) {
+    latestVersion = migrations[arrayLen(migrations)].version;
 } else {
-	 latestVersion = 0;
+    latestVersion = 0;
 }
+
+// 2. List pending (not yet run) migrations
+migrations = application.wheels.migrator.getAvailableMigrations();
+
+for (migration in migrations) {
+    if (migration.status != "migrated") {
+        writeOutput(migration.version & " - " & migration.name);
+    }
+}
+
+// 3. Use a custom migrations path
+migrations = application.wheels.migrator.getAvailableMigrations(path=expandPath("/app/db/migrate/"));
