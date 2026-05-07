@@ -1,0 +1,18 @@
+// 1. Add a single float column to a new table
+t.float("price");
+
+// 2. Add a float column with a default value
+t.float(columnNames="rating", default="0.0");
+
+// 3. Add multiple float columns at once
+t.float("latitude,longitude");
+
+// 4. Add a float column that does not allow NULL values
+t.float(columnNames="score", allowNull=false);
+
+// 5. Use float() within a createTable migration
+createTable("measurements") {
+    t.float("temperature");
+    t.float(columnNames="humidity,pressure", default="0.0");
+    t.timestamps();
+};

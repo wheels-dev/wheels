@@ -1,0 +1,22 @@
+// 1. Remove all records from a table (use with caution)
+removeRecord(table = "sessions");
+
+// 2. Remove a specific record by primary key
+removeRecord(table = "roles", where = "id = 1");
+
+// 3. Remove multiple records matching a condition
+removeRecord(table = "users", where = "active = 0");
+
+// 4. Use removeRecord in a migration's down() function to reverse an addRecord call
+component extends="wheels.migrator.Migration" {
+    function up() {
+        addRecord(
+            table = "settings",
+            name = "maintenanceMode",
+            value = "false"
+        );
+    }
+    function down() {
+        removeRecord(table = "settings", where = "name = 'maintenanceMode'");
+    }
+}

@@ -1,0 +1,25 @@
+// 1. Rename legacy c_o_r_e_* tables to wheels_* in one step
+result = application.wheels.migrator.renameSystemTables();
+// result.success  -> true
+// result.renamed  -> ["c_o_r_e_levels -> wheels_levels", "c_o_r_e_migrator_versions -> wheels_migrator_versions"]
+// result.sql      -> ["ALTER TABLE c_o_r_e_migrator_versions RENAME TO wheels_migrator_versions", "ALTER TABLE c_o_r_e_levels RENAME TO wheels_levels"]
+// result.skipped  -> ""
+// result.errors   -> []
+
+// 2. Dry-run: preview the SQL without executing any changes
+result = application.wheels.migrator.renameSystemTables(dryRun=true);
+// result.success  -> true
+// result.renamed  -> []   (nothing executed)
+// result.sql      -> ["ALTER TABLE c_o_r_e_migrator_versions RENAME TO wheels_migrator_versions", "ALTER TABLE c_o_r_e_levels RENAME TO wheels_levels"]
+
+// 3. Handle all possible outcomes after running the rename
+result = application.wheels.migrator.renameSystemTables();
+if (!result.success) {
+    // Partial-rename conflict or execution error
+    writeOutput("Rename failed: " & arrayToList(result.errors, "; "));
+} else if (len(result.skipped)) {
+    // Tables were already on wheels_* names (or no legacy tables found)
+    writeOutput(result.skipped);
+} else {
+    writeOutput("Renamed: " & arrayToList(result.renamed, ", "));
+}

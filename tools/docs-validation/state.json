@@ -4264,6 +4264,937 @@
         "cache_creation_input_tokens": 2366,
         "cache_read_input_tokens": 10821
       }
+    },
+    "function:addColumn": {
+      "kind": "function",
+      "id": "addColumn",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:24:52.123Z",
+      "summary": "Expanded the `addColumn` reference example from a single bare call to three numbered examples covering: (1) a basic string column with a length limit, (2) a boolean column with a default value and NULL constraint, and (3) a decimal column with precision/scale for numeric data. No docblock or code changes were needed — the source and docs are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/addcolumn.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16609,
+        "output_tokens": 621,
+        "cache_creation_input_tokens": 5235,
+        "cache_read_input_tokens": 7214
+      }
+    },
+    "function:addForeignKey": {
+      "kind": "function",
+      "id": "addForeignKey",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:25:03.005Z",
+      "summary": "Authored a new reference example for `addForeignKey` at `vendor/wheels/public/docs/reference/migration/addforeignkey.txt`. Three examples cover: a basic orders→customers FK, a comments→posts FK, and a paired up()/down() migration pattern showing how to drop the key in the reverse migration.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/addforeignkey.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16826,
+        "output_tokens": 652,
+        "cache_creation_input_tokens": 1258,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:addIndex": {
+      "kind": "function",
+      "id": "addIndex",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:25:18.485Z",
+      "summary": "Rewrote the `addIndex` reference example with four numbered examples covering a basic single-column index, a unique index, a composite multi-column index, and a custom index name. The docblock in the CFC was already accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/addindex.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 16674,
+        "output_tokens": 698,
+        "cache_creation_input_tokens": 8931,
+        "cache_read_input_tokens": 27079
+      }
+    },
+    "function:addRecord": {
+      "kind": "function",
+      "id": "addRecord",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:25:34.249Z",
+      "summary": "Rewrote the `addRecord` reference example with three idiomatic examples: a simple single-column seed, a multi-column person record insert, and a migration component context showing addRecord paired with removeRecord in up()/down(). The existing example had a trailing comma issue and didn't illustrate the extra-arguments-as-columns pattern clearly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/addrecord.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16208,
+        "output_tokens": 658,
+        "cache_creation_input_tokens": 1250,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:addReference": {
+      "kind": "function",
+      "id": "addReference",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:25:49.062Z",
+      "summary": "Created vendor/wheels/public/docs/reference/migration/addreference.txt with three examples demonstrating addReference() as a convenience wrapper around addForeignKey() that auto-derives the column name and pluralizes the reference table. Also shows the matching dropReference() in down().",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/addreference.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 17168,
+        "output_tokens": 732,
+        "cache_creation_input_tokens": 8864,
+        "cache_read_input_tokens": 26921
+      }
+    },
+    "function:announce": {
+      "kind": "function",
+      "id": "announce",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:26:07.503Z",
+      "summary": "Authored the reference example for `announce()` in `vendor/wheels/public/docs/reference/migration/announce.txt`. The two examples show how to call `announce()` within a migration's `up()` function to log feedback messages after DDL operations — one for a single table creation and one for multiple sequential steps.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/announce.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 12605,
+        "output_tokens": 1004,
+        "cache_creation_input_tokens": 6624,
+        "cache_read_input_tokens": 33983
+      }
+    },
+    "function:bigInteger": {
+      "kind": "function",
+      "id": "bigInteger",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:26:27.747Z",
+      "summary": "Created the reference example file for `bigInteger` at `vendor/wheels/public/docs/reference/tabledefinition/biginteger.txt`. Three examples cover: adding a single bigInteger column in a new table, adding multiple columns via a comma-separated list, and adding a bigInteger column when altering an existing table.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/biginteger.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 16674,
+        "output_tokens": 879,
+        "cache_creation_input_tokens": 8559,
+        "cache_read_input_tokens": 37813
+      }
+    },
+    "function:binary": {
+      "kind": "function",
+      "id": "binary",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:26:43.241Z",
+      "summary": "Created the reference example file for the `binary` table definition function at `vendor/wheels/public/docs/reference/tabledefinition/binary.txt`. Three idiomatic examples demonstrate: adding a single binary column in a new table, adding multiple binary columns at once, and adding a binary column when altering an existing table — modeled on the existing `biginteger.txt` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/binary.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 16115,
+        "output_tokens": 848,
+        "cache_creation_input_tokens": 8472,
+        "cache_read_input_tokens": 37776
+      }
+    },
+    "function:boolean": {
+      "kind": "function",
+      "id": "boolean",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:26:59.084Z",
+      "summary": "Created the reference example file for the `boolean()` table definition function at `vendor/wheels/public/docs/reference/tabledefinition/boolean.txt`. The three examples demonstrate adding a single boolean column, multiple boolean columns at once (comma-separated), and altering an existing table — matching the style and structure of the existing `binary.txt` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/boolean.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15913,
+        "output_tokens": 798,
+        "cache_creation_input_tokens": 8278,
+        "cache_read_input_tokens": 26391
+      }
+    },
+    "function:change": {
+      "kind": "function",
+      "id": "change",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:27:14.975Z",
+      "summary": "Authored `vendor/wheels/public/docs/reference/tabledefinition/change.txt` with three idiomatic examples demonstrating: (1) altering existing columns, (2) adding new columns with `addColumns=true`, and (3) adding a foreign key reference column. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/change.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15745,
+        "output_tokens": 801,
+        "cache_creation_input_tokens": 8115,
+        "cache_read_input_tokens": 26237
+      }
+    },
+    "function:changeColumn": {
+      "kind": "function",
+      "id": "changeColumn",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:27:25.901Z",
+      "summary": "Rewrote the reference example for `changeColumn` with four idiomatic examples covering: basic string length change, type change with a default value, decimal precision/scale, and allowing NULL. All parameter names match the function signature exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/changecolumn.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16565,
+        "output_tokens": 552,
+        "cache_creation_input_tokens": 1624,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:changeTable": {
+      "kind": "function",
+      "id": "changeTable",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:27:41.973Z",
+      "summary": "Rewrote the `changeTable` reference example with three numbered examples demonstrating: (1) adding a string column to an existing table, (2) modifying multiple columns at once, and (3) using `addColumns=true` to safely add a column. Examples follow the established migration reference style.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/changetable.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 18772,
+        "output_tokens": 775,
+        "cache_creation_input_tokens": 8942,
+        "cache_read_input_tokens": 15087
+      }
+    },
+    "function:char": {
+      "kind": "function",
+      "id": "char",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:27:56.033Z",
+      "summary": "Created reference example for `char()` in `vendor/wheels/public/docs/reference/tabledefinition/char.txt` with three idiomatic examples: adding a single char column, adding multiple char columns at once via a comma-separated list, and altering an existing table to add a char column with a default value.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/char.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15772,
+        "output_tokens": 772,
+        "cache_creation_input_tokens": 8184,
+        "cache_read_input_tokens": 26306
+      }
+    },
+    "function:column": {
+      "kind": "function",
+      "id": "column",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:28:12.988Z",
+      "summary": "Created the reference example file for `column()` in `vendor/wheels/public/docs/reference/tabledefinition/column.txt` with three examples: basic table creation with string/text columns, a table with decimal precision/scale and defaults, and altering an existing table — all following the style of other tabledefinition reference files.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/column.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15884,
+        "output_tokens": 838,
+        "cache_creation_input_tokens": 8266,
+        "cache_read_input_tokens": 26383
+      }
+    },
+    "function:createMigration": {
+      "kind": "function",
+      "id": "createMigration",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:28:41.686Z",
+      "summary": "Rewrote the `createmigration.txt` reference with three numbered examples covering: basic blank migration with timestamp prefix (showing example return value), using a built-in template, and using a numeric prefix. All parameters (`migrationName`, `templateName`, `migrationPrefix`) are now demonstrated, with named-argument style for multi-param calls.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/createmigration.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 31216,
+        "output_tokens": 903,
+        "cache_creation_input_tokens": 16453,
+        "cache_read_input_tokens": 43332
+      }
+    },
+    "function:createTable": {
+      "kind": "function",
+      "id": "createTable",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:28:58.577Z",
+      "summary": "Rewrote the createTable reference example with three numbered examples covering: (1) a standard users table with common column types and timestamps, (2) a table with a custom string primary key using id=false, and (3) a join/pivot table with composite primary keys using force=true. Applied consistent camelCase, double-quote string literals, and proper numbered comment headings.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/createtable.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 17777,
+        "output_tokens": 854,
+        "cache_creation_input_tokens": 9571,
+        "cache_read_input_tokens": 15503
+      }
+    },
+    "function:createView": {
+      "kind": "function",
+      "id": "createView",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:29:14.136Z",
+      "summary": "Authored `vendor/wheels/public/docs/reference/migration/createview.txt` with three examples demonstrating `createView()` usage: a simple view creation, method chaining, and a full up/down migration pair using `createView` and `dropView`. The examples reflect the actual `ViewDefinition` API (`selectStatement(sql)` and `create()`) discovered from the source CFC.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/createview.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 18360,
+        "output_tokens": 861,
+        "cache_creation_input_tokens": 9294,
+        "cache_read_input_tokens": 27396
+      }
+    },
+    "function:date": {
+      "kind": "function",
+      "id": "date",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:29:28.593Z",
+      "summary": "Created the reference example for `tabledefinition.date` at `vendor/wheels/public/docs/reference/tabledefinition/date.txt`. Three examples demonstrate: adding a single date column to a new table, adding multiple date columns at once using a comma-separated list, and adding a nullable date column to an existing table via `changeTable`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/date.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15738,
+        "output_tokens": 748,
+        "cache_creation_input_tokens": 8175,
+        "cache_read_input_tokens": 26284
+      }
+    },
+    "function:datetime": {
+      "kind": "function",
+      "id": "datetime",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:29:42.516Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/tabledefinition/datetime.txt` with three idiomatic examples: adding a single datetime column, adding multiple datetime columns at once using a comma-separated list, and adding a nullable datetime column with a default value to an existing table. Examples follow the same style as the adjacent `date.txt` reference file.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/datetime.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15979,
+        "output_tokens": 793,
+        "cache_creation_input_tokens": 8307,
+        "cache_read_input_tokens": 26393
+      }
+    },
+    "function:decimal": {
+      "kind": "function",
+      "id": "decimal",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:29:58.676Z",
+      "summary": "Created the reference example file for `decimal()` in `vendor/wheels/public/docs/reference/tabledefinition/decimal.txt` with three idiomatic examples: single column creation, multiple columns at once, and altering an existing table — matching the style of similar tabledefinition reference files.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/decimal.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15784,
+        "output_tokens": 751,
+        "cache_creation_input_tokens": 8231,
+        "cache_read_input_tokens": 26329
+      }
+    },
+    "function:down": {
+      "kind": "function",
+      "id": "down",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:30:17.445Z",
+      "summary": "Rewrote the `down()` migration reference example with three idiomatic examples: (1) reversing a table creation via `dropTable`, (2) reversing an `addColumn` via `removeColumn`, and (3) a complete paired `up()`/`down()` component showing best practices with transaction/try/catch rollback handling. The docblock in `Migration.cfc` matches the documented hint exactly — no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/down.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 19912,
+        "output_tokens": 1204,
+        "cache_creation_input_tokens": 9927,
+        "cache_read_input_tokens": 15513
+      }
+    },
+    "function:dropForeignKey": {
+      "kind": "function",
+      "id": "dropForeignKey",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:30:31.026Z",
+      "summary": "Created reference example file for `dropForeignKey` at `vendor/wheels/public/docs/reference/migration/dropforeignkey.txt` with three examples demonstrating dropping a foreign key by explicit name, reversing an `addReference()` call, and reversing an `addForeignKey()` call in a migration's `down()` function.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/dropforeignkey.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 18298,
+        "output_tokens": 704,
+        "cache_creation_input_tokens": 1150,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:dropReference": {
+      "kind": "function",
+      "id": "dropReference",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:30:49.319Z",
+      "summary": "Created vendor/wheels/public/docs/reference/migration/dropreference.txt with three idiomatic examples showing basic usage, a second table scenario, and a paired up()/down() migration pattern. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/dropreference.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 17094,
+        "output_tokens": 701,
+        "cache_creation_input_tokens": 8894,
+        "cache_read_input_tokens": 26923
+      }
+    },
+    "function:dropTable": {
+      "kind": "function",
+      "id": "dropTable",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:31:03.245Z",
+      "summary": "Created the reference example file at `vendor/wheels/public/docs/reference/migration/droptable.txt` with two idiomatic examples: a basic up/down migration pair showing `dropTable` reversing a `createTable`, and a second example dropping multiple tables in a `down()` method. No docblock or source changes were needed — the existing source and docs are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/droptable.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 18331,
+        "output_tokens": 771,
+        "cache_creation_input_tokens": 1092,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:dropView": {
+      "kind": "function",
+      "id": "dropView",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:31:20.329Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/migration/dropview.txt` with two examples showing how to use `dropView()` in the `down()` method of a migration: one pairing a single `createView`/`dropView`, and one dropping multiple views at once.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/dropview.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 18339,
+        "output_tokens": 856,
+        "cache_creation_input_tokens": 9392,
+        "cache_read_input_tokens": 38791
+      }
+    },
+    "function:execute": {
+      "kind": "function",
+      "id": "execute",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:31:35.126Z",
+      "summary": "Authored `vendor/wheels/public/docs/reference/migration/execute.txt` with three idiomatic examples demonstrating raw SQL execution in migrations: a simple UPDATE, a CREATE VIEW, and a full up/down migration pair. No docblock drift was found — the source matches the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/execute.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 17130,
+        "output_tokens": 642,
+        "cache_creation_input_tokens": 8822,
+        "cache_read_input_tokens": 26831
+      }
+    },
+    "function:float": {
+      "kind": "function",
+      "id": "float",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:31:45.798Z",
+      "summary": "Authored the reference example for `tabledefinition.float` at `vendor/wheels/public/docs/reference/tabledefinition/float.txt`. The five examples cover: single column, default value, multiple columns in one call, non-nullable column, and use within a `createTable` migration block.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/float.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16902,
+        "output_tokens": 572,
+        "cache_creation_input_tokens": 1132,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:getAvailableMigrations": {
+      "kind": "function",
+      "id": "getAvailableMigrations",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:32:08.949Z",
+      "summary": "Rewrote the reference example for `getAvailableMigrations` to use camelCase builtins (`arrayLen`), added a second example showing how to iterate and filter pending migrations by `status`, and a third example demonstrating the optional `path` parameter. The migration struct keys (`version`, `name`, `status`, etc.) were confirmed directly from the source.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/getavailablemigrations.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 31497,
+        "output_tokens": 897,
+        "cache_creation_input_tokens": 2047,
+        "cache_read_input_tokens": 19822
+      }
+    },
+    "function:getCurrentMigrationVersion": {
+      "kind": "function",
+      "id": "getCurrentMigrationVersion",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:32:26.743Z",
+      "summary": "Wrote an improved reference example for `getCurrentMigrationVersion()` with two examples: one showing the basic call and the shape of the return value, and one demonstrating practical usage checking whether any migrations have been applied.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/getcurrentmigrationversion.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 30630,
+        "output_tokens": 639,
+        "cache_creation_input_tokens": 1497,
+        "cache_read_input_tokens": 19383
+      }
+    },
+    "function:integer": {
+      "kind": "function",
+      "id": "integer",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:32:41.949Z",
+      "summary": "Created the reference example file for `integer()` in the `tabledefinition` scope, demonstrating single column addition, multiple columns at once with defaults, and altering an existing table — consistent in style with the existing `biginteger.txt` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/integer.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15813,
+        "output_tokens": 728,
+        "cache_creation_input_tokens": 8220,
+        "cache_read_input_tokens": 26306
+      }
+    },
+    "function:migrateIndividual": {
+      "kind": "function",
+      "id": "migrateIndividual",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:33:09.887Z",
+      "summary": "Created the reference example for `migrateIndividual` at `vendor/wheels/public/docs/reference/migrator/migrateindividual.txt`. The file demonstrates three scenarios: basic usage, error/already-applied result checking, and the primary use case of applying an out-of-sequence colleague's migration without affecting the version pointer. The docblock in `Migrator.cfc` matches the documented hint and parameter exactly — no edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/migrateindividual.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 31357,
+        "output_tokens": 919,
+        "cache_creation_input_tokens": 1696,
+        "cache_read_input_tokens": 19687
+      }
+    },
+    "function:migrateTo": {
+      "kind": "function",
+      "id": "migrateTo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:33:35.532Z",
+      "summary": "Rewrote the `migrateTo` reference with 5 idiomatic examples covering migrate-up, migrate-down, rollback-to-zero, error-checking, and the `missingMigFlag` parameter for out-of-order gap migrations. Examples match the actual return strings produced by the function body.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/migrateto.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 32017,
+        "output_tokens": 1096,
+        "cache_creation_input_tokens": 16427,
+        "cache_read_input_tokens": 43261
+      }
+    },
+    "function:migrateToLatest": {
+      "kind": "function",
+      "id": "migrateToLatest",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:33:57.439Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/migrator/migratetolatest.txt` with three idiomatic examples covering: running all pending migrations, the already-up-to-date no-op case, and checking the result string for errors. No docblock or code changes were needed — the function source and hint are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/migratetolatest.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 33082,
+        "output_tokens": 1264,
+        "cache_creation_input_tokens": 16730,
+        "cache_read_input_tokens": 43700
+      }
+    },
+    "function:redoMigration": {
+      "kind": "function",
+      "id": "redoMigration",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:34:15.415Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/migrator/redomigration.txt` with three examples demonstrating: redoing the current migration, redoing a specific version, and error-checking after redo. Examples match the pattern of existing migrator reference files and accurately reflect the function's behavior (down() + up() on the target version).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/redomigration.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 31804,
+        "output_tokens": 859,
+        "cache_creation_input_tokens": 1914,
+        "cache_read_input_tokens": 19706
+      }
+    },
+    "function:references": {
+      "kind": "function",
+      "id": "references",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:34:33.877Z",
+      "summary": "Created vendor/wheels/public/docs/reference/tabledefinition/references.txt with four idiomatic examples covering: single reference with FK, multiple references, polymorphic reference (no FK, adds type column), and a reference with cascade delete and nullable column. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/references.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 16083,
+        "output_tokens": 960,
+        "cache_creation_input_tokens": 8318,
+        "cache_read_input_tokens": 26401
+      }
+    },
+    "function:removeColumn": {
+      "kind": "function",
+      "id": "removeColumn",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:34:54.348Z",
+      "summary": "Created the reference example file for `removeColumn` at `vendor/wheels/public/docs/reference/migration/removecolumn.txt`. Three examples cover direct column removal by name, removal via a reference name (which auto-derives the `<referenceName>id` column), and a typical `down()` usage pattern.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/removecolumn.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 17210,
+        "output_tokens": 710,
+        "cache_creation_input_tokens": 9131,
+        "cache_read_input_tokens": 38955
+      }
+    },
+    "function:removeIndex": {
+      "kind": "function",
+      "id": "removeIndex",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:35:07.638Z",
+      "summary": "Expanded the `removeIndex` reference example from a single bare call to three idiomatic examples: a basic removal by index name, removing a compound index, and a typical `up()`/`down()` migration pair that pairs `addIndex` with `removeIndex`. Docblock and parameters match the snapshot — no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/removeindex.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16059,
+        "output_tokens": 542,
+        "cache_creation_input_tokens": 1180,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:removeRecord": {
+      "kind": "function",
+      "id": "removeRecord",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:35:21.886Z",
+      "summary": "Created the reference example file for `removeRecord` at `vendor/wheels/public/docs/reference/migration/removerecord.txt` with four idiomatic examples: removing all records, removing by primary key, removing by condition, and using `removeRecord` in a migration's `down()` function to reverse an `addRecord` call.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/removerecord.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 17259,
+        "output_tokens": 721,
+        "cache_creation_input_tokens": 8905,
+        "cache_read_input_tokens": 26900
+      }
+    },
+    "function:renameColumn": {
+      "kind": "function",
+      "id": "renameColumn",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:35:32.424Z",
+      "summary": "Created the reference example for `renameColumn` at `vendor/wheels/public/docs/reference/migration/renamecolumn.txt`. The docblock in the source CFC was already accurate and matched the documented parameters, so no CFC edits were needed. Two examples were written: a simple standalone column rename and a full migration CFC demonstrating reversible `up()`/`down()` usage.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/renamecolumn.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 16695,
+        "output_tokens": 583,
+        "cache_creation_input_tokens": 1166,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:renameSystemTables": {
+      "kind": "function",
+      "id": "renameSystemTables",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:35:59.008Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/migrator/renamesystemtables.txt` with three idiomatic examples covering: (1) a successful rename, (2) a dry-run preview, and (3) full outcome handling including the conflict/error and skipped cases. No CFC changes were needed — the docblock matches the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migrator/renamesystemtables.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 32628,
+        "output_tokens": 1193,
+        "cache_creation_input_tokens": 17009,
+        "cache_read_input_tokens": 44880
+      }
+    },
+    "function:renameTable": {
+      "kind": "function",
+      "id": "renameTable",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:36:09.728Z",
+      "summary": "Created the reference example for `renameTable` at `vendor/wheels/public/docs/reference/migration/renametable.txt`. Two examples cover a simple standalone rename and a migration component with reversible up/down methods. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/renametable.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17023,
+        "output_tokens": 529,
+        "cache_creation_input_tokens": 1126,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:string": {
+      "kind": "function",
+      "id": "string",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:36:24.535Z",
+      "summary": "Created the reference example for `string()` in `vendor/wheels/public/docs/reference/tabledefinition/string.txt`. The file provides three idiomatic examples: adding single string columns to a new table, adding multiple string columns at once with defaults, and altering an existing table to add a string column — matching the style and tone of the existing `integer.txt` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/string.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15831,
+        "output_tokens": 765,
+        "cache_creation_input_tokens": 8225,
+        "cache_read_input_tokens": 26302
+      }
+    },
+    "function:text": {
+      "kind": "function",
+      "id": "text",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:36:42.176Z",
+      "summary": "Created the reference example file for `tabledefinition.text` at `vendor/wheels/public/docs/reference/tabledefinition/text.txt`. The file covers six scenarios: single column, multiple columns via comma-list, default/allowNull options, MySQL MEDIUMTEXT, MySQL LONGTEXT, and a full migration context example.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/text.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 17063,
+        "output_tokens": 648,
+        "cache_creation_input_tokens": 1316,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:time": {
+      "kind": "function",
+      "id": "time",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:36:59.290Z",
+      "summary": "Created the reference example for `tabledefinition.time()` at `vendor/wheels/public/docs/reference/tabledefinition/time.txt`. The three examples demonstrate: adding a single time column to a new table, adding multiple time columns at once (using a comma-separated list), and adding a nullable time column with a default to an existing table — mirroring the established pattern of sibling functions like `datetime()`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/time.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 16149,
+        "output_tokens": 836,
+        "cache_creation_input_tokens": 8389,
+        "cache_read_input_tokens": 26420
+      }
+    },
+    "function:timestamp": {
+      "kind": "function",
+      "id": "timestamp",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:37:15.309Z",
+      "summary": "Created the reference example file for `timestamp()` in `vendor/wheels/public/docs/reference/tabledefinition/timestamp.txt`. The file demonstrates four idiomatic usage patterns: adding a single timestamp column, adding multiple columns at once via a comma-separated list, adding a nullable column with a default to an existing table, and overriding the default `columnType` from `datetime` to `timestamp`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/timestamp.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15935,
+        "output_tokens": 856,
+        "cache_creation_input_tokens": 8249,
+        "cache_read_input_tokens": 26312
+      }
+    },
+    "function:timestamps": {
+      "kind": "function",
+      "id": "timestamps",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:37:33.258Z",
+      "summary": "Authored `vendor/wheels/public/docs/reference/tabledefinition/timestamps.txt` with two examples showing how `timestamps()` adds the Wheels convention `createdAt`, `updatedAt`, and `deletedAt` nullable datetime columns to a table definition. No docblock or code changes were needed; the existing hint accurately describes the function.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/timestamps.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 16079,
+        "output_tokens": 838,
+        "cache_creation_input_tokens": 8125,
+        "cache_read_input_tokens": 26177
+      }
+    },
+    "function:uniqueidentifier": {
+      "kind": "function",
+      "id": "uniqueidentifier",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:37:48.684Z",
+      "summary": "Authored the reference example for `uniqueidentifier()` in the tabledefinition scope. Three examples demonstrate: (1) a basic single UUID column with the default `newid()`, (2) a nullable UUID column, and (3) altering an existing table to add multiple UUID columns at once — mirroring the style of other tabledefinition reference files.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/tabledefinition/uniqueidentifier.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15874,
+        "output_tokens": 736,
+        "cache_creation_input_tokens": 8257,
+        "cache_read_input_tokens": 26303
+      }
+    },
+    "function:up": {
+      "kind": "function",
+      "id": "up",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:38:03.901Z",
+      "summary": "Rewrote the `up()` migration reference with three idiomatic examples: creating a new table with columns and timestamps, adding a column to an existing table, and executing raw SQL alongside seeding a record — all using the standard transaction/try/catch/rollback pattern from the framework templates.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/up.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 19200,
+        "output_tokens": 962,
+        "cache_creation_input_tokens": 2070,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:updateRecord": {
+      "kind": "function",
+      "id": "updateRecord",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:38:18.376Z",
+      "summary": "Created the reference example file for `updateRecord` at `vendor/wheels/public/docs/reference/migration/updaterecord.txt` with three idiomatic examples: a basic full-table column update, a targeted update using a `where` clause, and a full migration component showing `up()`/`down()` reversibility using extra keyword arguments as column/value pairs.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/migration/updaterecord.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 17328,
+        "output_tokens": 753,
+        "cache_creation_input_tokens": 8927,
+        "cache_read_input_tokens": 26899
+      }
     }
   },
   "runs": []
