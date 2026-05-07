@@ -1,4 +1,10 @@
-// In `models/User.cfc`, `firstName` and `lastName` cannot be changed through mass assignment operations like `updateAll()`.
-function config(){
+// 1. Protect a comma-delimited list of properties from mass assignment in `models/User.cfc`.
+// `firstName` and `lastName` cannot be changed via `updateAll()`, `new()`, `update()`, etc.
+function config() {
 	protectedProperties("firstName,lastName");
+}
+
+// 2. Using the named argument form to protect sensitive fields like `role` and `isAdmin`
+function config() {
+	protectedProperties(properties="role,isAdmin");
 }

@@ -1,2 +1,8 @@
-// Instruct CFWheels to call the `fixObj` method after an object has been validated.
+// 1. Call a single method after an object is validated
 afterValidation("fixObj");
+
+// 2. Call multiple methods after an object is validated (comma-delimited list)
+afterValidation("sanitizeFields,logValidationResult");
+
+// 3. Use the singular `method` alias for clarity
+afterValidation(method="trimWhitespace");

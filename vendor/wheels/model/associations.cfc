@@ -11,6 +11,7 @@ component {
 	 * @foreignKey Foreign key property name (usually not needed if you follow Wheels conventions since the foreign key name will be deduced from the `name` argument).
 	 * @joinKey Column name to join to if not the primary key (usually not needed if you follow Wheels conventions since the join key will be the table's primary key/keys).
 	 * @joinType Use to set the join type when joining associated tables. Possible values are `inner` (for `INNER JOIN`) and `outer` (for `LEFT OUTER JOIN`).
+	 * @polymorphic Set to `true` to declare a polymorphic `belongsTo` association. The foreign key defaults to `{name}Id` and a `{name}Type` column is used to store the owning model name at runtime.
 	 */
 	public void function belongsTo(
 		required string name,
@@ -56,6 +57,7 @@ component {
 	 * @dependent Defines how to handle dependent model objects when you delete an object from this model. `delete` / `deleteAll` deletes the record(s) (`deleteAll` bypasses object instantiation). `remove` / `removeAll` sets the forein key field(s) to `NULL` (`removeAll` bypasses object instantiation).
 	 * @shortcut Set this argument to create an additional dynamic method that gets the object(s) from the other side of a many-to-many association.
 	 * @through Set this argument if you need to override Wheels conventions when using the `shortcut` argument. Accepts a list of two association names representing the chain from the opposite side of the many-to-many relationship to this model.
+	 * @as Set this argument to declare a polymorphic `hasMany` association. The child model stores the parent type in a `{as}Type` column alongside the foreign key `{as}Id`.
 	 */
 	public void function hasMany(
 		required string name,
@@ -111,6 +113,7 @@ component {
 	 * @joinKey [see:belongsTo].
 	 * @joinType [see:belongsTo].
 	 * @dependent [see:hasMany].
+	 * @as Set this argument to declare a polymorphic `hasOne` association. The child model stores the parent type in a `{as}Type` column alongside the foreign key `{as}Id`.
 	 */
 	public void function hasOne(
 		required string name,

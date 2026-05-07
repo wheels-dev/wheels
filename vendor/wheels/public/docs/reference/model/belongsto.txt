@@ -1,5 +1,13 @@
-// Specify that instances of this model belong to an author. (The table for this model should have a foreign key set on it, typically named `authorid`.)
+// 1. Specify that instances of this model belong to an author.
+// (The table for this model should have a foreign key column, typically named `authorId`.)
 belongsTo("author");
 
-// Same as above, but because we have broken away from the foreign key naming convention, we need to set `modelName` and `foreignKey`.
+// 2. Override naming conventions by specifying `modelName` and `foreignKey` explicitly.
 belongsTo(name="bookWriter", modelName="author", foreignKey="authorId");
+
+// 3. Use a LEFT OUTER JOIN instead of the default INNER JOIN when including this association.
+belongsTo(name="category", joinType="outer");
+
+// 4. Declare a polymorphic belongsTo association (e.g. a Comment that can belong to a Post or a Photo).
+// Wheels will look for `commentableId` and `commentableType` columns on the comments table.
+belongsTo(name="commentable", polymorphic=true);

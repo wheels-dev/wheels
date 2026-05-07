@@ -1,9 +1,37 @@
-function config(){
-	// Register the `check` method below to be called to validate existing objects before they are updated.
-	validateOnUpdate("checkPhoneNumber");
+// 1. Register a single custom validation method to run only on updates
+component extends="Model" {
+	function config() {
+		validateOnUpdate("checkPhoneNumber");
+	}
+
+	private boolean function checkPhoneNumber() {
+		// Make sure area code is 614
+		return Left(this.phoneNumber, 3) == "614";
+	}
 }
 
-function checkPhoneNumber(){
-	// Make sure area code is `614`
-	return Left(this.phoneNumber, 3) == "614";
+// 2. Register multiple custom validation methods for updates
+component extends="Model" {
+	function config() {
+		validateOnUpdate(methods="checkStatus,checkExpiry");
+	}
+
+	private boolean function checkStatus() {
+		return ListFindNoCase("active,pending,suspended", this.status);
+	}
+
+	private boolean function checkExpiry() {
+		return this.expiresAt > Now();
+	}
+}
+
+// 3. Only validate when a condition is met (run only for premium accounts)
+component extends="Model" {
+	function config() {
+		validateOnUpdate(methods="checkBillingAddress", condition="this.accountType eq 'premium'");
+	}
+
+	private boolean function checkBillingAddress() {
+		return Len(Trim(this.billingAddress)) GT 0;
+	}
 }

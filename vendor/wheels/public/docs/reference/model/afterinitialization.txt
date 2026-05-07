@@ -1,2 +1,5 @@
-// Instruct CFWheels to call the `fixObj` method after an object has been initialized (i.e. after creating it or fetching it with a finder method).
+// 1. Call a single method after any object is initialized (whether new or fetched from the database)
 afterInitialization("fixObj");
+
+// 2. Call multiple methods after initialization by passing a comma-delimited list
+afterInitialization("setDefaults,fixObj");

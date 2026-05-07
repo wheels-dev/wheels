@@ -1,2 +1,16 @@
-// Instruct CFWheels to call the `fixObj` method after an object has been updated.
-afterUpdate("fixObj");
+// 1. Register a single method to run after an object is updated
+// In models/User.cfc
+component extends="Model" {
+    function config() {
+        afterUpdate("clearCache");
+    }
+    private function clearCache() {
+        // invalidate cached data for this user
+    }
+}
+
+// 2. Register multiple methods by passing a comma-delimited list
+afterUpdate("clearCache,notifyAuditLog");
+
+// 3. Register using the named `methods` argument
+afterUpdate(methods="syncToSearchIndex");
