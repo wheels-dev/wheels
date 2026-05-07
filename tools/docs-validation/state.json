@@ -7081,6 +7081,212 @@
         "cache_creation_input_tokens": 3323,
         "cache_read_input_tokens": 11742
       }
+    },
+    "guide:basics/associations.mdx": {
+      "kind": "guide",
+      "id": "basics/associations.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:19:46.646Z",
+      "summary": "Annotated the 2 untested blocks (lines 187 and 201) as illustrative by adding descriptive `title=` attributes. Both are \"before\" comparison examples requiring a running app context (model finders, view loops) and are not independently compilable. All 15 compile-tagged blocks continue to pass the harness (15 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/basics/associations.mdx"
+      ],
+      "notes": "2 blocks marked illustrative (title= attribute), 15 compile blocks already passing, 0 prose drift fixes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 11294,
+        "output_tokens": 1099,
+        "cache_creation_input_tokens": 9757,
+        "cache_read_input_tokens": 18124
+      }
+    },
+    "guide:basics/controllers-and-actions.mdx": {
+      "kind": "guide",
+      "id": "basics/controllers-and-actions.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:19:57.766Z",
+      "summary": "All 10 code blocks on the page were already annotated with `{test:compile}` and pass the harness (10 passed, 0 failed). No changes were needed.",
+      "files_changed": [],
+      "notes": "10 blocks tested (compile), 0 illustrative, 0 prose drift fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1269,
+        "output_tokens": 321,
+        "cache_creation_input_tokens": 1019,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/database-and-multiple-datasources.mdx": {
+      "kind": "guide",
+      "id": "basics/database-and-multiple-datasources.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:20:05.908Z",
+      "summary": "All 10 code blocks were already annotated with `{test:compile}` and all 10 pass the verify-docs harness. No changes needed.",
+      "files_changed": [],
+      "notes": "10 tested (compile), 0 illustrative, 0 prose drift fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1177,
+        "output_tokens": 313,
+        "cache_creation_input_tokens": 920,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/forms-and-form-helpers.mdx": {
+      "kind": "guide",
+      "id": "basics/forms-and-form-helpers.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:20:16.120Z",
+      "summary": "All 5 blocks on this page were already correctly annotated: 4 CFML blocks tagged `{test:compile}` (all passing), and 1 HTML rendered-output block marked illustrative. No changes needed; harness reports 4 passed, 0 failed.",
+      "files_changed": [],
+      "notes": "4 blocks tested (compile), 1 illustrative (HTML rendered output), 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1018,
+        "output_tokens": 392,
+        "cache_creation_input_tokens": 810,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/index.mdx": {
+      "kind": "guide",
+      "id": "basics/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:20:19.583Z",
+      "summary": "The basics/index.mdx page is a section index with no code blocks. No annotations, prose fixes, or validation steps were needed.",
+      "files_changed": [],
+      "notes": "0 code blocks total; 0 tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 580,
+        "output_tokens": 158,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:basics/migrations.mdx": {
+      "kind": "guide",
+      "id": "basics/migrations.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:20:35.296Z",
+      "summary": "All 10 code blocks on this page were already correctly annotated: 9 tested (1 cli + 8 compile) and 1 illustrative. The verify-docs harness confirmed 9 passed, 0 failed — no changes were needed.",
+      "files_changed": [],
+      "notes": "9 blocks tested, 1 illustrative (bash block with title=\"your shell\"), 0 CFC docblock fixes, 0 prose drift corrections. Harness output: 9 passed, 0 failed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1152,
+        "output_tokens": 369,
+        "cache_creation_input_tokens": 912,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/models-and-the-orm.mdx": {
+      "kind": "guide",
+      "id": "basics/models-and-the-orm.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:20:44.036Z",
+      "summary": "All 8 code blocks on this page were already annotated with `{test:compile}` and all 8 pass the verify-docs harness with no failures. No prose drift or docblock fixes were needed.",
+      "files_changed": [],
+      "notes": "8 blocks tested (compile), 0 illustrative, 0 CFC docblock fixes, 0 prose drift corrections.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1112,
+        "output_tokens": 330,
+        "cache_creation_input_tokens": 861,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/query-builder-and-scopes.mdx": {
+      "kind": "guide",
+      "id": "basics/query-builder-and-scopes.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:20:52.027Z",
+      "summary": "All 11 code blocks on the page were already annotated with `{test:compile}` and all 11 pass the verify-docs harness with no failures. No changes were needed.",
+      "files_changed": [],
+      "notes": "11 tested (compile), 0 illustrative, 0 CFC docblock fixes, 0 prose drift corrections.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1190,
+        "output_tokens": 313,
+        "cache_creation_input_tokens": 951,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/routing.mdx": {
+      "kind": "guide",
+      "id": "basics/routing.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:21:02.224Z",
+      "summary": "All 7 code blocks on the Routing page were already annotated and tested (6 compile, 1 cli). The harness confirmed 7 passed, 0 failed — no changes needed.",
+      "files_changed": [],
+      "notes": "Page was fully annotated prior to this run. No prose drift or missing annotations found.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 308,
+        "cache_creation_input_tokens": 818,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/seeding.mdx": {
+      "kind": "guide",
+      "id": "basics/seeding.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:21:11.747Z",
+      "summary": "All 4 code blocks were already correctly annotated (3 compile, 1 cli). The harness confirms 4 passed, 0 failed — no changes needed.",
+      "files_changed": [],
+      "notes": "No prose drift or annotation fixes required. Page is fully validated as-is.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 963,
+        "output_tokens": 281,
+        "cache_creation_input_tokens": 729,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/validation-and-errors.mdx": {
+      "kind": "guide",
+      "id": "basics/validation-and-errors.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:21:20.613Z",
+      "summary": "All 7 code blocks were already annotated with `{test:compile}` and the harness confirms 7 passed, 0 failed. No changes were needed.",
+      "files_changed": [],
+      "notes": "No prose drift or untested blocks found. Page is fully validated as-is.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 307,
+        "cache_creation_input_tokens": 821,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:basics/views-layouts-partials.mdx": {
+      "kind": "guide",
+      "id": "basics/views-layouts-partials.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:21:29.371Z",
+      "summary": "All 6 code blocks were already annotated with `{test:compile}` and passed the harness with no failures. No prose drift or annotation changes were required.",
+      "files_changed": [],
+      "notes": "6 tested (compile), 0 illustrative, 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1130,
+        "output_tokens": 326,
+        "cache_creation_input_tokens": 878,
+        "cache_read_input_tokens": 5518
+      }
     }
   },
   "runs": []
