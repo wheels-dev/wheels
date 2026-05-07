@@ -61,7 +61,7 @@ See [Migrating from Kamal](/v4-0-0-snapshot/deployment/migrating-from-kamal/) fo
 
 Ruby Kamal allows ERB inside `deploy.yml`:
 
-```yaml
+```yaml title="Ruby Kamal ERB (NOT supported in wheels deploy)"
 # Ruby Kamal — NOT SUPPORTED in wheels deploy
 service: <%= ENV["APP_NAME"] %>
 image: <%= ENV["REGISTRY"] %>/<%= ENV["APP_NAME"] %>
@@ -71,7 +71,7 @@ ERB is a Ruby template language — it executes arbitrary Ruby at render time. T
 
 What `wheels deploy` keeps unchanged is Kamal's other built-in interpolation: `${UPPER_SNAKE}` env-var tokens. Most ERB-using configs convert mechanically by dropping the `<%= ENV["..."] %>` wrapper:
 
-```yaml
+```yaml title="${VAR} interpolation (supported)"
 service: ${APP_NAME}
 image: ${REGISTRY}/${APP_NAME}
 ```
@@ -97,7 +97,7 @@ The `cli/lucli/services/deploy/lib/Mustache.cfc` wrapper is a thin facade over j
 
 The most important structural property of the codebase: **every method on a `*Commands.cfc` component returns a plain string containing a shell command. Only the CLI layer and the orchestrator actually execute those strings.**
 
-```cfm
+```cfm {test:compile}
 // cli/lucli/services/deploy/commands/AppCommands.cfc
 public string function boot(required struct role, required string version) {
     return "docker run -d --name #role.containerName# --network kamal #role.image#:#version#";
@@ -108,7 +108,7 @@ The `AppCli.cfc` or orchestrator is what runs `boot()` and passes the returned s
 
 This invariant is why `--dry-run` is trivial — instead of swapping out the SSH transport, `--dry-run` just prints the strings. It's also why the unit test suite runs completely offline: a `FakeSshPool` records every command string without opening a socket, and assertions check the recorded strings against expected values. No Docker, no sshd, no network required for the commands-layer suite.
 
-```bash
+```bash title="--dry-run prints commands without opening SSH connections"
 wheels deploy --dry-run          # any verb, no SSH connections opened
 wheels deploy rollback v1 --dry-run
 wheels deploy app boot --dry-run
@@ -116,7 +116,7 @@ wheels deploy app boot --dry-run
 
 ## Code layout
 
-```
+```title="Code layout"
 cli/lucli/services/deploy/
 ├── cli/*.cfc           # User-facing CLI entry points (DeployMainCli, DeployAppCli, ...)
 ├── commands/*.cfc      # Pure string-returning command builders (AppCommands, ProxyCommands, ...)
