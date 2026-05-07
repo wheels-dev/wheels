@@ -1,0 +1,28 @@
+// 1. Inspect all enum definitions on the Order model
+info = model("Order").enumInfo();
+// info -> {
+//   status: {
+//     property: "status",
+//     names: "draft,published,archived",
+//     values: {draft: "draft", published: "published", archived: "archived"}
+//   }
+// }
+
+// 2. List all enum-mapped properties
+info = model("Order").enumInfo();
+for (propName in info) {
+    writeOutput(propName & ": " & info[propName].names);
+}
+// status: draft,published,archived
+// priority: low,medium,high
+
+// 3. Use enum metadata to build a select list for a form
+info = model("Order").enumInfo();
+statusEnum = info["status"];
+for (enumName in listToArray(statusEnum.names)) {
+    storedValue = statusEnum.values[enumName];
+    writeOutput(enumName & " -> " & storedValue);
+}
+// draft -> draft
+// published -> published
+// archived -> archived

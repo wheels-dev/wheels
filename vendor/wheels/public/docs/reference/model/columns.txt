@@ -1,0 +1,15 @@
+// 1. Get all column names for the User model
+cols = model("User").columns();
+// cols -> ["id", "firstName", "lastName", "email", "createdAt", "updatedAt", "deletedAt"]
+
+// 2. Check whether a specific column exists in the table
+cols = model("User").columns();
+if (arrayFindNoCase(cols, "deletedAt")) {
+    writeOutput("Soft-delete column is present");
+}
+
+// 3. Iterate over all columns and output their names
+cols = model("User").columns();
+for (col in cols) {
+    writeOutput(col);
+}

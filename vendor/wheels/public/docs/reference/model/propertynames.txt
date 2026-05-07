@@ -1,2 +1,15 @@
-// Get a list of the property names in use in the user model
-propNames = model("user").propertyNames();
+// 1. Get a comma-delimited list of all property names for the User model
+propNames = model("User").propertyNames();
+// propNames -> "id,firstName,lastName,email,createdAt,updatedAt"
+
+// 2. Check whether a specific property exists on the model before accessing it
+propNames = model("User").propertyNames();
+if (listFindNoCase(propNames, "email")) {
+    writeOutput("email is a valid property");
+}
+
+// 3. Property names include calculated properties defined with property(sql="...")
+// In User.cfc config():
+//   property(name="fullName", sql="firstName || ' ' || lastName");
+propNames = model("User").propertyNames();
+// propNames -> "id,firstName,lastName,email,createdAt,updatedAt,fullName"

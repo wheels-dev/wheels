@@ -1,0 +1,28 @@
+// 1. Prevent duplicate processing of a background job
+model("Job").withAdvisoryLock(name="process-nightly-report", callback=function() {
+    job = model("Job").findOneByNameAndStatus(name="nightly-report", status="pending");
+    if (isObject(job)) {
+        job.process();
+    }
+});
+
+// 2. Serialize access to a shared external resource with a custom timeout
+result = model("Payment").withAdvisoryLock(
+    name="payment-gateway-sync",
+    timeout=30,
+    callback=function() {
+        return model("Payment").syncWithGateway();
+    }
+);
+
+// 3. Ensure only one instance assigns the next batch of records
+model("Task").withAdvisoryLock(name="task-batch-assignment", callback=function() {
+    tasks = model("Task").findAll(
+        conditions="assignedTo IS NULL",
+        maxRows=10,
+        returnAs="objects"
+    );
+    for (task in tasks) {
+        task.update(assignedTo=getCurrentWorkerID());
+    }
+});

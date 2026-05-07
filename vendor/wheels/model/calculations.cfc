@@ -86,7 +86,6 @@ component {
 	 *
 	 * @where [see:findAll].
 	 * @include [see:findAll].
-	 * @reload [see:findAll].
 	 * @parameterize [see:findAll].
 	 * @includeSoftDeletes [see:findAll].
 	 * @group [see:findAll].

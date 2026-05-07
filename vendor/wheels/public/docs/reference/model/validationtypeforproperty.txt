@@ -1,5 +1,15 @@
-// first name is a varchar(50) column
-employee = model("employee").new();
+// 1. Get the validation type for a string column (e.g. firstName is varchar)
+type = model("Employee").validationTypeForProperty("firstName");
+// type -> "string"
 
-<!--- would output "string"--->
-#employee.validationTypeForProperty("firstName")#
+// 2. Get the validation type for a numeric column (e.g. salary is integer)
+type = model("Employee").validationTypeForProperty("salary");
+// type -> "numeric"
+
+// 3. Get the validation type for a date column (e.g. hireDate is a date/datetime column)
+type = model("Employee").validationTypeForProperty("hireDate");
+// type -> "date"
+
+// 4. Property does not exist on the model — returns "string" as the default
+type = model("Employee").validationTypeForProperty("nonExistentProperty");
+// type -> "string"

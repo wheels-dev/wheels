@@ -1,12 +1,27 @@
-// Create a new author and save it to the database
+// 1. Create a new author and save it to the database
 newAuthor = model("author").create(params.author);
 
-// Same as above using named arguments
+// 2. Create using named arguments
 newAuthor = model("author").create(firstName="John", lastName="Doe");
 
-// Same as above using both named arguments and a struct
+// 3. Merge named arguments with a properties struct
 newAuthor = model("author").create(active=1, properties=params.author);
 
-// If you have a `hasOne` or `hasMany` association setup from `customer` to `order`, you can do a scoped call. (The `createOrder` method below will call `model("order").create(customerId=aCustomer.id, shipping=params.shipping)` internally.)
+// 4. Skip validation when creating (e.g. for seeding trusted data)
+newAuthor = model("author").create(properties=params.author, validate=false);
+
+// 5. Create inside a transaction that is rolled back (useful for dry-run testing)
+newAuthor = model("author").create(properties=params.author, transaction="rollback");
+
+// 6. Allow explicit createdAt / updatedAt values when importing legacy data
+newAuthor = model("author").create(
+	firstName="Jane",
+	lastName="Smith",
+	createdAt="2020-01-15 08:00:00",
+	allowExplicitTimestamps=true
+);
+
+// 7. Scoped create via a hasOne / hasMany association
+// (calls model("order").create(customerId=aCustomer.id, shipping=params.shipping) internally)
 aCustomer = model("customer").findByKey(params.customerId);
 anOrder = aCustomer.createOrder(shipping=params.shipping);

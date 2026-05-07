@@ -1,0 +1,13 @@
+// 1. Get the list of column names for the User model
+cols = model("User").columnNames();
+// cols -> "id,firstName,lastName,email,createdAt,updatedAt,deletedAt"
+
+// 2. Check whether a specific column exists in the table
+if (listFindNoCase(model("User").columnNames(), "email")) {
+    writeOutput("The users table has an email column.");
+}
+
+// 3. Iterate over every column name
+for (col in listToArray(model("User").columnNames())) {
+    writeOutput(col);
+}
