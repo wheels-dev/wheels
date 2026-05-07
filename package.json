@@ -10,7 +10,7 @@
     "issue-resolver:run": "tsx tools/issue-resolver/run.ts"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.88.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
     "@playwright/test": "^1.58.2",
