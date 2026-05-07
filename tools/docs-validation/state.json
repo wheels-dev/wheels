@@ -6875,6 +6875,59 @@
         "cache_creation_input_tokens": 2372,
         "cache_read_input_tokens": 10821
       }
+    },
+    "guide:upgrading/2x-to-3x.mdx": {
+      "kind": "guide",
+      "id": "upgrading/2x-to-3x.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:16:09.351Z",
+      "summary": "No code blocks present on this page — it is a pure prose pointer to the frozen v3.0 guides. Nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 614,
+        "output_tokens": 190,
+        "cache_creation_input_tokens": 2759,
+        "cache_read_input_tokens": 0
+      }
+    },
+    "guide:upgrading/3x-to-4x.mdx": {
+      "kind": "guide",
+      "id": "upgrading/3x-to-4x.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:16:28.481Z",
+      "summary": "Annotated the one untested non-illustrative block (#10, the `wheels-auditlog/` directory tree listing at line 206) as `txt title=\"package layout\"` to mark it illustrative and exclude it from the harness. All 9 compile-tested blocks continue to pass (9 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/upgrading/3x-to-4x.mdx"
+      ],
+      "notes": "9 blocks tested (compile), 7 illustrative (bash shell commands + JSON manifest + txt directory layout). No prose drift found. No CFC docblock fixes needed.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 13998,
+        "output_tokens": 836,
+        "cache_creation_input_tokens": 8431,
+        "cache_read_input_tokens": 12353
+      }
+    },
+    "guide:upgrading/index.mdx": {
+      "kind": "guide",
+      "id": "upgrading/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:16:35.771Z",
+      "summary": "Page has 0 code blocks — nothing to annotate or validate. Prose was reviewed and is consistent with the current framework state; no drift found.",
+      "files_changed": [],
+      "notes": "Pure prose/navigation section page. 0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1981,
+        "output_tokens": 366,
+        "cache_creation_input_tokens": 610,
+        "cache_read_input_tokens": 5518
+      }
     }
   },
   "runs": []
