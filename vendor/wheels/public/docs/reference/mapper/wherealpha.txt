@@ -1,0 +1,22 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a single route variable to alphabetic characters only
+    //    The [locale] segment will only match values like "en", "fr", "de"
+    .get(name="localizedHome", pattern="[locale]/home", to="home##index")
+    .whereAlpha("locale")
+
+    // 2. Constrain multiple variables at once using a comma-delimited list
+    //    Both [lang] and [region] must contain only a-z / A-Z characters
+    .get(name="localizedPage", pattern="[lang]/[region]/[action]", to="pages##show")
+    .whereAlpha("lang,region")
+
+    // 3. Chain with other constraint helpers for mixed-type route variables
+    //    [category] must be alphabetic; [id] must be numeric
+    .resources(name="articles")
+    .get(name="articleByCategory", pattern="articles/[category]/[id]", to="articles##byCategory")
+    .whereAlpha("category")
+    .whereNumber("id")
+.end();
+
+</cfscript>

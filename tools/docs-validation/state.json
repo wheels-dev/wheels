@@ -1884,6 +1884,633 @@
         "cache_creation_input_tokens": 1336,
         "cache_read_input_tokens": 9798
       }
+    },
+    "function:addFormat": {
+      "kind": "function",
+      "id": "addFormat",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:18:40.522Z",
+      "summary": "Verified the `addFormat` function in `vendor/wheels/Global.cfc` — the docblock, hint, and parameters all match the snapshot exactly. Updated the reference file with three numbered examples covering `js`, PowerPoint (`ppt`/`pptx`), and `csv` formats.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/addformat.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126197,
+        "output_tokens": 648,
+        "cache_creation_input_tokens": 5277,
+        "cache_read_input_tokens": 15979
+      }
+    },
+    "function:api": {
+      "kind": "function",
+      "id": "api",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:18:56.971Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/api.txt` with four examples demonstrating basic API scoping, combining `api()` with `version()` for versioned endpoints, overriding path/name prefixes, and using the callback form to avoid manual `.end()` calls. No docblock or body changes were needed — the source matched the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/api.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 11052,
+        "output_tokens": 938,
+        "cache_creation_input_tokens": 5876,
+        "cache_read_input_tokens": 23906
+      }
+    },
+    "function:collection": {
+      "kind": "function",
+      "id": "collection",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:19:12.695Z",
+      "summary": "Updated the `collection.txt` reference example with two numbered examples: one showing a GET search route on a photos collection, and one showing multiple collection routes (GET featured + POST bulkDelete) on articles. The docblock in the CFC matches the documented hint with no drift.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/collection.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 9715,
+        "output_tokens": 755,
+        "cache_creation_input_tokens": 5273,
+        "cache_read_input_tokens": 23358
+      }
+    },
+    "function:constraints": {
+      "kind": "function",
+      "id": "constraints",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:19:29.016Z",
+      "summary": "Authored `vendor/wheels/public/docs/reference/mapper/constraints.txt` with two examples showing how `constraints()` restricts dynamic route segments via regex patterns (digits-only id, and multiple constraints for id + slug).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/constraints.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 8478,
+        "output_tokens": 659,
+        "cache_creation_input_tokens": 4475,
+        "cache_read_input_tokens": 22517
+      }
+    },
+    "function:end": {
+      "kind": "function",
+      "id": "end",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:19:42.771Z",
+      "summary": "The existing reference example for `mapper.end` was already correct and idiomatic. The docblock in the CFC matches the documented hint exactly, so no edits were needed. The reference file was confirmed and written as-is.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/end.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 4030,
+        "output_tokens": 564,
+        "cache_creation_input_tokens": 1306,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:env": {
+      "kind": "function",
+      "id": "env",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:19:57.230Z",
+      "summary": "Authored a new reference example for `env()` in `vendor/wheels/public/docs/reference/controller/env.txt` with three idiomatic examples: reading a required variable, using a default fallback, and guarding startup on a missing secret. No docblock changes were needed — the source docblock matches the documented hint exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/env.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 125994,
+        "output_tokens": 596,
+        "cache_creation_input_tokens": 1346,
+        "cache_read_input_tokens": 15112
+      }
+    },
+    "function:get": {
+      "kind": "function",
+      "id": "get",
+      "status": "done",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T04:20:35.278Z",
+      "summary": "Updated the `mapper/get.txt` reference file to add numbered comment headings (per style guide) and a new example demonstrating the `redirect` parameter, which was documented but missing from the original examples. All existing usage patterns (slug routing, controller+action, custom patterns, package namespacing, nested resource member/collection routes) are preserved.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/get.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 24061,
+        "output_tokens": 1112,
+        "cache_creation_input_tokens": 2916,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:group": {
+      "kind": "function",
+      "id": "group",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:20:49.748Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/group.txt` with four idiomatic examples covering: basic path-prefix grouping, combined path+name prefix, regex constraints, and callback-style auto-closing groups. No docblock or code changes were needed; the source and documented hint are already in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/group.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8740,
+        "output_tokens": 842,
+        "cache_creation_input_tokens": 1448,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:health": {
+      "kind": "function",
+      "id": "health",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:21:06.396Z",
+      "summary": "Created vendor/wheels/public/docs/reference/mapper/health.txt with three examples: default usage at /health, overriding the path and route name, and delegating to a custom controller action. No docblock or code changes were needed — the implementation matches the documented parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/health.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 22291,
+        "output_tokens": 681,
+        "cache_creation_input_tokens": 11738,
+        "cache_read_input_tokens": 29756
+      }
+    },
+    "function:mapper": {
+      "kind": "function",
+      "id": "mapper",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:21:30.806Z",
+      "summary": "Rewrote the mapper() reference example with three numbered examples: typical config/routes.cfm usage with namespace/resources/singular-resource/custom-named-routes/root, a `mapFormat=false` example, and a wildcard catch-all example. The docblock in Global.cfc already matched the documented parameters, so no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/mapper.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 128052,
+        "output_tokens": 1037,
+        "cache_creation_input_tokens": 64913,
+        "cache_read_input_tokens": 92513
+      }
+    },
+    "function:member": {
+      "kind": "function",
+      "id": "member",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:21:43.194Z",
+      "summary": "Updated the `member()` reference example to use numbered comment headings and added a second example demonstrating multiple member routes, matching the style of the adjacent `collection.txt` reference file. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/member.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 9904,
+        "output_tokens": 664,
+        "cache_creation_input_tokens": 5424,
+        "cache_read_input_tokens": 15110
+      }
+    },
+    "function:namespace": {
+      "kind": "function",
+      "id": "namespace",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:22:00.459Z",
+      "summary": "Wrote the reference example for `mapper.namespace`, keeping the existing well-structured example and adding a clarifying comment explaining how `path` and `package` override the defaults derived from `name`. The docblock in the CFC matches the documented hint and parameters exactly (no edits needed).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/namespace.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8111,
+        "output_tokens": 809,
+        "cache_creation_input_tokens": 1718,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:package": {
+      "kind": "function",
+      "id": "package",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:22:26.504Z",
+      "summary": "Updated the reference example for `mapper.package()` with three numbered examples: basic subfolder scoping without URL modification, overriding the subfolder name via the `package` argument, and nesting a `package` scope inside a resource to organize sub-resource controllers. The examples clearly demonstrate the key distinction from `namespace()` — no URL prefix is added.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/package.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 10842,
+        "output_tokens": 1378,
+        "cache_creation_input_tokens": 6010,
+        "cache_read_input_tokens": 40123
+      }
+    },
+    "function:patch": {
+      "kind": "function",
+      "id": "patch",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:22:44.269Z",
+      "summary": "The existing reference example was comprehensive and matched the docblock exactly. Updated the reference file to add a `redirect` parameter example (previously undocumented in the example) while preserving all existing examples. The docblock and function signature are already in sync — no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/patch.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 22656,
+        "output_tokens": 987,
+        "cache_creation_input_tokens": 2840,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:post": {
+      "kind": "function",
+      "id": "post",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:23:04.482Z",
+      "summary": "Updated the `mapper/post.txt` reference example to add a `redirect` example (parameter #6) that was documented but previously undemonstrated, renumbered headings for clarity, and preserved all existing well-structured examples. The docblock in the CFC is consistent with the documented hint and parameters — no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/post.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 22760,
+        "output_tokens": 1119,
+        "cache_creation_input_tokens": 2822,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:put": {
+      "kind": "function",
+      "id": "put",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:23:25.021Z",
+      "summary": "Updated the `put` mapper reference example to add a `redirect` parameter demo (example 6) and renumbered all headings with descriptive comments, while preserving all existing examples. The docblock in the source CFC is already in sync with the documented hint and parameters — no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/put.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 22845,
+        "output_tokens": 1143,
+        "cache_creation_input_tokens": 2916,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:registerOnError": {
+      "kind": "function",
+      "id": "registerOnError",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:23:50.140Z",
+      "summary": "Created the reference example file `vendor/wheels/public/docs/reference/controller/registeronerror.txt` with three idiomatic examples demonstrating: (1) basic error logging via `writeLog`, (2) multiple callbacks registered in order including one storing error state in application scope, and (3) a note on keeping callbacks fast with the isolation guarantee.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/registeronerror.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 128535,
+        "output_tokens": 1440,
+        "cache_creation_input_tokens": 64518,
+        "cache_read_input_tokens": 24979
+      }
+    },
+    "function:resource": {
+      "kind": "function",
+      "id": "resource",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:24:07.421Z",
+      "summary": "Updated the `resource` mapper reference example to fix an invalid `only=\"index\"` action (singular resources don't support `index`; that's only for plural `resources()`), improved the `controller` path format to use `/` separator consistent with Wheels conventions, and added clearer numbered headings for each example scenario.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/resource.txt"
+      ],
+      "notes": "The original example used `only=\"index\"` on a singular resource, but `index` is not a valid action for singular resources (valid actions are: show, new, create, edit, update, delete). Also changed `controller=\"sessions.auth\"` to `controller=\"sessions/auth\"` to match Wheels' subdirectory controller path convention.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10695,
+        "output_tokens": 982,
+        "cache_creation_input_tokens": 2724,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:resources": {
+      "kind": "function",
+      "id": "resources",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:24:23.397Z",
+      "summary": "Updated the `resources` reference example to expand coverage from 6 examples to 9, adding demonstrations of `shallow` nesting, `constraints`, and `singular` override — all parameters documented but previously absent from the reference. The existing examples were preserved and renumbered with consistent numbered comment headings.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/resources.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10546,
+        "output_tokens": 880,
+        "cache_creation_input_tokens": 2580,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:root": {
+      "kind": "function",
+      "id": "root",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:24:37.993Z",
+      "summary": "Rewrote the `root` reference example with three numbered examples covering: (1) basic web root mapping with `to`, (2) namespace-scoped root using separate `controller`/`action` arguments, and (3) namespace root with `mapFormat=true` to capture format extensions. The docblock already correctly documents all parameters including `controller` and `action`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/root.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 21676,
+        "output_tokens": 689,
+        "cache_creation_input_tokens": 1500,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:scope": {
+      "kind": "function",
+      "id": "scope",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:24:51.889Z",
+      "summary": "Updated the reference example for `mapper.scope` to add two new examples demonstrating the `name` prefix and `constraints` parameters, while preserving and reformatting the three existing examples with numbered comment headings. The docblock in the CFC is accurate and needed no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/scope.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8926,
+        "output_tokens": 854,
+        "cache_creation_input_tokens": 1930,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:set": {
+      "kind": "function",
+      "id": "set",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:25:13.831Z",
+      "summary": "Rewrote the reference file for `set()` with numbered comment headings, fixing the trailing `:` typo on the old example 3, and adding a 4th example showing how to apply defaults to multiple helper functions at once using a comma-delimited `functionName` list (supported by `$set()` internals).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/set.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 128249,
+        "output_tokens": 976,
+        "cache_creation_input_tokens": 64707,
+        "cache_read_input_tokens": 20280
+      }
+    },
+    "function:switchTenant": {
+      "kind": "function",
+      "id": "switchTenant",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:25:29.091Z",
+      "summary": "Created the reference example file for `switchTenant` at `vendor/wheels/public/docs/reference/controller/switchtenant.txt` with three idiomatic examples: basic data-source-only switch, full tenant struct with id and config, and force-switching past a TenantResolver lock.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/switchtenant.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 127037,
+        "output_tokens": 728,
+        "cache_creation_input_tokens": 2012,
+        "cache_read_input_tokens": 19573
+      }
+    },
+    "function:tenant": {
+      "kind": "function",
+      "id": "tenant",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:25:47.047Z",
+      "summary": "Created the reference example file for `tenant()` at `vendor/wheels/public/docs/reference/controller/tenant.txt` with three idiomatic examples: basic retrieval, checking if a tenant is active, and accessing per-tenant config values. No docblock or code changes were needed — the source and documented hint were consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/tenant.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 126621,
+        "output_tokens": 771,
+        "cache_creation_input_tokens": 63677,
+        "cache_read_input_tokens": 19352
+      }
+    },
+    "function:version": {
+      "kind": "function",
+      "id": "version",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:25:58.762Z",
+      "summary": "Created the reference example file for `mapper.version` at `vendor/wheels/public/docs/reference/mapper/version.txt`. The file demonstrates three examples: basic versioned API routing with `api()` + `version()`, using a callback for nested route definitions, and overriding the default path/name prefixes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/version.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8736,
+        "output_tokens": 724,
+        "cache_creation_input_tokens": 1364,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:whereAlpha": {
+      "kind": "function",
+      "id": "whereAlpha",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:26:18.244Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/wherealpha.txt` with three examples demonstrating: (1) constraining a single route variable to alphabetic characters, (2) constraining multiple variables via a comma-delimited list, and (3) chaining with `whereNumber` for mixed-type constraints. No docblock or code changes were needed — the source and documentation are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/wherealpha.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 22420,
+        "output_tokens": 809,
+        "cache_creation_input_tokens": 11595,
+        "cache_read_input_tokens": 29602
+      }
+    },
+    "function:whereAlphaNumeric": {
+      "kind": "function",
+      "id": "whereAlphaNumeric",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:26:34.243Z",
+      "summary": "Created the reference example for `whereAlphaNumeric()` at `vendor/wheels/public/docs/reference/mapper/wherealphanumeric.txt`. Three examples demonstrate: constraining a single variable, constraining multiple comma-delimited variables at once, and chaining after a `resources()` block. No docblock changes were needed — the existing hint and `@variableName` param are accurate.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/wherealphanumeric.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 22583,
+        "output_tokens": 765,
+        "cache_creation_input_tokens": 11733,
+        "cache_read_input_tokens": 29733
+      }
+    },
+    "function:whereIn": {
+      "kind": "function",
+      "id": "whereIn",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:26:56.540Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/wherein.txt` with three idiomatic examples showing how to constrain route variables to a fixed set of allowed values using `whereIn()`, including chaining with other constraint helpers like `whereNumber()`.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/wherein.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 23465,
+        "output_tokens": 947,
+        "cache_creation_input_tokens": 12043,
+        "cache_read_input_tokens": 59388
+      }
+    },
+    "function:whereMatch": {
+      "kind": "function",
+      "id": "whereMatch",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:27:10.777Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/wherematch.txt` with three idiomatic examples demonstrating `whereMatch()`: constraining a year placeholder to a 4-digit pattern, a slug to lowercase-alphanumeric-hyphen, and a product key to a SKU format after a `resources()` call. No docblock changes were needed — the source docblock and snapshot parameters are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/wherematch.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 22583,
+        "output_tokens": 678,
+        "cache_creation_input_tokens": 1126,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:whereNumber": {
+      "kind": "function",
+      "id": "whereNumber",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:27:24.361Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/wherenumber.txt` with three idiomatic examples demonstrating single-variable constraint, comma-delimited multi-variable constraint, and chaining with `whereAlpha()`. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/wherenumber.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 22733,
+        "output_tokens": 744,
+        "cache_creation_input_tokens": 11634,
+        "cache_read_input_tokens": 29606
+      }
+    },
+    "function:whereSlug": {
+      "kind": "function",
+      "id": "whereSlug",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:27:44.905Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/whereslug.txt` with three examples demonstrating: constraining a single slug variable, chaining after a resources route, and constraining multiple slug variables via a comma-delimited list. The docblock in the source was already consistent with the documented hint and parameters — no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/whereslug.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 22550,
+        "output_tokens": 746,
+        "cache_creation_input_tokens": 11682,
+        "cache_read_input_tokens": 29688
+      }
+    },
+    "function:whereUuid": {
+      "kind": "function",
+      "id": "whereUuid",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:27:58.816Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/mapper/whereuuid.txt` with three idiomatic examples showing single-variable UUID constraint, comma-delimited multi-variable constraint, and chaining with other `where*` helpers. The docblock and parameters were already accurate; no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/whereuuid.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 22717,
+        "output_tokens": 780,
+        "cache_creation_input_tokens": 11602,
+        "cache_read_input_tokens": 29558
+      }
+    },
+    "function:wildcard": {
+      "kind": "function",
+      "id": "wildcard",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:28:16.217Z",
+      "summary": "Rewrote the `wildcard` reference example with five numbered scenarios covering the basic case, `mapKey`, `mapFormat`, a custom `action` default, and multiple HTTP methods. The existing example used `methods=` (the alias) for the last case; updated to use the canonical `method=` parameter name while keeping the same intent. No CFC changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/mapper/wildcard.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 21967,
+        "output_tokens": 812,
+        "cache_creation_input_tokens": 1864,
+        "cache_read_input_tokens": 10821
+      }
     }
   },
   "runs": []

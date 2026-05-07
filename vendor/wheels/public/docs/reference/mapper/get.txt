@@ -1,30 +1,35 @@
 <cfscript>
 
 mapper()
+    // 1. Basic GET route using the `to` shorthand (controller##action)
     // Route name:  post
     // Example URL: /posts/my-post-title
     // Controller:  Posts
     // Action:      show
     .get(name="post", pattern="posts/[slug]", to="posts##show")
 
+    // 2. Route using separate `controller` and `action` arguments
     // Route name:  posts
     // Example URL: /posts
     // Controller:  Posts
     // Action:      index
     .get(name="posts", controller="posts", action="index")
 
+    // 3. Custom URL pattern that differs from the route name
     // Route name:  authors
     // Example URL: /the-scribes
     // Controller:  Authors
     // Action:      index
     .get(name="authors", pattern="the-scribes", to="authors##index")
 
+    // 4. Package (subfolder) scoping — keeps the package out of the URL
     // Route name:  commerceCart
     // Example URL: /cart
     // Controller:  commerce.Carts
     // Action:      show
     .get(name="cart", to="carts##show", package="commerce")
 
+    // 5. Multi-line format for readability, with package scoping
     // Route name:  extranetEditProfile
     // Example URL: /profile/edit
     // Controller:  extranet.Profiles
@@ -36,7 +41,11 @@ mapper()
         package="extranet"
     )
 
-    // Example scoping within a nested resource
+    // 6. Permanent redirect — useful for renamed or moved URLs
+    // Example URL: /old-about  ->  302 redirect to /about
+    .get(name="oldAbout", pattern="old-about", redirect="/about")
+
+    // 7. GET routes scoped inside a nested resource
     .resources(name="users", nested=true)
         // Route name:  activatedUsers
         // Example URL: /users/activated
@@ -44,7 +53,7 @@ mapper()
         // Action:      activated
         .get(name="activated", to="users##activated", on="collection")
 
-        // Route name:  preferencesUsers
+        // Route name:  preferencesUser
         // Example URL: /users/391/preferences
         // Controller:  Preferences
         // Action:      index

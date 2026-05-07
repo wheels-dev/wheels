@@ -1,8 +1,11 @@
 <cfscript>
 
+// 1. Typical usage in config/routes.cfm — namespaced admin resources, a singular
+//    resource, custom named routes, and a root route
 mapper()
     .namespace("admin")
         .resources("users")
+        .resources("posts")
     .end()
 
     .resource("profile")
@@ -10,6 +13,21 @@ mapper()
     .get(name="login", to="sessions##new")
     .post(name="auth", to="sessions##create")
     .delete(name="logout", to="sessions##delete")
+
+    .root(to="home##index")
+.end();
+
+// 2. Disable automatic .[format] URL generation for all resource-based routes
+//    (useful when you do not want /users.json, /users.xml, etc.)
+mapper(mapFormat=false)
+    .resources("users")
+    .resources("posts")
+.end();
+
+// 3. Wildcard catch-all route appended after all other route definitions
+mapper()
+    .resources("articles")
+    .wildcard(controller="pages")
 .end();
 
 </cfscript>

@@ -1,0 +1,49 @@
+<cfscript>
+
+// 1. Basic API scope using the default path and name prefix "api"
+mapper()
+    .api()
+        // Route name:  apiUsers
+        // Example URL: /api/users
+        .resources("users")
+    .end()
+.end();
+
+// 2. Combine api() with version() for versioned API endpoints
+mapper()
+    .api()
+        .version(1)
+            // Route name:  apiV1Users
+            // Example URL: /api/v1/users
+            .resources("users")
+        .end()
+
+        .version(2)
+            // Route name:  apiV2Products
+            // Example URL: /api/v2/products
+            .resources("products")
+        .end()
+    .end()
+.end();
+
+// 3. Override the default path and name prefixes
+mapper()
+    .api(path="public-api", name="publicApi")
+        // Route name:  publicApiOrders
+        // Example URL: /public-api/orders
+        .resources("orders")
+    .end()
+.end();
+
+// 4. Use api() with a callback to avoid manual .end() calls
+mapper()
+    .api(callback=function(m) {
+        m.version(number=1, callback=function(m) {
+            // Route name:  apiV1Users
+            // Example URL: /api/v1/users
+            m.resources("users");
+        });
+    })
+.end();
+
+</cfscript>
