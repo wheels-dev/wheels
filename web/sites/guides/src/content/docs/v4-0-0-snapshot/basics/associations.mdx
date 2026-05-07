@@ -184,7 +184,7 @@ component extends="Controller" {
 
 Compare with the non-association form:
 
-```cfm
+```cfm title="Illustrative: non-association form (requires running app)"
 comment = model("Comment").create(
     postId=params.postKey,
     author=params.comment.author,
@@ -198,7 +198,7 @@ The first form is shorter, less error-prone (you can't forget the foreign key), 
 
 The classic N+1 problem: you load a list of posts, then touch each post's comments inside the view. Each touch fires a new query, and the page crawls.
 
-```cfm
+```cfm title="Illustrative: N+1 problem (requires running app)"
 posts = model("Post").findAll();
 // in the view:
 <cfloop query="posts">
