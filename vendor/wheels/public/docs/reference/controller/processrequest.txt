@@ -1,0 +1,30 @@
+// 1. Basic usage: simulate a GET request to the Users#index action and return the rendered body.
+result = processRequest(params={controller="users", action="index"});
+// result -> "<html>...</html>"
+
+// 2. Simulate a POST request to create a new user and return the full response struct.
+result = processRequest(
+    params={controller="users", action="create", firstName="Jane", lastName="Doe"},
+    method="post",
+    returnAs="struct"
+);
+// result.status   -> 302
+// result.redirect -> "/users"
+// result.body     -> ""
+// result.flash    -> {success="User created."}
+
+// 3. Roll back all database changes made during the request (useful in tests to keep data clean).
+result = processRequest(
+    params={controller="users", action="create", firstName="Jane"},
+    method="post",
+    rollback=true,
+    returnAs="struct"
+);
+// result.status -> 302
+
+// 4. Run the action without any filters (bypass before/after filter logic).
+result = processRequest(
+    params={controller="users", action="index"},
+    includeFilters=false
+);
+// result -> "<html>...</html>"

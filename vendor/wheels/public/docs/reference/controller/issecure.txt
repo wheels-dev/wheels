@@ -1,5 +1,12 @@
-// Redirect non-secure connections to the secure version
-if (!isSecure())
-{
+// 1. Redirect non-secure connections to the HTTPS version
+if (!isSecure()) {
 	redirectTo(protocol="https");
+}
+
+// 2. Conditionally set a secure cookie flag based on the connection
+cookieOptions = {secure: isSecure(), httpOnly: true};
+
+// 3. Log a warning when a sensitive action is performed over a non-secure connection
+if (!isSecure()) {
+	logMessage("WARNING: sensitive action performed over non-secure connection");
 }

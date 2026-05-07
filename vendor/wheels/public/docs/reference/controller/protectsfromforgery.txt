@@ -1,0 +1,27 @@
+// 1. Protect all POST actions across the entire application (add to the base Controller.cfc).
+component extends="Controller" {
+    function config() {
+        protectsFromForgery();
+    }
+}
+
+// 2. Abort silently on an invalid token instead of throwing an exception.
+component extends="Controller" {
+    function config() {
+        protectsFromForgery(with="abort");
+    }
+}
+
+// 3. Enable CSRF protection only on state-changing actions.
+component extends="Controller" {
+    function config() {
+        protectsFromForgery(only="create, update, delete");
+    }
+}
+
+// 4. Enable CSRF protection globally but skip it for a public API endpoint.
+component extends="Controller" {
+    function config() {
+        protectsFromForgery(except="apiReceive");
+    }
+}

@@ -1,13 +1,22 @@
-// Redirect to an action after successfully saving a user.
+// 1. Redirect to an action after successfully saving a user.
 if (user.save()) {
 	redirectTo(action="saveSuccessful");
 }
 
-// Redirect to a specific page on a secure server.
+// 2. Redirect to a different controller and action on a secure server with extra query params.
 redirectTo(controller="checkout", action="start", params="type=express", protocol="https");
 
-// Redirect to a route specified in `app/config/routes.cfm` and pass in the screen name that the route takes.
+// 3. Redirect to a named route and pass in a dynamic route variable.
 redirectTo(route="profile", screenName="Joe");
 
-// Redirect back to the page the user came from.
+// 4. Redirect back to the referring page (e.g. after a cancelled edit).
 redirectTo(back=true);
+
+// 5. Redirect to an external URL (requires allowExternalRedirects=true in config).
+redirectTo(url="https://example.com/landing");
+
+// 6. Delay the redirect until after the rest of the action has run, and set a flash message.
+redirectTo(action="index", delay=true, flashMessage="Record deleted successfully.");
+
+// 7. Use a 301 permanent redirect when moving a page.
+redirectTo(controller="posts", action="index", statusCode=301);

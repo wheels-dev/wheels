@@ -3350,6 +3350,920 @@
         "cache_creation_input_tokens": 2084,
         "cache_read_input_tokens": 10821
       }
+    },
+    "function:authenticityToken": {
+      "kind": "function",
+      "id": "authenticityToken",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:03:09.057Z",
+      "summary": "Created the reference example for `authenticityToken()` at `vendor/wheels/public/docs/reference/controller/authenticitytoken.txt` with three idiomatic examples showing how to embed the raw CSRF token in a hidden form field, a meta tag for AJAX use, and a JSON API response body. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/authenticitytoken.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10302,
+        "output_tokens": 607,
+        "cache_creation_input_tokens": 4611,
+        "cache_read_input_tokens": 7214
+      }
+    },
+    "function:caches": {
+      "kind": "function",
+      "id": "caches",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:03:20.172Z",
+      "summary": "Updated the `caches` reference example to fix two issues: corrected a copy-paste error in example 2's comment (it described `termsOfUse` but cached `browseByUser/browseByTitle`), and fixed example 4 which used the non-existent `key` parameter — it should be `appendToKey` per the actual function signature.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/caches.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 4536,
+        "output_tokens": 698,
+        "cache_creation_input_tokens": 1658,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:clearCachableActions": {
+      "kind": "function",
+      "id": "clearCachableActions",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:03:31.694Z",
+      "summary": "Created the reference example file for `clearCachableActions()` at `vendor/wheels/public/docs/reference/controller/clearcachableactions.txt` with three examples covering: clearing all cached actions, clearing a single named action, and clearing a comma-delimited list of actions.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/clearcachableactions.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 4627,
+        "output_tokens": 536,
+        "cache_creation_input_tokens": 2713,
+        "cache_read_input_tokens": 15058
+      }
+    },
+    "function:filterChain": {
+      "kind": "function",
+      "id": "filterChain",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:03:43.413Z",
+      "summary": "Verified that the `filterChain` source, docblock, and documented parameters all match. Rewrote the reference example with three numbered examples showing full chain retrieval, iterating before-filters, and counting after-filters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/filterchain.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 5849,
+        "output_tokens": 518,
+        "cache_creation_input_tokens": 1220,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:filters": {
+      "kind": "function",
+      "id": "filters",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:03:57.802Z",
+      "summary": "Rewrote the reference example for `filters()` with four numbered examples covering basic usage, multiple filters with `except`, an `after` filter with `only`, and `placement=\"prepend\"`, plus a note reminding users that filter functions must be `private`. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/filters.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 6153,
+        "output_tokens": 655,
+        "cache_creation_input_tokens": 1620,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:flash": {
+      "kind": "function",
+      "id": "flash",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:04:09.003Z",
+      "summary": "Reviewed the `flash()` function source — docblock and parameters match the snapshot exactly. Enhanced the reference example with three idiomatic examples: reading a specific key, reading the entire flash as a struct, and conditionally reading a key after checking its existence.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flash.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8273,
+        "output_tokens": 472,
+        "cache_creation_input_tokens": 1190,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:flashClear": {
+      "kind": "function",
+      "id": "flashClear",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:04:23.086Z",
+      "summary": "Expanded the `flashClear` reference from a single bare call to three idiomatic examples: a simple clear, clearing after inserting messages, and a conditional clear inside a controller action. No docblock or source changes were needed — the CFC is accurate.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashclear.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 8797,
+        "output_tokens": 668,
+        "cache_creation_input_tokens": 4852,
+        "cache_read_input_tokens": 15000
+      }
+    },
+    "function:flashCount": {
+      "kind": "function",
+      "id": "flashCount",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:04:35.516Z",
+      "summary": "Expanded the `flashCount` reference from a single bare call to three idiomatic examples: a basic call with an inline comment showing return values, a conditional output check, and a demonstration alongside `flashInsert` to show a concrete non-zero count.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashcount.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8208,
+        "output_tokens": 486,
+        "cache_creation_input_tokens": 1032,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:flashDelete": {
+      "kind": "function",
+      "id": "flashDelete",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:04:47.480Z",
+      "summary": "Wrote three idiomatic examples for `flashDelete()` covering basic usage, capturing the boolean return value, and a conditional branch — matching the function's documented behaviour of returning `true` when the key existed and `false` when it did not.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashdelete.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8301,
+        "output_tokens": 523,
+        "cache_creation_input_tokens": 1140,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:flashInsert": {
+      "kind": "function",
+      "id": "flashInsert",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:04:59.644Z",
+      "summary": "Wrote three idiomatic examples for `flashInsert` covering single-key insertion, multi-key insertion, and reading a flash value back in the next request. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashinsert.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8216,
+        "output_tokens": 474,
+        "cache_creation_input_tokens": 1060,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:flashIsEmpty": {
+      "kind": "function",
+      "id": "flashIsEmpty",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:05:12.066Z",
+      "summary": "Wrote an expanded reference example for `flashIsEmpty()` with three idiomatic scenarios: guarding output with a negated check, verifying the Flash is non-empty after an insert, and confirming it is empty after a clear. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashisempty.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 8742,
+        "output_tokens": 558,
+        "cache_creation_input_tokens": 4702,
+        "cache_read_input_tokens": 15014
+      }
+    },
+    "function:flashKeep": {
+      "kind": "function",
+      "id": "flashKeep",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:05:23.204Z",
+      "summary": "Verified the `flashKeep` source matches its documentation. Updated the reference file with numbered headings covering all three usage patterns: keeping the entire flash, a single key, and multiple comma-delimited keys.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashkeep.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8300,
+        "output_tokens": 466,
+        "cache_creation_input_tokens": 1248,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:flashKeyExists": {
+      "kind": "function",
+      "id": "flashKeyExists",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:05:38.657Z",
+      "summary": "Expanded the `flashKeyExists` reference from a single bare expression to three idiomatic examples showing checking before read, checking before output, and checking before delete. The docblock in the CFC already matches the documented hint and parameter exactly — no source edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/flashkeyexists.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8528,
+        "output_tokens": 522,
+        "cache_creation_input_tokens": 1142,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:getEmails": {
+      "kind": "function",
+      "id": "getEmails",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:06:11.087Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/getemails.txt` with three idiomatic examples showing: asserting email count/properties in a test, iterating over sent emails, and the empty-array return when no emails were sent. No docblock drift was found.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/getemails.txt"
+      ],
+      "notes": "",
+      "turns": 11,
+      "usage": {
+        "input_tokens": 35965,
+        "output_tokens": 1202,
+        "cache_creation_input_tokens": 18027,
+        "cache_read_input_tokens": 157093
+      }
+    },
+    "function:getFiles": {
+      "kind": "function",
+      "id": "getFiles",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:06:26.669Z",
+      "summary": "Authored `vendor/wheels/public/docs/reference/controller/getfiles.txt` with three idiomatic examples showing how to use `getFiles()` in tests to assert on sent files, iterate over them, and handle the empty-array case. Modelled directly after the parallel `getEmails` reference file.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/getfiles.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 34658,
+        "output_tokens": 680,
+        "cache_creation_input_tokens": 17638,
+        "cache_read_input_tokens": 34788
+      }
+    },
+    "function:getRedirect": {
+      "kind": "function",
+      "id": "getRedirect",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:06:50.994Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/controller/getredirect.txt` with three examples showing how to use `getRedirect()` in tests: asserting a redirect occurred, inspecting the full redirect struct (url, statusCode, addToken), and confirming no redirect was performed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/getredirect.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 33812,
+        "output_tokens": 884,
+        "cache_creation_input_tokens": 17258,
+        "cache_read_input_tokens": 75240
+      }
+    },
+    "function:isAjax": {
+      "kind": "function",
+      "id": "isAjax",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:07:07.122Z",
+      "summary": "Wrote improved reference examples for `isAjax()` showing two practical controller-action patterns: redirecting non-AJAX requests and returning JSON vs. rendering a full view. No docblock or code changes were needed — the function body and hint are accurate.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/isajax.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 13049,
+        "output_tokens": 489,
+        "cache_creation_input_tokens": 1074,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:isDelete": {
+      "kind": "function",
+      "id": "isDelete",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:07:18.025Z",
+      "summary": "Created the reference example for `isDelete()` at `vendor/wheels/public/docs/reference/controller/isdelete.txt`. The example shows two idiomatic usages: using it in a conditional guard and assigning the boolean result to a variable, matching the style of the existing `isGet` reference.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/isdelete.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 13184,
+        "output_tokens": 490,
+        "cache_creation_input_tokens": 7094,
+        "cache_read_input_tokens": 15006
+      }
+    },
+    "function:isGet": {
+      "kind": "function",
+      "id": "isGet",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:07:32.299Z",
+      "summary": "Wrote three idiomatic examples for `isGet()` to `vendor/wheels/public/docs/reference/controller/isget.txt`, demonstrating a guard redirect, a method-based branch, and a simple variable assignment. No docblock or code changes were needed — the source and documentation are already consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/isget.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 13570,
+        "output_tokens": 608,
+        "cache_creation_input_tokens": 7151,
+        "cache_read_input_tokens": 15026
+      }
+    },
+    "function:isHead": {
+      "kind": "function",
+      "id": "isHead",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:07:49.842Z",
+      "summary": "Created the reference example for `isHead()` at `vendor/wheels/public/docs/reference/controller/ishead.txt` with three idiomatic examples showing how to detect and respond to HTTP HEAD requests in a controller action. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/ishead.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 13537,
+        "output_tokens": 532,
+        "cache_creation_input_tokens": 7094,
+        "cache_read_input_tokens": 15002
+      }
+    },
+    "function:isOptions": {
+      "kind": "function",
+      "id": "isOptions",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:08:03.211Z",
+      "summary": "Authored a new reference example for `isOptions()` in `vendor/wheels/public/docs/reference/controller/isoptions.txt`, modelled after the existing `isget.txt` pattern. The three examples cover a CORS preflight use-case, a guard redirect, and storing the boolean result — all idiomatic and consistent with the function's implementation (`request.cgi.request_method == \"options\"`). No docblock changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/isoptions.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 13574,
+        "output_tokens": 614,
+        "cache_creation_input_tokens": 7096,
+        "cache_read_input_tokens": 15006
+      }
+    },
+    "function:isPatch": {
+      "kind": "function",
+      "id": "isPatch",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:08:17.748Z",
+      "summary": "Created the reference example for `isPatch()` at `vendor/wheels/public/docs/reference/controller/ispatch.txt`. The example follows the same style as the existing `isget.txt` reference, with three idiomatic examples: a guard redirect, a conditional partial update handler, and storing the boolean result in a variable.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/ispatch.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 15842,
+        "output_tokens": 711,
+        "cache_creation_input_tokens": 8167,
+        "cache_read_input_tokens": 25339
+      }
+    },
+    "function:isPost": {
+      "kind": "function",
+      "id": "isPost",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:08:30.130Z",
+      "summary": "Expanded the `isPost()` reference from a single bare assignment into three idiomatic examples: a conditional form-processing branch, a method guard that rejects non-POST requests, and the original variable-capture pattern with annotated return values.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/ispost.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 13133,
+        "output_tokens": 573,
+        "cache_creation_input_tokens": 1068,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:isPut": {
+      "kind": "function",
+      "id": "isPut",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:08:45.575Z",
+      "summary": "Created a new reference example for `isPut()` at `vendor/wheels/public/docs/reference/controller/isput.txt` with two idiomatic controller examples demonstrating how to guard an action against non-PUT requests and how to branch behavior based on the HTTP method. The docblock in the CFC matches the documented hint exactly — no edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/isput.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 14185,
+        "output_tokens": 679,
+        "cache_creation_input_tokens": 7484,
+        "cache_read_input_tokens": 25441
+      }
+    },
+    "function:isSecure": {
+      "kind": "function",
+      "id": "isSecure",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:08:57.186Z",
+      "summary": "Reviewed `isSecure()` in `vendor/wheels/controller/miscellaneous.cfc` — docblock and implementation are accurate (checks both `http_x_forwarded_proto` and `server_port_secure`). Wrote an enhanced reference example with three idiomatic usage patterns: redirect to HTTPS, secure cookie flag, and warning log for non-secure sensitive actions.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/issecure.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 13081,
+        "output_tokens": 535,
+        "cache_creation_input_tokens": 1114,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:onlyProvides": {
+      "kind": "function",
+      "id": "onlyProvides",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:09:07.536Z",
+      "summary": "Expanded the `onlyProvides` reference example from a single minimal usage to three examples: overriding with a single format (html), specifying multiple formats (json,xml), and using the `action` parameter to target a named action.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/onlyprovides.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 3555,
+        "output_tokens": 530,
+        "cache_creation_input_tokens": 1414,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:pagination": {
+      "kind": "function",
+      "id": "pagination",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:09:24.548Z",
+      "summary": "Rewrote the reference example for `pagination()` with three idiomatic examples: basic usage with the default handle, named handle for multiple concurrent paginated queries, and using the returned struct keys to build a summary string.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/pagination.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 126417,
+        "output_tokens": 728,
+        "cache_creation_input_tokens": 1563,
+        "cache_read_input_tokens": 15167
+      }
+    },
+    "function:processAction": {
+      "kind": "function",
+      "id": "processAction",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:09:46.024Z",
+      "summary": "Authored the reference example for `processAction` at `vendor/wheels/public/docs/reference/controller/processaction.txt`. Three examples cover the default (all filters), before-only, and no-filters usage, which matches the documented `includeFilters` parameter values.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/processaction.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 11079,
+        "output_tokens": 666,
+        "cache_creation_input_tokens": 6044,
+        "cache_read_input_tokens": 24082
+      }
+    },
+    "function:processRequest": {
+      "kind": "function",
+      "id": "processRequest",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:10:08.015Z",
+      "summary": "Created vendor/wheels/public/docs/reference/controller/processrequest.txt with 4 idiomatic examples demonstrating basic GET usage, POST with full struct response, rollback mode for clean test isolation, and skipping all filters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/processrequest.txt"
+      ],
+      "notes": "",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 17463,
+        "output_tokens": 1143,
+        "cache_creation_input_tokens": 9310,
+        "cache_read_input_tokens": 39321
+      }
+    },
+    "function:protectsFromForgery": {
+      "kind": "function",
+      "id": "protectsFromForgery",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:10:21.030Z",
+      "summary": "Created the reference example file for `protectsFromForgery` with four idiomatic examples covering the default usage in base Controller.cfc, the `with=\"abort\"` option, the `only` parameter, and the `except` parameter. The docblock in the CFC matches the documented hint and parameters exactly — no edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/protectsfromforgery.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10059,
+        "output_tokens": 638,
+        "cache_creation_input_tokens": 1550,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:provides": {
+      "kind": "function",
+      "id": "provides",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:10:30.677Z",
+      "summary": "Expanded the `provides` reference example from a single bare call into three idiomatic examples covering common use cases: HTML+JSON, all supported formats, and JSON-only for a REST API controller.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/provides.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 3112,
+        "output_tokens": 433,
+        "cache_creation_input_tokens": 1282,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:redirectTo": {
+      "kind": "function",
+      "id": "redirectTo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:10:55.298Z",
+      "summary": "Updated the `redirectTo` reference example with 7 numbered examples covering the most common use cases (basic action redirect, controller+action with protocol, named route, back redirect, external URL, delayed redirect with flash, and 301 permanent redirect). Also fixed the docblock to add missing `@method` annotation and replace the `[see:URLFor]` shorthand for `@encode` with the full descriptive hint.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/redirectto.txt",
+        "vendor/wheels/controller/redirection.cfc"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 10836,
+        "output_tokens": 1196,
+        "cache_creation_input_tokens": 6886,
+        "cache_read_input_tokens": 15771
+      }
+    },
+    "function:renderNothing": {
+      "kind": "function",
+      "id": "renderNothing",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:11:07.583Z",
+      "summary": "Updated the renderNothing reference example with three idiomatic examples: basic blank response, passing a 204 status code, and a real-world controller action that demonstrates the key advantage over cfabort (after-filters still run).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/rendernothing.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 32090,
+        "output_tokens": 506,
+        "cache_creation_input_tokens": 1236,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:renderPartial": {
+      "kind": "function",
+      "id": "renderPartial",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:11:21.390Z",
+      "summary": "Expanded the `renderPartial` reference example from 2 basic usages to 6, covering: simple partial by name, absolute-path partial, `returnAs=\"string\"`, caching with a layout, `dataFunction` for data loading, and forcing an HTTP status code. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/renderpartial.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 32784,
+        "output_tokens": 681,
+        "cache_creation_input_tokens": 1642,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:renderText": {
+      "kind": "function",
+      "id": "renderText",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:11:33.193Z",
+      "summary": "Updated the renderText reference example to use camelCase `serializeJSON` (per convention), fixed the model name to PascalCase (`Product`), and added a third example demonstrating the `status` parameter with a custom HTTP status code.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/rendertext.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 32060,
+        "output_tokens": 473,
+        "cache_creation_input_tokens": 1278,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:renderView": {
+      "kind": "function",
+      "id": "renderView",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:11:46.417Z",
+      "summary": "Updated the `renderView` reference example to use numbered comment headings and added two new examples covering the `status` and `hideDebugInformation` parameters, which were documented in the function signature but not shown in the original reference file. The docblock in the CFC matches the documented hint and parameters — no source edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/renderview.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 33303,
+        "output_tokens": 726,
+        "cache_creation_input_tokens": 2080,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:renderWith": {
+      "kind": "function",
+      "id": "renderWith",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:12:05.147Z",
+      "summary": "Rewrote the `renderWith` reference example with five numbered examples covering: basic query rendering, JSON error with status code, returning as a string, rendering with layout=false and hideDebugInformation, and rendering with a custom template path. The docblock in the CFC matches the documented hint and parameters — no edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/renderwith.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 33824,
+        "output_tokens": 887,
+        "cache_creation_input_tokens": 17744,
+        "cache_read_input_tokens": 15517
+      }
+    },
+    "function:response": {
+      "kind": "function",
+      "id": "response",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:12:22.501Z",
+      "summary": "Rewrote the `response()` reference example with three idiomatic examples: basic usage returning the current response string, using it in a controller test to assert rendered output, and inspecting/modifying the response via `setResponse()` before it is sent to the client.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/response.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 32572,
+        "output_tokens": 760,
+        "cache_creation_input_tokens": 16704,
+        "cache_read_input_tokens": 34868
+      }
+    },
+    "function:sendEmail": {
+      "kind": "function",
+      "id": "sendEmail",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:12:35.022Z",
+      "summary": "Rewrote the `sendEmail` reference example with three idiomatic examples. The original example was missing the required `from` argument; all three new examples include it. The examples cover basic welcome email with custom template variables, multipart text+HTML email, and file attachment with `deliver=false` for testing.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/sendemail.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 14185,
+        "output_tokens": 706,
+        "cache_creation_input_tokens": 2036,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:sendFile": {
+      "kind": "function",
+      "id": "sendFile",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:12:56.684Z",
+      "summary": "Updated the `sendFile` docblock to add the missing `@deliver` parameter hint, and rewrote the reference file with 7 clear examples covering all key parameters: basic usage, custom download name, inline disposition, explicit MIME type, external directory, server-side file deletion, and RAM virtual file system.",
+      "files_changed": [
+        "vendor/wheels/controller/miscellaneous.cfc",
+        "vendor/wheels/public/docs/reference/controller/sendfile.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 14138,
+        "output_tokens": 971,
+        "cache_creation_input_tokens": 7932,
+        "cache_read_input_tokens": 15390
+      }
+    },
+    "function:setFilterChain": {
+      "kind": "function",
+      "id": "setFilterChain",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:13:11.244Z",
+      "summary": "Rewrote the reference example for `setFilterChain` with three idiomatic examples: basic usage (original), replacing an inherited chain in a child controller, and conditionally swapping the chain based on environment. No docblock or code changes were needed — the source matches the documented hint and parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/setfilterchain.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 6014,
+        "output_tokens": 635,
+        "cache_creation_input_tokens": 1336,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:setFlashStorage": {
+      "kind": "function",
+      "id": "setFlashStorage",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:13:23.193Z",
+      "summary": "Created the reference example file for `setFlashStorage` at `vendor/wheels/public/docs/reference/controller/setflashstorage.txt`. Three examples cover: switching to cookie storage for the current request, switching back to session, and using `setGlobally=true` to persist the change app-wide.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/setflashstorage.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 8717,
+        "output_tokens": 546,
+        "cache_creation_input_tokens": 4797,
+        "cache_read_input_tokens": 15063
+      }
+    },
+    "function:setPagination": {
+      "kind": "function",
+      "id": "setPagination",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:13:54.948Z",
+      "summary": "Rewrote the `setPagination` reference example with three clean, idiomatic examples covering: (1) CFML-engine pagination using `startRow`/`endRow` with a named handle, (2) database-level pagination using separate COUNT + page-slice queries, and (3) use of the default \"query\" handle so `paginationLinks()` needs no arguments. Fixed the syntax bug from the old file (`param name=\"params.page\" default=\"1;` was missing a closing quote).",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/setpagination.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 131581,
+        "output_tokens": 1903,
+        "cache_creation_input_tokens": 5324,
+        "cache_read_input_tokens": 23450
+      }
+    },
+    "function:setResponse": {
+      "kind": "function",
+      "id": "setResponse",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:14:14.184Z",
+      "summary": "Rewrote the `setResponse` reference example from a single typo-ridden line to three idiomatic numbered examples showing: plain string override, modifying an existing response in an after filter using `response()` + `setResponse()` together, and replacing the response with serialized JSON data.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/setresponse.txt"
+      ],
+      "notes": "",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 32809,
+        "output_tokens": 750,
+        "cache_creation_input_tokens": 16764,
+        "cache_read_input_tokens": 34910
+      }
+    },
+    "function:setVerificationChain": {
+      "kind": "function",
+      "id": "setVerificationChain",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:14:26.328Z",
+      "summary": "Rewrote the reference example for `setVerificationChain` with three idiomatic examples: setting the chain from scratch, getting an existing chain, appending to it, and setting it back, and replacing a parent controller's chain with a stricter one.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/setverificationchain.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 7509,
+        "output_tokens": 569,
+        "cache_creation_input_tokens": 1378,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:usesLayout": {
+      "kind": "function",
+      "id": "usesLayout",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:14:40.108Z",
+      "summary": "Updated the reference example for `usesLayout` to cover all documented parameters: `except`, `only`, `ajax`, function-based layout delegation, and `useDefault`. The docblock in the CFC matches the snapshot exactly — no edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/useslayout.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 7075,
+        "output_tokens": 656,
+        "cache_creation_input_tokens": 1674,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:verificationChain": {
+      "kind": "function",
+      "id": "verificationChain",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:14:51.352Z",
+      "summary": "Wrote an enhanced reference example for `verificationChain()` with three examples: removing the first item and resetting the chain (preserving the existing example), inspecting the count of registered verifications, and looping over the chain to find verifications that apply to a specific action.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/verificationchain.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 7371,
+        "output_tokens": 538,
+        "cache_creation_input_tokens": 1172,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:verifies": {
+      "kind": "function",
+      "id": "verifies",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T05:15:06.630Z",
+      "summary": "Updated the `verifies` reference example to cover all major parameter combinations: POST-only verification, GET + params type checking, custom handler, redirect-on-failure, `except`-based session check, and combined AJAX + POST + params type verification. The docblock and function signature were already correct and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/controller/verifies.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8099,
+        "output_tokens": 688,
+        "cache_creation_input_tokens": 2366,
+        "cache_read_input_tokens": 10821
+      }
     }
   },
   "runs": []

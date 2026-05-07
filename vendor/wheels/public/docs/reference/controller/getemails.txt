@@ -1,0 +1,16 @@
+// 1. Assert that exactly one email was sent during the action (in a test)
+processSignup();
+emails = getEmails();
+assert("arrayLen(emails) eq 1");
+assert("emails[1].to eq 'newuser@example.com'");
+assert("emails[1].subject eq 'Welcome!'");
+
+// 2. Inspect all emails sent during a request
+emails = getEmails();
+for (email in emails) {
+	writeOutput(email.to & " — " & email.subject);
+}
+
+// 3. Return an empty array when no emails were sent
+emails = getEmails();
+// emails -> []

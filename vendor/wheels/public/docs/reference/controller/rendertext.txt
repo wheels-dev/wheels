@@ -1,6 +1,9 @@
-// Render just the text "Done!" to the client
+// 1. Render a simple text response to the client
 renderText("Done!");
 
-// Render serialized product data to the client
-products = model("product").findAll();
-renderText(SerializeJson(products));
+// 2. Render serialized JSON data to the client
+products = model("Product").findAll();
+renderText(serializeJSON(products));
+
+// 3. Render a plain-text response with a custom HTTP status code
+renderText(text="Not authorized", status=401);

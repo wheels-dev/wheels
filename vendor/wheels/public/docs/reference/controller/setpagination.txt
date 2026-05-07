@@ -1,101 +1,113 @@
-/* Note that there are two ways to do pagination yourself using a custom query.
-	1) Do a query that grabs everything that matches and then use
-	the `cfouput` or `cfloop` tag to page through the results.
-	2) Use your database to make 2 queries. The first query
-	basically does a count of the total number of records that match
-	the criteria and the second query actually selects the page of
-	records for retrieval.
-	In the example below, we will show how to write a custom query
-	using both of these methods. Note that the syntax where your
-	database performs the pagination will differ depending on the
-	database engine you are using. Please consult your database
-	engine's documentation for the correct syntax.
-	Also note that the view code will differ depending on the method
-	used.
-*/
-
-//=================== First method: Handle the pagination through your CFML engine
-
-// Model code: In your model (ie. User.cfc), create a custom method for your custom query
-function myCustomQuery(required numeric page, numeric perPage=25){
-	local.customQuery=QueryExecute("SELECT * FROM users", [], { datasource=get('dataSourceName') });
+// 1. Basic usage: paginate a custom query inside a model method, letting the CFML engine handle pagination
+// In app/models/User.cfc
+function searchByName(required string name, numeric page = 1, numeric perPage = 25) {
+	local.allMatches = QueryExecute(
+		"SELECT * FROM users WHERE firstName LIKE :name ORDER BY lastName",
+		{ name = { value = "%" & arguments.name & "%", cfsqltype = "cf_sql_varchar" } },
+		{ datasource = get("dataSourceName") }
+	);
 	setPagination(
-		totalRecords=local.customQuery.RecordCount,
-		currentPage=arguments.page,
-		perPage=arguments.perPage,
-		handle="myCustomQueryHandle");
-	return local.customQuery;
+		totalRecords = local.allMatches.recordCount,
+		currentPage  = arguments.page,
+		perPage      = arguments.perPage,
+		handle       = "userSearch"
+	);
+	return local.allMatches;
 }
 
-// Controller code
-function list(){
-	param name="params.page" default="1;
+// In app/controllers/Users.cfc
+function search() {
+	param name="params.page"    default="1";
 	param name="params.perPage" default="25";
-	allUsers = model("user").myCustomQuery( page=params.page, perPage=params.perPage);
-
-	// Because we're going to let `cfoutput`/`cfloop` handle the pagination,
-	// we're going to need to get some addition information about the pagination.
-	paginationData = pagination("myCustomQueryHandle")
+	searchResults = model("User").searchByName(
+		name    = params.q,
+		page    = params.page,
+		perPage = params.perPage
+	);
+	paginationData = pagination("userSearch");
 }
 
-<!--- View code (using `cfloop`): Use the information from `paginationData` to page through the records --->
+<!--- In app/views/users/search.cfm --->
+<!--- Use startRow / endRow to page through the full query result --->
 <ul>
-	<cfloop query="allUsers" startrow="#paginationData.startrow#" endrow="#paginationData.endrow#" >
-	<li> #allUsers.firstName# #allUsers.lastName# </li>
+	<cfloop query="searchResults"
+	        startRow="#paginationData.startRow#"
+	        endRow="#paginationData.endRow#">
+		<li>#searchResults.firstName# #searchResults.lastName#</li>
 	</cfloop>
 </ul>
-#paginationLinks(handle="myCustomQueryHandle")#
+#paginationLinks(handle="userSearch")#
 
-<!--- View code (using `cfoutput`) Use the information from `paginationData` to page through the records--->
-<ul>
-	<cfoutput query="allUsers" startrow="#paginationData.startrow#" maxrows="#paginationData.maxrows#" >
-	<li> #allUsers.firstName# #allUsers.lastName# </li>
-	</cfoutput>
-</ul>
-#paginationLinks(handle="myCustomQueryHandle")#
-
-//=================== Second method: Handle the pagination through the database
-
-// Model code: In your model (ie. `User.cfc`), create a custom method for your custom query
-
-function myCustomQuery(required numeric page, numeric perPage=25){
-	local.customQueryCount=QueryExecute("SELECT COUNT(*) AS theCount FROM users",
-										[], { datasource=get('dataSourceName') });
-	local.customQuery=QueryExecute("SELECT * FROM users LIMIT ? OFFSET ?",
-									[arguments.page, arguments.perPage],
-									{ datasource=get('dataSourceName') });
-
-	//Notice the we use the value from the first query for `totalRecords`
+// 2. Database-level pagination: run a COUNT query and a page-slice query separately
+// In app/models/Article.cfc
+function pagedResults(numeric page = 1, numeric perPage = 10) {
+	local.countQuery = QueryExecute(
+		"SELECT COUNT(*) AS total FROM articles WHERE publishedAt IS NOT NULL",
+		[],
+		{ datasource = get("dataSourceName") }
+	);
+	local.pageQuery = QueryExecute(
+		"SELECT * FROM articles WHERE publishedAt IS NOT NULL ORDER BY publishedAt DESC LIMIT :perPage OFFSET :offset",
+		{
+			perPage = { value = arguments.perPage, cfsqltype = "cf_sql_integer" },
+			offset  = { value = (arguments.page - 1) * arguments.perPage, cfsqltype = "cf_sql_integer" }
+		},
+		{ datasource = get("dataSourceName") }
+	);
+	// Use the COUNT result so paginationLinks reflects the total, not just this page
 	setPagination(
-		totalRecords=local.customQueryCount.theCount,
-		currentPage=arguments.page,
-		perPage=arguments.perPage,
-		handle="myCustomQueryHandle" );
-
-	// We return the second query
-	return local.customQuery;
+		totalRecords = local.countQuery.total,
+		currentPage  = arguments.page,
+		perPage      = arguments.perPage,
+		handle       = "articles"
+	);
+	return local.pageQuery;
 }
 
-// Controller code
-function list(){
-	param name="params.page" default="1;
-	param name="params.perPage" default="25";
-	allUsers = model("user").myCustomQuery( page=params.page, perPage=params.perPage);
+// In app/controllers/Articles.cfc
+function index() {
+	param name="params.page"    default="1";
+	param name="params.perPage" default="10";
+	articles = model("Article").pagedResults(
+		page    = params.page,
+		perPage = params.perPage
+	);
 }
 
-<!--- View code (using `cfloop`)--->
+<!--- In app/views/articles/index.cfm --->
 <ul>
-	<cfloop query="allUsers">
-	<li> #allUsers.firstName# #allUsers.lastName# </li>
+	<cfloop query="articles">
+		<li>#articles.title#</li>
 	</cfloop>
 </ul>
-#paginationLinks(handle="myCustomQueryHandle")#
+#paginationLinks(handle="articles")#
 
-<!--- View code (using `cfoutput`)--->
+// 3. Use the default handle name so paginationLinks() needs no handle argument
+// In app/models/Product.cfc
+function featured(numeric page = 1) {
+	local.q = QueryExecute(
+		"SELECT * FROM products WHERE featured = 1 ORDER BY name",
+		[],
+		{ datasource = get("dataSourceName") }
+	);
+	// Omitting handle defaults it to "query", matching paginationLinks() default
+	setPagination(totalRecords = local.q.recordCount, currentPage = arguments.page);
+	return local.q;
+}
+
+// In app/controllers/Products.cfc
+function index() {
+	param name="params.page" default="1";
+	products     = model("Product").featured(page = params.page);
+	pagingData   = pagination(); // uses default handle "query"
+}
+
+<!--- In app/views/products/index.cfm --->
 <ul>
-	<cfoutput query="allUsers">
-	<li> #allUsers.firstName# #allUsers.lastName# </li>
-	</cfoutput>
+	<cfloop query="products"
+	        startRow="#pagingData.startRow#"
+	        endRow="#pagingData.endRow#">
+		<li>#products.name#</li>
+	</cfloop>
 </ul>
-#paginationLinks(handle="myCustomQueryHandle")#
-
+#paginationLinks()#

@@ -1,5 +1,14 @@
-// Get filter chain.
+// 1. Get the entire filter chain for the current controller
 myFilterChain = filterChain();
+// myFilterChain -> array of structs, each with keys: through, type, only, except, arguments
+// e.g. [{ through: "checkLogin", type: "before", only: "", except: "" }, ...]
 
-// Get filter chain for after filters only.
-myFilterChain = filterChain(type="after");
+// 2. Get only the before-filters
+beforeFilters = filterChain(type="before");
+for (f in beforeFilters) {
+    writeOutput(f.through);
+}
+
+// 3. Get only the after-filters
+afterFilters = filterChain(type="after");
+writeOutput(arrayLen(afterFilters));

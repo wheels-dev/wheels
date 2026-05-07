@@ -1,10 +1,24 @@
-// This will provide the formats defined in the `config()` function.
-products = model("product").findAll();
+// 1. Render a query using the format defined in the controller's `config()` function.
+// Wheels automatically serializes to JSON or XML when those formats are requested.
+products = model("Product").findAll();
 renderWith(products);
 
-// Provide a 403 status code for a json response (for example)
-msg={
-	"status" : "Error",
+// 2. Return a JSON error payload with a specific HTTP status code.
+msg = {
+	"status": "Error",
 	"message": "Not Authenticated"
-}
-renderWith(data=msg, status=403)
+};
+renderWith(data=msg, status=403);
+
+// 3. Render a struct as JSON and return the result as a string instead of sending it to the client.
+payload = {"id": 1, "name": "Alice"};
+jsonString = renderWith(data=payload, returnAs="string");
+
+// 4. Render with a custom XML template for the current action
+// (looks for a view file named `show.xml.cfm` in the current controller's views folder).
+user = model("User").findByKey(params.key);
+renderWith(data=user, layout=false, hideDebugInformation=true);
+
+// 5. Render data using a specific template from outside the current controller's views folder.
+report = model("Order").findAll(select="id,total,createdAt");
+renderWith(data=report, template="/reports/summary", layout=false);

@@ -1,0 +1,15 @@
+// 1. Allow only PUT requests for a resource update action
+if (!isPut()) {
+    redirectTo(action = "index");
+}
+// ... proceed with update logic
+
+// 2. Branch behavior based on HTTP method
+if (isPut()) {
+    // Full replacement of the resource
+    user = model("User").findByKey(params.key);
+    user.update(params.user);
+    redirectTo(action = "show", key = user.key());
+} else {
+    renderNothing();
+}

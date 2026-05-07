@@ -1,0 +1,8 @@
+// 1. Clear all cached action metadata for the current controller.
+clearCachableActions();
+
+// 2. Clear the cached metadata for a single action.
+clearCachableActions(action="termsOfUse");
+
+// 3. Clear the cached metadata for a list of specific actions.
+clearCachableActions(action="browseByUser,browseByTitle");

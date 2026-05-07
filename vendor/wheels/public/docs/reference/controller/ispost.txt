@@ -1,1 +1,26 @@
+// 1. Respond differently depending on whether the request is a POST
+if (isPost()) {
+    // Process the submitted form data
+    user = model("User").new(params.user);
+    if (user.save()) {
+        redirectTo(action="index");
+    } else {
+        renderView(action="new");
+    }
+} else {
+    renderView(action="new");
+}
+
+// 2. Guard an action so it only accepts POST requests
+function create() {
+    if (!isPost()) {
+        renderNothing(status="405 Method Not Allowed");
+        return;
+    }
+    // handle form submission
+}
+
+// 3. Store the result for later use in the action
 requestIsPost = isPost();
+// requestIsPost -> true (when submitted via a form POST)
+// requestIsPost -> false (when the page is visited normally with GET)

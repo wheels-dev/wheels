@@ -1,2 +1,14 @@
-// Render a blank white page to the client
+// 1. Render a blank response (useful for AJAX fire-and-forget actions)
 renderNothing();
+
+// 2. Render a blank response with a specific HTTP status code (e.g., 204 No Content)
+renderNothing(status=204);
+
+// 3. Use renderNothing() instead of cfabort so that after-filters still run
+// In a controller action:
+function markAsRead() {
+    post = model("Post").findByKey(params.key);
+    post.update(read=true);
+    // After-filters (e.g. logging) will still execute, unlike cfabort
+    renderNothing();
+}

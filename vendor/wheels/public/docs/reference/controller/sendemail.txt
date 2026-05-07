@@ -1,9 +1,30 @@
-// Get a member and send a welcome email, passing in a few custom variables to the template
-newMember = model("member").findByKey(params.member.id);
+// 1. Send a welcome email to a new member, passing custom variables to the template
+newMember = model("Member").findByKey(params.member.id);
 sendEmail(
+	from="welcome@example.com",
 	to=newMember.email,
-	template="myemailtemplate",
 	subject="Thank You for Becoming a Member",
+	template="welcomeEmail",
 	recipientName=newMember.name,
 	startDate=newMember.startDate
+);
+
+// 2. Send a multipart email (text + HTML) using two templates
+sendEmail(
+	from="news@example.com",
+	to=params.subscriber.email,
+	subject="Your Weekly Newsletter",
+	template="newsletterText,newsletterHtml",
+	layout=false,
+	issueDate=Now()
+);
+
+// 3. Send an email with a file attachment and suppress actual delivery (e.g. during testing)
+sendEmail(
+	from="billing@example.com",
+	to=params.customer.email,
+	subject="Your Invoice",
+	template="invoiceEmail",
+	file="invoice_2024.pdf",
+	deliver=false
 );

@@ -19,9 +19,10 @@ component {
 	 * @host Set this to override the current host.
 	 * @protocol Set this to override the current protocol.
 	 * @port Set this to override the current port number.
+	 * @method HTTP method constraint used when matching routes.
 	 * @url Redirect to an external URL.
 	 * @delay Set to `true` to delay the redirection until after the rest of your action code has executed.
-	 * @encode [see:URLFor].
+	 * @encode Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead.
 	 */
 	public void function redirectTo(
 		boolean back = false,

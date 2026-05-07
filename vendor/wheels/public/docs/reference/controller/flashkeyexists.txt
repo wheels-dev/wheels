@@ -1,1 +1,14 @@
-errorExists = flashKeyExists("error");
+// 1. Check for an "error" key before reading it
+if (flashKeyExists("error")) {
+    errorMessage = flash("error");
+}
+
+// 2. Conditionally display a success notice
+if (flashKeyExists("success")) {
+    writeOutput(flash("success"));
+}
+
+// 3. Guard before deleting a specific flash key
+if (flashKeyExists("notice")) {
+    flashDelete("notice");
+}
