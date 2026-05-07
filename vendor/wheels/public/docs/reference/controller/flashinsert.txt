@@ -1,1 +1,10 @@
-flashInsert(msg="It Worked!");
+// 1. Insert a single key / value into the Flash
+flashInsert(notice="Your profile has been updated.");
+
+// 2. Insert multiple keys at once
+flashInsert(success="Account created.", hint="Check your email to confirm.");
+
+// 3. Read back a Flash value in the next action or view
+// (After a redirect, in the destination action or its view:)
+msg = flash("notice");
+// msg -> "Your profile has been updated."

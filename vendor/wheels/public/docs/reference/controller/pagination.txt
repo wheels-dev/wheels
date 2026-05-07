@@ -1,6 +1,16 @@
-allAuthors = model("author").findAll(page=1, perPage=25, order="lastName", handle="authorsData");
-paginationData = pagination("authorsData");
+// 1. Get pagination info for the default query handle
+authors = model("Author").findAll(page=1, perPage=25, order="lastName");
+info = pagination();
+// info.currentPage  -> 1
+// info.totalPages   -> 4
+// info.totalRecords -> 98
 
-#pagination().currentPage#
-#pagination().totalPages#
-#pagination().totalRecords#
+// 2. Get pagination info using a named handle (when running multiple paginated queries)
+articles = model("Article").findAll(page=2, perPage=10, order="publishedAt DESC", handle="articles");
+articleInfo = pagination("articles");
+writeOutput("Page " & articleInfo.currentPage & " of " & articleInfo.totalPages);
+
+// 3. Use pagination info to build a simple summary string
+products = model("Product").findAll(page=params.page, perPage=20, order="name", handle="products");
+info = pagination("products");
+writeOutput("Showing page " & info.currentPage & " of " & info.totalPages & " (" & info.totalRecords & " total products)");

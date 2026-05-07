@@ -1,1 +1,13 @@
-requestIsAjax = isAjax();
+// 1. Respond differently based on whether the request is an AJAX call
+if (isAjax()) {
+    renderNothing();
+} else {
+    redirectTo(action = "index");
+}
+
+// 2. Return JSON for AJAX requests, render a full view otherwise
+if (isAjax()) {
+    renderWith(data = model("Article").findAll(returnAs = "objects"));
+} else {
+    articles = model("Article").findAll();
+}

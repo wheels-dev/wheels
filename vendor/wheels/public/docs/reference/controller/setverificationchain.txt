@@ -1,6 +1,17 @@
-// Set verification chain directly in an array.
+// 1. Set the entire verification chain directly using an array of structs
 setVerificationChain([
 	{only="handleForm", post=true},
 	{only="edit", get=true, params="userId", paramsTypes="integer"},
-	{only="edit", get=true, params="userId", paramsTypes="integer", handler="index", error="Invalid userId"}
+	{only="delete", post=true, session="currentUser", handler="accessDenied"}
+]);
+
+// 2. Get the existing chain, modify it, and set it back
+chain = verificationChain();
+ArrayAppend(chain, {only="create,update", post=true});
+setVerificationChain(chain);
+
+// 3. Replace the chain built by a parent controller with a stricter one
+setVerificationChain([
+	{except="index,show", post=true, session="isAdmin", handler="requireAdmin"},
+	{only="destroy", post=true}
 ]);

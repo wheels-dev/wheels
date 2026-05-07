@@ -1,1 +1,17 @@
+// 1. Only allow GET requests in an action
+if (!isGet()) {
+    redirectTo(action = "index");
+}
+
+// 2. Respond differently depending on the HTTP method
+if (isGet()) {
+    // Render the form for display
+    user = model("User").findByKey(params.key);
+} else {
+    // Handle a non-GET submission
+    renderNothing();
+}
+
+// 3. Store the result to use in a conditional
 requestIsGet = isGet();
+// requestIsGet -> true (for a normal page request), false otherwise

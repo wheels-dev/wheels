@@ -163,6 +163,7 @@ component {
 	 * @disposition Set to `inline` to have the browser handle the opening of the file (possibly inline in the browser) or set to `attachment` to force a download dialog box.
 	 * @directory Directory outside of the web root where the file exists. Must be a full path.
 	 * @deleteFile Pass in `true` to delete the file on the server after sending it.
+	 * @deliver When set to `false`, the file will not be sent to the browser (used for testing).
 	 */
 	public any function sendFile(
 		required string file,

@@ -1,0 +1,9 @@
+// 1. Switch flash storage to cookie for the current request only
+setFlashStorage(storage="cookie");
+flashInsert(notice="Switching to cookie-based flash.");
+
+// 2. Switch flash storage to session (the default) for the current request only
+setFlashStorage(storage="session");
+
+// 3. Update flash storage globally so all subsequent requests also use cookie storage
+setFlashStorage(storage="cookie", setGlobally=true);

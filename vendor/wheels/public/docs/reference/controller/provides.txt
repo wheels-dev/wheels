@@ -1,1 +1,10 @@
-provides("html,xml,json");
+// 1. Allow the controller to respond to HTML and JSON requests
+// Place this call inside the controller's config() function
+provides("html,json");
+
+// 2. Allow all supported formats for an API controller
+provides("html,xml,json,csv,pdf,xls");
+
+// 3. JSON-only controller (e.g. a pure REST API controller)
+// Any request for a format other than json will be rejected
+provides("json");

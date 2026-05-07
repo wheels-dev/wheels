@@ -1,6 +1,29 @@
-// Set filter chain directly in an array.
+// 1. Set the entire filter chain directly using an array of structs
 setFilterChain([
 	{through="restrictAccess"},
 	{through="isLoggedIn, checkIPAddress", except="home, login"},
 	{type="after", through="logConversion", only="thankYou"}
 ]);
+
+// 2. Replace an inherited filter chain in a child controller by starting fresh
+// In app/controllers/Admin.cfc config():
+parentChain = filterChain();
+// Modify parentChain as needed, then reassign it wholesale
+setFilterChain([
+	{through="requireAdmin"},
+	{through="loadCurrentUser", except="login"},
+	{type="after", through="auditAction"}
+]);
+
+// 3. Conditionally swap the filter chain based on application mode
+if (get("environment") == "testing") {
+	setFilterChain([
+		{through="stubAuthentication"}
+	]);
+} else {
+	setFilterChain([
+		{through="requireSSL"},
+		{through="authenticate"},
+		{type="after", through="trackPageView"}
+	]);
+}

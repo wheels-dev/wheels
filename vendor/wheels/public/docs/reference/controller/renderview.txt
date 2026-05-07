@@ -1,17 +1,23 @@
-// Render a view page for a different action within the same controller.
+// 1. Render the view template for a different action within the same controller.
 renderView(action="edit");
 
-// Render a view page for a different action within a different controller.
+// 2. Render the view template for a different action within a different controller.
 renderView(controller="blog", action="new");
 
-// Another way to render the blog/new template from within a different controller.
+// 3. Render a specific template using an absolute path from the `views` folder.
 renderView(template="/blog/new");
 
-// Render the view page for the current action but without a layout and cache it for 60 minutes.
+// 4. Render without a layout and cache the output for 60 minutes.
 renderView(layout=false, cache=60);
 
-// Load a layout from a different folder within `views`.
+// 5. Load a layout from a non-default folder within `views`.
 renderView(layout="/layouts/blog");
 
-// Don't render the view immediately but rather return and store in a variable for further processing.
+// 6. Return the rendered output as a string instead of sending it to the client.
 myView = renderView(returnAs="string");
+
+// 7. Render with a specific HTTP status code (useful for error pages).
+renderView(action="notFound", status=404);
+
+// 8. Render XML output and suppress debug information even when `showDebugInformation` is globally enabled.
+renderView(template="/reports/summary", layout=false, hideDebugInformation=true);

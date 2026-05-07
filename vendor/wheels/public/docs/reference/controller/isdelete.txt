@@ -1,0 +1,7 @@
+// 1. Only process delete logic when the request method is DELETE
+if (isDelete()) {
+    // perform delete operation
+}
+
+// 2. Assign the result to a variable for later use
+requestIsDelete = isDelete();

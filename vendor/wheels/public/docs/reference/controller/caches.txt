@@ -1,11 +1,11 @@
-// Cache the `termsOfUse` action.
+// 1. Cache the `termsOfUse` action for the default 60 minutes.
 caches("termsOfUse");
 
-// Cache the `termsOfUse` action for 30 minutes.
-caches(actions="browseByUser, browseByTitle", time=30);
+// 2. Cache two actions for 30 minutes.
+caches(actions="browseByUser,browseByTitle", time=30);
 
-// Cache the `termsOfUse` and `codeOfConduct` actions, including their filters.
-caches(actions="termsOfUse, codeOfConduct", static=true);
+// 3. Cache the `termsOfUse` and `codeOfConduct` actions, including their filters.
+caches(actions="termsOfUse,codeOfConduct", static=true);
 
-// Cache content separately based on region.
-caches(action="home", key="request.region");
+// 4. Cache content separately based on region.
+caches(action="home", appendToKey="request.region");

@@ -1,1 +1,18 @@
+// 1. Clear all flash data
 flashClear();
+
+// 2. Insert some messages, then clear them all before redirecting
+flashInsert(notice="Record saved.");
+flashInsert(warning="Check your settings.");
+// Oops — wipe everything and start fresh
+flashClear();
+// flash() is now an empty struct: {}
+
+// 3. Clear flash conditionally inside a controller action
+function checkout() {
+    if (!isLoggedIn()) {
+        flashClear();
+        flashInsert(error="You must be logged in to check out.");
+        redirectTo(action="login");
+    }
+}
