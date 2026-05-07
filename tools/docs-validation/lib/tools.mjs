@@ -17,7 +17,7 @@ const READ_ROOTS = [
 ];
 
 const WRITE_GLOBS = [
-  /^vendor\/wheels\/public\/docs\/reference\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\/[a-z][a-z0-9]+\.txt$/,
+  /^vendor\/wheels\/public\/docs\/reference\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\/[a-z][a-z0-9]*\.txt$/,
 ];
 
 const EDIT_GLOBS = [/^vendor\/wheels\/.+\.cfc$/];
