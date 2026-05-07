@@ -8205,6 +8205,74 @@
         "cache_creation_input_tokens": 0,
         "cache_read_input_tokens": 2759
       }
+    },
+    "guide:contributing/coding-standards.mdx": {
+      "kind": "guide",
+      "id": "contributing/coding-standards.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:08:24.134Z",
+      "summary": "All 9 blocks are correctly handled: 8 already tagged and passing (7 compile + 1 cli), and block #8 is legitimately illustrative (multi-command bash with no single-command structure) with a descriptive title. No changes were needed; the harness reports 8 passed, 0 failed.",
+      "files_changed": [],
+      "notes": "Block #8 (bash, line 166) shows three `bash tools/test-local.sh` variants — multi-line, cannot be expressed as a single {test:cli cmd=\"...\"} token. Already has title=\"your shell — from the wheels repo root\" so the harness skips it cleanly. No prose drift found.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 8025,
+        "output_tokens": 849,
+        "cache_creation_input_tokens": 4687,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:contributing/index.mdx": {
+      "kind": "guide",
+      "id": "contributing/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:08:30.762Z",
+      "summary": "The contributing/index.mdx page contains no code blocks — it is a pure prose section index page. No annotations, no prose drift fixes needed. Harness confirmed 0 blocks, 0 failures.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 826,
+        "output_tokens": 289,
+        "cache_creation_input_tokens": 602,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:contributing/pull-requests.mdx": {
+      "kind": "guide",
+      "id": "contributing/pull-requests.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:08:39.764Z",
+      "summary": "All 8 code blocks on this page were already marked illustrative (git/shell workflow commands and example text patterns that cannot be meaningfully compile- or CLI-tested in the harness). No annotations needed; harness confirms 0 tagged blocks, 0 failures.",
+      "files_changed": [],
+      "notes": "Blocks are bash/text snippets showing git fork/clone/branch/push workflows and conventional-commit examples — none are executable CFML or Wheels CLI commands that the harness can validate. Illustrative classification is correct.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1070,
+        "output_tokens": 407,
+        "cache_creation_input_tokens": 889,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:contributing/writing-docs.mdx": {
+      "kind": "guide",
+      "id": "contributing/writing-docs.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:08:51.492Z",
+      "summary": "Page was already fully annotated: 2 blocks tagged ({test:compile} and {test:cli}) and 6 illustrative blocks properly marked with titles. Harness ran clean — 2 passed, 0 failed, no changes needed.",
+      "files_changed": [],
+      "notes": "No edits required. All 8 blocks were already in correct state: 2 tested, 6 illustrative.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1142,
+        "output_tokens": 386,
+        "cache_creation_input_tokens": 946,
+        "cache_read_input_tokens": 5518
+      }
     }
   },
   "runs": []
