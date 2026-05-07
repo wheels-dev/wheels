@@ -19,7 +19,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Overview
 
-```
+``` title="Synopsis"
 wheels generate <type> <name> [attributes...] [flags]
 ```
 
@@ -76,7 +76,7 @@ Generate a model CFC and, when properties are supplied, a matching create-table 
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate model <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>] [--hasOne=<list>]
 ```
 
@@ -86,7 +86,7 @@ Writes `app/models/<Name>.cfc` with `belongsTo`/`hasMany`/`hasOne` associations 
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate model User name email:string active:boolean --hasMany=posts" step=1}
 wheels generate model User name email:string active:boolean --hasMany=posts
 ```
 
@@ -98,7 +98,7 @@ Generate a controller CFC and view files for each read-only action.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate controller <Name> [action ...]
 ```
 
@@ -108,7 +108,7 @@ Writes `app/controllers/<Name>.cfc` with a stub method per action name you pass.
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate controller Users index show new create" step=2}
 wheels generate controller Users index show new create
 ```
 
@@ -120,7 +120,7 @@ Generate a single view template.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate view <controller> <action>
 ```
 
@@ -130,7 +130,7 @@ Writes `app/views/<controller>/<action>.cfm`. Both arguments are required — un
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate view products edit" step=3}
 wheels generate view products edit
 ```
 
@@ -142,7 +142,7 @@ Generate a blank migration file.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate migration <Name>
 ```
 
@@ -152,7 +152,7 @@ Writes `app/migrator/migrations/<timestamp>_<Name>.cfc` with empty `up()` and `d
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate migration AddIndexesToPosts" step=4}
 wheels generate migration AddIndexesToPosts
 ```
 
@@ -164,7 +164,7 @@ Generate a complete CRUD resource.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate scaffold <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>]
 ```
 
@@ -178,7 +178,7 @@ After running, do `wheels migrate latest` to apply the migration, then `wheels s
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate scaffold Post title body:text publishedAt:datetime --belongsTo=author" step=5}
 wheels generate scaffold Post title body:text publishedAt:datetime --belongsTo=author
 ```
 
@@ -199,7 +199,7 @@ Generate a JSON-only resource — model, controller, migration, tests, and a nam
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate api-resource <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>]
 ```
 
@@ -209,7 +209,7 @@ Same pipeline as `scaffold`, but the controller is generated in JSON-only mode (
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate api-resource Product name price:decimal sku:string" step=6}
 wheels generate api-resource Product name price:decimal sku:string
 ```
 
@@ -221,7 +221,7 @@ Add a single resource route to `config/routes.cfm`.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate route <name>
 ```
 
@@ -233,7 +233,7 @@ This is the one-line equivalent of the route step that `scaffold` and `api-resou
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate route comments" step=7}
 wheels generate route comments
 ```
 
@@ -245,7 +245,7 @@ Generate a BDD test spec file.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate test <type> <Name>
 ```
 
@@ -257,7 +257,7 @@ Writes `tests/specs/models/<Name>Spec.cfc` or `tests/specs/controllers/<Name>Con
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate test model User" step=8}
 wheels generate test model User
 ```
 
@@ -269,7 +269,7 @@ Generate an add-column migration for an existing model.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate property <ModelName> <property:type>
 ```
 
@@ -281,7 +281,7 @@ The generator prints a reminder to add a matching `validatesPresenceOf()` call i
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate property User phoneNumber:string" step=9}
 wheels generate property User phoneNumber:string
 ```
 
@@ -293,7 +293,7 @@ Generate a helper CFC under `app/helpers/`.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate helper <name> [functionName ...] [--force]
 ```
 
@@ -303,7 +303,7 @@ Writes `app/helpers/<Name>Helper.cfc` (the `Helper` suffix is appended automatic
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate helper Formatting truncateText formatCurrency" step=10}
 wheels generate helper Formatting truncateText formatCurrency
 ```
 
@@ -315,7 +315,7 @@ Stamp out a named code pattern.
 
 #### Synopsis
 
-```
+``` title="Synopsis"
 wheels generate snippets [pattern] [--force]
 wheels generate snippets templates [--force]
 ```
@@ -341,7 +341,7 @@ The special `templates` subcommand copies every raw generator template from the 
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels generate snippets auth" step=11}
 wheels generate snippets auth
 ```
 

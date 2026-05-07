@@ -11,7 +11,7 @@ Tail `kamal-proxy` logs on every host. Shows access logs, health-check results, 
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy proxy logs [--tail=<N>] [--destination=<name>] [--dry-run]
 ```
 
@@ -29,6 +29,6 @@ Emits `docker logs --tail <N> kamal-proxy` on every host, prefixed by host.
 
 ## Example
 
-```bash
+```bash title="illustrative — requires live deploy hosts"
 wheels deploy proxy logs --tail=500
 ```

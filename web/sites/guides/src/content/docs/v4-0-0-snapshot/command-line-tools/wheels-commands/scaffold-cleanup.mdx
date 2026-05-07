@@ -28,7 +28,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Synopsis
 
-```bash
+```bash title="illustrative — synopsis"
 wheels destroy <name> [type] [--force]
 wheels d <name> [type] [--force]
 ```
@@ -56,7 +56,7 @@ Running `wheels destroy` with no arguments prints the usage block and supported 
 
 ### Example
 
-```bash
+```bash title="illustrative — preview then force"
 wheels destroy Post
 # preview prints; nothing deleted yet
 
@@ -79,7 +79,7 @@ The second command removes `app/models/Post.cfc`, `app/controllers/Posts.cfc`, `
 
 ### Undo a scaffold
 
-```bash
+```bash title="illustrative — undo scaffold"
 wheels destroy Post --force
 wheels migrate latest   # apply the generated drop-table migration
 ```
@@ -88,7 +88,7 @@ Removes every file `wheels generate scaffold Post` wrote, clears its route, and 
 
 ### Clean up aborted work
 
-```bash
+```bash title="illustrative — clean up aborted work"
 wheels destroy User model --force
 wheels destroy Users controller --force
 ```
@@ -97,7 +97,7 @@ Useful when you ran `wheels generate model` and `wheels generate controller` sep
 
 ### Re-scaffold under a new name
 
-```bash
+```bash title="illustrative — re-scaffold under new name"
 wheels destroy Post --force
 wheels migrate latest
 wheels generate scaffold Article title body:text

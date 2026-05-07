@@ -26,7 +26,7 @@ Execute a CFML expression (or short script fragment) supplied on the command lin
 
 #### Synopsis
 
-```bash
+```bash title="synopsis — illustrative"
 wheels cfml <expression> [<expression> ...]
 ```
 
@@ -48,13 +48,13 @@ wheels cfml 'now()'
 
 The expression runs through the Lucee engine and the process exits with code 0. To see the value, emit it explicitly:
 
-```bash
+```bash {test:cli cmd="wheels cfml writeOutput(1+2)" asserts-stdout="3"}
 wheels cfml 'writeOutput(1 + 2)'
 ```
 
 Sample output:
 
-```
+```text title="sample output"
 3
 ```
 
@@ -68,7 +68,7 @@ Execute a CFML script file (`.cfm`, `.cfs`) or a LuCLI batch script (`.lucli`).
 
 #### Synopsis
 
-```bash
+```bash title="synopsis — illustrative"
 wheels run <script> [<arg> ...]
 ```
 
@@ -89,7 +89,7 @@ Any trailing arguments after the script path are passed through to the script. T
 
 #### Example
 
-```bash
+```bash title="illustrative — multi-command example"
 wheels run hello.cfm
 wheels run script.cfs arg1 arg2
 wheels run deploy.lucli
@@ -107,7 +107,7 @@ Start an interactive CFML read-eval-print loop. No Wheels app, no project contex
 
 #### Synopsis
 
-```bash
+```bash title="synopsis — illustrative"
 wheels repl [flags]
 ```
 
@@ -135,7 +135,7 @@ wheels repl [flags]
 
 #### Example session
 
-```text
+```text title="example REPL session — illustrative"
 $ wheels repl
 🚀 CFML REPL - LuCLI 0.3.5
 ℹ  Type CFML expressions to evaluate. Type 'exit' or Ctrl+D to quit.

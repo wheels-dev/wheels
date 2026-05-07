@@ -11,7 +11,7 @@ sidebar:
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy registry login [--password=<value>] [--destination=<name>] [--dry-run]
 ```
 
@@ -27,7 +27,7 @@ wheels deploy registry login [--password=<value>] [--destination=<name>] [--dry-
 
 Per host:
 
-```
+``` title="docker login invocation (illustrative)"
 echo <password> | docker login <server> --username <username> --password-stdin
 ```
 
@@ -37,6 +37,6 @@ Password comes from `.kamal/secrets` via the first key in `registry.password:`, 
 
 ## Example
 
-```bash
+```bash title="example (illustrative — requires deployment infrastructure)"
 wheels deploy registry login
 ```

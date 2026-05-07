@@ -30,7 +30,7 @@ Start a Wheels development server for the current project. Delegates to `wheels 
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels start [flags]
 ```
 
@@ -51,7 +51,7 @@ Any flags you pass are forwarded verbatim to `wheels server start`. The common o
 
 #### Example
 
-```bash
+```bash title="illustrative — foreground process, not runnable in CI"
 wheels start
 ```
 
@@ -67,7 +67,7 @@ Stop the running Wheels development server for the current project.
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels stop
 ```
 
@@ -75,7 +75,7 @@ Resolves the server instance from the project directory and asks LuCLI to stop i
 
 #### Example
 
-```bash
+```bash title="illustrative — requires running server"
 wheels stop
 ```
 
@@ -91,7 +91,7 @@ Reinitialize the running Wheels application without restarting the JVM. Useful a
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels reload
 ```
 
@@ -99,7 +99,7 @@ wheels reload
 
 #### Example
 
-```bash
+```bash title="illustrative — requires running server"
 wheels reload
 ```
 
@@ -113,7 +113,7 @@ Most CFML source changes are picked up on the next request without a reload. You
 
 The three commands compose into a typical inner loop:
 
-```bash
+```bash title="illustrative — dev loop example"
 # Terminal 1 — bring the server up and leave it running
 wheels start
 

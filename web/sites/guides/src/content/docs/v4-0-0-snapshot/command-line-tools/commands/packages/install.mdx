@@ -11,7 +11,7 @@ Installs a package into `vendor/<name>/` from the registry. On the next `wheels 
 
 ## Synopsis
 
-```
+```sh title="synopsis"
 wheels packages install <name>[@<version>] [--force]
 ```
 
@@ -44,7 +44,7 @@ The same `SemVer` matcher that `PackageLoader` uses at runtime.
 
 ## Example
 
-```
+```sh title="illustrative — terminal session"
 $ wheels packages install wheels-sentry
 Installed wheels-sentry@1.0.0 → /Users/me/app/vendor/wheels-sentry
 Run `wheels reload` to activate it.

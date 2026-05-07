@@ -11,7 +11,7 @@ Install and run the `kamal-proxy` singleton on every host. First-run verb — pa
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy proxy boot [--destination=<name>] [--dry-run]
 ```
 
@@ -26,7 +26,7 @@ wheels deploy proxy boot [--destination=<name>] [--dry-run]
 
 For every host across every role (the proxy is a per-host singleton):
 
-```
+``` title="docker command issued per host"
 docker run -d --restart unless-stopped \
   --name kamal-proxy \
   --network kamal \
@@ -40,6 +40,6 @@ Fails fast if port 80 or 443 is occupied on any host.
 
 ## Example
 
-```bash
+```bash title="example"
 wheels deploy proxy boot
 ```

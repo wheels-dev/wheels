@@ -44,7 +44,7 @@ Run the Wheels BDD test suite. Auto-detects core tests when `vendor/wheels/tests
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels test [--filter=<dir>] [--db=<engine>] [--verbose] [--ci] [--core] [flags]
 ```
 
@@ -79,7 +79,7 @@ The engine identifiers are `postgres` (not `postgresql`) and `sqlserver` (not `m
 
 #### Example
 
-```bash
+```bash title="example"
 wheels test --filter=models --db=sqlite --verbose
 ```
 
@@ -91,7 +91,7 @@ Download the Playwright Java JARs and a Chromium binary into `.wheels/browser/` 
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels browser install [--force] [--browser=<name>]
 ```
 
@@ -106,7 +106,7 @@ wheels browser install [--force] [--browser=<name>]
 
 #### Example
 
-```bash
+```bash title="example"
 wheels browser install
 ```
 
@@ -118,7 +118,7 @@ Specs that extend `wheels.wheelstest.BrowserTest` short-circuit gracefully when 
 
 ## Common workflows
 
-```bash
+```bash title="common workflows"
 # Run the whole suite against SQLite (the default)
 wheels test
 

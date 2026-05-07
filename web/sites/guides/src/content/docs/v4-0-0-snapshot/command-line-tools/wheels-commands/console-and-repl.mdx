@@ -24,7 +24,7 @@ Because the evaluation happens in the server, not the CLI, every expression runs
 
 ### Synopsis
 
-```bash
+```bash title="illustrative — synopsis only"
 wheels console [--password=<value>]
 ```
 
@@ -72,13 +72,13 @@ Commands at the prompt start with `/`. They're short-circuits for things you'd o
 
 Invoke the console from a project root while a dev server is running:
 
-```bash
+```bash title="illustrative — starts interactive session"
 wheels console
 ```
 
 A typical session looks like this — the prompt is `wheels>`, and each line you type is evaluated in the app context:
 
-```text
+```text title="illustrative — sample REPL session"
 Wheels Console v4.0.0
 Connected to localhost:3000 (development) — Wheels 4.0.0
 Type expressions to evaluate in your app context. /help for commands.
@@ -96,7 +96,7 @@ wheels> /models
 
 Build a new model instance, check validations, and inspect the error list:
 
-```text
+```text title="illustrative — sample REPL session"
 wheels> var u = model("User").new(email="bad")
 wheels> u.valid()
 => false
@@ -111,7 +111,7 @@ wheels> u.errorsOn("email")
 
 Resolve a DI-registered service and invoke a method:
 
-```text
+```text title="illustrative — sample REPL session"
 wheels> var svc = service("emailService")
 wheels> svc.isConfigured()
 => true
@@ -119,7 +119,7 @@ wheels> svc.isConfigured()
 
 Chain scopes against a model that defines them:
 
-```text
+```text title="illustrative — sample REPL session"
 wheels> model("Post").published().recent().findAll().recordCount
 => 17
 ```

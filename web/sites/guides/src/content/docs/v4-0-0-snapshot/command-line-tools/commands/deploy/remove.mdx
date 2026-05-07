@@ -17,7 +17,7 @@ This removes running containers on every target host. Requires `--confirm`. Ther
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy remove --confirm [--destination=<name>] [--dry-run]
 ```
 
@@ -40,7 +40,7 @@ Volumes attached to accessories persist (they're named) — `docker rm` doesn't 
 
 ## Example
 
-```bash
+```bash title="example"
 wheels deploy remove --confirm --dry-run     # always preview first
 wheels deploy remove --confirm --destination=staging
 ```

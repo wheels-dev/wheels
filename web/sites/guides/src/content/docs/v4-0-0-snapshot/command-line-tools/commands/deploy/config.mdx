@@ -11,7 +11,7 @@ Print the fully-resolved `deploy.yml` config as YAML. Mustache interpolation is 
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy config [--destination=<name>] [--config=<path>]
 ```
 
@@ -26,7 +26,7 @@ wheels deploy config [--destination=<name>] [--config=<path>]
 
 Prints a YAML dump with four keys that matter at deploy time:
 
-```yaml
+```yaml title="example output"
 service: myapp
 image: myorg/myapp
 servers:
@@ -47,6 +47,6 @@ Full per-role options, env merging, and accessory blocks are not emitted in Phas
 
 ## Example
 
-```bash
+```bash title="illustrative"
 wheels deploy config --destination=staging
 ```

@@ -11,7 +11,7 @@ Manually take the deploy lock. Useful when running an out-of-band maintenance ta
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy lock acquire [--message=<string>] [--destination=<name>] [--dry-run]
 ```
 
@@ -29,6 +29,6 @@ Emits the atomic lock-acquire command (`ln -s` against `/tmp/kamal_deploy_lock_<
 
 ## Example
 
-```bash
+```bash title="example"
 wheels deploy lock acquire --message="db migration in progress"
 ```

@@ -31,7 +31,7 @@ Manage the LuCLI module registry. Aliased as `wheels module` (singular).
 
 ### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules <subcommand> [flags]
 ```
 
@@ -43,7 +43,7 @@ Print every module installed under the active profile's modules directory, along
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules list
 ```
 
@@ -71,7 +71,7 @@ Install a module from the bundled repository index (by name) or directly from a 
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules install [MODULE_NAME] [flags]
 ```
 
@@ -86,7 +86,7 @@ wheels modules install [MODULE_NAME] [flags]
 
 #### Example
 
-```bash
+```bash title="install a module from a git URL"
 wheels modules install my-module --url=https://github.com/acme/my-module.git --ref=main
 ```
 
@@ -96,7 +96,7 @@ Alias for `install` with an explicit focus on `--ref`. Takes the same arguments 
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules add [MODULE_NAME] [flags]
 ```
 
@@ -115,7 +115,7 @@ Update a previously-installed git-sourced module to a newer ref.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules update <MODULE_NAME> [flags]
 ```
 
@@ -133,7 +133,7 @@ Remove an installed module by deleting its directory under the active profile's 
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules uninstall <MODULE_NAME>
 ```
 
@@ -145,7 +145,7 @@ Scaffold a new module in the active profile's modules directory. Creates the dir
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules init [MODULE_NAME] [flags]
 ```
 
@@ -164,7 +164,7 @@ Invoke a module's `Module.cfc` directly with arguments, bypassing the normal top
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules run <MODULE_NAME> [ARGS...] [flags]
 ```
 
@@ -182,7 +182,7 @@ Print help for a module or a specific command within a module.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels modules help --module=<MODULE_NAME> [--command=<COMMAND>]
 ```
 
@@ -199,7 +199,7 @@ Manage per-project dependencies declared in `lucee.json`. Aliased as `wheels dep
 
 ### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels deps <subcommand> [flags]
 ```
 
@@ -213,7 +213,7 @@ Read `lucee.json`, resolve every dependency, and install supported sources (git,
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels deps install [flags]
 ```
 
@@ -231,7 +231,7 @@ Unsupported sources (currently anything other than git, extension, or ForgeBox) 
 
 #### Example
 
-```bash
+```bash title="examples — run in a project with a lucee.json"
 wheels deps install
 wheels deps install --dry-run --include-nested-deps
 wheels deps install --env=prod --production
@@ -243,7 +243,7 @@ Interactive wizard that appends a new dependency to `lucee.json`. Walks you thro
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels deps add
 ```
 
@@ -255,7 +255,7 @@ Remove cached git dependency clones under LuCLI's git cache directory (e.g. `~/.
 
 #### Synopsis
 
-```bash
+```bash {test:cli cmd="wheels deps prune"}
 wheels deps prune
 ```
 
@@ -284,7 +284,7 @@ Don't confuse LuCLI modules with Wheels packages. Wheels packages (installed int
 
 ### Install a LuCLI module
 
-```bash
+```bash title="install and verify a LuCLI module"
 wheels modules install my-module --url=https://github.com/acme/my-module.git --ref=v1.0.0
 wheels modules list
 ```
@@ -293,7 +293,7 @@ The first command clones the repo into `~/.wheels/modules/my-module/` and regist
 
 ### Add a dep to the current project
 
-```bash
+```bash title="add a dependency interactively then install"
 wheels deps add
 wheels deps install
 ```
@@ -302,7 +302,7 @@ wheels deps install
 
 ### Prune removed deps
 
-```bash
+```bash title="prune cache and force reinstall"
 wheels deps prune
 wheels deps install --force
 ```

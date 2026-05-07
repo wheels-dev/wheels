@@ -24,7 +24,7 @@ The `wheels` CLI is configured at two levels. Per-project behaviour — which Lu
 
 The schema is permissive (unknown keys are ignored) and JSON-with-comments is accepted by the parser. A minimal file that pins a Lucee version and a port looks like this:
 
-```json
+```json title="lucee.json — minimal example"
 {
   "name": "my-wheels-app",
   "lucee": {
@@ -37,7 +37,7 @@ The schema is permissive (unknown keys are ignored) and JSON-with-comments is ac
 
 An annotated maximal example, showing every top-level key the LuCLI parser recognises today:
 
-```jsonc
+```jsonc title="lucee.json — all recognised keys"
 {
   "name": "my-wheels-app",
   "lucee": {
@@ -127,7 +127,7 @@ LuCLI uses the word *profile* for two unrelated things, and keeping them separat
 
 The `environments` object in `lucee.json` lets you override specific keys for a named environment. Keys inside an environment are merged over the base config — anything you omit is inherited.
 
-```json
+```json title="lucee.json — environment profiles"
 {
   "name": "my-app",
   "lucee": { "version": "7.0.1.100" },
@@ -150,7 +150,7 @@ The `environments` object in `lucee.json` lets you override specific keys for a 
 
 Select an environment with `--env` (or the short form `-e`) on any command that loads `lucee.json`:
 
-```bash
+```bash title="selecting an environment profile"
 wheels server start --env=prod
 wheels server run -e dev
 ```
@@ -195,7 +195,7 @@ Four global flags are defined on the root `wheels` command and apply to every su
 
 Global flags go *before* the subcommand:
 
-```bash
+```bash title="global flags before the subcommand"
 wheels --verbose server start
 wheels -t generate model User name email
 wheels -v -t test
@@ -224,13 +224,13 @@ The CLI keeps two kinds of state in two distinct places.
 
 Because `wheels` defaults to `~/.wheels` and `lucli` defaults to `~/.lucli`, the two installs are isolated by default — no action needed. If you want `wheels` to share state with a standalone LuCLI install anyway (unusual, but legitimate for debugging), point `LUCLI_HOME` at the shared directory:
 
-```bash
+```bash title="sharing home directories between wheels and lucli"
 LUCLI_HOME=$HOME/.lucli wheels server status
 ```
 
 If you want a single machine to juggle multiple Wheels installs — say, one for work and one for a personal project — override `LUCLI_HOME` per-shell:
 
-```bash
+```bash title="juggling multiple Wheels installs on one machine"
 # Project A
 export LUCLI_HOME=$HOME/.wheels-work
 wheels server start

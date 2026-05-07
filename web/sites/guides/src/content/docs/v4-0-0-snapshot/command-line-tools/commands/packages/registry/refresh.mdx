@@ -11,7 +11,7 @@ Removes `~/.wheels/cache/packages/` entirely. The next registry-touching command
 
 ## Synopsis
 
-```
+```sh {test:cli cmd="wheels packages registry refresh"}
 wheels packages registry refresh
 ```
 
@@ -23,7 +23,7 @@ wheels packages registry refresh
 
 ## Example
 
-```
+```sh title="illustrative — example terminal session"
 $ wheels packages registry refresh
 Cache cleared. Next `wheels packages list` will re-fetch from the registry.
 ```

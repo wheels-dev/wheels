@@ -27,7 +27,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server <subcommand> [flags]
 ```
 
@@ -39,7 +39,7 @@ Boot a Lucee server instance in the background for the current (or specified) pr
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server start [PROJECT_DIR] [flags]
 ```
 
@@ -77,13 +77,13 @@ wheels server start [PROJECT_DIR] [flags]
 
 #### Example
 
-```bash
+```bash title="example"
 wheels server start --name=dev --version=6.2.2.91 --port=8080
 ```
 
 Sample output:
 
-```
+```title="sample output"
 Starting Lucee server 'dev' on port 8080...
 Lucee version: 6.2.2.91
 Server started successfully. Visit: http://localhost:8080/
@@ -95,7 +95,7 @@ Same as `start`, but runs the server in the foreground with log streaming. Usefu
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server run [PROJECT_DIR] [flags]
 ```
 
@@ -105,7 +105,7 @@ Terminate a running Lucee server instance.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server stop [flags]
 ```
 
@@ -119,13 +119,13 @@ wheels server stop [flags]
 
 #### Example
 
-```bash
+```bash title="example"
 wheels server stop --name=dev
 ```
 
 Sample output:
 
-```
+```title="sample output"
 Stopping server 'dev'...
 Server 'dev' stopped.
 ```
@@ -136,7 +136,7 @@ Stop and then start a named server instance.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server restart [flags]
 ```
 
@@ -153,7 +153,7 @@ Report whether a server is running, along with port and process metadata.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server status [flags]
 ```
 
@@ -166,13 +166,13 @@ wheels server status [flags]
 
 #### Example
 
-```bash
+```bash title="example"
 wheels server status --name=dev
 ```
 
 Sample output:
 
-```
+```title="sample output"
 Server: dev
 Status: RUNNING
 Port: 8080
@@ -186,7 +186,7 @@ List every configured server instance known to LuCLI.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server list [flags]
 ```
 
@@ -198,13 +198,13 @@ wheels server list [flags]
 
 #### Example
 
-```bash
+```bash title="example"
 wheels server list
 ```
 
 Sample output:
 
-```
+```title="sample output"
 NAME          STATUS    PORT    VERSION       DIRECTORY
 dev           RUNNING   8080    6.2.2.91      /Users/you/projects/app
 scratchpad    STOPPED   8081    6.2.0.280     /Users/you/projects/scratch
@@ -216,7 +216,7 @@ View or follow logs for a named server instance.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server log [flags]
 ```
 
@@ -230,7 +230,7 @@ wheels server log [flags]
 
 #### Example
 
-```bash
+```bash title="example"
 wheels server log --name=dev --follow
 ```
 
@@ -242,7 +242,7 @@ Show a server configuration overview without starting anything. Useful for verif
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server info [PROJECT_DIR] [flags]
 ```
 
@@ -260,7 +260,7 @@ Print the effective environment variables LuCLI will hand to the server — the 
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server env [flags]
 ```
 
@@ -279,7 +279,7 @@ Open an already-running server instance in your default browser.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server open [flags]
 ```
 
@@ -295,7 +295,7 @@ Remove stopped server instances from LuCLI's registry.
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server prune [flags]
 ```
 
@@ -314,7 +314,7 @@ Create a new `lucee.json` for this project (or edit the existing one) in the int
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server new [flags]
 ```
 
@@ -332,7 +332,7 @@ Open an existing `lucee.json` in the same interactive editor as `new`. Errors if
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server edit [flags]
 ```
 
@@ -350,7 +350,7 @@ Lock the server configuration for a given environment to a `lucee-lock.json` —
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server lock [flags]
 wheels server unlock [flags]
 ```
@@ -377,7 +377,7 @@ Read or write values in `lucee.json` without opening the interactive editor. Han
 
 #### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels server config get <key> [flags]
 wheels server config set <key=value> [<key=value> ...] [flags]
 ```
@@ -399,7 +399,7 @@ wheels server config set <key=value> [<key=value> ...] [flags]
 
 #### Example
 
-```bash
+```bash title="example"
 wheels server config get port
 wheels server config set port=8081 admin.enabled=false
 ```

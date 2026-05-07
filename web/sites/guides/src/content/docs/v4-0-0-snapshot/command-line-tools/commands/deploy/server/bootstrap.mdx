@@ -11,7 +11,7 @@ Install Docker on every host. Idempotent — re-runs on already-installed hosts 
 
 ## Synopsis
 
-```
+```txt title="synopsis"
 wheels deploy server bootstrap [--destination=<name>] [--dry-run]
 ```
 
@@ -26,7 +26,7 @@ wheels deploy server bootstrap [--destination=<name>] [--dry-run]
 
 Per host:
 
-```
+```sh title="per-host behavior"
 which docker >/dev/null 2>&1 || curl -fsSL https://get.docker.com | sh
 ```
 
@@ -34,6 +34,6 @@ The convenience script runs as root (or via `sudo`). For production hardening, i
 
 ## Example
 
-```bash
+```bash title="example"
 wheels deploy server bootstrap
 ```

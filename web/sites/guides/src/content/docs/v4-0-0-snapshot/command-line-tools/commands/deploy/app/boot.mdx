@@ -11,7 +11,7 @@ sidebar:
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy app boot --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
@@ -28,7 +28,7 @@ wheels deploy app boot --version=<v> [--role=<name>] [--destination=<name>] [--d
 
 For each host in each role, emits:
 
-```
+``` title="emitted docker run command"
 docker run --detach --restart unless-stopped \
   --name <service>-<role>-<version> \
   --network kamal \
@@ -41,7 +41,7 @@ docker run --detach --restart unless-stopped \
 
 ## Example
 
-```bash
+```bash title="example"
 wheels deploy app boot --version=abc1234
 wheels deploy app boot --version=abc1234 --role=job
 ```
