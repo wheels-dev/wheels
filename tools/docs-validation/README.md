@@ -1,45 +1,59 @@
 # tools/docs-validation
 
-Per-function and per-guide-page documentation validation, run by Claude
-agents. The agent reads `docs/api/v4.0.0.json` (the framework's live
-self-introspection), walks the listed functions, and for each one:
+Agent-driven docs validation. Two modes:
 
-1. Reads the CFC source for the function in `vendor/wheels/`.
-2. Reads any existing example body in
-   `vendor/wheels/public/docs/reference/<scope>/<name>.txt`.
-3. Validates samples by compiling them with `wheels cfml` (existing
-   `verify-docs` harness primitive) or by running them through a fresh
-   fixture app (also reused from `verify-docs`).
-4. Reconciles the docblock prose in the CFC against actual behavior.
-   When the body is genuinely buggy and the documented contract is
-   right, fixes the body — bounded by the test suite staying green.
-5. Commits the edits.
+- **`--mode=api`** (the original) — walks `docs/api/v4.0.0.json` and
+  validates each public function: reads CFC source, refreshes/authors
+  reference example at `vendor/wheels/public/docs/reference/<scope>/<name>.txt`,
+  fixes docblock drift in the CFC.
+- **`--mode=guide`** — walks `web/sites/guides/src/content/docs/v4-0-0-snapshot/`
+  and validates each page: enumerates code blocks, adds `{test:*}`
+  annotations to anything tag-able, marks illustrative blocks with
+  `title="..."`, fixes prose drift, validates via the existing
+  `verify-docs` harness.
 
-## Edit scope (enforced)
+## Edit scope (enforced at the tool layer)
 
 - `vendor/wheels/**/*.cfc` — docblock hint + `@param` hints + (rarely)
   function bodies when behavior contradicts the contract
-- `vendor/wheels/public/docs/reference/<scope>/<name>.txt` — examples
-- Nothing else. Anything else trips the "needs human" flag.
+- `vendor/wheels/public/docs/reference/<scope>/<name>.txt` — API
+  examples (api mode)
+- `web/sites/guides/src/content/docs/v4-0-0-snapshot/**/*.mdx?` —
+  guide page edits (guide mode)
+- Nothing else. Anything else trips the `needs_human` flag.
 
 ## Running locally
 
     cd tools/docs-validation
-    pnpm install
-    ANTHROPIC_API_KEY=sk-... node orchestrate.mjs --section "Model Class" --dry-run
+    npm install
+
+    # API mode
+    node orchestrate.mjs --list-sections
+    node orchestrate.mjs --section "Model Class" --dry-run
     ANTHROPIC_API_KEY=sk-... node orchestrate.mjs --function findEach
-    node orchestrate.mjs --section "Model Class" --status     # show progress
+
+    # Guide mode
+    node orchestrate.mjs --mode=guide --list-directories
+    node orchestrate.mjs --mode=guide --directory upgrading --dry-run
+    ANTHROPIC_API_KEY=sk-... node orchestrate.mjs --mode=guide --path "upgrading/3x-to-4x.mdx"
+
+    # Shared
+    node orchestrate.mjs --status
 
 ## Running in CI
 
-`.github/workflows/docs-validation.yml` exposes `workflow_dispatch`
-with a `section` input. Triggering it picks one of the 9 sections,
-runs the orchestrator over every function in that section, opens a
-draft PR against `develop` with the edits.
+`.github/workflows/docs-validation.yml` exposes `workflow_dispatch` with
+a `mode` input (`api` / `guide`). Pick the appropriate `section` (api
+mode) or `directory` (guide mode), and the orchestrator opens a draft
+PR back into `develop`.
 
 ## State
 
-`state.json` (committed) tracks per-function status:
+`state.json` (committed) tracks per-item status:
 `pending` → `in_progress` → `done` | `failed` | `needs_human`.
-Re-runs are idempotent — only `pending` and `failed` items are
-re-attempted.
+
+Item keys: `function:<name>` for api mode, `guide:<rel-path>` for
+guide mode (e.g. `guide:upgrading/3x-to-4x.mdx`).
+
+Re-runs are idempotent — `done` items are skipped unless `--force` is
+passed; `pending` and `failed` items are re-attempted.

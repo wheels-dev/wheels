@@ -3,10 +3,19 @@ name: Docs validation (agent)
 on:
   workflow_dispatch:
     inputs:
-      section:
-        description: 'API section to validate'
+      mode:
+        description: 'Validation mode'
         required: true
         type: choice
+        default: 'api'
+        options:
+          - 'api'
+          - 'guide'
+      section:
+        description: '[api mode] API section to validate (ignored in guide mode)'
+        required: false
+        type: choice
+        default: 'Model Class'
         options:
           - 'Configuration'
           - 'Controller'
@@ -16,8 +25,23 @@ on:
           - 'Model Configuration'
           - 'Model Object'
           - 'View Helpers'
+      directory:
+        description: '[guide mode] Top-level guides directory to validate (ignored in api mode)'
+        required: false
+        type: choice
+        default: 'upgrading'
+        options:
+          - 'basics'
+          - 'command-line-tools'
+          - 'contributing'
+          - 'core-concepts'
+          - 'deployment'
+          - 'digging-deeper'
+          - 'start-here'
+          - 'testing'
+          - 'upgrading'
       limit:
-        description: 'Max functions to validate this run (blank = all pending)'
+        description: 'Max items to validate this run (blank = all pending)'
         required: false
         type: string
         default: ''
@@ -32,7 +56,7 @@ on:
         type: boolean
         default: false
       force:
-        description: 'Re-run already-done functions (overwrites their state.json entries)'
+        description: 'Re-run already-done items (overwrites their state.json entries)'
         required: false
         type: boolean
         default: false
@@ -42,7 +66,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: docs-validation-${{ inputs.section }}
+  group: docs-validation-${{ inputs.mode }}-${{ inputs.section || inputs.directory }}
   cancel-in-progress: false
 
 jobs:
@@ -52,10 +76,6 @@ jobs:
 
     steps:
       - name: Checkout dispatching ref
-        # We check out the ref this workflow was dispatched against (typically
-        # `develop` once merged, but a feature branch during initial testing).
-        # The agent's edits land in a per-run branch derived from this ref;
-        # the resulting PR always targets `develop`.
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -68,6 +88,17 @@ jobs:
       - name: Install tools/docs-validation deps
         working-directory: tools/docs-validation
         run: npm ci --no-audit --no-fund
+
+      - name: Set up pnpm
+        if: ${{ inputs.mode == 'guide' }}
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.23.0
+
+      - name: Install web pnpm deps (for verify-docs harness in guide mode)
+        if: ${{ inputs.mode == 'guide' }}
+        working-directory: web
+        run: pnpm install --frozen-lockfile
 
       - name: Set up Linuxbrew
         uses: Homebrew/actions/setup-homebrew@master
@@ -86,11 +117,22 @@ jobs:
       - name: Warm up wheels module
         run: wheels --version >/dev/null
 
-      - name: Compute branch name
+      - name: Compute branch name + commit message
         id: branch
         run: |
-          slug=$(echo "${{ inputs.section }}" | tr '[:upper:] ' '[:lower:]-')
-          echo "name=docs-validation/${slug}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ inputs.mode }}" == "guide" ]]; then
+            slug=$(echo "${{ inputs.directory }}" | tr '[:upper:] ' '[:lower:]-')
+            echo "name=docs-validation/guide-${slug}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "title=docs(guides): validate ${{ inputs.directory }} directory" >> "$GITHUB_OUTPUT"
+            echo "msg=docs(guides): validate ${{ inputs.directory }} directory (run ${{ github.run_id }})" >> "$GITHUB_OUTPUT"
+            echo "label=${{ inputs.directory }} directory" >> "$GITHUB_OUTPUT"
+          else
+            slug=$(echo "${{ inputs.section }}" | tr '[:upper:] ' '[:lower:]-')
+            echo "name=docs-validation/${slug}-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "title=docs(api): validate ${{ inputs.section }} section" >> "$GITHUB_OUTPUT"
+            echo "msg=docs(api): validate ${{ inputs.section }} section (run ${{ github.run_id }})" >> "$GITHUB_OUTPUT"
+            echo "label=${{ inputs.section }} section" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Configure git
         run: |
@@ -102,7 +144,12 @@ jobs:
         if: ${{ inputs.dry_run }}
         working-directory: tools/docs-validation
         run: |
-          ARGS=(--section "${{ inputs.section }}" --dry-run)
+          ARGS=(--mode "${{ inputs.mode }}" --dry-run)
+          if [[ "${{ inputs.mode }}" == "guide" ]]; then
+            ARGS+=(--directory "${{ inputs.directory }}")
+          else
+            ARGS+=(--section "${{ inputs.section }}")
+          fi
           if [[ -n "${{ inputs.limit }}" ]]; then
             ARGS+=(--limit "${{ inputs.limit }}")
           fi
@@ -119,8 +166,14 @@ jobs:
           WHEELS_DOCS_MODEL: ${{ inputs.model }}
           WHEELS_DOCS_MAX_TURNS: '24'
           LUCLI_HOME: ${{ runner.temp }}/.wheels
+          WHEELS_FRAMEWORK_PATH: ${{ github.workspace }}/vendor/wheels
         run: |
-          ARGS=(--section "${{ inputs.section }}")
+          ARGS=(--mode "${{ inputs.mode }}")
+          if [[ "${{ inputs.mode }}" == "guide" ]]; then
+            ARGS+=(--directory "${{ inputs.directory }}")
+          else
+            ARGS+=(--section "${{ inputs.section }}")
+          fi
           if [[ -n "${{ inputs.limit }}" ]]; then
             ARGS+=(--limit "${{ inputs.limit }}")
           fi
@@ -147,8 +200,7 @@ jobs:
             exit 0
           fi
           git add -A
-          MSG="docs(api): validate ${{ inputs.section }} section (run ${{ github.run_id }})"
-          git commit -m "$MSG"
+          git commit -m "${{ steps.branch.outputs.msg }}"
           git push -u origin "${{ steps.branch.outputs.name }}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
@@ -160,15 +212,16 @@ jobs:
           BODY=$(cat <<'EOF'
           ## Summary
 
-          Agent-driven docs validation for the **${{ inputs.section }}** section.
+          Agent-driven docs validation for the **${{ steps.branch.outputs.label }}**.
 
-          - Snapshot: `docs/api/v4.0.0.json`
-          - Edits scoped to: `vendor/wheels/**/*.cfc` (docblocks + narrow body fixes) and `vendor/wheels/public/docs/reference/{scope}/{name}.txt`
-          - Per-function status tracked in `tools/docs-validation/state.json`
+          - Mode: `${{ inputs.mode }}`
+          - Edit scope (api mode): `vendor/wheels/**/*.cfc` (docblocks + narrow body fixes) and `vendor/wheels/public/docs/reference/{scope}/{name}.txt`
+          - Edit scope (guide mode): `web/sites/guides/src/content/docs/v4-0-0-snapshot/**/*.mdx?` and `vendor/wheels/**/*.cfc` (docblock prose only)
+          - Per-item status tracked in `tools/docs-validation/state.json`
 
           ## Review checklist
 
-          - [ ] Each `state.json` entry with `status: done` has a sensible reference example file added or updated
+          - [ ] Each `state.json` entry with `status: done` has the corresponding reference file (api) or annotated guide page (guide)
           - [ ] No CFC function signature changes (agent is forbidden from changing them — verify anyway)
           - [ ] Any docblock/body edits hold up against the test suite
           - [ ] `state.json` items with `status: needs_human` describe the open question in `notes`
@@ -177,7 +230,7 @@ jobs:
           gh pr create \
             --base develop \
             --head "${{ steps.branch.outputs.name }}" \
-            --title "docs(api): validate ${{ inputs.section }} section" \
+            --title "${{ steps.branch.outputs.title }}" \
             --body "$BODY" \
             --draft
 
