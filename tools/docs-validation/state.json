@@ -7694,6 +7694,273 @@
         "cache_creation_input_tokens": 18512,
         "cache_read_input_tokens": 261465
       }
+    },
+    "guide:digging-deeper/authentication-patterns.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/authentication-patterns.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:05:55.695Z",
+      "summary": "All 14 blocks were already in their correct state: 13 tagged `{test:compile}` (all passing) and 1 correctly marked illustrative. No changes needed; validation passed 13/13.",
+      "files_changed": [],
+      "notes": "0 blocks annotated this run, 13 compile tests passing, 1 illustrative block, 0 prose drift fixes, 0 CFC docblock changes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1445,
+        "output_tokens": 385,
+        "cache_creation_input_tokens": 3975,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:digging-deeper/authorization-and-filters.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/authorization-and-filters.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:06:03.674Z",
+      "summary": "All 7 code blocks on the page were already annotated with `{test:compile}` and all pass the verify-docs harness (7 passed, 0 failed). No changes were required.",
+      "files_changed": [],
+      "notes": "7 blocks tested (compile), 0 illustrative, 0 CFC docblock fixes, 0 prose drift corrections.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1150,
+        "output_tokens": 322,
+        "cache_creation_input_tokens": 913,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:digging-deeper/background-jobs.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/background-jobs.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:06:32.829Z",
+      "summary": "Annotated the 4 previously-untested language-less code blocks (wheels jobs retry, monitor, status, and purge commands) as `bash title=\"your shell\"` illustrative examples. All 6 testable blocks pass the harness (6 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/background-jobs.mdx"
+      ],
+      "notes": "4 blocks marked illustrative (require a running app/database and cannot be tested in isolation), 6 blocks already tested (5 compile + 1 cli). No prose drift found. No CFC docblock fixes needed.",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 11120,
+        "output_tokens": 1579,
+        "cache_creation_input_tokens": 7325,
+        "cache_read_input_tokens": 37117
+      }
+    },
+    "guide:digging-deeper/caching.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/caching.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:06:44.507Z",
+      "summary": "All 10 code blocks on the caching page were already annotated with `{test:compile}` and all pass the verify-docs harness with no failures. No changes were required.",
+      "files_changed": [],
+      "notes": "10 blocks tested (compile), 0 illustrative, 0 prose drift fixes needed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1275,
+        "output_tokens": 322,
+        "cache_creation_input_tokens": 1024,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:digging-deeper/cors.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/cors.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:07:03.183Z",
+      "summary": "All 4 code blocks on the CORS page are correctly handled: 2 CFML blocks already carry `{test:compile}` and pass the harness. The 2 bash blocks (curl debugging examples requiring a live server) are genuinely illustrative and correctly left unannotated — the harness ignores blocks without `{test:*}` meta, so no changes were needed.",
+      "files_changed": [],
+      "notes": "2 blocks tested (compile), 2 blocks illustrative (curl commands, no annotation needed), 0 prose drift fixes, 0 CFC docblock changes. Harness result: 2 passed, 0 failed.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10824,
+        "output_tokens": 817,
+        "cache_creation_input_tokens": 1470,
+        "cache_read_input_tokens": 8277
+      }
+    },
+    "guide:digging-deeper/dependency-injection-usage.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/dependency-injection-usage.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:07:12.371Z",
+      "summary": "All 12 code blocks on the page were already correctly annotated (9 with `{test:compile}`, 3 marked illustrative). The verify-docs harness confirmed 9 passed, 0 failed — no changes needed.",
+      "files_changed": [],
+      "notes": "9 blocks tested (all compile), 3 illustrative, 0 prose drift fixes, 0 CFC docblock changes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1371,
+        "output_tokens": 392,
+        "cache_creation_input_tokens": 1152,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:digging-deeper/file-uploads-and-downloads.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/file-uploads-and-downloads.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:07:20.536Z",
+      "summary": "All 5 code blocks were already annotated with `{test:compile}` and pass the harness cleanly. No changes needed.",
+      "files_changed": [],
+      "notes": "5 tested (compile), 0 illustrative, 0 prose drift fixes. Harness: 5 passed, 0 failed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1078,
+        "output_tokens": 305,
+        "cache_creation_input_tokens": 832,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:digging-deeper/index.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:07:23.470Z",
+      "summary": "Page has 0 code blocks — nothing to annotate or validate. No changes needed.",
+      "files_changed": [],
+      "notes": "0 tested, 0 illustrative, 0 prose drift fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 597,
+        "output_tokens": 158,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:digging-deeper/internationalization.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/internationalization.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:07:42.090Z",
+      "summary": "Annotated the single untested block (block #3, the directory layout at line 74) as `txt title=\"illustrative — directory layout\"` since it's a plain directory tree, not executable code. All 7 compile-tested blocks continue to pass (7 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/internationalization.mdx"
+      ],
+      "notes": "Blocks tested: 7 (compile). Blocks illustrative: 4 (the directory layout + 3 already-marked illustrative view snippets). No prose drift found. No CFC docblock fixes needed.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 8629,
+        "output_tokens": 800,
+        "cache_creation_input_tokens": 5467,
+        "cache_read_input_tokens": 12155
+      }
+    },
+    "guide:digging-deeper/multi-tenancy.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/multi-tenancy.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:08:01.481Z",
+      "summary": "Block #6 (a plain-text query-routing flow diagram) was the only untested block. It's genuinely illustrative pseudo-code showing internal call flow, so it was annotated with `title=\"query routing flow (illustrative)\"` to make it clearly non-executable. All 11 compile-tagged blocks continue to pass (11 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/multi-tenancy.mdx"
+      ],
+      "notes": "11 blocks tested (compile), 1 illustrative (plain-text flow diagram). No prose drift detected, no CFC docblock fixes needed.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 12627,
+        "output_tokens": 924,
+        "cache_creation_input_tokens": 7490,
+        "cache_read_input_tokens": 12198
+      }
+    },
+    "guide:digging-deeper/packages.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/packages.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:08:26.209Z",
+      "summary": "Annotated the 2 untested blocks on the Packages page as illustrative by adding `title=` attributes: the directory layout block (block 4, no language) got `text title=\"myfeature/ directory layout\"`, and the curl command block (block 11, bash) got `title=\"your shell\"`. Both require a running server/fixture context so they're correctly treated as illustrative. The 2 existing `{test:compile}` blocks continue to pass (2 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/packages.mdx"
+      ],
+      "notes": "11 total blocks: 2 tested (compile), 9 illustrative (all bash/json/text blocks that require a running app or are reference material). No prose drift found. No CFC docblock changes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 14298,
+        "output_tokens": 1192,
+        "cache_creation_input_tokens": 8265,
+        "cache_read_input_tokens": 22235
+      }
+    },
+    "guide:digging-deeper/rate-limiting.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/rate-limiting.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:08:49.453Z",
+      "summary": "Added `http` language identifiers and descriptive `title` attributes to the two untagged illustrative blocks (blocks 6 and 7) showing HTTP response headers — these are plain response examples that can't be compiled or executed. All 6 existing `{test:compile}` tagged CFML blocks continue to pass validation (6 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/rate-limiting.mdx"
+      ],
+      "notes": "Blocks 6 and 7 are HTTP response header examples — marked illustrative with `http` lang and title attributes. No prose drift found. No CFC docblock changes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 8038,
+        "output_tokens": 1205,
+        "cache_creation_input_tokens": 5091,
+        "cache_read_input_tokens": 18946
+      }
+    },
+    "guide:digging-deeper/route-model-binding.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/route-model-binding.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:08:59.742Z",
+      "summary": "All 8 blocks were already correctly annotated: 5 `{test:compile}` blocks pass the harness, and 3 illustrative blocks (before/after controller snippets and a log excerpt) are appropriately left untagged. No changes needed.",
+      "files_changed": [],
+      "notes": "5 tested (compile), 3 illustrative, 0 prose drift fixes, 0 CFC docblock changes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1190,
+        "output_tokens": 395,
+        "cache_creation_input_tokens": 981,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:digging-deeper/sending-email.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/sending-email.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:09:19.009Z",
+      "summary": "Added `text title=\"app/views/mailers/user/\"` to the lone untagged block (#8), a plain file-tree illustration showing the two template files for multi-part email. All 11 compile-tested blocks continue to pass; the harness reports 11 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/sending-email.mdx"
+      ],
+      "notes": "Block counts: 11 tested (compile), 2 illustrative (block #5 already had title, block #8 now has text lang + title), 0 prose drift fixes needed.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 9472,
+        "output_tokens": 873,
+        "cache_creation_input_tokens": 5901,
+        "cache_read_input_tokens": 12175
+      }
+    },
+    "guide:digging-deeper/server-sent-events.mdx": {
+      "kind": "guide",
+      "id": "digging-deeper/server-sent-events.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T15:09:27.732Z",
+      "summary": "All 6 code blocks on this page were already in their correct state: 3 CFML blocks tagged `{test:compile}` (all passing), and 3 illustrative-only blocks (JavaScript browser code, a resume handler snippet, and a timeout-disable snippet) already marked with `title=\"illustrative — ...\"`. No changes needed; harness reports 3 passed, 0 failed.",
+      "files_changed": [],
+      "notes": "3 tested (compile), 3 illustrative, 0 prose drift fixes needed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 988,
+        "output_tokens": 343,
+        "cache_creation_input_tokens": 929,
+        "cache_read_input_tokens": 5518
+      }
     }
   },
   "runs": []

@@ -137,7 +137,7 @@ Because retries are automatic, your `perform()` must be **idempotent**. If the f
 
 To kick failed jobs back into the queue — after you've fixed the bug, say — use the retry command:
 
-```
+```bash title="your shell"
 wheels jobs retry                       # retry every failed job
 wheels jobs retry --queue=mailers       # only the mailers queue
 wheels jobs retry --limit=10            # cap at 10 jobs
@@ -165,7 +165,7 @@ You can also bias ordering within a queue with `this.priority` in `config()` (hi
 
 For an interactive dashboard, run:
 
-```
+```bash title="your shell"
 wheels jobs monitor                     # refresh every 3 seconds
 wheels jobs monitor --interval=5        # slower refresh
 wheels jobs monitor --queue=mailers     # one queue only
@@ -175,7 +175,7 @@ The dashboard shows per-queue counts, throughput over the last 60 minutes, error
 
 For headless metrics, pipe `wheels jobs status --format=json` into whatever you already use — Prometheus, Datadog, a custom scrape:
 
-```
+```bash title="your shell"
 wheels jobs status --format=json
 ```
 
@@ -230,7 +230,7 @@ Testing `perform()` in isolation keeps the spec fast and avoids the complexity o
 
 Completed and failed rows accumulate forever unless you prune them. The purge command takes days and status flags:
 
-```
+```bash title="your shell"
 wheels jobs purge                                 # completed jobs older than 7 days
 wheels jobs purge --completed --older-than=30     # completed older than 30 days
 wheels jobs purge --failed --older-than=90        # failed jobs older than 90 days

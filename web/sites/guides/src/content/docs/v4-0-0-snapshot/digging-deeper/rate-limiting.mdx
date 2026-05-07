@@ -132,7 +132,7 @@ The closure receives the request struct and returns a unique-per-client string. 
 
 On every request (allowed or rejected), the middleware writes three headers:
 
-```
+```http title="Response headers (allowed request)"
 X-RateLimit-Limit: 60
 X-RateLimit-Remaining: 42
 X-RateLimit-Reset: 1713589200
@@ -146,7 +146,7 @@ The header prefix is configurable via the `headerPrefix` constructor argument (d
 
 When a client exceeds the limit, the middleware returns `429 Too Many Requests` with `Retry-After` added:
 
-```
+```http title="Response headers (429 Too Many Requests)"
 HTTP/1.1 429 Too Many Requests
 Retry-After: 47
 X-RateLimit-Limit: 60

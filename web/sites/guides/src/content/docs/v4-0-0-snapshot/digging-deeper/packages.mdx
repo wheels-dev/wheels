@@ -111,7 +111,7 @@ A package is a directory with a `package.json` and at least one CFC. The loader'
 
 A minimal layout (in your own package repo, installed to `vendor/myfeature/`):
 
-```
+```text title="myfeature/ directory layout"
 myfeature/
   package.json                     # manifest (required)
   MyFeature.cfc                    # main entry — matches directory name
@@ -260,7 +260,7 @@ component extends="wheels.WheelsTest" output="false" {
 
 Scope a run to a single package with the `directory=` URL param on the core test runner:
 
-```bash
+```bash title="your shell"
 curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.mypackage.tests"
 ```
 
