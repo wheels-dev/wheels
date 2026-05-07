@@ -200,26 +200,57 @@ async function doEdit(path, oldStr, newStr) {
 function doBash(command, timeoutSeconds = 60) {
   return new Promise((resolveP) => {
     const ms = Math.min(Math.max((timeoutSeconds | 0) || 60, 1), 180) * 1000;
-    const child = spawn('bash', ['-lc', command], { cwd: REPO_ROOT });
+    // detached:true puts the child into its own process group so we can kill
+    // the whole tree (bash -> pnpm -> node -> harness -> wheels -> lucli ...)
+    // by signalling the negative pid. Without this, SIGKILL on bash leaves
+    // descendants orphaned to init and they keep stdio open, so close never
+    // fires and the agent loop deadlocks waiting for tool output.
+    const child = spawn('bash', ['-lc', command], { cwd: REPO_ROOT, detached: true });
     let stdout = '';
     let stderr = '';
     let killed = false;
-    const t = setTimeout(() => {
+    let resolved = false;
+    const finish = (result) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      clearTimeout(graceTimer);
+      resolveP(result);
+    };
+    const cap = (s) => (s.length > 32_000 ? s.slice(0, 32_000) + `\n[...truncated ${s.length - 32_000} bytes]` : s);
+    const killTree = (signal) => {
+      try { process.kill(-child.pid, signal); } catch {}
+      try { child.kill(signal); } catch {}
+    };
+    const timer = setTimeout(() => {
       killed = true;
-      child.kill('SIGKILL');
+      killTree('SIGKILL');
     }, ms);
+    // Backstop: if descendants still hold stdio open after SIGKILL, force-resolve
+    // 5s after the timeout fires so the agent loop never hangs forever on a
+    // single tool call.
+    const graceTimer = setTimeout(() => {
+      finish({
+        ok: false,
+        exit_code: null,
+        timed_out: true,
+        stdout: cap(stdout),
+        stderr: cap(stderr) + '\n[doBash: forced resolve after SIGKILL — descendants still holding stdio]',
+      });
+    }, ms + 5000);
     child.stdout.on('data', (d) => (stdout += d.toString()));
     child.stderr.on('data', (d) => (stderr += d.toString()));
     child.on('close', (code) => {
-      clearTimeout(t);
-      const cap = (s) => (s.length > 32_000 ? s.slice(0, 32_000) + `\n[...truncated ${s.length - 32_000} bytes]` : s);
-      resolveP({
+      finish({
         ok: !killed,
         exit_code: code,
         timed_out: killed,
         stdout: cap(stdout),
         stderr: cap(stderr),
       });
+    });
+    child.on('error', (err) => {
+      finish({ ok: false, exit_code: null, timed_out: false, stdout: cap(stdout), stderr: cap(stderr) + `\n[spawn error: ${err.message}]` });
     });
   });
 }
