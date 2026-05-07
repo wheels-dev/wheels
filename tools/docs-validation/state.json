@@ -6928,6 +6928,159 @@
         "cache_creation_input_tokens": 610,
         "cache_read_input_tokens": 5518
       }
+    },
+    "guide:core-concepts/conventions-over-configuration.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/conventions-over-configuration.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:42:44.506Z",
+      "summary": "No code blocks present on this page — nothing to annotate or validate. The page is pure prose describing Wheels conventions.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 588,
+        "output_tokens": 183,
+        "cache_creation_input_tokens": 2759,
+        "cache_read_input_tokens": 0
+      }
+    },
+    "guide:core-concepts/dependency-injection.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/dependency-injection.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:42:51.727Z",
+      "summary": "Page has 1 code block, already correctly marked illustrative (config/services.cfm example). No untested blocks to annotate. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 1 illustrative, 0 CFC docblock fixes, 0 prose drift corrections.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 885,
+        "output_tokens": 351,
+        "cache_creation_input_tokens": 684,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:core-concepts/environments-and-configuration.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/environments-and-configuration.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:42:59.099Z",
+      "summary": "All 2 code blocks on this page were already correctly marked illustrative (config file examples that require a running app context). No annotations were needed, no prose drift found, and the harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 2 blocks illustrative, 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 919,
+        "output_tokens": 369,
+        "cache_creation_input_tokens": 716,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:core-concepts/how-routing-works.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/how-routing-works.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:43:06.160Z",
+      "summary": "The page has exactly 1 code block, already correctly marked illustrative with a descriptive title. No annotations were needed and the harness passes with 0 failures.",
+      "files_changed": [],
+      "notes": "1 block illustrative, 0 tested, 0 CFC docblock fixes, 0 prose drift changes. Harness: 0 passed, 0 failed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 899,
+        "output_tokens": 350,
+        "cache_creation_input_tokens": 694,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:core-concepts/index.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:43:09.428Z",
+      "summary": "No code blocks present on this page — it is a section index with only prose content. No annotations, edits, or validation runs were needed.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 584,
+        "output_tokens": 160,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:core-concepts/middleware-pipeline.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/middleware-pipeline.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:43:16.859Z",
+      "summary": "Both code blocks on the middleware-pipeline page were already correctly marked illustrative (titles set). Harness ran clean: 0 tagged blocks, 0 failures. No prose drift or annotation changes needed.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes. Page was already in a valid state.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 919,
+        "output_tokens": 332,
+        "cache_creation_input_tokens": 683,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:core-concepts/mvc-in-wheels.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/mvc-in-wheels.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:43:21.117Z",
+      "summary": "The page `core-concepts/mvc-in-wheels.mdx` contains zero code blocks, so no annotations, prose fixes, or validation steps were needed.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes, 0 prose drift corrections. Nothing to do.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 602,
+        "output_tokens": 178,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:core-concepts/orm-philosophy.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/orm-philosophy.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:43:24.833Z",
+      "summary": "No code blocks exist on this page — it is a pure prose concept guide. No annotations, edits, or validation runs were needed.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 588,
+        "output_tokens": 167,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:core-concepts/request-lifecycle.mdx": {
+      "kind": "guide",
+      "id": "core-concepts/request-lifecycle.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T13:43:47.153Z",
+      "summary": "The single code block on this page is a `text`-language ASCII-art pipeline diagram — purely illustrative, not compilable or runnable. Per VALIDATION.md the harness ignores blocks without a `{test:*}` tag, so no annotation is needed. The harness confirmed 0 tagged blocks, 0 failures.",
+      "files_changed": [],
+      "notes": "1 block examined, 0 tested (all illustrative), 0 prose-drift fixes, 0 CFC changes. The `text` diagram block is intentionally left untagged.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 8750,
+        "output_tokens": 760,
+        "cache_creation_input_tokens": 3323,
+        "cache_read_input_tokens": 11742
+      }
     }
   },
   "runs": []
