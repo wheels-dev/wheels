@@ -1,16 +1,23 @@
-// Make sure that the `firstname` and `lastName` properties are not more than
-// 50 characters and use square brackets to dynamically insert the property
-// name when the error message is displayed to the user. (The `firstName`
-// property will be displayed as "first name".)
+// 1. Validate a maximum length on multiple properties, using [property] in the
+// message so the property label is injected dynamically at runtime
 validatesLengthOf(
     properties="firstName,lastName",
     maximum=50,
-    message="Please shorten your [property] please (50 characters max)."
+    message="Please shorten your [property] (50 characters max)."
 );
 
-// Make sure that the `password` property is between 4 and 15 characters
+// 2. Validate that a password falls within a range of character lengths
 validatesLengthOf(
     property="password",
     within="4,20",
-    message="The password length must be between 4 and 20 characters."
+    message="The password must be between 4 and 20 characters."
+);
+
+// 3. Validate an exact length only on create, skipping blank values
+validatesLengthOf(
+    property="postalCode",
+    exactly=5,
+    when="onCreate",
+    allowBlank=true,
+    message="Postal code must be exactly 5 characters."
 );

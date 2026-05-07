@@ -1,5 +1,13 @@
-// In models/User.cfc.
+// 1. Override the data source for a model (basic usage).
+// In models/User.cfc
 config() {
-	// Tell Wheels to use the data source named `users_source` instead of the default one whenever this model makes SQL calls.
+	// Tell Wheels to use the data source named `users_source` instead of
+	// the default one whenever this model makes SQL calls.
 	dataSource("users_source");
+}
+
+// 2. Override the data source with explicit credentials.
+// In models/LegacyOrder.cfc
+config() {
+	dataSource(datasource="legacy_db", username="app_reader", password="s3cr3t");
 }

@@ -1,2 +1,16 @@
-// Instruct CFWheels to call the `fixObj` method after an object has been created.
-afterCreate("fixObj");
+// 1. Register a single method to run after an object is created
+// In models/User.cfc
+component extends="Model" {
+    function config() {
+        afterCreate("sendWelcomeEmail");
+    }
+    private function sendWelcomeEmail() {
+        // send email to this.email
+    }
+}
+
+// 2. Register multiple methods by passing a comma-delimited list
+afterCreate("updateCache,notifyAdmin");
+
+// 3. Register using the named `methods` argument
+afterCreate(methods="syncToExternalApi");

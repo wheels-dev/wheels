@@ -1,2 +1,50 @@
-// Instruct CFWheels to call the `fixObj` method
-beforeValidation("fixObj");
+// 1. Register a single method to run before any validation
+// In models/User.cfc
+component extends="Model" {
+    function config() {
+        beforeValidation("normalizeEmail");
+        validatesPresenceOf("email");
+    }
+
+    private function normalizeEmail() {
+        this.email = LCase(Trim(this.email));
+    }
+}
+
+// 2. Register multiple methods to run before validation using a comma-delimited list
+// In models/Article.cfc
+component extends="Model" {
+    function config() {
+        beforeValidation("stripTags,setSlug");
+        validatesPresenceOf(properties="title,slug");
+    }
+
+    private function stripTags() {
+        this.title = ReReplace(this.title, "<[^>]*>", "", "all");
+    }
+
+    private function setSlug() {
+        if (!Len(this.slug)) {
+            this.slug = LCase(ReReplace(Trim(this.title), "\s+", "-", "all"));
+        }
+    }
+}
+
+// 3. Register callbacks across multiple calls (they are stacked in order)
+// In models/Product.cfc
+component extends="Model" {
+    function config() {
+        beforeValidation("trimFields");
+        beforeValidation("setDefaults");
+    }
+
+    private function trimFields() {
+        this.name = Trim(this.name);
+    }
+
+    private function setDefaults() {
+        if (!Len(this.status)) {
+            this.status = "draft";
+        }
+    }
+}

@@ -1,2 +1,11 @@
-// Do not allow "PHP" or "Fortran" to be saved to the database as a cool language
-validatesExclusionOf(property="coolLanguage", list="php,fortran", message="Haha, you can not be serious. Try again, please.");
+// 1. Prevent reserved words from being saved as a programming language name
+validatesExclusionOf(property="language", list="php,fortran", message="[property] is reserved. Try a real language.");
+
+// 2. Validate multiple properties against the same exclusion list (e.g. reserved usernames)
+validatesExclusionOf(properties="username,displayName", list="admin,root,superuser,moderator");
+
+// 3. Only enforce the exclusion on create, and skip validation when the value is blank
+validatesExclusionOf(property="referralCode", list="FREE,GRATIS,FREEBIE", when="onCreate", allowBlank=true);
+
+// 4. Conditionally enforce the exclusion based on a model property
+validatesExclusionOf(property="status", list="banned,suspended", condition="this.isAdmin");

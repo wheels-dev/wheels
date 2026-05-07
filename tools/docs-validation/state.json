@@ -2511,6 +2511,845 @@
         "cache_creation_input_tokens": 1864,
         "cache_read_input_tokens": 10821
       }
+    },
+    "function:accessibleProperties": {
+      "kind": "function",
+      "id": "accessibleProperties",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:40:34.979Z",
+      "summary": "Updated the `accessibleProperties` reference example to include two clear usage examples: one for a single property and one for a comma-delimited list of properties, both placed inside `config()` as required by the function's context.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/accessibleproperties.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28717,
+        "output_tokens": 519,
+        "cache_creation_input_tokens": 4839,
+        "cache_read_input_tokens": 7214
+      }
+    },
+    "function:afterCreate": {
+      "kind": "function",
+      "id": "afterCreate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:40:47.850Z",
+      "summary": "Enhanced the `afterCreate` reference example with three idiomatic examples: registering a single callback method shown in context of a model `config()` block, registering multiple methods via a comma-delimited list, and using the named `methods` argument form. No code or docblock changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/aftercreate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10569,
+        "output_tokens": 604,
+        "cache_creation_input_tokens": 1252,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterDelete": {
+      "kind": "function",
+      "id": "afterDelete",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:40:59.691Z",
+      "summary": "Expanded the `afterDelete` reference example from a single one-liner to three idiomatic examples demonstrating: (1) registering a single callback method, (2) passing a comma-separated list of methods in one call, and (3) chaining multiple individual `afterDelete` calls. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/afterdelete.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10175,
+        "output_tokens": 509,
+        "cache_creation_input_tokens": 1248,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterFind": {
+      "kind": "function",
+      "id": "afterFind",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:41:15.923Z",
+      "summary": "Updated the afterFind reference example with three numbered examples: basic single-callback registration, a realistic field-formatting use case, and registering multiple callbacks as a comma-delimited list. The examples demonstrate the key behavior that the callback receives row columns as `arguments` and can modify them by returning the struct.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/afterfind.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 10788,
+        "output_tokens": 733,
+        "cache_creation_input_tokens": 6016,
+        "cache_read_input_tokens": 15171
+      }
+    },
+    "function:afterInitialization": {
+      "kind": "function",
+      "id": "afterInitialization",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:41:26.847Z",
+      "summary": "Updated the `afterInitialization` reference example to use numbered headings and added a second example demonstrating a comma-delimited list of callback methods. The docblock and function signature are consistent with the documented hint and parameters — no CFC edits needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/afterinitialization.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10572,
+        "output_tokens": 534,
+        "cache_creation_input_tokens": 1298,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterNew": {
+      "kind": "function",
+      "id": "afterNew",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:41:39.081Z",
+      "summary": "Updated the `afterNew` reference example with three idiomatic examples: a full model config() context showing a single callback with its implementation, a comma-delimited multi-method list, and the `method` argument alias. The docblock and signature are accurate and required no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/afternew.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10578,
+        "output_tokens": 594,
+        "cache_creation_input_tokens": 1276,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterSave": {
+      "kind": "function",
+      "id": "afterSave",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:41:58.332Z",
+      "summary": "Expanded the `afterSave` reference example from a single bare call to three idiomatic examples showing single-method registration, comma-delimited multi-method list, and multiple chained `afterSave()` calls — all placed inside a model's `config()` method as is conventional. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/aftersave.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10263,
+        "output_tokens": 587,
+        "cache_creation_input_tokens": 1244,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterUpdate": {
+      "kind": "function",
+      "id": "afterUpdate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:42:07.757Z",
+      "summary": "Rewrote the afterUpdate reference example with three idiomatic examples matching the style of afterCreate: single method registration, comma-delimited list, and named `methods` argument. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/afterupdate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10749,
+        "output_tokens": 523,
+        "cache_creation_input_tokens": 1238,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterValidation": {
+      "kind": "function",
+      "id": "afterValidation",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:42:18.617Z",
+      "summary": "Expanded the `afterValidation` reference example to three idiomatic cases: single method, comma-delimited list of methods, and use of the `method` singular alias. No docblock or code changes were needed — source and docs are already in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/aftervalidation.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10141,
+        "output_tokens": 455,
+        "cache_creation_input_tokens": 1258,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterValidationOnCreate": {
+      "kind": "function",
+      "id": "afterValidationOnCreate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:42:30.779Z",
+      "summary": "Expanded the reference example for `afterValidationOnCreate` from a single line to three idiomatic examples showing: a single method with a practical body, a comma-delimited list of methods, and the `method` alias — all placed inside a `config()` block within a model component, matching the style of sibling callback reference files.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/aftervalidationoncreate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10733,
+        "output_tokens": 644,
+        "cache_creation_input_tokens": 1288,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:afterValidationOnUpdate": {
+      "kind": "function",
+      "id": "afterValidationOnUpdate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:42:44.453Z",
+      "summary": "Rewrote the reference example for `afterValidationOnUpdate` with two idiomatic examples: one showing a single callback method in a model's `config()`, and one demonstrating a comma-separated list of multiple methods. No docblock or code changes were needed — the source and documented hint are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/aftervalidationonupdate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10662,
+        "output_tokens": 673,
+        "cache_creation_input_tokens": 1288,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:automaticValidations": {
+      "kind": "function",
+      "id": "automaticValidations",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:42:55.601Z",
+      "summary": "Updated the reference example for `automaticValidations` to include two idiomatic examples: one disabling and one enabling automatic validations, both shown in a proper model `config()` context with `component extends=\"Model\"` wrappers.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/automaticvalidations.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 33516,
+        "output_tokens": 484,
+        "cache_creation_input_tokens": 1214,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:beforeCreate": {
+      "kind": "function",
+      "id": "beforeCreate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:43:13.599Z",
+      "summary": "Expanded the beforeCreate reference example from a single minimal line to three numbered examples demonstrating single callback registration, multiple callbacks as a comma-separated list, and use of the named `methods` argument.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/beforecreate.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 11013,
+        "output_tokens": 692,
+        "cache_creation_input_tokens": 6072,
+        "cache_read_input_tokens": 33151
+      }
+    },
+    "function:beforeDelete": {
+      "kind": "function",
+      "id": "beforeDelete",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:43:27.650Z",
+      "summary": "Expanded the `beforeDelete` reference from a single one-liner to three idiomatic examples: registering a single cleanup callback, registering multiple callbacks via a comma-delimited list, and halting deletion by returning false from the callback. No CFC edits were needed — the docblock and implementation are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/beforedelete.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10717,
+        "output_tokens": 774,
+        "cache_creation_input_tokens": 1222,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:beforeSave": {
+      "kind": "function",
+      "id": "beforeSave",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:43:39.896Z",
+      "summary": "Expanded the `beforeSave` reference example from a single one-liner to three idiomatic examples demonstrating a single method callback, a comma-delimited list of methods, and the `method` argument alias — all consistent with the CFC source and Wheels conventions.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/beforesave.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10565,
+        "output_tokens": 608,
+        "cache_creation_input_tokens": 1230,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:beforeUpdate": {
+      "kind": "function",
+      "id": "beforeUpdate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:43:50.391Z",
+      "summary": "Expanded the `beforeUpdate` reference example from a single line to three idiomatic examples matching the style of `beforesave.txt`: single method, comma-delimited list, and `method` argument alias. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/beforeupdate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10924,
+        "output_tokens": 603,
+        "cache_creation_input_tokens": 1224,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:beforeValidation": {
+      "kind": "function",
+      "id": "beforeValidation",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:44:04.791Z",
+      "summary": "Expanded the `beforeValidation` reference example from a single one-liner into three idiomatic examples demonstrating: (1) registering a single method to normalize data before validation, (2) passing a comma-delimited list of multiple methods, and (3) stacking multiple `beforeValidation` calls in `config()`. No docblock or code changes were needed — the source and documented hint are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/beforevalidation.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10776,
+        "output_tokens": 848,
+        "cache_creation_input_tokens": 1230,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:beforeValidationOnCreate": {
+      "kind": "function",
+      "id": "beforeValidationOnCreate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:44:16.531Z",
+      "summary": "Expanded the `beforeValidationOnCreate` reference example from a single minimal line to three idiomatic examples covering single-method, multi-method (comma-separated list), and the `method` argument alias — consistent with the documented parameter hint and sibling callback functions.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/beforevalidationoncreate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10528,
+        "output_tokens": 545,
+        "cache_creation_input_tokens": 1254,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:beforeValidationOnUpdate": {
+      "kind": "function",
+      "id": "beforeValidationOnUpdate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:44:27.220Z",
+      "summary": "Expanded the `beforeValidationOnUpdate` reference example from a single minimal line to three examples demonstrating a single callback, a comma-delimited list of callbacks, and the `method` argument alias. No docblock or code changes were needed — the source matched the documented hint and parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/beforevalidationonupdate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10508,
+        "output_tokens": 538,
+        "cache_creation_input_tokens": 1272,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:belongsTo": {
+      "kind": "function",
+      "id": "belongsTo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:44:46.095Z",
+      "summary": "Updated the `belongsTo` reference file with four idiomatic examples covering basic usage, custom naming, `joinType=\"outer\"`, and the `polymorphic=true` option. Also added the missing `@polymorphic` param hint to the CFC docblock to match the documented parameter table.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/belongsto.txt",
+        "vendor/wheels/model/associations.cfc"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 12042,
+        "output_tokens": 1042,
+        "cache_creation_input_tokens": 6942,
+        "cache_read_input_tokens": 15389
+      }
+    },
+    "function:dataSource": {
+      "kind": "function",
+      "id": "dataSource",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:45:00.960Z",
+      "summary": "Updated the `dataSource` reference example to include a basic usage example (matching the original) and a second example demonstrating the optional `username` and `password` parameters. No docblock or code changes were needed — the source and documentation are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/datasource.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11536,
+        "output_tokens": 511,
+        "cache_creation_input_tokens": 1328,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:enum": {
+      "kind": "function",
+      "id": "enum",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:45:24.577Z",
+      "summary": "Created `vendor/wheels/public/docs/reference/model/enum.txt` with three idiomatic examples showing: (1) basic list-based enum for a `status` property, (2) struct-based enum mapping names to numeric stored values, and (3) runtime usage of the generated `is<Value>()` checker methods and named query scopes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/enum.txt"
+      ],
+      "notes": "",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 30147,
+        "output_tokens": 1083,
+        "cache_creation_input_tokens": 15589,
+        "cache_read_input_tokens": 51654
+      }
+    },
+    "function:hasMany": {
+      "kind": "function",
+      "id": "hasMany",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:45:50.329Z",
+      "summary": "Updated the `hasMany` docblock to add the missing `@as` parameter documentation, and rewrote the reference example file with 8 idiomatic examples covering basic usage, many-to-many shortcuts, all four `dependent` modes, custom foreign keys, join type override, and polymorphic associations.",
+      "files_changed": [
+        "vendor/wheels/model/associations.cfc",
+        "vendor/wheels/public/docs/reference/model/hasmany.txt"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 12415,
+        "output_tokens": 1322,
+        "cache_creation_input_tokens": 7390,
+        "cache_read_input_tokens": 15742
+      }
+    },
+    "function:hasOne": {
+      "kind": "function",
+      "id": "hasOne",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:46:10.094Z",
+      "summary": "Fixed the reference file for `hasOne`: the third example incorrectly called `hasMany` instead of `hasOne` — corrected and reformatted with numbered headings. Added a fourth example showing the polymorphic `as` usage. Also added the missing `@as` docblock annotation to the `hasOne` function in associations.cfc.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/hasone.txt",
+        "vendor/wheels/model/associations.cfc"
+      ],
+      "notes": "",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 12612,
+        "output_tokens": 1148,
+        "cache_creation_input_tokens": 7202,
+        "cache_read_input_tokens": 15475
+      }
+    },
+    "function:ignoredColumns": {
+      "kind": "function",
+      "id": "ignoredColumns",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:46:22.116Z",
+      "summary": "Rewrote the `ignoredColumns` reference example with two clear, idiomatic examples: one showing a single column being ignored, and another showing multiple columns. Both demonstrate proper usage inside a model's `config()` method using the named `columns` array argument.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/ignoredcolumns.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28706,
+        "output_tokens": 529,
+        "cache_creation_input_tokens": 1208,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:nestedProperties": {
+      "kind": "function",
+      "id": "nestedProperties",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:46:35.107Z",
+      "summary": "Rewrote the `nestedProperties` reference example with four idiomatic examples covering the main parameters: `allowDelete`, `autoSave`+`rejectIfBlank`, `sortProperty`, and multiple associations via the `associations` alias. No docblock drift was found; the CFC source matched the documented parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/nestedproperties.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 15821,
+        "output_tokens": 721,
+        "cache_creation_input_tokens": 1710,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:property": {
+      "kind": "function",
+      "id": "property",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:46:53.810Z",
+      "summary": "Updated the `property()` reference example to retain all four original examples while adding two new ones covering the `dataType`/`select` combination and `automaticValidations` parameters, ensuring all documented parameters are illustrated.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/property.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 29429,
+        "output_tokens": 827,
+        "cache_creation_input_tokens": 2070,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:protectedProperties": {
+      "kind": "function",
+      "id": "protectedProperties",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:47:07.412Z",
+      "summary": "Validated the `protectedProperties` function source — docblock and signature match the documented hint and parameters exactly. Updated the reference example to include two idiomatic examples: one with a comma-delimited list (positional) and one using the named `properties` argument form.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/protectedproperties.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28690,
+        "output_tokens": 499,
+        "cache_creation_input_tokens": 1262,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:setPrimaryKey": {
+      "kind": "function",
+      "id": "setPrimaryKey",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:47:21.532Z",
+      "summary": "Expanded the `setPrimaryKey` reference example from a single minimal snippet to two examples: one showing a custom single primary key, and one demonstrating composite primary keys using the `setPrimaryKeys()` alias. The docblock in the CFC was already accurate and needed no changes.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/setprimarykey.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11931,
+        "output_tokens": 605,
+        "cache_creation_input_tokens": 1320,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:setPrimaryKeys": {
+      "kind": "function",
+      "id": "setPrimaryKeys",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:47:32.560Z",
+      "summary": "Wrote two idiomatic examples for `setPrimaryKeys()` — a two-column composite key (Subscription model) and a three-column composite key (OrderItem model). The docblock and source were already consistent with the documented hint and parameters; no CFC edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/setprimarykeys.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11504,
+        "output_tokens": 502,
+        "cache_creation_input_tokens": 1290,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:setTableNamePrefix": {
+      "kind": "function",
+      "id": "setTableNamePrefix",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:47:46.827Z",
+      "summary": "Verified that the docblock in miscellaneous.cfc exactly matches the documented hint and parameters. Updated the reference example with a cleaner first example and a second example showing a schema-style prefix, covering the most common real-world use cases.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/settablenameprefix.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11506,
+        "output_tokens": 518,
+        "cache_creation_input_tokens": 1244,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:sharedModel": {
+      "kind": "function",
+      "id": "sharedModel",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:47:56.843Z",
+      "summary": "Created reference example for `sharedModel()` at `vendor/wheels/public/docs/reference/model/sharedmodel.txt`. The examples demonstrate calling `sharedModel()` inside a model's `config()` method for both a `Tenant` model and a `Plan` lookup table, illustrating the multi-tenancy use case where these models always use the central application datasource.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/sharedmodel.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11420,
+        "output_tokens": 511,
+        "cache_creation_input_tokens": 1124,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:table": {
+      "kind": "function",
+      "id": "table",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:48:08.845Z",
+      "summary": "Wrote an expanded reference example for `model/table.txt` with three examples: mapping to a custom table name, mapping to a legacy-prefixed table, and calling `table(false)` to declare a model with no backing table. No docblock changes were needed — the CFC source exactly matches the documented hint and parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/table.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11581,
+        "output_tokens": 550,
+        "cache_creation_input_tokens": 1382,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validate": {
+      "kind": "function",
+      "id": "validate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:48:25.404Z",
+      "summary": "Expanded the `validate` reference example from one basic usage to five numbered examples covering: basic registration, multiple methods via the `methods` argument, limiting to `onUpdate`/`onCreate` via `when`, conditional execution via `condition`, and conditional skipping via `unless`. No docblock or code changes were needed — the source and snapshot are in sync.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34310,
+        "output_tokens": 740,
+        "cache_creation_input_tokens": 1550,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validateOnCreate": {
+      "kind": "function",
+      "id": "validateOnCreate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:48:39.664Z",
+      "summary": "Updated the reference example for `validateOnCreate` with three idiomatic examples: basic single-method registration, registering a comma-delimited list of methods, and using the `condition` argument to conditionally run validation on create.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validateoncreate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34292,
+        "output_tokens": 732,
+        "cache_creation_input_tokens": 1482,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validateOnUpdate": {
+      "kind": "function",
+      "id": "validateOnUpdate",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:48:52.483Z",
+      "summary": "Updated the `validateOnUpdate` reference example with three idiomatic examples: basic single-method registration, multiple methods via comma-delimited list, and conditional validation using the `condition` argument. The docblock in the CFC is accurate and no changes were needed there.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validateonupdate.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34266,
+        "output_tokens": 717,
+        "cache_creation_input_tokens": 1464,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesConfirmationOf": {
+      "kind": "function",
+      "id": "validatesConfirmationOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:49:05.621Z",
+      "summary": "Rewrote the reference example for `validatesConfirmationOf` with three numbered examples covering: basic password confirmation on create, email confirmation with the default `onSave` timing, and multiple properties with case-sensitive comparison. No docblock or code changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validatesconfirmationof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34330,
+        "output_tokens": 622,
+        "cache_creation_input_tokens": 1868,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesExclusionOf": {
+      "kind": "function",
+      "id": "validatesExclusionOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:49:21.715Z",
+      "summary": "Rewrote the reference example for `validatesExclusionOf` with four idiomatic examples covering: basic single-property exclusion with custom message, multiple properties, `when`/`allowBlank` combination, and conditional validation via `condition`. No docblock or code changes were needed — the source matches the documented parameters.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validatesexclusionof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34364,
+        "output_tokens": 698,
+        "cache_creation_input_tokens": 1842,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesFormatOf": {
+      "kind": "function",
+      "id": "validatesFormatOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:49:36.000Z",
+      "summary": "Rewrote the `validatesFormatOf` reference example with proper formatting and 4 numbered examples covering: type-based credit card validation, email type validation, regex with allowBlank and custom message, and the conditional Swedish email check from the original. The existing file was a single unreadable line; the new file is properly formatted and idiomatic.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validatesformatof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34754,
+        "output_tokens": 742,
+        "cache_creation_input_tokens": 2204,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesInclusionOf": {
+      "kind": "function",
+      "id": "validatesInclusionOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:49:48.681Z",
+      "summary": "Rewrote the reference example for `validatesInclusionOf` with four numbered examples covering basic usage, `allowBlank`, `when` (onCreate-only), and `condition`-based validation. The docblock in the CFC matches the documented parameters — no source edits were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validatesinclusionof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34354,
+        "output_tokens": 637,
+        "cache_creation_input_tokens": 1824,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesLengthOf": {
+      "kind": "function",
+      "id": "validatesLengthOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:50:02.252Z",
+      "summary": "Rewrote the reference example for `validatesLengthOf` with three numbered examples covering `maximum` with multiple properties, `within` range validation (fixing the comment/code mismatch where the comment said \"4 and 15\" but the code used `within=\"4,20\"`), and `exactly` with `when` and `allowBlank` arguments.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validateslengthof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34875,
+        "output_tokens": 763,
+        "cache_creation_input_tokens": 2284,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesNumericalityOf": {
+      "kind": "function",
+      "id": "validatesNumericalityOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:50:19.807Z",
+      "summary": "Rewrote the reference example for `validatesNumericalityOf` with 6 idiomatic examples covering basic numeric validation, integer-only with allowBlank, range constraints (greaterThan/lessThanOrEqualTo), create-only integer ranges, conditional equality, and odd-number enforcement. Also fixed the existing example's typo (\"Tetting\" → properly rewritten). The docblock has a minor formatting issue (`@oddSpecifies`/`@evenSpecifies` missing a space) but the parameters are documented in the snapshot table, so no CFC edit was needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validatesnumericalityof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 35184,
+        "output_tokens": 899,
+        "cache_creation_input_tokens": 2278,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesPresenceOf": {
+      "kind": "function",
+      "id": "validatesPresenceOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:50:31.686Z",
+      "summary": "Expanded the `validatesPresenceOf` reference from a single minimal example to 6 numbered examples covering basic usage, multiple properties, custom message, `when` limiting validation to create/update, and conditional validation via `condition` and `unless`. No docblock or code changes were needed — the source and documented parameters are consistent.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validatespresenceof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34140,
+        "output_tokens": 632,
+        "cache_creation_input_tokens": 1574,
+        "cache_read_input_tokens": 10821
+      }
+    },
+    "function:validatesUniquenessOf": {
+      "kind": "function",
+      "id": "validatesUniquenessOf",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T04:50:49.370Z",
+      "summary": "Rewrote the reference file for `validatesUniquenessOf` with 7 idiomatic examples covering the core use case, scoped uniqueness, multi-property lists, allowBlank, when, condition, and includeSoftDeletes — all consistent with the documented parameters and source implementation.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/validatesuniquenessof.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 34583,
+        "output_tokens": 717,
+        "cache_creation_input_tokens": 2084,
+        "cache_read_input_tokens": 10821
+      }
     }
   },
   "runs": []

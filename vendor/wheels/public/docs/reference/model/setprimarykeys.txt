@@ -1,4 +1,13 @@
-// In `models/Subscription.cfc`, define the primary key as composite of the columns `customerId` and `publicationId`.
-function config(){
-	setPrimaryKeys("customerId,publicationId");
+// 1. In `models/Subscription.cfc`, define the primary key as a composite of `customerId` and `publicationId`.
+component extends="Model" {
+	function config() {
+		setPrimaryKeys("customerId,publicationId");
+	}
+}
+
+// 2. In `models/OrderItem.cfc`, define a composite primary key using three columns.
+component extends="Model" {
+	function config() {
+		setPrimaryKeys("orderId,productId,warehouseId");
+	}
 }

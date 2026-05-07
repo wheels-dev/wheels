@@ -1,11 +1,24 @@
-// Tell Wheels that when we are referring to `firstName` in the CFML code, it should translate to the `STR_USERS_FNAME` column when interacting with the database instead of the default (which would be the `firstname` column)
+// 1. Map a CFML property name to a differently-named database column
+// Tell Wheels that `firstName` in CFML maps to `STR_USERS_FNAME` in the database
+// instead of the default `firstname` column
 property(name="firstName", column="STR_USERS_FNAME");
 
-// Tell Wheels that when we are referring to `fullName` in the CFML code, it should concatenate the `STR_USERS_FNAME` and `STR_USERS_LNAME` columns
+// 2. Create a calculated property using a SQL expression
+// `fullName` is derived by concatenating two columns at the database level
 property(name="fullName", sql="STR_USERS_FNAME + ' ' + STR_USERS_LNAME");
 
-// Tell Wheels that when displaying error messages or labels for form fields, we want to use `First name(s)` as the label for the `STR_USERS_FNAME` column
+// 3. Set a custom label used in form helpers and validation error messages
 property(name="firstName", label="First name(s)");
 
-// Tell Wheels that when creating new objects, we want them to be auto-populated with a `firstName` property of value `Dave`
+// 4. Specify a default value applied when creating new objects
 property(name="firstName", defaultValue="Dave");
+
+// 5. Define a calculated property with a specific data type and exclude it from default SELECTs
+// Useful when the SQL expression returns a numeric result or when you only need
+// the value in specific queries
+property(name="orderTotal", sql="SUM(line_items.price)", dataType="decimal", select=false);
+
+// 6. Disable automatic validations for a specific property
+// Wheels normally infers validations (e.g. string-length, numeric) from the column type;
+// set automaticValidations=false to skip that for this property
+property(name="legacyCode", automaticValidations=false);

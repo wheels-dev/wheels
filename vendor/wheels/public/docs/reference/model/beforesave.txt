@@ -1,2 +1,25 @@
-// Instruct CFWheels to call the `fixObj` method
-beforeSave("fixObj");
+// 1. Call a single method before every save (create or update)
+// In models/User.cfc
+component extends="Model" {
+    function config() {
+        beforeSave("normalizeEmail");
+    }
+
+    private function normalizeEmail() {
+        this.email = LCase(Trim(this.email));
+    }
+}
+
+// 2. Register multiple callback methods as a comma-delimited list
+component extends="Model" {
+    function config() {
+        beforeSave("stripWhitespace,generateSlug");
+    }
+}
+
+// 3. Use the `method` argument alias to register a single callback
+component extends="Model" {
+    function config() {
+        beforeSave(method="sanitizeContent");
+    }
+}

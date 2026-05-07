@@ -1,2 +1,12 @@
-// Instruct CFWheels to call the `fixObj` method after an object has been deleted.
-afterDelete("fixObj");
+// 1. Call a single method after an object is deleted
+// In models/Order.cfc
+afterDelete("notifyWarehouse");
+
+// 2. Call multiple methods after an object is deleted (comma-separated list)
+// In models/User.cfc
+afterDelete("removeFromSearchIndex,clearCachedData");
+
+// 3. Register several after-delete callbacks individually for clarity
+// In models/Article.cfc
+afterDelete("logDeletion");
+afterDelete("cleanupAttachments");

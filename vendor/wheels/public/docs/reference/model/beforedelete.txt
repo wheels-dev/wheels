@@ -1,2 +1,46 @@
-// Instruct CFWheels to call the `fixObj` method
-beforeDelete("fixObj");
+// 1. Register a single method to run before an object is deleted
+// In models/Post.cfc
+component extends="Model" {
+    function config() {
+        beforeDelete("cleanUpAttachments");
+    }
+
+    private function cleanUpAttachments() {
+        // Remove associated files from disk before the record is deleted
+        fileDelete(expandPath("/uploads/#this.id#"));
+    }
+}
+
+// 2. Register multiple methods to run before deletion (comma-delimited list)
+// In models/User.cfc
+component extends="Model" {
+    function config() {
+        beforeDelete("revokeTokens,archiveActivity");
+    }
+
+    private function revokeTokens() {
+        model("Token").deleteAll(where="userId=#this.id#");
+    }
+
+    private function archiveActivity() {
+        model("ActivityLog").updateAll(
+            properties="archivedAt=NOW()",
+            where="userId=#this.id#"
+        );
+    }
+}
+
+// 3. Halt deletion by returning false from the callback
+// In models/Order.cfc
+component extends="Model" {
+    function config() {
+        beforeDelete("preventIfShipped");
+    }
+
+    private function preventIfShipped() {
+        // Returning false cancels the delete operation
+        if (this.status eq "shipped") {
+            return false;
+        }
+    }
+}

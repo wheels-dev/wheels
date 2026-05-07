@@ -1,2 +1,17 @@
-// Instruct CFWheels to call the `fixObj` method after a new object has been created.
-afterNew("fixObj");
+// 1. Call a single method after a new object is initialized
+// In models/User.cfc
+component extends="Model" {
+    function config() {
+        afterNew("setDefaults");
+    }
+    private function setDefaults() {
+        this.role = "member";
+        this.active = true;
+    }
+}
+
+// 2. Call multiple methods after a new object is initialized (comma-delimited list)
+afterNew("setDefaults,generateToken");
+
+// 3. Use the `method` argument alias instead of `methods`
+afterNew(method="setDefaults");

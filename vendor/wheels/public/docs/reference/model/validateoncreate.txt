@@ -1,9 +1,35 @@
-function config(){
-	// Register the `checkPhoneNumber` method below to be called to validate new objects before they are inserted.
+// 1. Register a custom method to validate new objects before insert
+function config() {
+	// `checkPhoneNumber` will only be called when creating a new record.
 	validateOnCreate("checkPhoneNumber");
 }
 
-function checkPhoneNumber(){
+function checkPhoneNumber() {
 	// Make sure area code is `614`.
 	return Left(this.phoneNumber, 3) == "614";
+}
+
+// 2. Register multiple validation methods at once
+function config() {
+	validateOnCreate("checkPhoneNumber,checkReferralCode");
+}
+
+function checkPhoneNumber() {
+	return Left(this.phoneNumber, 3) == "614";
+}
+
+function checkReferralCode() {
+	if (Len(this.referralCode) && !isValidReferral(this.referralCode)) {
+		addError(property="referralCode", message="Invalid referral code.");
+	}
+}
+
+// 3. Only run the validation when a condition is met
+function config() {
+	// Only validate the phone number on create when the user is in the US.
+	validateOnCreate(methods="checkPhoneNumber", condition="this.country eq 'US'");
+}
+
+function checkPhoneNumber() {
+	return IsNumeric(this.phoneNumber);
 }

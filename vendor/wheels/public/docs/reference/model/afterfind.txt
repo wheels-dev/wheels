@@ -1,9 +1,29 @@
-// Instruct CFWheels to call the `setTime` method after getting objects or records with one of the finder methods.
+// 1. Register a single callback method to run after records are fetched
+// In models/User.cfc
 config() {
-	afterFind("setTime");
+	afterFind("setFetchedAt");
 }
 
-function setTime(){
+// The callback receives each row's columns as arguments; return the struct to modify the record.
+function setFetchedAt() {
 	arguments.fetchedAt = Now();
 	return arguments;
+}
+
+// 2. Format a column value after a find (works for both query rows and objects)
+// In models/Product.cfc
+config() {
+	afterFind("formatPrice");
+}
+
+function formatPrice() {
+	if (StructKeyExists(arguments, "price")) {
+		arguments.price = DollarFormat(arguments.price);
+	}
+	return arguments;
+}
+
+// 3. Register multiple callback methods as a comma-delimited list
+config() {
+	afterFind("setFetchedAt,formatPrice");
 }

@@ -1,2 +1,18 @@
-// Make sure that the score is a number with no decimals but only when a score is supplied. (Tetting `allowBlank` to `true` means that objects are allowed to be saved without scores, typically resulting in `NULL` values being inserted in the database table)
-validatesNumericalityOf(property="score", onlyInteger=true, allowBlank=true, message="Please enter a correct score.");
+// 1. Validate that the `age` property is a number
+validatesNumericalityOf(property="age");
+
+// 2. Validate that the `score` property is a whole number (no decimals), allowing blank so that
+// records can be saved without a score (resulting in a NULL in the database)
+validatesNumericalityOf(property="score", onlyInteger=true, allowBlank=true, message="Please enter a whole number for score.");
+
+// 3. Validate that a `price` value is greater than zero and no more than 10000
+validatesNumericalityOf(property="price", greaterThan=0, lessThanOrEqualTo=10000);
+
+// 4. Validate that `quantity` is at least 1, is an integer, and only on create
+validatesNumericalityOf(property="quantity", onlyInteger=true, greaterThanOrEqualTo=1, when="onCreate");
+
+// 5. Validate that `rating` must be exactly 5 only when a condition is met
+validatesNumericalityOf(property="rating", equalTo=5, condition="this.isPerfect()");
+
+// 6. Validate that `luckyNumber` is an odd number
+validatesNumericalityOf(property="luckyNumber", odd=true, message="[property] must be an odd number.");

@@ -1,2 +1,11 @@
-// Make sure that the user has to confirm their password correctly the first time they register (usually done by typing it again in a second form field)
+// 1. Require a confirmed password when creating a new user account
+// The form should include a `passwordConfirmation` field that the user types their password into a second time
 validatesConfirmationOf(property="password", when="onCreate", message="Your password and its confirmation do not match. Please try again.");
+
+// 2. Confirm an email address on every save (default `when="onSave"`)
+// A matching `emailConfirmation` property must be set on the object before saving
+validatesConfirmationOf(property="email");
+
+// 3. Confirm multiple properties and use a case-sensitive comparison
+// Both `passwordConfirmation` and `pinConfirmation` must match exactly (including letter case)
+validatesConfirmationOf(properties="password,pin", caseSensitive=true);

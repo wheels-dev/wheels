@@ -1,2 +1,11 @@
-// Make sure that the user selects either "CFWheels" or "Rails" as their framework 
-validatesInclusionOf(property="frameworkOfChoice", list="cfwheels,rails", message="Please try again, and this time, select a decent framework!" );
+// 1. Validate that a user selects a valid framework choice
+validatesInclusionOf(property="frameworkOfChoice", list="cfwheels,rails,django", message="Please select a supported framework.");
+
+// 2. Validate a status field and skip validation if the value is blank
+validatesInclusionOf(property="status", list="active,inactive,pending", allowBlank=true);
+
+// 3. Validate a role only when creating a new record
+validatesInclusionOf(property="role", list="admin,editor,viewer", when="onCreate");
+
+// 4. Validate a priority field only when a condition is met
+validatesInclusionOf(property="priority", list="low,medium,high", condition="this.isAssigned()");
