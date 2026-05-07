@@ -1,8 +1,14 @@
-// Get the average salary for all employees.
+// 1. Get the average salary for all employees.
 avgSalary = model("employee").average("salary");
 
-// Get the average salary for employees in a given department.
+// 2. Get the average salary for employees in a given department.
 avgSalary = model("employee").average(property="salary", where="departmentId=#params.key#");
 
-// Make sure a numeric value is always returned if no records are calculated.
+// 3. Make sure a numeric value is always returned if no records are found.
 avgSalary = model("employee").average(property="salary", where="salary BETWEEN #params.min# AND #params.max#", ifNull=0);
+
+// 4. Average only distinct salary values (duplicates excluded).
+avgSalary = model("employee").average(property="salary", distinct=true);
+
+// 5. Get the average salary grouped by department (returns a query).
+avgByDept = model("employee").average(property="salary", group="departmentId");

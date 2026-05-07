@@ -1,0 +1,17 @@
+// 1. Get all column metadata for a property
+data = model("User").columnDataForProperty("email");
+// Returns a struct like:
+// { column: "email", type: "varchar", validationtype: "string", label: "Email" }
+
+// 2. Check whether a property is mapped before accessing its data
+data = model("Product").columnDataForProperty("price");
+if (IsStruct(data)) {
+    writeOutput("Column: " & data.column);
+    writeOutput("Type: " & data.validationtype);
+}
+
+// 3. Handle the false return when the property does not exist
+data = model("User").columnDataForProperty("nonExistentProp");
+if (!IsStruct(data)) {
+    writeOutput("Property not found on this model.");
+}

@@ -1,0 +1,34 @@
+// 1. Inspect all metadata for the User model
+info = model("User").classInfo();
+// info.modelName      -> "User"
+// info.tableName      -> "users"
+// info.primaryKeys    -> "id"
+// info.propertyNames  -> "id,firstName,lastName,email,createdAt,updatedAt"
+// info.properties     -> struct of column/type metadata keyed by property name
+// info.associations   -> struct of association definitions (belongsTo, hasMany, etc.)
+// info.validations    -> struct keyed by trigger (onSave, onCreate, onUpdate) with arrays of rules
+// info.enums          -> struct of enum definitions keyed by property name
+// info.scopes         -> struct of named scope definitions
+// info.callbacks      -> struct of callback arrays keyed by callback type (beforeSave, afterCreate, etc.)
+// info.softDeletion   -> false (true when the model has a deletedAt column)
+
+// 2. Use classInfo() in a code-generation or introspection tool
+info = model("Article").classInfo();
+
+// List all association names
+for (assocName in info.associations) {
+    assoc = info.associations[assocName];
+    WriteOutput(assocName & " (" & assoc.type & ")" & "<br>");
+}
+
+// 3. Check whether a model uses soft deletion and list its callbacks
+info = model("Post").classInfo();
+
+if (info.softDeletion) {
+    WriteOutput("Post uses soft deletion.");
+}
+
+for (callbackType in info.callbacks) {
+    methods = info.callbacks[callbackType];
+    WriteOutput(callbackType & ": " & ArrayToList(methods) & "<br>");
+}

@@ -19,6 +19,101 @@
         "cache_creation_input_tokens": 4083,
         "cache_read_input_tokens": 5834
       }
+    },
+    "function:associationNames": {
+      "kind": "function",
+      "id": "associationNames",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T00:05:13.682Z",
+      "summary": "Authored the reference example for `associationNames()` in `vendor/wheels/public/docs/reference/model/associationnames.txt`. The function simply returns `StructKeyList(variables.wheels.class.associations)`, so three concise examples cover retrieving the list, checking for a specific association, and iterating over all association names.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/associationnames.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28589,
+        "output_tokens": 525,
+        "cache_creation_input_tokens": 3933,
+        "cache_read_input_tokens": 5834
+      }
+    },
+    "function:average": {
+      "kind": "function",
+      "id": "average",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T00:05:26.647Z",
+      "summary": "Rewrote the reference file for `model.average` with five numbered examples covering basic usage, filtered with `where`, `ifNull` fallback, `distinct=true`, and `group` for grouped results. No CFC edits were needed — the docblock and signature match the documented parameters exactly.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/average.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 10255,
+        "output_tokens": 612,
+        "cache_creation_input_tokens": 2492,
+        "cache_read_input_tokens": 8751
+      }
+    },
+    "function:callbackInfo": {
+      "kind": "function",
+      "id": "callbackInfo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T00:05:39.936Z",
+      "summary": "Created the reference example for `callbackInfo()` at `vendor/wheels/public/docs/reference/model/callbackinfo.txt`. The function takes no parameters and returns the internal callbacks struct keyed by callback type (e.g., `beforeSave`, `afterCreate`), each containing an array of method names. Three examples demonstrate: inspecting the full struct, checking a specific callback type, and iterating all callbacks for debugging.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/callbackinfo.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28699,
+        "output_tokens": 620,
+        "cache_creation_input_tokens": 1110,
+        "cache_read_input_tokens": 8751
+      }
+    },
+    "function:classInfo": {
+      "kind": "function",
+      "id": "classInfo",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T00:05:56.336Z",
+      "summary": "Authored the reference example for `classInfo()` at `vendor/wheels/public/docs/reference/model/classinfo.txt`. The three examples cover basic metadata inspection, iterating over associations in a code-generation context, and checking soft-deletion status plus callback introspection. No docblock or source changes were needed.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/classinfo.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28877,
+        "output_tokens": 775,
+        "cache_creation_input_tokens": 1082,
+        "cache_read_input_tokens": 8751
+      }
+    },
+    "function:columnDataForProperty": {
+      "kind": "function",
+      "id": "columnDataForProperty",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T00:06:11.595Z",
+      "summary": "Created the reference example file for `columnDataForProperty` at `vendor/wheels/public/docs/reference/model/columndataforproperty.txt`. The three examples demonstrate retrieving full column metadata for a property, safely checking the returned struct before use, and handling the `false` return value when the property doesn't exist on the model.",
+      "files_changed": [
+        "vendor/wheels/public/docs/reference/model/columndataforproperty.txt"
+      ],
+      "notes": "",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 28697,
+        "output_tokens": 594,
+        "cache_creation_input_tokens": 1096,
+        "cache_read_input_tokens": 8751
+      }
     }
   },
   "runs": []
