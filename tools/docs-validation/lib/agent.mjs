@@ -4,17 +4,19 @@ import { resolve } from 'node:path';
 import { TOOLS, makeExecutor } from './tools.mjs';
 import { locateFunction } from './source-map.mjs';
 import { readReferenceAnyScope } from './reference-store.mjs';
+import { loadGuidePage, summarizeBlocks } from './guides.mjs';
 
-const PROMPT_PATH = resolve(new URL('../agent/prompt.md', import.meta.url).pathname);
+const PROMPT_PATH_API = resolve(new URL('../agent/prompt.md', import.meta.url).pathname);
+const PROMPT_PATH_GUIDE = resolve(new URL('../agent/prompt-guide.md', import.meta.url).pathname);
 
 const DEFAULT_MODEL = process.env.WHEELS_DOCS_MODEL ?? 'claude-sonnet-4-6';
 const MAX_TURNS = Number(process.env.WHEELS_DOCS_MAX_TURNS ?? 16);
 const MAX_TOKENS = Number(process.env.WHEELS_DOCS_MAX_TOKENS ?? 8192);
 
-let SYSTEM_PROMPT;
-async function getSystemPrompt() {
-  SYSTEM_PROMPT ??= await readFile(PROMPT_PATH, 'utf8');
-  return SYSTEM_PROMPT;
+const PROMPT_CACHE = {};
+async function getPrompt(path) {
+  PROMPT_CACHE[path] ??= await readFile(path, 'utf8');
+  return PROMPT_CACHE[path];
 }
 
 async function userPayload(fn) {
@@ -76,14 +78,69 @@ async function userPayload(fn) {
   return lines.join('\n');
 }
 
+async function guidePayload(relPath) {
+  const page = await loadGuidePage(relPath);
+  const summary = summarizeBlocks(page.blocks);
+  const lines = [
+    `# Guide page: ${relPath}`,
+    '',
+    `**Repo path:** \`${page.repoRelPath}\``,
+    '',
+    '## Frontmatter',
+    '',
+  ];
+  if (page.frontmatter) {
+    for (const [k, v] of Object.entries(page.frontmatter)) lines.push(`- **${k}:** ${v}`);
+  } else {
+    lines.push('_(no frontmatter found)_');
+  }
+  lines.push('');
+  lines.push('## Code blocks');
+  lines.push('');
+  lines.push(`Total: ${summary.total}, tested: ${summary.tested}, illustrative: ${summary.illustrative}, untested: ${summary.untested}`);
+  if (Object.keys(summary.byKind).length > 0) {
+    lines.push(`By kind: ${Object.entries(summary.byKind).map(([k, n]) => `${k}=${n}`).join(', ')}`);
+  }
+  lines.push('');
+  lines.push('| # | Lang | Line | Tested | Kind | Illustrative | Body bytes | Meta |');
+  lines.push('| - | --- | --- | --- | --- | --- | --- | --- |');
+  page.blocks.forEach((b, i) => {
+    lines.push(
+      `| ${i + 1} | ${b.lang || '_'} | ${b.startLine} | ${b.tested ? 'yes' : 'no'} | ${b.testKind || '_'} | ${b.illustrative ? 'yes' : 'no'} | ${b.bodyLength} | ${(b.meta || '').replace(/\|/g, '\\|') || '_'} |`,
+    );
+  });
+  lines.push('');
+  lines.push('## Your task');
+  lines.push('');
+  lines.push(
+    `Follow the workflow in the system prompt for THIS page only. \`read_file\` the page at \`${page.repoRelPath}\` if you need the full content. Annotate untested blocks, validate via the verify-docs harness, and call \`report_outcome\` exactly once.`,
+  );
+  return lines.join('\n');
+}
+
+export async function runAgentForGuidePage(relPath, { logger = console.log } = {}) {
+  const client = new Anthropic();
+  const system = await getPrompt(PROMPT_PATH_GUIDE);
+  const outcome = { value: null };
+  const runState = { filesChanged: new Set(), referencesWritten: new Set() };
+  const exec = makeExecutor({ outcome, runState });
+
+  const messages = [{ role: 'user', content: await guidePayload(relPath) }];
+  return runAgentLoop({ client, system, outcome, runState, exec, messages, logger });
+}
+
 export async function runAgentForFunction(fn, { logger = console.log } = {}) {
   const client = new Anthropic();
-  const system = await getSystemPrompt();
+  const system = await getPrompt(PROMPT_PATH_API);
   const outcome = { value: null };
   const runState = { filesChanged: new Set(), referencesWritten: new Set() };
   const exec = makeExecutor({ outcome, runState });
 
   const messages = [{ role: 'user', content: await userPayload(fn) }];
+  return runAgentLoop({ client, system, outcome, runState, exec, messages, logger });
+}
+
+async function runAgentLoop({ client, system, outcome, runState, exec, messages, logger }) {
   let turn = 0;
   let usage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
 

@@ -14,13 +14,19 @@ const READ_ROOTS = [
   'tests',
   'config',
   'CLAUDE.md',
+  'web/sites/guides/src/content',
+  'web/sites/guides/scripts/verify-docs',
 ];
 
 const WRITE_GLOBS = [
   /^vendor\/wheels\/public\/docs\/reference\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\/[a-z][a-z0-9]*\.txt$/,
+  /^web\/sites\/guides\/src\/content\/docs\/v4-0-0-snapshot\/.+\.mdx?$/,
 ];
 
-const EDIT_GLOBS = [/^vendor\/wheels\/.+\.cfc$/];
+const EDIT_GLOBS = [
+  /^vendor\/wheels\/.+\.cfc$/,
+  /^web\/sites\/guides\/src\/content\/docs\/v4-0-0-snapshot\/.+\.mdx?$/,
+];
 
 function withinRoot(absPath) {
   const norm = normalize(absPath);
