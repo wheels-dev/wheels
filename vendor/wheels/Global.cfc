@@ -1670,12 +1670,12 @@ return local.$wheels;
 	}
 
 	/**
-	 * Capitalizes all words in the text to create a nicer looking title.
+	 * Capitalizes the first character of the supplied string.
 	 *
 	 * [section: Global Helpers]
 	 * [category: String Functions]
 	 *
-	 * @string String to capitalize.
+	 * @text String to capitalize.
 	 */
 	public string function capitalize(required string text) {
 		local.rv = arguments.text;
@@ -1748,7 +1748,7 @@ return local.$wheels;
 	 * [section: Global Helpers]
 	 * [category: String Functions]
 	 *
-	 * @string String to singularize.
+	 * @word The word to singularize.
 	 */
 	public string function singularize(required string word) {
 		return $singularizeOrPluralize(text = arguments.word, which = "singularize");

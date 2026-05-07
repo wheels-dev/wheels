@@ -1,0 +1,11 @@
+// 1. Get the DI container and register a service binding
+di = injector();
+di.register(name="emailService", component="app.services.EmailService");
+
+// 2. Register a singleton service with constructor arguments (typical config/services.cfm usage)
+di = injector();
+di.register(name="paymentGateway", component="app.services.StripeGateway", singleton=true, initArguments={apiKey=env("STRIPE_KEY")});
+
+// 3. Retrieve the container to inspect or manipulate registrations at runtime
+di = injector();
+writeOutput(di.containsInstance("emailService")); // true or false

@@ -1,2 +1,11 @@
-// Singularize a word, will result in "language" 
-#singularize("languages")#
+// 1. Singularize a regular plural word
+singular = singularize("languages");
+// singular -> "language"
+
+// 2. Singularize an irregular plural
+singular = singularize("children");
+// singular -> "child"
+
+// 3. Singularize a camelCased word (only the last part is singularized)
+singular = singularize("blogPosts");
+// singular -> "blogPost"

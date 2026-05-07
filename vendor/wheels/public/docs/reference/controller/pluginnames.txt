@@ -1,4 +1,13 @@
-// Check if the Scaffold plugin is installed 
-<cfif ListFindNoCase("scaffold", pluginNames())>
-    // do something cool 
+// 1. Check if the Scaffold plugin is installed
+<cfif listFindNoCase(pluginNames(), "scaffold")>
+    // do something cool
 </cfif>
+
+// 2. Output all installed plugin names
+names = pluginNames();
+// names -> "scaffold,formobject,myplugin" (comma-separated list of installed plugin names)
+
+// 3. Loop over installed plugins
+<cfloop list="#pluginNames()#" index="pluginName">
+    writeOutput(pluginName);
+</cfloop>

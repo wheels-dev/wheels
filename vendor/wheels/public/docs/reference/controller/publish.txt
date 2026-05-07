@@ -1,0 +1,15 @@
+// 1. Publish a notification event to a user-specific channel (in-memory adapter)
+data = serializeJSON({message = "Your order has shipped!", orderId = 42});
+result = publish(channel="user.42", event="notification", data=data);
+// result -> {success: true, ...}
+
+// 2. Publish an update event using the database adapter for persistence
+data = serializeJSON({status = "active", updatedAt = Now()});
+result = publish(channel="products", event="update", data=data, adapter="database");
+
+// 3. Broadcast a chat message to a room channel
+result = publish(
+    channel = "chat.room.5",
+    event   = "message",
+    data    = serializeJSON({user = "alice", text = "Hello everyone!"})
+);

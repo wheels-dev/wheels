@@ -1,6 +1,15 @@
-// Controller code.
-aLittleAhead = DateAdd("d", 365, Now());
+// 1. Show approximate time until a future date
+nextYear = DateAdd("yyyy", 1, Now());
+writeOutput(timeUntilInWords(nextYear));
+// -> "about 1 year"
 
-// View code.
-<!--- Will output: about 1 year --->
-#timeUntilInWords(aLittleAhead)#
+// 2. Include seconds for a near-future time
+soonish = DateAdd("s", 8, Now());
+writeOutput(timeUntilInWords(toTime=soonish, includeSeconds=true));
+// -> "less than 10 seconds"
+
+// 3. Compare two explicit dates (custom fromTime)
+launchDate = CreateDate(2025, 6, 1);
+deadline   = CreateDate(2025, 9, 15);
+writeOutput(timeUntilInWords(toTime=deadline, fromTime=launchDate));
+// -> "about 3 months"
