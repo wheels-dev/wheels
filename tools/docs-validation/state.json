@@ -5734,12 +5734,15 @@
     "function:h": {
       "kind": "function",
       "id": "h",
-      "status": "needs_human",
-      "attempts": 1,
-      "updatedAt": "2026-05-07T05:58:19.750Z",
-      "summary": "The `h()` function reference file cannot be written because the write-allow regex requires filenames matching `[a-z][a-z0-9]+` (2+ chars), but the function name is a single character `h`, making `h.txt` an invalid path. A human needs to either update the WRITE_GLOBS regex in `tools/docs-validation/lib/tools.mjs` to allow single-character names (e.g., `[a-z][a-z0-9]*`) or create the file `vendor/wheels/public/docs/reference/controller/h.txt` manually with the following content:",
-      "files_changed": [],
-      "notes": "Proposed file content for vendor/wheels/public/docs/reference/controller/h.txt:\n\n// 1. Safely output user-supplied text in a view template\nwriteOutput(h(user.name));\n// If user.name is \"<script>alert('xss')</script>\", outputs:\n// &lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;\n\n// 2. Encode a variable inline in a cfoutput block\n// Instead of: <cfoutput>#user.bio#</cfoutput>\n// Use:        <cfoutput>#h(user.bio)#</cfoutput>\nencodedBio = h(user.bio);\n\n// 3. Encode a non-string value (converted to string automatically)\nrating = 4.5;\nwriteOutput(h(rating));\n// -> \"4.5\"\n\nThe fix needed in tools/docs-validation/lib/tools.mjs is to change the WRITE_GLOBS regex from:\n  /^vendor\\/wheels\\/public\\/docs\\/reference\\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\\/[a-z][a-z0-9]+\\.txt$/\nto:\n  /^vendor\\/wheels\\/public\\/docs\\/reference\\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\\/[a-z][a-z0-9]*\\.txt$/\n(changing `+` to `*` to allow single-character names)",
+      "status": "done",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T06:30:00.000Z",
+      "summary": "Manually resolved after the agent flagged needs_human on attempt 1: WRITE_GLOBS regex in tools/docs-validation/lib/tools.mjs required 2+ char filenames; single-char name `h` was rejected. Regex updated and the agent's proposed reference content written to vendor/wheels/public/docs/reference/controller/h.txt.",
+      "files_changed": [
+        "tools/docs-validation/lib/tools.mjs",
+        "vendor/wheels/public/docs/reference/controller/h.txt"
+      ],
+      "notes": "Resolution: WRITE_GLOBS regex changed from `[a-z][a-z0-9]+` to `[a-z][a-z0-9]*` so single-char function names are writable. Agent's drafted examples used as-is.",
       "turns": 18,
       "usage": {
         "input_tokens": 8781,

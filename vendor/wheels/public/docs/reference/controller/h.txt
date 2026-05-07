@@ -1,0 +1,14 @@
+// 1. Safely output user-supplied text in a view template
+writeOutput(h(user.name));
+// If user.name is "<script>alert('xss')</script>", outputs the
+// HTML-encoded form: &lt;script&gt;alert(&##x27;xss&##x27;)&lt;/script&gt;
+
+// 2. Encode a variable inline in a cfoutput block
+//   Instead of: <cfoutput>##user.bio##</cfoutput>
+//   Use:        <cfoutput>##h(user.bio)##</cfoutput>
+encodedBio = h(user.bio);
+
+// 3. Encode a non-string value (converted to string automatically)
+rating = 4.5;
+writeOutput(h(rating));
+// rating -> "4.5"
