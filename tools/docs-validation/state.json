@@ -7287,6 +7287,176 @@
         "cache_creation_input_tokens": 878,
         "cache_read_input_tokens": 5518
       }
+    },
+    "guide:testing/browser-tests.mdx": {
+      "kind": "guide",
+      "id": "testing/browser-tests.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:29:21.565Z",
+      "summary": "All 9 blocks were already correctly handled: 8 tagged (1 cli + 7 compile) all pass the harness, and block #2 is legitimately illustrative (a shell prompt snippet). No annotations added, no prose drift found, no CFC changes needed.",
+      "files_changed": [],
+      "notes": "8 blocks tested (1 cli, 7 compile), 1 illustrative, 0 CFC docblock fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1247,
+        "output_tokens": 370,
+        "cache_creation_input_tokens": 3779,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:testing/ci-integration.mdx": {
+      "kind": "guide",
+      "id": "testing/ci-integration.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:29:34.036Z",
+      "summary": "All 8 code blocks on this page are YAML/bash GitHub Actions and shell-script examples that are correctly classified as illustrative. No annotations were needed; the harness passes with 0 tagged blocks and 0 failures.",
+      "files_changed": [],
+      "notes": "Blocks 1–8 are CI configuration snippets (GitHub Actions workflow YAML and a bash helper script). None can be executed by the compile, cli, or tutorial drivers, so illustrative-only classification is correct. No prose drift or API mismatches found.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1128,
+        "output_tokens": 479,
+        "cache_creation_input_tokens": 985,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/controller-tests.mdx": {
+      "kind": "guide",
+      "id": "testing/controller-tests.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:29:43.862Z",
+      "summary": "All 9 blocks were already properly annotated (7 `{test:compile}` blocks all pass, 2 illustrative blocks correctly skipped). No changes were needed.",
+      "files_changed": [],
+      "notes": "7 blocks tested (compile), 2 illustrative, 0 CFC docblock fixes, 0 prose drift. Harness: 7 passed, 0 failed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1239,
+        "output_tokens": 357,
+        "cache_creation_input_tokens": 1001,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/fixtures-and-test-data.mdx": {
+      "kind": "guide",
+      "id": "testing/fixtures-and-test-data.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:29:52.875Z",
+      "summary": "All 4 code blocks on this page were already correctly annotated as `{test:compile}` and the harness confirms 4 passed, 0 failed. No changes were needed.",
+      "files_changed": [],
+      "notes": "4 blocks tested (compile), 0 illustrative, 0 CFC docblock fixes, 0 prose drift corrections.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1055,
+        "output_tokens": 334,
+        "cache_creation_input_tokens": 799,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/functional-tests.mdx": {
+      "kind": "guide",
+      "id": "testing/functional-tests.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:30:01.296Z",
+      "summary": "All 7 code blocks in functional-tests.mdx were already correctly annotated with `{test:compile}` and the verify-docs harness confirms 7 passed, 0 failed. No changes were needed.",
+      "files_changed": [],
+      "notes": "7 blocks tested (compile), 0 illustrative, 0 prose drift fixes needed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1187,
+        "output_tokens": 325,
+        "cache_creation_input_tokens": 939,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/index.mdx": {
+      "kind": "guide",
+      "id": "testing/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:30:12.021Z",
+      "summary": "All 2 code blocks on the page were already correctly annotated (`{test:compile}` and `{test:cli}`). Validation passed with 2/2 tests passing and 0 failures.",
+      "files_changed": [],
+      "notes": "No changes required. Both blocks were pre-tagged and passing.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 904,
+        "output_tokens": 283,
+        "cache_creation_input_tokens": 670,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/integration-tests.mdx": {
+      "kind": "guide",
+      "id": "testing/integration-tests.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:30:20.688Z",
+      "summary": "All 4 code blocks were already correctly annotated with `{test:compile}` and all pass the verify-docs harness (4 passed, 0 failed). No changes were needed.",
+      "files_changed": [],
+      "notes": "4 blocks tested (compile), 0 illustrative, 0 prose drift fixes.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1042,
+        "output_tokens": 318,
+        "cache_creation_input_tokens": 794,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/model-tests.mdx": {
+      "kind": "guide",
+      "id": "testing/model-tests.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:30:34.487Z",
+      "summary": "All 8 compile-tested blocks pass the harness; block 9 is already correctly marked illustrative. No changes were needed.",
+      "files_changed": [],
+      "notes": "8 blocks tested (compile), 1 block illustrative, 0 CFC docblock fixes, 0 prose drift fixes. Page was already fully annotated and passing.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1239,
+        "output_tokens": 334,
+        "cache_creation_input_tokens": 980,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/running-tests-locally.mdx": {
+      "kind": "guide",
+      "id": "testing/running-tests-locally.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:30:46.059Z",
+      "summary": "Page already in good shape: 1 CLI block tested (`wheels --version`), 6 illustrative bash blocks correctly marked with `title=` attributes (they cover multi-step shell workflows, Docker matrix commands, and HTTP calls that require a running dev server — all legitimately non-executable in the harness). Harness reports 1 passed, 0 failed with no changes required.",
+      "files_changed": [],
+      "notes": "0 blocks annotated, 6 illustrative (unchanged), 0 CFC docblock fixes, 0 prose drift corrections.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1112,
+        "output_tokens": 399,
+        "cache_creation_input_tokens": 888,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:testing/view-and-form-tests.mdx": {
+      "kind": "guide",
+      "id": "testing/view-and-form-tests.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T14:31:00.589Z",
+      "summary": "All 9 code blocks on this page were already correctly annotated: 8 CFML blocks carry `{test:compile}` and the 1 HTML block is marked illustrative. The harness confirmed 8 passed, 0 failed with no changes needed.",
+      "files_changed": [],
+      "notes": "8 blocks tested (compile), 1 block illustrative (rendered HTML), 0 CFC docblock fixes, 0 prose drift corrections. Nothing to change — page was already in a fully validated state.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 12341,
+        "output_tokens": 545,
+        "cache_creation_input_tokens": 2020,
+        "cache_read_input_tokens": 8277
+      }
     }
   },
   "runs": []
