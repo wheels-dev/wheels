@@ -488,7 +488,7 @@ Then walk through the flow in the browser:
 
 The `/logout` route is a `DELETE`, so a plain `<a href>` won't reach it — you need a small form. Drop this anywhere in your layout (or any view) for a working "Log out" button:
 
-```cfm
+```cfm title="app/views/layout.cfm (excerpt)"
 #buttonTo(text="Log out", route="logout", method="delete")#
 ```
 
