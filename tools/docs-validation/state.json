@@ -5,114 +5,114 @@
       "kind": "function",
       "id": "associationInfo",
       "status": "done",
-      "attempts": 1,
-      "updatedAt": "2026-05-06T23:00:18.793Z",
-      "summary": "Created the reference example for `associationInfo()` at `vendor/wheels/public/docs/reference/model/associationinfo.txt`. The file includes three idiomatic examples: basic struct inspection with field commentary, checking for a specific association by key, and iterating over all associations to produce a summary. No docblock or code changes were needed — the source and documented hint were already consistent.",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T00:38:57.063Z",
+      "summary": "Validated `associationInfo()` — source and docblock are aligned. Updated the reference example to remove the `<br>` HTML tag from example 3's `writeOutput` call, keeping all three examples otherwise intact and idiomatic.",
       "files_changed": [
         "vendor/wheels/public/docs/reference/model/associationinfo.txt"
       ],
       "notes": "",
       "turns": 3,
       "usage": {
-        "input_tokens": 30491,
-        "output_tokens": 701,
-        "cache_creation_input_tokens": 4083,
-        "cache_read_input_tokens": 5834
+        "input_tokens": 29090,
+        "output_tokens": 668,
+        "cache_creation_input_tokens": 4970,
+        "cache_read_input_tokens": 6532
       }
     },
     "function:associationNames": {
       "kind": "function",
       "id": "associationNames",
       "status": "done",
-      "attempts": 1,
-      "updatedAt": "2026-05-07T00:05:13.682Z",
-      "summary": "Authored the reference example for `associationNames()` in `vendor/wheels/public/docs/reference/model/associationnames.txt`. The function simply returns `StructKeyList(variables.wheels.class.associations)`, so three concise examples cover retrieving the list, checking for a specific association, and iterating over all association names.",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T00:39:10.674Z",
+      "summary": "Updated the reference example for `associationNames()` to fix the HTML `<br>` tag in example 3 (replaced with plain `writeOutput`) and ensured consistent camelCase for all CFML built-in calls (`listFindNoCase`, `listToArray`, `writeOutput`). The function body and docblock are correct and required no changes.",
       "files_changed": [
         "vendor/wheels/public/docs/reference/model/associationnames.txt"
       ],
       "notes": "",
       "turns": 3,
       "usage": {
-        "input_tokens": 28589,
-        "output_tokens": 525,
-        "cache_creation_input_tokens": 3933,
-        "cache_read_input_tokens": 5834
+        "input_tokens": 28798,
+        "output_tokens": 601,
+        "cache_creation_input_tokens": 1314,
+        "cache_read_input_tokens": 9798
       }
     },
     "function:average": {
       "kind": "function",
       "id": "average",
       "status": "done",
-      "attempts": 1,
-      "updatedAt": "2026-05-07T00:05:26.647Z",
-      "summary": "Rewrote the reference file for `model.average` with five numbered examples covering basic usage, filtered with `where`, `ifNull` fallback, `distinct=true`, and `group` for grouped results. No CFC edits were needed — the docblock and signature match the documented parameters exactly.",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T00:39:22.775Z",
+      "summary": "Reviewed the `average()` function in calculations.cfc — the docblock and parameters match the documented snapshot exactly. Wrote the reference file with five idiomatic examples covering basic usage, filtered average, ifNull fallback, distinct averaging, and grouped results.",
       "files_changed": [
         "vendor/wheels/public/docs/reference/model/average.txt"
       ],
       "notes": "",
       "turns": 3,
       "usage": {
-        "input_tokens": 10255,
-        "output_tokens": 612,
-        "cache_creation_input_tokens": 2492,
-        "cache_read_input_tokens": 8751
+        "input_tokens": 10305,
+        "output_tokens": 569,
+        "cache_creation_input_tokens": 2658,
+        "cache_read_input_tokens": 9798
       }
     },
     "function:callbackInfo": {
       "kind": "function",
       "id": "callbackInfo",
       "status": "done",
-      "attempts": 1,
-      "updatedAt": "2026-05-07T00:05:39.936Z",
-      "summary": "Created the reference example for `callbackInfo()` at `vendor/wheels/public/docs/reference/model/callbackinfo.txt`. The function takes no parameters and returns the internal callbacks struct keyed by callback type (e.g., `beforeSave`, `afterCreate`), each containing an array of method names. Three examples demonstrate: inspecting the full struct, checking a specific callback type, and iterating all callbacks for debugging.",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T00:39:49.181Z",
+      "summary": "Validated the `callbackInfo()` function in `vendor/wheels/model/properties.cfc` — it simply returns `variables.wheels.class.callbacks`, a struct keyed by callback type (e.g. `beforeSave`, `afterCreate`) where each value is an array of method name strings. Rewrote the reference example to use camelCase builtins (`arrayLen`), expand the illustrative struct comment to include more callback types, and use string concatenation instead of HTML output tags.",
       "files_changed": [
         "vendor/wheels/public/docs/reference/model/callbackinfo.txt"
       ],
       "notes": "",
-      "turns": 3,
+      "turns": 6,
       "usage": {
-        "input_tokens": 28699,
-        "output_tokens": 620,
-        "cache_creation_input_tokens": 1110,
-        "cache_read_input_tokens": 8751
+        "input_tokens": 31232,
+        "output_tokens": 1157,
+        "cache_creation_input_tokens": 15955,
+        "cache_read_input_tokens": 50089
       }
     },
     "function:classInfo": {
       "kind": "function",
       "id": "classInfo",
       "status": "done",
-      "attempts": 1,
-      "updatedAt": "2026-05-07T00:05:56.336Z",
-      "summary": "Authored the reference example for `classInfo()` at `vendor/wheels/public/docs/reference/model/classinfo.txt`. The three examples cover basic metadata inspection, iterating over associations in a code-generation context, and checking soft-deletion status plus callback introspection. No docblock or source changes were needed.",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T00:40:08.599Z",
+      "summary": "Updated the `classInfo` reference example to add the missing `calculatedProperties` key (which the function actually returns), removed HTML `<br>` tags, normalised casing on CFML builtins (`writeOutput`, `arrayToList`), and added a fourth example demonstrating iteration over calculated properties.",
       "files_changed": [
         "vendor/wheels/public/docs/reference/model/classinfo.txt"
       ],
       "notes": "",
       "turns": 3,
       "usage": {
-        "input_tokens": 28877,
-        "output_tokens": 775,
-        "cache_creation_input_tokens": 1082,
-        "cache_read_input_tokens": 8751
+        "input_tokens": 29498,
+        "output_tokens": 975,
+        "cache_creation_input_tokens": 1930,
+        "cache_read_input_tokens": 9798
       }
     },
     "function:columnDataForProperty": {
       "kind": "function",
       "id": "columnDataForProperty",
       "status": "done",
-      "attempts": 1,
-      "updatedAt": "2026-05-07T00:06:11.595Z",
-      "summary": "Created the reference example file for `columnDataForProperty` at `vendor/wheels/public/docs/reference/model/columndataforproperty.txt`. The three examples demonstrate retrieving full column metadata for a property, safely checking the returned struct before use, and handling the `false` return value when the property doesn't exist on the model.",
+      "attempts": 2,
+      "updatedAt": "2026-05-07T00:40:29.055Z",
+      "summary": "Validated the `columnDataForProperty` function source — it returns the full property metadata struct or `false` when the property doesn't exist. Rewrote the reference example to use camelCase `isStruct()` per conventions, removed the inaccurate `type` key from the comment stub (the struct has `column`, `validationtype`, `label`, not a `type` field), and tightened the prose.",
       "files_changed": [
         "vendor/wheels/public/docs/reference/model/columndataforproperty.txt"
       ],
       "notes": "",
       "turns": 3,
       "usage": {
-        "input_tokens": 28697,
-        "output_tokens": 594,
-        "cache_creation_input_tokens": 1096,
-        "cache_read_input_tokens": 8751
+        "input_tokens": 29084,
+        "output_tokens": 809,
+        "cache_creation_input_tokens": 1518,
+        "cache_read_input_tokens": 9798
       }
     }
   },
