@@ -7961,6 +7961,250 @@
         "cache_creation_input_tokens": 929,
         "cache_read_input_tokens": 5518
       }
+    },
+    "guide:start-here/first-15-minutes.mdx": {
+      "kind": "guide",
+      "id": "start-here/first-15-minutes.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:20:14.196Z",
+      "summary": "All 8 code blocks on the page were already correctly classified: 3 testable blocks tagged ({test:cli} for `wheels --version`, {test:compile} for the route mapper snippet and the controller component), and 5 illustrative blocks (bash commands requiring a live app, and a plain-HTML view template). Harness confirms 3 passed, 0 failed — no changes needed.",
+      "files_changed": [],
+      "notes": "3 tested (1 cli, 2 compile), 5 illustrative (bash commands needing a running app or plain HTML). No prose drift or CFC docblock fixes required.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 4341,
+        "output_tokens": 656,
+        "cache_creation_input_tokens": 4485,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:start-here/index.mdx": {
+      "kind": "guide",
+      "id": "start-here/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:20:17.841Z",
+      "summary": "No code blocks found on this page — it is a section index page with only prose content. Nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes, 0 prose drift corrections.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 569,
+        "output_tokens": 163,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:start-here/installing.mdx": {
+      "kind": "guide",
+      "id": "start-here/installing.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:20:29.436Z",
+      "summary": "No changes needed. All 17 blocks were already correctly classified: 1 `{test:cli}` block (wheels --version) passes validation, and the remaining 16 installation/shell commands are appropriately marked illustrative as they are environment-specific and cannot run in the harness.",
+      "files_changed": [],
+      "notes": "0 blocks newly annotated, 16 illustrative, 1 already-tested cli block passing. No prose drift found.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1362,
+        "output_tokens": 430,
+        "cache_creation_input_tokens": 1175,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:start-here/tutorial/01-hello-wheels.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/01-hello-wheels.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:20:48.700Z",
+      "summary": "All 10 code blocks on this tutorial page were already correctly annotated: 3 tested (1 cli, 2 compile) and 7 illustrative (shell setup commands, before/after reference snippets, and live-server verification that can't run in the harness). The verify-docs harness confirmed 3 passed, 0 failed — no changes required.",
+      "files_changed": [],
+      "notes": "Blocks 2–4 and 9 are illustrative shell commands requiring a live dev server (wheels new, cd, wheels start, wheels reload). Block 5 is a \"before\" reference showing the unmodified routes.cfm. Block 8 is a single-line HTML view. Block 10 is a curl verification against a live server. All correctly left as illustrative.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 6794,
+        "output_tokens": 734,
+        "cache_creation_input_tokens": 1894,
+        "cache_read_input_tokens": 8277
+      }
+    },
+    "guide:start-here/tutorial/02-first-model.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/02-first-model.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:21:35.888Z",
+      "summary": "Annotated 2 previously-untested blocks: added `{test:cli step=1 cmd=\"wheels generate model Post title:string body:text\" asserts-output=\"Post\"}` to the bash generator command (block 1/line 66), and added `title=\"expected output\"` to the text block showing migration output (block 6/line 179) so the harness skips it as illustrative. All 7 tagged blocks pass the harness.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/start-here/tutorial/02-first-model.mdx"
+      ],
+      "notes": "Blocks tested: 7 (5 compile, 1 cli, 1 existing cli). Illustrative blocks: 7 (already marked or now marked with title). No prose drift or CFC docblock fixes needed. The `text` migration-output block was the only one without any title; it now has `title=\"expected output\"` so Starlight renders it clearly and the harness skips it.",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 16373,
+        "output_tokens": 1676,
+        "cache_creation_input_tokens": 9536,
+        "cache_read_input_tokens": 41740
+      }
+    },
+    "guide:start-here/tutorial/03-crud-scaffold.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/03-crud-scaffold.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:21:56.011Z",
+      "summary": "All 13 code blocks on this page were already correctly categorized: 3 tested (2 compile, 1 cli) and 10 marked illustrative with appropriate titles. The harness confirms 3 passed, 0 failed — no changes were needed.",
+      "files_changed": [],
+      "notes": "Blocks 1–3 (bash shell commands like wheels destroy, rm, wheels generate scaffold) are illustrative with title=\"your shell\". Blocks 5–9 (cfm view templates) are illustrative with file-path titles. Block 11 (illustrative gh clone) and Block 13 (wheels reload) are also illustrative. Blocks 4, 10 (cfm) and 12 (cli) are correctly tested. No prose drift or CFC docblock fixes were needed.",
+      "turns": 3,
+      "usage": {
+        "input_tokens": 11536,
+        "output_tokens": 732,
+        "cache_creation_input_tokens": 2146,
+        "cache_read_input_tokens": 8277
+      }
+    },
+    "guide:start-here/tutorial/04-validations-frames.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/04-validations-frames.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:22:08.535Z",
+      "summary": "All 6 blocks were already correctly annotated: 3 tested (2 `{test:compile}`, 1 `{test:cli}`) and 3 illustrative (marked with `title=` for layout/view snippets and a shell prompt). Harness passed 3/3 with no failures.",
+      "files_changed": [],
+      "notes": "No changes needed. Page was already in a valid state.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1118,
+        "output_tokens": 409,
+        "cache_creation_input_tokens": 878,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:start-here/tutorial/05-comments-streams.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/05-comments-streams.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:22:22.726Z",
+      "summary": "All 11 code blocks on this page were already properly handled: 7 tested blocks pass the harness (6 compile, 1 cli), and 4 illustrative-only blocks are correctly marked with `title=` attributes. No annotations or prose changes were needed.",
+      "files_changed": [],
+      "notes": "7 tested, 4 illustrative, 0 CFC docblock fixes, 0 prose drift corrections. Harness: 7 passed, 0 failed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1268,
+        "output_tokens": 372,
+        "cache_creation_input_tokens": 1036,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:start-here/tutorial/06-authentication.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/06-authentication.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:22:48.746Z",
+      "summary": "Annotated the one untested non-illustrative block (#13, line 491) — the `buttonTo` view-helper snippet — as illustrative by adding `title=\"app/views/layout.cfm (excerpt)\"`. This makes the harness skip it cleanly since it requires a full running app context. All 15 tagged blocks pass validation.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/start-here/tutorial/06-authentication.mdx"
+      ],
+      "notes": "1 block annotated as illustrative (buttonTo view helper), 15 compile/cli blocks already tested, 4 illustrative blocks (views + shell examples). No prose drift found. Harness: 15 passed, 0 failed.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 23211,
+        "output_tokens": 897,
+        "cache_creation_input_tokens": 13131,
+        "cache_read_input_tokens": 12390
+      }
+    },
+    "guide:start-here/tutorial/07-testing-deploying.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/07-testing-deploying.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:23:01.720Z",
+      "summary": "All 8 blocks on this page were already correctly annotated: 3 compile tests, 1 CLI test, and 4 illustrative-only blocks. The verify-docs harness confirmed 4 passed, 0 failed with no changes needed.",
+      "files_changed": [],
+      "notes": "4 tested blocks (3 compile, 1 cli), 4 illustrative blocks (bash shell commands and text output examples), 0 CFC docblock fixes, 0 prose drift corrections needed.",
+      "turns": 2,
+      "usage": {
+        "input_tokens": 1158,
+        "output_tokens": 433,
+        "cache_creation_input_tokens": 923,
+        "cache_read_input_tokens": 5518
+      }
+    },
+    "guide:start-here/tutorial/08-bonus-basecoat.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/08-bonus-basecoat.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:23:25.961Z",
+      "summary": "Block #2 (line 67, no language, expected shell output) was the only untested non-illustrative block. It's purely illustrative \"expected output\" text, so it was given a `title=\"expected output\"` and `text` language tag to make it explicitly illustrative. All other non-illustrative blocks were already annotated (block #11 with `{test:compile}`). Harness: 1 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/start-here/tutorial/08-bonus-basecoat.mdx"
+      ],
+      "notes": "14 total blocks: 1 tested (compile), 12 illustrative (already marked), 1 newly marked illustrative (expected terminal output). No prose drift or CFC docblock fixes needed.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 13024,
+        "output_tokens": 1044,
+        "cache_creation_input_tokens": 7743,
+        "cache_read_input_tokens": 12240
+      }
+    },
+    "guide:start-here/tutorial/index.mdx": {
+      "kind": "guide",
+      "id": "start-here/tutorial/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:23:29.436Z",
+      "summary": "The tutorial index page contains no code blocks, so no annotations were needed and no prose drift was found. Nothing to change.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 605,
+        "output_tokens": 176,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:start-here/welcome.mdx": {
+      "kind": "guide",
+      "id": "start-here/welcome.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:23:36.385Z",
+      "summary": "The welcome.mdx page contains no code blocks, so no annotations were needed and no prose drift was found. Nothing to change.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 576,
+        "output_tokens": 179,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:start-here/why-wheels.mdx": {
+      "kind": "guide",
+      "id": "start-here/why-wheels.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T19:23:39.566Z",
+      "summary": "Page \"Why Wheels?\" contains zero code blocks, so no annotations, prose drift fixes, or harness runs were needed.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes. Nothing to do.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 584,
+        "output_tokens": 182,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
     }
   },
   "runs": []

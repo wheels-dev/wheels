@@ -63,7 +63,7 @@ The `Controller` and `Model` base classes that your code extends (e.g. `componen
 
 1. Run the generator:
 
-   ```bash
+   ```bash {test:cli step=1 cmd="wheels generate model Post title:string body:text" asserts-output="Post"}
    wheels generate model Post title:string body:text
    ```
 
@@ -176,7 +176,7 @@ A few things to notice:
 
    Expected output looks roughly like:
 
-   ```text
+   ```text title="expected output"
    Migrating from 0 up to 20260419120000.
 
    -------- 20260419120000_create_posts_table -----------------
