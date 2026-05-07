@@ -21,7 +21,7 @@ Drive Lucee-managed AI endpoints from the CLI. LuCLI stores only lightweight loc
 
 ### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels ai <subcommand> [flags]
 ```
 
@@ -41,7 +41,7 @@ Calling `wheels ai` without a subcommand prints the help summary and exits.
 
 View or update the LuCLI-local defaults (stored under `~/.lucli/ai/settings.json`). These tell other `ai` subcommands which endpoint and model to use when you don't pass `--endpoint` or `--model` explicitly.
 
-```bash
+```bash title="synopsis"
 wheels ai config defaults [flags]
 ```
 
@@ -55,7 +55,7 @@ wheels ai config defaults [flags]
 
 Add or update an AI endpoint entry via CFConfig import. Writes to the Lucee server's `CFConfig.json` so the endpoint is reachable from both CLI prompts and Lucee code.
 
-```bash
+```bash title="synopsis"
 wheels ai config add [flags]
 ```
 
@@ -84,7 +84,7 @@ Use `#env:VAR#` placeholders instead of passing the raw key on the command line.
 
 List AI endpoint entries from the Lucee server's CFConfig.
 
-```bash
+```bash title="synopsis"
 wheels ai config list [flags]
 ```
 
@@ -98,7 +98,7 @@ wheels ai config list [flags]
 
 Top-level list — same data as `ai config list` but annotated with the current LuCLI default endpoint.
 
-```bash
+```bash title="synopsis"
 wheels ai list [flags]
 ```
 
@@ -113,7 +113,7 @@ wheels ai list [flags]
 
 Run a one-shot prompt against a Lucee-managed endpoint.
 
-```bash
+```bash title="synopsis"
 wheels ai prompt [flags]
 ```
 
@@ -143,7 +143,7 @@ wheels ai prompt [flags]
 
 Send a minimal "Respond with the word: pong" prompt to verify an endpoint round-trips correctly.
 
-```bash
+```bash title="synopsis"
 wheels ai test [flags]
 ```
 
@@ -156,7 +156,7 @@ wheels ai test [flags]
 
 Manage reusable skill definitions (a skill bundles prompt text, system instructions, model, temperature, and timeout into a single named unit).
 
-```bash
+```bash title="synopsis"
 wheels ai skill <subcommand> [flags]
 ```
 
@@ -171,7 +171,7 @@ Global skill paths are stored in `~/.lucli/ai/skill-paths.json`. Pass `--skills-
 
 ### Example
 
-```bash
+```bash title="illustrative — requires a running Lucee server and API credentials"
 # Register an OpenAI endpoint using an env-var placeholder for the key
 wheels ai config add \
   --name=mychatgpt --type=openai --model=gpt-4o \
@@ -206,7 +206,7 @@ Generate a shell completion script for the `wheels` (LuCLI) binary. Picocli's st
 
 ### Synopsis
 
-```bash
+```bash title="synopsis"
 wheels completion <bash|zsh|md>
 ```
 
@@ -233,7 +233,7 @@ Each subcommand writes to stdout and takes no flags. Redirect to a file.
 
 **Bash:**
 
-```bash
+```bash title="illustrative — shell pipes and redirects not supported in test harness"
 # System-wide (requires sudo)
 wheels completion bash | sudo tee /etc/bash_completion.d/wheels
 
@@ -244,14 +244,14 @@ echo 'source ~/.wheels-completion.bash' >> ~/.bashrc
 
 **Zsh:**
 
-```bash
+```bash title="illustrative — shell redirects not supported in test harness"
 wheels completion zsh > ~/.zsh/wheels_completion
 echo 'source ~/.zsh/wheels_completion' >> ~/.zshrc
 ```
 
 Open a new shell (or `source ~/.bashrc` / `source ~/.zshrc`) and verify:
 
-```bash
+```bash title="illustrative — verify tab completion works after installation"
 wheels <TAB>
 ```
 
@@ -263,13 +263,13 @@ The generated script includes dynamic completion for `--version` values that inv
 
 Not a shell integration — emits a single markdown document describing every LuCLI command, option, and subcommand. Useful for generating a static reference or feeding documentation pipelines.
 
-```bash
+```bash title="illustrative — shell redirect not supported in test harness"
 wheels completion md > docs/command-reference.md
 ```
 
 ## Common workflows
 
-```bash
+```bash title="illustrative — shell features (&&, redirects, subshell) not supported in test harness"
 # Quick zsh completion bootstrap
 mkdir -p ~/.zsh && \
   wheels completion zsh > ~/.zsh/wheels_completion && \

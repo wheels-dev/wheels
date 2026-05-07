@@ -11,7 +11,7 @@ Build the app image locally and tag it with `:dev`. No registry push; intended f
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy build dev [--destination=<name>] [--dry-run]
 ```
 
@@ -28,7 +28,7 @@ Emits `docker build -t <image>:dev ...` on the control machine, using the same `
 
 ## Example
 
-```bash
+```bash title="illustrative"
 wheels deploy build dev
 docker run --rm -it <image>:dev   # spot-check locally
 ```

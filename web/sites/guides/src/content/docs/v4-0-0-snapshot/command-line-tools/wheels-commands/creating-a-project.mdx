@@ -30,7 +30,7 @@ Scaffold a new Wheels project directory.
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels new <name> [flags]
 ```
 
@@ -57,7 +57,7 @@ Creates a new application in `<name>/` under the current working directory. SQLi
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels new myblog --no-open-browser" asserts-output="myblog"}
 wheels new myblog --no-open-browser
 ```
 
@@ -71,7 +71,7 @@ Create application components. In the current release the only supported subtype
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels create <type> <name> [flags]
 ```
 
@@ -92,7 +92,7 @@ For `wheels create app`, every flag from `wheels new` is accepted and forwarded 
 
 #### Example
 
-```bash
+```bash {test:cli cmd="wheels create app myblog --port=3000 --setup-h2" asserts-output="myblog"}
 wheels create app myblog --port=3000 --setup-h2
 ```
 
@@ -104,7 +104,7 @@ Identical to `wheels new` — the command forwards to the same implementation.
 
 A fresh project has the following top-level layout:
 
-```text
+```text title="generated directory layout"
 myblog/
   app/
     controllers/          # Main.cfc starter controller
@@ -140,7 +140,7 @@ The `.env` file is created from the template's `_env` stub and carries environme
 
 ### Create and start in one line
 
-```bash
+```bash title="illustrative — chained shell commands"
 wheels new myblog --no-open-browser && cd myblog && wheels start
 ```
 
@@ -148,7 +148,7 @@ wheels new myblog --no-open-browser && cd myblog && wheels start
 
 ### Create with H2 instead of SQLite
 
-```bash
+```bash {test:cli cmd="wheels new myblog --setup-h2" asserts-output="myblog"}
 wheels new myblog --setup-h2
 ```
 
@@ -156,7 +156,7 @@ H2 is a pure-Java embedded database that ships with Lucee, so no JDBC download i
 
 ### Create with an explicit port and datasource name
 
-```bash
+```bash {test:cli cmd="wheels new myblog --port=3000 --datasource=blogdb" asserts-output="myblog"}
 wheels new myblog --port=3000 --datasource=blogdb
 ```
 

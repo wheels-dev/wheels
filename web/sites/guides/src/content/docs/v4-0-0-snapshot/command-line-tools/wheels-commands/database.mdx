@@ -27,7 +27,7 @@ Apply or roll back migration files in `app/migrator/migrations/`.
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels migrate [latest|up|down|info]
 ```
 
@@ -53,7 +53,7 @@ Prints a summary of applied and pending migrations without changing the schema. 
 
 #### Example
 
-```bash
+```bash title="example"
 wheels migrate latest
 ```
 
@@ -69,7 +69,7 @@ Populate the database from `app/db/seeds.cfm` and any environment-specific seed 
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels seed [--environment=<env>] [--mode=<mode>] [--generate]
 ```
 
@@ -85,13 +85,13 @@ The seeder runs `app/db/seeds.cfm` first (shared across every environment) and t
 
 #### Example
 
-```bash
+```bash title="example"
 wheels seed
 ```
 
 Prints `Running database seeds...` and then a count like `Seeded: 12 created, 3 skipped` — the skipped count reflects rows that `seedOnce()` found already present.
 
-```bash
+```bash title="example"
 wheels seed --environment=production
 ```
 
@@ -105,7 +105,7 @@ Utility subcommands for migration status, schema version, and full-reset workflo
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels db <command> [flags]
 ```
 
@@ -122,7 +122,7 @@ Runs pending migrations and reseeds the database in one shot. Destructive in the
 | `--force` | off | Required. Confirms you want to migrate and reseed. |
 | `--skip-seed` | off | Run migrations but skip the seeding step. |
 
-```bash
+```bash title="example"
 wheels db reset --force
 ```
 
@@ -136,7 +136,7 @@ Prints a table of every migration — version, description, status (`applied` or
 |---|---|---|
 | `--pending` | off | Show only migrations that have not yet been applied. |
 
-```bash
+```bash title="example"
 wheels db status
 ```
 
@@ -150,7 +150,7 @@ Prints the current schema version.
 |---|---|---|
 | `--detailed` | off | Also show the last applied migration, total migration count, pending count, and the next pending migration. |
 
-```bash
+```bash title="example"
 wheels db version --detailed
 ```
 
@@ -160,7 +160,7 @@ Prints the current version followed by a summary block — last applied migratio
 
 ### Fresh development setup
 
-```bash
+```bash title="example"
 wheels migrate latest
 wheels seed
 ```
@@ -169,7 +169,7 @@ Apply all migrations, then load the shared and development seed files. Run this 
 
 ### Reset the dev database to a clean slate
 
-```bash
+```bash title="example"
 wheels db reset --force
 ```
 
@@ -177,7 +177,7 @@ Runs pending migrations and reseeds in one command. Skip seeding with `wheels db
 
 ### Check what's pending before applying
 
-```bash
+```bash title="example"
 wheels db status --pending
 wheels migrate latest
 ```
@@ -186,7 +186,7 @@ Print only the pending migrations first — useful for a quick sanity check on a
 
 ### Seed production reference data
 
-```bash
+```bash title="example"
 wheels seed --environment=production
 ```
 

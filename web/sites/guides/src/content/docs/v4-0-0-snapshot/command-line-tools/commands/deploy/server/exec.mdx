@@ -11,7 +11,7 @@ Run a command on every host. Filter to one host with `--host=`.
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy server exec --cmd=<command> [--host=<host>] [--destination=<name>] [--dry-run]
 ```
 
@@ -32,7 +32,7 @@ Useful for smoke-testing connectivity, reading environment details, or running o
 
 ## Example
 
-```bash
+```bash title="illustrative — requires live SSH hosts"
 wheels deploy server exec --cmd="uptime"
 wheels deploy server exec --cmd="docker ps" --host=192.0.2.10
 ```

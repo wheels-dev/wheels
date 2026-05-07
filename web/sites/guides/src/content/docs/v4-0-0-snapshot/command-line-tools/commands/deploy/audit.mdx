@@ -11,7 +11,7 @@ Tail the on-host audit log. Every deploy appends an entry with the actor, versio
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy audit [--tail=<N>] [--destination=<name>] [--dry-run]
 ```
 
@@ -31,7 +31,7 @@ The audit log is on ephemeral `/tmp`, so it doesn't survive host reboots. For du
 
 ## Example
 
-```bash
+```bash title="illustrative — requires live deploy host"
 wheels deploy audit
 wheels deploy audit --tail=500 --destination=production
 ```

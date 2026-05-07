@@ -40,7 +40,7 @@ None. The current implementation forwards no query arguments to the inspector en
 
 #### Example
 
-```bash
+```bash title="illustrative — server required"
 wheels routes
 ```
 
@@ -237,7 +237,7 @@ Status is one of `HEALTHY`, `WARNING`, or `CRITICAL`. Issues (red) indicate the 
 
 ### Quick setup verification
 
-```bash
+```bash {test:cli cmd="wheels doctor"}
 wheels doctor
 ```
 
@@ -245,7 +245,7 @@ Run this first when a project acts strangely or when you've just cloned someone 
 
 ### See what exists
 
-```bash
+```bash title="illustrative — shell operators not supported"
 wheels info && wheels stats && wheels routes
 ```
 
@@ -253,7 +253,7 @@ Three commands, in order, give you: versions and environment, artifact counts, a
 
 ### Find stale work
 
-```bash
+```bash {test:cli cmd="wheels notes --annotations=TODO,FIXME,HACK,XXX"}
 wheels notes --annotations=TODO,FIXME,HACK,XXX
 ```
 

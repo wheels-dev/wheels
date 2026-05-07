@@ -17,7 +17,7 @@ Releasing a lock held by an active deploy on another machine causes that deploy 
 
 ## Synopsis
 
-```
+``` title="Synopsis"
 wheels deploy lock release [--destination=<name>] [--dry-run]
 ```
 
@@ -34,7 +34,7 @@ Removes `/tmp/kamal_deploy_lock_<service>` on a single host. Lock state is per-s
 
 ## Example
 
-```bash
+```bash title="Example"
 wheels deploy lock status        # confirm it's stale
 wheels deploy lock release
 ```

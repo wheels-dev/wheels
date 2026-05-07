@@ -24,7 +24,7 @@ LuCLI ships a generic `mcp` subcommand that wraps any installed module's public 
 
 Add an `.mcp.json` file to your project root (or wherever your IDE expects it). Most AI IDEs auto-load this file when the project opens:
 
-```json
+```json title=".mcp.json"
 {
   "mcpServers": {
     "wheels": {
@@ -47,7 +47,7 @@ Claude Code reads `.mcp.json` from the project root. OpenCode uses `.opencode.js
 
 Before wiring it into an IDE, you can confirm the server starts and enumerates tools with the built-in `--once` helper:
 
-```bash
+```bash title="smoke-test — run in your project root"
 wheels mcp wheels --once tools/list
 ```
 

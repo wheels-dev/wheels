@@ -21,7 +21,7 @@ The `wheels` binary is distributed through three channels: Homebrew for macOS an
 
 The CLI runs on Java 21. On macOS and Linux, the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper, so you don't have to wire up a system JDK. If you're installing manually — or on Windows outside the Chocolatey package — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
 
-```bash
+```bash title="illustrative — system JDK setup"
 brew install openjdk@21
 java -version
 ```
@@ -32,7 +32,7 @@ You should see `openjdk version "21.0.x"` in the output. On Apple Silicon macOS,
 
 Tap the formula repository and install:
 
-```bash
+```bash title="illustrative — Homebrew install"
 brew tap wheels-dev/wheels
 brew install wheels
 ```
@@ -57,7 +57,7 @@ The `wheels` package at [community.chocolatey.org/packages/wheels](https://commu
 
 Once the LuCLI-based v2 package ships, installation will be:
 
-```powershell
+```powershell title="illustrative — Chocolatey install (not yet available)"
 choco install wheels
 wheels --version
 ```
@@ -72,14 +72,14 @@ If Homebrew and Chocolatey don't fit your environment — a locked-down CI host,
 
 2. **Wheels Module.** Download `wheels-module-<version>.tar.gz` (or `.zip` on Windows) from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases). Extract it into `~/.wheels/modules/wheels/`:
 
-   ```bash
+   ```bash title="illustrative — manual module extract"
    mkdir -p ~/.wheels/modules/wheels
    tar -xzf wheels-module-*.tar.gz -C ~/.wheels/modules/wheels/
    ```
 
 3. **Environment.** Export `JAVA_HOME` to your JDK 21 install and `LUCLI_HOME` to `$HOME/.wheels`:
 
-   ```bash
+   ```bash title="illustrative — environment variables"
    export JAVA_HOME=/path/to/jdk-21
    export LUCLI_HOME=$HOME/.wheels
    ```
@@ -92,13 +92,13 @@ Pick LuCLI and Wheels Module versions that are known to be paired — the Homebr
 
 After any of the three paths, confirm the binary resolves and reports a version:
 
-```bash
+```bash {test:cli cmd="wheels --version" asserts-output="Wheels"}
 wheels --version
 ```
 
 You should see something like:
 
-```
+``` title="illustrative — example version output"
 Wheels 4.0.0-SNAPSHOT+1523 (snapshot)
 LuCLI 0.3.7
 Java 21.0.8

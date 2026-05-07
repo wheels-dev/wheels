@@ -22,7 +22,7 @@ Walk the project's CFC and CFM files and print a code-health report: totals, a g
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels analyze [target]
 ```
 
@@ -55,7 +55,7 @@ wheels analyze
 
 Sample output (trimmed):
 
-```text
+```text title="sample output"
 Analyzing code...
 
 Code Analysis Results
@@ -83,7 +83,7 @@ Run the shorter, error-focused pass: check model associations, controller conven
 
 #### Synopsis
 
-```
+``` title="synopsis"
 wheels validate
 ```
 
@@ -110,7 +110,7 @@ wheels validate
 
 Sample output when everything passes (warnings can still appear):
 
-```text
+```text title="sample output — passing"
 Validating...
 
 Validation passed — no errors found (1 warnings)
@@ -119,7 +119,7 @@ Validation passed — no errors found (1 warnings)
 
 Sample output with errors:
 
-```text
+```text title="sample output — errors"
 Validating...
 
 Validation found 2 issue(s):
@@ -135,7 +135,7 @@ Both commands read the same files through the same service, but they answer diff
 
 ### Pre-commit sanity check
 
-```bash
+```bash title="run both checks in sequence"
 wheels validate
 wheels analyze
 ```
@@ -144,7 +144,7 @@ Run `validate` first and read its output for any ✗ errors or ⚠ warnings. The
 
 ### Scope the analysis
 
-```bash
+```bash title="scope the analysis to one directory"
 wheels analyze models
 wheels analyze controllers
 wheels analyze views

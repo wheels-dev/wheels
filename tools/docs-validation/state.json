@@ -8273,6 +8273,1863 @@
         "cache_creation_input_tokens": 946,
         "cache_read_input_tokens": 5518
       }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/boot.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/boot.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:30:40.740Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis with placeholder syntax and block 2 is a multi-command Docker deploy example requiring real infrastructure. Added `title=\"synopsis\"` and `title=\"example\"` respectively so the harness skips them cleanly. Harness passes with 0 tagged, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/boot.mdx"
+      ],
+      "notes": "2 blocks tested: 0, illustrative: 2. No CFC docblock fixes. No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6585,
+        "output_tokens": 1208,
+        "cache_creation_input_tokens": 12928,
+        "cache_read_input_tokens": 9018
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/details.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/details.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:31:00.588Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis uses placeholder syntax (`<name|all>`, `[...]`) and the example invokes a deploy command requiring live Docker infrastructure. Added `title=\"synopsis\"` and `title=\"example\"` so Starlight renders them with labels and the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/details.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 tested, 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6383,
+        "output_tokens": 1136,
+        "cache_creation_input_tokens": 3872,
+        "cache_read_input_tokens": 17797
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:31:04.003Z",
+      "summary": "No code blocks present on this page — nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "The page has 0 code blocks (0 tested, 0 illustrative, 0 untested). No edits were needed.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 607,
+        "output_tokens": 175,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/logs.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/logs.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:31:25.302Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis uses placeholder syntax (`<name|all>`, `[--tail=<N>]`) and the example block contains two commands requiring a live deployment environment — neither can be run in a fixture app. Added `title=\"synopsis\"` and `title=\"example\"` so Starlight renders them cleanly and the harness skips them. Validation passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/logs.mdx"
+      ],
+      "notes": "0 blocks tested, 2 blocks illustrative, 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6613,
+        "output_tokens": 1226,
+        "cache_creation_input_tokens": 4007,
+        "cache_read_input_tokens": 17924
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/reboot.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/reboot.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:31:44.604Z",
+      "summary": "Both blocks on this reference page are illustrative: the synopsis block uses angle-bracket placeholders that can't be executed, and the bash example requires a live deploy environment. Added `title=` attributes to both fences so the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/reboot.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative (synopsis + example), 0 CFC docblock fixes. No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 2982,
+        "output_tokens": 1087,
+        "cache_creation_input_tokens": 2161,
+        "cache_read_input_tokens": 16105
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/remove.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/remove.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:32:07.646Z",
+      "summary": "Both code blocks on this page are illustrative — the synopsis uses placeholder syntax (angle brackets, square brackets) and the example requires a live deployment context with a configured redis accessory. Added `title=\"synopsis\"` and `title=\"example\"` attributes so Starlight renders them with labels; the harness correctly skips both (0 tagged blocks, 0 failures).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/remove.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6591,
+        "output_tokens": 1271,
+        "cache_creation_input_tokens": 3971,
+        "cache_read_input_tokens": 22021
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/restart.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/restart.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:32:30.884Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block (no language, angle-bracket placeholders) and the bash example (requires live Docker infrastructure). Added `title=\"synopsis\"` and `title=\"example\"` respectively so the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/restart.mdx"
+      ],
+      "notes": "0 blocks tested, 2 blocks illustrative (synopsis + deploy command requiring Docker), 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6381,
+        "output_tokens": 1208,
+        "cache_creation_input_tokens": 3829,
+        "cache_read_input_tokens": 21865
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/start.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/start.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:32:55.866Z",
+      "summary": "Both code blocks on this page are illustrative deploy-infrastructure commands (require real Docker/Kamal setup) and cannot be run in the fixture harness. Added `title=` attributes to both blocks so Starlight renders them with labels while the harness correctly skips them. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/start.mdx"
+      ],
+      "notes": "0 blocks tested (compile/cli/tutorial), 2 blocks illustrative (synopsis with placeholders + deploy command requiring live Docker infrastructure). No prose drift or CFC docblock fixes needed.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6520,
+        "output_tokens": 1263,
+        "cache_creation_input_tokens": 3918,
+        "cache_read_input_tokens": 21965
+      }
+    },
+    "guide:command-line-tools/commands/deploy/accessory/stop.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/accessory/stop.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:33:20.448Z",
+      "summary": "Both code blocks on this page are genuinely illustrative: the synopsis block uses placeholder syntax (`<name|all>`) and the example block requires a live deploy environment with an accessory container. Added `title=\"synopsis\"` and `title=\"illustrative\"` respectively so the harness skips them cleanly. No prose drift found. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/stop.mdx"
+      ],
+      "notes": "0 blocks tested (both illustrative), 2 blocks marked illustrative via title=, 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6481,
+        "output_tokens": 1262,
+        "cache_creation_input_tokens": 3897,
+        "cache_read_input_tokens": 21952
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/boot.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/boot.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:33:44.927Z",
+      "summary": "All 3 code blocks on this page are illustrative: the synopsis uses `<placeholder>` tokens, the docker-run behavior block uses template placeholders, and the bash example requires a live deploy environment. Added `title=\"...\"` attributes to all three blocks so they are clearly labeled and the harness correctly ignores them. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/boot.mdx"
+      ],
+      "notes": "3 illustrative blocks, 0 tested blocks, 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 7277,
+        "output_tokens": 1386,
+        "cache_creation_input_tokens": 4634,
+        "cache_read_input_tokens": 24557
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/containers.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/containers.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:34:07.208Z",
+      "summary": "Both blocks on this page are illustrative: block 1 is a synopsis with `[...]` placeholders, and block 2 shows deploy commands requiring real Docker/remote infrastructure. Both were marked with `title=` attributes so Starlight renders them with titles; neither carries a `{test:*}` annotation. Harness passes: 0 tagged, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/containers.mdx"
+      ],
+      "notes": "2 blocks total, both illustrative (0 tested). No prose drift found. No CFC docblock changes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6558,
+        "output_tokens": 1159,
+        "cache_creation_input_tokens": 3976,
+        "cache_read_input_tokens": 17888
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/details.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/details.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:34:33.466Z",
+      "summary": "Both code blocks on this page are illustrative (synopsis with placeholder syntax, and a deploy example requiring Docker/remote infrastructure) — neither can run in the harness fixture. Added `title=` attributes to both so they render cleanly in Starlight. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/details.mdx"
+      ],
+      "notes": "2 blocks total: 0 tested, 2 illustrative (synopsis with placeholders + deploy example requiring live Docker infrastructure). No prose drift found. No CFC docblock changes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6618,
+        "output_tokens": 1134,
+        "cache_creation_input_tokens": 3980,
+        "cache_read_input_tokens": 17910
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/images.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/images.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:34:52.934Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block is a usage template (not a real command), and the example `wheels deploy app images` command requires live deployment infrastructure unavailable in fixture apps. Added `title=\"synopsis\"` and `title=\"example\"` to both blocks so the harness cleanly skips them. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/images.mdx"
+      ],
+      "notes": "2 blocks total, 0 tested (both illustrative), 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6546,
+        "output_tokens": 1094,
+        "cache_creation_input_tokens": 3953,
+        "cache_read_input_tokens": 17884
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:34:55.648Z",
+      "summary": "Page has 0 code blocks — nothing to annotate or validate. No changes needed.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 607,
+        "output_tokens": 161,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/live.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/live.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:35:22.635Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses placeholder syntax (`<v>`, `[--flag]`) and the example block requires real SSH/deployment infrastructure. Added `title` attributes to both to mark them as illustrative; the harness correctly skips both (0 tagged, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/live.mdx"
+      ],
+      "notes": "2 blocks marked illustrative via title attribute, 0 tested, 0 CFC docblock fixes needed.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6870,
+        "output_tokens": 1257,
+        "cache_creation_input_tokens": 4090,
+        "cache_read_input_tokens": 22339
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/logs.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/logs.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:35:45.247Z",
+      "summary": "Both code blocks on the page are illustrative (synopsis with placeholder tokens, and multi-line examples including a blocking `--follow` flag) and cannot be run by the harness. Added `title=\"synopsis\"` and `title=\"illustrative\"` attributes to mark them clearly; harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/logs.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes. Synopsis block uses placeholder syntax (&lt;N&gt;, &lt;name&gt;); examples block includes --follow which blocks indefinitely — neither is executable by the harness.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6886,
+        "output_tokens": 1233,
+        "cache_creation_input_tokens": 4142,
+        "cache_read_input_tokens": 18027
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/maintenance.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/maintenance.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:36:08.621Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis with placeholder syntax (`<v>`, `<name>`), and block 2 is a deploy command that targets real SSH infrastructure — neither can run in a fixture app. Added `title=\"synopsis\"` and `title=\"example\"` so the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/maintenance.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative (title-only), 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6885,
+        "output_tokens": 1226,
+        "cache_creation_input_tokens": 4165,
+        "cache_read_input_tokens": 18096
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/remove.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/remove.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:36:34.613Z",
+      "summary": "All 3 code blocks on this deploy reference page are illustrative: the synopsis uses placeholder syntax (`<v>`, `[--role=<name>]`), the behavior block shows internal Docker commands with `&&` and template vars, and the example command requires live deploy infrastructure unavailable in a fixture app. Added descriptive `title=` attributes to all three blocks to make their illustrative nature clear; no `{test:*}` annotations were appropriate. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/remove.mdx"
+      ],
+      "notes": "3 blocks illustrative, 0 tested. No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 7272,
+        "output_tokens": 1558,
+        "cache_creation_input_tokens": 4731,
+        "cache_read_input_tokens": 24659
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/start.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/start.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:36:54.584Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis uses placeholder syntax (`<v>`, `<name>`) and the example invokes Docker infrastructure unavailable in a fixture app. Added `title=\"synopsis\"` and `title=\"example\"` to both blocks so the harness skips them cleanly. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/start.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 tested, 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6617,
+        "output_tokens": 1149,
+        "cache_creation_input_tokens": 3983,
+        "cache_read_input_tokens": 17913
+      }
+    },
+    "guide:command-line-tools/commands/deploy/app/stop.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/app/stop.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:37:13.489Z",
+      "summary": "Both code blocks on this deploy reference page are illustrative-only: the synopsis block contains template placeholders and the example requires live Docker infrastructure. Added `title=\"Synopsis\"` and `title=\"Example\"` attributes so the harness skips them cleanly. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/app/stop.mdx"
+      ],
+      "notes": "2 blocks total, 0 tested (both illustrative), 0 CFC docblock fixes, no prose drift detected.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 2954,
+        "output_tokens": 1082,
+        "cache_creation_input_tokens": 2123,
+        "cache_read_input_tokens": 16072
+      }
+    },
+    "guide:command-line-tools/commands/deploy/audit.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/audit.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:37:37.544Z",
+      "summary": "Both code blocks on this page are illustrative — the synopsis block uses `[...]`/`<...>` placeholder syntax, and the example block contains two deploy commands requiring live infrastructure. Both were marked with descriptive `title=\"...\"` attributes so the harness skips them cleanly. No compile/cli annotations were appropriate. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/audit.mdx"
+      ],
+      "notes": "2 blocks marked illustrative via title=\"...\" (synopsis with placeholders; multi-command bash example requiring live deploy host). No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6731,
+        "output_tokens": 1202,
+        "cache_creation_input_tokens": 4103,
+        "cache_read_input_tokens": 17999
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/create.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/create.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:38:09.439Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis uses placeholder syntax (`[--destination=<name>]`) and the example invokes `wheels deploy build create` which requires Docker buildx infrastructure unavailable in the test harness. Added `title=\"Synopsis\"` and `title=\"Example\"` so Starlight renders them with clear labels while the harness correctly skips them. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/build/create.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative (synopsis + example), 0 CFC docblock fixes. Deploy subcommands require Docker/remote infrastructure and cannot run in the CLI fixture app.",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 8627,
+        "output_tokens": 1499,
+        "cache_creation_input_tokens": 5063,
+        "cache_read_input_tokens": 35805
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/deliver.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/deliver.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:38:27.146Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block is a usage-pattern template, and the example block requires Docker and remote host infrastructure that can't run in CI. Added `title=\"Synopsis\"` and `title=\"Example\"` attributes to mark them clearly; the harness reports 0 tagged blocks and passes cleanly.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/build/deliver.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 3032,
+        "output_tokens": 1044,
+        "cache_creation_input_tokens": 2199,
+        "cache_read_input_tokens": 16119
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/details.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/details.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:38:51.750Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis pattern with placeholder tokens, and block 2 requires live Docker/builder infrastructure. Added `title=\"synopsis\"` and `title=\"example\"` respectively so the harness skips them cleanly. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/build/details.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6416,
+        "output_tokens": 1282,
+        "cache_creation_input_tokens": 3912,
+        "cache_read_input_tokens": 21888
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/dev.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/dev.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:39:14.618Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis with `[flag]`/`<placeholder>` syntax, and block 2 is a two-command example with a `<image>` placeholder. Added `title=\"synopsis\"` and `title=\"illustrative\"` respectively so Starlight renders them with labels and the harness correctly skips them. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/build/dev.mdx"
+      ],
+      "notes": "0 blocks tested (both illustrative), 2 blocks marked with descriptive titles, 0 CFC docblock fixes, no prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6493,
+        "output_tokens": 1186,
+        "cache_creation_input_tokens": 3981,
+        "cache_read_input_tokens": 17860
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:39:17.416Z",
+      "summary": "Page has 0 code blocks — nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "No code blocks present on this reference page. No prose drift fixes needed.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 603,
+        "output_tokens": 162,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/pull.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/pull.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:39:38.765Z",
+      "summary": "Both code blocks on this deploy reference page are illustrative (a synopsis syntax diagram and an example requiring real SSH/Docker infrastructure) — neither can run in a fixture app. Added `title=\"synopsis\"` and `title=\"example\"` attributes so the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/build/pull.mdx"
+      ],
+      "notes": "2 illustrative blocks, 0 tested blocks, 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6609,
+        "output_tokens": 1233,
+        "cache_creation_input_tokens": 3963,
+        "cache_read_input_tokens": 22070
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/push.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/push.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:39:59.514Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses placeholder tokens (`<v>`, `<name>`) that can't run, and the example `wheels deploy build push` command requires a full Docker environment and `deploy.yml` config. Added `title=\"synopsis\"` and `title=\"example\"` to both blocks so the harness skips them cleanly. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/build/push.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 tested, 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6668,
+        "output_tokens": 1154,
+        "cache_creation_input_tokens": 4030,
+        "cache_read_input_tokens": 17960
+      }
+    },
+    "guide:command-line-tools/commands/deploy/build/remove.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/build/remove.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:40:31.206Z",
+      "summary": "Both code blocks on this deploy reference page are illustrative: the synopsis block (no lang) shows command syntax documentation, and the bash example requires Docker buildx infrastructure unavailable in CI. Added `title=\"Synopsis\"` and `title=\"Example\"` to match the sibling page pattern, making them cleanly skip the harness. 0 blocks tested, 2 illustrative, 0 CFC docblock fixes.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/build/remove.mdx"
+      ],
+      "notes": "",
+      "turns": 10,
+      "usage": {
+        "input_tokens": 8113,
+        "output_tokens": 1623,
+        "cache_creation_input_tokens": 4824,
+        "cache_read_input_tokens": 47620
+      }
+    },
+    "guide:command-line-tools/commands/deploy/config.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/config.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:40:57.925Z",
+      "summary": "All 3 blocks on this page are illustrative (a synopsis with optional-arg bracket syntax, a YAML output sample, and a CLI example requiring a staging deploy config). Added `title=\"synopsis\"`, `title=\"example output\"`, and `title=\"illustrative\"` to each so the harness skips them cleanly. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/config.mdx"
+      ],
+      "notes": "3 blocks illustrative, 0 tested, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 7089,
+        "output_tokens": 1325,
+        "cache_creation_input_tokens": 4538,
+        "cache_read_input_tokens": 24455
+      }
+    },
+    "guide:command-line-tools/commands/deploy/deploy.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/deploy.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:41:19.644Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses placeholder syntax (`<v>`, `<name>`) and the examples block requires live Kamal/Docker infrastructure. Added `title=\"synopsis\"` and `title=\"illustrative — requires live infrastructure\"` respectively so the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/deploy.mdx"
+      ],
+      "notes": "2 illustrative blocks, 0 tested blocks, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6820,
+        "output_tokens": 1133,
+        "cache_creation_input_tokens": 4140,
+        "cache_read_input_tokens": 18017
+      }
+    },
+    "guide:command-line-tools/commands/deploy/details.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/details.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:41:40.671Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis uses placeholder syntax and the example requires a live Docker/Kamal deployment environment. Added `title=\"synopsis\"` and `title=\"example\"` so Starlight renders them with labels and the harness cleanly skips them. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/details.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative (synopsis + deployment example requiring live Docker/Kamal). No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6581,
+        "output_tokens": 1095,
+        "cache_creation_input_tokens": 3988,
+        "cache_read_input_tokens": 17884
+      }
+    },
+    "guide:command-line-tools/commands/deploy/docs.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/docs.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:42:04.867Z",
+      "summary": "Both code blocks on this reference page were marked illustrative: the synopsis block uses `[<section>]` placeholder syntax (not runnable), and the examples block contains multiple commands that can't map to a single `{test:cli cmd=\"...\"}`. Added `title=` attributes to both so the harness skips them cleanly. Validation passed with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/docs.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 blocks tested, 0 CFC docblock fixes. The synopsis block has `[<section>]` placeholder syntax; the examples block has 3 commands on separate lines which cannot be expressed as a single `cmd=` token string.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6493,
+        "output_tokens": 1132,
+        "cache_creation_input_tokens": 3981,
+        "cache_read_input_tokens": 17851
+      }
+    },
+    "guide:command-line-tools/commands/deploy/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:42:08.231Z",
+      "summary": "No code blocks exist on this reference page — 0 blocks tested, 0 illustrative, no prose drift fixes needed.",
+      "files_changed": [],
+      "notes": "The page is a pure prose/reference page describing the `wheels deploy` verb surface with no fenced code blocks to annotate or validate.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 611,
+        "output_tokens": 188,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/init.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/init.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:43:16.130Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses angle-bracket placeholders (not executable), and the bash example block was tested with `{test:cli cmd=\"wheels deploy init\"}` but failed because the command requires CLI-bundled Mustache template files not present in the fixture app. Both blocks were marked illustrative with `title=` attributes. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/init.mdx"
+      ],
+      "notes": "0 blocks tested (both illustrative). The synopsis block has angle-bracket placeholders; the bash example requires CLI-internal templates (`lucli/templates/deploy/init/deploy.yml.mustache`) unavailable in the harness fixture, so `wheels deploy init` exits 1 in test context.",
+      "turns": 12,
+      "usage": {
+        "input_tokens": 13710,
+        "output_tokens": 3022,
+        "cache_creation_input_tokens": 7782,
+        "cache_read_input_tokens": 78119
+      }
+    },
+    "guide:command-line-tools/commands/deploy/lock/acquire.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/lock/acquire.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:43:38.527Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis template with placeholder syntax (`[--message=<string>]`) and block 2 has a quoted CLI arg with spaces, which the harness tokenizer cannot handle. Both were marked with `title=` attributes (synopsis and example) so the harness cleanly skips them. No prose drift detected.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/lock/acquire.mdx"
+      ],
+      "notes": "0 blocks tagged with {test:*}, 2 blocks marked illustrative via title= attribute. No CFC docblock fixes needed.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6596,
+        "output_tokens": 1236,
+        "cache_creation_input_tokens": 3945,
+        "cache_read_input_tokens": 21985
+      }
+    },
+    "guide:command-line-tools/commands/deploy/lock/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/lock/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:43:41.541Z",
+      "summary": "No code blocks found on this page — nothing to annotate or validate. The page is pure prose reference content for the `wheels deploy lock` command.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 594,
+        "output_tokens": 154,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/lock/release.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/lock/release.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:44:01.231Z",
+      "summary": "Both code blocks on this page are illustrative (a synopsis usage pattern and a two-command sequential example that can't run as a single CLI command), so neither received a `{test:*}` annotation. Added `title=\"Synopsis\"` and `title=\"Example\"` to both fences for clarity. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/lock/release.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes. The synopsis block has no language tag (raw fenced block) and the bash example contains two sequential commands — neither is a candidate for test:cli (which requires a single tokenizable command) or test:compile.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 2942,
+        "output_tokens": 1067,
+        "cache_creation_input_tokens": 2149,
+        "cache_read_input_tokens": 16057
+      }
+    },
+    "guide:command-line-tools/commands/deploy/lock/status.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/lock/status.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:44:33.134Z",
+      "summary": "Both blocks on this page are illustrative: the synopsis block uses placeholder bracket notation (not executable) and was given `title=\"synopsis\"`, while the example bash block requires a `config/deploy.yml` deployment config unavailable in the bare fixture app and was given `title=\"example\"`. No `{test:*}` annotations were added; harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/lock/status.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative (synopsis + example both require deployment context unavailable in bare fixture). No CFC docblock changes. No prose drift found.",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 7793,
+        "output_tokens": 1493,
+        "cache_creation_input_tokens": 4517,
+        "cache_read_input_tokens": 30372
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/boot.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/boot.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:44:57.153Z",
+      "summary": "All 3 code blocks on this page are illustrative (deploy synopsis with placeholders, a docker run command showing internal behavior, and an example CLI invocation requiring real deploy infrastructure). Added `title=\"...\"` attributes to each so Starlight renders them cleanly and the harness skips them. Harness passes with 0 tagged / 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/boot.mdx"
+      ],
+      "notes": "0 blocks tested (compile/cli/tutorial), 3 blocks illustrative (all require real deployment infrastructure — Docker hosts, kamal-proxy, network access). No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6938,
+        "output_tokens": 1287,
+        "cache_creation_input_tokens": 4447,
+        "cache_read_input_tokens": 24223
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/details.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/details.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:45:25.888Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses placeholder syntax (`[--destination=<name>]`) that isn't executable, and the example block invokes a live Kamal/Docker deployment command that requires real infrastructure — neither is suitable for the compile or CLI test drivers. Added `title=\"synopsis\"` and `title=\"example\"` to make the illustrative intent explicit. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/details.mdx"
+      ],
+      "notes": "2 blocks total, 0 tested, 2 illustrative (deployment infrastructure commands). No CFC docblock fixes needed. No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6490,
+        "output_tokens": 1428,
+        "cache_creation_input_tokens": 4021,
+        "cache_read_input_tokens": 22075
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:45:28.832Z",
+      "summary": "Page has 0 code blocks — nothing to annotate or validate. No prose drift fixes were needed.",
+      "files_changed": [],
+      "notes": "0 tested blocks, 0 illustrative blocks, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 607,
+        "output_tokens": 174,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/logs.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/logs.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:45:50.542Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis with placeholder tokens, and block 2 is a live-deploy CLI command requiring real infrastructure hosts. Added `title=\"synopsis\"` and `title=\"illustrative — requires live deploy hosts\"` respectively so the harness skips them cleanly. No `{test:*}` annotations are appropriate. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/logs.mdx"
+      ],
+      "notes": "2 blocks total: 0 tested, 2 illustrative (synopsis with placeholders + live deploy command). No prose drift found. No CFC docblock changes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6499,
+        "output_tokens": 1194,
+        "cache_creation_input_tokens": 3969,
+        "cache_read_input_tokens": 17887
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/reboot.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/reboot.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:46:19.756Z",
+      "summary": "Both code blocks on this page are illustrative (synopsis with placeholder syntax, and an example command that requires live Docker/kamal infrastructure). Added `title=\"synopsis\"` and `title=\"example\"` attributes to match the pattern used in the sibling `boot.mdx` page; the harness correctly skips both blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/reboot.mdx"
+      ],
+      "notes": "0 blocks tested (both illustrative), 2 blocks marked illustrative via title= attribute. No prose drift found.",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 8106,
+        "output_tokens": 1500,
+        "cache_creation_input_tokens": 4993,
+        "cache_read_input_tokens": 37044
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/remove.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/remove.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:46:41.898Z",
+      "summary": "Both code blocks on this deploy reference page are illustrative (remote-infrastructure commands that cannot be executed by any test driver). Added `title=\"synopsis\"` to the synopsis block and `title=\"illustrative — requires remote hosts\"` to the bash example so the harness skips them cleanly. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/remove.mdx"
+      ],
+      "notes": "2 blocks total, 0 tested, 2 illustrative (both require remote deploy infrastructure). No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6424,
+        "output_tokens": 1135,
+        "cache_creation_input_tokens": 3856,
+        "cache_read_input_tokens": 21907
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/restart.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/restart.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:47:07.180Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses placeholder syntax (`[--flag]`) and the example block requires real remote Docker/Kamal hosts. Added `title=\"synopsis\"` and `title=\"illustrative — requires remote hosts\"` so the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/restart.mdx"
+      ],
+      "notes": "2 blocks marked illustrative via title attributes. 0 blocks tested. No CFC docblock fixes needed.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6319,
+        "output_tokens": 1263,
+        "cache_creation_input_tokens": 3850,
+        "cache_read_input_tokens": 21779
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/start.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/start.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:47:34.631Z",
+      "summary": "Both code blocks on this page are illustrative — the synopsis block shows command syntax with optional-flag notation and the example block invokes a deploy command requiring remote Docker infrastructure, neither of which can be executed in the test harness. Added `title=\"synopsis\"` and `title=\"example\"` to both fences so Starlight renders them with labels while the harness correctly skips them. Validation passed with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/start.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 tested, 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6405,
+        "output_tokens": 1280,
+        "cache_creation_input_tokens": 3898,
+        "cache_read_input_tokens": 21939
+      }
+    },
+    "guide:command-line-tools/commands/deploy/proxy/stop.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/proxy/stop.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:48:01.010Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block contains placeholder syntax (`[--destination=<name>]`) and the example block runs a live deployment command that requires real remote hosts with kamal-proxy running. Both were marked illustrative with descriptive titles. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/stop.mdx"
+      ],
+      "notes": "0 blocks tested, 2 blocks marked illustrative, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6394,
+        "output_tokens": 1221,
+        "cache_creation_input_tokens": 3875,
+        "cache_read_input_tokens": 21852
+      }
+    },
+    "guide:command-line-tools/commands/deploy/prune/all.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/prune/all.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:48:28.722Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block shows command syntax with optional flags, and the example bash block runs `wheels deploy prune all` which requires a `config/deploy.yml` that doesn't exist in the test fixture. Added `title=` attributes to both blocks to mark them as illustrative, and validation passes with 0 tagged blocks (0 failures).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/all.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative (synopsis pattern + deploy CLI command needing config/deploy.yml). No prose drift found. No CFC changes needed.",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 4206,
+        "output_tokens": 1394,
+        "cache_creation_input_tokens": 2696,
+        "cache_read_input_tokens": 24961
+      }
+    },
+    "guide:command-line-tools/commands/deploy/prune/containers.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/prune/containers.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:49:02.371Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses bracket notation for optional flags and is not executable, and the example `wheels deploy prune containers` requires a `config/deploy.yml` fixture that a bare test app lacks. Both blocks were given `title=\"...\"` labels so the harness skips them cleanly. 0 blocks tested, 2 illustrative, 0 CFC docblock fixes.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/containers.mdx"
+      ],
+      "notes": "",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 7884,
+        "output_tokens": 1526,
+        "cache_creation_input_tokens": 4507,
+        "cache_read_input_tokens": 34647
+      }
+    },
+    "guide:command-line-tools/commands/deploy/prune/images.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/prune/images.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:49:25.918Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses bracket-notation placeholders (not executable), and the example bash block invokes a deployment command requiring real Docker/infrastructure. Added `title=\"synopsis\"` and `title=\"illustrative\"` to both blocks so the harness skips them cleanly. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/images.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6419,
+        "output_tokens": 1232,
+        "cache_creation_input_tokens": 3895,
+        "cache_read_input_tokens": 21903
+      }
+    },
+    "guide:command-line-tools/commands/deploy/prune/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/prune/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:49:28.668Z",
+      "summary": "No code blocks exist on this page — nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 600,
+        "output_tokens": 148,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/redeploy.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/redeploy.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:49:51.485Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis uses placeholder syntax (`<v>`, `<name>`) and the examples require real deploy infrastructure (Kamal/Docker). Added `title=\"synopsis\"` and `title=\"illustrative — requires deploy infrastructure\"` so the harness skips them cleanly. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/redeploy.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 tested, 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6809,
+        "output_tokens": 1285,
+        "cache_creation_input_tokens": 4191,
+        "cache_read_input_tokens": 18092
+      }
+    },
+    "guide:command-line-tools/commands/deploy/registry/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/registry/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:49:54.488Z",
+      "summary": "No code blocks found on this page. Nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "Page contains 0 code blocks (0 tested, 0 illustrative, 0 untested). No prose drift or annotation work required.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 596,
+        "output_tokens": 179,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/registry/login.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/registry/login.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:50:20.384Z",
+      "summary": "All 3 blocks on this page are illustrative: the synopsis uses placeholder syntax, the behavior block contains a shell pipe (unsupported by the CLI driver), and the example command requires real deployment infrastructure. Added descriptive `title=\"...\"` attributes to all three blocks to make their illustrative nature explicit; harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/login.mdx"
+      ],
+      "notes": "0 blocks tested, 3 illustrative, 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6990,
+        "output_tokens": 1408,
+        "cache_creation_input_tokens": 4539,
+        "cache_read_input_tokens": 24332
+      }
+    },
+    "guide:command-line-tools/commands/deploy/registry/logout.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/registry/logout.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:50:37.851Z",
+      "summary": "Both code blocks on this page are illustrative (a synopsis syntax block and a deploy command example requiring a real environment). Added `title=\"Synopsis\"` and `title=\"Example\"` attributes to mark them clearly; no `{test:*}` annotations applied. Harness passed with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/logout.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes. Both blocks are deployment-context commands that cannot be tested in isolation.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 2547,
+        "output_tokens": 959,
+        "cache_creation_input_tokens": 1885,
+        "cache_read_input_tokens": 15820
+      }
+    },
+    "guide:command-line-tools/commands/deploy/registry/remove.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/registry/remove.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:51:07.251Z",
+      "summary": "Both code blocks on this page (synopsis and example for `wheels deploy registry remove`) are deployment commands that require real registry infrastructure, so they were marked illustrative by adding `title=\"Synopsis\"` and `title=\"Example\"` attributes respectively. The synopsis block also had its language updated from bare (unlabeled) to `txt` for consistency with the sibling `logout.mdx` page. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/remove.mdx"
+      ],
+      "notes": "0 blocks tested (compile/cli), 2 blocks illustrative (deployment commands needing real infrastructure), 0 CFC docblock fixes.",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 7440,
+        "output_tokens": 1494,
+        "cache_creation_input_tokens": 4346,
+        "cache_read_input_tokens": 28225
+      }
+    },
+    "guide:command-line-tools/commands/deploy/registry/setup.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/registry/setup.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:51:39.876Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block (no lang, showing optional flags/placeholders) and the bare `wheels deploy registry setup` example (requires a `config/deploy.yml` that doesn't exist in the fixture app). Both were marked with `title=\"illustrative\"` so the harness skips them cleanly. No prose drift found.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/registry/setup.mdx"
+      ],
+      "notes": "0 blocks tested, 2 blocks illustrative, 0 CFC docblock fixes. The CLI command fails in the bare fixture because deploy commands need config/deploy.yml; treating as illustrative is the correct call.",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 7599,
+        "output_tokens": 1453,
+        "cache_creation_input_tokens": 4296,
+        "cache_read_input_tokens": 33944
+      }
+    },
+    "guide:command-line-tools/commands/deploy/remove.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/remove.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:52:00.602Z",
+      "summary": "Both code blocks on this page are illustrative-only: the synopsis uses placeholder bracket notation and cannot be executed as-is, while the bash examples invoke destructive `wheels deploy remove` commands requiring a live Docker/deploy environment. Added `title=\"synopsis\"` and `title=\"example\"` attributes so the harness skips them cleanly. Validation passed with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/remove.mdx"
+      ],
+      "notes": "0 blocks tested (compile/cli), 2 illustrative (title-annotated), 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 3290,
+        "output_tokens": 1098,
+        "cache_creation_input_tokens": 2385,
+        "cache_read_input_tokens": 16277
+      }
+    },
+    "guide:command-line-tools/commands/deploy/rollback.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/rollback.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:52:21.876Z",
+      "summary": "Both code blocks on this page are illustrative-only: the synopsis contains placeholder tokens (`<v>`, `[--destination=<name>]`) and the examples require live Docker/kamal-proxy infrastructure. Added `title=\"Synopsis\"` and `title=\"Examples\"` attributes so Starlight renders them with labels; no `{test:*}` annotations were appropriate. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/rollback.mdx"
+      ],
+      "notes": "2 blocks: both illustrative. 0 tested, 2 illustrative, 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 3177,
+        "output_tokens": 1138,
+        "cache_creation_input_tokens": 2304,
+        "cache_read_input_tokens": 16197
+      }
+    },
+    "guide:command-line-tools/commands/deploy/secrets/extract.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/secrets/extract.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:52:47.515Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis contains placeholder tokens (`<name>`, `<block>`), and the example uses shell variable assignment and `$block` expansion which the harness cannot run. Added `title=\"synopsis\"` and `title=\"illustrative — shell variables not supported by harness\"` to mark them clearly; harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/secrets/extract.mdx"
+      ],
+      "notes": "2 blocks total, 0 tested, 2 illustrative (marked with title= attributes). No prose drift or CFC docblock fixes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6490,
+        "output_tokens": 1187,
+        "cache_creation_input_tokens": 3993,
+        "cache_read_input_tokens": 17826
+      }
+    },
+    "guide:command-line-tools/commands/deploy/secrets/fetch.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/secrets/fetch.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:53:12.162Z",
+      "summary": "All 3 code blocks on this page are correctly marked as illustrative: the synopsis block uses placeholder syntax, the examples block requires external adapter CLIs (op/aws) unavailable in the test fixture, and the `.kamal/secrets` block was already illustrative. Added `title=\"synopsis (illustrative — do not type)\"` to block 1 and `title=\"examples (illustrative — do not type)\"` to block 2. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/secrets/fetch.mdx"
+      ],
+      "notes": "0 blocks tested, 3 illustrative, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 7166,
+        "output_tokens": 1345,
+        "cache_creation_input_tokens": 4401,
+        "cache_read_input_tokens": 18275
+      }
+    },
+    "guide:command-line-tools/commands/deploy/secrets/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/secrets/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:53:15.054Z",
+      "summary": "Page has zero code blocks — nothing to annotate or validate. No changes were needed.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 601,
+        "output_tokens": 174,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/secrets/print.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/secrets/print.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:53:38.882Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses angle-bracket placeholder syntax and the example block contains two commands requiring deploy infrastructure. Added `title=\"synopsis\"` and `title=\"illustrative\"` to both blocks so the harness cleanly skips them. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/secrets/print.mdx"
+      ],
+      "notes": "0 blocks tested, 2 blocks illustrative, 0 CFC docblock fixes. The deploy secrets commands require Kamal infrastructure and can't be validated in the CLI fixture app.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6677,
+        "output_tokens": 1146,
+        "cache_creation_input_tokens": 4047,
+        "cache_read_input_tokens": 17950
+      }
+    },
+    "guide:command-line-tools/commands/deploy/server/bootstrap.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/server/bootstrap.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:54:07.459Z",
+      "summary": "All 3 code blocks on this page are illustrative: the synopsis uses angle-bracket placeholders, the behavior block uses shell pipes/redirects unsupported by the harness, and the example command would attempt real server operations. Added `title=\"...\"` attributes to all three blocks so Starlight renders them cleanly; the harness correctly skips them with 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/server/bootstrap.mdx"
+      ],
+      "notes": "3 blocks marked illustrative (via title= attribute), 0 blocks tagged for testing, 0 CFC docblock fixes.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6893,
+        "output_tokens": 1395,
+        "cache_creation_input_tokens": 4531,
+        "cache_read_input_tokens": 24241
+      }
+    },
+    "guide:command-line-tools/commands/deploy/server/exec.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/server/exec.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:54:30.314Z",
+      "summary": "Both code blocks on this page are illustrative: the synopsis block uses placeholder syntax (`<command>`, `[--host=...]`) unsuitable for execution, and the bash example requires live SSH hosts. Added `title=\"synopsis\"` and `title=\"illustrative — requires live SSH hosts\"` so the harness skips them cleanly. Harness passes with 0 tagged blocks.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/server/exec.mdx"
+      ],
+      "notes": "0 blocks tested, 2 illustrative, 0 CFC docblock fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6765,
+        "output_tokens": 1206,
+        "cache_creation_input_tokens": 4092,
+        "cache_read_input_tokens": 17974
+      }
+    },
+    "guide:command-line-tools/commands/deploy/server/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/server/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:54:33.505Z",
+      "summary": "No code blocks exist on this page, so no annotations were needed. Nothing to validate.",
+      "files_changed": [],
+      "notes": "Page has 0 code blocks (0 tested, 0 illustrative, 0 untested). No changes required.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 599,
+        "output_tokens": 175,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/deploy/setup.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/setup.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:54:59.681Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis/usage-pattern block and block 2 shows `wheels deploy setup` examples that require a full Docker/Kamal/SSH environment. Added `title=\"synopsis\"` and `title=\"illustrative — requires Docker/Kamal environment\"` to make their intent explicit; neither carries a `{test:*}` annotation. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/setup.mdx"
+      ],
+      "notes": "0 blocks tested, 2 blocks illustrative, 0 CFC docblock fixes, no prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6758,
+        "output_tokens": 1308,
+        "cache_creation_input_tokens": 4078,
+        "cache_read_input_tokens": 22305
+      }
+    },
+    "guide:command-line-tools/commands/deploy/version.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/deploy/version.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:55:27.170Z",
+      "summary": "Annotated 1 block as {test:cli} (the bash example — `wheels deploy version` with `asserts-output=\"kamal\"`) and marked the 2 illustrative blocks (synopsis and sample output) with `title=\"... — illustrative\"` so the harness skips them cleanly. Harness reports 1 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/deploy/version.mdx"
+      ],
+      "notes": "3 blocks total: 1 tested (cli), 2 illustrative (synopsis and sample output). No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6755,
+        "output_tokens": 1243,
+        "cache_creation_input_tokens": 3854,
+        "cache_read_input_tokens": 17963
+      }
+    },
+    "guide:command-line-tools/commands/packages/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:55:43.408Z",
+      "summary": "The single code block on this page is a plain-text synopsis listing CLI command patterns (multi-line, uses `<>` placeholders, `--flags`, `@version` syntax). It is illustrative documentation, not executable CFML or a runnable CLI command, so no `{test:*}` annotation was added. A `title=\"Synopsis\"` attribute was added to the fence for clean rendering.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/index.mdx"
+      ],
+      "notes": "1 block total: 0 tested, 1 illustrative (synopsis). No prose drift found. No CFC docblock changes needed.",
+      "turns": 4,
+      "usage": {
+        "input_tokens": 3839,
+        "output_tokens": 748,
+        "cache_creation_input_tokens": 2473,
+        "cache_read_input_tokens": 11763
+      }
+    },
+    "guide:command-line-tools/commands/packages/install.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/install.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:56:07.107Z",
+      "summary": "Both code blocks on this page are illustrative (a synopsis with placeholder tokens and a terminal session showing command + output interspersed) and cannot be run by any test driver. Added `sh title=\"synopsis\"` and `sh title=\"illustrative — terminal session\"` to make the illustrative intent explicit. Harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/install.mdx"
+      ],
+      "notes": "0 blocks tested, 2 blocks illustrative, 0 CFC docblock fixes. No prose drift found.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 7394,
+        "output_tokens": 1328,
+        "cache_creation_input_tokens": 4535,
+        "cache_read_input_tokens": 18243
+      }
+    },
+    "guide:command-line-tools/commands/packages/list.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/list.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:56:32.252Z",
+      "summary": "Both code blocks on this reference page are illustrative shell-session examples (synopsis with placeholder syntax and example output with fake registry data). Added `title=\"synopsis — illustrative\"` and `title=\"illustrative — example output\"` to mark them clearly; the harness correctly skips them (0 tagged blocks, 0 failures).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/list.mdx"
+      ],
+      "notes": "2 blocks marked illustrative, 0 tested, 0 CFC docblock fixes. No prose drift detected.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6613,
+        "output_tokens": 1328,
+        "cache_creation_input_tokens": 4058,
+        "cache_read_input_tokens": 21828
+      }
+    },
+    "guide:command-line-tools/commands/packages/registry/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/registry/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:56:35.337Z",
+      "summary": "Page has zero code blocks — nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "0 blocks tested, 0 illustrative, 0 CFC docblock fixes. Page is pure prose reference content with no code examples.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 594,
+        "output_tokens": 173,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/commands/packages/registry/info.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/registry/info.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:56:58.011Z",
+      "summary": "Annotated the synopsis block with `{test:cli cmd=\"wheels packages registry info\"}` and marked the example output block as illustrative with a descriptive title. Harness reports 1 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/registry/info.mdx"
+      ],
+      "notes": "2 blocks total: 1 tested (CLI synopsis), 1 illustrative (example output with environment-specific paths and timestamps). No prose drift found. No CFC changes needed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6349,
+        "output_tokens": 1019,
+        "cache_creation_input_tokens": 3869,
+        "cache_read_input_tokens": 17762
+      }
+    },
+    "guide:command-line-tools/commands/packages/registry/refresh.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/registry/refresh.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:57:25.311Z",
+      "summary": "Annotated 1 of 2 blocks on the page: the synopsis block got `{test:cli cmd=\"wheels packages registry refresh\"}` and passes the harness. The example terminal-session block (with `$` prompt and expected output text) was marked illustrative with a `title=` attribute since it contains shell prompt decoration and output that can't be cleanly asserted.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/registry/refresh.mdx"
+      ],
+      "notes": "1 block tested (cli), 1 block illustrative. No prose drift found. Harness: 1 passed, 0 failed.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6270,
+        "output_tokens": 1146,
+        "cache_creation_input_tokens": 3817,
+        "cache_read_input_tokens": 21762
+      }
+    },
+    "guide:command-line-tools/commands/packages/remove.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/remove.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:57:42.619Z",
+      "summary": "Both code blocks on this reference page are illustrative documentation (synopsis with placeholder `<name>` and example output requiring a real installed package). Added `title=\"Synopsis\"` and `title=\"Example\"` to mark them clearly as illustrative; no executable test annotations were appropriate. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/remove.mdx"
+      ],
+      "notes": "0 tested, 2 illustrative (title-only), 0 CFC docblock fixes, 0 prose drift fixes.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 2673,
+        "output_tokens": 1020,
+        "cache_creation_input_tokens": 2058,
+        "cache_read_input_tokens": 15940
+      }
+    },
+    "guide:command-line-tools/commands/packages/search.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/search.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:58:07.276Z",
+      "summary": "Both code blocks on this page are illustrative: block 1 is a synopsis with a `<query>` placeholder, and block 2 mixes a shell prompt with multi-line output. Both were annotated with `title=\"synopsis\"` and `title=\"example\"` respectively so the harness skips them cleanly. No `{test:*}` tags were added (correct for illustrative blocks). Harness passes: 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/search.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 tested, 0 CFC docblock fixes, no prose drift found.",
+      "turns": 6,
+      "usage": {
+        "input_tokens": 6072,
+        "output_tokens": 1157,
+        "cache_creation_input_tokens": 3698,
+        "cache_read_input_tokens": 21476
+      }
+    },
+    "guide:command-line-tools/commands/packages/show.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/show.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:58:28.041Z",
+      "summary": "Both code blocks on this page are illustrative terminal display examples (a synopsis placeholder and a multi-line command+output dump), neither of which can be run by any test driver. Added `sh` language identifiers and descriptive `title=` attributes so Starlight renders them cleanly; the harness correctly skips them with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/show.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 blocks tested, 0 CFC docblock fixes. Block 1 is a synopsis with a `<name>` placeholder; block 2 is a combined command+stdout dump prefixed with `$` — both are display-only.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6454,
+        "output_tokens": 1111,
+        "cache_creation_input_tokens": 3947,
+        "cache_read_input_tokens": 17832
+      }
+    },
+    "guide:command-line-tools/commands/packages/update.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/commands/packages/update.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:58:49.925Z",
+      "summary": "Both code blocks on this page are illustrative (synopsis with placeholder `<name>` and a multi-command output example) — neither is runnable by the harness. Added `sh title=\"synopsis\"` and `sh title=\"example output\"` to give them language highlighting and descriptive titles, while intentionally leaving them without `{test:*}` annotations. Harness passes: 0 tagged, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/commands/packages/update.mdx"
+      ],
+      "notes": "2 blocks illustrative, 0 tested, 0 CFC docblock fixes. Block 1 is a synopsis with a `<name>` placeholder; Block 2 is a multi-command shell session showing expected output — both are display-only.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 6830,
+        "output_tokens": 1132,
+        "cache_creation_input_tokens": 4131,
+        "cache_read_input_tokens": 18032
+      }
+    },
+    "guide:command-line-tools/configuration.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/configuration.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T20:59:32.473Z",
+      "summary": "All 7 code blocks on this configuration reference page are legitimately illustrative (3 JSON config file examples, 4 multi-command/shell-feature bash snippets) and cannot be expressed as single `{test:compile}` or `{test:cli cmd=\"...\"}` invocations. Added descriptive `title=\"...\"` attributes to all 7 blocks so the harness skips them cleanly. No prose drift found. Harness validates with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/configuration.mdx"
+      ],
+      "notes": "7 blocks total: 0 tested, 7 illustrative (titled). No CFC docblock changes needed.",
+      "turns": 10,
+      "usage": {
+        "input_tokens": 15477,
+        "output_tokens": 2414,
+        "cache_creation_input_tokens": 10031,
+        "cache_read_input_tokens": 74419
+      }
+    },
+    "guide:command-line-tools/core-commands/ai-and-completion.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/core-commands/ai-and-completion.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:00:40.273Z",
+      "summary": "All 15 bash code blocks on this page are illustrative: 8 are synopsis placeholders (e.g., `wheels ai <subcommand> [flags]`) and 7 contain unsupported shell features (pipes, redirects, `&&`, subshells, credential-dependent API calls). Each block was given a descriptive `title=\"...\"` attribute so the harness skips them cleanly. No `{test:*}` annotations were added. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/core-commands/ai-and-completion.mdx"
+      ],
+      "notes": "15 illustrative blocks, 0 tested blocks, 0 CFC docblock fixes. All blocks are either synopsis forms with `<placeholder>` tokens or multi-step shell sequences using pipes/redirects/subshells/`&&` that the {test:cli} driver cannot handle. No prose drift found.",
+      "turns": 18,
+      "usage": {
+        "input_tokens": 18644,
+        "output_tokens": 3746,
+        "cache_creation_input_tokens": 14022,
+        "cache_read_input_tokens": 177463
+      }
+    },
+    "guide:command-line-tools/core-commands/cfml-execution.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/core-commands/cfml-execution.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:01:23.588Z",
+      "summary": "Annotated 1 block as `{test:cli}` (the `writeOutput(1+2)` example with `asserts-stdout=\"3\"`); marked 6 illustrative-only blocks (2 synopsis templates, 1 multi-command example, 1 REPL synopsis, 1 sample output, 1 REPL session) with `title=\"... illustrative\"` so the harness skips them. No prose drift found. Harness reports 2 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/core-commands/cfml-execution.mdx"
+      ],
+      "notes": "2 tested blocks total (1 pre-existing + 1 new), 6 illustrative blocks titled, 0 CFC docblock changes.",
+      "turns": 10,
+      "usage": {
+        "input_tokens": 12608,
+        "output_tokens": 2121,
+        "cache_creation_input_tokens": 8652,
+        "cache_read_input_tokens": 65882
+      }
+    },
+    "guide:command-line-tools/core-commands/modules-and-deps.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/core-commands/modules-and-deps.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:02:51.809Z",
+      "summary": "Annotated 2 blocks as `{test:cli}` (`wheels modules list` already existed; added `wheels deps prune`). All 18 remaining blocks are synopsis/illustrative forms with placeholder text — marked with descriptive `title=\"...\"` attributes so the harness skips them cleanly. Harness reports 2 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/core-commands/modules-and-deps.mdx"
+      ],
+      "notes": "2 blocks tested (cli), 18 blocks illustrative (synopsis/multi-command/interactive-wizard forms), 0 CFC docblock fixes needed.",
+      "turns": 21,
+      "usage": {
+        "input_tokens": 20748,
+        "output_tokens": 5113,
+        "cache_creation_input_tokens": 15520,
+        "cache_read_input_tokens": 231414
+      }
+    },
+    "guide:command-line-tools/core-commands/server.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/core-commands/server.mdx",
+      "status": "needs_human",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:04:05.918Z",
+      "summary": "Edits made to 1 file(s) but no reference example was written; exhausted turn budget (24) before report_outcome.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/core-commands/server.mdx"
+      ],
+      "notes": "auto_finalized=true; CFC-only edits without a reference write. Possible causes: edit→revert flow, partial work, or agent stopped early. Review and decide.",
+      "turns": 24,
+      "usage": {
+        "input_tokens": 22382,
+        "output_tokens": 4596,
+        "cache_creation_input_tokens": 18177,
+        "cache_read_input_tokens": 286568
+      }
+    },
+    "guide:command-line-tools/core-commands/system-and-secrets.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/core-commands/system-and-secrets.mdx",
+      "status": "needs_human",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:05:19.165Z",
+      "summary": "Edits made to 1 file(s) but no reference example was written; exhausted turn budget (24) before report_outcome.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/core-commands/system-and-secrets.mdx"
+      ],
+      "notes": "auto_finalized=true; CFC-only edits without a reference write. Possible causes: edit→revert flow, partial work, or agent stopped early. Review and decide.",
+      "turns": 24,
+      "usage": {
+        "input_tokens": 23200,
+        "output_tokens": 4778,
+        "cache_creation_input_tokens": 15905,
+        "cache_read_input_tokens": 288625
+      }
+    },
+    "guide:command-line-tools/index.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/index.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:05:23.420Z",
+      "summary": "No code blocks found on this page — nothing to annotate or validate.",
+      "files_changed": [],
+      "notes": "The page is a pure prose reference page (CLI Reference overview) with 0 code blocks. No annotations, edits, or validation runs were needed.",
+      "turns": 1,
+      "usage": {
+        "input_tokens": 585,
+        "output_tokens": 169,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2759
+      }
+    },
+    "guide:command-line-tools/installation.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/installation.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:06:03.260Z",
+      "summary": "Annotated the one executable block (`wheels --version`, block 6) with `{test:cli cmd=\"wheels --version\" asserts-output=\"Wheels\"}`. The remaining 6 blocks are system-level shell commands (brew, choco, tar, export) or example output that cannot run in the harness fixture — all marked illustrative with `title=\"illustrative — ...\"` so the harness skips them cleanly. Harness passes: 1 tested, 6 illustrative, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/installation.mdx"
+      ],
+      "notes": "",
+      "turns": 10,
+      "usage": {
+        "input_tokens": 12895,
+        "output_tokens": 2187,
+        "cache_creation_input_tokens": 8491,
+        "cache_read_input_tokens": 65710
+      }
+    },
+    "guide:command-line-tools/mcp-integration.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/mcp-integration.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:06:26.397Z",
+      "summary": "Both code blocks on this page are illustrative: the JSON config snippet is IDE configuration data (not executable), and the bash `wheels mcp wheels --once tools/list` is an interactive MCP smoke-test command that cannot run in a fixture app. Added `title=` attributes to both blocks so Starlight renders them with helpful labels while the harness correctly skips them.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/mcp-integration.mdx"
+      ],
+      "notes": "0 blocks tagged with test annotations, 2 blocks marked illustrative (via title= only). No prose drift found. Harness: 0 passed, 0 failed.",
+      "turns": 5,
+      "usage": {
+        "input_tokens": 9823,
+        "output_tokens": 1243,
+        "cache_creation_input_tokens": 5625,
+        "cache_read_input_tokens": 19570
+      }
+    },
+    "guide:command-line-tools/quick-start.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/quick-start.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:07:29.106Z",
+      "summary": "Annotated 5 bash blocks on the Quick Start page: 2 tagged as `{test:cli}` (wheels new + wheels generate scaffold, steps 1–2) and 3 marked illustrative (wheels start requires foreground server; wheels migrate and wheels test require a running server). Harness: 2 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/quick-start.mdx"
+      ],
+      "notes": "blocks 1 and 3 (wheels new, wheels generate scaffold) are testable CLI commands; blocks 2, 4, 5 (wheels start, wheels migrate latest, wheels test) require a running Wheels server and are correctly marked illustrative.",
+      "turns": 12,
+      "usage": {
+        "input_tokens": 12438,
+        "output_tokens": 2453,
+        "cache_creation_input_tokens": 7784,
+        "cache_read_input_tokens": 77633
+      }
+    },
+    "guide:command-line-tools/wheels-commands/app-inspection.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/app-inspection.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:08:22.472Z",
+      "summary": "Annotated 2 previously-untested bash blocks as `{test:cli}` (the \"Quick setup verification\" `wheels doctor` workflow block and the `wheels notes --annotations=TODO,FIXME,HACK,XXX` workflow block). Marked 2 blocks as illustrative with `title=` attributes: `wheels routes` (requires a running server) and `wheels info && wheels stats && wheels routes` (uses `&&` shell operator unsupported by the CLI harness). All synopsis (`_` lang) and `text` sample-output blocks remain unannotated and are naturally skipped by the harness. Validation: 6 tagged blocks, 6 passed, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/app-inspection.mdx"
+      ],
+      "notes": "Blocks annotated as tested: 6 total (4 pre-existing + 2 new). Illustrative: 2 (routes example needing server, compound shell command). Synopsis and text output blocks: left unannotated (harness ignores them). No CFC docblock fixes needed.",
+      "turns": 7,
+      "usage": {
+        "input_tokens": 12920,
+        "output_tokens": 1994,
+        "cache_creation_input_tokens": 8585,
+        "cache_read_input_tokens": 40900
+      }
+    },
+    "guide:command-line-tools/wheels-commands/code-generation.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/code-generation.mdx",
+      "status": "needs_human",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:09:29.073Z",
+      "summary": "Edits made to 1 file(s) but no reference example was written; exhausted turn budget (24) before report_outcome.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/code-generation.mdx"
+      ],
+      "notes": "auto_finalized=true; CFC-only edits without a reference write. Possible causes: edit→revert flow, partial work, or agent stopped early. Review and decide.",
+      "turns": 24,
+      "usage": {
+        "input_tokens": 22811,
+        "output_tokens": 4517,
+        "cache_creation_input_tokens": 18192,
+        "cache_read_input_tokens": 289759
+      }
+    },
+    "guide:command-line-tools/wheels-commands/code-quality.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/code-quality.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:10:13.090Z",
+      "summary": "All 7 untested blocks on this page were correctly classified as illustrative (synopsis lines, sample output text, and multi-command bash snippets that can't run without shell operators) and annotated with descriptive `title=\"...\"` attributes so the harness skips them cleanly. The 2 pre-existing `{test:cli}` blocks continue to pass (2 passed, 0 failed).",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/code-quality.mdx"
+      ],
+      "notes": "7 illustrative blocks annotated with title=\"...\": synopsis for `wheels analyze`, sample analyze output, synopsis for `wheels validate`, 2 sample validate outputs (pass + error), pre-commit workflow (multi-command), and scoped analysis (multi-command). No prose drift found. 0 CFC docblock changes needed.",
+      "turns": 9,
+      "usage": {
+        "input_tokens": 11365,
+        "output_tokens": 2264,
+        "cache_creation_input_tokens": 8339,
+        "cache_read_input_tokens": 53853
+      }
+    },
+    "guide:command-line-tools/wheels-commands/console-and-repl.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/console-and-repl.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:10:48.632Z",
+      "summary": "All 6 code blocks on this page are illustrative: the synopsis block shows argument-placeholder syntax (not a real command), one bash block starts an interactive REPL session that would block indefinitely, and the four `text` blocks are REPL session transcripts. Added `title=\"illustrative — ...\"` to each block so the harness skips them cleanly. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/console-and-repl.mdx"
+      ],
+      "notes": "0 blocks tested, 6 blocks marked illustrative, 0 CFC docblock fixes, no prose drift found.",
+      "turns": 9,
+      "usage": {
+        "input_tokens": 12138,
+        "output_tokens": 2163,
+        "cache_creation_input_tokens": 8433,
+        "cache_read_input_tokens": 55115
+      }
+    },
+    "guide:command-line-tools/wheels-commands/creating-a-project.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/creating-a-project.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:11:56.290Z",
+      "summary": "Annotated 4 CLI blocks with `{test:cli}` (wheels new and wheels create app variations) and marked the remaining 4 blocks as illustrative with `title=` attributes (2 synopsis blocks, 1 directory tree, 1 chained `&&` shell command that the harness can't tokenize). All 4 tagged blocks pass the verify-docs harness.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/creating-a-project.mdx"
+      ],
+      "notes": "4 blocks tested (cli), 4 blocks illustrative (synopsis × 2, directory tree, chained-shell). No CFC docblock changes needed. No prose drift found.",
+      "turns": 12,
+      "usage": {
+        "input_tokens": 13729,
+        "output_tokens": 3006,
+        "cache_creation_input_tokens": 8635,
+        "cache_read_input_tokens": 87131
+      }
+    },
+    "guide:command-line-tools/wheels-commands/database.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/database.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:12:58.663Z",
+      "summary": "All 13 code blocks on this reference page are illustrative — they demonstrate CLI commands (`wheels migrate`, `wheels seed`, `wheels db`) that require a live server connection and cannot run in the bare harness fixture. Each block was annotated with `title=\"synopsis\"` or `title=\"example\"` so the harness skips them cleanly. No CFML compile blocks or prose drift corrections were needed. Harness passed: 0 tagged, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/database.mdx"
+      ],
+      "notes": "13 blocks total: 3 synopsis blocks (lang=_) and 10 bash blocks. All marked illustrative via title= attribute. Commands require a running Wheels server (HTTP dispatch to /wheels/cli), making them unsuitable for {test:cli} which runs in a bare fixture without a server. No {test:compile} candidates (no CFML). No prose drift detected.",
+      "turns": 19,
+      "usage": {
+        "input_tokens": 20407,
+        "output_tokens": 3624,
+        "cache_creation_input_tokens": 13689,
+        "cache_read_input_tokens": 180974
+      }
+    },
+    "guide:command-line-tools/wheels-commands/dev-server.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/dev-server.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:13:38.458Z",
+      "summary": "All 7 code blocks on this dev-server reference page are legitimately illustrative: 3 are synopsis/pseudo-syntax blocks (lang `_`), and 4 are bash blocks that either block the terminal (`wheels start`), require a running server (`wheels stop`, `wheels reload`), or combine multiple commands with comments into a dev-loop example. All blocks were annotated with descriptive `title=\"...\"` attributes so the harness skips them cleanly. Harness passes: 0 tagged, 0 failed.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/dev-server.mdx"
+      ],
+      "notes": "7 blocks total: 0 tested, 7 illustrative (3 synopsis, 4 bash requiring live environment). No prose drift found. No CFC docblock changes needed.",
+      "turns": 10,
+      "usage": {
+        "input_tokens": 11499,
+        "output_tokens": 2217,
+        "cache_creation_input_tokens": 8040,
+        "cache_read_input_tokens": 62666
+      }
+    },
+    "guide:command-line-tools/wheels-commands/scaffold-cleanup.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/scaffold-cleanup.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:14:12.614Z",
+      "summary": "All 5 bash code blocks on this page are multi-command sequences or use placeholder syntax (angle brackets), making them unsuitable for `{test:cli}`. Each was marked illustrative by adding a descriptive `title=\"illustrative — ...\"` attribute so the harness skips them cleanly. No prose drift was found; harness reports 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/scaffold-cleanup.mdx"
+      ],
+      "notes": "0 blocks tested (compile/cli/tutorial), 5 blocks illustrative. All blocks contain either multi-command sequences or synopsis placeholders that cannot be executed by the {test:cli} driver.",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 10418,
+        "output_tokens": 1830,
+        "cache_creation_input_tokens": 6922,
+        "cache_read_input_tokens": 43477
+      }
+    },
+    "guide:command-line-tools/wheels-commands/testing.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/testing.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:14:51.280Z",
+      "summary": "All 5 code blocks on this reference page are illustrative — 2 are synopsis placeholders (with `[--flag]` syntax tokens), 1 is a heavy one-time download command, 1 is a single-command example requiring a full running app, and 1 is a multi-command workflow snippet incompatible with the harness's single-command `{test:cli}` driver. Added `title=\"synopsis\"`, `title=\"example\"`, or `title=\"common workflows\"` to each so Starlight renders them cleanly and the harness skips them. No prose drift found.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/testing.mdx"
+      ],
+      "notes": "0 tested blocks, 5 illustrative blocks, 0 CFC docblock fixes. All blocks are either synopsis text, heavy-download CLI operations, or multi-command workflow examples that cannot be run by the harness in isolation.",
+      "turns": 8,
+      "usage": {
+        "input_tokens": 10960,
+        "output_tokens": 2048,
+        "cache_creation_input_tokens": 7174,
+        "cache_read_input_tokens": 44621
+      }
+    },
+    "guide:command-line-tools/wheels-commands/upgrade.mdx": {
+      "kind": "guide",
+      "id": "command-line-tools/wheels-commands/upgrade.mdx",
+      "status": "done",
+      "attempts": 1,
+      "updatedAt": "2026-05-07T21:15:38.119Z",
+      "summary": "All 5 blocks on this page are legitimately illustrative: a synopsis block, a CLI example requiring network access and existing project state, two sample text outputs, and a two-line git rollback snippet. Added `title=\"...\"` attributes to all 5 blocks to make the illustrative intent explicit to readers; no `{test:*}` annotations were added. Harness passes with 0 tagged blocks, 0 failures.",
+      "files_changed": [
+        "web/sites/guides/src/content/docs/v4-0-0-snapshot/command-line-tools/wheels-commands/upgrade.mdx"
+      ],
+      "notes": "0 tested blocks, 5 illustrative blocks, 0 CFC docblock fixes. Block 2 (wheels upgrade check --to=4.0.0) is technically a CLI command but requires network access to GitHub and a properly structured project with vendor/wheels/box.json — not executable in a clean fixture app. Block 5 (git restore/clean) is two separate commands with no wheels CLI involvement. Both are correctly left as illustrative.",
+      "turns": 11,
+      "usage": {
+        "input_tokens": 12295,
+        "output_tokens": 2568,
+        "cache_creation_input_tokens": 8278,
+        "cache_read_input_tokens": 72525
+      }
     }
   },
   "runs": []

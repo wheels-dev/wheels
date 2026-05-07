@@ -18,7 +18,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ### Synopsis
 
-```
+``` title="Synopsis"
 wheels upgrade check [--to=<version>]
 ```
 
@@ -53,13 +53,13 @@ That is the complete flag surface. The command does not accept `--force`, `--dry
 
 ### Example
 
-```bash
+```bash title="illustrative"
 wheels upgrade check --to=4.0.0
 ```
 
 Sample output (trimmed):
 
-```text
+```text title="illustrative — sample output"
 Current version: 3.5.1
 Target version:  4.0.0
 
@@ -80,7 +80,7 @@ Upgrade with: brew upgrade wheels
 
 When current and target share a major version, output collapses to:
 
-```text
+```text title="illustrative — same-major output"
 Current version: 4.0.0
 Target version:  4.0.1
 
@@ -122,7 +122,7 @@ Framework upgrades live outside the CLI by design. `wheels upgrade check` is the
 
 Because the command writes no files, there is nothing to roll back. If you proceed with the actual upgrade and it goes sideways, the standard git recovery applies to your project:
 
-```bash
+```bash title="illustrative"
 git restore vendor/wheels/
 git clean -fd vendor/wheels/
 ```

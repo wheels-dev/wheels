@@ -11,7 +11,7 @@ Revert traffic to a previously-deployed version. Finds the containers tagged wit
 
 ## Synopsis
 
-```
+``` title="Synopsis"
 wheels deploy rollback --version=<v> [--destination=<name>] [--dry-run]
 ```
 
@@ -33,7 +33,7 @@ Success requires the target containers to still exist on each host. `retain_cont
 
 ## Examples
 
-```bash
+```bash title="Examples"
 wheels deploy rollback --version=abc1234
 wheels deploy rollback --version=v1.2.3 --destination=production
 ```

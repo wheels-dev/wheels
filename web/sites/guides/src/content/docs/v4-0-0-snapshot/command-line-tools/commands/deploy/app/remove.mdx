@@ -11,7 +11,7 @@ Stop and remove app containers for the given version. Scoped to one version — 
 
 ## Synopsis
 
-```
+``` title="synopsis"
 wheels deploy app remove --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
@@ -28,7 +28,7 @@ wheels deploy app remove --version=<v> [--role=<name>] [--destination=<name>] [-
 
 For each host in each targeted role, chains:
 
-```
+``` title="illustrative — internal docker commands"
 docker stop <service>-<role>-<version> && docker rm <service>-<role>-<version>
 ```
 
@@ -38,6 +38,6 @@ Prefer [`wheels deploy prune`](/v4-0-0-snapshot/command-line-tools/commands/depl
 
 ## Example
 
-```bash
+```bash title="illustrative — requires deploy infrastructure"
 wheels deploy app remove --version=abc1234
 ```
