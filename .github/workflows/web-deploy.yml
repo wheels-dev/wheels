@@ -70,18 +70,25 @@ jobs:
 
   visual-regression:
     name: Visual regression
-    # Hard gate as of 2026-04. Baselines soaked through the initial
-    # Phase 3 rollout (#2158, #2159, #2160, #2161, #2162). If this job
-    # fails on your PR and the change is intentional, download the
-    # `visual-regression-diffs` artifact and copy each `*.actual.png`
-    # over the matching `web/tests/visual-baselines/*.png`, commit,
-    # and push.
+    # Hard gate for non-content changes (layout/styling/structure). For
+    # content-only pushes (markdown under web/content/blog/posts/), the
+    # job auto-regenerates the affected baseline, commits it back to
+    # develop with [skip ci], and exits success — so adding a new blog
+    # article doesn't trip a stale-baseline failure.
+    #
+    # If this job fails on a non-content PR and the change is intentional,
+    # download the `visual-regression-diffs` artifact and copy each
+    # *.actual.png over the matching web/tests/visual-baselines/*.png,
+    # commit, and push.
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
@@ -116,11 +123,60 @@ jobs:
         run: pnpm build
 
       - name: Run visual regression
+        id: regress
+        continue-on-error: true
         working-directory: web
         run: pnpm visual:test
 
+      - name: Detect content-only push
+        id: scope
+        if: steps.regress.outcome == 'failure' && github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          # `changed` comes from git itself (file paths under version
+          # control), not from user-controlled event metadata, so it's
+          # safe to grep over without further sanitization.
+          changed=$(git diff --name-only HEAD~1..HEAD)
+          non_content=$(echo "$changed" | grep -v -E '^web/content/blog/posts/' || true)
+          if [ -z "$non_content" ]; then
+            echo "content_only=true" >> "$GITHUB_OUTPUT"
+            echo "All changes under web/content/blog/posts/ — will auto-refresh baseline."
+          else
+            echo "content_only=false" >> "$GITHUB_OUTPUT"
+            echo "Non-content files changed; treating regression failure as real."
+            echo "$non_content"
+          fi
+
+      - name: Auto-refresh blog baseline
+        if: steps.regress.outcome == 'failure' && steps.scope.outputs.content_only == 'true'
+        working-directory: web
+        run: node scripts/visual-regression.mjs --update --site blog
+
+      - name: Commit and push refreshed baseline
+        if: steps.regress.outcome == 'failure' && steps.scope.outputs.content_only == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/tests/visual-baselines/blog.png
+          if git diff --cached --quiet; then
+            echo "Baseline did not actually change after refresh — exiting clean."
+            exit 0
+          fi
+          # [skip ci] keeps this push from re-triggering the deploy
+          # workflow and creating a publish loop.
+          git commit -m "chore(docs): auto-refresh blog visual baseline after content change [skip ci]"
+          git push origin HEAD:develop
+
+      - name: Fail job on real regression
+        if: steps.regress.outcome == 'failure' && steps.scope.outputs.content_only != 'true'
+        run: |
+          echo "Visual regression failed on changes that include non-content files."
+          echo "Download the visual-regression-diffs artifact and update baselines as needed."
+          exit 1
+
       - name: Upload diffs on failure
-        if: failure()
+        if: steps.regress.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: visual-regression-diffs
