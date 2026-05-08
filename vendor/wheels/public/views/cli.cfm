@@ -45,6 +45,42 @@ try {
 			case "migrateToLatest":
 				data.message = migrator.migrateToLatest();
 				break;
+			case "migrateUp":
+				// Walk the migration list (sorted ascending by version) and
+				// migrate to the first pending version after the current one.
+				// `migrateTo` handles the actual transaction + status update.
+				local.targetVersion = "";
+				for (local.m in data.migrations) {
+					if (local.m.status != "migrated" && local.m.version > data.currentVersion) {
+						local.targetVersion = local.m.version;
+						break;
+					}
+				}
+				if (Len(local.targetVersion)) {
+					data.message = migrator.migrateTo(local.targetVersion);
+				} else {
+					data.message = "No pending migrations. Database is at version #data.currentVersion#.";
+				}
+				break;
+			case "migrateDown":
+				// Walk the list in reverse to find the migration immediately
+				// below the current version, then migrate down to it. If the
+				// current version is the first applied migration, target "0"
+				// (rolls back the only migration).
+				local.targetVersion = "0";
+				for (local.i = ArrayLen(data.migrations); local.i >= 1; local.i--) {
+					local.m = data.migrations[local.i];
+					if (local.m.version < data.currentVersion && local.m.status == "migrated") {
+						local.targetVersion = local.m.version;
+						break;
+					}
+				}
+				if (data.currentVersion == "0") {
+					data.message = "Database is at version 0; nothing to roll back.";
+				} else {
+					data.message = migrator.migrateTo(local.targetVersion);
+				}
+				break;
 			case "renameSystemTables":
 				// F15 Phase 2: opt-in rename of legacy c_o_r_e_* system tables.
 				// Returns the full result struct (success/renamed/skipped/errors/sql)
@@ -121,7 +157,35 @@ try {
 				data.message = migrator.redoMigration(local.redoVersion);
 				break;
 			case "info":
-				data.message = "Returning what I know..";
+				// Build a human-readable status block from the data already
+				// populated above (currentVersion, migrations, datasource).
+				// Without this, the CLI's `wheels migrate info` printed an
+				// empty success message (issue #2474).
+				local.lines = [];
+				ArrayAppend(local.lines, "Datasource: " & data.datasource);
+				ArrayAppend(local.lines, "Database type: " & data.databaseType);
+				ArrayAppend(local.lines, "Current version: " & (Len(data.currentVersion) ? data.currentVersion : "0"));
+				ArrayAppend(local.lines, "Total migrations: " & ArrayLen(data.migrations));
+				if (ArrayLen(data.migrations)) {
+					local.applied = 0;
+					local.pending = 0;
+					for (local.m in data.migrations) {
+						if (local.m.status == "migrated") {
+							local.applied++;
+						} else {
+							local.pending++;
+						}
+					}
+					ArrayAppend(local.lines, "  applied: " & local.applied);
+					ArrayAppend(local.lines, "  pending: " & local.pending);
+					ArrayAppend(local.lines, "");
+					ArrayAppend(local.lines, "Migrations (newest last):");
+					for (local.m in data.migrations) {
+						local.marker = local.m.status == "migrated" ? "[x]" : "[ ]";
+						ArrayAppend(local.lines, "  " & local.marker & " " & local.m.version & " " & local.m.name);
+					}
+				}
+				data.message = ArrayToList(local.lines, Chr(10));
 				break;
 			
 			// Database commands
