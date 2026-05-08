@@ -1,9 +1,11 @@
 <cfparam name="{{singular}}" default="">
-#errorMessagesFor(objectName="{{singular}}")#
-<cfset local.formRoute = {{singular}}.isPersisted() ? "admin~{{singular}}" : "admin~{{plural}}">
+<cfset local.formRoute = {{singular}}.isPersisted() ? "admin{{SingularCap}}" : "admin{{PluralCap}}">
 <cfset local.formMethod = {{singular}}.isPersisted() ? "patch" : "post">
 <cfset local.formKey = {{singular}}.isPersisted() ? {{singular}}.key() : "">
+<cfoutput>
+#errorMessagesFor(objectName="{{singular}}")#
 #startFormTag(route=local.formRoute, method=local.formMethod, key=local.formKey)#
 {{formFields}}
 	<div>#submitTag(value="Save {{SingularCap}}")#</div>
 #endFormTag()#
+</cfoutput>

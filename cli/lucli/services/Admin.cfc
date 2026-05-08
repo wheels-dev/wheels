@@ -219,15 +219,21 @@ component {
 		var t = chr(9);
 		var resourceLine = '.resources("' & arguments.plural & '")';
 
-		// Check if this admin resource already exists
-		if (findNoCase('scope(path="admin"', content) && findNoCase(resourceLine, content)) {
+		// Check if this admin resource already exists. Detect both the new
+		// `.namespace("admin")` form and the legacy `.scope(path="admin")`
+		// form so re-running on existing routes still no-ops.
+		var hasAdminNamespace = reFindNoCase('\.namespace\(\s*"admin"', content)
+			|| reFindNoCase('\.scope\(\s*path\s*=\s*"admin"', content);
+		if (hasAdminNamespace && findNoCase(resourceLine, content)) {
 			return false;
 		}
 
-		// Try to find existing admin scope and append inside it
-		if (reFindNoCase('\.scope\(\s*path\s*=\s*"admin"', content)) {
-			// Find the admin scope opening and insert the resource before its .end()
-			var adminScopePos = reFindNoCase('\.scope\(\s*path\s*=\s*"admin"[^)]*\)', content);
+		// Try to find existing admin namespace/scope and append inside it.
+		if (hasAdminNamespace) {
+			var adminScopePos = reFindNoCase('\.namespace\(\s*"admin"[^)]*\)', content);
+			if (!adminScopePos) {
+				adminScopePos = reFindNoCase('\.scope\(\s*path\s*=\s*"admin"[^)]*\)', content);
+			}
 			if (adminScopePos > 0) {
 				// Find the .end() that closes this scope — simple heuristic: first .end() after scope
 				var afterScope = mid(content, adminScopePos, len(content));
@@ -242,8 +248,13 @@ component {
 		}
 
 		// No existing admin scope — create one before CLI-Appends-Here or last .end()
+		// Use `.namespace("admin")` rather than `.scope(path="admin", package="admin")`
+		// so the named-route prefix is set: routes resolve to `adminUsers`,
+		// `adminUser`, etc. (camelCase concat per `vendor/wheels/mapper/matching.cfc`).
+		// Without a name on the scope, routes collide with any same-named
+		// non-admin resource.
 		var marker = "// CLI-Appends-Here";
-		var adminBlock = t & '.scope(path="admin", package="admin")' & nl;
+		var adminBlock = t & '.namespace("admin")' & nl;
 		adminBlock &= t & t & resourceLine & nl;
 		adminBlock &= t & ".end()" & nl & t;
 

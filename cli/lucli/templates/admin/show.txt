@@ -3,7 +3,9 @@
 <dl>
 {{showFields}}
 </dl>
+<cfoutput>
 <p>
-	#linkTo(text="Edit", route="admin~edit_{{singular}}", key={{singular}}.key())#
-	#linkTo(text="Back to list", route="admin~{{plural}}")#
+	#linkTo(text="Edit", route="editAdmin{{SingularCap}}", key={{singular}}.key())#
+	#linkTo(text="Back to list", route="admin{{PluralCap}}")#
 </p>
+</cfoutput>
