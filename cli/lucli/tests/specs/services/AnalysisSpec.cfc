@@ -112,6 +112,34 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(issueMessages).toInclude("Model");
 				});
 
+				it("does not flag the framework's parent Model.cfc / Controller.cfc", () => {
+					// The base parent files extend "wheels.Model" / "wheels.Controller"
+					// rather than "Model" / "Controller", since they ARE the parent.
+					// The validator must skip them.
+					var modelDir = tempRoot & "/app/models";
+					var ctrlDir = tempRoot & "/app/controllers";
+					directoryCreate(modelDir, true, true);
+					directoryCreate(ctrlDir, true, true);
+					fileWrite(modelDir & "/Model.cfc", 'component extends="wheels.Model" {}');
+					fileWrite(ctrlDir & "/Controller.cfc", 'component extends="wheels.Controller" {}');
+
+					// Remove any leftover broken files so the assertion is clean.
+					var brokenModel = modelDir & "/Broken.cfc";
+					if (fileExists(brokenModel)) {
+						fileDelete(brokenModel);
+					}
+					var badModel = modelDir & "/BadModel.cfc";
+					if (fileExists(badModel)) {
+						fileDelete(badModel);
+					}
+
+					var results = analysis.validate();
+					for (var issue in results.issues) {
+						expect(issue.message).notToInclude("Model.cfc does not extend Model");
+						expect(issue.message).notToInclude("Controller.cfc does not extend Controller");
+					}
+				});
+
 			});
 
 		});
