@@ -49,17 +49,21 @@ wheels test
 wheels test model
 wheels test --filter=controller
 
-# Pick a reporter — simple (default), verbose, or machine-readable
-wheels test --reporter=verbose
+# Pick a reporter — simple (default), json, tap
+wheels test --reporter=tap
 
-# Target a specific test database
-wheels test --db=mysql
+# Target a specific test database — only meaningful with --core
+wheels test --core --db=mysql
 
 # CI-friendly output (exits non-zero on failures, terse pass/fail summary)
 wheels test --ci
 ```
 
-The supported flags today are `--filter=<dir>`, `--reporter=<name>`, `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>`, `--verbose` / `-v`, `--ci`, and `--core` (force framework-core mode when the auto-detect doesn't pick it up). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter; there is no raw `--format=json` or `--reporter=tap` flag on `wheels test` at the time of writing.
+The supported flags today are `--filter=<dir>`, `--reporter=<simple|json|tap>`, `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>` (only honoured with `--core`), `--verbose` / `-v`, `--ci`, `--core` (force framework-core mode when the auto-detect doesn't pick it up), and `--no-test-db` (don't auto-swap to `<datasource>_test`). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter.
+
+<Aside type="note" title="--db is for --core only">
+The framework's matrix self-tests (`--core`) wire up a `wheelstestdb_<engine>` datasource per supported engine — that's what `--db` selects between. App tests run against the datasource your project is configured for; passing `--db` to an app run prints a warning and is otherwise ignored. To run your app suite against a different engine, set the engine in your shell environment before invoking `wheels test` — see [the testing CLI reference](/v4-0-0-snapshot/command-line-tools/wheels-commands/testing/#testing-against-different-engines) for the env-var pattern. This matches Rails (`DATABASE_URL`), Laravel (`DB_CONNECTION`), Symfony (`APP_ENV=test`), and Phoenix (`MIX_ENV`) — DB selection is a process-level concern, not a per-invocation flag.
+</Aside>
 
 <Aside type="tip">
   When `vendor/wheels/tests/` exists (you're hacking on framework core), `wheels test` auto-enables `--core`. Pass `--core` explicitly if you want to force it.
