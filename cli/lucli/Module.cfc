@@ -895,12 +895,15 @@ component extends="modules.BaseModule" {
 			// CFML engine
 			out("Engine:   Lucee (LuCLI module)");
 
-			// Datasource
+			// Datasource. Strip CFML/cfscript comments first so commented-out
+			// `set(...)` calls don't get parsed as live config, and use a
+			// word-boundary on the property name so `coreTestDataSourceName`
+			// is not picked up as if it were `dataSourceName`.
 			var settingsFile = variables.projectRoot & "/config/settings.cfm";
 			if (fileExists(settingsFile)) {
 				try {
-					var sContent = fileRead(settingsFile);
-					var dsMatch = reFindNoCase('dataSourceName\s*[=,]\s*"([^"]+)"', sContent, 1, true);
+					var sContent = stripCfmlComments(fileRead(settingsFile));
+					var dsMatch = reFindNoCase('\bdataSourceName\s*=\s*"([^"]+)"', sContent, 1, true);
 					if (arrayLen(dsMatch.match) > 1) {
 						out("Database: #dsMatch.match[2]#");
 					}
@@ -934,10 +937,18 @@ component extends="modules.BaseModule" {
 				}
 			}
 
-			// Count models
+			// Count models. Exclude the framework's parent `Model.cfc` — it
+			// extends `wheels.Model` and is not an application/domain model.
 			var modelsDir = variables.projectRoot & "/app/models";
 			if (directoryExists(modelsDir)) {
-				var modelCount = arrayLen(directoryList(modelsDir, false, "name", "*.cfc"));
+				var modelFiles = directoryList(modelsDir, false, "name", "*.cfc");
+				var modelCount = 0;
+				for (var modelFile in modelFiles) {
+					if (modelFile == "Model.cfc") {
+						continue;
+					}
+					modelCount++;
+				}
 				if (modelCount > 0) {
 					out("Models:   #modelCount# model(s)");
 				}
@@ -5536,6 +5547,24 @@ component extends="modules.BaseModule" {
 		for (var i = 1; i <= arguments.length; i++) {
 			result &= mid(chars, randRange(1, len(chars)), 1);
 		}
+		return result;
+	}
+
+	/**
+	 * Remove CFML and cfscript comments so static parsers don't pick up
+	 * commented-out config calls. Strips:
+	 *   - cfscript line comments  // ...
+	 *   - cfscript/JS block comments  /* ... *​/
+	 *   - CFML tag-style block comments  <!--- ... --->
+	 */
+	private string function stripCfmlComments(required string source) {
+		var result = arguments.source;
+		// Tag-style CFML comments. Non-greedy across lines.
+		result = reReplace(result, "<!---[\s\S]*?--->", "", "all");
+		// /* ... */ block comments. Non-greedy across lines.
+		result = reReplace(result, "/\*[\s\S]*?\*/", "", "all");
+		// // line comments to end of line.
+		result = reReplace(result, "//[^\r\n]*", "", "all");
 		return result;
 	}
 
