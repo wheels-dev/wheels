@@ -1,6 +1,8 @@
 <cfparam name="{{plural}}" default="">
 <h1>{{PluralCap}} Admin</h1>
-<p>#linkTo(text="New {{SingularCap}}", route="admin~new_{{singular}}")#</p>
+<cfoutput>
+<p>#linkTo(text="New {{SingularCap}}", route="newAdmin{{SingularCap}}")#</p>
+</cfoutput>
 <cfif {{plural}}.recordCount>
 <table>
 	<thead>
@@ -14,8 +16,10 @@
 		<tr>
 {{indexCells}}
 			<td>
-				#linkTo(text="Show", route="admin~{{singular}}", key={{plural}}.{{primaryKey}})#
-				#linkTo(text="Edit", route="admin~edit_{{singular}}", key={{plural}}.{{primaryKey}})#
+				<cfoutput>
+				#linkTo(text="Show", route="admin{{SingularCap}}", key={{plural}}.{{primaryKey}})#
+				#linkTo(text="Edit", route="editAdmin{{SingularCap}}", key={{plural}}.{{primaryKey}})#
+				</cfoutput>
 			</td>
 		</tr>
 		</cfloop>
@@ -24,4 +28,4 @@
 <cfelse>
 <p>No {{plural}} found.</p>
 </cfif>
-#paginationNav()#
+<cfoutput>#paginationNav()#</cfoutput>
