@@ -27,7 +27,7 @@ Less boilerplate. Fewer mistakes. Faster development.
 
 Whether you're building a new app or maintaining a large codebase, the extension helps you write cleaner code and move faster with confidence.
 
-# Why a Dedicated Wheels Extension Matters
+## Why a Dedicated Wheels Extension Matters
 
 Modern development isn’t just about writing code — it’s about:
 
@@ -38,7 +38,7 @@ Modern development isn’t just about writing code — it’s about:
 - Smooth onboarding for new developers
   The Wheels VS Code Extension addresses all of these by bringing Wheels intelligence directly into your editor. Instead of memorizing function signatures or manually creating files, the extension assists you in real time.
 
-# Key Features
+## Key Features
 
 **File Templates & Scaffolding**
 Generate Wheels components in seconds using built-in templates that follow best practices.
@@ -62,7 +62,7 @@ You can create components via:
 - Command Palette
   The extension also creates missing directories automatically.
 
-# Quick Code Templates
+## Quick Code Templates
 
 Typing a short keyword expands into a full component structure.
 **Examples:**
@@ -78,7 +78,7 @@ These templates include:
 - Common CRUD logic
   Perfect for rapidly building production-ready components.
 
-# Function Snippets
+## Function Snippets
 
 The extension includes 300+ Wheels functions with smart snippets.
 You get two options:
@@ -93,7 +93,7 @@ Benefits:
 - Faster and more accurate coding
 - Great for learning Wheels APIs
 
-# Go To Definition (F12)
+## Go To Definition (F12)
 
 Instantly jump to related Wheels components.
 Works with:
@@ -110,7 +110,7 @@ Examples:
 - Jump from routes to controller actions
   This is a massive time saver in large projects.
 
-# Smart Parameter System
+## Smart Parameter System
 
 A powerful assistance system for function parameters.
 **Parameter Highlighting**
@@ -147,7 +147,7 @@ Hover over any Wheels function to see:
 - Return values
   This provides instant documentation without leaving your editor. It’s especially helpful when exploring unfamiliar APIs.
 
-# Installation & Setup
+## Installation & Setup
 
 Getting started is simple:
 
@@ -157,7 +157,7 @@ Getting started is simple:
 4. Install and reload
    No configuration required. It works immediately with CFML files.
 
-# Troubleshooting
+## Troubleshooting
 
 **Extension Not Working?**
 
@@ -182,7 +182,7 @@ Getting started is simple:
 - Issue Reporting
 - Extension Source Code
 
-# What This Means for Wheels Developers
+## What This Means for Wheels Developers
 
 The Wheels VS Code Extension turns your editor into a Wheels-aware assistant. You get:
 
@@ -193,7 +193,7 @@ The Wheels VS Code Extension turns your editor into a Wheels-aware assistant. Yo
 - Instant documentation
   This reduces context switching and keeps you focused on building features.
 
-# Conclusion
+## Conclusion
 
 The Wheels VS Code Extension isn’t just a convenience — it’s a serious productivity upgrade. Developers who use it will:
 

@@ -20,7 +20,7 @@ coverImage: null
 legacyId: '1151033207156506627'
 ---
 
-# Introduction
+## Introduction
 
 In our previous article, we explored the classic Wheels CLI commands that have supported Wheels developers for years and continue to work in Wheels 3.x. Those commands helped developers scaffold faster, manage resources, and speed up everyday development.
 
@@ -34,7 +34,7 @@ This article is not a deep dive into every command yet. Think of it as a preview
 
 In upcoming articles, we’ll cover each area in detail — step by step.
 
-# Why This Matters for Modern Development
+## Why This Matters for Modern Development
 
 Today’s applications demand more than just CRUD generators. Teams now expect:
 
@@ -58,7 +58,7 @@ The goal is simple:
 
 less manual work, fewer surprises, and more confidence in every stage of development.
 
-# What’s Changing in Wheels CLI 3.x
+## What’s Changing in Wheels CLI 3.x
 
 The new CLI commands are being designed around key areas like:
 
@@ -76,7 +76,7 @@ The new CLI commands are being designed around key areas like:
 
 Rather than learning everything at once, we’ll explore these in focused articles. Each module deserves its own spotlight and practical examples.
 
-# What’s Next
+## What’s Next
 
 In the next articles, we’ll go module by module and explore:
 
@@ -100,7 +100,7 @@ In the next articles, we’ll go module by module and explore:
 
 Each guide will include real-world usage, tips, and scenarios where these commands shine.
 
-# Closing Note
+## Closing Note
 
 Wheels CLI 3.x represents a shift from “**developer convenience**” to developer empowerment.
 

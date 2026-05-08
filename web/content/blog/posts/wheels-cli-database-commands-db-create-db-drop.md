@@ -18,7 +18,7 @@ coverImage: null
 legacyId: '1155515146896900099'
 ---
 
-# Introduction
+## Introduction
 
 So far in this series, we’ve explored how the Wheels CLI in 3.x helps you inspect your application, manage configuration, and control environments safely. Now we’re moving into something even more foundational: **database lifecycle management**.
 
@@ -63,7 +63,7 @@ wheels db drop
 Simple in appearance.
 Powerful in impact.
 
-# Why Database CLI Commands Matter
+## Why Database CLI Commands Matter
 
 Traditionally, creating or dropping databases meant:
 
@@ -90,7 +90,7 @@ It knows:
 
 And it acts accordingly.
 
-# wheels db create
+## wheels db create
 
 Create a Database Instantly
 `wheels db create`
@@ -146,7 +146,7 @@ If you are in staging → It creates the staging DB.
 
 No cross-environment confusion.
 
-# wheels db drop
+## wheels db drop
 
 Drops the configured database. This command permanently deletes a database. This is a destructive operation that cannot be undone.
 
@@ -200,7 +200,7 @@ That’s why best practice is:
 2. Validate settings
 3. Then execute database commands
 
-# Example Safe Workflow
+## Example Safe Workflow
 
 Step 1 – Confirm Environment
 `wheels environment show`
@@ -216,7 +216,7 @@ Step 4 – Recreate
 
 This structured process prevents irreversible mistakes.
 
-# Real-World Development Scenarios
+## Real-World Development Scenarios
 
 **Scenario 1: Local Development Reset**
 You’ve been experimenting with schema changes. Your database is messy. Instead of manually cleaning tables:
@@ -253,7 +253,7 @@ wheels db drop
 Fully automated lifecycle.
 No manual intervention.
 
-# How These Commands Improve Team Workflows
+## How These Commands Improve Team Workflows
 
 They:
 
@@ -266,7 +266,7 @@ They:
 
 In modern development, repeatability matters. These commands make database setup repeatable.
 
-# The Bigger Philosophy
+## The Bigger Philosophy
 
 Earlier CLI tools focused on scaffolding code. Wheels 3.x CLI is evolving into:
 
@@ -277,7 +277,7 @@ Earlier CLI tools focused on scaffolding code. Wheels 3.x CLI is evolving into:
 
 Applications aren’t just code. They are infrastructure + configuration + environments + data. Managing databases via CLI is a natural evolution.
 
-# Important Best Practices
+## Important Best Practices
 
 Before using database commands:
 
@@ -289,7 +289,7 @@ Before using database commands:
 
 Treat database commands with respect. They’re powerful by design.
 
-# Conclusion
+## Conclusion
 
 The new database commands in Wheels CLI 3.x simplify one of the most critical parts of application management.
 

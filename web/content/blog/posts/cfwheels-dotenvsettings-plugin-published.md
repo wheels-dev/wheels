@@ -19,17 +19,17 @@ legacyId: '119'
 
 A new plugin was published to provide support for .env settings files in a production environment. This plugin is based on Eric Peterson's CommandBox module and allows the use of .env or similarly named files to store your application secrets so they can be kept out of source control.
 
-## LICENSE
+### LICENSE
 
 Apache License, Version 2.0.
 
-## SYSTEM REQUIREMENTS
+### SYSTEM REQUIREMENTS
 
 - Lucee 5+
 - ColdFusion 9+
 - CFWheels 2+
 
-# Instructions
+## Instructions
 
 Just drop the zip file into your `plugins` folder and restart your application or use CommandBox cli to install. Simply type the following at the root of your project:
 
@@ -37,7 +37,7 @@ Just drop the zip file into your `plugins` folder and restart your application o
 box install cfwheels-dotenvsettings
 ```
 
-## Usage
+### Usage
 
 Create a .env file in your project root and add to .gitignore or your version control's equivalent (don't commit secrets to your repo!) The file can contain JSON or Java properties style key value pairs:
 

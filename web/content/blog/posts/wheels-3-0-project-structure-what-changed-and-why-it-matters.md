@@ -32,7 +32,7 @@ In this article, we’ll explore:
 
 Let’s dive in.
 
-# **What Changed in Wheels 3.0**
+## **What Changed in Wheels 3.0**
 
 In Wheels 3.0, the framework core is separated from your application code in a clear and intentional way:
 
@@ -44,13 +44,13 @@ This change makes your project easier to understand and harder to accidentally m
 
 Here's what the major change means in practice:
 
-# **Before (Wheels 2.5):**
+## **Before (Wheels 2.5):**
 
 - Framework files were inside the project root
 - Application and framework files lived beside each other
 - Harder to distinguish app code from framework code
 
-# **Now (Wheels 3.0):**
+## **Now (Wheels 3.0):**
 
 - Core Wheels files are under: **vendor/wheels**
 - App code lives under: **app/controllers**, **app/models**, **app/views**
@@ -60,7 +60,7 @@ Here's what the major change means in practice:
 
 This creates a clear **separation of concerns** between your code and the framework itself.
 
-# **Why This Matters**
+## **Why This Matters**
 
 **1. Cleaner Application Root**
 

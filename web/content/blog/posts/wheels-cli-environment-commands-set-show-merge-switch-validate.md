@@ -18,13 +18,13 @@ coverImage: null
 legacyId: '1154675066987118593'
 ---
 
-# Introduction
+## Introduction
 
 In our previous deep dives, we explored how the Wheels CLI helps you inspect your application and validate configuration.
 
 Now we’re focusing on something even more critical:
 
-# Environment management.
+## Environment management.
 
 Modern applications don’t run in just one mode. They operate across:
 
@@ -46,7 +46,7 @@ This article explores five powerful environment-focused commands:
 
 Because in real-world development, environment mistakes are expensive.
 
-# Why Environment Management Matters
+## Why Environment Management Matters
 
 Environment confusion causes real problems:
 
@@ -61,7 +61,7 @@ They’re environment issues.
 
 The new environment commands in Wheels CLI are designed to prevent exactly that.
 
-# wheels environment show
+## wheels environment show
 
 **See Your Active Environment Instantly**
 `wheels environment show`
@@ -92,7 +92,7 @@ This prevents:
 - Misaligned debugging settings
   Clarity before action.
 
-# wheels environment set
+## wheels environment set
 
 **Explicitly Define Your Environment**
 `wheels environment set staging`
@@ -122,7 +122,7 @@ Sometimes environment detection depends on:
 
 You choose the environment.
 
-# wheels environment switch
+## wheels environment switch
 
 **Seamlessly Move Between Environments**
 `wheels environment switch production`
@@ -148,7 +148,7 @@ Now your local app mirrors production behavior. You debug confidently. Then swit
 
 Fast. Controlled. Safe.
 
-# wheels environment merge
+## wheels environment merge
 
 **Combine Environment Configurations**
 `wheels environment merge staging production`
@@ -181,7 +181,7 @@ Now production inherits the verified configuration.
 Clean promotion.
 Less risk.
 
-# wheels environment validate
+## wheels environment validate
 
 **Protect Against Environment Mistakes**
 `wheels environment validate`
@@ -216,7 +216,7 @@ If validation fails, deployment stops.
 
 That’s modern DevOps discipline.
 
-# How These Commands Work Together
+## How These Commands Work Together
 
 Here’s a safe environment workflow:
 
@@ -237,7 +237,7 @@ Step 5 – Explicitly Set for Deployment
 
 This structured approach prevents environment chaos.
 
-# The Bigger Evolution of Wheels CLI
+## The Bigger Evolution of Wheels CLI
 
 Earlier CLI generations focused heavily on:
 
@@ -260,7 +260,7 @@ And environments are a major source of that complexity.
 
 These commands bring order to it.
 
-# What This Means for Wheels Developers
+## What This Means for Wheels Developers
 
 With **set**, **show**, **merge**, **switch**, and **validate**, you gain:
 
@@ -275,7 +275,7 @@ Environment mistakes are subtle — but costly.
 
 These commands dramatically reduce that risk.
 
-# Conclusion
+## Conclusion
 
 The new environment commands in Wheels CLI 3.x transform how you manage application modes.
 

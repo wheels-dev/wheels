@@ -18,7 +18,7 @@ legacyId: '134'
 
 Today, we're thrilled to announce the release of Wheels 3.0 — the most significant update in the framework's history. This release marks not just a version bump, but a complete evolution of the project, including a rebrand from CFWheels to simply Wheels.
 
-# A Fresh Identity
+## A Fresh Identity
 
 With version 3.0, we've embraced a new identity:
 
@@ -38,7 +38,7 @@ The project structure has been completely redesigned for cleaner separation of c
 - Updated Mappings: Simplified Application.cfm configuration
 - Modular Design: Better support for modern dependency management
 
-# Powerful New CLI
+## Powerful New CLI
 
 The wheels CLI has been completely rewritten with powerful new commands:
 
@@ -89,7 +89,7 @@ Looking to the future? Wheels 3.0 is compatible with https://boxlang.io, the nex
 - macOS Installer: One-click installation for Mac developers
 - MCP Integration: AI-assisted development with Model Context Protocol support
 
-# Getting Started
+## Getting Started
 
 _New Projects_
 
@@ -111,7 +111,7 @@ Before upgrading, review the breaking changes:
 
 See our https://wheels.dev/3.0.0/guides/introduction/upgrading for detailed instructions.
 
-# Thank You
+## Thank You
 
 Wheels 3.0 represents months of work from our incredible community. Special thanks to:
 
