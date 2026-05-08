@@ -10,7 +10,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 You'll ship a running Wheels app with one CRUD resource — a blog post with a title and body — wired through model, controller, views, migration, tests, and routes.
 
-This page assumes `wheels --version` already works. If it doesn't, run through [Installation](./installation/) first.
+This page assumes `wheels --version` already works. If it doesn't, run through [Installation](../installation/) first.
 
 ## 1. Create the app
 
@@ -80,22 +80,22 @@ wheels test --filter=posts
 <CardGrid>
   <LinkCard
     title="Code Generation"
-    href="./wheels-commands/code-generation/"
+    href="../wheels-commands/code-generation/"
     description="The full catalog — models, controllers, views, migrations, scaffolds, API resources, routes, tests, admin, snippets."
   />
   <LinkCard
     title="Database"
-    href="./wheels-commands/database/"
+    href="../wheels-commands/database/"
     description="wheels migrate, wheels seed, and wheels db — schema management and seed data workflows."
   />
   <LinkCard
     title="Testing"
-    href="./wheels-commands/testing/"
+    href="../wheels-commands/testing/"
     description="wheels test options, the browser suite, and CI reporters."
   />
   <LinkCard
     title="Dev Server"
-    href="./wheels-commands/dev-server/"
+    href="../wheels-commands/dev-server/"
     description="wheels start, wheels stop, wheels reload — running your app locally and driving hot reload."
   />
 </CardGrid>
@@ -108,7 +108,7 @@ The scaffold gives you CRUD, not a login flow. See [Authentication Patterns](/v4
 
 ### Configuration
 
-To swap SQLite for a real database, tune the reload password, or wire per-environment settings, see [Configuration](./configuration/) and the [Database](./wheels-commands/database/) guide. The datasource name defaults to the app name (`myblog`) and lives in `config/settings.cfm`.
+To swap SQLite for a real database, tune the reload password, or wire per-environment settings, see [Configuration](../configuration/) and the [Database](../wheels-commands/database/) guide. The datasource name defaults to the app name (`myblog`) and lives in `config/settings.cfm`.
 
 ### Deployment
 
