@@ -18,11 +18,11 @@ coverImage: null
 legacyId: '1159470321786880005'
 ---
 
-# Introduction
+## Introduction
 
 So far in this series, we’ve explored how the Wheels CLI in 3.x helps you manage your application’s environments, databases, plugins, and testing workflows. Now we’re discussing another critical aspect of modern web applications:
 
-# Asset management.
+## Asset management.
 
 Every production-ready application depends on optimized frontend assets — CSS, JavaScript, images, fonts, and other static resources. During development, assets are often served individually for easier debugging. But in production, they must be optimized for performance.
 
@@ -40,7 +40,7 @@ wheels assets clobber
 
 These commands transform asset handling from a manual deployment step into a repeatable, production-ready workflow.
 
-# Why Asset Commands Matter
+## Why Asset Commands Matter
 
 In real-world applications, asset management affects:
 
@@ -60,7 +60,7 @@ Without proper asset control, you may encounter:
 
 The Wheels CLI asset commands solve these issues with clarity and structure.
 
-# wheels assets precompile
+## wheels assets precompile
 
 `wheels assets precompile`
 
@@ -89,7 +89,7 @@ Instead of relying on runtime compilation, precompiling ensures assets are ready
 - Stable, predictable deployments
   Precompilation shifts processing from runtime to build time — which is a best practice in modern web architecture.
 
-# wheels assets clean
+## wheels assets clean
 
 `wheels assets clean`
 
@@ -112,7 +112,7 @@ Without cleaning:
 
 It keeps your asset directory organized and efficient.
 
-# wheels assets clobber
+## wheels assets clobber
 
 `wheels assets clobber`
 
@@ -141,7 +141,7 @@ You get a completely fresh build from scratch.
 
 Use it carefully — but confidently.
 
-# Example Production Workflow
+## Example Production Workflow
 
 **Before Deployment**
 
@@ -162,7 +162,7 @@ wheels assets precompile
 
 Automated builds become reliable and predictable.
 
-# How These Commands Improve Team Workflows
+## How These Commands Improve Team Workflows
 
 They bring:
 
@@ -175,7 +175,7 @@ They bring:
 
 Instead of manually managing static files, everything is controlled via CLI — just like databases, environments, and plugins.
 
-# The Bigger Picture
+## The Bigger Picture
 
 Earlier development workflows often mixed runtime asset handling with manual production steps. Wheels 3.x introduces structured asset lifecycle management.
 Just like:
@@ -187,7 +187,7 @@ Just like:
 
 Asset commands manage performance and deployment consistency. This completes the development lifecycle.
 
-# What This Means for Wheels Developers
+## What This Means for Wheels Developers
 
 With precompile, clean, and clobber, you gain:
 
@@ -199,7 +199,7 @@ With precompile, clean, and clobber, you gain:
 
 Assets are no longer an afterthought. They are part of your deployment discipline.
 
-# Conclusion
+## Conclusion
 
 The Wheels CLI asset commands in 3.x bring structure to frontend asset management:
 

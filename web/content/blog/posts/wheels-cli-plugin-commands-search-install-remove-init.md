@@ -18,7 +18,7 @@ coverImage: null
 legacyId: '1157791657974759425'
 ---
 
-# Introduction
+## Introduction
 
 So far in this series, we’ve explored how the Wheels CLI in 3.x helps you manage your application key points and main aspects. Now we are discussing one of the strengths of Wheels, which has always been its extensibility. With Wheels 3.x, plugin management has evolved into a complete lifecycle experience within the CLI. In earlier versions of Wheels, we already had plugin-related commands such as:
 
@@ -57,7 +57,7 @@ Instead of manually downloading, copying, and configuring plugin folders, everyt
 
 What used to be a manual setup task is now a structured, repeatable workflow — aligned with modern development practices.
 
-# Why Plugin CLI Commands Matter
+## Why Plugin CLI Commands Matter
 
 Traditionally, managing plugins meant:
 
@@ -83,7 +83,7 @@ The new CLI plugin commands bring:
 
 It makes plugin management modern and developer-friendly.
 
-# wheels plugins search
+## wheels plugins search
 
 **Discover Available Plugins**
 
@@ -105,7 +105,7 @@ This command lets you search for available plugins by keyword. Instead of browsi
 
 It turns plugin discovery into a quick CLI action instead of a research task.
 
-# wheels plugins install
+## wheels plugins install
 
 **Install Plugins Cleanly**
 
@@ -134,7 +134,7 @@ For teams, this is huge. Instead of sending plugin files manually, you simply sa
 
 Consistent. Repeatable. Clean.
 
-# wheels plugins remove
+## wheels plugins remove
 
 **Remove Plugins Safely**
 
@@ -158,7 +158,7 @@ The CLI ensures a structured uninstall process.
 Cleaner codebase.
 Less technical debt.
 
-# wheels plugins init
+## wheels plugins init
 
 **Scaffold Your Own Plugin**
 
@@ -184,7 +184,7 @@ You can now package them as plugins easily.
 
 Instead of copying code between projects, you create a proper plugin once — and reuse it everywhere.
 
-# Real-World Workflow Example
+## Real-World Workflow Example
 
 **Discover a Plugin**
 
@@ -208,7 +208,7 @@ Instead of copying code between projects, you create a proper plugin once — an
 
 Everything stays structured and reproducible.
 
-# Team & CI/CD Benefits
+## Team & CI/CD Benefits
 
 These commands support:
 
@@ -224,7 +224,7 @@ For example, in CI:
 
 The environment is ready instantly.
 
-# The Bigger Evolution of Wheels CLI
+## The Bigger Evolution of Wheels CLI
 
 In older versions, plugin management was mostly manual, with only listing support available. Wheels 3.x expands that capability into:
 
@@ -241,7 +241,7 @@ The CLI is no longer just for generating controllers and models. It’s becoming
 - An automation tool
 - A development assistant
 
-# What This Means for Wheels Developers
+## What This Means for Wheels Developers
 
 With search, install, remove, init, and plugin list, you gain:
 
@@ -253,7 +253,7 @@ With search, install, remove, init, and plugin list, you gain:
 
 Plugins are no longer “extra files.” They are first-class components of your application architecture. And the CLI treats them that way.
 
-# Conclusion
+## Conclusion
 
 The Wheels CLI plugin commands in 3.x modernize how developers extend their applications.
 

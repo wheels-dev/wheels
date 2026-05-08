@@ -18,7 +18,7 @@ coverImage: null
 legacyId: '1152697052871000065'
 ---
 
-# Introduction
+## Introduction
 
 In our previous article, [Wheels CLI: Modern Commands for Faster, Smarter Wheels 3.0 Development](https://wheels.dev/blog/wheels-cli-modern-commands-for-faster-smarter-wheels-3-0-development), we introduced the new generation of CLI capabilities coming to Wheels 3.x.
 
@@ -33,7 +33,7 @@ This article explores three powerful inspection commands that help you understan
 - wheels get settings
   These commands are not about generating code. They’re about visibility, awareness, and confidence. When debugging, deploying, or supporting an application, knowing your environment and configuration matters just as much as writing good code.
 
-# Why App Inspection Commands Matter
+## Why App Inspection Commands Matter
 
 Modern development environments are rarely simple.
 You may have:
@@ -59,7 +59,7 @@ The new CLI inspection commands answer these instantly.
 - No assumptions.
   Just clarity.
 
-# wheels about
+## wheels about
 
 **Your Application’s Full Snapshot**
 The about command provides a complete overview of your Wheels application.
@@ -112,7 +112,7 @@ Why about Is Powerful:
 
 It’s your first command when something feels “off.”
 
-# wheels get environment
+## wheels get environment
 
 **Know Exactly Where You Are**
 Modern apps typically run in multiple environments:
@@ -157,7 +157,7 @@ Running:
 Immediately confirms whether your assumption is correct.
 This command alone can save hours of debugging.
 
-# wheels get settings
+## wheels get settings
 
 **Inspect Your Active Configuration**
 The get settings command shows the current Wheels application settings for your active environment.
@@ -213,7 +213,7 @@ They help you:
 - Collaborate more efficiently
   In modern development, visibility is productivity.
 
-# How These Commands Work Together
+## How These Commands Work Together
 
 Here’s a practical workflow:
 
@@ -232,7 +232,7 @@ Verify important configuration values.
 
 Review the full application snapshot. Together, they provide a complete picture of your application’s runtime state.
 
-# What This Means for Wheels Developers
+## What This Means for Wheels Developers
 
 With these inspection tools, Wheels CLI is evolving into more than just a scaffolding tool. It’s becoming:
 
@@ -258,7 +258,7 @@ Each module builds toward one goal:
 - More clarity.
 - More confidence.
 
-# Conclusion
+## Conclusion
 
 The new inspection commands in Wheels CLI 3.x are small in size — but huge in impact.
 

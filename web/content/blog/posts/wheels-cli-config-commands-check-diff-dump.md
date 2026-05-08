@@ -17,7 +17,7 @@ coverImage: null
 legacyId: '1153543943534673921'
 ---
 
-# Introduction
+## Introduction
 
 In our previous article, Wheels CLI Essentials: Inspect Your App with about & get Commands, we explored how Wheels 3.x helps you understand your application's runtime state. Those commands focused on visibility.
 
@@ -30,7 +30,7 @@ This article introduces three powerful configuration-focused commands:
 - wheels config dump
   These commands are not about what is running. They’re about how your configuration is structured, validated, and compared. If **about** and **get** gave you awareness, these commands give you control.
 
-# Why Configuration Commands Matter
+## Why Configuration Commands Matter
 
 In modern applications, configuration complexity grows quickly:
 
@@ -51,7 +51,7 @@ Over time, small configuration mismatches can cause major issues:
 
 They give you validation, comparison, and export tools — directly from the CLI.
 
-# wheels config check
+## wheels config check
 
 **Validate Your Configuration with Confidence**
 `wheels config check`
@@ -92,7 +92,7 @@ Why config check Is Powerful:
   Instead of discovering configuration errors in production…
   You catch them instantly.
 
-# wheels config diff
+## wheels config diff
 
 **Compare Configuration Across Environments**
 `wheels config diff development production`
@@ -139,7 +139,7 @@ Now you know:
 - Simplifies debugging
   In larger teams, configuration drift is inevitable. This command keeps environments aligned.
 
-# wheels config dump
+## wheels config dump
 
 Export Your Full Configuration Snapshot
 `wheels config dump`
@@ -185,7 +185,7 @@ Full visibility into final configuration state
 - Encourages configuration discipline
   It removes ambiguity.
 
-# How These Commands Work Together
+## How These Commands Work Together
 
 Here’s a practical workflow:
 
@@ -205,7 +205,7 @@ Identify environment differences.
 Review the full resolved configuration.
 Together, they form a powerful configuration management toolkit.
 
-# The Bigger Shift in CLI Philosophy
+## The Bigger Shift in CLI Philosophy
 
 Earlier versions of CLI tools focused primarily on:
 
@@ -222,7 +222,7 @@ It’s becoming:
 - A deployment safety layer
   This shift reflects modern development needs. Applications today are not just code. They are configuration-driven systems. And configuration must be inspectable, verifiable, and comparable.
 
-# What This Means for Wheels Developers
+## What This Means for Wheels Developers
 
 With config check, config diff, and config dump, you gain:
 
@@ -235,7 +235,7 @@ With config check, config diff, and config dump, you gain:
 
 But they solve real-world development problems — the kind that cost time, trust, and production stability.
 
-# Conclusion
+## Conclusion
 
 The new configuration commands in Wheels CLI 3.x are small additions — but major upgrades to your workflow.
 

@@ -18,13 +18,13 @@ coverImage: null
 legacyId: '1156663438686814212'
 ---
 
-# Introduction
+## Introduction
 
 In previous articles, we explored how the Wheels CLI helps you manage environments, configuration, and databases safely in Wheels 3.x.
 
 Now we’re stepping into one of the most critical parts of modern development:
 
-# Testing automation.
+## Testing automation.
 
 Writing tests is important. Running them consistently, efficiently, and intelligently is even more important.
 Whether you're:
@@ -49,7 +49,7 @@ wheels test coverage
 
 These commands transform testing from a manual step into a structured development workflow.
 
-# Why CLI-Based Testing Matters
+## Why CLI-Based Testing Matters
 
 Without proper CLI testing tools, developers often:
 
@@ -70,7 +70,7 @@ The Wheels CLI standardizes test execution. It makes testing:
 
 Testing becomes part of your daily workflow — not a separate task.
 
-# wheels test run
+## wheels test run
 
 Run Tests Quickly
 `wheels test run`
@@ -84,7 +84,7 @@ This is your primary test execution command. It runs your default configured tes
 
 It’s your go-to command for daily development.
 
-# wheels test all
+## wheels test all
 
 **Execute Everything**
 `wheels test all`
@@ -104,7 +104,7 @@ Use it when:
 
 This gives you complete confidence before shipping.
 
-# wheels test unit
+## wheels test unit
 
 **Fast, Focused Feedback**
 `wheels test unit`
@@ -131,7 +131,7 @@ Run this when:
 
 Unit tests provide rapid feedback. They should run in seconds.
 
-# wheels test integration
+## wheels test integration
 
 **Test Real Interactions**
 `wheels test integration`
@@ -156,7 +156,7 @@ Use them when:
 
 Integration tests protect against system-level regressions.
 
-# wheels test watch
+## wheels test watch
 
 **Continuous Testing During Development**
 `wheels test watch`
@@ -177,7 +177,7 @@ It encourages:
 
 No more manually re-running tests after every change.
 
-# wheels test coverage
+## wheels test coverage
 
 **Measure Code Coverage**
 `wheels test coverage`
@@ -198,7 +198,7 @@ Coverage helps you:
 
 It transforms testing from reactive to strategic.
 
-# How These Commands Work Together
+## How These Commands Work Together
 
 Here’s a modern development workflow:
 **Daily Development**
@@ -230,7 +230,7 @@ Full confidence check.
 
 Continuous feedback loop. Each command serves a specific purpose. Together, they create a complete testing ecosystem.
 
-# CI/CD Integration
+## CI/CD Integration
 
 These commands are designed to work seamlessly in pipelines:
 
@@ -246,7 +246,7 @@ Add coverage thresholds for quality enforcement:
 
 This makes testing not just a developer tool — but a deployment safeguard.
 
-# The Bigger Picture
+## The Bigger Picture
 
 Older CLI tools focused mainly on scaffolding and generation.
 Wheels 3.x CLI emphasizes:
@@ -267,7 +267,7 @@ Modern development requires:
 
 These testing commands deliver exactly that.
 
-# What This Means for Wheels Developers
+## What This Means for Wheels Developers
 
 With **run**, **all**, **unit**, **integration**, **watch**, and **coverage**, you gain:
 
@@ -280,7 +280,7 @@ With **run**, **all**, **unit**, **integration**, **watch**, and **coverage**, y
 
 Testing stops being optional. It becomes integrated. And when testing becomes effortless, quality naturally improves.
 
-# Conclusion
+## Conclusion
 
 The Wheels CLI testing commands in 3.x bring structure and power to your development workflow:
 
