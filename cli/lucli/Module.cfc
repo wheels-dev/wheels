@@ -123,26 +123,62 @@ component extends="modules.BaseModule" {
 	//  version / help — banner + command listing
 	// ─────────────────────────────────────────────────
 
-	// Produces the same output the brew/choco wrapper emits for `wheels --version`,
-	// so `wheels version` (no leading dashes) reaches the same banner via module
-	// dispatch. See cli/lucli/ARCHITECTURE.md for the two paths.
-	//
-	// Internal callers that want the bare version string use super.version() to
-	// bypass the banner formatting.
+	// Emits the three-line `wheels --version` format the installation guide
+	// documents (Wheels Module + LuCLI runtime + JVM). See
+	// web/sites/guides/.../command-line-tools/installation.mdx for the
+	// canonical output shape; issue #2431 tracked the prior banner output
+	// drifting from the doc.
 	/**
-	 * hint: Show Wheels CLI version and banner
+	 * hint: Show Wheels Module, LuCLI runtime, and JVM versions
 	 */
 	public string function version() {
-		var v = super.version();
 		var nl = chr(10);
-		var banner = "Wheels Version: " & v & nl & nl;
-		banner &= " __        ___               _     " & nl;
-		banner &= " \ \      / / |__   ___  ___| |___ " & nl;
-		banner &= "  \ \ /\ / /| '_ \ / _ \/ _ \ / __|" & nl;
-		banner &= "   \ V  V / | | | |  __/  __/ \__ \" & nl;
-		banner &= "    \_/\_/  |_| |_|\___|\___|_|___/" & nl & nl;
-		banner &= "https://wheels.dev";
-		return banner;
+		var moduleVersion = super.version();
+		var snapshotTag = reFindNoCase("snapshot|dev", moduleVersion) ? " (snapshot)" : "";
+
+		var lines = ["Wheels " & moduleVersion & snapshotTag];
+
+		var lucliVersion = $detectLucliVersion();
+		if (len(lucliVersion)) {
+			arrayAppend(lines, "LuCLI " & lucliVersion);
+		}
+
+		var javaVersion = $detectJavaVersion();
+		if (len(javaVersion)) {
+			arrayAppend(lines, "Java " & javaVersion);
+		}
+
+		return arrayToList(lines, nl);
+	}
+
+	private string function $detectLucliVersion() {
+		try {
+			var sys = createObject("java", "java.lang.System");
+			var v = sys.getProperty("lucli.version");
+			if (!isNull(v) && len(v)) {
+				return v;
+			}
+			v = sys.getenv("LUCLI_VERSION");
+			if (!isNull(v) && len(v)) {
+				return v;
+			}
+		} catch (any e) {
+			// fall through
+		}
+		return "";
+	}
+
+	private string function $detectJavaVersion() {
+		try {
+			var sys = createObject("java", "java.lang.System");
+			var v = sys.getProperty("java.version");
+			if (!isNull(v) && len(v)) {
+				return v;
+			}
+		} catch (any e) {
+			// fall through
+		}
+		return "";
 	}
 
 	// Hand-written replacement for BaseModule's auto-discovered help. Grouped by
