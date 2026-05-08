@@ -511,7 +511,13 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Reload the running Wheels application
+	 * hint: Reload the running Wheels application. The reload password
+	 * gates the HTTP `?reload=true` endpoint against remote attackers;
+	 * the CLI reads it from `.env` or `config/settings.cfm` and forwards
+	 * it because it runs locally with filesystem access. This matches
+	 * how Rails, Laravel, Symfony, etc. treat CLI-vs-HTTP — the CLI is
+	 * already trusted at the same level as the project on disk. See
+	 * issue #2477 and `deployment/security-hardening.mdx`.
 	 */
 	public string function reload() {
 		var serverPort = $requireRunningServer();

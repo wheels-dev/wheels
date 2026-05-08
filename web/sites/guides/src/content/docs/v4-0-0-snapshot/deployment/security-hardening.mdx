@@ -163,6 +163,28 @@ set(reloadPassword=application.wo.env("WHEELS_RELOAD_PASSWORD"));
 
 Rotate it in every environment. The scaffolded template uses `{{reloadPassword}}` as a placeholder the generator fills in (`cli/lucli/templates/app/config/settings.cfm` line 25); replace with an env-var lookup before you ship. Never commit the literal value.
 
+### What it protects (and what it doesn't)
+
+The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, those URLs return 403 unless the attacker also knows the secret.
+
+What it explicitly does **not** gate:
+
+- **`wheels reload` from the CLI.** The CLI runs locally with filesystem access to `.env` and `config/settings.cfm`, reads the password from one of those, and forwards it to the HTTP endpoint as a trusted local proxy. Re-prompting the operator for a password the tool just read from disk would add no security — anyone with that disk read already has the password. This matches how Rails, Laravel, Symfony, Django, and Phoenix treat their CLI/HTTP boundary: the CLI carries owner-of-the-project trust by definition.
+- **`wheels stop && wheels start`.** A full restart goes through LuCLI and never touches the HTTP reload endpoint. The reload password is irrelevant.
+- **Filesystem-level access.** Anyone who can read `config/settings.cfm` (or whatever env file you've pointed it at) sees the password in plaintext. The defence is `chmod` + filesystem ACLs + secret managers, not the password itself.
+
+### Hardening beyond the password
+
+If your threat model needs to defend against compromised disk read or a hostile co-tenant on a shared dev box, gate the actual disk:
+
+- `.env` permissions: `chmod 600 .env` so only the app's UNIX user can read it.
+- Use a secret manager (1Password Connect, AWS Parameter Store, Doppler) to inject `WHEELS_RELOAD_PASSWORD` at process start; never write it to disk in the first place.
+- For the HTTP endpoint specifically, layer a network ACL: bind the dev server to `127.0.0.1` only, or front it with a reverse proxy that requires VPN-side IPs for the reload path.
+
+The password is the cheapest of these — it's a single defence-in-depth layer against opportunistic remote scans. It's not a substitute for keeping the secret out of attacker-readable storage.
+
+See issue [#2477](https://github.com/wheels-dev/wheels/issues/2477) for the full Rails / Laravel comparison that informed this design.
+
 ## Secret management
 
 Keep every runtime secret out of source control:
