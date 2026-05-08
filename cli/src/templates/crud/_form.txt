@@ -1,7 +1,11 @@
 <cfparam name="|ObjectNameSingular|" default="">
 <cfoutput>
 #errorMessagesFor("|ObjectNameSingular|")#
-#startFormTag(action=IsNumeric(|ObjectNameSingular|.id ?: "") ? "update" : "create", key=|ObjectNameSingular|.id ?: "")#
+<cfif IsNumeric(|ObjectNameSingular|.id ?: "")>
+	#startFormTag(action="update", key=|ObjectNameSingular|.id, method="patch")#
+<cfelse>
+	#startFormTag(action="create")#
+</cfif>
 	|FormFields|
 	<button type="submit">Save</button>
 #endFormTag()#
