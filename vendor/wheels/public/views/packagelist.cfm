@@ -161,8 +161,11 @@ for (local.key in packageMeta) {
 								<span class="ui label"><i class="check icon"></i> Installed</span>
 							<cfelse>
 								<!--- rp.name is registry-schema-constrained to ^[a-z0-9][a-z0-9-]*$, so both id and JS string are already safe.
-								      JSStringFormat() is applied in the onclick defensively in case that invariant ever loosens. --->
-								<code id="install-#HTMLEditFormat(local.rpKey)#">wheels packages install #HTMLEditFormat(local.rp.name)#</code>
+								      JSStringFormat() is applied in the onclick defensively in case that invariant ever loosens.
+								      `add` (not `install`) is the canonical verb — LuCLI's built-in extension
+								      installer intercepts the literal subcommand `install`, so `wheels packages
+								      install <name>` never reaches Module.cfc. See PR #2374 / cli/lucli/services/packages/PackagesMainCli.cfc. --->
+								<code id="install-#HTMLEditFormat(local.rpKey)#">wheels packages add #HTMLEditFormat(local.rp.name)#</code>
 								<button type="button"
 									class="ui tiny button"
 									aria-label="Copy install command for #HTMLEditFormat(local.rp.name)#"
