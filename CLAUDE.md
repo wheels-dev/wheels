@@ -382,9 +382,9 @@ Use the `wheels packages` CLI. Resolves names against the `wheels-dev/wheels-pac
 wheels packages list                          # browse the registry
 wheels packages search <query>                # name/description/tag match
 wheels packages show <name>                   # detail page
-wheels packages install <name>                # latest compat version
-wheels packages install <name>@<version>      # pin
-wheels packages install <name> --force        # overwrite an existing vendor/<name>
+wheels packages add <name>                    # latest compat version (canonical verb)
+wheels packages add <name>@<version>          # pin
+wheels packages add <name> --force            # overwrite an existing vendor/<name>
 wheels packages update <name> --yes           # explicit update
 wheels packages update --all --yes            # update every installed package
 wheels packages remove <name>                 # delete vendor/<name>
