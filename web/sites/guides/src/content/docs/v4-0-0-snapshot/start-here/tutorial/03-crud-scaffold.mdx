@@ -76,9 +76,10 @@ Drop the hand-written controller and views. The model, migration, seed file, and
 
 ```bash title="your shell"
 wheels destroy Posts controller --force
+wheels destroy Posts view --force
 ```
 
-The argument order is `<name> [type]` — `Posts controller`, not `controller Posts`. The `--force` flag skips the interactive confirmation; without it, `destroy` prints `Use --force to confirm deletion.` and exits without touching anything. If you'd rather skip the CLI and remove the files yourself:
+The argument order is `<name> [type]` — `Posts controller`, not `controller Posts`. `destroy controller` removes the controller `.cfc` and its spec; `destroy view` removes the views directory. They're separate commands so you can scope each cleanup independently — e.g. `destroy controller` alone if you want to keep your views intact while rewriting the controller. The `--force` flag skips the interactive confirmation; without it, `destroy` prints `Use --force to confirm deletion.` and exits without touching anything. If you'd rather skip the CLI and remove the files yourself:
 
 ```bash title="your shell"
 rm app/controllers/Posts.cfc

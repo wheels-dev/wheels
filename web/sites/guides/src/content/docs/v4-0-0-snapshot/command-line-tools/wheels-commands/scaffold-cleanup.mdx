@@ -63,7 +63,7 @@ wheels destroy Post
 wheels destroy Post --force
 ```
 
-The second command removes `app/models/Post.cfc`, `app/controllers/Posts.cfc`, `app/views/posts/`, `tests/specs/models/PostSpec.cfc`, `tests/specs/controllers/PostsSpec.cfc`, `tests/specs/views/posts/`, and the `.resources("posts")` line from `config/routes.cfm`. It also writes a new `<timestamp>_remove_posts_table.cfc` migration into `app/migrator/migrations/` — you still need to run `wheels migrate latest` to actually drop the table from the database.
+The second command removes `app/models/Post.cfc`, `app/controllers/Posts.cfc`, `app/views/posts/`, `tests/specs/models/PostSpec.cfc`, `tests/specs/controllers/PostsControllerSpec.cfc`, `tests/specs/views/posts/`, and the `.resources("posts")` line from `config/routes.cfm`. It also writes a new `<timestamp>_remove_posts_table.cfc` migration into `app/migrator/migrations/` — you still need to run `wheels migrate latest` to actually drop the table from the database.
 
 ## Safety notes
 
@@ -71,7 +71,8 @@ The second command removes `app/models/Post.cfc`, `app/controllers/Posts.cfc`, `
 - Commit your work before running `destroy`. Deleted files are gone — `destroy` does not move them to a backup directory.
 - Run `destroy` without `--force` first and read the preview. The command always lists what it would delete before doing anything.
 - `destroy model` and `destroy resource` generate a drop-table migration but do **not** execute it. Your database schema is unchanged until you run `wheels migrate latest`. If you want the schema back the way it was, delete the generated migration file before migrating.
-- `destroy` removes whole view directories by default. Pass a `controller/action` path to `destroy view` when you only want a single template deleted.
+- `destroy resource` (the default form, no type) removes the views directory. `destroy controller` does NOT — it deletes only the controller `.cfc` and its spec, so a hand-written partial in `app/views/<name>/` is left in place. Use `destroy view` (or the resource form) when you want the views gone.
+- Pass a `controller/action` path to `destroy view` when you only want a single template deleted instead of the whole directory.
 - Files not found are reported as skipped, not errors — `destroy` succeeds even if the files you asked about were already gone.
 </Aside>
 
