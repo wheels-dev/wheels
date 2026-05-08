@@ -11,7 +11,7 @@
 	* View |ObjectNameSingularC|
 	**/
 	function show() {
-		|ObjectNameSingular|=params.|ObjectNameSingular|;
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
 	}
 
 	/**
@@ -37,14 +37,14 @@
 	* Edit |ObjectNameSingularC|
 	**/
 	function edit() {
-		|ObjectNameSingular|=params.|ObjectNameSingular|;
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
 	}
 
 	/**
 	* Update |ObjectNameSingularC|
 	**/
 	function update() {
-		|ObjectNameSingular|=params.|ObjectNameSingular|;
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
 		if(|ObjectNameSingular|.update(params.|ObjectNameSingular|)){
 			redirectTo(route="|ObjectNameSingular|", key=|ObjectNameSingular|.id);
 		} else {
@@ -56,7 +56,7 @@
 	* Delete |ObjectNameSingularC|
 	**/
 	function delete() {
-		|ObjectNameSingular|=params.|ObjectNameSingular|;
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
 		|ObjectNameSingular|.delete();
 		redirectTo(route="|ObjectNamePlural|");
 	}
