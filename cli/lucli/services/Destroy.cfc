@@ -100,31 +100,36 @@ component {
 	}
 
 	/**
-	 * Destroy a controller, its views, and its test.
+	 * Destroy a controller and its test.
 	 *
-	 * Uses the input name verbatim (just capitalised for the filename), to
-	 * mirror how `wheels generate controller <Name>` writes the file. The
-	 * previous implementation pluralised + lowercased + recapitalised, so
-	 * `wheels destroy WidgetTest controller` looked for `Widgettests.cfc`
-	 * — which was never created. See issue #2330 and the related
-	 * name-mangling side-finding.
+	 * Type-scoped destroy: removes only the controller .cfc and its
+	 * spec. Views are intentionally left in place — to clean up the
+	 * controller AND its views together, run `wheels destroy <Name>`
+	 * (no type), which calls `destroyResource` and cascades model +
+	 * controller + views + tests + route + drop-table migration.
+	 *
+	 * Earlier behaviour (#2330) cascaded views from this command too,
+	 * but #2493 surfaced the Rails-style over-delete risk: a
+	 * hand-written partial inside `app/views/<name>/` would be wiped
+	 * by `destroy controller` even though the user never asked for
+	 * views to be touched. The split form (resource-level destroy =
+	 * cascade, type-level destroy = scoped) matches the Laravel
+	 * artisan-destroy convention.
+	 *
+	 * Uses the input name verbatim (just capitalised for the filename),
+	 * to mirror how `wheels generate controller <Name>` writes the
+	 * file. The previous implementation pluralised + lowercased +
+	 * recapitalised, so `wheels destroy WidgetTest controller` looked
+	 * for `Widgettests.cfc` — which was never created. See issue
+	 * #2330 and the related name-mangling side-finding.
 	 */
 	public struct function destroyController(required string name) {
 		var result = {success: true, deleted: [], warnings: []};
 		var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
 		var controllerCap = variables.helpers.capitalize(clean);
-		var viewsDir = lCase(controllerCap);
 
 		deleteFileIfExists(
 			variables.projectRoot & "/app/controllers/" & controllerCap & ".cfc",
-			result
-		);
-		// Views directory is generated alongside the controller; destroy
-		// removes it too. Issue #2330: previously views were left behind,
-		// making `wheels generate scaffold` over the same name fail with
-		// orphaned partial state.
-		deleteDirIfExists(
-			variables.projectRoot & "/app/views/" & viewsDir,
 			result
 		);
 		deleteFileIfExists(
@@ -195,11 +200,13 @@ component {
 			case "controller":
 				// Controller destroy uses the input verbatim (matching how
 				// `generate controller` writes the file), not the pluralised
-				// name. Views directory comes along too.
+				// name. Views are intentionally NOT included here — the
+				// type-scoped form deletes only the named type. For a full
+				// resource teardown including views, run
+				// `wheels destroy <Name>` (no type). See issue #2493.
 				var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
 				var controllerCap = variables.helpers.capitalize(clean);
 				arrayAppend(preview, "app/controllers/" & controllerCap & ".cfc");
-				arrayAppend(preview, "app/views/" & lCase(controllerCap) & "/");
 				arrayAppend(preview, "tests/specs/controllers/" & controllerCap & "ControllerSpec.cfc");
 				break;
 			case "view":

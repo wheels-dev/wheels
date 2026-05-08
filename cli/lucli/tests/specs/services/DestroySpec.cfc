@@ -50,7 +50,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			describe("destroyController()", () => {
 
-				it("deletes controller, views directory, and test files (##2330)", () => {
+				it("deletes controller and test files but NOT views (##2493)", () => {
 					var controllerPath = tempRoot & "/app/controllers/Deletemes.cfc";
 					var viewsDir = tempRoot & "/app/views/deletemes";
 					// Generator writes <name>ControllerSpec.cfc (CodeGen.cfc
@@ -64,13 +64,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					fileWrite(controllerPath, 'component extends="Controller" {}');
 					fileWrite(testPath, 'component {}');
 
-					// Input matches the controller filename verbatim — destroy
-					// no longer pluralises (which used to produce wrong target
-					// filenames for non-conventional names; see #2330).
+					// Type-scoped destroy is intentionally narrow: only the
+					// named type goes. Views stay. Use `destroy <Name>` (no
+					// type) for the resource-level cascade.
 					var result = destroy.destroyController("Deletemes");
 					expect(fileExists(controllerPath)).toBeFalse();
-					expect(directoryExists(viewsDir)).toBeFalse();
 					expect(fileExists(testPath)).toBeFalse();
+					expect(directoryExists(viewsDir)).toBeTrue();
+					expect(fileExists(viewsDir & "/index.cfm")).toBeTrue();
+				});
+
+				it("preserves hand-written partials in the views dir (##2493)", () => {
+					// Rails-style over-delete regression: an unrelated file
+					// inside app/views/<name>/ that the user authored by hand
+					// must NOT be touched by `destroy controller`.
+					var controllerPath = tempRoot & "/app/controllers/Posts.cfc";
+					var viewsDir = tempRoot & "/app/views/posts";
+					var handwrittenPartial = viewsDir & "/_custom_widget.cfm";
+					directoryCreate(getDirectoryFromPath(controllerPath), true, true);
+					directoryCreate(viewsDir, true, true);
+					fileWrite(controllerPath, 'component extends="Controller" {}');
+					fileWrite(handwrittenPartial, "<cfoutput>handcrafted</cfoutput>");
+
+					destroy.destroyController("Posts");
+					expect(fileExists(controllerPath)).toBeFalse();
+					expect(fileExists(handwrittenPartial)).toBeTrue();
 				});
 
 				it("preserves PascalCase for non-conventional names (##2330 side-finding)", () => {
@@ -78,14 +96,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					// recapitalised, mangling `WidgetTest` into `Widgettests`
 					// which never matched the actually-generated file.
 					var controllerPath = tempRoot & "/app/controllers/WidgetTest.cfc";
-					var viewsDir = tempRoot & "/app/views/widgettest";
 					directoryCreate(getDirectoryFromPath(controllerPath), true, true);
-					directoryCreate(viewsDir, true, true);
 					fileWrite(controllerPath, 'component extends="Controller" {}');
 
 					var result = destroy.destroyController("WidgetTest");
 					expect(fileExists(controllerPath)).toBeFalse();
-					expect(directoryExists(viewsDir)).toBeFalse();
 				});
 
 				it("does not generate a migration", () => {
@@ -182,14 +197,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayToList(preview)).toInclude("drop table");
 				});
 
-				it("returns expected items for controller type (##2330)", () => {
-					// 3 items: controller .cfc, views/ directory, controller spec.
-					// Issue #2330 added the views directory to controller destroy.
+				it("returns controller and spec only — views excluded (##2493)", () => {
+					// Type-scoped controller destroy is narrow: only the
+					// controller .cfc and its spec. Views are explicitly NOT
+					// previewed because they're not deleted. The resource
+					// form (previewDestroy("Products", "resource")) covers
+					// the cascade case.
 					var preview = destroy.previewDestroy("Products", "controller");
-					expect(arrayLen(preview)).toBe(3);
+					expect(arrayLen(preview)).toBe(2);
 					expect(arrayToList(preview)).toInclude("Products.cfc");
-					expect(arrayToList(preview)).toInclude("app/views/products/");
 					expect(arrayToList(preview)).toInclude("ProductsControllerSpec.cfc");
+					expect(arrayToList(preview)).notToInclude("app/views/products/");
 				});
 
 			});
