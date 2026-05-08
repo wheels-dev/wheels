@@ -409,6 +409,7 @@ component extends="modules.BaseModule" {
 		var ciMode = false;
 		var coreTests = false;
 		var db = "sqlite";
+		var dbExplicit = false;
 		var useTestDB = true;
 
 		// Parse named arguments from --key=value or --key value
@@ -434,8 +435,10 @@ component extends="modules.BaseModule" {
 				reporter = valueAfterEquals(arg);
 			} else if (arg == "--db" && i < arrayLen(args)) {
 				db = args[++i];
+				dbExplicit = true;
 			} else if (reFindNoCase("^--db=", arg)) {
 				db = valueAfterEquals(arg);
+				dbExplicit = true;
 			} else if (arg == "--verbose" || arg == "-v") {
 				verboseOutput = true;
 			} else if (arg == "--ci") {
@@ -467,7 +470,7 @@ component extends="modules.BaseModule" {
 		// expects. Onboarding finding #2.
 		filter = $normalizeTestFilter(filter, coreTests);
 
-		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB);
+		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit);
 	}
 
 	/**
@@ -3685,7 +3688,8 @@ component extends="modules.BaseModule" {
 		boolean coreTests = false,
 		string db = "sqlite",
 		boolean ciMode = false,
-		boolean useTestDB = true
+		boolean useTestDB = true,
+		boolean dbExplicit = false
 	) {
 		var serverPort = $requireRunningServer([
 			"Start one with: wheels start",
@@ -3693,7 +3697,34 @@ component extends="modules.BaseModule" {
 		]);
 
 		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
-		out("Running #(coreTests ? 'core' : 'app')# tests (#db#)...", "cyan");
+
+		// Print the suite type with a truthful datasource label. Issue #2489:
+		// the previous output echoed `--db` even for app tests where the
+		// framework's app-runner ignores `url.db` and uses the user's
+		// configured datasource (or `<datasource>_test` when --useTestDB).
+		// That misled users into thinking app tests had run against the
+		// engine they passed.
+		//
+		// `--db` is honoured only for `--core` (the framework's matrix self-
+		// test, where `wheelstestdb_<db>` is wired up across engines). For
+		// app tests, surface the real source-of-truth instead and warn if
+		// the user explicitly passed --db.
+		if (coreTests) {
+			out("Running core tests (#db#)...", "cyan");
+		} else {
+			var resolvedDataSource = $resolveAppTestDataSource(useTestDB);
+			out("Running app tests (#resolvedDataSource#)...", "cyan");
+			if (dbExplicit) {
+				out("", "yellow");
+				out("Warning: --db only applies to --core tests; ignoring for the app suite.", "yellow");
+				out("App tests run against the configured app datasource (or", "yellow");
+				out("<datasource>_test when --useTestDB is set). To test against a different", "yellow");
+				out("engine, point your app's datasource env var at it (or use --core).", "yellow");
+				out("See: command-line-tools/wheels-commands/testing#testing-against-different-engines", "yellow");
+				out("", "yellow");
+			}
+		}
+
 		if (len(filter)) {
 			// Surface the resolved filter so users see what the auto-prefix
 			// (`browser` → `tests.specs.browser`) actually scoped to. Also
@@ -4977,6 +5008,51 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	/**
+	 * Resolve the datasource label app tests will actually run against.
+	 *
+	 * Mirrors `vendor/wheels/tests/app-runner.cfm`'s logic: when `useTestDB`
+	 * is true the runner swaps to `<base>_test` if that datasource is
+	 * registered, otherwise it falls back to the configured base. We can't
+	 * see Lucee's registered-datasources list from this side cheaply, so we
+	 * report the optimistic label (`<base>_test`) when useTestDB is on and
+	 * the bare base otherwise. Used by `runTests` (#2489) so the CLI's
+	 * preamble shows the truth instead of echoing `--db`.
+	 *
+	 * Detection order matches `detectReloadPassword`: .env first, then
+	 * `config/settings.cfm`. Returns "(unknown)" if neither yields a name —
+	 * a label, not a fatal error, so the run still proceeds.
+	 */
+	private string function $resolveAppTestDataSource(boolean useTestDB = true) {
+		var base = "";
+
+		var envFile = variables.projectRoot & "/.env";
+		if (fileExists(envFile)) {
+			var envContent = fileRead(envFile);
+			var match = reFindNoCase("DATASOURCE_NAME\s*=\s*(.+)", envContent, 1, true);
+			if (arrayLen(match.match) > 1 && len(trim(match.match[2]))) {
+				base = trim(match.match[2]);
+			}
+		}
+
+		if (!len(base)) {
+			var settingsFile = variables.projectRoot & "/config/settings.cfm";
+			if (fileExists(settingsFile)) {
+				var settingsContent = fileRead(settingsFile);
+				var settingsMatch = reFindNoCase('dataSourceName\s*=\s*"([^"]*)"', settingsContent, 1, true);
+				if (arrayLen(settingsMatch.match) > 1 && len(trim(settingsMatch.match[2]))) {
+					base = trim(settingsMatch.match[2]);
+				}
+			}
+		}
+
+		if (!len(base)) {
+			return "(unknown)";
+		}
+
+		return arguments.useTestDB ? base & "_test" : base;
 	}
 
 	/**

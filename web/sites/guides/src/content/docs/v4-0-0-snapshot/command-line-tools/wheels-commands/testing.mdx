@@ -54,24 +54,29 @@ A bare positional argument is treated as the filter directory — `wheels test m
 
 | Flag | Description |
 |---|---|
-| `--filter=<dir>` | Substring or path match against spec directories. Narrows the run to a subset (e.g., `models`, `controller`, `browser`). |
-| `--db=<engine>` | Database engine to run against. Defaults to `sqlite`. See the valid values below. |
-| `--reporter=<name>` | Accepted but currently not consumed — the output format is fixed. Reserved for a future reporter surface. |
+| `--filter=<dir>` | Substring or path match against spec directories. Narrows the run to a subset (e.g., `models`, `controller`, `browser`). Bare names are auto-prefixed (`models` → `tests.specs.models`). Also accepted as a positional arg. |
+| `--db=<engine>` | Database engine for `--core` matrix runs only. Ignored for app tests (with a warning) — see [below](#testing-against-different-engines). |
+| `--reporter=<name>` | `simple` (default, colourful), `json` (raw runner JSON), `tap` (TAP v13 for CI consumers). |
 | `--verbose`, `-v` | Print per-spec output instead of the summary line. |
 | `--ci` | CI mode: tightens exit codes and output for GitHub Actions and similar runners. |
-| `--core` | Force core framework tests (`vendor/wheels/tests/`). Auto-detected when `vendor/wheels/` is present, so you rarely need this explicitly. |
+| `--core` | Run framework self-tests (`vendor/wheels/tests/specs/`) instead of your app suite. App tests are the default; `--core` is the explicit opt-in. |
+| `--no-test-db` | Disable the auto-swap to `<datasource>_test`. App tests run against your dev datasource, with whatever data is already in it. |
 
-#### Valid `--db` values
+#### `--db` is for `--core` runs only
 
-| Value | Engine |
-|---|---|
-| `sqlite` | SQLite (default; no external server) |
-| `h2` | H2 (embedded) |
-| `mysql` | MySQL |
-| `postgres` | PostgreSQL |
-| `sqlserver` | Microsoft SQL Server |
-| `oracle` | Oracle |
-| `cockroachdb` | CockroachDB |
+The framework's matrix self-tests (`--core`) wire up a `wheelstestdb_<engine>` datasource per supported engine — that's what `--db` selects between. App tests don't have an analogous matrix because your app has one configured datasource at a time, and switching mid-run would break test isolation. This matches the convention every comparable framework uses (Rails reads `DATABASE_URL`, Laravel uses `phpunit.xml` `<env>` blocks, Symfony uses `APP_ENV=test`, etc.) — DB selection is a process-level decision, not a per-invocation flag.
+
+If you pass `--db` to an app run, the CLI prints a warning and ignores it. The preamble shows the actual datasource the suite will run against (`<your-datasource>_test` by default, or your bare datasource with `--no-test-db`).
+
+| Value | Engine | Where used |
+|---|---|---|
+| `sqlite` | SQLite (default; no external server) | `--core` only |
+| `h2` | H2 (embedded) | `--core` only (Lucee only) |
+| `mysql` | MySQL | `--core` only |
+| `postgres` | PostgreSQL | `--core` only |
+| `sqlserver` | Microsoft SQL Server | `--core` only |
+| `oracle` | Oracle | `--core` only |
+| `cockroachdb` | CockroachDB | `--core` only |
 
 <Aside type="caution" title="Name gotchas">
 The engine identifiers are `postgres` (not `postgresql`) and `sqlserver` (not `mssql`). Anything else is rejected by the runner.
@@ -80,10 +85,32 @@ The engine identifiers are `postgres` (not `postgresql`) and `sqlserver` (not `m
 #### Example
 
 ```bash title="example"
-wheels test --filter=models --db=sqlite --verbose
+wheels test --filter=models --verbose
 ```
 
-Runs every spec under a directory matching `models`, against SQLite, with per-spec output. Exit code is non-zero if any spec fails or errors.
+Runs every spec under `tests/specs/models/` with per-spec output. Exit code is non-zero if any spec fails or errors.
+
+#### Testing against different engines
+
+App tests run against your project's configured datasource. To run the same suite against a different engine, register a second datasource in your engine (Lucee admin, Adobe CF Administrator, BoxLang config) and point your app at it via the env var your `config/settings.cfm` already reads. For example:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(dataSourceName=application.wo.env("WHEELS_DATASOURCE", "myapp"));
+</cfscript>
+```
+
+```bash title="run against MySQL"
+WHEELS_DATASOURCE=myapp_mysql wheels test
+```
+
+```bash title="run against the framework's matrix"
+wheels test --core --db=mysql
+```
+
+This mirrors how Rails (`DATABASE_URL=...`), Laravel (`DB_CONNECTION=...`), Symfony (`APP_ENV=test`), Django (`DJANGO_SETTINGS_MODULE`), and Phoenix (`MIX_ENV`) handle multi-engine testing — the engine choice is a process-level concern, not a per-invocation CLI flag. A flag would force the framework to reload the datasource pool mid-run, which breaks transactional test isolation.
+
+For full-matrix CI (every engine × every database), see [`tools/test-matrix.sh`](../../../testing/ci-integration/) — it spins up the engine + DB containers and invokes the test endpoint per cell.
 
 ### `wheels browser install`
 
