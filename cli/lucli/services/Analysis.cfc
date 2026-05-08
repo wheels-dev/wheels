@@ -90,20 +90,29 @@ component {
 	public struct function validate() {
 		var issues = [];
 
-		// Check model associations
+		// Check model associations. Skip the framework's parent Model.cfc —
+		// it intentionally extends "wheels.Model" rather than "Model", since
+		// it IS the parent that user models inherit from.
 		var modelsDir = variables.projectRoot & "/app/models";
 		if (directoryExists(modelsDir)) {
 			var models = directoryList(modelsDir, false, "path", "*.cfc");
 			for (var modelFile in models) {
+				if (listLast(modelFile, "/\") == "Model.cfc") {
+					continue;
+				}
 				issues.addAll(validateModel(modelFile));
 			}
 		}
 
-		// Check controller conventions
+		// Check controller conventions. Skip the framework's parent
+		// Controller.cfc for the same reason as Model.cfc above.
 		var controllersDir = variables.projectRoot & "/app/controllers";
 		if (directoryExists(controllersDir)) {
 			var controllers = directoryList(controllersDir, false, "path", "*.cfc");
 			for (var ctrlFile in controllers) {
+				if (listLast(ctrlFile, "/\") == "Controller.cfc") {
+					continue;
+				}
 				issues.addAll(validateController(ctrlFile));
 			}
 		}
