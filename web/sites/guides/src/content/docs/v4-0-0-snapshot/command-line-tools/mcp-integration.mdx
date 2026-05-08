@@ -60,7 +60,7 @@ Every public function in the Wheels Module is auto-discovered as an MCP tool, pr
 | Tool | Purpose |
 |---|---|
 | `wheels_generate` | Scaffold a model, controller, view, migration, scaffold, route, test, property, or helper. |
-| `wheels_destroy` | Remove a previously generated component and its associated files. |
+| `wheels_destroy` | Remove a previously generated component. The default `resource` type cascades (model + controller + views + tests + route + drop-table migration); `model`, `controller`, and `view` are scoped to that artefact only. |
 | `wheels_migrate` | Run, roll back, or inspect database migrations. |
 | `wheels_seed` | Run convention-based seeds against the configured environment. |
 | `wheels_db` | Database utility operations (schema, reset, status). |
