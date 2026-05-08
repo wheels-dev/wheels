@@ -106,7 +106,7 @@ local.manifest = local.meta.manifest;
 
 		<!--- Show test link if package has tests --->
 		<cfif DirectoryExists(expandPath("/vendor/#LCase(local.pkgName)#/tests"))>
-			<a class="ui button" href="#urlFor(route='testbox')#&directory=vendor.#LCase(local.pkgName)#.tests">
+			<a class="ui button" href="#urlFor(route='testbox', params='directory=vendor.#LCase(local.pkgName)#.tests')#">
 				Run Package Tests
 			</a>
 		</cfif>
