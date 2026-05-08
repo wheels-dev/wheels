@@ -53,7 +53,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("deletes controller, views directory, and test files (##2330)", () => {
 					var controllerPath = tempRoot & "/app/controllers/Deletemes.cfc";
 					var viewsDir = tempRoot & "/app/views/deletemes";
-					var testPath = tempRoot & "/tests/specs/controllers/DeletemesSpec.cfc";
+					// Generator writes <name>ControllerSpec.cfc (CodeGen.cfc
+					// suffix = "ControllerSpec"); destroy must use the same
+					// name. See issue ##2492.
+					var testPath = tempRoot & "/tests/specs/controllers/DeletemesControllerSpec.cfc";
 					directoryCreate(getDirectoryFromPath(controllerPath), true, true);
 					directoryCreate(viewsDir, true, true);
 					fileWrite(viewsDir & "/index.cfm", "<p>i</p>");
@@ -100,7 +103,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var controllerPath = tempRoot & "/app/controllers/Widgets.cfc";
 					var viewsDir = tempRoot & "/app/views/widgets";
 					var modelTestPath = tempRoot & "/tests/specs/models/WidgetSpec.cfc";
-					var controllerTestPath = tempRoot & "/tests/specs/controllers/WidgetsSpec.cfc";
+					var controllerTestPath = tempRoot & "/tests/specs/controllers/WidgetsControllerSpec.cfc";
 					var viewTestsDir = tempRoot & "/tests/specs/views/widgets";
 
 					directoryCreate(getDirectoryFromPath(modelPath), true, true);
@@ -186,7 +189,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayLen(preview)).toBe(3);
 					expect(arrayToList(preview)).toInclude("Products.cfc");
 					expect(arrayToList(preview)).toInclude("app/views/products/");
-					expect(arrayToList(preview)).toInclude("ProductsSpec.cfc");
+					expect(arrayToList(preview)).toInclude("ProductsControllerSpec.cfc");
 				});
 
 			});

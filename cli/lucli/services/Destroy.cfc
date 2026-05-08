@@ -48,9 +48,11 @@ component {
 			result
 		);
 
-		// Controller test
+		// Controller test. The generator writes <Plural>ControllerSpec.cfc
+		// (see CodeGen.cfc::generateTest where the controller suffix is
+		// "ControllerSpec"), so destroy must look for the matching name.
 		deleteFileIfExists(
-			variables.projectRoot & "/tests/specs/controllers/" & names.pluralCap & "Spec.cfc",
+			variables.projectRoot & "/tests/specs/controllers/" & names.pluralCap & "ControllerSpec.cfc",
 			result
 		);
 
@@ -126,7 +128,7 @@ component {
 			result
 		);
 		deleteFileIfExists(
-			variables.projectRoot & "/tests/specs/controllers/" & controllerCap & "Spec.cfc",
+			variables.projectRoot & "/tests/specs/controllers/" & controllerCap & "ControllerSpec.cfc",
 			result
 		);
 
@@ -180,7 +182,7 @@ component {
 				arrayAppend(preview, "app/controllers/" & names.pluralCap & ".cfc");
 				arrayAppend(preview, "app/views/" & names.plural & "/");
 				arrayAppend(preview, "tests/specs/models/" & names.singularCap & "Spec.cfc");
-				arrayAppend(preview, "tests/specs/controllers/" & names.pluralCap & "Spec.cfc");
+				arrayAppend(preview, "tests/specs/controllers/" & names.pluralCap & "ControllerSpec.cfc");
 				arrayAppend(preview, "tests/specs/views/" & names.plural & "/");
 				arrayAppend(preview, 'Route: .resources("' & names.plural & '") from config/routes.cfm');
 				arrayAppend(preview, "Migration: drop table " & names.plural);
@@ -198,7 +200,7 @@ component {
 				var controllerCap = variables.helpers.capitalize(clean);
 				arrayAppend(preview, "app/controllers/" & controllerCap & ".cfc");
 				arrayAppend(preview, "app/views/" & lCase(controllerCap) & "/");
-				arrayAppend(preview, "tests/specs/controllers/" & controllerCap & "Spec.cfc");
+				arrayAppend(preview, "tests/specs/controllers/" & controllerCap & "ControllerSpec.cfc");
 				break;
 			case "view":
 				if (find("/", arguments.name)) {
