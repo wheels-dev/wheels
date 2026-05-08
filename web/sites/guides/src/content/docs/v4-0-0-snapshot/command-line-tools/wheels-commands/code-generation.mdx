@@ -47,7 +47,9 @@ Running `wheels generate` with no arguments prints the list of supported types a
 
 ## Attribute syntax
 
-Most generators accept a trailing list of `name:type` property pairs after the resource name. The parser also recognises a few `--belongsTo=`, `--hasMany=`, and `--hasOne=` flags for associations. Type names are normalised to Wheels migration column types — unknown types fall back to `string`.
+Property-aware generators — `model`, `scaffold`, `api-resource`, and `property` — accept a trailing list of `name:type` property pairs after the resource name. They also recognise `--belongsTo=`, `--hasMany=`, and `--hasOne=` flags for associations. Type names are normalised to Wheels migration column types — unknown types fall back to `string`.
+
+The other generators (`controller`, `view`, `migration`, `route`, `test`, `helper`, `snippets`, `admin`) take their own positional arguments — see the per-subcommand Synopsis sections below for what each accepts.
 
 | You write | Column type | Notes |
 |---|---|---|
