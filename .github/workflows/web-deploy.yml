@@ -122,45 +122,57 @@ jobs:
         working-directory: web
         run: pnpm build
 
-      - name: Run visual regression
-        id: regress
-        continue-on-error: true
-        working-directory: web
-        run: pnpm visual:test
-
-      - name: Detect content-only push
+      # The blog index page is content-driven — new articles appear on it
+      # automatically — so the blog baseline is *expected* to drift whenever
+      # any file under web/content/blog/posts/ changes. Detect that here and
+      # pre-refresh the blog baseline before the regression test runs, so
+      # mixed commits (blog content alongside CLI / guides / etc.) don't
+      # surface the expected blog drift as a "real regression."
+      - name: Detect blog content change
         id: scope
-        if: steps.regress.outcome == 'failure' && github.event_name == 'push'
+        if: github.event_name == 'push'
         run: |
           set -euo pipefail
           # `changed` comes from git itself (file paths under version
           # control), not from user-controlled event metadata, so it's
           # safe to grep over without further sanitization.
           changed=$(git diff --name-only HEAD~1..HEAD)
-          non_content=$(echo "$changed" | grep -v -E '^web/content/blog/posts/' || true)
-          if [ -z "$non_content" ]; then
-            echo "content_only=true" >> "$GITHUB_OUTPUT"
-            echo "All changes under web/content/blog/posts/ — will auto-refresh baseline."
+          if echo "$changed" | grep -qE '^web/content/blog/posts/'; then
+            echo "blog_content_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Blog content changed — will pre-refresh blog baseline before regression."
           else
-            echo "content_only=false" >> "$GITHUB_OUTPUT"
-            echo "Non-content files changed; treating regression failure as real."
-            echo "$non_content"
+            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
+            echo "No blog content changes detected."
           fi
 
-      - name: Auto-refresh blog baseline
-        if: steps.regress.outcome == 'failure' && steps.scope.outputs.content_only == 'true'
+      - name: Pre-refresh blog baseline before regression test
+        if: steps.scope.outputs.blog_content_changed == 'true'
         working-directory: web
         run: node scripts/visual-regression.mjs --update --site blog
 
-      - name: Commit and push refreshed baseline
-        if: steps.regress.outcome == 'failure' && steps.scope.outputs.content_only == 'true'
+      - name: Run visual regression
+        id: regress
+        continue-on-error: true
+        working-directory: web
+        run: pnpm visual:test
+
+      # Commit the pre-refreshed baseline only when the regression test
+      # passed for all pages. If a non-blog page regressed, we don't want
+      # to commit an updated blog baseline that might mask a real regression
+      # elsewhere — investigators can see the failure with the un-committed
+      # refreshed blog.png in the diffs artifact and update baselines once
+      # the non-blog regression is fixed.
+      - name: Commit pre-refreshed blog baseline
+        if: |
+          steps.scope.outputs.blog_content_changed == 'true' &&
+          steps.regress.outcome == 'success'
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add web/tests/visual-baselines/blog.png
           if git diff --cached --quiet; then
-            echo "Baseline did not actually change after refresh — exiting clean."
+            echo "Baseline did not actually change after pre-refresh — exiting clean."
             exit 0
           fi
           # [skip ci] keeps this push from re-triggering the deploy
@@ -169,9 +181,16 @@ jobs:
           git push origin HEAD:develop
 
       - name: Fail job on real regression
-        if: steps.regress.outcome == 'failure' && steps.scope.outputs.content_only != 'true'
+        if: steps.regress.outcome == 'failure'
+        env:
+          BLOG_CONTENT_CHANGED: ${{ steps.scope.outputs.blog_content_changed }}
         run: |
-          echo "Visual regression failed on changes that include non-content files."
+          echo "Visual regression failed."
+          if [ "$BLOG_CONTENT_CHANGED" = "true" ]; then
+            echo "Note: the blog baseline was pre-refreshed for this run, so any"
+            echo "[blog] failure here would be a mismatch separate from content drift."
+            echo "Failure is most likely on another page."
+          fi
           echo "Download the visual-regression-diffs artifact and update baselines as needed."
           exit 1
 
