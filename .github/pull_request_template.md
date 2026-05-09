@@ -32,3 +32,6 @@ Closes #
 ## Screenshots / Output
 
 <!-- If applicable -->
+
+<!-- wheels-bot opt-out: add the [skip-claude] label or include [skip-claude] in the title -->
+

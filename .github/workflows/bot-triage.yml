@@ -1,0 +1,73 @@
+name: Wheels Bot — Triage
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-triage-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    name: Triage issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && github.event.issue.user.login != 'wheels-bot[bot]'
+    env:
+      WHEELS_CI: "true"
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 1
+
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: issue
+          target-number: ${{ github.event.issue.number }}
+          marker-pattern: 'wheels-bot:triage:${{ github.event.issue.number }}|wheels-bot:triage-class:'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Wheels test environment
+        if: steps.gate.outputs.skip == 'false'
+        uses: ./.github/actions/setup-wheels-test-env
+        with:
+          port: '60007'
+          install-playwright: 'false'
+
+      - name: Run Triage
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /triage-issue ${{ github.event.issue.number }}
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 20
+            --allowedTools "Bash(gh:*),Bash(git status),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(bash tools/test-local.sh*),Bash(curl:*),Read,Grep,Glob,Edit,Write"
+
+      - name: Stop Lucee server
+        if: always()
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
+          lucli server stop 2>/dev/null || true

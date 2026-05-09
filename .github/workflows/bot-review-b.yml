@@ -1,0 +1,57 @@
+name: Wheels Bot — Reviewer B
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-review-b-${{ github.event.pull_request.number }}-${{ github.event.review.id }}
+  cancel-in-progress: false
+
+jobs:
+  review-the-review:
+    name: Reviewer B
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && github.event.review.user.login == 'wheels-bot[bot]'
+      && github.event.pull_request.draft == false
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: pr
+          target-number: ${{ github.event.pull_request.number }}
+          marker-pattern: 'wheels-bot:review-b:${{ github.event.pull_request.number }}:${{ github.event.pull_request.head.sha }}:'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Run Reviewer B
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /review-the-review ${{ github.event.pull_request.number }} ${{ github.event.review.id }}
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 20
+            --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
