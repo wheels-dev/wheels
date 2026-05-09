@@ -153,7 +153,13 @@ they make every workflow safely retryable.
    - `Validate Commit Messages` (existing)
    - `Lucee 7 + SQLite (LuCLI)` (existing)
    - `Bot PR TDD Gate` (new — only fails on bot PRs without a spec)
-   And require 1 approving review from `wheels-dev/maintainers` on every PR.
+
+   **Approval requirement is org-size-dependent.** Multi-maintainer
+   teams should require ≥1 approving review from `wheels-dev/maintainers`.
+   Solo-maintainer setups may set `required_approving_review_count: 0`,
+   relying on the bot's `--draft` PR posture and the maintainer's manual
+   review-then-merge workflow as the human-eye gate. The `Bot PR TDD Gate`
+   required check still enforces test discipline regardless of approval count.
 
 ### Day-to-day
 
@@ -161,8 +167,10 @@ they make every workflow safely retryable.
   starting cut. Promote subsequent phases (triage, Reviewer B, propose-fix)
   one at a time.
 - **Promote propose-fix from manual to auto-fire** only after at least 5
-  supervised runs are clean. Until then, leave the auto-fire trigger off
-  by editing `bot-propose-fix.yml` to gate on `workflow_dispatch` only.
+  supervised runs are clean. The shipped default is `workflow_dispatch` only
+  (gated in `bot-propose-fix.yml`'s `if:`); to lift the gate, restore the
+  `triage-confidence:high` branch (Phase 4a) and the `research-confidence:high`
+  branch (Phase 4b). Same pattern applies to `bot-research.yml`.
 - **Review bot-authored PRs the same as human-authored PRs.** Don't
   rubber-stamp.
 - **Watch costs.** API spend per fix-PR is non-trivial (Opus + many turns +
@@ -194,3 +202,6 @@ The bot's structure is modelled on Bun's public Claude workflows
 - A dedicated bot user (Bun: `robobun`; ours: `wheels-bot[bot]`).
 - Scheduled cleanup (Bun: `auto-close-duplicates.yml`; ours:
   `bot-auto-close.yml`).
+
+
+
