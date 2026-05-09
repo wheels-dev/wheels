@@ -202,3 +202,4 @@ The bot's structure is modelled on Bun's public Claude workflows
 - A dedicated bot user (Bun: `robobun`; ours: `wheels-bot[bot]`).
 - Scheduled cleanup (Bun: `auto-close-duplicates.yml`; ours:
   `bot-auto-close.yml`).
+
