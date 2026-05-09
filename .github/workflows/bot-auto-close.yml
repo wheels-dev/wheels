@@ -35,6 +35,10 @@ jobs:
       - name: Run Auto-close
         uses: anthropics/claude-code-action@v1
         with:
+          # Daily cron triggers run as github-actions[bot]; manual workflow_dispatch
+          # may run as wheels-bot[bot] or a human. Allow both bot identities so the
+          # cron path doesn't fail-fast on the action's "non-human actor" check.
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |

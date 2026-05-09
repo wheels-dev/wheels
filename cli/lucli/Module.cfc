@@ -3720,7 +3720,7 @@ component extends="modules.BaseModule" {
 				out("App tests run against the configured app datasource (or", "yellow");
 				out("<datasource>_test when --useTestDB is set). To test against a different", "yellow");
 				out("engine, point your app's datasource env var at it (or use --core).", "yellow");
-				out("See: command-line-tools/wheels-commands/testing#testing-against-different-engines", "yellow");
+				out("See: command-line-tools/wheels-commands/testing##testing-against-different-engines", "yellow");
 				out("", "yellow");
 			}
 		}

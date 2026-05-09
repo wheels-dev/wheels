@@ -2,11 +2,14 @@ name: Wheels Bot — skip check
 description: |
   Centralised gate for every wheels-bot workflow. Sets `outputs.skip` to "true"
   when any of the following are met:
-    - The repo variable `WHEELS_BOT_ENABLED` is not "true"
     - The issue / PR carries the `[skip-claude]` label
     - The issue / PR title contains `[skip-claude]` or `[wip]` (case-insensitive)
     - A marker matching `marker-pattern` is already present on the target
   Workflows should consume `outputs.skip` and `exit 0` early when it is "true".
+
+  Note: the kill-switch (`vars.WHEELS_BOT_ENABLED`) is enforced at the job
+  level via `if: vars.WHEELS_BOT_ENABLED == 'true'`. Composite actions cannot
+  read the `vars` context, so the kill switch cannot be checked here.
 
 inputs:
   target-type:
@@ -41,7 +44,6 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
-        WHEELS_BOT_ENABLED: ${{ vars.WHEELS_BOT_ENABLED }}
         TARGET_TYPE: ${{ inputs.target-type }}
         TARGET_NUMBER: ${{ inputs.target-number }}
         MARKER_PATTERN: ${{ inputs.marker-pattern }}
@@ -51,47 +53,40 @@ runs:
         skip=false
         reason=""
 
-        if [[ "${WHEELS_BOT_ENABLED:-}" != "true" ]]; then
-          skip=true
-          reason="vars.WHEELS_BOT_ENABLED is not 'true'"
+        if [[ "$TARGET_TYPE" == "issue" ]]; then
+          payload=$(gh issue view "$TARGET_NUMBER" --repo "$GH_REPO" --json title,labels,comments,body)
+        elif [[ "$TARGET_TYPE" == "pr" ]]; then
+          payload=$(gh pr view "$TARGET_NUMBER" --repo "$GH_REPO" --json title,labels,comments,body,reviews)
+        else
+          echo "::error::Invalid target-type: $TARGET_TYPE (must be 'issue' or 'pr')"
+          exit 1
         fi
 
-        if [[ "$skip" == "false" ]]; then
-          if [[ "$TARGET_TYPE" == "issue" ]]; then
-            payload=$(gh issue view "$TARGET_NUMBER" --repo "$GH_REPO" --json title,labels,comments,body)
-          elif [[ "$TARGET_TYPE" == "pr" ]]; then
-            payload=$(gh pr view "$TARGET_NUMBER" --repo "$GH_REPO" --json title,labels,comments,body,reviews)
-          else
-            echo "::error::Invalid target-type: $TARGET_TYPE (must be 'issue' or 'pr')"
-            exit 1
+        title=$(echo "$payload" | jq -r '.title')
+        has_skip_label=$(echo "$payload" | jq -r '[.labels[]?.name] | any(. == "skip-claude")')
+        title_lc=$(echo "$title" | tr '[:upper:]' '[:lower:]')
+
+        if [[ "$has_skip_label" == "true" ]]; then
+          skip=true
+          reason="[skip-claude] label is present"
+        elif [[ "$title_lc" == *"[skip-claude]"* ]]; then
+          skip=true
+          reason="title contains [skip-claude]"
+        elif [[ "$title_lc" == *"[wip]"* ]]; then
+          skip=true
+          reason="title contains [wip]"
+        fi
+
+        if [[ "$skip" == "false" && -n "$MARKER_PATTERN" ]]; then
+          haystack=""
+          haystack+=$(echo "$payload" | jq -r '[.comments[]?.body] | join("\n")')
+          if [[ "$TARGET_TYPE" == "pr" ]]; then
+            haystack+=$'\n'
+            haystack+=$(echo "$payload" | jq -r '[.reviews[]?.body] | join("\n")')
           fi
-
-          title=$(echo "$payload" | jq -r '.title')
-          has_skip_label=$(echo "$payload" | jq -r '[.labels[]?.name] | any(. == "skip-claude")')
-          title_lc=$(echo "$title" | tr '[:upper:]' '[:lower:]')
-
-          if [[ "$has_skip_label" == "true" ]]; then
+          if echo "$haystack" | grep -Eq "$MARKER_PATTERN"; then
             skip=true
-            reason="[skip-claude] label is present"
-          elif [[ "$title_lc" == *"[skip-claude]"* ]]; then
-            skip=true
-            reason="title contains [skip-claude]"
-          elif [[ "$title_lc" == *"[wip]"* ]]; then
-            skip=true
-            reason="title contains [wip]"
-          fi
-
-          if [[ "$skip" == "false" && -n "$MARKER_PATTERN" ]]; then
-            haystack=""
-            haystack+=$(echo "$payload" | jq -r '[.comments[]?.body] | join("\n")')
-            if [[ "$TARGET_TYPE" == "pr" ]]; then
-              haystack+=$'\n'
-              haystack+=$(echo "$payload" | jq -r '[.reviews[]?.body] | join("\n")')
-            fi
-            if echo "$haystack" | grep -Eq "$MARKER_PATTERN"; then
-              skip=true
-              reason="idempotency marker already present (pattern: $MARKER_PATTERN)"
-            fi
+            reason="idempotency marker already present (pattern: $MARKER_PATTERN)"
           fi
         fi
 

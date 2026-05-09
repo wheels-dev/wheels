@@ -89,6 +89,10 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
+          # When un-gated at Phase 4a/4b, this workflow fires from wheels-bot[bot]
+          # comments containing high-confidence triage or research markers. Allow
+          # that bot identity (and github-actions[bot] for consistency).
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
