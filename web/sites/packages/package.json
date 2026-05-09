@@ -14,7 +14,7 @@
 		"@astrojs/sitemap": "^3.7.2",
 		"@shikijs/rehype": "^3.3.0",
 		"@wheels-dev/ui": "workspace:*",
-		"astro": "^5.1.0",
+		"astro": "^6.3.1",
 		"rehype-sanitize": "^6.0.0",
 		"rehype-stringify": "^10.0.1",
 		"remark-gfm": "^4.0.1",
