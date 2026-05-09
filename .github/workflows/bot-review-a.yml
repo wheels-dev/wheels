@@ -48,6 +48,11 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
+          # Allow our App's bot identity and github-actions[bot] to initiate
+          # the action. Currently the job-level if: blocks wheels-bot[bot] PRs,
+          # so this is defensive for future bot-authored PRs (Dependabot,
+          # Renovate) — and for consistency with the other bot workflows.
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
