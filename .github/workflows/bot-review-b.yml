@@ -58,5 +58,5 @@ jobs:
             /review-the-review ${{ github.event.pull_request.number }} ${{ github.event.review.id }}
           claude_args: |
             --model claude-sonnet-4-6
-            --max-turns 20
+            --max-turns 30
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
