@@ -1085,3 +1085,29 @@ Tools are auto-discovered from `cli/lucli/Module.cfc` public functions, prefixed
 Workflow orchestration (multi-step planning, feature development) is not a framework concern — use your preferred Claude Code plugin (Superpowers, feature-dev, etc.). The framework ships deterministic Wheels operations via MCP; the model orchestrates.
 
 **Deprecated:** The in-dev-server HTTP endpoint at `/wheels/mcp` (routed from `vendor/wheels/public/views/mcp.cfm`). Emits a deprecation notice and warning log on first request. Scheduled for removal in a future release — migrate to the stdio surface. See `docs/command-line-tools/commands/mcp/mcp-configuration-guide.md`.
+
+## Wheels Bot
+
+`wheels-bot[bot]` is a custom GitHub App that runs Claude-powered automation on issues and PRs in `wheels-dev/wheels`. Five stages, all opt-out via the `[skip-claude]` label or repo variable `WHEELS_BOT_ENABLED=false`. Slash-command prompts live in `.claude/commands/`; workflows in `.github/workflows/bot-*.yml`. Full docs: [`docs/contributing/wheels-bot.md`](docs/contributing/wheels-bot.md).
+
+| Stage | Trigger | Model | Output |
+|---|---|---|---|
+| Triage | issue opened/reopened | Sonnet | Comment classifying as `bug` / `framework-design` / `other` (+ confidence on `bug` path). |
+| Research | bot triage emits `framework-design` marker | Opus | Comment comparing Rails / Laravel / Django / Phoenix / Spring Boot / +1 and recommending a Wheels-idiomatic path (+ confidence). |
+| Propose Fix | bot triage emits `triage-confidence:high` OR research emits `research-confidence:high` (or `workflow_dispatch`) | Opus | TDD-mandatory draft PR on branch `fix/bot-<issue>-<slug>`. Spec-then-implementation, both required by `bot-tdd-gate.yml`. |
+| Reviewer A | PR opened / synchronized / ready_for_review | Sonnet | Single PR review with line comments, verdict, and `wheels-bot:review-a:<pr>:<sha>` marker. |
+| Reviewer B | Reviewer A submits a review | Sonnet | PR comment critiquing A for sycophancy, false positives, and missed issues. Loop cap = 3 rounds. |
+
+**Marker conventions** (HTML comments, used for idempotency):
+- `<!-- wheels-bot:triage:<issue> -->` + `<!-- wheels-bot:triage-class:<bug|framework-design|other> -->` (+ optional `<!-- wheels-bot:triage-confidence:high -->`)
+- `<!-- wheels-bot:research:<issue> -->` (+ optional `<!-- wheels-bot:research-confidence:high -->`)
+- `<!-- wheels-bot:fix:<issue> -->` / `<!-- wheels-bot:fix-held:<issue> -->`
+- `<!-- wheels-bot:review-a:<pr>:<sha> -->`
+- `<!-- wheels-bot:review-b:<pr>:<sha>:<round> -->`
+- `<!-- wheels-bot:auto-close:<issue> -->`
+
+**Allow-listed scopes per stage**: every bot-authored commit must conform to the `commitlint.config.js` allowlist (see § Commit Message Conventions). The bot's prompt (`.claude/commands/_shared-rails.md`) re-states the allowlist verbatim.
+
+**Kill switch**: flip the repo variable `WHEELS_BOT_ENABLED` to `false` to halt every bot workflow without code changes. Add the `[skip-claude]` label (or `[skip-claude]` in the title) to halt activity on a single issue/PR.
+
+**Auto-fire safety net**: the bot is permitted to chain stages (triage → research → propose-fix), but each handoff requires `*-confidence:high` and the propose-fix prompt auto-downgrades on sensitive areas (security, migrations, deploy, DI). All bot PRs land as `--draft` and require a human approving review on `develop`.
