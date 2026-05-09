@@ -48,7 +48,8 @@ export default defineConfig({
 				{ label: 'Overview', link: '/' },
 				...versions.map((v) => ({
 					label: v.label,
-					autogenerate: { directory: v.slug },
+					// Starlight 0.39+ requires autogenerate to be wrapped in items[].
+					items: [{ autogenerate: { directory: v.slug } }],
 					collapsed: v.collapsed,
 				})),
 			],
