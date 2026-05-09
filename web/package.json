@@ -28,5 +28,14 @@
 		"prettier-plugin-astro": "^0.14.1",
 		"typescript": "^5.7.2",
 		"vitest": "^2.1.9"
+	},
+	"pnpm": {
+		"overrides": {
+			"fast-uri": "^3.1.2",
+			"fast-xml-builder": "^1.1.7",
+			"esbuild": "^0.27.3",
+			"vite": "^6.4.2",
+			"yaml": "^2.8.3"
+		}
 	}
 }
