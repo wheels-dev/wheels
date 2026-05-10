@@ -70,6 +70,31 @@ component extends="wheels.WheelsTest" {
 				cache.refresh();
 			});
 
+			it("rejects a stale on-disk cache entry that fails the versions invariant (B's nuance)", () => {
+				// Reviewer B noted the cache-hit path bypasses validation if
+				// the on-disk manifest was written by an older Registry that
+				// didn't enforce the versions invariant. Pre-populate the
+				// cache with a bad manifest, mark it fresh, and verify
+				// fetchManifest re-validates on read instead of returning
+				// the stale entry.
+				var fake = new wheels.tests._assets.packages.FakeHttpClient();
+				var cache = $freshCache();
+				cache.writeManifest("wheels-x", {name = "wheels-x"}); // no versions
+				expect(cache.hasFreshManifest("wheels-x")).toBeTrue();
+				var r = $newRegistry(fake, cache);
+				var threw = "";
+				try {
+					r.fetchManifest("wheels-x");
+				} catch ("Wheels.Packages.RegistryMalformed" e) {
+					threw = e.message;
+				}
+				expect(threw contains "versions").toBeTrue(
+					"Stale cache entries written by older Registry versions must "
+					& "be re-validated on read, not returned blindly. Got: " & threw
+				);
+				cache.refresh();
+			});
+
 			it("listAll() skips a malformed manifest instead of crashing", () => {
 				// End-to-end: a malformed manifest in the registry list must
 				// not propagate an Expression error to the Tools → Packages

@@ -77,10 +77,18 @@ component {
 
 	/**
 	 * Fetches a package's manifest. Cached 24h per package.
+	 *
+	 * Both the cache-hit and fresh-fetch paths run $validateManifest()
+	 * so a manifest written by an older Registry version that lacks
+	 * the `versions` invariant (or any other required field added later)
+	 * still throws RegistryMalformed instead of crashing listAll() with
+	 * an Expression-level error.
 	 */
 	public struct function fetchManifest(required string name) {
 		if (variables.cache.hasFreshManifest(arguments.name)) {
-			return variables.cache.readManifest(arguments.name);
+			local.cached = variables.cache.readManifest(arguments.name);
+			$validateManifest(arguments.name, local.cached);
+			return local.cached;
 		}
 		local.url = "https://raw.githubusercontent.com/#variables.registryRepo#/#variables.branch#/packages/#arguments.name#/manifest.json";
 		local.resp = variables.http.get(local.url);
@@ -97,28 +105,36 @@ component {
 			);
 		}
 		local.manifest = DeserializeJSON(local.resp.body);
-		if (!IsStruct(local.manifest) || !StructKeyExists(local.manifest, "name")) {
+		$validateManifest(arguments.name, local.manifest);
+		variables.cache.writeManifest(arguments.name, local.manifest);
+		return local.manifest;
+	}
+
+	/**
+	 * Asserts the listAll() consumption contract: must be a struct with
+	 * `name` and a non-empty `versions` array. Throws RegistryMalformed
+	 * on any violation. Called from both the cache-hit and fresh-fetch
+	 * paths in fetchManifest so stale on-disk manifests written by an
+	 * older Registry version surface as a typed throw instead of an
+	 * Expression-level crash deeper in the call chain.
+	 */
+	private void function $validateManifest(required string name, required any manifest) {
+		if (!IsStruct(arguments.manifest) || !StructKeyExists(arguments.manifest, "name")) {
 			Throw(
 				type = "Wheels.Packages.RegistryMalformed",
 				message = "Manifest for '#arguments.name#' is not a valid manifest struct."
 			);
 		}
-		// listAll() reads .versions[ArrayLen(.versions)] — validate the
-		// invariant here so cached and fresh manifests share one guard
-		// and the per-package skip in listAll() catches a typed throw
-		// instead of an Expression-level missing-key error.
 		if (
-			!StructKeyExists(local.manifest, "versions")
-			|| !IsArray(local.manifest.versions)
-			|| !ArrayLen(local.manifest.versions)
+			!StructKeyExists(arguments.manifest, "versions")
+			|| !IsArray(arguments.manifest.versions)
+			|| !ArrayLen(arguments.manifest.versions)
 		) {
 			Throw(
 				type = "Wheels.Packages.RegistryMalformed",
 				message = "Manifest for '#arguments.name#' is missing a non-empty versions array."
 			);
 		}
-		variables.cache.writeManifest(arguments.name, local.manifest);
-		return local.manifest;
 	}
 
 	/**
