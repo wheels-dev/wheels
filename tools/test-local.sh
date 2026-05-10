@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Run Wheels core tests locally via LuCLI + SQLite (no Docker required)
+# Run Wheels core tests locally via Wheels CLI + SQLite (no Docker required)
 #
 # Prerequisites:
-#   - LuCLI 0.3.3+ installed (brew install lucli or download from GitHub)
+#   - Wheels CLI installed (brew install wheels or download from GitHub releases)
+#     Wheels is built on the LuCLI runtime; we ship the runtime under the
+#     `wheels` brand. There is no separate `lucli` binary on a normal install.
 #   - Java 21+ installed
-#   - SQLite JDBC driver in ~/.lucli/express/*/lib/ext/ (auto-installed by LuCLI 0.2.66+)
+#   - SQLite JDBC driver in ~/.wheels/express/*/lib/ext/ (auto-installed by recent
+#     Wheels CLI releases; older releases may use ~/.lucli/express/*/lib/ext/)
 #
 # Usage:
 #   bash tools/test-local.sh              # run all core tests
@@ -14,7 +17,7 @@
 #
 # Browser-test behavior:
 #   Browser specs (BrowserDialog/Login/Route) run against the local
-#   LuCLI server via Playwright. Requires Playwright JARs installed in
+#   Wheels CLI server via Playwright. Requires Playwright JARs installed in
 #   ~/.wheels/browser/lib/ — run `wheels browser:install` once if not.
 #   WHEELS_BROWSER_TEST_BASE_URL is auto-set to match the local PORT so
 #   specs hit the right server; CI sets its own override before invoking
@@ -29,7 +32,7 @@ DB="${DB:-sqlite}"
 PASSWORD="wheels"
 RESULT_FILE="/tmp/wheels-local-test-results.json"
 
-# Browser specs call back into the local LuCLI server — point Playwright
+# Browser specs call back into the local Wheels CLI server — point Playwright
 # at the right port. CI sets this explicitly before invoking the script;
 # the ${VAR:-default} preserves the CI override.
 export WHEELS_BROWSER_TEST_BASE_URL="${WHEELS_BROWSER_TEST_BASE_URL:-http://localhost:${PORT}}"
@@ -40,11 +43,11 @@ cd "$PROJECT_ROOT"
 sqlite3 wheelstestdb.db "SELECT 1;" 2>/dev/null || true
 sqlite3 wheelstestdb_tenant_b.db "SELECT 1;" 2>/dev/null || true
 
-# ── Resolve {project} placeholder if LuCLI doesn't support it yet ──
-# Check if lucee.json has {project} and LuCLI version < 0.2.66
+# ── Resolve {project} placeholder if the Wheels CLI doesn't support it yet ──
+# Check if lucee.json has {project} and the runtime version is too old to
+# resolve the placeholder.
 if grep -q '{project}' lucee.json 2>/dev/null; then
-  LUCLI_VER=$(lucli --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
-  # Simple version check: if version starts with 0.2. or 0.3. and < 0.2.66
+  WHEELS_VER=$(wheels --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
   # For safety, always create a resolved copy for the server
   cp lucee.json lucee.json.bak
   sed -i '' "s|{project}|${PROJECT_ROOT}|g" lucee.json
@@ -60,7 +63,7 @@ cleanup() {
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
     echo "Stopping test server..."
     kill "$SERVER_PID" 2>/dev/null || true
-    lucli server stop 2>/dev/null || true
+    wheels server stop 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -70,17 +73,19 @@ STARTED_SERVER=false
 if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
   echo "Using existing server on port ${PORT}"
 else
-  echo "Starting LuCLI server on port ${PORT}..."
+  echo "Starting Wheels CLI server on port ${PORT}..."
 
-  # Ensure SQLite JDBC is installed
-  LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
+  # Ensure SQLite JDBC is installed. Recent Wheels CLI releases extract
+  # Lucee Express to ~/.wheels/express/; older releases used ~/.lucli/express/.
+  # Search both so this script keeps working through the rename.
+  LUCEE_LIB=$(find ~/.wheels/express ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
   if [ -n "$LUCEE_LIB" ] && ! ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
     echo "Downloading SQLite JDBC driver..."
     curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \
       -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
   fi
 
-  nohup lucli server run --port="$PORT" --force > /tmp/wheels-test-server.log 2>&1 &
+  nohup wheels server run --port="$PORT" --force > /tmp/wheels-test-server.log 2>&1 &
   SERVER_PID=$!
   STARTED_SERVER=true
 

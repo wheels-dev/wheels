@@ -510,9 +510,11 @@ component extends="wheels.WheelsTest" {
 - **`Left(str, 0)` crashes Lucee 7**: Use a ternary guard: `local.match.pos[1] > 1 ? Left(str, local.match.pos[1] - 1) : ""`
 - Run with MCP `wheels_test()` or CLI `wheels test run`
 
-## Running Tests Locally (LuCLI — Recommended)
+## Running Tests Locally (Wheels CLI — Recommended)
 
 **IMPORTANT: Always run the test suite before pushing.** Do not rely on CI alone.
+
+> **`wheels` IS the CLI.** Wheels is built on the LuCLI runtime, but we ship the runtime under the `wheels` brand. End users only ever interact with the CLI as `wheels` — there is no separate `lucli` binary on a normal install. When older docs or scripts mention "install LuCLI" or invoke `lucli`, they pre-date the rebrand and are being migrated to `wheels`.
 
 ### Fastest method: one command
 ```bash
@@ -521,12 +523,12 @@ bash tools/test-local.sh model        # run model tests only
 bash tools/test-local.sh security     # run security tests only
 ```
 
-The script handles everything: creates SQLite DBs, starts a LuCLI server if needed, runs tests, reports results, cleans up. No Docker required.
+The script handles everything: creates SQLite DBs, starts a Wheels CLI server if needed, runs tests, reports results, cleans up. No Docker required.
 
 ### Prerequisites (one-time setup)
 ```bash
-# Install LuCLI (0.3.3+ recommended)
-brew install lucli    # or download from GitHub releases
+# Install the Wheels CLI (4.0.0+ recommended)
+brew install wheels   # or download from GitHub releases
 # Java 21 required
 brew install openjdk@21
 ```
@@ -536,7 +538,7 @@ brew install openjdk@21
 cd /path/to/wheels
 sqlite3 wheelstestdb.db "SELECT 1;"
 sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
-lucli server run --port=8080
+wheels start --port=8080
 
 # In another terminal:
 curl -s "http://localhost:8080/?reload=true&password=wheels"
@@ -670,7 +672,7 @@ journal format. Output is directly comparable to fresh-VM run reports.
 |---|---|---|
 | 1 | Setup isolated `LUCLI_HOME`, framework path, Lucee Express symlink | — |
 | 2 | `wheels new` (no duplicate `create` lines, file tree, no `bundleName`) | F1, F3, F4 |
-| 3 | Server boot via `lucli server run` + sqlite-jdbc shim | (formula simulation) |
+| 3 | Server boot via `wheels start` + sqlite-jdbc shim | (formula simulation) |
 | 4 | Migration cliff — verify the actual sqlite db has tables, not just exit 0 | F2, F5 |
 | 5 | Seed (cfscript wrapper + `seedOnce` idempotency) | F3-orig |
 | 6 | CRUD walkthrough (tutorial chapters 2-3 happy path) | tutorial verification |
@@ -743,7 +745,7 @@ seedOnce(modelName="User", uniqueProperties="email", properties={
 });
 ```
 
-**CLI** (LuCLI canonical form; `wheels db:seed` is the legacy CommandBox alias — prefer the short form):
+**CLI** (canonical Wheels CLI form; `wheels db:seed` is the legacy CommandBox alias — prefer the short form):
 ```bash
 wheels seed                             # Run convention seeds (auto-detect env)
 wheels seed --environment=production    # Seed for specific environment
@@ -751,7 +753,7 @@ wheels seed --generate                  # Legacy: random test data
 wheels generate seed                    # Create app/db/seeds.cfm
 wheels generate seed --all              # Create seeds.cfm + dev/prod stubs
 ```
-Note: the `--count` / `--models` / `--dataFile` flags on `--generate` only exist on the legacy CommandBox `wheels db:seed` surface; LuCLI's `wheels seed` ignores them.
+Note: the `--count` / `--models` / `--dataFile` flags on `--generate` only exist on the legacy CommandBox `wheels db:seed` surface; the Wheels CLI's `wheels seed` ignores them.
 
 **`seedOnce()`** — idempotent: checks `uniqueProperties` via `findOne()`, creates only if not found. Re-running seeds is always safe.
 
@@ -990,7 +992,7 @@ Deeper documentation lives in `.ai/` — Claude will search it automatically whe
 - `.ai/wheels/configuration/` — routing, environments, settings, DI container, multi-tenancy, security
 - `.ai/wheels/middleware/` — pipeline structure, rate limiting, tenant resolver
 - `.ai/wheels/jobs/` — background job queue, retries, priority queues
-- `.ai/wheels/mcp/` — AI agent integration via LuCLI stdio MCP (setup, tool reference, auto-discovery)
+- `.ai/wheels/mcp/` — AI agent integration via the Wheels CLI's stdio MCP (setup, tool reference, auto-discovery)
 - `.ai/wheels/packages/` — first-party packages (sentry, hotwire, basecoat) + activation model
 - `.ai/wheels/cli/` — generators (model, controller, scaffold, admin, migrations)
 - `.ai/wheels/testing/` — WheelsTest BDD, browser testing, browser automation patterns, **onboarding harness** (fresh-install simulation for cliff fixes)
@@ -1072,7 +1074,7 @@ The project name is **Wheels** (not "CFWheels"). The rebrand happened at v3.0. A
 
 ## MCP Server
 
-**Canonical surface (Wheels 4.0+):** LuCLI stdio MCP at `wheels mcp wheels`. Configure your AI IDE with:
+**Canonical surface (Wheels 4.0+):** the Wheels CLI's stdio MCP server at `wheels mcp wheels`. Configure your AI IDE with:
 
 ```json
 {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
