@@ -108,7 +108,7 @@ jobs:
             /propose-fix ${{ env.ISSUE_NUMBER }}
           claude_args: |
             --model claude-opus-4-7
-            --max-turns 60
+            --max-turns 100
             --allowedTools "Bash(gh:*),Bash(git:*),Bash(bash tools/test-local.sh*),Bash(curl:*),Read,Edit,Write,Grep,Glob"
 
       - name: Push branch
