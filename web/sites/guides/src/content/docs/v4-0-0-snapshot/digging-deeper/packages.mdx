@@ -70,6 +70,8 @@ Six packages are maintained as first-party modules under the `wheels-dev` GitHub
 - **[`wheels-i18n`](https://github.com/wheels-dev/wheels-i18n)** — Internationalization with JSON-file or database-backed translations, parameter interpolation, and pluralization. Mixes into controllers.
 - **[`wheels-seo-suite`](https://github.com/wheels-dev/wheels-seo-suite)** — Meta tags, Open Graph, Twitter Cards, canonical URLs, XML sitemaps, robots.txt, and an in-page debug/admin panel. Mixes into controllers.
 
+In development mode, the debug bar's **Packages** tab shows both the currently installed packages (from `vendor/`) and a live "Available from registry" table pulled from the same 24-hour registry cache used by the CLI. This lets you discover and compare first-party packages without leaving your browser.
+
 ## The `package.json` manifest
 
 Every package declares a `package.json` at its root. The loader parses it before instantiating any CFC, so a manifest error isolates cleanly — the package is skipped, but the rest of the app boots.
