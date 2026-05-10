@@ -29,7 +29,7 @@ Before either path works, you need a handful of tools on `PATH`:
 
 - **Java 21+** — `brew install openjdk@21` on macOS, your distro's OpenJDK package on Linux, Adoptium on Windows.
 - **`JAVA_HOME` set** — LuCLI's preflight refuses to start if this is unset and points you at Adoptium. Set it in your shell profile (`export JAVA_HOME=$(/usr/libexec/java_home -v 21)` on macOS).
-- **The `wheels` CLI** — `brew install lucli`, `choco install lucli`, or the install script on Linux. This gives you the `wheels` command that wraps the LuCLI runtime.
+- **The `wheels` CLI** — `brew install wheels`, `choco install wheels`, or the install script on Linux. The Wheels CLI is built on the LuCLI runtime; we ship the runtime under the `wheels` brand so you only ever invoke it as `wheels`.
 - **SQLite** — usually pre-installed; `brew install sqlite` if not. Needed for the default test database.
 - **Docker Desktop or Docker Engine** — only if you're running the cross-engine matrix.
 

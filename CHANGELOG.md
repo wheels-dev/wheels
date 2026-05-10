@@ -108,6 +108,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Changed
 
+- Project-level docs and the `tools/test-local.sh` script now refer to the CLI as `wheels` rather than `lucli`. Wheels is built on the LuCLI runtime, but the rebranded `wheels` binary is the only thing end users install — `brew install wheels`, `wheels server run`, `~/.wheels/express`. CLAUDE.md adds an explicit "wheels IS the CLI" callout so future Claude sessions and new contributors don't go looking for a separate `lucli` install when `tools/test-local.sh` fails. References to LuCLI as the upstream runtime project (e.g. installation docs explaining the relationship, runtime-specific env vars like `LUCLI_HOME`) are intentionally retained.
 - **Breaking:** CORS middleware default changed from wildcard `*` to deny-all. Apps must explicitly configure `allowOrigins` or set an explicit wildcard. (#2039)
 - **Breaking:** `viteStrictManifest` defaults to `true` — a missing Vite manifest entry now throws `Wheels.ViteAssetNotFound` in production instead of silently falling back (3.x behavior). Rebuild Vite assets during the upgrade window; to retain 3.x silent behavior, `set(viteStrictManifest=false)`. (#2133)
 - **Breaking:** `allowEnvironmentSwitchViaUrl` defaults to `false` in production (#2076)

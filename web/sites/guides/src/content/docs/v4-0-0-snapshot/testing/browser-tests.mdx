@@ -316,7 +316,7 @@ When a spec fails, the `aroundEach` hook captures a screenshot and HTML dump to 
 
 The CI workflow sets `WHEELS_CI=true`, which `BrowserTest.beforeAll` interprets as an opt-out from running browser specs (they're skipped via `this.browserTestSkipped = true`). To run browser specs in CI, also set `WHEELS_BROWSER_CI_ENABLE=true` and ensure Playwright is installed on the runner. CI caches the Playwright JARs and Chromium via the `browser-manifest.json` hash; first runs pay the download cost once.
 
-Set `WHEELS_BROWSER_TEST_BASE_URL` so `visit("/path")` resolves to the right origin on the CI runner. For local work, the default `http://localhost:8080` matches `lucli server run --port=8080`. See [CI Integration](/v4-0-0-snapshot/testing/ci-integration/) for the full workflow.
+Set `WHEELS_BROWSER_TEST_BASE_URL` so `visit("/path")` resolves to the right origin on the CI runner. For local work, the default `http://localhost:8080` matches `wheels server run --port=8080`. See [CI Integration](/v4-0-0-snapshot/testing/ci-integration/) for the full workflow.
 
 ## When to skip browser tests
 
