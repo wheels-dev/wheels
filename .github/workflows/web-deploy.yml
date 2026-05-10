@@ -63,10 +63,17 @@ jobs:
           DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
           SITE: ${{ matrix.site }}
         run: |
+          # Pass --commit-message explicitly. wrangler auto-derives from git
+          # when omitted, and Cloudflare's API rejects non-ASCII content in
+          # auto-merged GitHub commit bodies (em-dashes, arrows, etc.) with
+          # "Invalid commit message, it must be a valid UTF-8 string". Send
+          # a controlled ASCII string instead. See PR #2550 for the snapshot.yml
+          # variant of this fix and the originating failure (run 25641189988).
           pnpm dlx wrangler@4.78.0 pages deploy "sites/${SITE}/dist" \
             --project-name="wheels-${SITE}" \
             --branch="${DEPLOY_BRANCH}" \
-            --commit-hash="${GITHUB_SHA}"
+            --commit-hash="${GITHUB_SHA}" \
+            --commit-message="deploy ${SITE} from ${DEPLOY_BRANCH} (run ${GITHUB_RUN_ID})"
 
   visual-regression:
     name: Visual regression

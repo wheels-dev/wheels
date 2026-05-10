@@ -278,7 +278,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
         run: |
+          # Pass --commit-message explicitly. Without it, wrangler auto-derives
+          # the commit message from git, and Cloudflare's API rejected this
+          # repo's auto-generated GitHub merge commit body in run 25641189988
+          # with "Invalid commit message, it must be a valid UTF-8 string"
+          # (despite the body being valid UTF-8 — CF appears to have a stricter
+          # rule than the error message implies). The fix is to send a short
+          # ASCII-only message derived from the version + run; that always works.
+          VERSION=$(jq -r '.version' ../wheels.json)
           pnpm dlx wrangler@4.78.0 pages deploy "sites/api/dist" \
             --project-name="wheels-api" \
             --branch="${DEPLOY_BRANCH}" \
-            --commit-hash="${GITHUB_SHA}"
+            --commit-hash="${GITHUB_SHA}" \
+            --commit-message="snapshot deploy: ${VERSION}-snapshot (run ${GITHUB_RUN_ID})"
