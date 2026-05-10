@@ -32,13 +32,13 @@ This means AJAX-driven partial updates, Turbo Streams, API endpoints, and CSV ex
 
 ## Enabling and disabling
 
-The bar respects the `enableDebug` application setting. By default, Wheels sets this to `true` in the `development` and `testing` environments and `false` in `production` and `maintenance`. You can override it explicitly in `config/environment.cfm`:
+The bar respects the `showDebugInformation` application setting. By default, Wheels sets this to `true` only in the `development` environment and `false` in every other environment (`testing`, `maintenance`, and `production`). You can override it explicitly in `config/environment.cfm`:
 
 ```cfm title="config/environment.cfm"
-<cfset set(enableDebug=true)>
+<cfset set(showDebugInformation=true)>
 ```
 
-Setting `enableDebug=false` removes the bar entirely — no HTML is injected into responses.
+Setting `showDebugInformation=false` removes the bar entirely — no HTML is injected into responses.
 
 <Aside type="caution">
   Never enable the debug bar in production. It renders internal state — your data source name, environment, CFML engine version, and parameter values — that you do not want visible to end users.
@@ -66,7 +66,7 @@ The Request tab label shows `controller.action` for the current request. Clickin
 | URL | Full URL for this request |
 | Application | Value of `applicationName` from `Application.cfc` |
 | Data Source | The configured `dataSourceName` |
-| DB Adapter | The active database adapter (MySQL, PostgreSQL, SQL Server, etc.) |
+| DB Adapter | The active database adapter (MySQL, PostgreSQL, SQL Server, etc.) — omitted when the adapter name is not detected |
 | URL Rewriting | Current URL rewriting mode |
 
 {/* screenshot: Request panel open — the key-value table showing Route, Controller, Action, HTTP Method, URL, Application, Data Source, DB Adapter, and URL Rewriting */}
@@ -172,7 +172,7 @@ Shown when `enablePublicComponent` is `true` (the default in development). Opens
 All settings are applied in `config/settings.cfm` or an environment-specific file under `config/`:
 
 ```cfm title="config/environment.cfm"
-<cfset set(enableDebug=true)>
+<cfset set(showDebugInformation=true)>
 <cfset set(enablePackagesComponent=true)>
 <cfset set(enablePluginsComponent=true)>
 <cfset set(showIncompatiblePlugins=true)>
@@ -182,11 +182,11 @@ All settings are applied in `config/settings.cfm` or an environment-specific fil
 
 | Setting | Default | Effect |
 |---|---|---|
-| `enableDebug` | `true` in development/testing | Show or hide the debug bar entirely |
+| `showDebugInformation` | `true` in `development`, `false` elsewhere | Show or hide the debug bar entirely |
 | `enablePackagesComponent` | `true` | Show the Packages subsection in the Environment panel and the Packages link in Tools |
 | `enablePluginsComponent` | `true` | Show the Plugins (Legacy) subsection and the Plugins link in Tools |
 | `showIncompatiblePlugins` | `true` | Include incompatible-plugin warnings in the Warnings subsection |
-| `enablePublicComponent` | `true` | Show the Tools tab and its link grid |
+| `enablePublicComponent` | `true` in `development`, `false` elsewhere | Show the Tools tab and its link grid |
 | `enableMigratorComponent` | `true` | Show the Migrator link in the Tools panel |
 
 ## Related guides
