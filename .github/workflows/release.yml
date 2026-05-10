@@ -127,7 +127,13 @@ jobs:
         run: |
          ./tools/build/scripts/prepare-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
+      # CommandBox is only needed for the ForgeBox publish below; it has no
+      # other consumer in this workflow. Develop snapshots no longer publish
+      # to ForgeBox (they go to wheels-dev/wheels-snapshots via Create Snapshot
+      # Pre-Release further down), so we save ~30s of CommandBox install on
+      # every snapshot run by gating this to stable releases only.
       - name: Install CommandBox
+        if: github.ref == 'refs/heads/main'
         run: |
           curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
           echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
@@ -211,7 +217,14 @@ jobs:
           echo "All packages validated successfully!"
           echo "=========================================="
 
+      # ForgeBox publishing is stable-only (main branch). Snapshots publish to
+      # wheels-dev/wheels-snapshots via the Create Snapshot Pre-Release step
+      # downstream — that's the canonical bleeding-edge channel post-4.0.
+      # Once ForgeBox is fully deprecated, this entire step (and all the
+      # ForgeBox-shaped Prepare* / Install CommandBox / Validate steps above)
+      # can be deleted as cleanup.
       - name: Publish All Packages to ForgeBox
+        if: github.ref == 'refs/heads/main'
         run: |
           # Publish stable release and mark as current/stable version
           ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true" "true"
