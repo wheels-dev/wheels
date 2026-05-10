@@ -74,5 +74,5 @@ jobs:
             /research-frameworks ${{ env.ISSUE_NUMBER }}
           claude_args: |
             --model claude-opus-4-7
-            --max-turns 40
+            --max-turns 400
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git show:*),Bash(git grep:*),WebFetch,WebSearch,Read,Grep,Glob"
