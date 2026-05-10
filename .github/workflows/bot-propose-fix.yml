@@ -98,6 +98,11 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
+          # DIAGNOSTIC (temporary): show_full_output exposes per-turn tool
+          # calls including which were denied, so we can see which tools
+          # Opus is reaching for that the allowlist rejects. Remove this
+          # line once the next run's data has informed allowlist tuning.
+          show_full_output: true
           # When un-gated at Phase 4a/4b, this workflow fires from wheels-bot[bot]
           # comments containing high-confidence triage or research markers. Allow
           # that bot identity (and github-actions[bot] for consistency).
