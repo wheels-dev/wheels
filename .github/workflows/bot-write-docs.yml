@@ -100,7 +100,7 @@ jobs:
             /write-docs ${{ env.ISSUE_NUMBER }}
           claude_args: |
             --model claude-sonnet-4-6
-            --max-turns 30
+            --max-turns 300
             --allowedTools "Bash(gh:*),Bash(git status),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Read,Edit,Write,Grep,Glob"
 
       - name: Push branch

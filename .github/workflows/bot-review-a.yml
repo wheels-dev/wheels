@@ -66,5 +66,5 @@ jobs:
             /review-pr ${{ github.event.pull_request.number }}
           claude_args: |
             --model claude-sonnet-4-6
-            --max-turns 25
+            --max-turns 250
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
