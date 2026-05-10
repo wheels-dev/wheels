@@ -144,9 +144,16 @@ NFPM_EXTRA_EOF
 # they live alongside lucli in /opt/wheels/.
 
 # ── Run nfpm ─────────────────────────────────────────────────────────────
-cd "${BUILD_DIR}"
+# Resolve the output path BEFORE cd-ing into BUILD_DIR. OUT_DIR is documented
+# as repo-root-relative (the workflow passes "artifacts/wheels/${WHEELS_VERSION}")
+# but we have to `cd "${BUILD_DIR}"` for nfpm to find the staged content
+# (the nfpm config references ./build/lucli, ./build/module/, etc.). If we
+# resolved NFPM_OUT after the cd, it would land inside .linux-pkg-build/
+# instead of the repo's artifacts/ tree — and the GitHub Release upload glob
+# would silently match nothing. (Yes, this was a real bug. Run 25637518317.)
 mkdir -p "${OUT_DIR}"
-NFPM_OUT="$(pwd)/${OUT_DIR}"
+NFPM_OUT="$(cd "${OUT_DIR}" && pwd)"
+cd "${BUILD_DIR}"
 
 if ! command -v nfpm >/dev/null 2>&1; then
   echo "nfpm not found on PATH. Install from https://github.com/goreleaser/nfpm/releases" >&2
