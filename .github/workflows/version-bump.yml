@@ -49,10 +49,11 @@ jobs:
         run: |
           echo "Updating to version: $NEW_VERSION"
 
-          # Update root box.json
-          jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
-            box.json > box.json.tmp
-          mv box.json.tmp box.json
+          # Update root wheels.json (was box.json pre-4.0; the legacy
+          # `dependencies."wheels-core"` field is dropped in the slim schema).
+          jq --arg version "$NEW_VERSION" '.version = $version' \
+            wheels.json > wheels.json.tmp
+          mv wheels.json.tmp wheels.json
 
           # Update examples/starter-app/box.json
           jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
@@ -72,7 +73,7 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          git add box.json
+          git add wheels.json
           git add examples/starter-app/box.json
           git add CHANGELOG.md
 
@@ -93,6 +94,6 @@ jobs:
           echo "**Bump Type:** $BUMP_TYPE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Files Updated:" >> $GITHUB_STEP_SUMMARY
-          echo "- box.json" >> $GITHUB_STEP_SUMMARY
+          echo "- wheels.json" >> $GITHUB_STEP_SUMMARY
           echo "- examples/starter-app/box.json" >> $GITHUB_STEP_SUMMARY
           echo "- CHANGELOG.md (auto-generated from merged PRs)" >> $GITHUB_STEP_SUMMARY

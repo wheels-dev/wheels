@@ -169,7 +169,7 @@ jobs:
       - name: Generate API docs JSON (snapshot)
         run: |
           mkdir -p docs/api
-          VERSION=$(jq -r '.version' box.json)
+          VERSION=$(jq -r '.version' wheels.json)
           # Lowercase "-snapshot" matches the URL slug convention used by
           # web/scripts/generate-api-docs.mjs (version.replace(/\./g, '-')).
           SNAPSHOT_FILE="docs/api/v${VERSION}-snapshot.json"
@@ -214,6 +214,11 @@ jobs:
       FORGEBOX_API_TOKEN: ${{ secrets.FORGEBOX_API_TOKEN }}
       FORGEBOX_PASS: ${{ secrets.FORGEBOX_PASS }}
       DOWNSTREAM_DISPATCH_TOKEN: ${{ secrets.DOWNSTREAM_DISPATCH_TOKEN }}
+      # Required: the snapshot-publish step in release.yml writes the GitHub
+      # Release to wheels-dev/wheels-snapshots, which needs a PAT with
+      # Contents:write on that repo. Stable (main) builds don't use this and
+      # rely on the default GITHUB_TOKEN.
+      WHEELS_SNAPSHOTS_TOKEN: ${{ secrets.WHEELS_SNAPSHOTS_TOKEN }}
 
   #############################################
   # Deploy API docs snapshot to Cloudflare Pages
@@ -259,7 +264,7 @@ jobs:
 
       - name: Generate snapshot markdown from JSON
         run: |
-          VERSION=$(jq -r '.version' box.json)
+          VERSION=$(jq -r '.version' wheels.json)
           node web/scripts/generate-api-docs.mjs "${VERSION}-snapshot"
 
       - name: Build api site

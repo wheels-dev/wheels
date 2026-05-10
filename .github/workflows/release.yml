@@ -20,6 +20,13 @@ on:
       # of waiting for the daily cron. When absent, the step warns and exits 0.
       DOWNSTREAM_DISPATCH_TOKEN:
         required: false
+      # Required when this workflow is invoked from develop (snapshot context) so
+      # the snapshot release can be published to wheels-dev/wheels-snapshots
+      # instead of wheels-dev/wheels. Stable (main) builds don't use this and
+      # rely on the default GITHUB_TOKEN. See .github/RELEASE_PLAYBOOK.md for
+      # the channel architecture.
+      WHEELS_SNAPSHOTS_TOKEN:
+        required: false
 
 env:
   WHEELS_PRERELEASE: false
@@ -150,20 +157,30 @@ jobs:
               exit 1
             fi
 
-            # Check if box.json exists
-            if [ ! -f "$PACKAGE_DIR/box.json" ]; then
-              echo "ERROR: box.json not found in $PACKAGE_DIR!"
+            # Locate the package manifest. Prefer wheels.json (post-rename in 4.0)
+            # over box.json (legacy CommandBox/ForgeBox format). The legacy
+            # ForgeBox-bound artifacts (wheels-base-template, wheels-cli,
+            # wheels-starter-app) still carry box.json; wheels-core now uses
+            # wheels.json. This validator handles both.
+            local MANIFEST=""
+            if [ -f "$PACKAGE_DIR/wheels.json" ]; then
+              MANIFEST="$PACKAGE_DIR/wheels.json"
+            elif [ -f "$PACKAGE_DIR/box.json" ]; then
+              MANIFEST="$PACKAGE_DIR/box.json"
+            else
+              echo "ERROR: neither wheels.json nor box.json found in $PACKAGE_DIR!"
               exit 1
             fi
+            echo "  Manifest: $(basename $MANIFEST)"
 
-            # Validate box.json syntax
-            if ! jq empty "$PACKAGE_DIR/box.json" 2>/dev/null; then
-              echo "ERROR: Invalid JSON in $PACKAGE_DIR/box.json"
+            # Validate manifest syntax
+            if ! jq empty "$MANIFEST" 2>/dev/null; then
+              echo "ERROR: Invalid JSON in $MANIFEST"
               exit 1
             fi
 
             # Extract and display version
-            local VERSION=$(jq -r '.version' "$PACKAGE_DIR/box.json")
+            local VERSION=$(jq -r '.version' "$MANIFEST")
             echo "  Version: $VERSION"
 
             # Check that version matches expected version
@@ -400,6 +417,13 @@ jobs:
       # Same retry-wrap rationale as the stable Create-GitHub-Release step
       # above. Both branches need the wrap because the same flake fires on
       # any release upload regardless of branch.
+      #
+      # Snapshots publish to a separate repo (wheels-dev/wheels-snapshots) so
+      # the main repo's Releases page stays curated for GA tags only. Without
+      # the redirect, ~200-500 snapshot releases per year would drown the
+      # ~6-12 GA releases. Requires WHEELS_SNAPSHOTS_TOKEN — a fine-grained PAT
+      # with Contents:write on wheels-dev/wheels-snapshots, passed through via
+      # workflow_call from snapshot.yml.
       - name: Create Snapshot Pre-Release
         if: github.ref != 'refs/heads/main'
         id: gh-release-snapshot
@@ -411,10 +435,18 @@ jobs:
           with: |
             tag_name: v${{ env.WHEELS_VERSION }}
             name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
-            body: "Snapshot build from develop. Not for production use."
+            body: |
+              Automated snapshot from `wheels-dev/wheels` develop branch.
+
+              Install:
+              ```
+              brew upgrade wheels-be
+              ```
             draft: false
             prerelease: true
             overwrite_files: true
+            repository: wheels-dev/wheels-snapshots
+            token: ${{ secrets.WHEELS_SNAPSHOTS_TOKEN }}
             files: |
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
@@ -466,9 +498,26 @@ jobs:
             exit 0
           fi
 
+          # Derive the channel from the version string. The tap's auto-update.yml
+          # uses this to decide which formula to bump:
+          #   stable        → Formula/wheels.rb     (sources from wheels-dev/wheels)
+          #   bleeding-edge → Formula/wheels-be.rb  (sources from wheels-dev/wheels-snapshots)
+          # The version string already encodes this — `*-snapshot.*` is BE,
+          # `*-rc.*` is RC, anything else SemVer-clean is stable. Sniffing here
+          # rather than using a separate event type keeps backwards-compat with
+          # taps still on the older single-channel handler.
+          if echo "${WHEELS_RELEASE_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
+            CHANNEL="bleeding-edge"
+          elif echo "${WHEELS_RELEASE_VERSION}" | grep -qE '\-rc\.'; then
+            CHANNEL="release-candidate"
+          else
+            CHANNEL="stable"
+          fi
+          echo "Channel: ${CHANNEL}"
+
           # Static event type, fixed repo list — no untrusted input flows
           # into the curl arguments. WHEELS_RELEASE_VERSION is generated
-          # earlier in the same workflow from box.json + run number.
+          # earlier in the same workflow from wheels.json + run number.
           for repo in homebrew-wheels chocolatey-wheels; do
             echo "Dispatching wheels-released to wheels-dev/${repo}..."
             http_status=$(curl -sS -o /tmp/dispatch-resp.txt -w "%{http_code}" \
@@ -477,13 +526,13 @@ jobs:
               -H "Authorization: Bearer ${GH_DISPATCH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/wheels-dev/${repo}/dispatches" \
-              -d "{\"event_type\":\"wheels-released\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\"}}" )
+              -d "{\"event_type\":\"wheels-released\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\",\"channel\":\"${CHANNEL}\"}}" )
 
             # GitHub returns 204 No Content on success.
             if [ "${http_status}" != "204" ]; then
               echo "::warning::Dispatch to wheels-dev/${repo} returned HTTP ${http_status}: $(cat /tmp/dispatch-resp.txt)"
             else
-              echo "  ✓ ${repo} dispatched"
+              echo "  ✓ ${repo} dispatched (channel=${CHANNEL})"
             fi
           done
 

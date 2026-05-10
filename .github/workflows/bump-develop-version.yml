@@ -1,12 +1,12 @@
-# Auto-bumps box.json's version on develop after a GA release lands on main.
+# Auto-bumps wheels.json's version on develop after a GA release lands on main.
 #
 # Workflow:
 #   1. Maintainer cuts v4.0.1 (or whatever) on main.
 #   2. release.yml publishes to wheels-dev/wheels Releases.
 #   3. THIS workflow fires on the published release event, opens a PR against
-#      develop bumping box.json's version to (just-released-patch + 1).
+#      develop bumping wheels.json's version to (just-released-patch + 1).
 #   4. Maintainer rubberstamps the PR.
-#   5. Next develop merge fires publish-snapshot.yml with the new target
+#   5. Next develop merge fires snapshot.yml with the new target
 #      embedded in the snapshot version string.
 #
 # This is the "no version decisions ahead of time" piece — the maintainer
@@ -64,7 +64,7 @@ jobs:
         if: steps.gate.outputs.eligible == 'true'
         run: |
           # Strip leading 'v' if present (we tag as v4.0.1 but version field
-          # is bare 4.0.1 in box.json).
+          # is bare 4.0.1 in wheels.json).
           RELEASED_VERSION="${RELEASE_TAG#v}"
           if [[ ! "${RELEASED_VERSION}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             echo "Released tag ${RELEASE_TAG} doesn't match SemVer M.m.p — skipping bump."
@@ -96,7 +96,7 @@ jobs:
           body: |
             Automated bump triggered by GA release `${{ env.RELEASED_VERSION }}`.
 
-            Sets `box.json` version to `${{ env.NEW_VERSION }}` so subsequent
+            Sets `wheels.json` version to `${{ env.NEW_VERSION }}` so subsequent
             develop snapshots are tagged `${{ env.NEW_VERSION }}-snapshot.<run>`.
 
             **This is a baseline, not a commitment.** If the next GA release

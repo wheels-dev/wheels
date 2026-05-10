@@ -125,17 +125,23 @@ jobs:
               exit 1
             fi
 
-            if [ ! -f "$PACKAGE_DIR/box.json" ]; then
-              echo "ERROR: box.json not found in $PACKAGE_DIR!"
+            local MANIFEST=""
+            if [ -f "$PACKAGE_DIR/wheels.json" ]; then
+              MANIFEST="$PACKAGE_DIR/wheels.json"
+            elif [ -f "$PACKAGE_DIR/box.json" ]; then
+              MANIFEST="$PACKAGE_DIR/box.json"
+            else
+              echo "ERROR: neither wheels.json nor box.json found in $PACKAGE_DIR!"
+              exit 1
+            fi
+            echo "  Manifest: $(basename $MANIFEST)"
+
+            if ! jq empty "$MANIFEST" 2>/dev/null; then
+              echo "ERROR: Invalid JSON in $MANIFEST"
               exit 1
             fi
 
-            if ! jq empty "$PACKAGE_DIR/box.json" 2>/dev/null; then
-              echo "ERROR: Invalid JSON in $PACKAGE_DIR/box.json"
-              exit 1
-            fi
-
-            local VERSION=$(jq -r '.version' "$PACKAGE_DIR/box.json")
+            local VERSION=$(jq -r '.version' "$MANIFEST")
             echo "  Version: $VERSION"
 
             if [[ "$VERSION" != "${{ env.WHEELS_VERSION }}" ]]; then

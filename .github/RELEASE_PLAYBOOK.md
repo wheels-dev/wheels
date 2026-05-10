@@ -8,10 +8,17 @@ maintainer cutting a release at 3am.
 ## Daily flow (no maintainer action)
 
 ```
-PR → develop  →  publish-snapshot.yml fires  →  wheels-dev/wheels-snapshots gets a new release
-                                              →  homebrew-wheels tap auto-PRs the wheels-be bump
+PR → develop  →  snapshot.yml fires (existing workflow)
+                   ↓ calls release.yml via workflow_call
+                   ↓ release.yml detects develop branch context
+                   ↓ publishes snapshot release to wheels-dev/wheels-snapshots
+                                              →  homebrew-wheels tap's bleeding-edge-update.yml auto-PRs the wheels-be bump
                                               →  scoop bucket auto-PRs the wheels-be bump
 ```
+
+The publish target (wheels-dev/wheels-snapshots vs wheels-dev/wheels) is
+selected inside `release.yml` based on `github.ref`. Snapshots and stable
+releases share build logic; only the upload destination differs.
 
 Maintainer's only job: rubberstamp the auto-bump PRs in the tap repos when CI
 on them is green. ~5 minutes/day max.
@@ -142,6 +149,6 @@ If any pin to `<X.Y.Z`, open issues on those repos to widen the constraint.
 
 - [docs/contributing/release-process.md](../docs/contributing/release-process.md) — design rationale (versioning, channel model, why two repos)
 - [docs/contributing/wheels-bot.md](../docs/contributing/wheels-bot.md) — Claude-powered bot that triages issues and PRs
-- [.github/workflows/release.yml](workflows/release.yml) — GA release pipeline
-- [.github/workflows/publish-snapshot.yml](workflows/publish-snapshot.yml) — develop snapshot pipeline
+- [.github/workflows/release.yml](workflows/release.yml) — GA + snapshot release pipeline (channel-aware: snapshots target wheels-dev/wheels-snapshots, stable targets wheels-dev/wheels)
+- [.github/workflows/snapshot.yml](workflows/snapshot.yml) — develop-branch driver (fast-test gate + calls release.yml + deploys API docs to CF Pages)
 - [.github/workflows/bump-develop-version.yml](workflows/bump-develop-version.yml) — auto-bumps develop after GA
