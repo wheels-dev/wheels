@@ -81,6 +81,10 @@ cd myApp
 box server start cfengine=boxlang@latest port=8080
 ```
 
+<Aside type="note">
+`wheels start` boots the Lucee Express bundled with the CLI — it does not start BoxLang. BoxLang developers manage their server through CommandBox (`box server start/stop/restart`). Generators (`wheels generate ...`) are pure file-system operations and work the same regardless of engine.
+</Aside>
+
 Wheels' BoxLang compatibility is verified per release in the same CI matrix as Lucee and Adobe CF. Cross-engine gotchas worth knowing about live in [`.ai/wheels/cross-engine-compatibility.md`](https://github.com/wheels-dev/wheels/blob/develop/.ai/wheels/cross-engine-compatibility.md) — most are about minor differences in struct/array semantics under closures.
 
 ## Pick an engine

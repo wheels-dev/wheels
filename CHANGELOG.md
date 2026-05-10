@@ -26,6 +26,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 **Documentation**
 - Add Debug Panel guide covering each tab, configuration settings, and when the bar appears
+- Clarify BoxLang server management in cfml-engines guide; update vm-deployment tip to distinguish CommandBox server management from the `wheels` dev CLI
 
 **ORM & data layer**
 - Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `whereNotIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries (#1922)

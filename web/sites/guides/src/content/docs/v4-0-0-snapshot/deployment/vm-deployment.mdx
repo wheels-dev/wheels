@@ -67,7 +67,7 @@ Lucee 7 is the canonical engine target for Wheels 4. Two install options work eq
 Follow the Lucee install docs end-to-end rather than re-typing them here — they're the authoritative source and they change with each release. See [Lucee installation guides](https://docs.lucee.org/guides/installing-lucee/).
 
 <Aside type="tip">
-  If you already run CommandBox on other hosts, you can install Lucee via `box server start cfengine=lucee@7.0.1+100` on the VM too. It's the same mechanism the Wheels test images use (see `tools/docker/lucee7/server.json`). The systemd unit below still applies — point `ExecStart` at the CommandBox wrapper script instead of `lucee.sh run`.
+  If your team already uses CommandBox for server management, you can run Lucee on the VM via `box server start cfengine=lucee@7.0.1+100` as an alternative to the official installer. The systemd unit below still applies — point `ExecStart` at the CommandBox wrapper script instead of `lucee.sh run`. Note that `wheels start` is a local development convenience (it bundles a Lucee Express runtime for dev machines) and is not intended for production VM deployment.
 </Aside>
 
 After install, confirm Lucee is listening on a local port (`8888` is a common default) and that a `lucee.sh` (or equivalent) start script exists in `/opt/lucee/bin`.
