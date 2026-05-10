@@ -1,15 +1,14 @@
 component extends="wheels.WheelsTest" {
 
 	function run() {
-
 		describe("debug.cfm Packages section", () => {
-
-			// Regression for issue #2530: the debug-bar Packages tab only renders
-			// the "installed" table (driven by application.wheels.packageMeta).
-			// It never calls Public.$loadRegistryPackages, so the "available
-			// from the registry" table is missing entirely. The same call is
-			// already wired into vendor/wheels/public/views/packagelist.cfm.
-			it("renders registry packages alongside installed packages (##2530)", () => {
+			// The debug bar's Environment > Packages section shows ONLY locally
+			// installed packages (application.wheels.packageMeta). The list of
+			// packages available from the wheels-packages registry belongs on
+			// the standalone Tools > Packages page (packagelist.cfm), not in
+			// the inline debug overlay — keeps the bar compact and avoids
+			// every page load triggering a registry-listAll() walk.
+			it("does NOT render registry packages in the inline Environment panel (##2530)", () => {
 				var priorPublic = application.wheels.public;
 				var hadPkgComp = StructKeyExists(application.wheels, "enablePackagesComponent");
 				var priorPkgComp = hadPkgComp ? application.wheels.enablePackagesComponent : false;
@@ -23,24 +22,23 @@ component extends="wheels.WheelsTest" {
 					application.wheels.environment = "development";
 					application.wheels.enablePackagesComponent = true;
 					application.wheels.packageMeta = {};
-					application.wheels.public = CreateObject(
-						"component",
-						"wheels.tests._assets.packages.FakePublic"
-					).init(packages = [
-						{
-							name: "wheels-sentry-fixture-pkg",
-							description: "Fixture registry package for ##2530",
-							tags: [],
-							homepage: "",
-							latestVersion: "9.9.9"
-						}
-					]);
+					application.wheels.public = CreateObject("component", "wheels.tests._assets.packages.FakePublic").init(
+						packages = [
+							{
+								name = "wheels-sentry-fixture-pkg",
+								description = "Fixture registry package for ##2530",
+								tags = [],
+								homepage = "",
+								latestVersion = "9.9.9"
+							}
+						]
+					);
 
 					if (!StructKeyExists(request, "wheels")) {
 						request.wheels = {};
 					}
-					request.wheels.execution = {total: 0};
-					request.wheels.params = {controller: "wheels", action: "tests", route: "", key: ""};
+					request.wheels.execution = {total = 0};
+					request.wheels.params = {controller = "wheels", action = "tests", route = "", key = ""};
 
 					// debug.cfm bails out (cfexit) when url.format is one of
 					// json/xml/csv/pdf so it never breaks an API response. The
@@ -54,19 +52,17 @@ component extends="wheels.WheelsTest" {
 
 					var output = "";
 					try {
-						output = application.wo.$includeAndReturnOutput(
-							$template = "/wheels/events/onrequestend/debug.cfm"
-						);
+						output = application.wo.$includeAndReturnOutput($template = "/wheels/events/onrequestend/debug.cfm");
 					} finally {
 						if (hadUrlFormat) {
 							url.format = priorUrlFormat;
 						}
 					}
 
-					expect(output contains "wheels-sentry-fixture-pkg").toBeTrue(
-						"Expected debug.cfm output to include the registry package name "
-						& "'wheels-sentry-fixture-pkg' but the registry-packages table "
-						& "is not being rendered. See issue ##2530."
+					expect(output contains "wheels-sentry-fixture-pkg").toBeFalse(
+						"debug.cfm must NOT render the registry-packages table inline "
+						& "in the Environment panel. The registry list belongs on the "
+						& "standalone Tools > Packages page. See issue ##2530."
 					);
 				} finally {
 					application.wheels.public = priorPublic;
@@ -86,7 +82,7 @@ component extends="wheels.WheelsTest" {
 					request.wheels = priorReqWheels;
 				}
 			});
-
 		});
 	}
+
 }

@@ -17,9 +17,9 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * debugging), these surfaces must stay gated. See issue #2233.
 	 */
 	public boolean function $shouldBlockInProduction() {
-		return structKeyExists(application, "wheels")
-			&& structKeyExists(application.wheels, "environment")
-			&& application.wheels.environment == "production";
+		return StructKeyExists(application, "wheels")
+		&& StructKeyExists(application.wheels, "environment")
+		&& application.wheels.environment == "production";
 	}
 
 	/**
@@ -29,9 +29,9 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 */
 	public void function $blockInProduction() {
 		if ($shouldBlockInProduction()) {
-			cfheader(statuscode=404);
-			cfcontent(type="text/plain");
-			writeOutput("Not Found");
+			cfheader(statuscode = 404);
+			cfcontent(type = "text/plain");
+			WriteOutput("Not Found");
 			abort;
 		}
 	}
@@ -48,43 +48,30 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 */
 	public struct function $loadRegistryPackages(any registry = "") {
 		if ($shouldBlockInProduction()) {
-			return {packages: [], error: ""};
-		}
-		// User apps generated with `wheels new` don't ship the CLI alongside.
-		// When the Registry class isn't on the classpath, silently disable the
-		// browse-registry feature rather than crashing. The installed-packages
-		// table still renders normally.
-		if (!IsObject(arguments.registry) && !$registryClientAvailable()) {
-			return {packages: [], error: ""};
+			return {packages = [], error = ""};
 		}
 		local.reg = IsObject(arguments.registry) ? arguments.registry : $getRegistryClient();
 		try {
-			return {packages: local.reg.listAll(), error: ""};
+			return {packages = local.reg.listAll(), error = ""};
 		} catch ("Wheels.Packages.RegistryUnavailable" e) {
-			return {packages: [], error: "Registry lookup failed: " & e.message};
+			return {packages = [], error = "Registry lookup failed: " & e.message};
 		} catch ("Wheels.Packages.RegistryMalformed" e) {
-			return {packages: [], error: "Registry lookup failed: " & e.message};
+			return {packages = [], error = "Registry lookup failed: " & e.message};
 		} catch ("Wheels.Packages.UnknownPackage" e) {
-			return {packages: [], error: "Registry lookup failed: " & e.message};
+			return {packages = [], error = "Registry lookup failed: " & e.message};
 		}
 	}
 
 	/**
-	 * True if the CLI's Registry component is on the classpath — i.e., we're
-	 * running inside the framework repo (or a user app that ships the CLI
-	 * alongside). In a plain user app this returns false and the browse-
-	 * registry section silently disables.
-	 */
-	private boolean function $registryClientAvailable() {
-		return FileExists(ExpandPath("/cli/lucli/services/packages/Registry.cfc"));
-	}
-
-	/**
-	 * Lazy, app-scope memo of the CLI's Registry component.
+	 * Lazy, app-scope memo of the framework's Registry component.
+	 *
+	 * Lives at `vendor/wheels/services/packages/` so it ships with every
+	 * generated app — the framework's debug panel can surface registry
+	 * packages without any CLI dependency on disk. Issue #2530.
 	 */
 	private any function $getRegistryClient() {
 		if (!StructKeyExists(application.wheels, "$packageRegistry")) {
-			application.wheels.$packageRegistry = new cli.lucli.services.packages.Registry();
+			application.wheels.$packageRegistry = new wheels.services.packages.Registry();
 		}
 		return application.wheels.$packageRegistry;
 	}
@@ -121,13 +108,13 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/views/api.cfm";
 		return "";
 	}
-	function runner(){
+	function runner() {
 		$blockInProduction();
 		include "/wheels/public/views/runner.cfm";
 		return "";
 	}
 
-	function testbox(){
+	function testbox() {
 		$blockInProduction();
 		// Prefer the project's own runner if it exists (advanced users who
 		// scaffolded a custom tests/runner.cfm). Otherwise fall back to a
@@ -135,20 +122,20 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// emits the same JSON shape as the framework's core runner. Without
 		// this fallback, fresh apps got "Page [/tests/runner.cfm] not found"
 		// because `wheels new` doesn't scaffold one.
-		var projectRunner = expandPath("/tests/runner.cfm");
-		if (fileExists(projectRunner)) {
+		var projectRunner = ExpandPath("/tests/runner.cfm");
+		if (FileExists(projectRunner)) {
 			include "/tests/runner.cfm";
 			return;
 		}
 		include "/wheels/tests/app-runner.cfm";
 	}
 
-	public function tests_testbox(){
+	public function tests_testbox() {
 		$blockInProduction();
 		// Delegate to RocketUnit if testFramework setting says so
 		if (
-			structKeyExists(application, "wheels")
-			&& structKeyExists(application.wheels, "testFramework")
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "testFramework")
 			&& application.wheels.testFramework == "rocketunit"
 		) {
 			include "/wheels/public/views/tests.cfm";
@@ -156,20 +143,20 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 
 		// Set proper HTTP status first
-		cfheader(statuscode="200");
+		cfheader(statuscode = "200");
 
 		// Simple test to ensure the endpoint works
-		if (structKeyExists(url, "test") && url.test == "simple") {
-			cfcontent(type="application/json");
-			writeOutput('{"success":true,"message":"TestBox endpoint is working"}');
+		if (StructKeyExists(url, "test") && url.test == "simple") {
+			cfcontent(type = "application/json");
+			WriteOutput('{"success":true,"message":"TestBox endpoint is working"}');
 			abort;
 		}
 
 		// Set content type based on format
-		if (structKeyExists(url, "format") && url.format == "json") {
-			cfcontent(type="application/json");
-		} else if (structKeyExists(url, "format") && url.format == "txt") {
-			cfcontent(type="text/plain");
+		if (StructKeyExists(url, "format") && url.format == "json") {
+			cfcontent(type = "application/json");
+		} else if (StructKeyExists(url, "format") && url.format == "txt") {
+			cfcontent(type = "text/plain");
 		}
 
 		// Include the TestBox runner
@@ -283,7 +270,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		local.action = StructKeyExists(request.wheels.params, "action") ? request.wheels.params.action : "";
 		local.view = StructKeyExists(request.wheels.params, "view") ? request.wheels.params.view : "";
 		local.type = StructKeyExists(request.wheels.params, "type") ? request.wheels.params.type : "";
-		
+
 		switch (local.view) {
 			case "routes":
 			case "docs":
@@ -307,7 +294,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 		return "";
 	}
-	
+
 	function legacy() {
 		$blockInProduction();
 		// Handle legacy ?controller=wheels&action=wheels&view=xxx URLs
@@ -330,43 +317,53 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		$blockInProduction();
 		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
 
-		file = getFileFromPath(file);
-		if (!len(file) || find("..", file) || reFind("[/\\]", file)) {
-			cfheader(statusCode=404);
-			writeOutput("Image not found");
+		file = GetFileFromPath(file);
+		if (!Len(file) || Find("..", file) || ReFind("[/\\]", file)) {
+			cfheader(statusCode = 404);
+			WriteOutput("Image not found");
 			return;
 		}
 
-		var assetsDir = expandPath("/wheels/docs/src/.gitbook/assets/");
+		var assetsDir = ExpandPath("/wheels/docs/src/.gitbook/assets/");
 		var assetPath = assetsDir & file;
 
 		try {
-			var canonicalAssets = createObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
-			var canonicalPath = createObject("java", "java.io.File").init(assetPath).getCanonicalPath();
+			var canonicalAssets = CreateObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
+			var canonicalPath = CreateObject("java", "java.io.File").init(assetPath).getCanonicalPath();
 		} catch (any e) {
-			cfheader(statusCode=404);
-			writeOutput("Image not found");
+			cfheader(statusCode = 404);
+			WriteOutput("Image not found");
 			return;
 		}
-		if (!fileExists(assetPath) || CompareNoCase(left(canonicalPath, len(canonicalAssets)), canonicalAssets) != 0) {
-			cfheader(statusCode=404);
-			writeOutput("Image not found");
+		if (!FileExists(assetPath) || CompareNoCase(Left(canonicalPath, Len(canonicalAssets)), canonicalAssets) != 0) {
+			cfheader(statusCode = 404);
+			WriteOutput("Image not found");
 			return;
 		}
 
-		var ext = lcase(listLast(file, "."));
+		var ext = LCase(ListLast(file, "."));
 		var mime = "application/octet-stream";
 		switch (ext) {
-			case "png": mime = "image/png"; break;
+			case "png":
+				mime = "image/png";
+				break;
 			case "jpg":
-			case "jpeg": mime = "image/jpeg"; break;
-			case "gif": mime = "image/gif"; break;
-			case "svg": mime = "image/svg+xml"; break;
-			case "webp": mime = "image/webp"; break;
+			case "jpeg":
+				mime = "image/jpeg";
+				break;
+			case "gif":
+				mime = "image/gif";
+				break;
+			case "svg":
+				mime = "image/svg+xml";
+				break;
+			case "webp":
+				mime = "image/webp";
+				break;
 		}
-		cfheader(name="Content-Type", value=mime);
-		cffile(action="readBinary", file=assetPath, variable="imgData");
-		cfcontent(type=mime, variable=imgData);
+		cfheader(name = "Content-Type", value = mime);
+		cffile(action = "readBinary", file = assetPath, variable = "imgData");
+		cfcontent(type = mime, variable = imgData);
 	}
 
 	function mcp() {
@@ -374,4 +371,5 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/views/mcp.cfm";
 		return "";
 	}
+
 }
