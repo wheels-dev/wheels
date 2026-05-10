@@ -11,7 +11,23 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 - Use `gh` for GitHub state and read-only `git`. No writes, no edits.
 - **Output is a PR comment, not a review.** Reviews would re-trigger the
   caller workflow into an infinite loop.
-- Loop cap: 3 rounds. Check the existing comment count before posting.
+- Loop cap: 10 rounds per SHA. Check the existing comment count before
+  posting. Convergence happens when you and A agree on a recommendation;
+  non-converged rounds keep the loop going via Reviewer A's response.
+
+## Convergence — what this stage decides
+
+After your critique, you choose one of three outcomes:
+
+1. **Aligned, no changes needed** → emit `converged-approve` marker.
+   The PR is review-clean for this SHA. The human can mark ready and
+   merge.
+2. **Aligned, changes needed** → emit `converged-changes` marker. This
+   triggers `bot-address-review.yml` to apply the consensus. New
+   commits → fresh Reviewer A on the new SHA → loop restarts.
+3. **Not aligned** → emit only the round marker (no convergence
+   marker). This triggers Reviewer A to respond to your critique in
+   the next round, continuing the back-and-forth until alignment.
 
 ## Args
 
@@ -24,15 +40,21 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
    `gh pr view <pr-number> --json comments,headRefOid`. Count comments
    whose body matches `wheels-bot:review-b:<pr-number>:<sha>:` (any round).
 
-   - If the most recent matching comment has the **current head SHA**, exit
-     silently (we already commented on this exact head).
-   - Round number = (count of B comments for any SHA on this PR) + 1.
-   - **If round > 3**: post the terminal comment and exit:
+   - If the most recent matching comment has the **current head SHA**
+     **AND** the comment count on the current SHA already equals the
+     review-id you're processing (a precise dedup), exit silently.
+   - Round number for the current SHA =
+     (count of B comments on this exact SHA) + 1.
+   - **If round > 10**: post the terminal comment and exit. The cap
+     exists so the loop terminates when A and B can't align — humans
+     take over from there.
 
      ```
-     ## Wheels Bot — Reviewer B (no further iterations)
+     ## Wheels Bot — Reviewer B (round cap reached)
 
-     Round cap (3) reached. Handing back to humans.
+     Round cap (10) reached on this SHA. A and B did not converge —
+     the senior advisor (`bot-advisor.yml`, Opus) will engage to
+     break the deadlock and issue a tie-breaking verdict.
 
      <!-- wheels-bot:review-b:<pr>:<sha>:terminal -->
      ```
@@ -75,12 +97,39 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
    - Is A's verdict (`approve` / `request-changes` / `comment`) consistent
      with the findings?
 
-5. **Post the comment.** Format:
+5. **Convergence decision.** After completing the critique, decide
+   whether you and A are now aligned on a recommendation. Aligned means
+   ALL of:
+
+   - You have no remaining unaddressed missed-issues findings (either
+     A flagged them in their initial review, or A conceded them in a
+     prior response, or B itself raised them and now considers them
+     addressed in A's most recent response).
+   - You have no remaining false-positive disputes (every claim A made
+     has either been verified by you or successfully retracted by A in
+     a response).
+   - A's current verdict (approve / request-changes / comment) is one
+     you would also recommend after seeing the diff yourself.
+
+   Three possible outcomes:
+
+   - **Aligned + verdict is `approve`** → set the convergence marker
+     to `wheels-bot:converged-approve:<pr>:<sha>`. The PR is
+     review-clean for this SHA.
+   - **Aligned + verdict is `request-changes`** (or `comment` with
+     concrete actionable findings) → set the convergence marker to
+     `wheels-bot:converged-changes:<pr>:<sha>`. This triggers
+     `bot-address-review.yml`.
+   - **Not aligned** → no convergence marker (only the round marker).
+     This triggers A's response on the next round.
+
+6. **Post the comment.** Format:
 
    ```
    ## Wheels Bot — Reviewer B (round <N>)
 
-   <one-paragraph TL;DR of your assessment of A's review>
+   <one-paragraph TL;DR of your assessment of A's review/response and
+   your convergence decision>
 
    ### Sycophancy
    <bullets, or "none detected">
@@ -94,23 +143,44 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
    detected">
 
    ### Verdict alignment
-   <one sentence: is A's approve/request-changes/comment consistent with
-   their findings?>
+   <one sentence: is A's approve/request-changes/comment consistent
+   with their findings?>
+
+   ### Convergence
+   <one paragraph: are you and A now aligned? what's the joint
+   recommendation? if not aligned, what specifically does A need to
+   address in their next response?>
 
    <!-- wheels-bot:review-b:<pr>:<sha>:<round> -->
+   <CONVERGENCE_MARKER>
    ```
+
+   Where `<CONVERGENCE_MARKER>` is:
+   - `<!-- wheels-bot:converged-approve:<pr>:<sha> -->` for aligned-no-
+     changes
+   - `<!-- wheels-bot:converged-changes:<pr>:<sha> -->` for aligned-
+     changes-needed (triggers `bot-address-review.yml`)
+   - omitted entirely if not aligned (triggers A's response in the
+     next round)
 
    Use `gh pr comment <pr-number> --body "<...>"` — do **not** use
    `gh pr review`.
 
-6. **Self-check before posting.**
+7. **Self-check before posting.**
    - Have you actually read the cited diff lines for each false-positive
      claim? (Do not handwave.)
    - Are your missed-issue findings concrete enough that A could act on
-     them in a follow-up review?
+     them in a response?
    - Is the round number correct in the marker?
-   - Have you avoided re-reviewing the PR from scratch? (Stay focused on
-     critiquing A.)
+   - Have you avoided re-reviewing the PR from scratch? (Stay focused
+     on critiquing A.)
+   - Is your convergence decision consistent with the body of your
+     critique? (Don't say "aligned, approve" while listing missed
+     issues; don't say "not aligned" while marking everything
+     resolved.)
+   - If you emitted `converged-changes`, are the changes concrete and
+     actionable? (Address-review will read your prior comments to
+     synthesize the consensus — make sure it has enough detail.)
 
    If any check fails, fix and re-post (do not double-post).
 

@@ -1,0 +1,106 @@
+name: Wheels Bot — Senior Advisor
+
+# Fires when Reviewer A and Reviewer B fail to converge after the
+# inner-loop cap (B emits a `:terminal` marker). The advisor reads the
+# full exchange + the disputed code + canonical references, then issues
+# a tie-breaking verdict using Opus's deeper reasoning. Output is a
+# comment + convergence marker that drops back into the existing flow:
+# converged-approve ends the loop; converged-changes triggers
+# bot-address-review.yml.
+#
+# This is the only stage in the pipeline that runs Opus on a non-coding
+# task. The cost is justified because the advisor's verdict overrides
+# a deadlock — it must be right.
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR number with deadlocked A↔B exchange to advise on'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-advisor-${{ github.event.issue.number || inputs.pr-number }}
+  cancel-in-progress: false
+
+jobs:
+  advisor:
+    name: Senior advisor
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Auto-fires only on B's terminal marker (cap reached). The
+    # bot-identity check is load-bearing.
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && (
+        github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'issue_comment'
+            && github.event.comment.user.login == 'wheels-bot[bot]'
+            && contains(github.event.comment.body, 'wheels-bot:review-b:')
+            && contains(github.event.comment.body, ':terminal'))
+      )
+    env:
+      PR_NUMBER: ${{ github.event.issue.number || inputs.pr-number }}
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Resolve PR head ref + SHA
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr-number must be numeric, got: $PR_NUMBER"
+            exit 1
+          fi
+          info=$(gh pr view "$PR_NUMBER" --repo wheels-dev/wheels --json headRefName,headRefOid)
+          ref=$(echo "$info" | python3 -c "import json,sys; print(json.load(sys.stdin)['headRefName'])")
+          sha=$(echo "$info" | python3 -c "import json,sys; print(json.load(sys.stdin)['headRefOid'])")
+          echo "head=$ref" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: pr
+          target-number: ${{ env.PR_NUMBER }}
+          # Fires once per SHA. If the advisor already advised at this
+          # SHA, the marker is already present and the workflow exits.
+          marker-pattern: 'wheels-bot:advisor:${{ env.PR_NUMBER }}:${{ steps.pr.outputs.sha }}'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Run Senior Advisor
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Triggered by wheels-bot[bot]'s Reviewer B comment carrying
+          # a terminal marker. Allow that bot identity (and
+          # github-actions[bot] for consistency).
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /advise-on-deadlock ${{ env.PR_NUMBER }}
+          claude_args: |
+            --model claude-opus-4-7
+            --max-turns 500
+            --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
