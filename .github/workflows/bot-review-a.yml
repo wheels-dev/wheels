@@ -1,40 +1,52 @@
 name: Wheels Bot — Reviewer A
 
+# Two trigger paths into this workflow:
+# 1. pull_request — the standard path (PR opens, syncs, or marks ready).
+#    Reviewer A submits its initial review of the diff via /review-pr.
+# 2. issue_comment — the convergence-loop path. When Reviewer B posts a
+#    not-yet-aligned critique (matches `wheels-bot:review-b:` but NOT
+#    `wheels-bot:converged-` and NOT `:terminal`), A responds via
+#    /respond-to-critique. The response is itself a review (state=COMMENT),
+#    which triggers Reviewer B's next round — loop continues until B
+#    emits a converged-* marker or the round cap fires.
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review]
     branches: [develop]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
 
 concurrency:
-  group: wheels-bot-review-a-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-  cancel-in-progress: true
+  group: wheels-bot-review-a-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   review:
     name: Reviewer A
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Reviews human PRs that are ready-for-review, AND the bot's own PRs
-    # even while draft. Bot PRs get reviewed pre-merge so the human merge
-    # decision is informed by Reviewer A's analysis (and Reviewer B's
-    # critique) rather than blind. Human drafts are skipped because drafts
-    # are work-in-progress and reviews would churn.
+    # Initial review: bot PRs (even draft) OR human ready-for-review PRs.
+    # Response: bot's own comment from Reviewer B that is NOT a converged
+    # marker AND NOT terminal — i.e., B is signalling "more discussion
+    # needed."
+    # The bot-identity check on the comment path is load-bearing: prevents
+    # humans from quoting a marker in a reply to trigger the response.
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
       && (
-        github.event.pull_request.user.login == 'wheels-bot[bot]'
-        || github.event.pull_request.draft == false
+        (github.event_name == 'pull_request'
+          && (github.event.pull_request.user.login == 'wheels-bot[bot]'
+              || github.event.pull_request.draft == false))
+        || (github.event_name == 'issue_comment'
+            && github.event.comment.user.login == 'wheels-bot[bot]'
+            && contains(github.event.comment.body, 'wheels-bot:review-b:')
+            && !contains(github.event.comment.body, 'wheels-bot:converged-')
+            && !contains(github.event.comment.body, ':terminal'))
       )
     steps:
-      - name: Checkout PR head
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-
       - name: Generate App token
         id: app-token
         uses: actions/create-github-app-token@v2
@@ -42,28 +54,69 @@ jobs:
           app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
           private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
 
-      - name: Skip check
+      - name: Resolve PR info
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_FROM_PR_EVENT: ${{ github.event.pull_request.number }}
+          PR_FROM_COMMENT_EVENT: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            pr_num="$PR_FROM_PR_EVENT"
+            sha="${{ github.event.pull_request.head.sha }}"
+            mode="initial"
+          else
+            pr_num="$PR_FROM_COMMENT_EVENT"
+            # Validate numeric.
+            if ! [[ "$pr_num" =~ ^[0-9]+$ ]]; then
+              echo "::error::Invalid PR number from issue context: $pr_num"
+              exit 1
+            fi
+            sha=$(gh pr view "$pr_num" --repo wheels-dev/wheels --json headRefOid -q '.headRefOid')
+            mode="response"
+          fi
+          echo "pr_num=$pr_num" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Skip check (initial review only — response mode handles its own idempotency)
+        if: github.event_name == 'pull_request'
         id: gate
         uses: ./.github/actions/wheels-bot-skip-check
         with:
           target-type: pr
-          target-number: ${{ github.event.pull_request.number }}
-          marker-pattern: 'wheels-bot:review-a:${{ github.event.pull_request.number }}:${{ github.event.pull_request.head.sha }}'
+          target-number: ${{ steps.pr.outputs.pr_num }}
+          marker-pattern: 'wheels-bot:review-a:${{ steps.pr.outputs.pr_num }}:${{ steps.pr.outputs.sha }}:'
           github-token: ${{ steps.app-token.outputs.token }}
 
+      - name: Determine prompt
+        id: cmd
+        run: |
+          if [ "${{ steps.pr.outputs.mode }}" = "initial" ]; then
+            echo "cmd=/review-pr ${{ steps.pr.outputs.pr_num }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "cmd=/respond-to-critique ${{ steps.pr.outputs.pr_num }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Reviewer A
-        if: steps.gate.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' || steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
-          # Allow our App's bot identity and github-actions[bot] to initiate
-          # the action. Reviewer A now runs on wheels-bot[bot] PRs too (so
-          # the human merge decision has analysis to lean on), so this is
-          # the primary case — not defensive.
+          # Allows the App's bot identity (and github-actions[bot] for
+          # consistency). Reviewer A runs on bot's own PRs and responds
+          # to its own Reviewer B comments — both legitimately bot-driven.
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
-            /review-pr ${{ github.event.pull_request.number }}
+            ${{ steps.cmd.outputs.cmd }}
           claude_args: |
             --model claude-sonnet-4-6
             --max-turns 250

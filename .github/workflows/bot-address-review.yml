@@ -1,0 +1,140 @@
+name: Wheels Bot — Address Review
+
+# Fires when Reviewer B posts a converged-changes verdict, signaling that
+# A and B have aligned on "this PR needs changes." The bot reads the
+# consensus, applies the changes to the PR's existing branch, and pushes.
+# The new commit triggers a fresh Reviewer A run on the new SHA — the
+# convergence loop restarts on the updated PR state. Bounded by an
+# outer-loop cap (5 implementation rounds per PR; enforced in the prompt).
+#
+# This is a *coding* stage — Opus model, broad allowlist with the test
+# runner, mirrors propose-fix's setup. Different from review-a/review-b
+# which are analytical and stay on Sonnet.
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR number whose converged-changes verdict to address'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-address-review-${{ github.event.issue.number || inputs.pr-number }}
+  cancel-in-progress: false
+
+jobs:
+  address-review:
+    name: Address review
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Auto-fires on B's converged-changes marker. The bot-identity check
+    # is load-bearing: prevents humans from quoting the marker in a reply
+    # to trigger this stage.
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && (
+        github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'issue_comment'
+            && github.event.comment.user.login == 'wheels-bot[bot]'
+            && contains(github.event.comment.body, 'wheels-bot:converged-changes:'))
+      )
+    env:
+      PR_NUMBER: ${{ github.event.issue.number || inputs.pr-number }}
+      WHEELS_CI: "true"
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Resolve PR head ref
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr-number must be numeric, got: $PR_NUMBER"
+            exit 1
+          fi
+          ref=$(gh pr view "$PR_NUMBER" --repo wheels-dev/wheels --json headRefName -q '.headRefName')
+          if [ -z "$ref" ]; then
+            echo "::error::Could not resolve PR head ref for #$PR_NUMBER"
+            exit 1
+          fi
+          echo "head=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: pr
+          target-number: ${{ env.PR_NUMBER }}
+          # Skip if address-held already engaged for this PR. The prompt
+          # does deeper round counting (outer-loop cap of 5).
+          marker-pattern: 'wheels-bot:address-held:${{ env.PR_NUMBER }}'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          git config user.name "wheels-bot[bot]"
+          git config user.email "wheels-bot[bot]@users.noreply.github.com"
+
+      - name: Set up Wheels test environment
+        if: steps.gate.outputs.skip == 'false'
+        uses: ./.github/actions/setup-wheels-test-env
+        with:
+          port: '60007'
+          install-playwright: 'false'
+
+      - name: Run Address Review
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Triggered by wheels-bot[bot]'s Reviewer B comment with a
+          # converged-changes marker. Allow that identity.
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /address-review ${{ env.PR_NUMBER }}
+          claude_args: |
+            --model claude-opus-4-7
+            --max-turns 1000
+            --allowedTools "Bash(gh:*),Bash(git:*),Bash(bash tools/test-local.sh*),Bash(curl:*),Read,Edit,Write,Grep,Glob"
+
+      - name: Push branch
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # Only push if the bot actually committed changes; otherwise
+          # the run was a no-op (e.g., address-held safety net engaged).
+          if [ -z "$(git log @{u}..HEAD --oneline 2>/dev/null)" ]; then
+            echo "No new commits — nothing to push."
+            exit 0
+          fi
+          git push origin HEAD
+
+      - name: Stop Lucee server
+        if: always()
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
+          lucli server stop 2>/dev/null || true

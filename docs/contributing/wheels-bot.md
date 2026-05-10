@@ -2,7 +2,7 @@
 
 `wheels-bot[bot]` is a custom GitHub App that automates issue triage,
 cross-framework design research, fix-PR generation, and PR review on
-`wheels-dev/wheels`. It runs as seven stages, each backed by a slash-command
+`wheels-dev/wheels`. It runs as nine stages, each backed by a slash-command
 prompt in `.claude/commands/` and a workflow in `.github/workflows/bot-*.yml`.
 
 This page is for humans interacting with the bot. For the design rationale,
@@ -21,7 +21,7 @@ contribution rules, see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 - Flip the repo variable `WHEELS_BOT_ENABLED` to `false` to halt the bot
   entirely without code changes.
 
-## The seven stages
+## The nine stages
 
 ### 1. Triage (`bot-triage.yml`)
 
@@ -162,37 +162,137 @@ in-flight branches.
 
 ### 6. Reviewer A (`bot-review-a.yml`)
 
-Fires on `pull_request: opened/synchronize/ready_for_review` against
-`develop`. Reviews:
+Fires on two trigger paths:
 
-- Human PRs that are ready-for-review (drafts are skipped — they're
-  work-in-progress and reviewing them would churn).
-- The bot's own PRs **even while draft**, so the human merge decision is
-  informed by Reviewer A's analysis (and Reviewer B's critique) rather
-  than blind. The PR stays draft until a human marks it ready, which
-  remains the explicit "I've read the reviews and want to merge" signal.
+1. **`pull_request: opened/synchronize/ready_for_review`** — initial
+   review (`/review-pr`). Reviews:
+   - Human PRs that are ready-for-review (drafts are skipped — they're
+     work-in-progress and reviewing them would churn).
+   - The bot's own PRs **even while draft**, so the human merge
+     decision is informed by Reviewer A's analysis (and Reviewer B's
+     critique) rather than blind.
+2. **`issue_comment: created`** matching `wheels-bot:review-b:` (and
+   NOT `:terminal`, NOT `wheels-bot:converged-`) — response mode
+   (`/respond-to-critique`). Triggered by Reviewer B posting a
+   not-yet-aligned critique. A reads B's critique, engages with each
+   finding (concede or defend with evidence), and submits a response
+   review (state `COMMENT`). The response triggers Reviewer B's next
+   round, continuing the back-and-forth until alignment.
 
-Posts a single PR review with line comments grouped under: Correctness,
-Conventions, Cross-engine, Tests, Docs, Commits, Security. Verdict is
-`approve` / `request-changes` / `comment`. Verdict and findings must be
-consistent — Reviewer B will catch sycophancy if they aren't.
+Initial review posts a `gh pr review` with verdict
+`approve` / `request-changes` / `comment` and findings grouped under
+Correctness, Conventions, Cross-engine, Tests, Docs, Commits, Security.
+Response review posts as `COMMENT` state with engagement on each of B's
+findings.
 
 ### 7. Reviewer B (`bot-review-b.yml`)
 
 Fires when Reviewer A submits a review (filtered on
-`review.user.login == 'wheels-bot[bot]'`). Reviewer B critiques A's review,
-not the PR — looking for sycophancy ("LGTM" without evidence), false
-positives (claims that don't match the actual code), and missed issues.
-Runs on both human PRs (ready-for-review only) and the bot's own PRs
-(even draft — same rationale as Reviewer A).
+`review.user.login == 'wheels-bot[bot]'`). Reviewer B critiques A's
+review, not the PR — looking for sycophancy ("LGTM" without evidence),
+false positives (claims that don't match the actual code), and missed
+issues. Runs on both human PRs (ready-for-review only) and the bot's
+own PRs (even draft — same rationale as Reviewer A).
+
+**Reviewer B is also the convergence arbiter.** Each round, after
+critiquing A's review or response, B decides whether they and A are
+now aligned on a recommendation. B emits one of three signals:
+
+- `converged-approve` — aligned, no changes needed. PR is review-clean
+  for this SHA. Loop terminates; the human can mark ready for merge.
+- `converged-changes` — aligned on the need for changes. **Triggers
+  `bot-address-review.yml`** (Stage 8) to apply the consensus.
+- (no convergence marker) — not aligned. Triggers Reviewer A to respond
+  to this critique in the next round, continuing the back-and-forth.
 
 Posts as a PR comment (not a review) so it doesn't re-trigger itself.
-Loop is capped at 3 rounds. Round 4 emits a terminal "no further
-iterations" message. The natural stopping condition for the bot-PR flow
-is one Reviewer A review per SHA — once the bot's PR stops emitting new
-commits (typically after `bot-update-docs` lands its docs commit), no
-new SHA → no new Reviewer A → no new Reviewer B. The human reads the
-final A+B exchange and decides whether to mark ready and merge.
+Loop is capped at **10 rounds per SHA**. Round 11 emits a terminal
+message that triggers Stage 9 (Senior Advisor) — A and B couldn't
+align, so an Opus advisor breaks the deadlock and issues a
+tie-breaking verdict that drops back into the convergence flow.
+
+### 8. Address Review (`bot-address-review.yml`)
+
+Fires when Reviewer B emits a `wheels-bot:converged-changes:<pr>:<sha>`
+marker. Reads the consensus from the A↔B exchange, applies the agreed
+changes to the PR's existing branch, and pushes the new commits. The
+new SHA triggers a fresh Reviewer A run, restarting the convergence
+loop on the updated PR state.
+
+This is a *coding* stage — Opus model, 60-minute timeout, broad
+allowlist with the test runner (mirrors propose-fix's setup). Different
+from the analytical Sonnet stages above.
+
+The bot:
+
+1. Reads A's review/responses and B's critique chain to identify the
+   consensus changes (intersection of A's findings B verified + B's
+   missed-issues findings A didn't refute).
+2. Auto-downgrades and stops if the consensus touches sensitive areas
+   (security, migrations, deploy, DI). Posts
+   `wheels-bot:address-held:<pr>:<sha>` instead of making changes.
+3. Branch-aware scope: `fix/bot-*` PRs allow code/test edits; `docs/bot-*`
+   PRs are doc-paths-only (refuses to touch code if a finding requires
+   it — escalates to held).
+4. Applies the consensus changes and re-runs affected specs for
+   `fix/bot-*` PRs.
+5. Commits + pushes back to the PR's existing branch.
+6. Posts a comment summarizing what was addressed and what was skipped.
+
+**Outer-loop cap: 5 implementation rounds per PR.** After 5 rounds, the
+prompt refuses to fire and posts a "max iterations reached, human
+attention required" comment. Combined with Reviewer B's 10-round inner
+cap, the maximum bot effort per PR is bounded at 5 implementations × 10
+A↔B rounds = 50 review rounds before a human takes over.
+
+Reviewer A and Reviewer B continue to cover the PR after each
+implementation cycle — the address-review's commit triggers `pull_request:
+synchronize` → Reviewer A on the new SHA → loop continues.
+
+### 9. Senior Advisor (`bot-advisor.yml`)
+
+The deadlock-breaker. Fires when Reviewer A and Reviewer B fail to
+converge after the inner-loop cap (B emits a `:terminal` marker at
+round 11). The advisor reads the full A↔B exchange, the disputed
+code, and the canonical references (`CLAUDE.md`, `.ai/wheels/`),
+then issues a tie-breaking verdict.
+
+**This is the only stage that runs Opus on a non-coding task.** The
+reasoning depth is justified because the advisor's verdict overrides
+the analytical reviewers' deadlock — it must be right. Address-
+review uses Opus because it modifies code; advisor uses Opus because
+it adjudicates code-related disputes Sonnet couldn't resolve.
+
+The advisor:
+
+1. Confirms the deadlock by finding B's terminal marker for the
+   current SHA.
+2. Reads A's reviews/responses + B's critiques chronologically.
+3. Identifies the SPECIFIC points of disagreement (findings A flagged
+   but B persistently rejected; issues B raised but A persistently
+   refuted; verdict mismatches).
+4. **Reads the actual disputed code at each cited line** — doesn't
+   rely solely on the exchange's quoted snippets.
+5. Consults canonical references for each ruling.
+6. Rules on each disputed point with concrete evidence (file:line,
+   doc path).
+7. Synthesizes one verdict: `approve` (disputes wash out) or
+   `changes` (at least one disputed finding required action).
+8. Posts a comment with the rulings + verdict + a convergence marker
+   that drops back into the existing flow:
+   - `converged-approve` → loop ends, PR is review-clean for this SHA
+   - `converged-changes` → triggers `bot-address-review.yml` (Stage 8)
+     to apply the advisor's specified findings
+
+The advisor fires once per SHA (idempotent on
+`wheels-bot:advisor:<pr>:<sha>`). It does NOT iterate or re-debate
+the rulings — its verdict is authoritative within the convergence
+loop. If the resulting address-review introduces a new SHA, the
+fresh A↔B loop on that SHA starts over from round 1.
+
+**Cost:** Opus + 30-min timeout + read-only allowlist. Worst case
+per advisor run: ~$3-5. Triggered only on deadlocks, so most PRs
+never invoke it.
 
 ## Maintenance: auto-close stale triage (`bot-auto-close.yml`)
 
@@ -224,8 +324,14 @@ they make every workflow safely retryable.
 | `wheels-bot:write-docs:<issue>` | Write Docs stage opened a docs PR for this issue. |
 | `wheels-bot:docs-held:<issue>` | Docs would have been written but the safety net held it for a human. |
 | `wheels-bot:update-docs:<pr>` | Update Docs stage processed this PR (with or without doc edits). |
-| `wheels-bot:review-a:<pr>:<sha>` | Reviewer A reviewed this PR at this SHA. |
+| `wheels-bot:review-a:<pr>:<sha>` | Reviewer A submitted its initial review at this SHA. |
+| `wheels-bot:review-a-response:<pr>:<sha>:<round>` | Reviewer A responded to B's critique at round N (convergence loop). |
 | `wheels-bot:review-b:<pr>:<sha>:<round>` | Reviewer B critiqued round N. |
+| `wheels-bot:converged-approve:<pr>:<sha>` | A and B aligned on `approve` — PR is review-clean. |
+| `wheels-bot:converged-changes:<pr>:<sha>` | A and B aligned on changes needed — triggers `bot-address-review.yml`. |
+| `wheels-bot:address-review:<pr>:<sha>:<round>` | Address-review applied consensus at SHA, round N (outer loop). |
+| `wheels-bot:address-held:<pr>:<sha>` | Address-review would have made changes but the safety net held it for a human. |
+| `wheels-bot:advisor:<pr>:<sha>` | Senior Advisor (Opus) issued a tie-breaking verdict on a deadlocked A↔B exchange at this SHA. |
 | `wheels-bot:auto-close:<issue>` | Auto-close cron closed this issue. |
 
 ## Operating the bot
@@ -269,10 +375,14 @@ they make every workflow safely retryable.
   `wheels-bot:triage-class:framework-design`; write-docs runs from
   `wheels-bot:docs-confidence:high`; bot-update-docs runs on
   `pull_request: opened` for `wheels-bot[bot]` PRs (excluding
-  `docs/bot-*` branches, which are write-docs's own output). To halt
-  auto-fire without code changes, flip `WHEELS_BOT_ENABLED=false`. To
-  halt permanently, revert the `if:` blocks in the four workflows back
-  to `workflow_dispatch`-only and keep the kill-switch flipped.
+  `docs/bot-*` branches); **address-review runs on
+  `wheels-bot:converged-changes:` markers from Reviewer B**;
+  **Reviewer A's response mode runs on non-converged
+  `wheels-bot:review-b:` markers**; **Senior Advisor runs on B's
+  `:terminal` markers (deadlock resolution)**. To halt auto-fire
+  without code changes, flip `WHEELS_BOT_ENABLED=false`. To halt
+  permanently, revert the `if:` blocks in the workflows back to
+  `workflow_dispatch`-only and keep the kill-switch flipped.
 - **Review bot-authored PRs the same as human-authored PRs.** Don't
   rubber-stamp.
 - **Watch costs.** API spend per fix-PR is non-trivial (Opus + many turns +
