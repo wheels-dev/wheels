@@ -134,9 +134,10 @@ component extends="modules.BaseModule" {
 	public string function version() {
 		var nl = chr(10);
 		var moduleVersion = super.version();
-		var snapshotTag = reFindNoCase("snapshot|dev", moduleVersion) ? " (snapshot)" : "";
+		var channel = new services.ReleaseChannel().classify(moduleVersion);
+		var channelTag = len(channel) ? " (" & channel & ")" : "";
 
-		var lines = ["Wheels " & moduleVersion & snapshotTag];
+		var lines = ["Wheels " & moduleVersion & channelTag];
 
 		var lucliVersion = $detectLucliVersion();
 		if (len(lucliVersion)) {
@@ -3520,13 +3521,19 @@ component extends="modules.BaseModule" {
 	 * Scan app for breaking changes between current and target version.
 	 */
 	private string function runUpgradeCheck(string targetVersion = "") {
-		// Detect current version
-		var boxJsonPath = variables.projectRoot & "/vendor/wheels/box.json";
+		// Detect current version. Prefer wheels.json (post-rename) and fall back
+		// to box.json so apps with pre-rename vendor/wheels/ committed in their
+		// repo still work. The fallback can be removed two releases after the
+		// wheels.json rename ships in stable.
+		var manifestPath = variables.projectRoot & "/vendor/wheels/wheels.json";
+		if (!fileExists(manifestPath)) {
+			manifestPath = variables.projectRoot & "/vendor/wheels/box.json";
+		}
 		var currentVersion = "unknown";
-		if (fileExists(boxJsonPath)) {
+		if (fileExists(manifestPath)) {
 			try {
-				var boxData = deserializeJSON(fileRead(boxJsonPath));
-				currentVersion = boxData.version ?: "unknown";
+				var manifestData = deserializeJSON(fileRead(manifestPath));
+				currentVersion = manifestData.version ?: "unknown";
 			} catch (any e) {}
 		}
 

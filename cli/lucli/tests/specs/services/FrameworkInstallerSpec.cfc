@@ -158,6 +158,63 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				directoryDelete(f.root, true);
 			});
 
+			describe("manifest filename: wheels.json preferred, box.json fallback", () => {
+
+				it("reads wheels.json when present (post-rename world)", () => {
+					var root = getTempDirectory() & "wheels-fw-newname-#createUUID()#";
+					var sourceWheels = root & "/vendor/wheels";
+					var targetWheels = root & "/target/vendor/wheels";
+					directoryCreate(sourceWheels, true, true);
+					directoryCreate(targetWheels, true, true);
+					fileWrite(root & "/wheels.json", '{"name":"Wheels.fw","version":"4.0.0"}');
+					fileWrite(sourceWheels & "/wheels.json", '{"version":"@build.version@"}');
+					fileWrite(targetWheels & "/wheels.json", '{"version":"@build.version@"}');
+
+					var rewrote = installer.rewriteVersionPlaceholder(sourceWheels, targetWheels);
+					expect(rewrote).toBeTrue();
+					var after = deserializeJSON(fileRead(targetWheels & "/wheels.json"));
+					expect(after.version).toBe("4.0.0-dev");
+					directoryDelete(root, true);
+				});
+
+				it("prefers wheels.json over box.json when both exist (rename in progress)", () => {
+					// During the rename window, an app might briefly have both files
+					// staged. wheels.json is canonical; box.json is stale.
+					var root = getTempDirectory() & "wheels-fw-both-#createUUID()#";
+					var sourceWheels = root & "/vendor/wheels";
+					var targetWheels = root & "/target/vendor/wheels";
+					directoryCreate(sourceWheels, true, true);
+					directoryCreate(targetWheels, true, true);
+					fileWrite(root & "/wheels.json", '{"name":"Wheels.fw","version":"5.0.0"}');
+					fileWrite(root & "/box.json", '{"name":"Wheels.fw","slug":"wheels","version":"3.9.9"}');
+					fileWrite(sourceWheels & "/wheels.json", '{"version":"@build.version@"}');
+					fileWrite(targetWheels & "/wheels.json", '{"version":"@build.version@"}');
+
+					var rewrote = installer.rewriteVersionPlaceholder(sourceWheels, targetWheels);
+					expect(rewrote).toBeTrue();
+					var after = deserializeJSON(fileRead(targetWheels & "/wheels.json"));
+					// wheels.json's 5.0.0 won, not box.json's 3.9.9.
+					expect(after.version).toBe("5.0.0-dev");
+					directoryDelete(root, true);
+				});
+
+				it("falls back to box.json when wheels.json is absent (pre-rename brew bottle)", () => {
+					// Already covered by every test above this describe — they
+					// all use box.json. This spec explicitly documents the fallback
+					// expectation as part of the rename's behavior contract.
+					var f = buildFixture(
+						'{"name":"Wheels.fw","slug":"wheels","version":"4.0.0"}',
+						'{"version":"@build.version@"}'
+					);
+					var rewrote = installer.rewriteVersionPlaceholder(f.sourceWheels, f.targetWheels);
+					expect(rewrote).toBeTrue();
+					var after = deserializeJSON(fileRead(f.targetWheels & "/box.json"));
+					expect(after.version).toBe("4.0.0-dev");
+					directoryDelete(f.root, true);
+				});
+
+			});
+
 		});
 
 	}

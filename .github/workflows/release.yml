@@ -41,18 +41,26 @@ jobs:
 
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          cat box.json
-          BASE_VERSION=$(cat box.json | jq '.version' -r)
-          echo "Base version from box.json: ${BASE_VERSION}"
-          # Develop builds get -SNAPSHOT qualifier; main builds are stable releases.
-          # Source files keep clean versions (e.g. 3.1.0) so no changes are
-          # needed when promoting develop to main.
+          cat wheels.json
+          BASE_VERSION=$(jq -r '.version' wheels.json)
+          echo "Base version from wheels.json: ${BASE_VERSION}"
+          # Develop builds carry a -snapshot.N pre-release identifier; main builds
+          # are stable releases. The snapshot identifier uses '.' (not '+') so it
+          # is a SemVer pre-release identifier, not build metadata. Per SemVer §10,
+          # build metadata (after '+') MUST be ignored in precedence comparisons —
+          # which would make snapshot N and N+1 sort equal in brew/choco. The '.'
+          # form sorts numerically, so 4.0.1-snapshot.1657 > 4.0.1-snapshot.1656.
           if [ "$GITHUB_REF" == "refs/heads/develop" ]; then
-            echo "WHEELS_VERSION=${BASE_VERSION}-SNAPSHOT+${{ github.run_number }}" >> $GITHUB_ENV
+            echo "WHEELS_VERSION=${BASE_VERSION}-snapshot.${RUN_NUMBER}" >> $GITHUB_ENV
             echo "BRANCH=develop" >> $GITHUB_ENV
           else
-            echo "WHEELS_VERSION=${BASE_VERSION}+${{ github.run_number }}" >> $GITHUB_ENV
+            # Stable release: BASE_VERSION is the GA version, no build qualifier.
+            # The run number is captured in the GitHub Actions history; embedding
+            # it in the artifact version is SemVer-meaningless for a GA tag.
+            echo "WHEELS_VERSION=${BASE_VERSION}" >> $GITHUB_ENV
             echo "BRANCH=main" >> $GITHUB_ENV
           fi
 
@@ -80,13 +88,13 @@ jobs:
             exit 1
           fi
 
-          # Check that source version in box.json is clean (no -SNAPSHOT suffix).
-          # The workflow injects -SNAPSHOT for develop builds automatically.
-          BASE_VERSION=$(jq -r '.version' box.json)
+          # Check that source version in wheels.json is clean (no -snapshot suffix).
+          # The workflow injects -snapshot.N for develop builds automatically.
+          BASE_VERSION=$(jq -r '.version' wheels.json)
           if echo "$BASE_VERSION" | grep -qi "snapshot"; then
-            echo "ERROR: Version in box.json contains -SNAPSHOT suffix ($BASE_VERSION)"
+            echo "ERROR: Version in wheels.json contains snapshot suffix ($BASE_VERSION)"
             echo "Source files should have clean versions (e.g., 3.1.0)."
-            echo "The workflow adds -SNAPSHOT automatically for develop builds."
+            echo "The workflow adds -snapshot.N automatically for develop builds."
             exit 1
           fi
 
@@ -229,6 +237,25 @@ jobs:
           md5sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5 || md5 -r wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5
           sha512sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512
 
+      # Build .deb / .rpm Linux packages alongside the zip artifacts. nfpm
+      # needs no Linux-specific build host (it's a single Go binary), so this
+      # runs on the same ubuntu-latest runner as the rest of the pipeline.
+      # Generates wheels_<v>_amd64.deb and wheels-<v>.x86_64.rpm in dist/.
+      # See tools/distribution-drafts/linux-packages/ for the nfpm configs.
+      - name: Install nfpm
+        run: |
+          NFPM_VERSION="2.40.0"
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
+            | sudo tar -xzf - -C /usr/local/bin nfpm
+          nfpm --version
+
+      - name: Build Linux packages (.deb / .rpm)
+        env:
+          WHEELS_VERSION: ${{ env.WHEELS_VERSION }}
+          CHANNEL: stable
+          OUT_DIR: artifacts/wheels/${{ env.WHEELS_VERSION }}
+        run: bash tools/distribution-drafts/linux-packages/build-linux-packages.sh
+
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v7
         with:
@@ -363,6 +390,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
 
       #############################################
       # Create Snapshot Pre-Release (develop only)
@@ -405,6 +434,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
 
       #############################################
       # Dispatch downstream package managers

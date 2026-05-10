@@ -1,6 +1,0 @@
-{
-    "version":"@build.version@",
-    "testbox":{
-        "runner":"/tests/runner.cfm"
-    }
-}

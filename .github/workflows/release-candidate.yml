@@ -28,14 +28,18 @@ jobs:
 
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          cat box.json
+          cat wheels.json
 
-          # Extract version from box.json (should be something like 3.1.0-rc.1)
-          VERSION=$(cat box.json | jq '.version' -r)
-          echo "WHEELS_VERSION=${VERSION}+${{ github.run_number }}" >> $GITHUB_ENV
+          # Extract version from wheels.json (e.g. 3.1.0-rc.1). The build number
+          # is appended as a SemVer pre-release identifier with '.' (not '+'):
+          # build metadata (after '+') is ignored in SemVer precedence comparisons,
+          # which would make adjacent runs sort equal in brew/scoop.
+          VERSION=$(jq -r '.version' wheels.json)
+          echo "WHEELS_VERSION=${VERSION}.${RUN_NUMBER}" >> $GITHUB_ENV
 
-          # Extract branch name
           BRANCH="${GITHUB_REF#refs/heads/}"
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
 

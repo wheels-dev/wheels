@@ -1,0 +1,73 @@
+{
+  "version": "4.0.0",
+  "description": "Wheels CFML MVC framework — stable channel.",
+  "homepage": "https://wheels.dev",
+  "license": "Apache-2.0",
+  "depends": "java/openjdk21",
+  "architecture": {
+    "64bit": {
+      "url": [
+        "https://github.com/wheels-dev/wheels/releases/download/v4.0.0/wheels-cli-4.0.0.zip",
+        "https://github.com/wheels-dev/wheels/releases/download/v4.0.0/wheels-core-4.0.0.zip",
+        "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-windows-x64.exe",
+        "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar"
+      ],
+      "hash": [
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    }
+  },
+  "extract_to": [
+    "module",
+    "module/vendor/wheels",
+    "",
+    ""
+  ],
+  "bin": [
+    [
+      "wheels-cli.cmd",
+      "wheels"
+    ]
+  ],
+  "pre_install": [
+    "$wheelsHome = \"$env:USERPROFILE\\.wheels\"",
+    "$moduleDir = \"$wheelsHome\\modules\\wheels\"",
+    "if (Test-Path $moduleDir) { Remove-Item -Recurse -Force $moduleDir }",
+    "New-Item -ItemType Directory -Force -Path \"$moduleDir\\vendor\\wheels\" | Out-Null",
+    "Copy-Item -Recurse -Force \"$dir\\module\\*\" \"$moduleDir\\\"",
+    "Copy-Item -Force \"$dir\\sqlite-jdbc-3.49.1.0.jar\" \"$wheelsHome\\sqlite-jdbc.jar\""
+  ],
+  "post_install": [
+    "$wrapper = @\"",
+    "@echo off",
+    "set JAVA_HOME=$env:JAVA_HOME",
+    "set LUCLI_HOME=%USERPROFILE%\\.wheels",
+    "\"$dir\\lucli-0.3.7-windows-x64.exe\" %*",
+    "\"@",
+    "Set-Content -Path \"$dir\\wheels-cli.cmd\" -Value $wrapper -Encoding ASCII"
+  ],
+  "checkver": {
+    "github": "https://github.com/wheels-dev/wheels"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": [
+          "https://github.com/wheels-dev/wheels/releases/download/v$version/wheels-cli-$version.zip",
+          "https://github.com/wheels-dev/wheels/releases/download/v$version/wheels-core-$version.zip",
+          "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-windows-x64.exe",
+          "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar"
+        ]
+      }
+    },
+    "hash": {
+      "url": [
+        "https://github.com/wheels-dev/wheels/releases/download/v$version/wheels-cli-$version.sha512",
+        "https://github.com/wheels-dev/wheels/releases/download/v$version/wheels-core-$version.sha512"
+      ]
+    }
+  }
+}

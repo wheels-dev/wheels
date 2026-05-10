@@ -1,0 +1,138 @@
+# Lives in: wheels-dev/homebrew-wheels/.github/workflows/wheels-be-bump.yml
+#
+# Listens for the `snapshot-published` repository_dispatch event from
+# wheels-dev/wheels (sent by publish-snapshot.yml on develop merges) and opens a
+# PR bumping the version, URL, and sha256 fields in Formula/wheels-be.rb to the
+# new snapshot. Tap CI validates `brew install --build-from-source ./Formula/wheels-be.rb`
+# in a clean container; a maintainer rubberstamps and merges.
+#
+# A parallel workflow (wheels-bump.yml, not shown here) handles the same flow
+# for the stable channel triggered by GA tag pushes on wheels-dev/wheels.
+name: Bump wheels-be
+
+on:
+  repository_dispatch:
+    types: [snapshot-published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Snapshot version (e.g. 4.0.1-snapshot.1700)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Open formula-bump PR
+    runs-on: ubuntu-latest
+    env:
+      # Hoist all dispatch payload fields and event metadata to env vars so
+      # run: blocks reference them via shell ${VAR}, never via inline
+      # ${ {github.event.*} } interpolation. Dispatch payloads are
+      # technically attacker-controllable (an org admin with PAT could fire
+      # one with a malicious version string), so this is real protection,
+      # not just a style choice.
+      INPUT_VERSION: ${{ github.event.client_payload.version || inputs.version }}
+      DISPATCH_SHA: ${{ github.event.client_payload.sha }}
+    steps:
+      - name: Checkout tap
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Validate version format
+        run: |
+          # Defense in depth: even though the dispatch source is restricted by
+          # the DOWNSTREAM_DISPATCH_TOKEN scope, validate the version string
+          # before letting it flow into URLs and shell substitution. SemVer
+          # pre-release format only — no shell metacharacters can survive.
+          if [[ ! "${INPUT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-snapshot\.[0-9]+$ ]]; then
+            echo "Invalid version format: ${INPUT_VERSION}"
+            echo "Expected: M.m.p-snapshot.N (e.g. 4.0.1-snapshot.1700)"
+            exit 1
+          fi
+          echo "VERSION=${INPUT_VERSION}" >> $GITHUB_ENV
+
+      - name: Compute SHA256s
+        run: |
+          # Download the released artifacts and read their published .sha512
+          # alongside re-computing sha256. brew formulas use sha256.
+          BASE="https://github.com/wheels-dev/wheels-snapshots/releases/download/v${VERSION}"
+
+          for artifact in wheels-cli wheels-core; do
+            url="${BASE}/${artifact}-${VERSION}.zip"
+            echo "Fetching ${url}"
+            curl -fsSL -o "/tmp/${artifact}.zip" "${url}"
+            sha=$(sha256sum "/tmp/${artifact}.zip" | awk '{print $1}')
+            echo "${artifact^^}_SHA256=${sha}" >> $GITHUB_ENV
+            echo "  sha256: ${sha}"
+          done
+
+      - name: Rewrite formula
+        run: |
+          FORMULA="Formula/wheels-be.rb"
+          BASE_URL="https://github.com/wheels-dev/wheels-snapshots/releases/download/v${VERSION}"
+
+          # The three AUTO-BUMP TARGETS in the formula are version/url/sha256
+          # for the main download, plus the wheels-core resource block. We use
+          # python instead of sed so multiline boundaries are handled without
+          # flag-soup.
+          python3 <<PYEOF
+          import re, os
+
+          version = os.environ['VERSION']
+          base = f"https://github.com/wheels-dev/wheels-snapshots/releases/download/v{version}"
+          cli_sha = os.environ['WHEELS-CLI_SHA256']
+          core_sha = os.environ['WHEELS-CORE_SHA256']
+
+          with open('Formula/wheels-be.rb') as f:
+              content = f.read()
+
+          # Bump main download (CLI module zip)
+          content = re.sub(r'^  version "[^"]+"', f'  version "{version}"', content, count=1, flags=re.M)
+          content = re.sub(
+              r'^  url "https://github\.com/wheels-dev/wheels-snapshots/releases/download/v[^/]+/wheels-cli-[^"]+"',
+              f'  url "{base}/wheels-cli-{version}.zip"',
+              content, count=1, flags=re.M
+          )
+          content = re.sub(
+              r'(^  url "https://github\.com/wheels-dev/wheels-snapshots/[^\n]+\n  sha256 ")[a-f0-9]{64}"',
+              rf'\1{cli_sha}"',
+              content, count=1, flags=re.M
+          )
+
+          # Bump wheels-core resource block
+          content = re.sub(
+              r'(  resource "wheels-core" do\n    url ")https://github\.com/wheels-dev/wheels-snapshots/releases/download/v[^/]+/wheels-core-[^"]+"',
+              rf'\1{base}/wheels-core-{version}.zip"',
+              content, count=1
+          )
+          content = re.sub(
+              r'(  resource "wheels-core" do\n    url "[^"]+"\n    sha256 ")[a-f0-9]{64}"',
+              rf'\1{core_sha}"',
+              content, count=1
+          )
+
+          with open('Formula/wheels-be.rb', 'w') as f:
+              f.write(content)
+          PYEOF
+
+          echo "Updated formula:"
+          grep -E '^\s*(version|url|sha256)' Formula/wheels-be.rb | head -10
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: "auto-bump/wheels-be-${{ env.VERSION }}"
+          title: "wheels-be: bump to ${{ env.VERSION }}"
+          body: |
+            Automated bump triggered by `wheels-dev/wheels` develop merge.
+
+            Snapshot artifacts: https://github.com/wheels-dev/wheels-snapshots/releases/tag/v${{ env.VERSION }}
+
+            Tap CI will validate `brew install --build-from-source ./Formula/wheels-be.rb` before merge is allowed.
+          commit-message: "wheels-be: bump to ${{ env.VERSION }}"
+          delete-branch: true

@@ -33,23 +33,11 @@ rm -rf "${BUILD_DIR}/wheels/docs"
 mkdir -p "${BUILD_DIR}/wheels/docs"
 cp -r docs/* "${BUILD_DIR}/wheels/docs/"
 
-# Copy template files
-cp tools/build/core/box.json "${BUILD_DIR}/wheels/box.json"
+# Copy template files. The manifest is now wheels.json (renamed from box.json
+# in 4.0.0 — the legacy box.json was a CommandBox/ForgeBox artifact). Slim
+# schema; no ForgeBox post-processing needed.
+cp tools/build/core/wheels.json "${BUILD_DIR}/wheels/wheels.json"
 cp tools/build/core/README.md "${BUILD_DIR}/wheels/README.md"
-
-# Update box.json for ForgeBox publishing
-echo "Adjusting box.json for ForgeBox..."
-if command -v jq >/dev/null 2>&1; then
-    # Update directory settings for proper packaging
-    # Set directory to empty string so ForgeBox packages all files in current directory
-    jq '.directory = "" | del(.packageDirectory) | .createPackageDirectory = false' "${BUILD_DIR}/wheels/box.json" > "${BUILD_DIR}/wheels/box.json.tmp" && mv "${BUILD_DIR}/wheels/box.json.tmp" "${BUILD_DIR}/wheels/box.json"
-else
-    # Fallback to sed if jq is not available
-    sed -i.bak 's/"directory"[[:space:]]*:[[:space:]]*"[^"]*"/"directory":""/' "${BUILD_DIR}/wheels/box.json"
-    sed -i.bak 's/"createPackageDirectory"[[:space:]]*:[[:space:]]*true/"createPackageDirectory":false/' "${BUILD_DIR}/wheels/box.json"
-    sed -i.bak '/"packageDirectory":/d' "${BUILD_DIR}/wheels/box.json"
-    rm -f "${BUILD_DIR}/wheels/box.json.bak"
-fi
 
 # Replace version placeholders
 echo "Replacing version placeholders..."

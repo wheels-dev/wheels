@@ -1,0 +1,108 @@
+# Auto-bumps box.json's version on develop after a GA release lands on main.
+#
+# Workflow:
+#   1. Maintainer cuts v4.0.1 (or whatever) on main.
+#   2. release.yml publishes to wheels-dev/wheels Releases.
+#   3. THIS workflow fires on the published release event, opens a PR against
+#      develop bumping box.json's version to (just-released-patch + 1).
+#   4. Maintainer rubberstamps the PR.
+#   5. Next develop merge fires publish-snapshot.yml with the new target
+#      embedded in the snapshot version string.
+#
+# This is the "no version decisions ahead of time" piece — the maintainer
+# decides at GA tag time whether the release is a patch / minor / major;
+# whatever they pick, this workflow bumps to next-patch as the snapshot baseline.
+# If the next release ends up being a minor or major bump, the snapshot version
+# string sorts strictly lower than any of those, so brew upgrade still works.
+name: Bump Develop Version
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    env:
+      # All event payload fields hoisted to env. Eligibility (non-prerelease,
+      # main branch) is enforced inside the run: block below — keeping it out
+      # of the if: clause to satisfy the workflow-injection security hook.
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+      RELEASE_TARGET_COMMITISH: ${{ github.event.release.target_commitish }}
+    steps:
+      - name: Check eligibility
+        id: gate
+        run: |
+          # Skip if it's a pre-release or wasn't cut from main. The native
+          # if: clause would do this with cleaner syntax but tripped the
+          # workflow-injection hook by referencing ${ {github.event.release.*} }.
+          if [ "${RELEASE_PRERELEASE}" = "true" ]; then
+            echo "Skipping pre-release: ${RELEASE_TAG}"
+            echo "eligible=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ "${RELEASE_TARGET_COMMITISH}" != "main" ]; then
+            echo "Skipping release from non-main branch: ${RELEASE_TARGET_COMMITISH}"
+            echo "eligible=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "eligible=true" >> $GITHUB_OUTPUT
+
+      - name: Checkout develop
+        if: steps.gate.outputs.eligible == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 1
+
+      - name: Compute next snapshot target
+        if: steps.gate.outputs.eligible == 'true'
+        run: |
+          # Strip leading 'v' if present (we tag as v4.0.1 but version field
+          # is bare 4.0.1 in box.json).
+          RELEASED_VERSION="${RELEASE_TAG#v}"
+          if [[ ! "${RELEASED_VERSION}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Released tag ${RELEASE_TAG} doesn't match SemVer M.m.p — skipping bump."
+            exit 0
+          fi
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          NEXT_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+          echo "Released: ${RELEASED_VERSION} -> next snapshot target: ${NEW_VERSION}"
+          echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
+          echo "RELEASED_VERSION=${RELEASED_VERSION}" >> $GITHUB_ENV
+
+      - name: Update wheels.json
+        if: steps.gate.outputs.eligible == 'true'
+        run: |
+          jq --arg v "${NEW_VERSION}" '.version = $v' wheels.json > wheels.json.tmp
+          mv wheels.json.tmp wheels.json
+          echo "wheels.json now reads:"
+          jq '.version' wheels.json
+
+      - name: Open bump PR
+        if: steps.gate.outputs.eligible == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: "auto-bump/develop-${{ env.NEW_VERSION }}"
+          title: "chore: bump develop snapshot target to ${{ env.NEW_VERSION }}"
+          body: |
+            Automated bump triggered by GA release `${{ env.RELEASED_VERSION }}`.
+
+            Sets `box.json` version to `${{ env.NEW_VERSION }}` so subsequent
+            develop snapshots are tagged `${{ env.NEW_VERSION }}-snapshot.<run>`.
+
+            **This is a baseline, not a commitment.** If the next GA release
+            ends up being a minor or major bump, the snapshot version strings
+            still sort strictly lower than any of those, so the tap auto-bump
+            and `brew upgrade` continue to work correctly. The maintainer makes
+            the actual scope decision at the next GA's tag-cut time, not here.
+          commit-message: "chore: bump develop snapshot target to ${{ env.NEW_VERSION }}"
+          delete-branch: true
