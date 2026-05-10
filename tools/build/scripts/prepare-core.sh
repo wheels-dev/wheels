@@ -33,10 +33,19 @@ rm -rf "${BUILD_DIR}/wheels/docs"
 mkdir -p "${BUILD_DIR}/wheels/docs"
 cp -r docs/* "${BUILD_DIR}/wheels/docs/"
 
-# Copy template files. The manifest is now wheels.json (renamed from box.json
-# in 4.0.0 — the legacy box.json was a CommandBox/ForgeBox artifact). Slim
-# schema; no ForgeBox post-processing needed.
+# Copy template files. The package now ships TWO manifests:
+#
+#   wheels.json — the new Wheels-native manifest (slim schema, what the framework
+#                 reads at runtime via FrameworkInstaller, Module.runUpgradeCheck,
+#                 Global.$buildReleaseZip, etc.).
+#   box.json    — CommandBox/ForgeBox-shaped manifest, retained because
+#                 `forgebox publish` reads slug/version/type/etc. from box.json
+#                 natively — we can't make CommandBox polyglot without forking
+#                 it. Once ForgeBox publishing is fully retired (post-4.0
+#                 cleanup), the box.json template can be deleted alongside
+#                 publish-to-forgebox.sh.
 cp tools/build/core/wheels.json "${BUILD_DIR}/wheels/wheels.json"
+cp tools/build/core/box.json "${BUILD_DIR}/wheels/box.json"
 cp tools/build/core/README.md "${BUILD_DIR}/wheels/README.md"
 
 # Replace version placeholders
