@@ -24,6 +24,9 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Added
 
+**Documentation**
+- Add Debug Panel guide covering each tab, configuration settings, and when the bar appears
+
 **ORM & data layer**
 - Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `whereNotIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries (#1922)
 - Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation (#1921)
