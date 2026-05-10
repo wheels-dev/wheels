@@ -44,23 +44,21 @@ Wheels 4.0 supports the three established SaaS data patterns. You pick based on 
 Tenant resolution happens early, in middleware, before your controller ever instantiates. The resolved tenant is attached to the request, and the datasource resolver picks it up from there.
 
 ```cfm
-// config/settings.cfm — tenant resolution via middleware
+// config/settings.cfm — register the built-in TenantResolver
 set(middleware = [
-    new app.middleware.TenantResolver()
+    new wheels.middleware.TenantResolver(
+        strategy = "subdomain",
+        resolver = function(req) {
+            // req.$tenantSubdomain is injected by the "subdomain" strategy
+            var t = model("Tenant").where("subdomain", req.$tenantSubdomain).findOne();
+            if (IsObject(t)) return {id: t.id, dataSource: t.dataSourceName, config: {}};
+            return {};  // no tenant matched — request proceeds with the app default datasource
+        }
+    )
 ]);
-
-// app/middleware/TenantResolver.cfc
-component implements="wheels.middleware.MiddlewareInterface" {
-    public any function handle(required struct request, required any next) {
-        var subdomain = ListFirst(arguments.request.cgi.server_name, ".");
-        arguments.request.tenant = subdomain;
-        $setTenantDatasource(arguments.request.tenant);
-        return arguments.next(arguments.request);
-    }
-}
 ```
 
-The resolution source is up to you: subdomain (`acme.myapp.com`), path prefix (`/t/acme`), request header (`X-Tenant: acme`), or a claim out of a JWT (`tid`). The middleware contract is the same — pull the identifier, call `$setTenantDatasource`, pass the request along.
+The framework ships `wheels.middleware.TenantResolver` with three strategies out of the box: `subdomain` (`acme.myapp.com`), `header` (`X-Tenant-ID: acme`), and `custom` (your closure receives the full request struct — handy for path prefixes like `/t/acme` or JWT claims like `tid`). The resolver closure's contract is the same in every case: return a struct with at least a `dataSource` key, and the framework writes `request.wheels.tenant` and routes every subsequent query through it. Return `{}` to leave the request on the default datasource.
 
 From that point on, every `model("Order").findAll()` in the request lifecycle hits the right database. You don't pass the tenant around. You don't remember to scope. The resolver already did it.
 
