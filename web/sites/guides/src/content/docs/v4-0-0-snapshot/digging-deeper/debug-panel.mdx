@@ -48,7 +48,7 @@ Setting `showDebugInformation=false` removes the bar entirely — no HTML is inj
 
 When active, the bar appears as a slim strip pinned to the bottom of the browser window. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params, Environment, and optionally Tools. The right side shows the current git branch (when Wheels detects a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
 
-{/* screenshot: the collapsed debug bar across the bottom of a browser window, showing all tabs and the git-branch + version on the right */}
+![The collapsed Wheels debug bar pinned to the bottom of a browser window: Wheels logo, Posts.index controller.action, timing badge, Params, Development environment, and Tools tabs, with Wheels 4.0.0-SNAPSHOT version on the right](/v4-0-0-snapshot/digging-deeper/debug-panel-screenshots/01-collapsed-bar.png)
 
 Clicking any tab opens a panel above the bar. Clicking the same tab again closes it. The minimize button (×) collapses the bar to a small "Debug" button in the corner, persisted via `sessionStorage` so it stays collapsed as you navigate.
 
@@ -69,7 +69,7 @@ The Request tab label shows `controller.action` for the current request. Clickin
 | DB Adapter | The active database adapter (MySQL, PostgreSQL, SQL Server, etc.) — omitted when the adapter name is not detected |
 | URL Rewriting | Current URL rewriting mode |
 
-{/* screenshot: Request panel open — the key-value table showing Route, Controller, Action, HTTP Method, URL, Application, Data Source, DB Adapter, and URL Rewriting */}
+![Request panel open showing the key-value table: Route (root), Controller (Posts), Action (index), HTTP Method (GET), URL, Application (blog), Data Source (blog), DB Adapter (SQLiteModel), URL Rewriting (On)](/v4-0-0-snapshot/digging-deeper/debug-panel-screenshots/02-request-panel.png)
 
 Use this panel to confirm that routing resolved the way you intended, that the correct data source is in use, and that URL rewriting is configured as expected.
 
@@ -83,7 +83,7 @@ The Timing tab label shows the total request duration in milliseconds, color-cod
 
 Opening the panel shows a horizontal bar chart breaking down where time was spent. Each phase (model, queries, template rendering, etc.) is sorted by duration descending and rendered as a proportional colored bar showing both the raw milliseconds and the percentage of total time.
 
-{/* screenshot: Timing panel open — horizontal bar chart with phases (model, queries, template) color-coded and sorted by duration, total ms shown in the header */}
+![Timing panel showing "Execution Timing — 9ms total" in the header with horizontal bar chart for action and view phases, color-coded and sorted by duration](/v4-0-0-snapshot/digging-deeper/debug-panel-screenshots/03-timing-panel.png)
 
 The chart is most useful for spotting query-heavy actions: if `queries` or `model` accounts for 80%+ of total time, look at the SQL being generated (the Routes admin page lists query counts per action if you need more detail).
 
@@ -97,7 +97,7 @@ The Params tab shows the count of extra request parameters as a badge. Opening t
 | Value | The value; complex values (structs, arrays) are JSON-encoded |
 | Type | `string` or `json` |
 
-{/* screenshot: Params panel open — table with Name, Value, Type columns, showing a mix of string and json-type parameters */}
+![Params panel showing the Request Parameters table with Name, Value, Type columns — four rows for status=published, category=tech, author=peter, page=2 — all string type](/v4-0-0-snapshot/digging-deeper/debug-panel-screenshots/04-params-panel.png)
 
 This is the fastest way to confirm that form fields, query string values, and nested structs arrived the way you expected before you reach for a `writeDump` call.
 
@@ -111,7 +111,7 @@ Always shown. Lists the environment, the git branch (when the app root contains 
 
 When no reload password is set, the environment name is followed by quick-switch links that reload the app in a different environment mode. This is useful during development to test environment-specific code paths without editing config files.
 
-{/* screenshot: Environment panel open, Application section — showing environment dot, git branch, Wheels version, CFML engine, with environment-switch links */}
+![Environment & Configuration panel showing Application section with Environment (Development with green dot), Wheels Version, CFML Engine (Lucee 7.0.0.395), Host Name; Packages section listing wheels-basecoat; and Plugins (Legacy) "No plugins installed."](/v4-0-0-snapshot/digging-deeper/debug-panel-screenshots/05-environment-panel.png)
 
 ### Packages
 
@@ -135,7 +135,7 @@ If any package failed to load (manifest error, missing dependency, CFC exception
 | Latest | Latest compatible version |
 | Description | Registry description |
 
-{/* screenshot: Packages section of the Environment panel — Installed table on top showing two packages, Available from registry table below listing several first-party packages */}
+![Packages section of the Environment panel — Installed table showing wheels-basecoat 3.0.0-rc.1 with version and description columns](/v4-0-0-snapshot/digging-deeper/debug-panel-screenshots/05-environment-panel.png)
 
 This lets you discover first-party packages such as `wheels-hotwire`, `wheels-sentry`, or `wheels-i18n` without leaving the app. The table reflects the same 24-hour cache as `wheels packages list`; run `wheels packages registry refresh` from the CLI if you need up-to-the-minute data.
 
@@ -165,7 +165,7 @@ Shown when `enablePublicComponent` is `true` (the default in development). Opens
 | Packages | `/wheels/packages` — the package browser (shown when `enablePackagesComponent` is `true`) |
 | Plugins | `/wheels/plugins` — the legacy plugin list (shown when `enablePluginsComponent` is `true`) |
 
-{/* screenshot: Tools panel open — the link-card grid showing System Info, Routes, API Docs, Guides, Tests, Migrator, Packages, and Plugins cards */}
+![Tools panel showing the Developer Tools link-card grid: System Info, Routes, API Docs, Guides, Tests, Migrator, Packages, and Plugins](/v4-0-0-snapshot/digging-deeper/debug-panel-screenshots/06-tools-panel.png)
 
 ## Configuration reference
 
