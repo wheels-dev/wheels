@@ -28,12 +28,16 @@ jobs:
     # Auto-fire only for the bot's own PRs. The bot-identity check is
     # load-bearing: prevents human PRs from triggering this stage and
     # adding bot-authored doc commits to in-flight branches.
+    # Skips docs/bot-* branches — those are write-docs's own PRs, which
+    # are docs-only by construction. Running update-docs on them would
+    # be redundant work.
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
       && (
         github.event_name == 'workflow_dispatch'
         || (github.event_name == 'pull_request'
-            && github.event.pull_request.user.login == 'wheels-bot[bot]')
+            && github.event.pull_request.user.login == 'wheels-bot[bot]'
+            && !startsWith(github.event.pull_request.head.ref, 'docs/bot-'))
       )
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
