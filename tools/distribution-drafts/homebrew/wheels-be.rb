@@ -40,19 +40,16 @@ class WheelsBe < Formula
 
   # LuCLI binary — pinned independently because it's an upstream artifact
   # (cybersonic/LuCLI). The brew formula stages it as libexec/wheels.
+  # LuCLI ships single binaries per OS (no arch split) — the macOS asset is a
+  # universal binary that works on both arm64 and x86_64. Source-of-truth:
+  # `gh release view v0.3.7 --repo cybersonic/LuCLI --json assets`.
   resource "lucli" do
     on_macos do
-      on_arm do
-        url "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-macos-arm64"
-        sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-      end
-      on_intel do
-        url "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-macos-x64"
-        sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-      end
+      url "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-macos"
+      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
     end
     on_linux do
-      url "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-linux-x64"
+      url "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-linux"
       sha256 "0000000000000000000000000000000000000000000000000000000000000000"
     end
   end
