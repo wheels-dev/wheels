@@ -337,6 +337,35 @@
 						</cfloop>
 					</div>
 				</cfif>
+				<!--- Available from registry — same data source as the standalone /wheels/packages page. --->
+				<cfif StructKeyExists(application.wheels, "public") AND IsObject(application.wheels.public)>
+					<cfset local.registryResult = application.wheels.public.$loadRegistryPackages()>
+					<div class="wdb-section-title" style="margin-top:12px;">Available from registry</div>
+					<cfif Len(local.registryResult.error)>
+						<p style="color:##f9e2af;font-size:12px;">#HTMLEditFormat(local.registryResult.error)#</p>
+					<cfelseif ArrayLen(local.registryResult.packages) GT 0>
+						<table class="wdb-table">
+							<thead><tr><th>Package</th><th>Latest</th><th>Description</th></tr></thead>
+							<tbody>
+							<cfloop array="#local.registryResult.packages#" index="local.rp">
+								<tr>
+									<td>
+										<cfif Len(local.rp.homepage) AND REFindNoCase("^https?://", local.rp.homepage)>
+											<a href="#HTMLEditFormat(local.rp.homepage)#" target="_blank" rel="noopener" style="color:##89b4fa;"><code>#HTMLEditFormat(local.rp.name)#</code></a>
+										<cfelse>
+											<code>#HTMLEditFormat(local.rp.name)#</code>
+										</cfif>
+									</td>
+									<td>#HTMLEditFormat(local.rp.latestVersion)#</td>
+									<td style="color:##a6adc8;">#HTMLEditFormat(local.rp.description)#</td>
+								</tr>
+							</cfloop>
+							</tbody>
+						</table>
+					<cfelse>
+						<p style="color:##6c7086;">No packages found in the registry.</p>
+					</cfif>
+				</cfif>
 			</div>
 		</cfif>
 		<cfif $get("enablePluginsComponent")>
