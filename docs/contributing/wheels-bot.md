@@ -95,8 +95,9 @@ following as a sibling stage rather than competing for the same turn
 budget. Sonnet, 30-turn budget — doc edits are pattern-recognition work,
 not reasoning-heavy.
 
-Currently `workflow_dispatch` only — invoke with the PR number once
-propose-fix has opened the PR:
+Auto-fires on `pull_request: opened` for PRs from the `wheels-bot[bot]`
+identity (the draft PRs that propose-fix produces). Manual dispatch is
+preserved as a fallback:
 
 ```bash
 gh workflow run bot-update-docs.yml --repo wheels-dev/wheels -F pr-number=<N>
@@ -117,10 +118,10 @@ The bot:
    comment with the marker `wheels-bot:update-docs:<pr>`.
 
 The narrow allowlist (no test runs, no Lucee bootstrap, no
-`vendor/wheels/` or `app/` writes) keeps this stage fast and cheap. A
-future PR can re-add an auto-fire trigger so this stage runs immediately
-after propose-fix opens the PR; for now the manual gate matches the
-phased-rollout philosophy from PR #2519.
+`vendor/wheels/` or `app/` writes) keeps this stage fast and cheap. The
+bot-identity check on the `if:` block is load-bearing — it prevents human
+PRs from triggering this stage and adding bot-authored doc commits to
+in-flight branches.
 
 ### 5. Reviewer A (`bot-review-a.yml`)
 
@@ -194,23 +195,30 @@ they make every workflow safely retryable.
    - `Lucee 7 + SQLite (LuCLI)` (existing)
    - `Bot PR TDD Gate` (new — only fails on bot PRs without a spec)
 
-   **Approval requirement is org-size-dependent.** Multi-maintainer
-   teams should require ≥1 approving review from `wheels-dev/maintainers`.
-   Solo-maintainer setups may set `required_approving_review_count: 0`,
-   relying on the bot's `--draft` PR posture and the maintainer's manual
-   review-then-merge workflow as the human-eye gate. The `Bot PR TDD Gate`
-   required check still enforces test discipline regardless of approval count.
+   **Approval requirement: `required_approving_review_count: 1`.** The
+   bot opens PRs as `--draft`, but with auto-fire enabled (Phase 4) the
+   approval gate is the load-bearing safety net that prevents a runaway
+   chain from merging itself. Multi-maintainer teams may require reviews
+   from a specific team (e.g. `wheels-dev/maintainers`); solo-maintainer
+   setups can leave it at 1 with the maintainer as the reviewer. The
+   `Bot PR TDD Gate` required check still enforces test discipline on
+   every bot PR regardless of approval count.
 
 ### Day-to-day
 
-- **Watch the bot's first runs.** Phase 1 (Reviewer A only) is the safe
-  starting cut. Promote subsequent phases (triage, Reviewer B, propose-fix)
-  one at a time.
-- **Promote propose-fix from manual to auto-fire** only after at least 5
-  supervised runs are clean. The shipped default is `workflow_dispatch` only
-  (gated in `bot-propose-fix.yml`'s `if:`); to lift the gate, restore the
-  `triage-confidence:high` branch (Phase 4a) and the `research-confidence:high`
-  branch (Phase 4b). Same pattern applies to `bot-research.yml`.
+- **Watch every bot run.** Even with auto-fire enabled, every bot PR is
+  `--draft` and requires an approving review (`required_approving_review_count: 1`
+  in develop's ruleset) before merge. Spot-check triage classifications
+  and Reviewer A verdicts; flip `WHEELS_BOT_ENABLED=false` if anything
+  looks off.
+- **Auto-fire (Phase 4) is on.** propose-fix runs from
+  `wheels-bot:triage-confidence:high` and
+  `wheels-bot:research-confidence:high` markers; research runs from
+  `wheels-bot:triage-class:framework-design`; bot-update-docs runs on
+  `pull_request: opened` for `wheels-bot[bot]` PRs. To halt auto-fire
+  without code changes, flip `WHEELS_BOT_ENABLED=false`. To halt
+  permanently, revert the `if:` blocks in the three workflows back to
+  `workflow_dispatch`-only and keep the kill-switch flipped.
 - **Review bot-authored PRs the same as human-authored PRs.** Don't
   rubber-stamp.
 - **Watch costs.** API spend per fix-PR is non-trivial (Opus + many turns +
