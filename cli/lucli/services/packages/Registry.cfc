@@ -15,28 +15,29 @@ component {
 	variables.DEFAULT_REPO = "wheels-dev/wheels-packages";
 	variables.DEFAULT_BRANCH = "main";
 
-	public Registry function init(
-		any httpClient = "",
-		any cache = "",
-		string registryRepo = "",
-		string branch = ""
-	) {
+	public Registry function init(any httpClient = "", any cache = "", string registryRepo = "", string branch = "") {
 		variables.http = IsObject(arguments.httpClient)
-			? arguments.httpClient
-			: new modules.wheels.services.packages.HttpClient();
+		 ? arguments.httpClient
+		 : new modules.wheels.services.packages.HttpClient();
 		variables.cache = IsObject(arguments.cache)
-			? arguments.cache
-			: new modules.wheels.services.packages.ManifestCache();
+		 ? arguments.cache
+		 : new modules.wheels.services.packages.ManifestCache();
 		variables.registryRepo = Len(arguments.registryRepo)
-			? arguments.registryRepo
-			: $resolveRepo();
+		 ? arguments.registryRepo
+		 : $resolveRepo();
 		variables.branch = Len(arguments.branch) ? arguments.branch : variables.DEFAULT_BRANCH;
 		return this;
 	}
 
-	public string function registryRepo() { return variables.registryRepo; }
-	public string function branch()        { return variables.branch; }
-	public any    function cache()         { return variables.cache; }
+	public string function registryRepo() {
+		return variables.registryRepo;
+	}
+	public string function branch() {
+		return variables.branch;
+	}
+	public any function cache() {
+		return variables.cache;
+	}
 
 	/**
 	 * Returns the list of package names in the registry. Serves cached
@@ -56,10 +57,7 @@ component {
 		}
 		local.entries = DeserializeJSON(local.resp.body);
 		if (!IsArray(local.entries)) {
-			Throw(
-				type = "Wheels.Packages.RegistryMalformed",
-				message = "Registry contents endpoint did not return an array."
-			);
+			Throw(type = "Wheels.Packages.RegistryMalformed", message = "Registry contents endpoint did not return an array.");
 		}
 		local.names = [];
 		for (local.entry in local.entries) {
@@ -100,6 +98,20 @@ component {
 				message = "Manifest for '#arguments.name#' is not a valid manifest struct."
 			);
 		}
+		// listAll() reads .versions[ArrayLen(.versions)] — validate the
+		// invariant here so cached and fresh manifests share one guard
+		// and the per-package skip in listAll() catches a typed throw
+		// instead of an Expression-level missing-key error.
+		if (
+			!StructKeyExists(local.manifest, "versions")
+			|| !IsArray(local.manifest.versions)
+			|| !ArrayLen(local.manifest.versions)
+		) {
+			Throw(
+				type = "Wheels.Packages.RegistryMalformed",
+				message = "Manifest for '#arguments.name#' is missing a non-empty versions array."
+			);
+		}
 		variables.cache.writeManifest(arguments.name, local.manifest);
 		return local.manifest;
 	}
@@ -120,13 +132,16 @@ component {
 				continue;
 			}
 			local.latest = local.m.versions[ArrayLen(local.m.versions)];
-			ArrayAppend(local.out, {
-				name:          local.m.name,
-				description:   local.m.description ?: "",
-				tags:          IsArray(local.m.tags ?: "") ? local.m.tags : [],
-				homepage:      local.m.homepage ?: "",
-				latestVersion: local.latest.version
-			});
+			ArrayAppend(
+				local.out,
+				{
+					name = local.m.name,
+					description = local.m.description ?: "",
+					tags = IsArray(local.m.tags ?: "") ? local.m.tags : [],
+					homepage = local.m.homepage ?: "",
+					latestVersion = local.latest.version
+				}
+			);
 		}
 		return local.out;
 	}
@@ -134,10 +149,10 @@ component {
 	public struct function info() {
 		local.cacheInfo = variables.cache.info();
 		return {
-			registryRepo: variables.registryRepo,
-			branch: variables.branch,
-			indexUrl: "https://github.com/#variables.registryRepo#/tree/#variables.branch#/packages",
-			cache: local.cacheInfo
+			registryRepo = variables.registryRepo,
+			branch = variables.branch,
+			indexUrl = "https://github.com/#variables.registryRepo#/tree/#variables.branch#/packages",
+			cache = local.cacheInfo
 		};
 	}
 
@@ -154,4 +169,5 @@ component {
 		}
 		return variables.DEFAULT_REPO;
 	}
+
 }

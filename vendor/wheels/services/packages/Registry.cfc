@@ -103,6 +103,20 @@ component {
 				message = "Manifest for '#arguments.name#' is not a valid manifest struct."
 			);
 		}
+		// listAll() reads .versions[ArrayLen(.versions)] — validate the
+		// invariant here so cached and fresh manifests share one guard
+		// and the per-package skip in listAll() catches a typed throw
+		// instead of an Expression-level missing-key error.
+		if (
+			!StructKeyExists(local.manifest, "versions")
+			|| !IsArray(local.manifest.versions)
+			|| !ArrayLen(local.manifest.versions)
+		) {
+			Throw(
+				type = "Wheels.Packages.RegistryMalformed",
+				message = "Manifest for '#arguments.name#' is missing a non-empty versions array."
+			);
+		}
 		variables.cache.writeManifest(arguments.name, local.manifest);
 		return local.manifest;
 	}
