@@ -114,13 +114,12 @@ is enforced by code, so don't skip steps.
    Confirm the spec now passes. Also confirm no other tests in the layer
    regressed. If something else broke, fix it before proceeding.
 
-9. **Update supporting docs.**
-   - If user-visible behavior changed: update
-     `web/sites/guides/src/content/docs/v4-0-0-snapshot/<area>/<page>.mdx`
-   - Always update `.ai/wheels/<layer>/` if the patterns table changed
-   - If model/controller/view conventions changed: update `CLAUDE.md`
-   - Add a `CHANGELOG.md` `[Unreleased]` entry (one line, present tense,
-     no PR number — humans add the link on merge)
+9. **Add a CHANGELOG entry.** Append one line to `CHANGELOG.md` under
+   `[Unreleased]` (present tense, no PR number — humans add the link on
+   merge). **Do not touch MDX guides, `.ai/wheels/`, or `CLAUDE.md`** —
+   those are handled separately by the `bot-update-docs.yml` workflow,
+   which runs after this PR opens. The bot's scope here is failing-spec →
+   implementation → passing-spec → CHANGELOG → PR.
 
 10. **Stage, commit, and prepare the PR.**
 
@@ -145,9 +144,12 @@ is enforced by code, so don't skip steps.
       `Recommended path from research: <link to research comment>`
     - Fill the `.github/pull_request_template.md` checklist honestly:
       - [x] Tests — your failing-then-passing spec
-      - [x/?] Framework Docs — checked if you updated MDX
-      - [x/?] AI Reference Docs — checked if you updated `.ai/wheels/`
-      - [x/?] CLAUDE.md — checked if you updated it
+      - [ ] Framework Docs — leave unchecked (`bot-update-docs.yml`
+        will add MDX updates as a follow-up commit if needed)
+      - [ ] AI Reference Docs — leave unchecked (handled by
+        `bot-update-docs.yml`)
+      - [ ] CLAUDE.md — leave unchecked (handled by
+        `bot-update-docs.yml`)
       - [x] CHANGELOG.md
       - [x] Test runner passes (cite the local test-local.sh output)
     - End with the marker `<!-- wheels-bot:fix:<issue-number> -->`
@@ -179,7 +181,8 @@ is enforced by code, so don't skip steps.
     Implementation: `<path(s)>`
 
     A human review is required before merge. Reviewer A and Reviewer B
-    will weigh in shortly.
+    will weigh in shortly. Doc updates (MDX guides, `.ai/wheels/`,
+    `CLAUDE.md`) are handled separately by `bot-update-docs.yml`.
 
     <!-- wheels-bot:fix:<issue-number> -->
     ```

@@ -1,0 +1,105 @@
+name: Wheels Bot — Update Docs
+
+# Phase 1 rollout: workflow_dispatch only. After several supervised runs
+# produce clean output, a future PR can re-add an auto-fire branch — e.g.
+# trigger on `pull_request: opened` for `wheels-bot[bot]` head refs, or
+# on `issue_comment: created` matching a `wheels-bot:fix:<pr>` marker
+# emitted by propose-fix.
+on:
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR number to add doc updates to'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-update-docs-${{ inputs.pr-number }}
+  cancel-in-progress: false
+
+jobs:
+  update-docs:
+    name: Update docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: vars.WHEELS_BOT_ENABLED == 'true'
+    env:
+      PR_NUMBER: ${{ inputs.pr-number }}
+      WHEELS_CI: "true"
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Resolve PR head ref
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # Validate input is numeric to short-circuit any injection vectors
+          # before passing it to gh.
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr-number must be numeric, got: $PR_NUMBER"
+            exit 1
+          fi
+          ref=$(gh pr view "$PR_NUMBER" --repo wheels-dev/wheels --json headRefName -q '.headRefName')
+          if [ -z "$ref" ]; then
+            echo "::error::Could not resolve PR head ref for #$PR_NUMBER"
+            exit 1
+          fi
+          echo "head=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: pr
+          target-number: ${{ env.PR_NUMBER }}
+          marker-pattern: 'wheels-bot:update-docs:${{ env.PR_NUMBER }}'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          git config user.name "wheels-bot[bot]"
+          git config user.email "wheels-bot[bot]@users.noreply.github.com"
+
+      - name: Run Update Docs
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /update-docs ${{ env.PR_NUMBER }}
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 30
+            --allowedTools "Bash(gh:*),Bash(git status),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git add:*),Bash(git commit:*),Read,Edit,Write,Grep,Glob"
+
+      - name: Push doc commits
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # Only push if new commits exist beyond what's already on the
+          # remote branch tip.
+          if [ -z "$(git log @{u}..HEAD --oneline 2>/dev/null)" ]; then
+            echo "No new commits — nothing to push."
+            exit 0
+          fi
+          git push origin HEAD

@@ -2,7 +2,7 @@
 
 `wheels-bot[bot]` is a custom GitHub App that automates issue triage,
 cross-framework design research, fix-PR generation, and PR review on
-`wheels-dev/wheels`. It runs as five stages, each backed by a slash-command
+`wheels-dev/wheels`. It runs as six stages, each backed by a slash-command
 prompt in `.claude/commands/` and a workflow in `.github/workflows/bot-*.yml`.
 
 This page is for humans interacting with the bot. For the design rationale,
@@ -21,7 +21,7 @@ contribution rules, see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 - Flip the repo variable `WHEELS_BOT_ENABLED` to `false` to halt the bot
   entirely without code changes.
 
-## The five stages
+## The six stages
 
 ### 1. Triage (`bot-triage.yml`)
 
@@ -76,7 +76,9 @@ The bot:
 4. Confirms the spec fails by running `bash tools/test-local.sh <layer>`.
 5. Implements the fix in `vendor/wheels/**` or `app/**`.
 6. Re-runs and confirms the spec passes.
-7. Updates `.ai/wheels/<layer>/`, `CHANGELOG.md`, and the relevant guide page.
+7. Updates `CHANGELOG.md`. Other doc updates (`.ai/wheels/`, MDX guides,
+   `CLAUDE.md`) happen in the next stage, not here — propose-fix's budget
+   stays focused on TDD work.
 8. Opens a draft PR on `fix/bot-<issue>-<slug>` against `develop`,
    referencing the research comment when applicable.
 
@@ -84,7 +86,43 @@ The PR must pass `bot-tdd-gate.yml` before any other check — that gate
 hard-rejects bot PRs that don't include both a spec change and an
 implementation change. The gate is a no-op for human-authored PRs.
 
-### 4. Reviewer A (`bot-review-a.yml`)
+### 4. Update Docs (`bot-update-docs.yml`)
+
+Adds doc commits to a freshly-opened bot PR. Runs as a separate stage so
+propose-fix's budget can stay focused on TDD work (failing spec →
+implementation → passing spec → CHANGELOG → PR), with documentation
+following as a sibling stage rather than competing for the same turn
+budget. Sonnet, 30-turn budget — doc edits are pattern-recognition work,
+not reasoning-heavy.
+
+Currently `workflow_dispatch` only — invoke with the PR number once
+propose-fix has opened the PR:
+
+```bash
+gh workflow run bot-update-docs.yml --repo wheels-dev/wheels -F pr-number=<N>
+```
+
+The bot:
+
+1. Reads the PR's diff and the linked issue's triage comment to identify
+   the affected layer.
+2. Decides whether docs need updating: MDX guide page (only if user-visible
+   behavior changed), `.ai/wheels/<layer>/` (only if a documented pattern
+   actually changed), `CLAUDE.md` (only if conventions changed). Skips
+   cleanly with a "no doc updates" comment when the diff is purely
+   internal.
+3. Makes conservative edits — limited to the touched paths only, no new
+   page creation, no broad rewrites.
+4. Lands a single `docs:` commit on the PR branch and posts an update
+   comment with the marker `wheels-bot:update-docs:<pr>`.
+
+The narrow allowlist (no test runs, no Lucee bootstrap, no
+`vendor/wheels/` or `app/` writes) keeps this stage fast and cheap. A
+future PR can re-add an auto-fire trigger so this stage runs immediately
+after propose-fix opens the PR; for now the manual gate matches the
+phased-rollout philosophy from PR #2519.
+
+### 5. Reviewer A (`bot-review-a.yml`)
 
 Fires on `pull_request: opened/synchronize/ready_for_review` against
 `develop`. Skips bot-authored PRs (Reviewer A is for human PRs); the bot's
@@ -95,7 +133,7 @@ Conventions, Cross-engine, Tests, Docs, Commits, Security. Verdict is
 `approve` / `request-changes` / `comment`. Verdict and findings must be
 consistent — Reviewer B will catch sycophancy if they aren't.
 
-### 5. Reviewer B (`bot-review-b.yml`)
+### 6. Reviewer B (`bot-review-b.yml`)
 
 Fires when Reviewer A submits a review (filtered on
 `review.user.login == 'wheels-bot[bot]'`). Reviewer B critiques A's review,
@@ -132,6 +170,7 @@ they make every workflow safely retryable.
 | `wheels-bot:research-confidence:high` | Triggers propose-fix on the framework-design path. |
 | `wheels-bot:fix:<issue>` | Fix PR has been opened for this issue. |
 | `wheels-bot:fix-held:<issue>` | Fix would have been proposed but the safety net held it for a human. |
+| `wheels-bot:update-docs:<pr>` | Update Docs stage processed this PR (with or without doc edits). |
 | `wheels-bot:review-a:<pr>:<sha>` | Reviewer A reviewed this PR at this SHA. |
 | `wheels-bot:review-b:<pr>:<sha>:<round>` | Reviewer B critiqued round N. |
 | `wheels-bot:auto-close:<issue>` | Auto-close cron closed this issue. |
