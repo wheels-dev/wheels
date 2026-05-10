@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to generate changelog for (leave empty to auto-detect from box.json)'
+        description: 'Version to generate changelog for (leave empty to auto-detect from wheels.json)'
         required: false
         type: string
       since_tag:
@@ -86,8 +86,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Detect version from box.json
-          VERSION=$(jq -r '.version' box.json)
+          # Detect version: prefer wheels.json (post-rename), fall back to box.json
+          if [ -f wheels.json ]; then
+            VERSION=$(jq -r '.version' wheels.json)
+          else
+            VERSION=$(jq -r '.version' box.json)
+          fi
 
           BRANCH="changelog/$VERSION"
           git checkout -b "$BRANCH"

@@ -1310,7 +1310,9 @@ Provide migration code following Wheels conventions."
 
 			// Fallback: If /app mapping doesn't exist or doesn't point to a valid location,
 			// use the traditional detection method
-			if (!directoryExists(local.appPath) || (!fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "public/Application.cfc"))) {
+			// Wheels project marker: wheels.json (4.0+) or legacy box.json (pre-4.0).
+			// Either is a sufficient signal that we're in a Wheels project root.
+			if (!directoryExists(local.appPath) || (!fileExists(local.appPath & "wheels.json") && !fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "public/Application.cfc"))) {
 				// Fallback to manual path detection from webroot
 				local.appPath = expandPath("/");
 
@@ -1319,8 +1321,8 @@ Provide migration code following Wheels conventions."
 					// We're in the vendor wheels directory, go up to find the application root
 					local.appPath = expandPath("/../../../");
 
-					// If that doesn't work, try going up more levels to find box.json or Application.cfc
-					if (!fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "Application.cfc")) {
+					// If that doesn't work, try going up more levels to find a project marker
+					if (!fileExists(local.appPath & "wheels.json") && !fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "Application.cfc")) {
 						local.appPath = expandPath("/../../../../");
 					}
 				} else {

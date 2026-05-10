@@ -18,16 +18,22 @@ set -euo pipefail
 
 REPO="wheels-dev/wheels"
 
-# Auto-detect version from box.json if not provided
+# Auto-detect version from wheels.json (preferred) or box.json (legacy fallback)
+# if not provided. The fallback can be removed once wheels.json has shipped in
+# stable for two releases.
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-  if [ -f "box.json" ]; then
+  if [ -f "wheels.json" ]; then
+    VERSION=$(jq -r '.version' wheels.json)
+  elif [ -f "box.json" ]; then
     VERSION=$(jq -r '.version' box.json)
-    VERSION="${VERSION%-SNAPSHOT}"
   else
     echo "ERROR: Cannot detect version. Provide it as first argument or run from repo root."
     exit 1
   fi
+  # Strip any pre-release suffix so changelog headings stay clean
+  VERSION="${VERSION%-SNAPSHOT}"
+  VERSION="${VERSION%%-snapshot.*}"
 fi
 
 # Auto-detect the last release tag if not provided

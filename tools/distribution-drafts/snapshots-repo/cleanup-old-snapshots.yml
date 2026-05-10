@@ -1,0 +1,77 @@
+# Lives in: wheels-dev/wheels-snapshots/.github/workflows/cleanup-old-snapshots.yml
+#
+# Daily cron that deletes pre-releases older than 30 days from this repo. Keeps
+# the snapshot repo from growing unboundedly while leaving a useful regression-
+# bisection window. GA releases (which are not pre-releases and never published
+# here anyway) would be untouched even if they did exist.
+name: Cleanup Old Snapshots
+
+on:
+  schedule:
+    # Daily at 04:00 UTC — outside US business hours, low-traffic window.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: "Override retention period (default 30)"
+        required: false
+        type: number
+        default: 30
+
+permissions:
+  contents: write   # needed to delete releases + tags
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RETENTION_DAYS: ${{ inputs.retention_days || 30 }}
+    steps:
+      - name: Delete pre-releases older than retention window
+        run: |
+          set -euo pipefail
+          CUTOFF=$(date -u -d "${RETENTION_DAYS} days ago" +%s)
+          echo "Cutoff timestamp (UTC, Unix): ${CUTOFF}"
+          echo "Will delete pre-releases published before: $(date -u -d @${CUTOFF})"
+
+          # Page through all releases. The default per_page=30 would require
+          # multiple round-trips on a busy repo; use the max (100).
+          DELETED=0
+          KEPT=0
+          PAGE=1
+          while true; do
+            BATCH=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100&page=${PAGE}")
+            COUNT=$(echo "${BATCH}" | jq 'length')
+            if [ "${COUNT}" -eq 0 ]; then break; fi
+
+            echo "${BATCH}" | jq -c '.[]' | while read -r release; do
+              ID=$(echo "${release}" | jq -r '.id')
+              TAG=$(echo "${release}" | jq -r '.tag_name')
+              PRERELEASE=$(echo "${release}" | jq -r '.prerelease')
+              PUBLISHED=$(echo "${release}" | jq -r '.published_at')
+
+              if [ "${PRERELEASE}" != "true" ]; then
+                # Don't ever touch full releases — they shouldn't be in this
+                # repo, but if a human published one manually, leave it alone.
+                continue
+              fi
+
+              PUBLISHED_TS=$(date -u -d "${PUBLISHED}" +%s)
+              if [ "${PUBLISHED_TS}" -lt "${CUTOFF}" ]; then
+                echo "Deleting ${TAG} (published ${PUBLISHED}, id=${ID})"
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${ID}"
+                # Also delete the underlying git tag — releases without a tag
+                # show up as "Untagged" in the UI which is uglier than just
+                # being gone.
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" || true
+                DELETED=$((DELETED + 1))
+              else
+                KEPT=$((KEPT + 1))
+              fi
+            done
+
+            PAGE=$((PAGE + 1))
+          done
+
+          echo "Cleanup complete. Deleted: ${DELETED}, kept: ${KEPT}"

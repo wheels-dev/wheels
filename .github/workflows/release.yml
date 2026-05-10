@@ -20,6 +20,13 @@ on:
       # of waiting for the daily cron. When absent, the step warns and exits 0.
       DOWNSTREAM_DISPATCH_TOKEN:
         required: false
+      # Required when this workflow is invoked from develop (snapshot context) so
+      # the snapshot release can be published to wheels-dev/wheels-snapshots
+      # instead of wheels-dev/wheels. Stable (main) builds don't use this and
+      # rely on the default GITHUB_TOKEN. See .github/RELEASE_PLAYBOOK.md for
+      # the channel architecture.
+      WHEELS_SNAPSHOTS_TOKEN:
+        required: false
 
 env:
   WHEELS_PRERELEASE: false
@@ -41,18 +48,26 @@ jobs:
 
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          cat box.json
-          BASE_VERSION=$(cat box.json | jq '.version' -r)
-          echo "Base version from box.json: ${BASE_VERSION}"
-          # Develop builds get -SNAPSHOT qualifier; main builds are stable releases.
-          # Source files keep clean versions (e.g. 3.1.0) so no changes are
-          # needed when promoting develop to main.
+          cat wheels.json
+          BASE_VERSION=$(jq -r '.version' wheels.json)
+          echo "Base version from wheels.json: ${BASE_VERSION}"
+          # Develop builds carry a -snapshot.N pre-release identifier; main builds
+          # are stable releases. The snapshot identifier uses '.' (not '+') so it
+          # is a SemVer pre-release identifier, not build metadata. Per SemVer §10,
+          # build metadata (after '+') MUST be ignored in precedence comparisons —
+          # which would make snapshot N and N+1 sort equal in brew/choco. The '.'
+          # form sorts numerically, so 4.0.1-snapshot.1657 > 4.0.1-snapshot.1656.
           if [ "$GITHUB_REF" == "refs/heads/develop" ]; then
-            echo "WHEELS_VERSION=${BASE_VERSION}-SNAPSHOT+${{ github.run_number }}" >> $GITHUB_ENV
+            echo "WHEELS_VERSION=${BASE_VERSION}-snapshot.${RUN_NUMBER}" >> $GITHUB_ENV
             echo "BRANCH=develop" >> $GITHUB_ENV
           else
-            echo "WHEELS_VERSION=${BASE_VERSION}+${{ github.run_number }}" >> $GITHUB_ENV
+            # Stable release: BASE_VERSION is the GA version, no build qualifier.
+            # The run number is captured in the GitHub Actions history; embedding
+            # it in the artifact version is SemVer-meaningless for a GA tag.
+            echo "WHEELS_VERSION=${BASE_VERSION}" >> $GITHUB_ENV
             echo "BRANCH=main" >> $GITHUB_ENV
           fi
 
@@ -80,13 +95,13 @@ jobs:
             exit 1
           fi
 
-          # Check that source version in box.json is clean (no -SNAPSHOT suffix).
-          # The workflow injects -SNAPSHOT for develop builds automatically.
-          BASE_VERSION=$(jq -r '.version' box.json)
+          # Check that source version in wheels.json is clean (no -snapshot suffix).
+          # The workflow injects -snapshot.N for develop builds automatically.
+          BASE_VERSION=$(jq -r '.version' wheels.json)
           if echo "$BASE_VERSION" | grep -qi "snapshot"; then
-            echo "ERROR: Version in box.json contains -SNAPSHOT suffix ($BASE_VERSION)"
+            echo "ERROR: Version in wheels.json contains snapshot suffix ($BASE_VERSION)"
             echo "Source files should have clean versions (e.g., 3.1.0)."
-            echo "The workflow adds -SNAPSHOT automatically for develop builds."
+            echo "The workflow adds -snapshot.N automatically for develop builds."
             exit 1
           fi
 
@@ -142,20 +157,30 @@ jobs:
               exit 1
             fi
 
-            # Check if box.json exists
-            if [ ! -f "$PACKAGE_DIR/box.json" ]; then
-              echo "ERROR: box.json not found in $PACKAGE_DIR!"
+            # Locate the package manifest. Prefer wheels.json (post-rename in 4.0)
+            # over box.json (legacy CommandBox/ForgeBox format). The legacy
+            # ForgeBox-bound artifacts (wheels-base-template, wheels-cli,
+            # wheels-starter-app) still carry box.json; wheels-core now uses
+            # wheels.json. This validator handles both.
+            local MANIFEST=""
+            if [ -f "$PACKAGE_DIR/wheels.json" ]; then
+              MANIFEST="$PACKAGE_DIR/wheels.json"
+            elif [ -f "$PACKAGE_DIR/box.json" ]; then
+              MANIFEST="$PACKAGE_DIR/box.json"
+            else
+              echo "ERROR: neither wheels.json nor box.json found in $PACKAGE_DIR!"
               exit 1
             fi
+            echo "  Manifest: $(basename $MANIFEST)"
 
-            # Validate box.json syntax
-            if ! jq empty "$PACKAGE_DIR/box.json" 2>/dev/null; then
-              echo "ERROR: Invalid JSON in $PACKAGE_DIR/box.json"
+            # Validate manifest syntax
+            if ! jq empty "$MANIFEST" 2>/dev/null; then
+              echo "ERROR: Invalid JSON in $MANIFEST"
               exit 1
             fi
 
             # Extract and display version
-            local VERSION=$(jq -r '.version' "$PACKAGE_DIR/box.json")
+            local VERSION=$(jq -r '.version' "$MANIFEST")
             echo "  Version: $VERSION"
 
             # Check that version matches expected version
@@ -228,6 +253,25 @@ jobs:
           sha512sum wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.sha512
           md5sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5 || md5 -r wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5
           sha512sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512
+
+      # Build .deb / .rpm Linux packages alongside the zip artifacts. nfpm
+      # needs no Linux-specific build host (it's a single Go binary), so this
+      # runs on the same ubuntu-latest runner as the rest of the pipeline.
+      # Generates wheels_<v>_amd64.deb and wheels-<v>.x86_64.rpm in dist/.
+      # See tools/distribution-drafts/linux-packages/ for the nfpm configs.
+      - name: Install nfpm
+        run: |
+          NFPM_VERSION="2.40.0"
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
+            | sudo tar -xzf - -C /usr/local/bin nfpm
+          nfpm --version
+
+      - name: Build Linux packages (.deb / .rpm)
+        env:
+          WHEELS_VERSION: ${{ env.WHEELS_VERSION }}
+          CHANNEL: stable
+          OUT_DIR: artifacts/wheels/${{ env.WHEELS_VERSION }}
+        run: bash tools/distribution-drafts/linux-packages/build-linux-packages.sh
 
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v7
@@ -363,6 +407,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
 
       #############################################
       # Create Snapshot Pre-Release (develop only)
@@ -371,6 +417,13 @@ jobs:
       # Same retry-wrap rationale as the stable Create-GitHub-Release step
       # above. Both branches need the wrap because the same flake fires on
       # any release upload regardless of branch.
+      #
+      # Snapshots publish to a separate repo (wheels-dev/wheels-snapshots) so
+      # the main repo's Releases page stays curated for GA tags only. Without
+      # the redirect, ~200-500 snapshot releases per year would drown the
+      # ~6-12 GA releases. Requires WHEELS_SNAPSHOTS_TOKEN — a fine-grained PAT
+      # with Contents:write on wheels-dev/wheels-snapshots, passed through via
+      # workflow_call from snapshot.yml.
       - name: Create Snapshot Pre-Release
         if: github.ref != 'refs/heads/main'
         id: gh-release-snapshot
@@ -382,10 +435,18 @@ jobs:
           with: |
             tag_name: v${{ env.WHEELS_VERSION }}
             name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
-            body: "Snapshot build from develop. Not for production use."
+            body: |
+              Automated snapshot from `wheels-dev/wheels` develop branch.
+
+              Install:
+              ```
+              brew upgrade wheels-be
+              ```
             draft: false
             prerelease: true
             overwrite_files: true
+            repository: wheels-dev/wheels-snapshots
+            token: ${{ secrets.WHEELS_SNAPSHOTS_TOKEN }}
             files: |
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
@@ -405,6 +466,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
 
       #############################################
       # Dispatch downstream package managers
@@ -435,9 +498,26 @@ jobs:
             exit 0
           fi
 
+          # Derive the channel from the version string. The tap's auto-update.yml
+          # uses this to decide which formula to bump:
+          #   stable        → Formula/wheels.rb     (sources from wheels-dev/wheels)
+          #   bleeding-edge → Formula/wheels-be.rb  (sources from wheels-dev/wheels-snapshots)
+          # The version string already encodes this — `*-snapshot.*` is BE,
+          # `*-rc.*` is RC, anything else SemVer-clean is stable. Sniffing here
+          # rather than using a separate event type keeps backwards-compat with
+          # taps still on the older single-channel handler.
+          if echo "${WHEELS_RELEASE_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
+            CHANNEL="bleeding-edge"
+          elif echo "${WHEELS_RELEASE_VERSION}" | grep -qE '\-rc\.'; then
+            CHANNEL="release-candidate"
+          else
+            CHANNEL="stable"
+          fi
+          echo "Channel: ${CHANNEL}"
+
           # Static event type, fixed repo list — no untrusted input flows
           # into the curl arguments. WHEELS_RELEASE_VERSION is generated
-          # earlier in the same workflow from box.json + run number.
+          # earlier in the same workflow from wheels.json + run number.
           for repo in homebrew-wheels chocolatey-wheels; do
             echo "Dispatching wheels-released to wheels-dev/${repo}..."
             http_status=$(curl -sS -o /tmp/dispatch-resp.txt -w "%{http_code}" \
@@ -446,13 +526,13 @@ jobs:
               -H "Authorization: Bearer ${GH_DISPATCH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/wheels-dev/${repo}/dispatches" \
-              -d "{\"event_type\":\"wheels-released\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\"}}" )
+              -d "{\"event_type\":\"wheels-released\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\",\"channel\":\"${CHANNEL}\"}}" )
 
             # GitHub returns 204 No Content on success.
             if [ "${http_status}" != "204" ]; then
               echo "::warning::Dispatch to wheels-dev/${repo} returned HTTP ${http_status}: $(cat /tmp/dispatch-resp.txt)"
             else
-              echo "  ✓ ${repo} dispatched"
+              echo "  ✓ ${repo} dispatched (channel=${CHANNEL})"
             fi
           done
 

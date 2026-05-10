@@ -1,0 +1,278 @@
+# Lives in: wheels-dev/homebrew-wheels/.github/workflows/bleeding-edge-update.yml
+#
+# Mirror of auto-update.yml but for the bleeding-edge channel. Listens for the
+# same wheels-released dispatch but only acts when channel=bleeding-edge.
+# Updates Formula/wheels-be.rb sourcing from wheels-dev/wheels-snapshots.
+#
+# Why a parallel workflow instead of folding into auto-update.yml: the existing
+# auto-update.yml is large, well-tested, and on the critical path for GA.
+# Adding channel-conditional branches throughout would risk regressions.
+# Keep them split through the v4.0 GA window; refactor into one channel-aware
+# workflow afterward.
+#
+# First-run note: Formula/wheels-be.rb must be pre-staged with placeholder
+# sha256 values before the first dispatch arrives. This workflow rewrites
+# the placeholders on first match. See tools/distribution-drafts/homebrew/
+# wheels-be.rb in wheels-dev/wheels for the template.
+name: Auto-Update wheels-be Formula
+
+on:
+  schedule:
+    - cron: '15 8 * * *'  # offset from auto-update.yml's :00 to avoid contention
+  workflow_dispatch:
+  repository_dispatch:
+    types:
+      - wheels-released
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-update-formula-be
+  cancel-in-progress: false
+
+jobs:
+  check-updates:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.AUTO_MERGE_PAT || secrets.GITHUB_TOKEN }}
+
+      # Channel filter — only proceed for bleeding-edge dispatches.
+      # Manual / cron triggers also run (they re-check the snapshots repo
+      # for new releases).
+      - name: Channel filter (bleeding-edge only)
+        id: channel-filter
+        env:
+          DISPATCH_CHANNEL: ${{ github.event.client_payload.channel }}
+          DISPATCH_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          if [ "${{ github.event_name }}" != "repository_dispatch" ]; then
+            echo "Non-dispatch trigger (cron/manual); will check snapshots repo."
+            echo "should_proceed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          CHANNEL="${DISPATCH_CHANNEL:-}"
+          if [ -z "${CHANNEL}" ] && [ -n "${DISPATCH_VERSION:-}" ]; then
+            if echo "${DISPATCH_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
+              CHANNEL="bleeding-edge"
+            else
+              CHANNEL="stable"
+            fi
+          fi
+          if [ "${CHANNEL}" = "bleeding-edge" ]; then
+            echo "Bleeding-edge dispatch; proceeding."
+            echo "should_proceed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Channel '${CHANNEL}' is not bleeding-edge; skipping."
+            echo "should_proceed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for updates
+        if: steps.channel-filter.outputs.should_proceed == 'true'
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+
+          # Read current version from Formula/wheels-be.rb.
+          if [ ! -f Formula/wheels-be.rb ]; then
+            echo "::error::Formula/wheels-be.rb does not exist. Pre-stage it from tools/distribution-drafts/homebrew/wheels-be.rb in wheels-dev/wheels."
+            exit 1
+          fi
+          CURRENT_MODULE=$(grep '^  version "' Formula/wheels-be.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+          # Resolve target version: prefer dispatch payload (race-free), fall
+          # back to querying the snapshots repo for the most recent pre-release.
+          LATEST_MODULE=""
+          if [ -n "${DISPATCH_VERSION:-}" ] && [ "${DISPATCH_VERSION}" != "null" ]; then
+            LATEST_MODULE="${DISPATCH_VERSION#v}"
+            echo "Using dispatch payload: ${LATEST_MODULE}"
+          fi
+
+          if [ -z "${LATEST_MODULE}" ]; then
+            for attempt in 1 2 3; do
+              LATEST_MODULE=$(gh api "repos/wheels-dev/wheels-snapshots/releases?per_page=1" \
+                -q '.[0].tag_name // ""' | sed 's/^v//')
+              if [ -n "${LATEST_MODULE}" ] && [ "${LATEST_MODULE}" != "null" ]; then
+                break
+              fi
+              sleep $((attempt * 15))
+            done
+          fi
+
+          if [ -z "${LATEST_MODULE}" ] || [ "${LATEST_MODULE}" = "null" ]; then
+            echo "::error::Could not resolve latest snapshot version."
+            exit 1
+          fi
+
+          echo "current_module=${CURRENT_MODULE}" >> "$GITHUB_OUTPUT"
+          echo "latest_module=${LATEST_MODULE}" >> "$GITHUB_OUTPUT"
+
+          if [ "${CURRENT_MODULE}" != "${LATEST_MODULE}" ]; then
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+            echo "Update needed: ${CURRENT_MODULE} -> ${LATEST_MODULE}"
+          else
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+            echo "Already at ${CURRENT_MODULE}; no-op."
+          fi
+
+      - name: Compute SHA256 hashes
+        if: steps.channel-filter.outputs.should_proceed == 'true' && steps.check.outputs.needs_update == 'true'
+        id: hashes
+        env:
+          MODULE_VER: ${{ steps.check.outputs.latest_module }}
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/wheels-dev/wheels-snapshots/releases/download/v${MODULE_VER}"
+
+          # CLI module zip — what the wrapper stages into ~/.wheels/modules/wheels/
+          curl -fsSL -o /tmp/wheels-cli.zip "${BASE}/wheels-cli-${MODULE_VER}.zip"
+          CLI_SHA=$(shasum -a 256 /tmp/wheels-cli.zip | awk '{print $1}')
+          [ "${#CLI_SHA}" -eq 64 ] || { echo "::error::Bad CLI sha256: ${CLI_SHA}"; exit 1; }
+          echo "cli_sha=${CLI_SHA}" >> "$GITHUB_OUTPUT"
+
+          # Framework source zip — what `wheels new` copies into vendor/wheels/
+          curl -fsSL -o /tmp/wheels-core.zip "${BASE}/wheels-core-${MODULE_VER}.zip"
+          CORE_SHA=$(shasum -a 256 /tmp/wheels-core.zip | awk '{print $1}')
+          [ "${#CORE_SHA}" -eq 64 ] || { echo "::error::Bad core sha256: ${CORE_SHA}"; exit 1; }
+          echo "core_sha=${CORE_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Update formula
+        if: steps.channel-filter.outputs.should_proceed == 'true' && steps.check.outputs.needs_update == 'true'
+        env:
+          MODULE_VER: ${{ steps.check.outputs.latest_module }}
+          CLI_SHA: ${{ steps.hashes.outputs.cli_sha }}
+          CORE_SHA: ${{ steps.hashes.outputs.core_sha }}
+        run: |
+          set -euo pipefail
+
+          # Anchor-based replacements — robust to formula reordering.
+          python3 <<PYEOF
+          import re, os
+          ver = os.environ['MODULE_VER']
+          cli_sha = os.environ['CLI_SHA']
+          core_sha = os.environ['CORE_SHA']
+          base = f"https://github.com/wheels-dev/wheels-snapshots/releases/download/v{ver}"
+
+          with open('Formula/wheels-be.rb') as f:
+              content = f.read()
+
+          # 1. Bump version line
+          content = re.sub(r'^  version "[^"]+"', f'  version "{ver}"', content, count=1, flags=re.M)
+
+          # 2. Bump main url + sha256 (CLI module zip)
+          content = re.sub(
+              r'(^  url "https://github\.com/wheels-dev/wheels-snapshots/releases/download/v)[^/]+/wheels-cli-[^"]+(")',
+              rf'\g<1>{ver}/wheels-cli-{ver}.zip\g<2>',
+              content, count=1, flags=re.M
+          )
+          content = re.sub(
+              r'(^  url "https://github\.com/wheels-dev/wheels-snapshots/[^"]+"\n  sha256 ")[^"]+(")',
+              rf'\g<1>{cli_sha}\g<2>',
+              content, count=1, flags=re.M
+          )
+
+          # 3. Bump wheels-core resource block
+          content = re.sub(
+              r'(  resource "wheels-core" do\n    url ")https://github\.com/wheels-dev/wheels-snapshots/releases/download/v[^/]+/wheels-core-[^"]+(")',
+              rf'\g<1>{base}/wheels-core-{ver}.zip\g<2>',
+              content, count=1
+          )
+          content = re.sub(
+              r'(  resource "wheels-core" do\n    url "[^"]+"\n    sha256 ")[^"]+(")',
+              rf'\g<1>{core_sha}\g<2>',
+              content, count=1
+          )
+
+          with open('Formula/wheels-be.rb', 'w') as f:
+              f.write(content)
+          print(f"Updated Formula/wheels-be.rb to {ver}")
+          PYEOF
+
+      - name: Smoke test formula
+        if: steps.channel-filter.outputs.should_proceed == 'true' && steps.check.outputs.needs_update == 'true'
+        run: |
+          set -euo pipefail
+          TAP_DIR="$(brew --repository)/Library/Taps/wheels-dev/homebrew-wheels"
+          mkdir -p "$(dirname "$TAP_DIR")"
+          ln -sfn "$GITHUB_WORKSPACE" "$TAP_DIR"
+
+          brew audit --strict wheels-dev/wheels/wheels-be
+          brew fetch --retry wheels-dev/wheels/wheels-be
+
+      - name: Create PR
+        if: steps.channel-filter.outputs.should_proceed == 'true' && steps.check.outputs.needs_update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_PAT || secrets.GITHUB_TOKEN }}
+          MODULE_VER: ${{ steps.check.outputs.latest_module }}
+          CURRENT_MODULE: ${{ steps.check.outputs.current_module }}
+        run: |
+          set -euo pipefail
+          sanitize() { echo "$1" | tr '+' '-'; }
+          BRANCH="auto-update/wheels-be-$(sanitize "$MODULE_VER")"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add Formula/wheels-be.rb
+          git commit -m "chore: bump wheels-be to ${MODULE_VER}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "chore: bump wheels-be to ${MODULE_VER}" \
+            --body "Auto-update from snapshot release.
+
+          Module: ${CURRENT_MODULE} -> ${MODULE_VER}
+          Source: https://github.com/wheels-dev/wheels-snapshots/releases/tag/v${MODULE_VER}" \
+            --label "auto-update"
+
+      - name: Wait for checks and merge
+        if: steps.channel-filter.outputs.should_proceed == 'true' && steps.check.outputs.needs_update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_PAT || secrets.GITHUB_TOKEN }}
+          MODULE_VER: ${{ steps.check.outputs.latest_module }}
+        run: |
+          set -euo pipefail
+          sanitize() { echo "$1" | tr '+' '-'; }
+          BRANCH="auto-update/wheels-be-$(sanitize "$MODULE_VER")"
+          PR_NUMBER=$(gh pr list --head "$BRANCH" --json number -q '.[0].number // ""')
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::No PR found; nothing to merge."
+            exit 0
+          fi
+
+          # Snapshot bumps churn fast — be more aggressive about merging than
+          # auto-update.yml (which holds for stable's full audit suite).
+          MAX_WAIT=300
+          INTERVAL=15
+          ELAPSED=0
+          while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
+            STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus -q '.mergeStateStatus')
+            case "$STATE" in
+              CLEAN)
+                echo "PR #$PR_NUMBER mergeable; squash-merging..."
+                gh pr merge "$PR_NUMBER" --squash --delete-branch
+                exit 0
+                ;;
+              BLOCKED|UNSTABLE)
+                echo "Waiting (${ELAPSED}s): $STATE"
+                ;;
+              DIRTY|BEHIND)
+                echo "PR #$PR_NUMBER is $STATE; updating branch..."
+                gh pr update-branch "$PR_NUMBER" --rebase || true
+                ;;
+              *)
+                echo "State: $STATE — continuing"
+                ;;
+            esac
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "::error::Timed out waiting for PR #$PR_NUMBER"
+          exit 1

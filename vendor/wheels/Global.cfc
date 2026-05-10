@@ -3105,6 +3105,7 @@ return local.$wheels;
 			"/app/views",
 			"/vendor/wheels",
 			"Application.cfc",
+			"../wheels.json",
 			"../box.json",
 			"index.cfm"
 		];
