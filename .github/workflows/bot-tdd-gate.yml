@@ -23,24 +23,31 @@ jobs:
         run: |
           set -euo pipefail
           is_bot=false
+          is_docs=false
           if [[ "$PR_AUTHOR" == "wheels-bot[bot]" ]]; then
             is_bot=true
-          elif [[ "$PR_HEAD" =~ ^bot/ || "$PR_HEAD" =~ ^fix/bot- ]]; then
+          elif [[ "$PR_HEAD" =~ ^bot/ || "$PR_HEAD" =~ ^fix/bot- || "$PR_HEAD" =~ ^docs/bot- ]]; then
             is_bot=true
           fi
+          if [[ "$PR_HEAD" =~ ^docs/bot- ]]; then
+            is_docs=true
+          fi
           echo "is_bot=$is_bot" >> "$GITHUB_OUTPUT"
+          echo "is_docs=$is_docs" >> "$GITHUB_OUTPUT"
           if [[ "$is_bot" == "false" ]]; then
             echo "Human-authored PR — gate is a no-op."
+          elif [[ "$is_docs" == "true" ]]; then
+            echo "Docs-only bot PR (docs/bot-* branch) — TDD invariant doesn't apply, gate is a no-op."
           fi
 
       - name: Checkout
-        if: steps.classify.outputs.is_bot == 'true'
+        if: steps.classify.outputs.is_bot == 'true' && steps.classify.outputs.is_docs == 'false'
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Verify bot PR contains spec + implementation changes
-        if: steps.classify.outputs.is_bot == 'true'
+        if: steps.classify.outputs.is_bot == 'true' && steps.classify.outputs.is_docs == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

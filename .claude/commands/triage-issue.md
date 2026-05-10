@@ -39,8 +39,15 @@ below. Highlights for this command:
      should Wheels do X," "Rails does it like Y, can Wheels do that," anything
      that requires picking among reasonable approaches before code can be
      written. The answer is a design decision, not a defect fix.
-   - **`other`** — docs request, support question ("how do I…"), discussion
-     thread without an actionable ask, broad product feedback.
+   - **`docs-request`** — actionable docs work needed. There's a concrete
+     deliverable (a specific feature, page, or section that should exist
+     or be updated). Distinguished from `other` by: is there a clear
+     "what should the docs contain" deliverable in the issue?
+     "Document the Debug Panel features" → `docs-request`.
+     "The docs are confusing" → `other`.
+   - **`other`** — non-actionable docs feedback, support question
+     ("how do I…"), discussion thread without an actionable ask, broad
+     product feedback.
 
    When the report mixes a bug with a feature request, classify as `bug` if
    the bug is reproducible in isolation; otherwise `framework-design`.
@@ -81,6 +88,53 @@ below. Highlights for this command:
    <!-- wheels-bot:triage:<issue-number> -->
    <!-- wheels-bot:triage-class:framework-design -->
    ```
+
+   Then exit.
+
+   ### If `docs-request`
+
+   Identify the rough docs scope from the issue body — what page(s) or
+   section(s) need creating or updating, and roughly how much work it
+   represents. Then self-rate confidence:
+
+   - **`high`**: the gap is concrete (specific feature/behavior to
+     document), the right page/path is clear from the issue or from
+     existing structure under
+     `web/sites/guides/src/content/docs/v4-0-0-snapshot/`, the work is
+     mostly translation-of-code (not requiring deep design decisions).
+     High-confidence docs-requests trigger the auto-fire write-docs
+     workflow.
+   - **`medium`**: the gap is real but the right page/path is ambiguous,
+     OR a new top-level section is needed (a structural design decision),
+     OR the docs require significant code investigation to write
+     accurately.
+   - **`low`**: the gap is vague, the scope is large (e.g. "rewrite the X
+     chapter"), or it's not clear what concretely needs to exist.
+
+   Post the triage comment:
+
+   ```
+   ## Wheels Bot — Triage
+
+   Classified as **docs-request**.
+
+   ### Docs scope
+
+   <one paragraph: what page(s) need creating/updating and what they should cover>
+
+   ### Confidence: `<low|medium|high>`
+
+   <one sentence: why this confidence level>
+
+   <!-- wheels-bot:triage:<issue-number> -->
+   <!-- wheels-bot:triage-class:docs-request -->
+   <CONFIDENCE_MARKER>
+   ```
+
+   Where `<CONFIDENCE_MARKER>` is:
+   - `<!-- wheels-bot:docs-confidence:high -->` if confidence is high
+     (triggers auto-fire of `bot-write-docs.yml`)
+   - omitted otherwise (medium/low confidence does not auto-trigger)
 
    Then exit.
 
@@ -153,6 +207,9 @@ below. Highlights for this command:
      and does the fix sketch identify a plausible target file?
    - For `bug` path: is the confidence consistent with the auto-downgrade
      rules?
+   - For `docs-request` path: is the docs scope concrete (a named page or
+     section), and is the confidence rating consistent with how clear the
+     deliverable is?
    - Are all required markers present?
 
    If any check fails, fix and re-post (do not post twice).

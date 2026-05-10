@@ -2,7 +2,7 @@
 
 `wheels-bot[bot]` is a custom GitHub App that automates issue triage,
 cross-framework design research, fix-PR generation, and PR review on
-`wheels-dev/wheels`. It runs as six stages, each backed by a slash-command
+`wheels-dev/wheels`. It runs as seven stages, each backed by a slash-command
 prompt in `.claude/commands/` and a workflow in `.github/workflows/bot-*.yml`.
 
 This page is for humans interacting with the bot. For the design rationale,
@@ -21,7 +21,7 @@ contribution rules, see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 - Flip the repo variable `WHEELS_BOT_ENABLED` to `false` to halt the bot
   entirely without code changes.
 
-## The six stages
+## The seven stages
 
 ### 1. Triage (`bot-triage.yml`)
 
@@ -34,11 +34,18 @@ posts a comment classifying it as one of:
   propose-fix stage, not here.
 - **`framework-design`** — feature request or API design question. The bot
   hands off to the research stage; it does not opine yet.
-- **`other`** — docs, support, or general discussion. No further automation.
+- **`docs-request`** — actionable docs work needed (a specific page or
+  section that should exist or be updated). The bot identifies the docs
+  scope and emits a confidence rating. High-confidence docs-requests
+  hand off to the write-docs stage.
+- **`other`** — non-actionable docs feedback, support, or general
+  discussion. No further automation.
 
 For high-confidence `bug` triages the bot emits an additional marker
 (`<!-- wheels-bot:triage-confidence:high -->`) which is the trigger for
-the propose-fix stage.
+the propose-fix stage. For high-confidence `docs-request` triages the
+bot emits `<!-- wheels-bot:docs-confidence:high -->`, which is the
+trigger for the write-docs stage.
 
 ### 2. Cross-framework research (`bot-research.yml`)
 
@@ -84,9 +91,39 @@ The bot:
 
 The PR must pass `bot-tdd-gate.yml` before any other check — that gate
 hard-rejects bot PRs that don't include both a spec change and an
-implementation change. The gate is a no-op for human-authored PRs.
+implementation change. The gate is a no-op for human-authored PRs and
+for docs-only bot PRs (`docs/bot-*` branches from the write-docs stage).
 
-### 4. Update Docs (`bot-update-docs.yml`)
+### 4. Write Docs (`bot-write-docs.yml`)
+
+The docs-path counterpart to propose-fix. Fires from triage's
+`wheels-bot:docs-confidence:high` marker on issues classified as
+`docs-request`. Sonnet, 30-turn budget — doc work is pattern-recognition,
+not reasoning-heavy. Also runnable manually via `workflow_dispatch`.
+
+The bot:
+
+1. Reads the triage comment and the issue body for the docs scope.
+2. Auto-downgrades and stops if the work signals a larger structural
+   docs-architecture decision than this stage handles cleanly. Posts
+   `wheels-bot:docs-held:<issue>` instead of opening a PR.
+3. Writes MDX guide pages, `.ai/wheels/` references, or `CLAUDE.md`
+   updates as appropriate. Filesystem writes are scoped to doc paths
+   only — the workflow's allowlist forbids touching `vendor/`, `app/`,
+   `tests/`, `.github/`, `cli/`, or `config/`.
+4. For features that benefit from screenshots, inserts placeholder
+   comments in the MDX (the bot has no headless browser available; the
+   PR description lists the placeholders so a human can capture and
+   replace them).
+5. Adds a `CHANGELOG.md` entry.
+6. Opens a draft PR on `docs/bot-<issue>-<slug>` against `develop`.
+
+The `docs/bot-*` branch prefix is what causes the `bot-tdd-gate.yml`
+check to skip — docs-only PRs have no spec/impl invariant. Reviewer A
+and Reviewer B still cover the PR, so the human merge decision has the
+same analytical context as for fix PRs.
+
+### 5. Update Docs (`bot-update-docs.yml`)
 
 Adds doc commits to a freshly-opened bot PR. Runs as a separate stage so
 propose-fix's budget can stay focused on TDD work (failing spec →
@@ -123,7 +160,7 @@ bot-identity check on the `if:` block is load-bearing — it prevents human
 PRs from triggering this stage and adding bot-authored doc commits to
 in-flight branches.
 
-### 5. Reviewer A (`bot-review-a.yml`)
+### 6. Reviewer A (`bot-review-a.yml`)
 
 Fires on `pull_request: opened/synchronize/ready_for_review` against
 `develop`. Reviews:
@@ -140,7 +177,7 @@ Conventions, Cross-engine, Tests, Docs, Commits, Security. Verdict is
 `approve` / `request-changes` / `comment`. Verdict and findings must be
 consistent — Reviewer B will catch sycophancy if they aren't.
 
-### 6. Reviewer B (`bot-review-b.yml`)
+### 7. Reviewer B (`bot-review-b.yml`)
 
 Fires when Reviewer A submits a review (filtered on
 `review.user.login == 'wheels-bot[bot]'`). Reviewer B critiques A's review,
@@ -177,12 +214,15 @@ they make every workflow safely retryable.
 | Marker | Meaning |
 |---|---|
 | `wheels-bot:triage:<issue>` | Triage stage processed this issue. |
-| `wheels-bot:triage-class:<bug\|framework-design\|other>` | Triage classification. |
+| `wheels-bot:triage-class:<bug\|framework-design\|docs-request\|other>` | Triage classification. |
 | `wheels-bot:triage-confidence:high` | Triggers propose-fix on the bug path. |
+| `wheels-bot:docs-confidence:high` | Triggers write-docs on the docs-request path. |
 | `wheels-bot:research:<issue>` | Research stage processed this issue. |
 | `wheels-bot:research-confidence:high` | Triggers propose-fix on the framework-design path. |
 | `wheels-bot:fix:<issue>` | Fix PR has been opened for this issue. |
 | `wheels-bot:fix-held:<issue>` | Fix would have been proposed but the safety net held it for a human. |
+| `wheels-bot:write-docs:<issue>` | Write Docs stage opened a docs PR for this issue. |
+| `wheels-bot:docs-held:<issue>` | Docs would have been written but the safety net held it for a human. |
 | `wheels-bot:update-docs:<pr>` | Update Docs stage processed this PR (with or without doc edits). |
 | `wheels-bot:review-a:<pr>:<sha>` | Reviewer A reviewed this PR at this SHA. |
 | `wheels-bot:review-b:<pr>:<sha>:<round>` | Reviewer B critiqued round N. |
@@ -226,11 +266,13 @@ they make every workflow safely retryable.
 - **Auto-fire (Phase 4) is on.** propose-fix runs from
   `wheels-bot:triage-confidence:high` and
   `wheels-bot:research-confidence:high` markers; research runs from
-  `wheels-bot:triage-class:framework-design`; bot-update-docs runs on
-  `pull_request: opened` for `wheels-bot[bot]` PRs. To halt auto-fire
-  without code changes, flip `WHEELS_BOT_ENABLED=false`. To halt
-  permanently, revert the `if:` blocks in the three workflows back to
-  `workflow_dispatch`-only and keep the kill-switch flipped.
+  `wheels-bot:triage-class:framework-design`; write-docs runs from
+  `wheels-bot:docs-confidence:high`; bot-update-docs runs on
+  `pull_request: opened` for `wheels-bot[bot]` PRs (excluding
+  `docs/bot-*` branches, which are write-docs's own output). To halt
+  auto-fire without code changes, flip `WHEELS_BOT_ENABLED=false`. To
+  halt permanently, revert the `if:` blocks in the four workflows back
+  to `workflow_dispatch`-only and keep the kill-switch flipped.
 - **Review bot-authored PRs the same as human-authored PRs.** Don't
   rubber-stamp.
 - **Watch costs.** API spend per fix-PR is non-trivial (Opus + many turns +
