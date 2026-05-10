@@ -1,10 +1,8 @@
 name: Wheels Bot — Update Docs
 
-# Phase 1 rollout: workflow_dispatch only. After several supervised runs
-# produce clean output, a future PR can re-add an auto-fire branch — e.g.
-# trigger on `pull_request: opened` for `wheels-bot[bot]` head refs, or
-# on `issue_comment: created` matching a `wheels-bot:fix:<pr>` marker
-# emitted by propose-fix.
+# Phase 4 (auto-fire): runs on pull_request opened from wheels-bot[bot]
+# head refs (after propose-fix opens its draft PR). workflow_dispatch is
+# preserved for manual reruns.
 on:
   workflow_dispatch:
     inputs:
@@ -12,12 +10,14 @@ on:
         description: 'PR number to add doc updates to'
         required: true
         type: string
+  pull_request:
+    types: [opened]
 
 permissions:
   contents: read
 
 concurrency:
-  group: wheels-bot-update-docs-${{ inputs.pr-number }}
+  group: wheels-bot-update-docs-${{ github.event.pull_request.number || inputs.pr-number }}
   cancel-in-progress: false
 
 jobs:
@@ -25,9 +25,18 @@ jobs:
     name: Update docs
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: vars.WHEELS_BOT_ENABLED == 'true'
+    # Auto-fire only for the bot's own PRs. The bot-identity check is
+    # load-bearing: prevents human PRs from triggering this stage and
+    # adding bot-authored doc commits to in-flight branches.
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && (
+        github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'pull_request'
+            && github.event.pull_request.user.login == 'wheels-bot[bot]')
+      )
     env:
-      PR_NUMBER: ${{ inputs.pr-number }}
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
       WHEELS_CI: "true"
     steps:
       - name: Generate App token
