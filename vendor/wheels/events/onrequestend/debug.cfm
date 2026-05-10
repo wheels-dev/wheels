@@ -1,18 +1,18 @@
 <!--- Skip debug bar for AJAX, HTMX, Turbo, and fetch requests to avoid breaking partial responses --->
-<cfset local.reqHeaders = GetHttpRequestData().headers>
-<cfif
-	(StructKeyExists(local.reqHeaders, "X-Requested-With") AND local.reqHeaders["X-Requested-With"] IS "XMLHttpRequest")
-	OR (StructKeyExists(local.reqHeaders, "HX-Request"))
-	OR (StructKeyExists(local.reqHeaders, "Turbo-Frame"))
-	OR (StructKeyExists(local.reqHeaders, "X-Fetch") AND local.reqHeaders["X-Fetch"] IS "true")
-	OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format))
-><cfexit></cfif>
+<cfset local.reqHeaders = GetHTTPRequestData().headers>
+<cfif (StructKeyExists(local.reqHeaders, "X-Requested-With") AND local.reqHeaders["X-Requested-With"] IS "XMLHttpRequest")
+OR (StructKeyExists(local.reqHeaders, "HX-Request"))
+OR (StructKeyExists(local.reqHeaders, "Turbo-Frame"))
+OR (StructKeyExists(local.reqHeaders, "X-Fetch") AND local.reqHeaders["X-Fetch"] IS "true")
+OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format))>
+	<cfexit>
+</cfif>
 <cfset local.baseReloadURL = cgi.script_name>
 <cfif IsDefined("request.cgi.path_info")>
 	<cfif request.cgi.path_info IS NOT cgi.script_name>
 		<cfset local.baseReloadURL &= request.cgi.path_info>
 	</cfif>
-<cfelse>
+	<cfelse>
 	<cfif cgi.path_info IS NOT cgi.script_name>
 		<cfset local.baseReloadURL &= cgi.path_info>
 	</cfif>
@@ -30,19 +30,21 @@
 </cfloop>
 <cfif local.baseReloadURL Contains "?">
 	<cfset local.baseReloadURL &= "&">
-<cfelse>
+	<cfelse>
 	<cfset local.baseReloadURL &= "?">
 </cfif>
 <cfset local.baseReloadURL &= "reload=">
-<cfset local.gitbranch = DirectoryExists(GetDirectoryFromPath(GetBaseTemplatePath()) & ".git") ? FileRead(GetDirectoryFromPath(GetBaseTemplatePath()) & ".git/HEAD") : "">
+<cfset local.gitbranch = DirectoryExists(GetDirectoryFromPath(GetBaseTemplatePath()) & ".git") ? FileRead(
+	GetDirectoryFromPath(GetBaseTemplatePath()) & ".git/HEAD"
+) : "">
 <cfset local.envClass = LCase($get("environment"))>
 <cfif local.envClass IS "production">
 	<cfset local.envColor = "##dc3545">
-<cfelseif local.envClass IS "testing">
+	<cfelseif local.envClass IS "testing">
 	<cfset local.envColor = "##fd7e14">
-<cfelseif local.envClass IS "maintenance">
+	<cfelseif local.envClass IS "maintenance">
 	<cfset local.envColor = "##ffc107">
-<cfelse>
+	<cfelse>
 	<cfset local.envColor = "##28a745">
 </cfif>
 <!--- Collect execution timing breakdown --->
@@ -52,7 +54,14 @@
 	<cfloop from="1" to="#ArrayLen(local.keys)#" index="local.ti">
 		<cfset local.tkey = local.keys[local.ti]>
 		<cfif local.tkey IS NOT "total" AND request.wheels.execution[local.tkey] GT 0>
-			<cfset ArrayAppend(local.timingBreakdown, {name = LCase(local.tkey), ms = request.wheels.execution[local.tkey], pct = Round((request.wheels.execution[local.tkey] / request.wheels.execution.total) * 100)})>
+			<cfset ArrayAppend(
+				local.timingBreakdown,
+				{
+					name = LCase(local.tkey),
+					ms = request.wheels.execution[local.tkey],
+					pct = Round((request.wheels.execution[local.tkey] / request.wheels.execution.total) * 100)
+				}
+			)>
 		</cfif>
 	</cfloop>
 </cfif>
@@ -61,9 +70,15 @@
 <cfloop collection="#request.wheels.params#" item="local.pi">
 	<cfif local.pi IS NOT "fieldnames" AND local.pi IS NOT "route" AND local.pi IS NOT "controller" AND local.pi IS NOT "action" AND local.pi IS NOT "key">
 		<cfif IsSimpleValue(request.wheels.params[local.pi])>
-			<cfset ArrayAppend(local.paramsList, {name = LCase(local.pi), value = request.wheels.params[local.pi], type = "string"})>
+			<cfset ArrayAppend(
+				local.paramsList,
+				{name = LCase(local.pi), value = request.wheels.params[local.pi], type = "string"}
+			)>
 		<cfelseif IsStruct(request.wheels.params[local.pi]) OR IsArray(request.wheels.params[local.pi])>
-			<cfset ArrayAppend(local.paramsList, {name = LCase(local.pi), value = SerializeJSON(request.wheels.params[local.pi]), type = "json"})>
+			<cfset ArrayAppend(
+				local.paramsList,
+				{name = LCase(local.pi), value = SerializeJSON(request.wheels.params[local.pi]), type = "json"}
+			)>
 		</cfif>
 	</cfif>
 </cfloop>
@@ -336,35 +351,6 @@
 							<p>Failed to load <strong>#local.fp.name#</strong>: #local.fp.error#</p>
 						</cfloop>
 					</div>
-				</cfif>
-				<!--- Available from registry — same data source as the standalone /wheels/packages page. --->
-				<cfif StructKeyExists(application.wheels, "public") AND IsObject(application.wheels.public)>
-					<cfset local.registryResult = application.wheels.public.$loadRegistryPackages()>
-					<div class="wdb-section-title" style="margin-top:12px;">Available from registry</div>
-					<cfif Len(local.registryResult.error)>
-						<p style="color:##f9e2af;font-size:12px;">#HTMLEditFormat(local.registryResult.error)#</p>
-					<cfelseif ArrayLen(local.registryResult.packages) GT 0>
-						<table class="wdb-table">
-							<thead><tr><th>Package</th><th>Latest</th><th>Description</th></tr></thead>
-							<tbody>
-							<cfloop array="#local.registryResult.packages#" index="local.rp">
-								<tr>
-									<td>
-										<cfif Len(local.rp.homepage) AND REFindNoCase("^https?://", local.rp.homepage)>
-											<a href="#HTMLEditFormat(local.rp.homepage)#" target="_blank" rel="noopener" style="color:##89b4fa;"><code>#HTMLEditFormat(local.rp.name)#</code></a>
-										<cfelse>
-											<code>#HTMLEditFormat(local.rp.name)#</code>
-										</cfif>
-									</td>
-									<td>#HTMLEditFormat(local.rp.latestVersion)#</td>
-									<td style="color:##a6adc8;">#HTMLEditFormat(local.rp.description)#</td>
-								</tr>
-							</cfloop>
-							</tbody>
-						</table>
-					<cfelse>
-						<p style="color:##6c7086;">No packages found in the registry.</p>
-					</cfif>
 				</cfif>
 			</div>
 		</cfif>

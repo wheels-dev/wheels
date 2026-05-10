@@ -9,6 +9,11 @@
  * Both are overridable via the `registryRepo` constructor arg or the
  * `WHEELS_PACKAGES_REGISTRY` env var (default "wheels-dev/wheels-packages").
  * Useful for forks, mirrors, and tests.
+ *
+ * Mirrors cli/lucli/services/packages/Registry.cfc — the framework's
+ * debug panel uses this copy directly (no CLI dependency, since user
+ * apps generated with `wheels new` don't ship the CLI alongside).
+ * Keep both copies in sync when changing registry-fetch behavior.
  */
 component {
 
@@ -18,10 +23,10 @@ component {
 	public Registry function init(any httpClient = "", any cache = "", string registryRepo = "", string branch = "") {
 		variables.http = IsObject(arguments.httpClient)
 		 ? arguments.httpClient
-		 : new modules.wheels.services.packages.HttpClient();
+		 : new wheels.services.packages.HttpClient();
 		variables.cache = IsObject(arguments.cache)
 		 ? arguments.cache
-		 : new modules.wheels.services.packages.ManifestCache();
+		 : new wheels.services.packages.ManifestCache();
 		variables.registryRepo = Len(arguments.registryRepo)
 		 ? arguments.registryRepo
 		 : $resolveRepo();
