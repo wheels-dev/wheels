@@ -16,10 +16,17 @@ jobs:
     name: Reviewer B
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Critiques Reviewer A's reviews on human ready-for-review PRs AND on
+    # the bot's own PRs (even draft). The bot-PR draft case lets the human
+    # merge decision benefit from both Reviewer A's findings and Reviewer
+    # B's quality check before the PR is marked ready.
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
       && github.event.review.user.login == 'wheels-bot[bot]'
-      && github.event.pull_request.draft == false
+      && (
+        github.event.pull_request.user.login == 'wheels-bot[bot]'
+        || github.event.pull_request.draft == false
+      )
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v6

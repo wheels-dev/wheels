@@ -91,10 +91,15 @@ is enforced by code, so don't skip steps.
    bash tools/test-local.sh <layer>
    ```
 
-   Capture the failure to `/tmp/bot-failure.json` (use `format=json` on the
-   test endpoint or save the bash output). **Confirm the spec actually
-   fails.** A passing spec at this point means you wrote the wrong test —
-   redo it.
+   Read the bash output directly to confirm the failure — note which
+   assertion fired and the diff between expected and actual. **Do NOT
+   write to `/tmp/` or anywhere outside the repository working tree.**
+   The runtime sandboxes file operations to the working directory; `cp`
+   to `/tmp` (or any out-of-tree path) will be blocked and burn turns on
+   retries. If you need to persist test output for the next step, write
+   to a working-tree path like `./.bot-test-output.txt` and clean it up
+   before commit. **Confirm the spec actually fails.** A passing spec at
+   this point means you wrote the wrong test — redo it.
 
 7. **Implement the fix.** Edit the relevant files under `vendor/wheels/**`
    or `app/**`. Do not touch:

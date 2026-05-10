@@ -126,8 +126,14 @@ in-flight branches.
 ### 5. Reviewer A (`bot-review-a.yml`)
 
 Fires on `pull_request: opened/synchronize/ready_for_review` against
-`develop`. Skips bot-authored PRs (Reviewer A is for human PRs); the bot's
-own PRs get reviewed by humans.
+`develop`. Reviews:
+
+- Human PRs that are ready-for-review (drafts are skipped — they're
+  work-in-progress and reviewing them would churn).
+- The bot's own PRs **even while draft**, so the human merge decision is
+  informed by Reviewer A's analysis (and Reviewer B's critique) rather
+  than blind. The PR stays draft until a human marks it ready, which
+  remains the explicit "I've read the reviews and want to merge" signal.
 
 Posts a single PR review with line comments grouped under: Correctness,
 Conventions, Cross-engine, Tests, Docs, Commits, Security. Verdict is
@@ -140,10 +146,16 @@ Fires when Reviewer A submits a review (filtered on
 `review.user.login == 'wheels-bot[bot]'`). Reviewer B critiques A's review,
 not the PR — looking for sycophancy ("LGTM" without evidence), false
 positives (claims that don't match the actual code), and missed issues.
+Runs on both human PRs (ready-for-review only) and the bot's own PRs
+(even draft — same rationale as Reviewer A).
 
 Posts as a PR comment (not a review) so it doesn't re-trigger itself.
 Loop is capped at 3 rounds. Round 4 emits a terminal "no further
-iterations" message.
+iterations" message. The natural stopping condition for the bot-PR flow
+is one Reviewer A review per SHA — once the bot's PR stops emitting new
+commits (typically after `bot-update-docs` lands its docs commit), no
+new SHA → no new Reviewer A → no new Reviewer B. The human reads the
+final A+B exchange and decides whether to mark ready and merge.
 
 ## Maintenance: auto-close stale triage (`bot-auto-close.yml`)
 
