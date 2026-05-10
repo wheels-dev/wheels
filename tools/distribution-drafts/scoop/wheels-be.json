@@ -11,7 +11,7 @@
       "url": [
         "https://github.com/wheels-dev/wheels-snapshots/releases/download/v4.0.1-snapshot.1700/wheels-cli-4.0.1-snapshot.1700.zip",
         "https://github.com/wheels-dev/wheels-snapshots/releases/download/v4.0.1-snapshot.1700/wheels-core-4.0.1-snapshot.1700.zip",
-        "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-windows-x64.exe",
+        "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7.bat",
         "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar"
       ],
       "hash": [
@@ -47,7 +47,7 @@
     "@echo off",
     "set JAVA_HOME=$env:JAVA_HOME",
     "set LUCLI_HOME=%USERPROFILE%\\.wheels",
-    "\"$dir\\lucli-0.3.7-windows-x64.exe\" %*",
+    "\"$dir\\lucli-0.3.7.bat\" %*",
     "\"@",
     "Set-Content -Path \"$dir\\wheels-cli.cmd\" -Value $wrapper -Encoding ASCII"
   ],
@@ -62,7 +62,7 @@
         "url": [
           "https://github.com/wheels-dev/wheels-snapshots/releases/download/v$version/wheels-cli-$version.zip",
           "https://github.com/wheels-dev/wheels-snapshots/releases/download/v$version/wheels-core-$version.zip",
-          "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-windows-x64.exe",
+          "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7.bat",
           "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar"
         ]
       }
