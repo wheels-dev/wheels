@@ -44,13 +44,6 @@ jobs:
           marker-pattern: 'wheels-bot:triage:${{ github.event.issue.number }}|wheels-bot:triage-class:'
           github-token: ${{ steps.app-token.outputs.token }}
 
-      - name: Set up Wheels test environment
-        if: steps.gate.outputs.skip == 'false'
-        uses: ./.github/actions/setup-wheels-test-env
-        with:
-          port: '60007'
-          install-playwright: 'false'
-
       - name: Run Triage
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
@@ -66,12 +59,4 @@ jobs:
           claude_args: |
             --model claude-sonnet-4-6
             --max-turns 20
-            --allowedTools "Bash(gh:*),Bash(git status),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(bash tools/test-local.sh*),Bash(curl:*),Read,Grep,Glob,Edit,Write"
-
-      - name: Stop Lucee server
-        if: always()
-        run: |
-          if [ -f /tmp/lucli-server.pid ]; then
-            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
-          fi
-          lucli server stop 2>/dev/null || true
+            --allowedTools "Bash(gh:*),Bash(git status),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Read,Grep,Glob"
