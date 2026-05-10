@@ -17,10 +17,17 @@ jobs:
     name: Reviewer A
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Reviews human PRs that are ready-for-review, AND the bot's own PRs
+    # even while draft. Bot PRs get reviewed pre-merge so the human merge
+    # decision is informed by Reviewer A's analysis (and Reviewer B's
+    # critique) rather than blind. Human drafts are skipped because drafts
+    # are work-in-progress and reviews would churn.
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
-      && github.event.pull_request.draft == false
-      && github.event.pull_request.user.login != 'wheels-bot[bot]'
+      && (
+        github.event.pull_request.user.login == 'wheels-bot[bot]'
+        || github.event.pull_request.draft == false
+      )
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v6
@@ -49,9 +56,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           # Allow our App's bot identity and github-actions[bot] to initiate
-          # the action. Currently the job-level if: blocks wheels-bot[bot] PRs,
-          # so this is defensive for future bot-authored PRs (Dependabot,
-          # Renovate) — and for consistency with the other bot workflows.
+          # the action. Reviewer A now runs on wheels-bot[bot] PRs too (so
+          # the human merge decision has analysis to lean on), so this is
+          # the primary case — not defensive.
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
