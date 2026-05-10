@@ -34,7 +34,7 @@ is enforced by code, so don't skip steps.
 2. **Read the authoritative context.** Both must be read before doing
    anything else:
    - The triage comment (marker `wheels-bot:triage:<issue-number>`) — gives
-     you the layer, repro spec, and confidence assessment.
+     you the layer, fix sketch, and confidence assessment.
    - **If present**, the research comment (marker
      `wheels-bot:research:<issue-number>`) — gives you the recommended path
      forward for framework-design issues. **The research's recommended
@@ -80,7 +80,8 @@ is enforced by code, so don't skip steps.
    syntax. The spec should:
    - Be the smallest thing that demonstrates the bug or exercises the
      proposed feature
-   - Match the repro from the triage comment
+   - Reproduce the bug as described in the issue body, aligned with the
+     fix sketch from the triage comment
    - For `framework-design`: directly assert the API surface the research
      comment recommends
 

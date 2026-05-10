@@ -28,9 +28,10 @@ contribution rules, see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 Fires on `issues: opened` and `issues: reopened`. Reads the issue body and
 posts a comment classifying it as one of:
 
-- **`bug`** — observable wrong behavior. The bot tries to reproduce against
-  the local Wheels test stack (Lucee 7 + SQLite). Includes a confidence
-  assessment.
+- **`bug`** — observable wrong behavior. The bot identifies the affected
+  layer (model / controller / view / etc.) and emits a fix sketch with a
+  confidence rating. Reproduction and spec authoring happen in the
+  propose-fix stage, not here.
 - **`framework-design`** — feature request or API design question. The bot
   hands off to the research stage; it does not opine yet.
 - **`other`** — docs, support, or general discussion. No further automation.
