@@ -1,0 +1,205 @@
+---
+title: Debug Panel
+description: The built-in development debug bar — what each tab shows, how to configure it, and when it appears.
+type: howto
+sidebar:
+  order: 11
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The Debug Panel is a fixed bar that Wheels appends to every HTML response in development mode. It surfaces request details, execution timing, parameters, environment configuration, installed packages, and links to built-in tools — without leaving the page you are working on. The panel is rendered by `vendor/wheels/events/onrequestend/debug.cfm` and runs at the very end of the request lifecycle, after your controller and views have finished.
+
+**You'll learn:**
+
+- When the debug bar appears and how to control it
+- What each tab shows and which configuration drives it
+- How to read the timing breakdown to find bottlenecks
+- Where to find package and plugin status
+- How to access developer tools from the bar
+
+## When the debug bar appears
+
+The bar only renders for standard full-page HTML requests. It is automatically suppressed for any of the following:
+
+- AJAX requests (`X-Requested-With: XMLHttpRequest`)
+- HTMX requests (`HX-Request`)
+- Turbo Frame requests (`Turbo-Frame`)
+- Fetch requests (`X-Fetch: true`)
+- Requests that produce structured output (`?format=json`, `xml`, `csv`, or `pdf`)
+
+This means AJAX-driven partial updates, Turbo Streams, API endpoints, and CSV exports all receive clean responses with no injected HTML.
+
+## Enabling and disabling
+
+The bar respects the `enableDebug` application setting. By default, Wheels sets this to `true` in the `development` and `testing` environments and `false` in `production` and `maintenance`. You can override it explicitly in `config/environment.cfm`:
+
+```cfm title="config/environment.cfm"
+<cfset set(enableDebug=true)>
+```
+
+Setting `enableDebug=false` removes the bar entirely — no HTML is injected into responses.
+
+<Aside type="caution">
+  Never enable the debug bar in production. It renders internal state — your data source name, environment, CFML engine version, and parameter values — that you do not want visible to end users.
+</Aside>
+
+## The debug bar
+
+When active, the bar appears as a slim strip pinned to the bottom of the browser window. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params, Environment, and optionally Tools. The right side shows the current git branch (when Wheels detects a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
+
+{/* screenshot: the collapsed debug bar across the bottom of a browser window, showing all tabs and the git-branch + version on the right */}
+
+Clicking any tab opens a panel above the bar. Clicking the same tab again closes it. The minimize button (×) collapses the bar to a small "Debug" button in the corner, persisted via `sessionStorage` so it stays collapsed as you navigate.
+
+## Request tab
+
+The Request tab label shows `controller.action` for the current request. Clicking it opens a key-value panel with:
+
+| Field | Description |
+|---|---|
+| Route | Named route that matched this request (omitted when no named route matched) |
+| Controller | Controller name |
+| Action | Action name |
+| Key | URL key segment, if present |
+| HTTP Method | `GET`, `POST`, `PUT`, `DELETE`, etc. |
+| URL | Full URL for this request |
+| Application | Value of `applicationName` from `Application.cfc` |
+| Data Source | The configured `dataSourceName` |
+| DB Adapter | The active database adapter (MySQL, PostgreSQL, SQL Server, etc.) |
+| URL Rewriting | Current URL rewriting mode |
+
+{/* screenshot: Request panel open — the key-value table showing Route, Controller, Action, HTTP Method, URL, Application, Data Source, DB Adapter, and URL Rewriting */}
+
+Use this panel to confirm that routing resolved the way you intended, that the correct data source is in use, and that URL rewriting is configured as expected.
+
+## Timing tab
+
+The Timing tab label shows the total request duration in milliseconds, color-coded by threshold:
+
+- **Green** — under 100 ms
+- **Yellow** — 100–499 ms
+- **Red** — 500 ms or more
+
+Opening the panel shows a horizontal bar chart breaking down where time was spent. Each phase (model, queries, template rendering, etc.) is sorted by duration descending and rendered as a proportional colored bar showing both the raw milliseconds and the percentage of total time.
+
+{/* screenshot: Timing panel open — horizontal bar chart with phases (model, queries, template) color-coded and sorted by duration, total ms shown in the header */}
+
+The chart is most useful for spotting query-heavy actions: if `queries` or `model` accounts for 80%+ of total time, look at the SQL being generated (the Routes admin page lists query counts per action if you need more detail).
+
+## Params tab
+
+The Params tab shows the count of extra request parameters as a badge. Opening the panel displays a table of every parameter that was available to the action, excluding the routing parameters (`controller`, `action`, `key`, `route`) and `fieldnames`.
+
+| Column | Description |
+|---|---|
+| Name | Parameter key, lowercased |
+| Value | The value; complex values (structs, arrays) are JSON-encoded |
+| Type | `string` or `json` |
+
+{/* screenshot: Params panel open — table with Name, Value, Type columns, showing a mix of string and json-type parameters */}
+
+This is the fastest way to confirm that form fields, query string values, and nested structs arrived the way you expected before you reach for a `writeDump` call.
+
+## Environment tab
+
+The Environment tab label shows the current environment name (Development, Testing, etc.) with a color-coded dot matching the timing badge palette. The panel is divided into subsections based on what is enabled.
+
+### Application
+
+Always shown. Lists the environment, the git branch (when the app root contains a `.git` directory), the Wheels version, the CFML engine and version, and the host name (when available).
+
+When no reload password is set, the environment name is followed by quick-switch links that reload the app in a different environment mode. This is useful during development to test environment-specific code paths without editing config files.
+
+{/* screenshot: Environment panel open, Application section — showing environment dot, git branch, Wheels version, CFML engine, with environment-switch links */}
+
+### Packages
+
+Shown when `enablePackagesComponent` is `true` (the default in Wheels 4.0+). Displays two tables.
+
+**Installed packages** lists every package found in `vendor/` and loaded by `PackageLoader.cfc`:
+
+| Column | Description |
+|---|---|
+| Package | Package name from `package.json` |
+| Version | Semver version string |
+| Description | One-line description |
+
+If any package failed to load (manifest error, missing dependency, CFC exception), a red error list appears below the installed table with the package name and the exception message.
+
+**Available from registry** pulls the same 24-hour cached registry index used by the `wheels packages` CLI and shows what is available to install:
+
+| Column | Description |
+|---|---|
+| Package | Name, linked to the package homepage when available |
+| Latest | Latest compatible version |
+| Description | Registry description |
+
+{/* screenshot: Packages section of the Environment panel — Installed table on top showing two packages, Available from registry table below listing several first-party packages */}
+
+This lets you discover first-party packages such as `wheels-hotwire`, `wheels-sentry`, or `wheels-i18n` without leaving the app. The table reflects the same 24-hour cache as `wheels packages list`; run `wheels packages registry refresh` from the CLI if you need up-to-the-minute data.
+
+### Plugins (legacy)
+
+Shown when `enablePluginsComponent` is `true`. Lists plugins installed in the legacy `plugins/` directory with their names and versions. Legacy plugins are the Wheels 3.x predecessor to packages — if you are on a fresh 4.x app, this section is likely empty.
+
+If any plugin warnings exist, a red **Warnings** subsection appears beneath the plugin table:
+
+- **Incompatible plugins** — plugins flagged as incompatible with the current Wheels version (controlled by `showIncompatiblePlugins`)
+- **Dependent plugins** — plugins whose dependencies are not satisfied
+- **Version mismatches** — plugins that require a different version of another plugin than what is loaded
+- **Mixin collisions** — cases where two plugins defined the same method name on the same mixin target; the later-loaded plugin wins
+
+## Tools tab
+
+Shown when `enablePublicComponent` is `true` (the default in development). Opens a grid of link cards, each opening in a new tab:
+
+| Card | Links to |
+|---|---|
+| System Info | `/wheels/info` — Wheels internals, environment variables, loaded settings |
+| Routes | `/wheels/routes` — all registered routes with HTTP method, path, and handler |
+| API Docs | `/wheels/api-docs` — generated API documentation |
+| Guides | `/wheels/guides` — the documentation site |
+| Tests | `/wheels/tests` — the test runner |
+| Migrator | `/wheels/migrator` — the database migration UI (shown when `enableMigratorComponent` is `true`) |
+| Packages | `/wheels/packages` — the package browser (shown when `enablePackagesComponent` is `true`) |
+| Plugins | `/wheels/plugins` — the legacy plugin list (shown when `enablePluginsComponent` is `true`) |
+
+{/* screenshot: Tools panel open — the link-card grid showing System Info, Routes, API Docs, Guides, Tests, Migrator, Packages, and Plugins cards */}
+
+## Configuration reference
+
+All settings are applied in `config/settings.cfm` or an environment-specific file under `config/`:
+
+```cfm title="config/environment.cfm"
+<cfset set(enableDebug=true)>
+<cfset set(enablePackagesComponent=true)>
+<cfset set(enablePluginsComponent=true)>
+<cfset set(showIncompatiblePlugins=true)>
+<cfset set(enablePublicComponent=true)>
+<cfset set(enableMigratorComponent=true)>
+```
+
+| Setting | Default | Effect |
+|---|---|---|
+| `enableDebug` | `true` in development/testing | Show or hide the debug bar entirely |
+| `enablePackagesComponent` | `true` | Show the Packages subsection in the Environment panel and the Packages link in Tools |
+| `enablePluginsComponent` | `true` | Show the Plugins (Legacy) subsection and the Plugins link in Tools |
+| `showIncompatiblePlugins` | `true` | Include incompatible-plugin warnings in the Warnings subsection |
+| `enablePublicComponent` | `true` | Show the Tools tab and its link grid |
+| `enableMigratorComponent` | `true` | Show the Migrator link in the Tools panel |
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Packages"
+    description="Install first-party packages, write your own, and understand the vendor/ activation model — the same packages that appear in the debug bar's Packages tab."
+    href="/v4-0-0-snapshot/digging-deeper/packages/"
+  />
+  <LinkCard
+    title="Configuration"
+    description="Full reference for all Wheels application settings, including the debug-related flags covered here."
+    href="/v4-0-0-snapshot/configuration/"
+  />
+</CardGrid>
