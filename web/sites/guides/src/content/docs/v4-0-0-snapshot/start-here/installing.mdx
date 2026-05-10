@@ -30,6 +30,12 @@ The `wheels` CLI bundles a Lucee runtime — that's the easiest path for develop
   On macOS, `openjdk@21` is keg-only — Homebrew won't symlink it into `/opt/homebrew`. The `wheels` CLI handles this itself, but if you want to call `java` directly (or use it from an IDE, Maven, Gradle, etc.) you'll also need to set `JAVA_HOME` and add it to your `PATH`. See [Troubleshooting](#troubleshooting) below.
 </Aside>
 
+## Choose a channel
+
+Wheels ships on two parallel channels. The instructions below install **stable** (`wheels`) — the right pick for ~95% of users. If you want bleeding-edge (`wheels-be`, tracks every merge to `develop`), see [Release Channels](/v4-0-0-snapshot/start-here/release-channels/) for the comparison and install steps.
+
+The two are mutually exclusive — both expose the `wheels` binary. You install one, not both. You can switch later without losing any of your already-scaffolded apps.
+
 ## Install the CLI
 
 <Tabs>
