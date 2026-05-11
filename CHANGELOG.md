@@ -90,6 +90,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Legacy compatibility adapter for 3.x → 4.0 migration soft-landing (#2015)
 
 **CLI & LuCLI**
+- `wheels new` now prints a non-blocking hint at the end of app scaffolding when a newer Wheels release is available on the user's channel (stable, bleeding-edge). Channel-aware (skips dev/rc), 24h-cached at `$LUCLI_HOME/.update-check.json`, 5s HTTP timeout, silent on any failure — never delays or breaks `wheels new`. (#2556)
 - `wheels doctor` now detects a stale installed CLI module at `~/.wheels/modules/wheels/` that shadows a source checkout and warns with a remediation command (symlink). Previously, contributors running `wheels` from a checkout could silently execute a pre-install Module.cfc, making merged fixes appear not to take effect. (#2223)
 - LuCLI Phase 2: zero-Docker local testing via `tools/test-local.sh` (#2063)
 - LuCLI Phase 2: service layer, generators, MCP annotations (#1941)
