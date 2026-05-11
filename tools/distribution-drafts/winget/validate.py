@@ -57,7 +57,7 @@ def parse_yaml_lite(path: Path) -> dict[str, str]:
         if ":" not in line:
             continue
         key, _, val = line.partition(":")
-        out[key.strip()] = val.strip()
+        out[key.strip()] = val.split("#")[0].strip()
     return out
 
 
