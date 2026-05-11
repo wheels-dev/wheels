@@ -25,6 +25,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ### Added
 
 **Documentation**
+- Correct landing page license text from "MIT licensed" to "Apache 2.0 licensed"
 - Add Debug Panel guide covering each tab, configuration settings, and when the bar appears
 - Clarify BoxLang server management in cfml-engines guide; update vm-deployment tip to distinguish CommandBox server management from the `wheels` dev CLI
 
