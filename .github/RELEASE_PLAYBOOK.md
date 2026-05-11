@@ -144,6 +144,7 @@ If any pin to `<X.Y.Z`, open issues on those repos to widen the constraint.
 | brew tap PR doesn't open after release | `DOWNSTREAM_DISPATCH_TOKEN` expired or unset | Rotate token in repo secrets; re-run `release.yml` workflow_dispatch |
 | `brew install wheels` post-release fails | Formula sha256 mismatch | Re-run the tap bump workflow with `workflow_dispatch` to recompute |
 | Snapshot publish fails: "tag already exists" | Re-run after partial success | Delete the orphaned tag in `wheels-dev/wheels-snapshots`, re-run |
+| Linux package URL 404s when version has `~snapshot.N` | GitHub Releases silently rewrites `~` to `.` in uploaded asset filenames | Use `.` in the URL: `wheels_4.0.0.snapshot.1787_amd64.deb`, NOT `wheels_4.0.0~snapshot.1787_amd64.deb`. The on-disk filename keeps `~` (so `dpkg --compare-versions` orders pre-releases correctly), but the uploaded URL gets mangled. Downstream consumers (apt repo metadata generator, install scripts) must compute the `.`-form. See `tools/distribution-drafts/linux-packages/build-linux-packages.sh`. |
 
 ## See also
 
