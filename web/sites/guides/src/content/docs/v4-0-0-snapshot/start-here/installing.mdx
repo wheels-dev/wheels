@@ -113,29 +113,31 @@ The two are mutually exclusive — both expose the `wheels` binary. You install 
 
 <TabItem label="Windows" icon="seti:windows">
 
-<Aside type="caution" title="Do not run `choco install wheels` yet">
-The `wheels` package on the public Chocolatey feed is still the v1.x legacy (CommandBox-based) release and **cannot drive this tutorial**. The v2.x LuCLI-based package is built and tested in [`wheels-dev/chocolatey-wheels`](https://github.com/wheels-dev/chocolatey-wheels) but has not been pushed to the community feed yet. Use the manual JAR steps below until then. See [CLI Installation](/v4-0-0-snapshot/command-line-tools/installation/#windows-chocolatey) for context.
+<Aside type="caution" title="Don't run `choco install wheels`">
+The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x release and **cannot drive this tutorial**. Wheels v4 ships on Windows through [Scoop](https://scoop.sh) instead — see [CLI Installation](/v4-0-0-snapshot/command-line-tools/installation/#windows-scoop) for the full rationale.
 </Aside>
 
 <Steps>
 
-1. Download the LuCLI Windows launcher (`lucli-<version>.bat`) from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases). Rename it to `wheels.bat` and place it on your `PATH` (for example, `C:\Tools\wheels\wheels.bat`).
-
-2. Download `wheels-module-<version>.zip` from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases) and extract it into `%USERPROFILE%\.wheels\modules\wheels\`:
+1. Install Scoop if you don't have it (skip if `scoop --version` already works):
 
    ```powershell title="PowerShell"
-   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.wheels\modules\wheels" | Out-Null
-   Expand-Archive -Path "wheels-module-*.zip" -DestinationPath "$env:USERPROFILE\.wheels\modules\wheels"
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
    ```
 
-3. Set `JAVA_HOME` to your JDK 21 install and `LUCLI_HOME` to your Wheels directory (persist via System Properties → Environment Variables):
+2. Add the Wheels bucket and install a channel:
 
    ```powershell title="PowerShell"
-   setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-21"
-   setx LUCLI_HOME "$env:USERPROFILE\.wheels"
+   scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
+   scoop install wheels        # stable - tracks v4.0.0 GA tags
+   # OR:
+   scoop install wheels-be     # bleeding-edge - tracks every develop merge
    ```
 
-4. Open a new PowerShell (so PATH and the new env vars pick up) and verify:
+   Scoop pulls `java/openjdk21` automatically as a dependency. Both packages expose the same `wheels` shim on PATH — Scoop refuses to install both at once. See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/) for the comparison.
+
+3. Verify:
 
    ```powershell title="PowerShell"
    wheels --version
