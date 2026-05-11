@@ -68,6 +68,13 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
    for the initial review's verdict; responses use COMMENT so the
    verdict tracking stays consistent across rounds).
 
+   **Submit exactly one `gh pr review` call per session.** Never probe
+   the command with a placeholder body before issuing the real response —
+   every invocation is publicly visible. The post-submission guard in
+   `bot-review-a.yml` auto-dismisses wheels-bot reviews missing the
+   canonical marker or shorter than 200 characters (issue #2558); do not
+   rely on it as a safety net.
+
    Format:
 
    ```

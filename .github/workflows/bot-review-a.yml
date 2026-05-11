@@ -93,7 +93,11 @@ jobs:
         with:
           target-type: pr
           target-number: ${{ steps.pr.outputs.pr_num }}
-          marker-pattern: 'wheels-bot:review-a:${{ steps.pr.outputs.pr_num }}:${{ steps.pr.outputs.sha }}:'
+          # No trailing colon: the initial review marker is
+          # `wheels-bot:review-a:<pr>:<sha>` with no suffix. Adding a trailing
+          # `:` made this a no-op gate (issue #2558). Response markers use the
+          # distinct `wheels-bot:review-a-response:` prefix and won't false-match.
+          marker-pattern: 'wheels-bot:review-a:${{ steps.pr.outputs.pr_num }}:${{ steps.pr.outputs.sha }}'
           github-token: ${{ steps.app-token.outputs.token }}
 
       - name: Determine prompt
@@ -121,3 +125,54 @@ jobs:
             --model claude-sonnet-4-6
             --max-turns 250
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
+
+      # Post-submission guard (issue #2558). Reviewer A is trusted to issue a
+      # single, substantive `gh pr review` per session. When the model misbehaves
+      # — e.g. probing the CLI with `--body "test body"` before issuing the
+      # real review — the placeholder leaks out as a public review. This step
+      # scans wheels-bot reviews on the current SHA after the model exits and
+      # auto-dismisses any that look like probes (too short, or missing the
+      # canonical `wheels-bot:review-a` marker). Runs on `always()` so it still
+      # fires when the Claude step itself failed mid-session.
+      - name: Validate Reviewer A output
+        if: always() && (github.event_name == 'issue_comment' || steps.gate.outputs.skip == 'false')
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_num }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          reviews=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate \
+            | jq -c --arg sha "$HEAD_SHA" \
+                '[.[] | select(.user.login == "wheels-bot[bot]") | select(.commit_id == $sha) | select(.state != "DISMISSED")]')
+
+          count=$(echo "$reviews" | jq 'length')
+          if [[ "$count" == "0" ]]; then
+            echo "::notice::No active wheels-bot reviews on ${HEAD_SHA} to validate"
+            exit 0
+          fi
+
+          dismissed=0
+          while IFS= read -r row; do
+            id=$(echo "$row" | jq -r '.id')
+            body=$(echo "$row" | jq -r '.body')
+            body_len=${#body}
+
+            if [[ "$body_len" -lt 200 ]] || ! grep -q 'wheels-bot:review-a' <<<"$body"; then
+              echo "::warning::Dismissing bogus Reviewer A review id=${id} len=${body_len}"
+              gh api -X PUT \
+                "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews/${id}/dismissals" \
+                -f message="Auto-dismissed by Reviewer A guard: body is shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See wheels-dev/wheels#2558 for context."
+              dismissed=$((dismissed + 1))
+            fi
+          done < <(echo "$reviews" | jq -c '.[]')
+
+          if [[ "$dismissed" -gt 0 ]]; then
+            short_sha=${HEAD_SHA:0:7}
+            gh pr comment "$PR_NUMBER" --body "## Wheels Bot — Reviewer A guard
+
+          Detected and dismissed ${dismissed} bogus Reviewer A review(s) on commit \`${short_sha}\`. Cause: review body shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See [wheels-dev/wheels#2558](https://github.com/wheels-dev/wheels/issues/2558) for context.
+
+          <!-- wheels-bot:review-a-guard:${PR_NUMBER}:${HEAD_SHA} -->"
+          fi

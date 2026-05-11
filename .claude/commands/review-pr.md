@@ -96,6 +96,16 @@ below. Highlights for this command:
    `gh pr review` invocation with `--body` containing line-anchored Markdown
    if line comments are not feasible.
 
+   **Submit exactly one `gh pr review` call per session.** Never probe the
+   command with a placeholder (`--body "test body"`, `--body ""`, etc.)
+   before issuing the real review — every `gh pr review` invocation is
+   visible to humans and counts as a public review. If you need to verify
+   syntax or auth, use `gh auth status` or `gh pr view`; do not exercise
+   `gh pr review` until you have the final body ready. A post-submission
+   guard in `bot-review-a.yml` auto-dismisses any wheels-bot review missing
+   the canonical marker or shorter than 200 characters (issue #2558) — do
+   not rely on it as a safety net.
+
    The review body must:
    - Open with `## Wheels Bot — Reviewer A`
    - Have a one-paragraph **TL;DR** that names the PR's purpose and your
