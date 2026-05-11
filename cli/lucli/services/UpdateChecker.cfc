@@ -131,7 +131,9 @@ component {
 	 */
 	public numeric function $snapshotNumber(required string version) {
 		var m = reFindNoCase("snapshot[.+]([0-9]+)", arguments.version, 1, true);
-		if (!arrayLen(m.match) || arrayLen(m.match) < 2) return 0;
+		// reFindNoCase with returnsubexpressions=true returns ["", ...] on no
+		// match, never a zero-length array — so checking len < 2 is enough.
+		if (arrayLen(m.match) < 2) return 0;
 		return val(m.match[2]);
 	}
 

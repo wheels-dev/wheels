@@ -105,6 +105,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var r = uc.check(currentVersion="");
 					expect(structKeyExists(r, "hasUpdate")).toBeTrue();
 					expect(structKeyExists(r, "skipped")).toBeTrue();
+					expect(structKeyExists(r, "reason")).toBeTrue();
 					expect(structKeyExists(r, "current")).toBeTrue();
 					expect(structKeyExists(r, "latest")).toBeTrue();
 					expect(structKeyExists(r, "channel")).toBeTrue();

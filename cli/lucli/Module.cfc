@@ -4194,9 +4194,7 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			// Silently swallow — never let an update check delay or break
 			// `wheels new`. Log via verbose() so devs can see it with -v.
-			if (structKeyExists(variables, "verbose")) {
-				try { verbose("Update check failed: " & e.message); } catch (any ignore) {}
-			}
+			try { verbose("Update check failed: " & e.message); } catch (any ignore) {}
 		}
 
 		return "";
