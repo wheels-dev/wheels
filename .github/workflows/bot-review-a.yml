@@ -153,6 +153,13 @@ jobs:
             exit 0
           fi
 
+          # Dismissal criteria: body must be (a) >= 200 chars AND (b) contain
+          # `wheels-bot:review-a` as a substring. Both conditions are required —
+          # a long body without the marker still gets dismissed, because a
+          # marker-less review breaks downstream idempotency (the skip-check
+          # action greps for the marker on subsequent runs) and is itself a
+          # signal that the prompt was not followed. Belt-and-suspenders: the
+          # guard treats prompt compliance as load-bearing, not advisory.
           dismissed=0
           while IFS= read -r row; do
             id=$(echo "$row" | jq -r '.id')
@@ -169,10 +176,22 @@ jobs:
           done < <(echo "$reviews" | jq -c '.[]')
 
           if [[ "$dismissed" -gt 0 ]]; then
-            short_sha=${HEAD_SHA:0:7}
-            gh pr comment "$PR_NUMBER" --body "## Wheels Bot — Reviewer A guard
+            # Idempotency check: a manual workflow re-trigger combined with
+            # new bogus reviews on the same SHA could otherwise produce
+            # duplicate guard comments. Skip if a guard comment for this
+            # exact PR + SHA already exists.
+            guard_marker="wheels-bot:review-a-guard:${PR_NUMBER}:${HEAD_SHA}"
+            existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+              | jq -r --arg m "$guard_marker" '[.[] | select(.body | contains($m))] | length')
+
+            if [[ "$existing" == "0" ]]; then
+              short_sha=${HEAD_SHA:0:7}
+              gh pr comment "$PR_NUMBER" --body "## Wheels Bot — Reviewer A guard
 
           Detected and dismissed ${dismissed} bogus Reviewer A review(s) on commit \`${short_sha}\`. Cause: review body shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See [wheels-dev/wheels#2558](https://github.com/wheels-dev/wheels/issues/2558) for context.
 
-          <!-- wheels-bot:review-a-guard:${PR_NUMBER}:${HEAD_SHA} -->"
+          <!-- ${guard_marker} -->"
+            else
+              echo "::notice::Guard comment already present for ${PR_NUMBER}@${HEAD_SHA}; skipping duplicate"
+            fi
           fi
