@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the wheels binary via Homebrew, Chocolatey, or a manual JAR download, and verify your setup.
+description: Install the wheels binary via Homebrew, Scoop (Windows), or a manual JAR download, and verify your setup.
 type: reference
 sidebar:
   order: 2
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-The `wheels` binary is distributed through three channels: Homebrew for macOS and Linux, Chocolatey for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
+The `wheels` binary is distributed through three channels: Homebrew for macOS and Linux, Scoop for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
 
 **You'll use this for:**
 
@@ -19,7 +19,7 @@ The `wheels` binary is distributed through three channels: Homebrew for macOS an
 
 ## Requirements
 
-The CLI runs on Java 21. On macOS and Linux, the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper, so you don't have to wire up a system JDK. If you're installing manually — or on Windows outside the Chocolatey package — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
+The CLI runs on Java 21. On macOS and Linux, the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper, so you don't have to wire up a system JDK. If you're installing manually — or on Windows without Scoop — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
 
 ```bash title="illustrative — system JDK setup"
 brew install openjdk@21
@@ -49,24 +49,36 @@ The first time you invoke `wheels`, the wrapper:
 
 On upgrades (`brew upgrade wheels`), the staged module version bumps; the next `wheels` invocation notices the mismatch and refreshes `~/.wheels/modules/wheels/` in place.
 
-## Windows (Chocolatey)
+## Windows (Scoop)
 
-<Aside type="caution" title="LuCLI-based package is not yet on the Chocolatey community feed">
-The `wheels` package at [community.chocolatey.org/packages/wheels](https://community.chocolatey.org/packages/wheels) is still the v1.x legacy (CommandBox-based) release. The v2.x LuCLI-based package is built and tested in [`wheels-dev/chocolatey-wheels`](https://github.com/wheels-dev/chocolatey-wheels) but has not been pushed to the public feed yet. Until it is, Windows users should install via the manual JAR path below.
-</Aside>
+Wheels ships on Windows through [Scoop](https://scoop.sh) — a portable, sandboxed package manager that fits the project's release cadence (hourly autoupdate for both stable and bleeding-edge channels). The legacy Chocolatey path is no longer supported; the old v1.x `wheels` package at `community.chocolatey.org/packages/wheels` is the CommandBox-based release and won't drive a v4 tutorial.
 
-Once the LuCLI-based v2 package ships, installation will be:
+```powershell
+scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
 
-```powershell title="illustrative — Chocolatey install (not yet available)"
-choco install wheels
+# Pick a channel:
+scoop install wheels        # stable - tracks GA tags
+scoop install wheels-be     # bleeding-edge - tracks every develop merge
+
 wheels --version
 ```
 
-The Chocolatey install script downloads the LuCLI Windows launcher and the matching Wheels Module tarball from GitHub Releases, extracts the module under the package's `tools/module/` directory, and adds `wheels.cmd` to your `PATH`. Java 21 is declared as a Chocolatey dependency (`openjdk`), so `choco` installs a JDK if one isn't already present.
+Both packages depend on `java/openjdk21` (Scoop pulls it automatically) and expose the same `wheels` PATH shim — Scoop refuses to install both at once. To switch channels:
+
+```powershell
+scoop uninstall wheels && scoop install wheels-be
+scoop uninstall wheels-be && scoop install wheels
+```
+
+See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/) for the full channel comparison.
+
+The Scoop bucket lives at [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels). The bucket's `checkver`/`autoupdate` blocks pull new versions from GitHub Releases hourly via the community [Excavator](https://github.com/ScoopInstaller/Excavator) bot — no manual maintenance per release.
+
+WinGet support (`winget install Wheels.Wheels`) is planned for post-v4.0.0 GA once a proper installer artifact is built. Until then, use Scoop.
 
 ## Manual JAR install
 
-If Homebrew and Chocolatey don't fit your environment — a locked-down CI host, a Docker image, or a Windows box before the v2 Chocolatey package ships — you can wire the pieces up directly. The install has two independent artifacts:
+If Homebrew and Scoop don't fit your environment — a locked-down CI host, a Docker image, or a Windows box where Scoop isn't an option — you can wire the pieces up directly. The install has two independent artifacts:
 
 1. **LuCLI launcher.** Download from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases). Pick the asset matching your OS — `lucli-<version>-macos`, `lucli-<version>-linux`, or `lucli-<version>.bat` on Windows. Rename it to `wheels` (or `wheels.bat`) so LuCLI's binary-name detection activates the Wheels branding, and drop it somewhere on your `PATH`.
 

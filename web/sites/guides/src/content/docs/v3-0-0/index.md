@@ -5,6 +5,10 @@ description: Install Wheels and get a local development server running
 
 # Getting Started
 
+:::caution[Historical version]
+You are reading the **Wheels v3.0** documentation. v3.0 used a CommandBox-based CLI module; that path is preserved here for users still on v3 but is no longer how new projects install Wheels. v4.0 ships a self-contained `wheels` CLI (LuCLI-based) that replaces CommandBox entirely. For new projects, start with [v4.0 → Installing Wheels](/v4-0-0-snapshot/start-here/installing/).
+:::
+
 By far the quickest way to get started with Wheels is via [CommandBox](https://www.ortussolutions.com/products/commandbox). CommandBox brings a whole host of command line capabilities to the CFML developer. It allows you to write scripts that can be executed at the command line written entirely in CFML. It allows you to start a CFML server from any directory on your machine and wire up the code in that directory as the web root of the server. What's more is, those servers can be either Lucee servers or Adobe ColdFusion servers. You can even specify what version of each server to launch. Lastly, CommandBox is a package manager for CFML. That means you can take some CFML code and package it up into a module, host it on ForgeBox.io, and make it available to other CFML developers. In fact we make extensive use of these capabilities to distribute Wheels plugins and templates. More on that later.
 
 One module that we have created is a module that extends CommandBox itself with commands and features specific to the Wheels framework. The Wheels CLI module for CommandBox is modeled after the Ruby on Rails CLI module and gives similar capabilities to the Wheels developer.
