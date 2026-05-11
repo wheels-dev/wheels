@@ -96,7 +96,15 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          set -uo pipefail
+          # Disable -e (GitHub Actions sets it by default for bash steps).
+          # Plain `grep -v` with no matches exits 1, which is normal — but
+          # under `set -e` it would kill the script. For a content-only PR
+          # — the exact case we want to skip — every line matches the
+          # content patterns, the filter returns empty + exit 1, and the
+          # detector dies. Keep -u for typo protection, drop -e.
+          set +e
+          set -u
+          set -o pipefail
           # Resolve the diff range. For PRs we compare base vs head; for
           # pushes we compare the previous tip vs the new tip (falling back
           # to HEAD~1 on first-push / force-push when `before` is zeros).
@@ -145,9 +153,13 @@ jobs:
           #   web/sites/*/src/content/  — Astro content collections (guides, api)
           #   web/sites/*/public/       — static images/assets the sites serve
           #   web/**/*.md, web/**/*.mdx — markdown anywhere under web/
+          # `|| true` guards against the empty-match exit-1 case even if a
+          # future change reintroduces `set -e`. Belt-and-suspenders with the
+          # `set +e` above.
           non_content=$(echo "$changed" \
             | grep -v '^$' \
-            | grep -vE '^(web/content/.+|web/sites/[^/]+/src/content/.+|web/sites/[^/]+/public/.+|web/.+\.mdx?)$')
+            | grep -vE '^(web/content/.+|web/sites/[^/]+/src/content/.+|web/sites/[^/]+/public/.+|web/.+\.mdx?)$' \
+            || true)
 
           if [ -z "$non_content" ]; then
             echo "All changes are content-only — visual regression will be skipped."
@@ -177,10 +189,18 @@ jobs:
     # runs. If the blog index drifts because of the content change, the
     # pre-refresh step below regenerates the baseline before comparison.
     #
+    # Safety: when detect-scope itself fails (not success), fall through
+    # to running visual regression rather than silently skipping. The
+    # `always()` guard is required so this `if:` is evaluated even when
+    # the `needs:` dependency fails — without it, Actions auto-skips us.
+    #
     # If this job fails on an intentional layout change, download the
     # `visual-regression-diffs` artifact and copy each *.actual.png over
     # the matching web/tests/visual-baselines/*.png, commit, and push.
-    if: needs.detect-scope.outputs.content_only != 'true'
+    if: |
+      always() &&
+      (needs.detect-scope.result != 'success' ||
+       needs.detect-scope.outputs.content_only != 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
