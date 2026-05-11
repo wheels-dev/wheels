@@ -119,7 +119,7 @@ def validate_version(version_dir: Path, expected_id: str) -> None:
             url = s.split(":", 1)[1].strip().split("#")[0].strip()
             if not url.startswith("https://"):
                 fail(f"{installer}: InstallerUrl must use https: {url}")
-            if "PLACEHOLDER" in line or "wheels-windows-x64" in url:
+            if "PLACEHOLDER" in line:
                 warn(f"{installer}: InstallerUrl is a PLACEHOLDER (real artifact does not yet exist)")
         if s.startswith("InstallerSha256:"):
             h = s.split(":", 1)[1].strip().split("#")[0].strip()
