@@ -96,7 +96,7 @@ for (local.key in packageMeta) {
 								Details
 							</a>
 							<cfif DirectoryExists("#expandPath("/vendor/#LCase(local.pkgKey)#/tests")#")>
-								<a class="ui button tiny" href="#urlFor(route='testbox')#&directory=vendor.#LCase(local.pkgKey)#.tests">View Tests</a>
+								<a class="ui button tiny" href="#urlFor(route='testbox', params='directory=vendor.#LCase(local.pkgKey)#.tests')#">View Tests</a>
 							</cfif>
 						</td>
 					</tr>
