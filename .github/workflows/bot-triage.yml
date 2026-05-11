@@ -3,12 +3,18 @@ name: Wheels Bot — Triage
 on:
   issues:
     types: [opened, reopened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to triage (use when the original issues:opened event missed or failed)'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: wheels-bot-triage-${{ github.event.issue.number }}
+  group: wheels-bot-triage-${{ github.event.issue.number || inputs.issue_number }}
   cancel-in-progress: false
 
 jobs:
@@ -18,7 +24,7 @@ jobs:
     timeout-minutes: 25
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
-      && github.event.issue.user.login != 'wheels-bot[bot]'
+      && (github.event_name != 'issues' || github.event.issue.user.login != 'wheels-bot[bot]')
     env:
       WHEELS_CI: "true"
     steps:
@@ -40,8 +46,8 @@ jobs:
         uses: ./.github/actions/wheels-bot-skip-check
         with:
           target-type: issue
-          target-number: ${{ github.event.issue.number }}
-          marker-pattern: 'wheels-bot:triage:${{ github.event.issue.number }}|wheels-bot:triage-class:'
+          target-number: ${{ github.event.issue.number || inputs.issue_number }}
+          marker-pattern: 'wheels-bot:triage:${{ github.event.issue.number || inputs.issue_number }}|wheels-bot:triage-class:'
           github-token: ${{ steps.app-token.outputs.token }}
 
       - name: Run Triage
@@ -52,10 +58,18 @@ jobs:
           # bot and github-actions[bot] in case an upstream automation creates
           # an issue we want to triage. Specific allowlist (not '*') — public repo.
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          # Public OSS bug tracker: issues come from contributors without write
+          # permission. The action's default actor-permission gate would reject
+          # them, so we bypass it here. This is safe because: (a) workflow has
+          # `contents: read` only, (b) the App token used for commenting is
+          # independent of the actor, (c) claude_args below restricts shell to
+          # gh + read-only git + file reads — no Write/Edit/general Bash. The
+          # action's docs name "issue labeling" as the canonical use case.
+          allowed_non_write_users: '*'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
-            /triage-issue ${{ github.event.issue.number }}
+            /triage-issue ${{ github.event.issue.number || inputs.issue_number }}
           claude_args: |
             --model claude-sonnet-4-6
             --max-turns 200
