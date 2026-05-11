@@ -13,13 +13,27 @@ request.wheelsInternalAssetPath = application.wheels.webpath & "wheels/public/as
 // (e.g. /wheels/guides) and 404 — every <i class="...icon"> renders as an
 // empty box. Cached at application scope; falls back silently if the font
 // can't be read. See issue ##2421.
+// Wrapped in cflock to guard the check-then-act on application scope
+// against parallel first-request initialization. Without the lock a
+// second thread that wins the StructKeyExists race after the first
+// thread's initial assignment but before its file-read completes
+// reads an empty data URI and skips the @font-face block — the exact
+// symptom this PR is fixing. Same double-checked locking pattern as
+// BrowserTest.cfc::$ensureLauncher(). The value is built into a
+// local variable and assigned to application scope only once, so
+// readers never see an intermediate empty-string state.
 if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
-	local.iconsFontPath = ExpandPath("/wheels/public/assets/css/woff_files/icons.woff2");
-	application.wheels.iconsFontDataUri = "";
-	if (FileExists(local.iconsFontPath)) {
-		try {
-			application.wheels.iconsFontDataUri = "data:font/woff2;base64," & ToBase64(FileReadBinary(local.iconsFontPath));
-		} catch (any e) {
+	lock name="wheelsIconsFontInit" type="exclusive" timeout="10" {
+		if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
+			local.iconsFontPath = ExpandPath("/wheels/public/assets/css/woff_files/icons.woff2");
+			local.dataUri = "";
+			if (FileExists(local.iconsFontPath)) {
+				try {
+					local.dataUri = "data:font/woff2;base64," & ToBase64(FileReadBinary(local.iconsFontPath));
+				} catch (any e) {
+				}
+			}
+			application.wheels.iconsFontDataUri = local.dataUri;
 		}
 	}
 }

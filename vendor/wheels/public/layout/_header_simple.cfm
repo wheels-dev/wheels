@@ -13,13 +13,20 @@ if (StructKeyExists(request, "wheels") && IsStruct(request.wheels)) {
 
 // Inline icon font (see _header.cfm and issue ##2421). Duplicated here
 // because error pages can render before _header.cfm has been visited.
+// Double-checked locking matches _header.cfm — see comment there for
+// the TOCTOU rationale.
 if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
-	local.iconsFontPath = ExpandPath("/wheels/public/assets/css/woff_files/icons.woff2");
-	application.wheels.iconsFontDataUri = "";
-	if (FileExists(local.iconsFontPath)) {
-		try {
-			application.wheels.iconsFontDataUri = "data:font/woff2;base64," & ToBase64(FileReadBinary(local.iconsFontPath));
-		} catch (any e) {
+	lock name="wheelsIconsFontInit" type="exclusive" timeout="10" {
+		if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
+			local.iconsFontPath = ExpandPath("/wheels/public/assets/css/woff_files/icons.woff2");
+			local.dataUri = "";
+			if (FileExists(local.iconsFontPath)) {
+				try {
+					local.dataUri = "data:font/woff2;base64," & ToBase64(FileReadBinary(local.iconsFontPath));
+				} catch (any e) {
+				}
+			}
+			application.wheels.iconsFontDataUri = local.dataUri;
 		}
 	}
 }
