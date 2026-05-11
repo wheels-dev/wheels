@@ -1057,7 +1057,7 @@ Workflow orchestration (multi-step planning, feature development) is not a frame
 
 | Stage | Trigger | Model | Output |
 |---|---|---|---|
-| Triage | issue opened/reopened | Sonnet | Comment classifying as `bug` / `framework-design` / `other` (+ confidence on `bug` path). |
+| Triage | issue opened/reopened | Opus | Comment classifying as `bug` / `framework-design` / `other` (+ confidence on `bug` path). Reads code with the allowlisted tools to resolve uncertainty before rating. |
 | Research | bot triage emits `framework-design` marker | Opus | Comment comparing Rails / Laravel / Django / Phoenix / Spring Boot / +1 and recommending a Wheels-idiomatic path (+ confidence). |
 | Propose Fix | bot triage emits `triage-confidence:high` OR research emits `research-confidence:high` (or `workflow_dispatch`) | Opus | TDD-mandatory draft PR on branch `fix/bot-<issue>-<slug>`. Spec-then-implementation, both required by `bot-tdd-gate.yml`. |
 | Reviewer A | PR opened / synchronized / ready_for_review | Sonnet | Single PR review with line comments, verdict, and `wheels-bot:review-a:<pr>:<sha>` marker. |

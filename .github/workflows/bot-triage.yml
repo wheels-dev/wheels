@@ -71,6 +71,6 @@ jobs:
           prompt: |
             /triage-issue ${{ github.event.issue.number || inputs.issue_number }}
           claude_args: |
-            --model claude-sonnet-4-6
+            --model claude-opus-4-7
             --max-turns 200
             --allowedTools "Bash(gh:*),Bash(git status),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Read,Grep,Glob"
