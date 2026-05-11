@@ -221,7 +221,8 @@ loop on the updated PR state.
 
 This is a *coding* stage — Opus model, 60-minute timeout, broad
 allowlist with the test runner (mirrors propose-fix's setup). Different
-from the analytical Sonnet stages above.
+from Reviewer A and Reviewer B, which remain Sonnet-based analytical
+stages.
 
 The bot:
 
@@ -257,11 +258,11 @@ round 11). The advisor reads the full A↔B exchange, the disputed
 code, and the canonical references (`CLAUDE.md`, `.ai/wheels/`),
 then issues a tie-breaking verdict.
 
-**This is the only stage that runs Opus on a non-coding task.** The
-reasoning depth is justified because the advisor's verdict overrides
-the analytical reviewers' deadlock — it must be right. Address-
-review uses Opus because it modifies code; advisor uses Opus because
-it adjudicates code-related disputes Sonnet couldn't resolve.
+**The advisor and triage are the two stages that run Opus on
+non-coding tasks.** Triage justifies the cost by reading code to
+resolve uncertainty before rating confidence; advisor justifies it
+because its verdict overrides a deadlocked A↔B exchange — it must be
+right. Address-review and propose-fix run Opus for code edits.
 
 The advisor:
 
