@@ -308,7 +308,13 @@ def main() -> None:
         ("wheels.json", manifest_stable()),
     ]
     if check_mode:
-        drift = any(check_manifest(n, d) for n, d in manifests)
+        # Materialize the list before any() so every check_manifest() runs and emits
+        # its DRIFT log line. any() short-circuits on generators, which would skip
+        # the second manifest whenever the first one drifts. CI needs to see *all*
+        # drifting manifests in one run. The named binding also sidesteps ruff
+        # `any(comprehension)` warnings without obscuring intent.
+        results = [check_manifest(n, d) for n, d in manifests]
+        drift = any(results)
         sys.exit(1 if drift else 0)
     for n, d in manifests:
         write_manifest(n, d)

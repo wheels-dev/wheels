@@ -163,6 +163,21 @@ fi
 # Translate WHEELS_VERSION (with -snapshot.N) into a SemVer-friendly form for
 # .deb/.rpm. Both formats accept a tilde for pre-release ordering: `4.0.1~snapshot.1700`
 # sorts BELOW 4.0.1 (which is correct — snapshot 1700 ships before GA 4.0.1).
+#
+# Sharp edge — disk filename vs upload filename diverge:
+#   The output below is written to disk as `wheels_<v>~snapshot.<N>_amd64.deb`,
+#   which is the correct on-server name (apt/dpkg use `~` for pre-release
+#   ordering). HOWEVER, when this artifact is uploaded to a GitHub Release,
+#   GitHub silently rewrites `~` to `.` in the asset filename — the download
+#   URL ends up as `wheels_<v>.snapshot.<N>_amd64.deb`. Verified on snapshot
+#   v4.0.0-snapshot.1787 (the assets list shows `.snapshot.`, not `~snapshot.`).
+#
+#   Consequence: any consumer that constructs a download URL (Phase 2 apt repo
+#   metadata generator, install scripts, docs) MUST use the `.`-form, even
+#   though the file written here has `~`. The metadata *inside* the .deb/.rpm
+#   still contains `~`, so once installed, version ordering is correct.
+#   See tools/distribution-drafts/linux-packages/README.md § "Tilde mangling"
+#   and .github/RELEASE_PLAYBOOK.md § "Common failure modes".
 DEB_RPM_VERSION="$(echo "${WHEELS_VERSION}" | sed 's/-snapshot/~snapshot/')"
 
 WHEELS_VERSION="${DEB_RPM_VERSION}" nfpm pkg \

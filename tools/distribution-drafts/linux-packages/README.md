@@ -21,9 +21,9 @@ opt in pre-Phase-2 do:
 curl -fsSLO https://github.com/wheels-dev/wheels/releases/download/v4.0.0/wheels_4.0.0_amd64.deb
 sudo apt install ./wheels_4.0.0_amd64.deb
 
-# Bleeding-edge
-curl -fsSLO https://github.com/wheels-dev/wheels-snapshots/releases/download/v4.0.1-snapshot.1700/wheels-be_4.0.1~snapshot.1700_amd64.deb
-sudo apt install ./wheels-be_4.0.1~snapshot.1700_amd64.deb
+# Bleeding-edge — note the `.` (not `~`) in the URL; see "Tilde mangling" below
+curl -fsSLO https://github.com/wheels-dev/wheels-snapshots/releases/download/v4.0.1-snapshot.1700/wheels-be_4.0.1.snapshot.1700_amd64.deb
+sudo apt install ./wheels-be_4.0.1.snapshot.1700_amd64.deb
 ```
 
 Same for RPM via `dnf install`.
@@ -32,6 +32,33 @@ The `~snapshot` tilde is required: `.deb` and `.rpm` use `~` (not `-`) as the
 pre-release separator. The build script translates `-snapshot.N` to
 `~snapshot.N` automatically. Both result in the snapshot package sorting
 *below* the next GA version per `dpkg --compare-versions` and `rpmvercmp`.
+
+### Tilde mangling on GitHub Releases (sharp edge)
+
+The on-disk filename produced by nfpm is `wheels_4.0.0~snapshot.1787_amd64.deb`
+(correct SemVer pre-release form with `~`). However, **GitHub Releases silently
+rewrites `~` to `.` in uploaded asset filenames**, so the downloadable URL is
+`wheels_4.0.0.snapshot.1787_amd64.deb`.
+
+This is a one-way mangling at upload time — the URL form is the only form
+consumers can `curl`. The metadata *inside* the package still contains `~`
+(verifiable via `dpkg-deb -I` or `rpm -qip`), so once installed, `apt`/`dpkg`
+order the version correctly relative to GA releases. Only the delivery handle
+changes.
+
+Verify on any snapshot:
+```bash
+gh release view v4.0.0-snapshot.1787 --repo wheels-dev/wheels-snapshots \
+  --json assets -q '.assets[].name' | grep -E '\.(deb|rpm)$'
+# wheels-4.0.0.snapshot.1787.x86_64.rpm
+# wheels_4.0.0.snapshot.1787_amd64.deb
+```
+
+Practical impact for this directory:
+- `build-linux-packages.sh` writes the `~`-form to disk (correct for nfpm and
+  on-server `dpkg`). Uploading the artifact is what produces the `.`-form URL.
+- Anyone publishing a download URL (docs, install scripts, brew formulae,
+  Phase 2 apt repo metadata) MUST use the `.`-form or hit 404.
 
 ## Phase 2: apt.wheels.dev / yum.wheels.dev (post-Tuesday)
 
@@ -46,6 +73,23 @@ the `.deb` / `.rpm` files in a `pool/` directory. A CI workflow listens for
 `repository_dispatch` from the source repo's release workflows, fetches new
 artifacts, regenerates metadata, signs with GPG, commits and pushes — CF Pages
 auto-deploys on push.
+
+**Filename gotcha for the metadata generator**: when fetching snapshot
+artifacts from the source repo's GitHub Release, the URL filenames have `.`
+where the nfpm-produced names had `~` (see "Tilde mangling" above). The
+metadata generator must compute the `.`-form filename to actually fetch the
+file, then either:
+
+1. Rename to the `~`-form in `pool/` so `Packages.gz` `Filename:` fields use
+   the canonical SemVer pre-release name (preferred — matches what users see
+   from `apt-cache show`), or
+2. Keep the `.`-form on disk in `pool/` and emit `.`-form in `Packages.gz`
+   (simpler — fewer renames in the pipeline).
+
+Either way is correct on the `apt`/`dpkg` ordering side, since the version
+field inside the `.deb`'s control metadata still has `~`. Pick one and stay
+consistent; option 1 reads more naturally if a user pokes around at
+`apt.wheels.dev/pool/` directly.
 
 User setup post-Phase-2:
 
