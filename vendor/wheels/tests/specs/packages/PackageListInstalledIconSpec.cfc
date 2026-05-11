@@ -3,13 +3,14 @@
  * use an inline SVG checkmark, not Semantic UI's icon font.
  *
  * The bundled `vendor/wheels/public/assets/css/semantic.min.css` is inlined
- * into the page via `<style><cfinclude ...></style>` in `_header.cfm`, which
- * breaks the @font-face `url(themes/default/assets/fonts/icons.*)` relative
- * paths (they resolve against the page URL, not the CSS file location).
- * Additionally the `Icons` font-face declaration in that bundle only
- * references `.eot` and `.svg` formats — no `.woff`/`.woff2` — so even with
- * working URLs no modern browser can load the glyph. Every other icon in
- * the same view uses inline SVG; the Installed badge must do the same.
+ * into the page via a script-side include inside a style block in
+ * `_header.cfm`, which breaks the @font-face `url(themes/default/assets/`
+ * `fonts/icons.*)` relative paths (they resolve against the page URL, not
+ * the CSS file location). Additionally the `Icons` font-face declaration
+ * in that bundle only references `.eot` and `.svg` formats — no `.woff` or
+ * `.woff2` — so even with working URLs no modern browser can load the
+ * glyph. Every other icon in the same view uses inline SVG; the Installed
+ * badge must do the same.
  */
 component extends="wheels.WheelsTest" {
 
