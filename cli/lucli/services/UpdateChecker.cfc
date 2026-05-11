@@ -32,8 +32,9 @@
  *   {
  *     hasUpdate:       boolean,
  *     skipped:         boolean,        // true when channel doesn't auto-check
- *                                       // (dev/rc) OR when cache TTL not expired
- *                                       // AND no newer version cached
+ *                                       // (dev/rc), no release tag found on the
+ *                                       // repo, or any error during the check —
+ *                                       // hasUpdate is always false when skipped
  *     reason:          string,         // when skipped=true
  *     current:         string,
  *     latest:          string,         // "" when no check was made
