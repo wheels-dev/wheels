@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
+#
+# Top-level version manifest for the bleeding-edge channel.
+
+PackageIdentifier: Wheels.WheelsBE
+PackageVersion: 4.0.0-snapshot.1789
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0
