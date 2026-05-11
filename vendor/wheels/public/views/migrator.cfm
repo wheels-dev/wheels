@@ -296,7 +296,7 @@ if (request.wheels.params.format == "json") {
 
 		<div class="ui placeholder segment">
 			<div class="ui icon header">
-				<i class="database icon"></i>
+				<svg xmlns="http://www.w3.org/2000/svg" height="70" width="50" viewBox="0 0 448 512"><path fill="##f38ba8" d="M448 73.1v45.7C448 159.1 347.7 192 224 192S0 159.1 0 118.9V73.1C0 32.9 100.3 0 224 0s224 32.9 224 73.1zM448 176v102.9C448 319.1 347.7 352 224 352S0 319.1 0 278.9V176c48.1 33.1 136.2 48.6 224 48.6S399.9 209.1 448 176zm0 160v102.9C448 479.1 347.7 512 224 512S0 479.1 0 438.9V336c48.1 33.1 136.2 48.6 224 48.6S399.9 369.1 448 336z"/></svg><br>
 				Database Error<br><small>
 			#message#</small>
 			</div>
