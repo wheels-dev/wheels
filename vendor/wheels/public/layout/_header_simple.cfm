@@ -10,6 +10,26 @@ Static simple version of the header/navigation for output on error screens
 if (StructKeyExists(request, "wheels") && IsStruct(request.wheels)) {
 	request.wheels.showDebugInformation = true;
 }
+
+// Inline icon font (see _header.cfm and issue ##2421). Duplicated here
+// because error pages can render before _header.cfm has been visited.
+// Double-checked locking matches _header.cfm — see comment there for
+// the TOCTOU rationale.
+if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
+	lock name="wheelsIconsFontInit" type="exclusive" timeout="10" {
+		if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
+			local.iconsFontPath = ExpandPath("/wheels/public/assets/css/woff_files/icons.woff2");
+			local.dataUri = "";
+			if (FileExists(local.iconsFontPath)) {
+				try {
+					local.dataUri = "data:font/woff2;base64," & ToBase64(FileReadBinary(local.iconsFontPath));
+				} catch (any e) {
+				}
+			}
+			application.wheels.iconsFontDataUri = local.dataUri;
+		}
+	}
+}
 </cfscript>
 <cfoutput>
 <!--- cfformat-ignore-start --->
@@ -21,6 +41,15 @@ if (StructKeyExists(request, "wheels") && IsStruct(request.wheels)) {
 	<meta name="robots" content="noindex,nofollow">
 	<style>
 		<cfinclude template="/wheels/public/assets/css/semantic.min.css">
+		<cfif Len(application.wheels.iconsFontDataUri)>
+		@font-face {
+			font-family: 'Icons';
+			src: url("#application.wheels.iconsFontDataUri#") format('woff2');
+			font-weight: normal;
+			font-style: normal;
+			font-display: block;
+		}
+		</cfif>
 		/* ===== Wheels Dark Error Theme ===== */
 		:root {
 			--w-bg-base: ##1e1e2e;
