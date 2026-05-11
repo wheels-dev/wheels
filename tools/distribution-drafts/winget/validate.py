@@ -9,7 +9,7 @@ Run before pushing changes to the manifest content.
 
 Checks:
 - Each version dir contains exactly the 3 files: <Id>.yaml, <Id>.locale.en-US.yaml, <Id>.installer.yaml
-- PackageIdentifier matches the directory path (manifests/w/Wheels/<Name>/)
+- PackageIdentifier in all three files matches the package directory name (e.g. Wheels.Wheels)
 - PackageVersion matches the parent dir name
 - DefaultLocale (in top manifest) matches the locale file's PackageLocale
 - Installer URLs use https
