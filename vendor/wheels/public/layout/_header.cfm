@@ -7,6 +7,23 @@ if (!IsDefined("pageHeader")) {
 // Css Path
 request.wheelsInternalAssetPath = application.wheels.webpath & "wheels/public/assets";
 
+// Inline the Semantic UI icon font as a data URI. The framework's dev pages
+// inline semantic.min.css into a <style> block, so its relative URLs to
+// `themes/default/assets/fonts/icons.woff2` resolve against the page URL
+// (e.g. /wheels/guides) and 404 — every <i class="...icon"> renders as an
+// empty box. Cached at application scope; falls back silently if the font
+// can't be read. See issue ##2421.
+if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
+	local.iconsFontPath = ExpandPath("/wheels/public/assets/css/woff_files/icons.woff2");
+	application.wheels.iconsFontDataUri = "";
+	if (FileExists(local.iconsFontPath)) {
+		try {
+			application.wheels.iconsFontDataUri = "data:font/woff2;base64," & ToBase64(FileReadBinary(local.iconsFontPath));
+		} catch (any e) {
+		}
+	}
+}
+
 // Opt the request into the dev debug bar emitted at onrequestend.
 // Public.cfc handlers <cfinclude> these views directly (bypassing
 // renderView, which is what normally flips this flag), so without this
@@ -125,6 +142,15 @@ if (StructKeyExists(url, "refresh")) {
 		<style>
 			<cfinclude template="/wheels/public/assets/css/semantic.min.css">
 			<cfinclude template="/wheels/public/assets/css/highlight_default.min.css">
+			<cfif Len(application.wheels.iconsFontDataUri)>
+			@font-face {
+				font-family: 'Icons';
+				src: url("#application.wheels.iconsFontDataUri#") format('woff2');
+				font-weight: normal;
+				font-style: normal;
+				font-display: block;
+			}
+			</cfif>
 			.h-100 {height:100%;}
 			.forcescroll { overflow-y: scroll; max-height: 40rem; }
 			.margin-top { margin-top: 5em; }
