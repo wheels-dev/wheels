@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+#
+# Default-locale manifest. Describes the package to end users for
+# `winget search`, `winget show`, and the WinGet website.
+
+PackageIdentifier: Wheels.Wheels
+PackageVersion: 4.0.0
+PackageLocale: en-US
+Publisher: Wheels Dev
+PublisherUrl: https://wheels.dev
+PublisherSupportUrl: https://github.com/wheels-dev/wheels/issues
+PrivacyUrl: https://wheels.dev/privacy
+Author: Wheels Dev Contributors
+PackageName: Wheels
+PackageUrl: https://wheels.dev
+License: Apache-2.0
+LicenseUrl: https://github.com/wheels-dev/wheels/blob/main/LICENSE
+Copyright: Copyright (c) 2026 Wheels Dev
+ShortDescription: CFML MVC framework with code generation, migrations, testing, and server management.
+Description: |
+  Wheels is a full-stack MVC framework for CFML (ColdFusion / Lucee / BoxLang),
+  similar in spirit to Rails and Laravel. The Wheels CLI provides code generators,
+  database migrations, a test runner, a background-job worker, and a development
+  server, all wrapped in a single self-contained command.
+
+  This is the stable channel. For bleeding-edge snapshots from develop, install
+  Wheels.WheelsBE instead. Only one channel can be installed at a time.
+Moniker: wheels
+Tags:
+- cfml
+- coldfusion
+- lucee
+- boxlang
+- mvc
+- framework
+- cli
+- rails
+- web-development
+ReleaseNotesUrl: https://github.com/wheels-dev/wheels/releases/tag/v4.0.0
+Documentations:
+- DocumentLabel: Guides
+  DocumentUrl: https://guides.wheels.dev
+- DocumentLabel: API Reference
+  DocumentUrl: https://api.wheels.dev
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
