@@ -308,7 +308,10 @@ def main() -> None:
         ("wheels.json", manifest_stable()),
     ]
     if check_mode:
-        drift = any(check_manifest(n, d) for n, d in manifests)
+        # Force a list, not a generator: any() short-circuits, which would skip the
+        # second manifest's check_manifest() (and its DRIFT log line) whenever the
+        # first one drifts. CI needs to see *all* drifting manifests in one run.
+        drift = any([check_manifest(n, d) for n, d in manifests])
         sys.exit(1 if drift else 0)
     for n, d in manifests:
         write_manifest(n, d)
