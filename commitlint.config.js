@@ -1,61 +1,32 @@
 /**
  * Commitlint configuration for conventional commits.
  *
- * Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+ * Required: type from the conventional-commits list, a non-empty
+ * subject, header ≤ 100 chars, subject not in ALL-CAPS.
+ *
+ * Scope is OPTIONAL and unrestricted — pick any short noun that
+ * makes the commit easier to scan in `git log` (e.g. `model`,
+ * `web/blog`), or omit it entirely. The scope allowlist was
+ * dropped because picking the "right" scope produced more friction
+ * than value; conventional types still power changelog grouping.
+ *
+ * Valid types: feat, fix, docs, style, refactor, perf, test,
+ * build, ci, chore, revert.
  *
  * Examples:
  *   feat: add route model binding
  *   fix(model): correct association eager loading
- *   docs: update migration guide
- *   ci: add commit message validation to PR workflow
+ *   docs(web/blog): publish LuCLI post
+ *   ci: tighten visual regression path filter
  */
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    // Wheels-specific scope allowlist (optional — empty means all scopes allowed)
-    'scope-enum': [
-      2,
-      'always',
-      [
-        'model',
-        'controller',
-        'view',
-        'router',
-        'middleware',
-        'migration',
-        'cli',
-        'test',
-        'config',
-        'di',
-        'job',
-        'mailer',
-        'plugin',
-        'sse',
-        'seed',
-        'docs',
-        // Static-site monorepo under web/ (wheels.dev sites)
-        'web',
-        'web/ui',
-        'web/landing',
-        'web/blog',
-        'web/guides',
-        'web/api',
-        'web/starlight',
-        // Dependabot-generated bumps
-        'deps',
-        'deps-dev'
-      ]
-    ],
-    // Allow empty scope (scope is optional)
-    'scope-empty': [0, 'never'],
-    // Subject must not be empty
     'subject-empty': [2, 'never'],
-    // Type must not be empty
     'type-empty': [2, 'never'],
-    // Max header length
     'header-max-length': [2, 'always', 100],
-    // Allow sentence-case, pascal-case, start-case subjects (for proper nouns like
-    // "Giscus", "Buttondown", "CockroachDB"). Only reject ALL-CAPS ("SHOUTING").
+    // Allow sentence-case, pascal-case, start-case subjects (for proper nouns
+    // like "Giscus", "Buttondown", "CockroachDB"). Only reject ALL-CAPS.
     'subject-case': [2, 'never', ['upper-case']]
   }
 };

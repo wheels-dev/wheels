@@ -35,15 +35,12 @@ they are honored. Violating them is a bug — fix the prompt, not the rails.
 
 ## Commit & PR conventions
 
-- **Conventional commits.** `commitlint.config.js` is authoritative; the human
-  summary lives in `CLAUDE.md` § "Commit Message Conventions". Allowed types:
-  `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`,
-  `chore`, `revert`. Allowed scopes: `model`, `controller`, `view`, `router`,
-  `middleware`, `migration`, `cli`, `test`, `config`, `di`, `job`, `mailer`,
-  `plugin`, `sse`, `seed`, `docs`, `web`, `web/ui`, `web/landing`, `web/blog`,
-  `web/guides`, `web/api`, `web/starlight`. **Scope is optional** — use no
-  scope rather than guessing. **Never invent a scope** — commitlint will
-  reject the commit.
+- **Conventional commits.** `commitlint.config.js` is authoritative; the
+  human summary lives in `CLAUDE.md` § "Commit Message Conventions". Allowed
+  types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`,
+  `ci`, `chore`, `revert`. **Scope is optional and unrestricted** — pick a
+  short noun that helps a reader skim history (e.g. `model`, `web/blog`),
+  or omit it entirely. Don't agonize over which scope is "right."
 - **Subject ≤ 100 chars, not ALL-CAPS.** Sentence-case is fine.
 - **Branch naming** for bot-authored work: `fix/bot-<issue>-<slug>` or
   `feature/bot-<slug>`. The caller workflow creates the branch — do not

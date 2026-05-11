@@ -75,18 +75,112 @@ jobs:
             --commit-hash="${GITHUB_SHA}" \
             --commit-message="deploy ${SITE} from ${DEPLOY_BRANCH} (run ${GITHUB_RUN_ID})"
 
+  detect-scope:
+    name: Detect change scope
+    runs-on: ubuntu-latest
+    outputs:
+      content_only: ${{ steps.scope.outputs.content_only }}
+      blog_content_changed: ${{ steps.scope.outputs.blog_content_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute change scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          # Resolve the diff range. For PRs we compare base vs head; for
+          # pushes we compare the previous tip vs the new tip (falling back
+          # to HEAD~1 on first-push / force-push when `before` is zeros).
+          case "$EVENT_NAME" in
+            pull_request)
+              base="$PR_BASE_SHA"
+              head="$PR_HEAD_SHA"
+              ;;
+            push)
+              base="$BEFORE_SHA"
+              head="$HEAD_SHA"
+              if [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base" 2>/dev/null; then
+                base="${head}~1"
+              fi
+              ;;
+            *)
+              base=""
+              head=""
+              ;;
+          esac
+
+          # Safety default: any uncertainty → run the regression. The
+          # cost of running unnecessarily is one CI job; the cost of
+          # silently skipping is shipping a layout break.
+          if [ -z "$base" ] || [ -z "$head" ]; then
+            echo "Cannot resolve diff range for event $EVENT_NAME — running visual regression."
+            echo "content_only=false" >> "$GITHUB_OUTPUT"
+            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$base" "$head" 2>/dev/null)
+          if [ -z "$changed" ]; then
+            echo "Empty diff between $base and $head — running visual regression."
+            echo "content_only=false" >> "$GITHUB_OUTPUT"
+            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Changed files (vs $base):"
+          echo "$changed" | sed 's/^/  /'
+
+          # Content-only patterns. Visual regression skips when EVERY
+          # changed file matches one of these:
+          #   web/content/**            — blog posts + free-standing content
+          #   web/sites/*/src/content/  — Astro content collections (guides, api)
+          #   web/sites/*/public/       — static images/assets the sites serve
+          #   web/**/*.md, web/**/*.mdx — markdown anywhere under web/
+          non_content=$(echo "$changed" \
+            | grep -v '^$' \
+            | grep -vE '^(web/content/.+|web/sites/[^/]+/src/content/.+|web/sites/[^/]+/public/.+|web/.+\.mdx?)$')
+
+          if [ -z "$non_content" ]; then
+            echo "All changes are content-only — visual regression will be skipped."
+            echo "content_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Non-content files changed — visual regression will run. Triggering files:"
+            echo "$non_content" | sed 's/^/  /'
+            echo "content_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$changed" | grep -qE '^web/content/blog/posts/'; then
+            echo "blog_content_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   visual-regression:
     name: Visual regression
-    # Hard gate for non-content changes (layout/styling/structure). For
-    # content-only pushes (markdown under web/content/blog/posts/), the
-    # job auto-regenerates the affected baseline, commits it back to
-    # develop with [skip ci], and exits success — so adding a new blog
-    # article doesn't trip a stale-baseline failure.
+    needs: detect-scope
+    # Skip entirely on content-only changes (blog posts, guides/api
+    # markdown, static assets). The detect-scope job emits
+    # content_only=true when every changed file is markdown or sits under
+    # a content/asset path — that avoids the blog-baseline auto-refresh
+    # dance for routine publish flows.
     #
-    # If this job fails on a non-content PR and the change is intentional,
-    # download the `visual-regression-diffs` artifact and copy each
-    # *.actual.png over the matching web/tests/visual-baselines/*.png,
-    # commit, and push.
+    # For mixed PRs (content + components/scripts), the regression still
+    # runs. If the blog index drifts because of the content change, the
+    # pre-refresh step below regenerates the baseline before comparison.
+    #
+    # If this job fails on an intentional layout change, download the
+    # `visual-regression-diffs` artifact and copy each *.actual.png over
+    # the matching web/tests/visual-baselines/*.png, commit, and push.
+    if: needs.detect-scope.outputs.content_only != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -131,29 +225,12 @@ jobs:
 
       # The blog index page is content-driven — new articles appear on it
       # automatically — so the blog baseline is *expected* to drift whenever
-      # any file under web/content/blog/posts/ changes. Detect that here and
-      # pre-refresh the blog baseline before the regression test runs, so
-      # mixed commits (blog content alongside CLI / guides / etc.) don't
-      # surface the expected blog drift as a "real regression."
-      - name: Detect blog content change
-        id: scope
-        if: github.event_name == 'push'
-        run: |
-          set -euo pipefail
-          # `changed` comes from git itself (file paths under version
-          # control), not from user-controlled event metadata, so it's
-          # safe to grep over without further sanitization.
-          changed=$(git diff --name-only HEAD~1..HEAD)
-          if echo "$changed" | grep -qE '^web/content/blog/posts/'; then
-            echo "blog_content_changed=true" >> "$GITHUB_OUTPUT"
-            echo "Blog content changed — will pre-refresh blog baseline before regression."
-          else
-            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
-            echo "No blog content changes detected."
-          fi
-
+      # any file under web/content/blog/posts/ changes. The detect-scope job
+      # surfaces that via blog_content_changed; on mixed commits (blog
+      # content alongside non-content changes) we pre-refresh the blog
+      # baseline here before the regression test runs.
       - name: Pre-refresh blog baseline before regression test
-        if: steps.scope.outputs.blog_content_changed == 'true'
+        if: needs.detect-scope.outputs.blog_content_changed == 'true'
         working-directory: web
         run: node scripts/visual-regression.mjs --update --site blog
 
@@ -171,7 +248,7 @@ jobs:
       # the non-blog regression is fixed.
       - name: Commit pre-refreshed blog baseline
         if: |
-          steps.scope.outputs.blog_content_changed == 'true' &&
+          needs.detect-scope.outputs.blog_content_changed == 'true' &&
           steps.regress.outcome == 'success'
         run: |
           set -euo pipefail
@@ -221,20 +298,10 @@ jobs:
           echo "The auto-refresh will be retried on the next push that touches web/content/blog/posts/."
           exit 1
 
-      - name: Fail job on real regression
-        if: steps.regress.outcome == 'failure'
-        env:
-          BLOG_CONTENT_CHANGED: ${{ steps.scope.outputs.blog_content_changed }}
-        run: |
-          echo "Visual regression failed."
-          if [ "$BLOG_CONTENT_CHANGED" = "true" ]; then
-            echo "Note: the blog baseline was pre-refreshed for this run, so any"
-            echo "[blog] failure here would be a mismatch separate from content drift."
-            echo "Failure is most likely on another page."
-          fi
-          echo "Download the visual-regression-diffs artifact and update baselines as needed."
-          exit 1
-
+      # Upload BEFORE the explicit-fail step. Without this ordering, the
+      # fail step exits 1 first and Actions skips subsequent steps (even
+      # those with matching `if:`), leaving the diagnostic artifact
+      # unreachable on the run that needs it most.
       - name: Upload diffs on failure
         if: steps.regress.outcome == 'failure'
         uses: actions/upload-artifact@v7
@@ -245,6 +312,20 @@ jobs:
             web/tests/visual-baselines/*.png
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Fail job on real regression
+        if: steps.regress.outcome == 'failure'
+        env:
+          BLOG_CONTENT_CHANGED: ${{ needs.detect-scope.outputs.blog_content_changed }}
+        run: |
+          echo "Visual regression failed."
+          if [ "$BLOG_CONTENT_CHANGED" = "true" ]; then
+            echo "Note: the blog baseline was pre-refreshed for this run, so any"
+            echo "[blog] failure here would be a mismatch separate from content drift."
+            echo "Failure is most likely on another page."
+          fi
+          echo "Download the visual-regression-diffs artifact and update baselines as needed."
+          exit 1
 
 # Note: the packages-index baseline auto-refresh that fires on
 # repository_dispatch: registry-updated lives in its own workflow file
