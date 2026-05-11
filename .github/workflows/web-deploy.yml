@@ -197,7 +197,9 @@ jobs:
               # Rebase conflict is vanishingly unlikely (we only touch one PNG)
               # and would mean a parallel run also refreshed the baseline.
               # In that case our refresh is redundant — drop it.
-              git rebase --abort
+              # `|| true` so a failed --abort (e.g., already-clean rebase state)
+              # doesn't trip set -e and turn the exit-0 path into exit-1.
+              git rebase --abort || true
               echo "Rebase conflict on attempt $attempt — abandoning auto-refresh (parallel refresh likely already landed)."
               exit 0
             fi
@@ -206,7 +208,10 @@ jobs:
               exit 0
             fi
             echo "Push rejected on attempt $attempt; will fetch + rebase + retry."
-            sleep $((RANDOM % 5 + 2))
+            # Skip the backoff on the last iteration — no retry follows it.
+            if [ "$attempt" -lt 5 ]; then
+              sleep $((RANDOM % 5 + 2))
+            fi
           done
           echo "Failed to push baseline refresh after 5 attempts — develop is unusually contended."
           echo "The auto-refresh will be retried on the next push that touches web/content/blog/posts/."
