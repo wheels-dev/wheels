@@ -194,12 +194,20 @@ jobs:
     # `always()` guard is required so this `if:` is evaluated even when
     # the `needs:` dependency fails — without it, Actions auto-skips us.
     #
+    # Push events (merges to develop) ALWAYS run the regression — even
+    # for content-only changes — because the post-merge auto-refresh
+    # of the blog baseline lives in this job. Skipping on push would
+    # break the auto-refresh loop and leave the baseline stale forever.
+    # The skip optimization is for the PR friction case only; pushes
+    # eat the few extra CI minutes so the maintenance contract holds.
+    #
     # If this job fails on an intentional layout change, download the
     # `visual-regression-diffs` artifact and copy each *.actual.png over
     # the matching web/tests/visual-baselines/*.png, commit, and push.
     if: |
       always() &&
       (needs.detect-scope.result != 'success' ||
+       github.event_name != 'pull_request' ||
        needs.detect-scope.outputs.content_only != 'true')
     runs-on: ubuntu-latest
     permissions:
