@@ -24,7 +24,7 @@ You can now clone the repo, run two commands, and have the core test suite compl
 
 ## Why Docker was the wrong default for the inner loop
 
-Docker is still the right tool for Wheels' cross-engine compatibility matrix. The framework supports Lucee 5, 6, 7, Adobe ColdFusion 2018, 2021, 2023, 2025, plus BoxLang, across seven databases. No laptop can natively host that matrix. Docker Compose is the correct answer, and we still run it in CI, nightly, and on demand when you are chasing an Adobe CF quirk.
+Docker is still the right tool for Wheels' cross-engine compatibility matrix. The CI-gated matrix is Lucee 6, 7, Adobe ColdFusion 2023 and 2025, and BoxLang, across seven databases. (Lucee 5, Adobe 2018, and Adobe 2021 still have Compose definitions for spot checks, but they are not part of the CI matrix and should be considered unsupported for new development.) No laptop can natively host that matrix. Docker Compose is the correct answer, and we still run it in CI, nightly, and on demand when you are chasing an Adobe CF quirk.
 
 Docker was never the correct answer for the inner loop. The inner loop is what you do when you are writing a test, watching it fail, fixing it, and watching it pass. If that cycle takes ninety seconds, you do not run it. You push to CI, wait ten minutes, and context-switch four times while you wait. Multiply that by a contributor's first day on the project and you have explained why CFML frameworks have a contribution-curve problem.
 
@@ -133,7 +133,7 @@ Thanks to the contributors who made this migration possible: [@bpamiri](https://
 ## Where to go next
 
 - [Contributing guide](https://github.com/wheels-dev/wheels/blob/develop/CONTRIBUTING.md) — workflow, branch conventions, and the Definition of Done for a PR.
-- [Wheels CLI installers](https://github.com/wheels-dev/homebrew-wheels) — the [Homebrew tap](https://github.com/wheels-dev/homebrew-wheels) for macOS / Linux and the [`scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) bucket for Windows. This is the install most contributors want.
+- Wheels CLI installers — the [Homebrew tap](https://github.com/wheels-dev/homebrew-wheels) for macOS / Linux and the [`scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) bucket for Windows. This is the install most contributors want.
 - [LuCLI repo](https://github.com/bpamiri/LuCLI) — the underlying binary, if you want to run it standalone outside of Wheels; engine-level issues and feature requests belong here, not on the Wheels tracker.
 - [Running tests locally](https://guides.wheels.dev/v4-0-0-snapshot/testing/running-tests-locally/) — LuCLI path and the Docker matrix fallback for cross-engine coverage.
 - [`wheels-cli-lucli`](https://github.com/wheels-dev/wheels-cli-lucli) — the distribution repo for the LuCLI module itself.
