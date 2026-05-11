@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
 Static validation for the WinGet manifest drafts. Catches schema-level
-mistakes (missing required fields, identifier/version mismatches across the
+mistakes (missing required files, identifier/version mismatches across the
 3-file triplet) without needing the Windows `winget validate` tool.
 
 The official validator is Windows-only; this is the macOS/linux fallback.
 Run before pushing changes to the manifest content.
 
 Checks:
-- Each version dir contains exactly the 3 files: <Id>.yaml, <Id>.locale.en-US.yaml, <Id>.installer.yaml
+- Each version dir contains at least the 3 required files: <Id>.yaml, <Id>.locale.en-US.yaml, <Id>.installer.yaml
 - PackageIdentifier in all three files matches the package directory name (e.g. Wheels.Wheels)
 - PackageVersion matches the parent dir name
+- ManifestType in each file matches its role (version / defaultLocale / installer)
 - DefaultLocale (in top manifest) matches the locale file's PackageLocale
 - Installer URLs use https
 - License is in SPDX form
