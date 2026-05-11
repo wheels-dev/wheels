@@ -185,7 +185,41 @@ jobs:
           # [skip ci] keeps this push from re-triggering the deploy
           # workflow and creating a publish loop.
           git commit -m "chore(docs): auto-refresh blog visual baseline after content change [skip ci]"
-          git push origin HEAD:develop
+
+          # Retry with fetch+rebase: develop can move while this ~3-min job
+          # is running (e.g., another PR merges right behind a blog content
+          # push). Without retry, a dropped push here leaves the baseline
+          # stale on develop and trips every subsequent non-blog PR until
+          # someone refreshes manually.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin develop
+            if ! git rebase origin/develop; then
+              # Rebase conflict is vanishingly unlikely (we only touch one PNG)
+              # and would mean a parallel run also refreshed the baseline.
+              # In that case our refresh is redundant — drop it.
+              # `|| true` so a failed --abort (e.g., already-clean rebase state)
+              # doesn't trip set -e and turn the exit-0 path into exit-1.
+              git rebase --abort || true
+              echo "Rebase conflict on attempt $attempt — abandoning auto-refresh (parallel refresh likely already landed)."
+              exit 0
+            fi
+            if git push origin HEAD:develop; then
+              echo "Pushed baseline refresh on attempt $attempt."
+              exit 0
+            fi
+            # Skip the backoff (and the misleading "will retry" message) on
+            # the last iteration — no retry follows it; the loop falls through
+            # to the exit-1 path below.
+            if [ "$attempt" -lt 5 ]; then
+              echo "Push rejected on attempt $attempt; will fetch + rebase + retry."
+              sleep $((RANDOM % 5 + 2))
+            else
+              echo "Push rejected on attempt $attempt (final attempt, no retry)."
+            fi
+          done
+          echo "Failed to push baseline refresh after 5 attempts — develop is unusually contended."
+          echo "The auto-refresh will be retried on the next push that touches web/content/blog/posts/."
+          exit 1
 
       - name: Fail job on real regression
         if: steps.regress.outcome == 'failure'
