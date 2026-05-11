@@ -298,6 +298,21 @@ jobs:
           echo "The auto-refresh will be retried on the next push that touches web/content/blog/posts/."
           exit 1
 
+      # Upload BEFORE the explicit-fail step. Without this ordering, the
+      # fail step exits 1 first and Actions skips subsequent steps (even
+      # those with matching `if:`), leaving the diagnostic artifact
+      # unreachable on the run that needs it most.
+      - name: Upload diffs on failure
+        if: steps.regress.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-diffs
+          path: |
+            web/tests/visual-diffs/*.png
+            web/tests/visual-baselines/*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Fail job on real regression
         if: steps.regress.outcome == 'failure'
         env:
@@ -311,17 +326,6 @@ jobs:
           fi
           echo "Download the visual-regression-diffs artifact and update baselines as needed."
           exit 1
-
-      - name: Upload diffs on failure
-        if: steps.regress.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: visual-regression-diffs
-          path: |
-            web/tests/visual-diffs/*.png
-            web/tests/visual-baselines/*.png
-          if-no-files-found: ignore
-          retention-days: 14
 
 # Note: the packages-index baseline auto-refresh that fires on
 # repository_dispatch: registry-updated lives in its own workflow file
