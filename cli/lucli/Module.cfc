@@ -4175,6 +4175,30 @@ component extends="modules.BaseModule" {
 		out("Next steps:", "bold");
 		out("  cd #appName#");
 		out("  wheels start");
+
+		// Non-blocking update check. Prints a small hint AFTER the success
+		// block if a newer wheels release is available. All errors swallow
+		// silently — the user should never be blocked or confused by a
+		// failed/slow network check. See services/UpdateChecker.cfc for the
+		// channel-aware logic + 24h cache. Wrapped in try/catch as a final
+		// belt for any failure mode the service itself doesn't already
+		// internalize (e.g., the createObject call throwing).
+		try {
+			var checker = new services.UpdateChecker();
+			var updateResult = checker.check(currentVersion=super.version());
+			if (updateResult.hasUpdate) {
+				out("");
+				out("A newer wheels (#updateResult.channel#) is available: #updateResult.latest# (you have #updateResult.current#)", "yellow");
+				out("  Upgrade: #updateResult.upgradeCommand#", "yellow");
+			}
+		} catch (any e) {
+			// Silently swallow — never let an update check delay or break
+			// `wheels new`. Log via verbose() so devs can see it with -v.
+			if (structKeyExists(variables, "verbose")) {
+				try { verbose("Update check failed: " & e.message); } catch (any ignore) {}
+			}
+		}
+
 		return "";
 
 		} finally {
