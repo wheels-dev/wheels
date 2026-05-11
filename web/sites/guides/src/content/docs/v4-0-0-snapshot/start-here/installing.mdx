@@ -206,14 +206,13 @@ brew upgrade wheels
 
 <TabItem label="Windows" icon="seti:windows">
 
-Until the v2 Chocolatey package ships, upgrade by re-downloading the launcher and module from GitHub Releases:
+Upgrade through Scoop — it pulls the latest LuCLI launcher and Wheels Module from the [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) bucket:
 
-1. Replace `wheels.bat` on your `PATH` with the latest `lucli-<version>.bat` from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases).
-2. Re-extract the latest `wheels-module-<version>.zip` from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases) over `%USERPROFILE%\.wheels\modules\wheels\`:
-
-   ```powershell title="PowerShell"
-   Expand-Archive -Path "wheels-module-*.zip" -DestinationPath "$env:USERPROFILE\.wheels\modules\wheels" -Force
-   ```
+```powershell title="PowerShell"
+scoop update wheels
+# or, for the bleeding-edge channel:
+scoop update wheels-be
+```
 
 </TabItem>
 

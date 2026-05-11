@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the wheels binary via Homebrew, Chocolatey, or a manual JAR download, and verify your setup.
+description: Install the wheels binary via Homebrew, Scoop (Windows), or a manual JAR download, and verify your setup.
 type: reference
 sidebar:
   order: 2
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-The `wheels` binary is distributed through three channels: Homebrew for macOS and Linux, Chocolatey for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
+The `wheels` binary is distributed through three channels: Homebrew for macOS and Linux, Scoop for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
 
 **You'll use this for:**
 
@@ -19,7 +19,7 @@ The `wheels` binary is distributed through three channels: Homebrew for macOS an
 
 ## Requirements
 
-The CLI runs on Java 21. On macOS and Linux, the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper, so you don't have to wire up a system JDK. If you're installing manually — or on Windows outside the Chocolatey package — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
+The CLI runs on Java 21. On macOS and Linux, the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper, so you don't have to wire up a system JDK. If you're installing manually — or on Windows without Scoop — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
 
 ```bash title="illustrative — system JDK setup"
 brew install openjdk@21
