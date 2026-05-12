@@ -160,6 +160,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				fileDelete(modelDir & "/CommentedExtendsBlock.cfc");
 			});
 
+			it("flags model where extends is only present in a tag-style CFML comment", () => {
+				var modelDir = tempRoot & "/app/models";
+				directoryCreate(modelDir, true, true);
+				fileWrite(
+					modelDir & "/CommentedExtendsTag.cfc",
+					'<!--- example: component extends="Model" {} --->' & chr(10) &
+					'component {' & chr(10) &
+					'    function config() {}' & chr(10) &
+					'}'
+				);
+
+				var results = analysis.validate();
+				var issueMessages = "";
+				for (var issue in results.issues) {
+					if (findNoCase("CommentedExtendsTag.cfc", issue.file)) {
+						issueMessages &= issue.message & " ";
+					}
+				}
+				expect(issueMessages).toInclude("does not extend Model");
+
+				fileDelete(modelDir & "/CommentedExtendsTag.cfc");
+			});
+
 			it("still passes when extends is present alongside a commented-out copy", () => {
 				var modelDir = tempRoot & "/app/models";
 				directoryCreate(modelDir, true, true);
@@ -172,11 +195,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				);
 
 				var results = analysis.validate();
+				var foundBadIssue = false;
 				for (var issue in results.issues) {
-					if (findNoCase("CommentedAndReal.cfc", issue.file)) {
-						expect(issue.message).notToInclude("does not extend Model");
+					if (findNoCase("CommentedAndReal.cfc", issue.file)
+							&& findNoCase("does not extend Model", issue.message)) {
+						foundBadIssue = true;
 					}
 				}
+				expect(foundBadIssue).toBeFalse();
 
 				fileDelete(modelDir & "/CommentedAndReal.cfc");
 			});
