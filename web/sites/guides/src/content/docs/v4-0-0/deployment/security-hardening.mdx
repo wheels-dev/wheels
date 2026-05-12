@@ -1,0 +1,303 @@
+---
+title: Security hardening
+description: Security configuration Wheels apps should ship to production with — SecurityHeaders, CSRF, HSTS, reload password, secrets, error pages.
+type: howto
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you the framework-provided security primitives a Wheels app should turn on before it goes to production. You'll register the `SecurityHeaders` middleware, decide which opt-in headers (CSP, HSTS, Permissions-Policy) to emit, wire CSRF protection into a base controller, rotate the reload password and datasource secrets out of source, handle real-client IPs from behind a load balancer, and turn off verbose error pages.
+
+**You'll learn:**
+
+- The full set of headers `wheels.middleware.SecurityHeaders` sets, with their defaults
+- How Wheels enforces CSRF via `protectsFromForgery()`, `authenticityTokenField()`, and `csrfMetaTags()`
+- When to disable CSRF per-action (token-authenticated API endpoints)
+- How to handle HSTS, TLS termination, and `X-Forwarded-For` behind a reverse proxy
+- How to keep `reloadPassword` and datasource credentials out of source control
+- How to disable `showErrorInformation` for production
+
+<Aside type="note">
+  You should already know how the middleware pipeline runs. See [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/).
+</Aside>
+
+## Register SecurityHeaders
+
+Register `SecurityHeaders` globally in `config/settings.cfm`:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.SecurityHeaders()
+]);
+</cfscript>
+```
+
+With no arguments, the middleware writes four headers on every response and — in production — adds a fifth. Content-Security-Policy and Permissions-Policy stay off unless you configure them.
+
+## Headers and defaults
+
+Verified against `vendor/wheels/middleware/SecurityHeaders.cfc`:
+
+| Constructor arg | Header | Default | Source |
+|-----------------|--------|---------|--------|
+| `frameOptions` | `X-Frame-Options` | `SAMEORIGIN` | line 24, 54 |
+| `contentTypeOptions` | `X-Content-Type-Options` | `nosniff` | line 25, 57 |
+| `xssProtection` | `X-XSS-Protection` | `1; mode=block` | line 26, 60 |
+| `referrerPolicy` | `Referrer-Policy` | `strict-origin-when-cross-origin` | line 27, 63 |
+| `contentSecurityPolicy` | `Content-Security-Policy` | `""` (opt-in) | line 28, 65-67 |
+| `strictTransportSecurity` | `Strict-Transport-Security` | `""` — auto-resolves to `max-age=31536000; includeSubDomains` in production | line 29, 48-51, 68-70 |
+| `hsts` | — | `true` — set to `false` to suppress `Strict-Transport-Security` entirely | new |
+| `permissionsPolicy` | `Permissions-Policy` | `""` (opt-in) | line 30, 71-73 |
+| `environment` | — | `""` — falls back to `application.$wheels.environment` | line 31, 37-45 |
+
+Setting any value to an empty string suppresses that header. `frameOptions=""` drops `X-Frame-Options`; the same pattern works for every argument.
+
+## Configure CSP and Permissions-Policy
+
+`contentSecurityPolicy` and `permissionsPolicy` are empty by default because a restrictive policy can break apps with inline scripts, styles, or third-party embeds. Opt in explicitly once you know what your app loads:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.SecurityHeaders(
+        contentSecurityPolicy="default-src 'self'; img-src 'self' data:; script-src 'self'",
+        permissionsPolicy="geolocation=(), camera=(), microphone=()"
+    )
+]);
+</cfscript>
+```
+
+Test both with the browser console open — CSP violations log to the console, Permissions-Policy blocks silently but is visible in `Permissions-Policy` response headers.
+
+## HSTS and TLS termination
+
+HSTS tells browsers to force HTTPS for your hostname for `max-age` seconds. The middleware emits the default `max-age=31536000; includeSubDomains` automatically when the environment is `production` and you didn't pass a value.
+
+Three deployment cases:
+
+- **HTTPS-only app, TLS terminated by Wheels or a pass-through proxy.** Leave HSTS on. Terminate TLS once, redirect `http://` to `https://` at the reverse proxy (nginx, Caddy, ALB), and let the middleware emit the header.
+- **Load balancer terminates TLS and already sets HSTS.** You'll get duplicate headers. Browsers accept duplicates only if the values match — pass an explicit `strictTransportSecurity` matching what the proxy emits, or suppress the header at the proxy.
+- **Local development or HTTP traffic.** HSTS shouldn't appear. Because the middleware keys off `application.$wheels.environment`, a non-production environment already omits the header.
+
+### `preload` tradeoffs
+
+Adding `preload` to the directive opts your domain into the browser-maintained HSTS preload list. Once baked into Chrome/Firefox/Safari (weeks after submission), every browser forces HTTPS for the domain even on first visit — and removing the domain from the preload list takes months. Only opt in once you are certain every subdomain serves HTTPS:
+
+```cfm title="illustrative — do not type"
+new wheels.middleware.SecurityHeaders(
+    strictTransportSecurity="max-age=63072000; includeSubDomains; preload"
+)
+```
+
+<Aside type="tip">
+  **Suppressing HSTS entirely.** When your TLS-terminating proxy (load balancer, CDN, reverse proxy) already emits `Strict-Transport-Security`, pass `hsts=false` so the app does not emit a competing header:
+
+  ```cfm {test:compile} title="config/settings.cfm"
+  set(middleware = [
+      new wheels.middleware.SecurityHeaders(hsts=false)
+  ]);
+  ```
+
+  `hsts=false` takes precedence over both `strictTransportSecurity` and the production auto-default. Leave `hsts=true` (the default) whenever the app owns the HSTS header.
+</Aside>
+
+## CSRF protection
+
+Wheels ships CSRF protection in `vendor/wheels/controller/csrf.cfc`. Turn it on once in your base controller — every other controller inherits it.
+
+```cfm {test:compile} title="app/controllers/Controller.cfc"
+component extends="wheels.Controller" {
+    function config() {
+        protectsFromForgery();
+    }
+}
+```
+
+`protectsFromForgery()` takes three optional arguments:
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `with` | `"exception"` | How to handle a missing/invalid token. `"exception"` throws `Wheels.InvalidAuthenticityToken`, `"abort"` sends an empty response and aborts, `"ignore"` lets the request through. |
+| `only` | `""` | Comma-delimited list of actions to check. Empty means all actions. |
+| `except` | `""` | Comma-delimited list of actions to skip. |
+
+### The enforcement path
+
+1. **View** — add a hidden token field to any `POST`/`PUT`/`PATCH`/`DELETE` form with `authenticityTokenField()` (view helper in `vendor/wheels/view/csrf.cfc`, line 26). Form helpers like `startFormTag()` insert it automatically for non-GET forms.
+2. **View (AJAX)** — add `csrfMetaTags()` to your layout `<head>` (line 10 of the same file). It emits two `<meta>` tags your JavaScript reads to send the token as an `X-CSRF-Token` header.
+3. **Controller pipeline** — before each action runs, `$runCsrfProtection(action)` (`vendor/wheels/controller/csrf.cfc` line 37) checks the `only`/`except` filters, calls `$verifyAuthenticityToken()` (line 63), and throws, aborts, or ignores per the `with` setting.
+4. **Verification** — `$isVerifiedRequest()` (line 82) short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token (`CsrfVerifyToken`) or the cookie-stored token depending on `application.wheels.csrfStore` (session by default, see `vendor/wheels/events/init/security.cfm` line 3).
+
+### Disable per-action for API endpoints
+
+Token-authenticated API endpoints don't use cookies, so CSRF adds nothing. Skip the check for API actions:
+
+```cfm {test:compile} title="app/controllers/Api.cfc"
+component extends="Controller" {
+    function config() {
+        protectsFromForgery(except="create,update,delete");
+        provides("json");
+    }
+
+    function create() {
+        // Auth is handled by a Bearer token filter; CSRF is off for this action.
+    }
+}
+```
+
+For an entire JSON API under `/api`, inherit from a controller that calls `protectsFromForgery(with="ignore")` instead of the default exception-throwing base.
+
+## Reload password
+
+`reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, both are disabled and Wheels logs a security warning on boot (`vendor/wheels/events/onapplicationstart.cfc` line 287-290). If it's set, attempts log to `wheels_security.log` with the source IP (line 189, 197) and rate-limit by IP (line 135).
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(dataSourceName="myapp");
+set(reloadPassword=application.wo.env("WHEELS_RELOAD_PASSWORD"));
+</cfscript>
+```
+
+Rotate it in every environment. The scaffolded template uses `{{reloadPassword}}` as a placeholder the generator fills in (`cli/lucli/templates/app/config/settings.cfm` line 25); replace with an env-var lookup before you ship. Never commit the literal value.
+
+### What it protects (and what it doesn't)
+
+The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, those URLs return 403 unless the attacker also knows the secret.
+
+What it explicitly does **not** gate:
+
+- **`wheels reload` from the CLI.** The CLI runs locally with filesystem access to `.env` and `config/settings.cfm`, reads the password from one of those, and forwards it to the HTTP endpoint as a trusted local proxy. Re-prompting the operator for a password the tool just read from disk would add no security — anyone with that disk read already has the password. This matches how Rails, Laravel, Symfony, Django, and Phoenix treat their CLI/HTTP boundary: the CLI carries owner-of-the-project trust by definition.
+- **`wheels stop && wheels start`.** A full restart goes through LuCLI and never touches the HTTP reload endpoint. The reload password is irrelevant.
+- **Filesystem-level access.** Anyone who can read `config/settings.cfm` (or whatever env file you've pointed it at) sees the password in plaintext. The defence is `chmod` + filesystem ACLs + secret managers, not the password itself.
+
+### Hardening beyond the password
+
+If your threat model needs to defend against compromised disk read or a hostile co-tenant on a shared dev box, gate the actual disk:
+
+- `.env` permissions: `chmod 600 .env` so only the app's UNIX user can read it.
+- Use a secret manager (1Password Connect, AWS Parameter Store, Doppler) to inject `WHEELS_RELOAD_PASSWORD` at process start; never write it to disk in the first place.
+- For the HTTP endpoint specifically, layer a network ACL: bind the dev server to `127.0.0.1` only, or front it with a reverse proxy that requires VPN-side IPs for the reload path.
+
+The password is the cheapest of these — it's a single defence-in-depth layer against opportunistic remote scans. It's not a substitute for keeping the secret out of attacker-readable storage.
+
+See issue [#2477](https://github.com/wheels-dev/wheels/issues/2477) for the full Rails / Laravel comparison that informed this design.
+
+## Secret management
+
+Keep every runtime secret out of source control:
+
+- **`.env` files in dev.** `application.wo.env("NAME")` reads from the process environment, which Wheels populates from `.env` at boot. Add `.env` to `.gitignore`; commit `.env.example` with the keys (no values).
+- **Environment variables in prod.** Set secrets via the deploy tool (systemd `EnvironmentFile=`, Kubernetes `Secret`, Docker `--env-file`, 1Password Connect, AWS Parameter Store, etc.).
+- **Never bake secrets into an image.** A container image is a public artifact — treat it that way.
+
+The datasource is a common miss. `set(dataSourcePassword="hunter2")` in `config/settings.cfm` ends up in git blame. Read it from the environment instead:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(dataSourceName="myapp");
+set(dataSourceUserName=application.wo.env("DB_USER"));
+set(dataSourcePassword=application.wo.env("DB_PASSWORD"));
+</cfscript>
+```
+
+## Trusted proxies and client IP
+
+Wheels does **not** trust `X-Forwarded-For` by default. `cgi.remote_addr` is the last-hop address — your load balancer, not the end user. Two framework surfaces touch this:
+
+- **`RateLimiter` middleware.** Opt into proxy trust explicitly with `trustProxy=true`. The default is `false` "for security" (`vendor/wheels/middleware/RateLimiter.cfc` line 20, 51). Your proxy **must** strip any incoming `X-Forwarded-For` and append the real client, otherwise attackers can spoof an arbitrary IP and bypass rate limits.
+- **Application-level logging.** Nothing in Wheels reads `X-Forwarded-For` automatically for `cgi.remote_addr`. If you want the real client IP in logs, configure your reverse proxy to overwrite `CF.REMOTE_ADDR` at the connector (`mod_cfml`, Tuckey rewriter, nginx `proxy_set_header`) before the request reaches the engine.
+
+```cfm {test:compile} title="config/settings.cfm — rate limiter with trusted proxy"
+<cfscript>
+set(middleware = [
+    new wheels.middleware.SecurityHeaders(),
+    new wheels.middleware.RateLimiter(
+        maxRequests=100,
+        windowSeconds=60,
+        trustProxy=true,
+        proxyStrategy="last"
+    )
+]);
+</cfscript>
+```
+
+`proxyStrategy="last"` takes the rightmost IP in `X-Forwarded-For` (added by the nearest trusted proxy). Use `"first"` only if your proxy chain guarantees the client is always the leftmost entry.
+
+## Rate limiting
+
+`wheels.middleware.RateLimiter` is your first line of defense against credential stuffing, scraping, and accidental self-DoS from a runaway client. It adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers and responds `429` with `Retry-After` when the bucket is empty. See [Rate Limiting](/v4-0-0/digging-deeper/rate-limiting/) for strategies, storage backends, and key functions.
+
+## CORS
+
+Cross-origin restrictions are a browser-enforced policy, not a server-enforced one — but your server has to opt in for the browser to let requests through. Use `wheels.middleware.Cors` with an explicit origin allowlist; never wildcard `*` on credentialed endpoints. Full reference: [CORS](/v4-0-0/digging-deeper/cors/).
+
+## Production error pages
+
+Wheels renders a detailed error page with stack traces, parameter dumps, and file paths when `showErrorInformation=true`. That's fine locally and catastrophic in production — it leaks source paths, CFML versions, and sometimes credentials from the param dump.
+
+The framework already does the right thing by default: `vendor/wheels/events/init/debugging.cfm` line 22-25 flips both `showErrorInformation` and `sendEmailOnError` when the environment is `production`. Verify for your app:
+
+```cfm {test:compile} title="config/production/settings.cfm"
+<cfscript>
+set(showErrorInformation=false);
+set(showDebugInformation=false);
+set(sendEmailOnError=true);
+set(errorEmailToAddress="ops@example.com");
+</cfscript>
+```
+
+Configure a custom error page (usually in `app/events/onerror.cfm`) to render a friendly page instead of a raw CFML error.
+
+## Dependency monitoring
+
+Wheels does not ship automated vulnerability scanning. `wheels doctor` (`cli/lucli/services/Doctor.cfc`) checks project structure and config — required directories, datasource presence, migration count, test coverage — it does **not** audit dependencies or security settings.
+
+For dependency and engine monitoring:
+
+- Subscribe to [Lucee security advisories](https://lucee.org/security.html) and apply engine updates promptly.
+- Track Adobe ColdFusion security bulletins if you target it.
+- Pin package versions in `box.json` and audit third-party packages installed under `vendor/` during routine dependency reviews.
+
+## Production checklist
+
+- [ ] `SecurityHeaders` middleware registered globally
+- [ ] `Content-Security-Policy` configured (opt-in) and tested with browser console
+- [ ] `Strict-Transport-Security` emitted by exactly one layer (middleware or proxy), not both
+- [ ] HTTP-to-HTTPS redirect at the reverse proxy
+- [ ] `protectsFromForgery()` in base controller; API controllers opt out explicitly
+- [ ] `reloadPassword` set via env var, never committed
+- [ ] Datasource credentials read from env, never in `config/settings.cfm`
+- [ ] `.env` in `.gitignore`; `.env.example` committed without values
+- [ ] `RateLimiter` middleware on public write endpoints
+- [ ] `Cors` middleware with an explicit origin allowlist if serving cross-origin
+- [ ] `showErrorInformation=false` and `showDebugInformation=false` in production
+- [ ] `trustProxy` set correctly on `RateLimiter` for your proxy topology
+- [ ] Lucee/Adobe security bulletins subscribed
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Middleware Pipeline"
+    href="/v4-0-0/core-concepts/middleware-pipeline/"
+    description="How middleware runs, composes, and scopes across routes."
+  />
+  <LinkCard
+    title="Rate Limiting"
+    href="/v4-0-0/digging-deeper/rate-limiting/"
+    description="Strategies, storage backends, and key functions for the RateLimiter middleware."
+  />
+  <LinkCard
+    title="CORS"
+    href="/v4-0-0/digging-deeper/cors/"
+    description="Cross-origin request handling with the Cors middleware."
+  />
+  <LinkCard
+    title="Authentication Patterns"
+    href="/v4-0-0/digging-deeper/authentication-patterns/"
+    description="Session, JWT, and token strategies for HTML and JSON apps."
+  />
+</CardGrid>

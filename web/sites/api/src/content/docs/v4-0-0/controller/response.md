@@ -1,0 +1,22 @@
+---
+title: response()
+description: "Returns content that Wheels will send to the client in response to the request."
+sidebar:
+  label: response()
+  order: 0
+---
+
+## Signature
+
+`response()` — returns `string`
+
+**Available in:** `controller`
+**Category:** Rendering Functions
+
+## Description
+
+Returns content that Wheels will send to the client in response to the request.
+
+
+
+

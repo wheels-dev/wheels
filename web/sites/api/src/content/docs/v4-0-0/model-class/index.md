@@ -1,0 +1,52 @@
+---
+title: Model Class
+description: "47 Model Class functions in Wheels 4.0.0."
+---
+
+- [`associationInfo()`](/v4-0-0/model-class/associationinfo/) — Returns a struct containing all association definitions for this model.
+- [`associationNames()`](/v4-0-0/model-class/associationnames/) — Returns a list of association names defined on this model.
+- [`average()`](/v4-0-0/model-class/average/) — Calculates the average value for a given property.
+- [`callbackInfo()`](/v4-0-0/model-class/callbackinfo/) — Returns a struct containing all callback definitions for this model, keyed by callback type
+- [`classInfo()`](/v4-0-0/model-class/classinfo/) — Returns a comprehensive struct of all model metadata suitable for code generation and introspection tools.
+- [`columnDataForProperty()`](/v4-0-0/model-class/columndataforproperty/) — Returns a struct with data for the named property.
+- [`columnForProperty()`](/v4-0-0/model-class/columnforproperty/) — Returns the column name mapped for the named model property.
+- [`columnNames()`](/v4-0-0/model-class/columnnames/) — Returns a list of column names in the table mapped to this model.
+- [`columns()`](/v4-0-0/model-class/columns/) — Returns an array of columns names for the table associated with this class.
+- [`count()`](/v4-0-0/model-class/count/) — Returns the number of rows that match the arguments (or all rows if no arguments are passed in).
+- [`create()`](/v4-0-0/model-class/create/) — Creates a new object, saves it to the database (if the validation permits it), and returns it.
+- [`deleteAll()`](/v4-0-0/model-class/deleteall/) — Deletes all records that match the <code>where</code> argument.
+- [`deleteByKey()`](/v4-0-0/model-class/deletebykey/) — Finds the record with the supplied key and deletes it.
+- [`deleteOne()`](/v4-0-0/model-class/deleteone/) — Gets an object based on conditions and deletes it.
+- [`enumInfo()`](/v4-0-0/model-class/enuminfo/) — Returns a struct containing all enum definitions for this model.
+- [`exists()`](/v4-0-0/model-class/exists/) — Checks if a record exists in the table.
+- [`findAll()`](/v4-0-0/model-class/findall/) — Returns records from the database table mapped to this model according to the arguments passed in (use the <code>where</
+- [`findAllKeys()`](/v4-0-0/model-class/findallkeys/) — Returns all primary key values in a list.
+- [`findByKey()`](/v4-0-0/model-class/findbykey/) — Fetches the requested record by primary key and returns it as an object.
+- [`findEach()`](/v4-0-0/model-class/findeach/) — Processes large result sets one record at a time without loading everything into memory.
+- [`findFirst()`](/v4-0-0/model-class/findfirst/) — Fetches the first record ordered by primary key value.
+- [`findInBatches()`](/v4-0-0/model-class/findinbatches/) — Processes large result sets in batches without loading everything into memory at once.
+- [`findLastOne()`](/v4-0-0/model-class/findlastone/) — Fetches the last record ordered by primary key value.
+- [`findOne()`](/v4-0-0/model-class/findone/) — Fetches the first record found based on the <code>WHERE</code> and <code>ORDER BY</code> clauses.
+- [`getTableNamePrefix()`](/v4-0-0/model-class/gettablenameprefix/) — Returns the table name prefix set for the table.
+- [`insertAll()`](/v4-0-0/model-class/insertall/) — Inserts multiple records into the database in a single batch operation.
+- [`invokeWithTransaction()`](/v4-0-0/model-class/invokewithtransaction/) — Runs the specified method within a single database transaction.
+- [`isClass()`](/v4-0-0/model-class/isclass/) — Use this method to check whether you are currently in a class-level object.
+- [`isInstance()`](/v4-0-0/model-class/isinstance/) — Use this method to check whether you are currently in an instance object.
+- [`maximum()`](/v4-0-0/model-class/maximum/) — Calculates the maximum value for a given property.
+- [`minimum()`](/v4-0-0/model-class/minimum/) — Calculates the minimum value for a given property.
+- [`new()`](/v4-0-0/model-class/new/) — Creates a new object based on supplied <code>properties</code> and returns it.
+- [`onMissingMethod()`](/v4-0-0/model-class/onmissingmethod/) — This method is not designed to be called directly from your code, but provides functionality for dynamic finders such as
+- [`primaryKey()`](/v4-0-0/model-class/primarykey/) — Returns the name of the primary key for this model's table.
+- [`primaryKeys()`](/v4-0-0/model-class/primarykeys/) — Alias for <code>primaryKey()</code>.
+- [`propertyNames()`](/v4-0-0/model-class/propertynames/) — Returns a list of property names ordered by their respective column's ordinal position in the database table.
+- [`save()`](/v4-0-0/model-class/save/) — Saves the object if it passes validation and callbacks.
+- [`scopeInfo()`](/v4-0-0/model-class/scopeinfo/) — Returns a struct containing all named scope definitions for this model.
+- [`sum()`](/v4-0-0/model-class/sum/) — Calculates the sum of values for a given property.
+- [`tableName()`](/v4-0-0/model-class/tablename/) — Returns the name of the database table that this model is mapped to.
+- [`updateAll()`](/v4-0-0/model-class/updateall/) — Updates all properties for the records that match the <code>where</code> argument.
+- [`updateByKey()`](/v4-0-0/model-class/updatebykey/) — Finds the object with the supplied <code>key</code> and saves it (if validation permits it) with the supplied <code>prop
+- [`updateOne()`](/v4-0-0/model-class/updateone/) — Gets an object based on the arguments used and updates it with the supplied <code>properties</code>.
+- [`upsertAll()`](/v4-0-0/model-class/upsertall/) — Inserts or updates multiple records in a single batch operation (upsert).
+- [`validationInfo()`](/v4-0-0/model-class/validationinfo/) — Returns a struct containing all validation rules for this model, keyed by trigger (<code>onSave</code>, <code>onCreate</
+- [`validationTypeForProperty()`](/v4-0-0/model-class/validationtypeforproperty/) — Returns the validation type for the property.
+- [`withAdvisoryLock()`](/v4-0-0/model-class/withadvisorylock/) — Executes a callback while holding a database advisory lock.

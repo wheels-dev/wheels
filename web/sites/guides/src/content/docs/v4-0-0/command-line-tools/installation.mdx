@@ -1,0 +1,205 @@
+---
+title: Installation
+description: Install the wheels binary via Homebrew (macOS), .deb/.rpm (Linux), Scoop (Windows), or a manual JAR download, and verify your setup.
+type: reference
+sidebar:
+  order: 2
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The `wheels` binary is distributed through four channels: Homebrew for macOS, `.deb`/`.rpm` packages for Linux, Scoop for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
+
+**You'll use this for:**
+
+- First-time setup on a new machine.
+- Verifying that `wheels --version` runs before you start work.
+- Upgrading the CLI when a new LuCLI or Wheels Module release lands.
+- Troubleshooting PATH and `JAVA_HOME` issues on macOS Apple Silicon or a stripped-down Linux host.
+
+## Requirements
+
+The CLI runs on Java 21. On macOS the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper. On Linux the `.deb`/`.rpm` package declares OpenJDK 21 as a runtime dependency, so `apt`/`dnf` pulls it in alongside `wheels`. The wrapper probes `/usr/lib/jvm/` for a Java 21 install and exports `JAVA_HOME` itself. If you're installing manually — or on Windows without Scoop — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
+
+```bash title="illustrative — system JDK setup"
+brew install openjdk@21
+java -version
+```
+
+You should see `openjdk version "21.0.x"` in the output. On Apple Silicon macOS, Homebrew's `openjdk@21` isn't symlinked into `/usr/bin/java` by default — the wheels formula handles this by exporting `JAVA_HOME` itself, but if you call `java` directly you'll need to set it manually.
+
+## macOS (Homebrew)
+
+Tap the formula repository and install:
+
+```bash title="illustrative — Homebrew install"
+brew tap wheels-dev/wheels
+brew install wheels
+```
+
+The formula (`wheels-dev/wheels`) pins a specific LuCLI release and a matching Wheels Module tarball. At install time, Homebrew downloads both and stages the module under `$(brew --prefix)/opt/wheels/share/wheels/module/`. It does not copy the module into your home directory yet — that happens on first run.
+
+The first time you invoke `wheels`, the wrapper:
+
+1. Compares the staged module version against `~/.wheels/modules/wheels/.module-version`.
+2. If the versions don't match (or the destination doesn't exist), it copies the module into `~/.wheels/modules/wheels/`.
+3. Exports `LUCLI_HOME=$HOME/.wheels` so all runtime state — installed modules, running servers, resolved deps, stored secrets — lives under that directory and stays isolated from any standalone LuCLI install.
+4. Exports `JAVA_HOME` pointing at the Homebrew-installed `openjdk@21`.
+5. Execs the LuCLI launcher with your arguments.
+
+On upgrades (`brew upgrade wheels`), the staged module version bumps; the next `wheels` invocation notices the mismatch and refreshes `~/.wheels/modules/wheels/` in place.
+
+## Linux (`.deb` / `.rpm`)
+
+Wheels ships native packages for x86_64 Debian/Ubuntu (`.deb`) and Fedora/RHEL (`.rpm`) hosts on every release. Both are built by `nfpm` on the release workflow and uploaded to the GitHub Release alongside the zip/tar artifacts. The package declares an OpenJDK 21 runtime dependency so `apt`/`dnf` pulls a JDK in automatically when needed.
+
+Install the latest stable release:
+
+```bash title="illustrative — Debian / Ubuntu"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+```
+
+```bash title="illustrative — Fedora / RHEL"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+```
+
+The package lays down `/usr/bin/wheels` (a shell wrapper), `/opt/wheels/lucli` (the LuCLI launcher), `/opt/wheels/module/` (the staged Wheels Module), and `/opt/wheels/sqlite-jdbc.jar` (auto-staged into Lucee Express on first run). The wrapper mirrors the Homebrew flow: probes `/usr/lib/jvm/` for OpenJDK 21, exports `LUCLI_HOME=$HOME/.wheels`, syncs the staged module into `~/.wheels/modules/wheels/` on first run or version mismatch, then execs LuCLI.
+
+The bleeding-edge channel publishes `.deb`/`.rpm` to [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) on every merge to `develop`. Every release there is a GitHub *pre-release*, so `api.github.com/.../releases/latest` returns nothing — use `/releases` and take the first entry. The asset filename also differs: snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`) but the on-disk asset name uses a dot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. The substitution converts the tag's hyphen-form to the URL's dot-form:
+
+```bash title="illustrative — Debian / Ubuntu (bleeding-edge)"
+SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
+sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+```
+
+```bash title="illustrative — Fedora / RHEL (bleeding-edge)"
+SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+```
+
+The version metadata *inside* the `.deb`/`.rpm` preserves the canonical `~snapshot.N` form, so `dpkg --compare-versions` and `rpmvercmp` order pre-releases below the next GA correctly.
+
+<Aside type="note" title="Native apt/yum repositories">
+The download-and-install flow above is the v4.0 GA story. Native `apt`/`yum` repositories at `apt.wheels.dev` and `yum.wheels.dev` are on the v4.0.x roadmap — once they're live, you'll be able to add a sources list once and `sudo apt install wheels` / `sudo dnf install wheels` will pull new versions automatically via `apt update`. The package format on disk doesn't change.
+</Aside>
+
+<Aside type="caution" title="Trust model during Phase 1">
+Until the native repos are live, download integrity relies on GitHub's HTTPS transport — the `.deb`/`.rpm` artifacts ship without detached GPG signatures, so neither `apt-key` nor `rpm --checksig` has anything to verify against. Phase 2 introduces a GPG-signed apt/yum repository (the signing key will live in 1Password and be published at `apt.wheels.dev/wheels.gpg`), which will add cryptographic provenance on top of TLS. For now, treat `wheels-dev/wheels/releases` as the trust root.
+</Aside>
+
+## Windows (Scoop)
+
+Wheels ships on Windows through [Scoop](https://scoop.sh) — a portable, sandboxed package manager that fits the project's release cadence (hourly autoupdate for both stable and bleeding-edge channels). The legacy Chocolatey path is no longer supported; the old v1.x `wheels` package at `community.chocolatey.org/packages/wheels` is the CommandBox-based release and won't drive a v4 tutorial.
+
+```powershell
+scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
+
+# Pick a channel:
+scoop install wheels        # stable - tracks GA tags
+scoop install wheels-be     # bleeding-edge - tracks every develop merge
+
+wheels --version
+```
+
+Both packages depend on `java/openjdk21` (Scoop pulls it automatically) and expose the same `wheels` PATH shim — Scoop refuses to install both at once. To switch channels:
+
+```powershell
+scoop uninstall wheels && scoop install wheels-be
+scoop uninstall wheels-be && scoop install wheels
+```
+
+See [Release Channels](/v4-0-0/start-here/release-channels/) for the full channel comparison.
+
+The Scoop bucket lives at [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels). The bucket's `checkver`/`autoupdate` blocks pull new versions from GitHub Releases hourly via the community [Excavator](https://github.com/ScoopInstaller/Excavator) bot — no manual maintenance per release.
+
+WinGet support (`winget install Wheels.Wheels`) is planned for post-v4.0.0 GA once a proper installer artifact is built. Until then, use Scoop.
+
+## Manual JAR install
+
+If Homebrew and Scoop don't fit your environment — a locked-down CI host, a Docker image, or a Windows box where Scoop isn't an option — you can wire the pieces up directly. The install has two independent artifacts:
+
+1. **LuCLI launcher.** Download from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases). Pick the asset matching your OS — `lucli-<version>-macos`, `lucli-<version>-linux`, or `lucli-<version>.bat` on Windows. Rename it to `wheels` (or `wheels.bat`) so LuCLI's binary-name detection activates the Wheels branding, and drop it somewhere on your `PATH`.
+
+2. **Wheels Module.** Download `wheels-module-<version>.tar.gz` (or `.zip` on Windows) from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases). Extract it into `~/.wheels/modules/wheels/`:
+
+   ```bash title="illustrative — manual module extract"
+   mkdir -p ~/.wheels/modules/wheels
+   tar -xzf wheels-module-*.tar.gz -C ~/.wheels/modules/wheels/
+   ```
+
+3. **Environment.** Export `JAVA_HOME` to your JDK 21 install and `LUCLI_HOME` to `$HOME/.wheels`:
+
+   ```bash title="illustrative — environment variables"
+   export JAVA_HOME=/path/to/jdk-21
+   export LUCLI_HOME=$HOME/.wheels
+   ```
+
+   Persist these in your shell profile (`~/.zshrc`, `~/.bashrc`, or `$PROFILE` on PowerShell).
+
+Pick LuCLI and Wheels Module versions that are known to be paired — the Homebrew formula's `LUCLI_VERSION` and `MODULE_VERSION` constants in [`Formula/wheels.rb`](https://github.com/wheels-dev/homebrew-wheels/blob/main/Formula/wheels.rb) are the canonical source for "what's currently shipping together."
+
+## Verifying installation
+
+After any of the four paths, confirm the binary resolves and reports a version:
+
+```bash {test:cli cmd="wheels --version" asserts-output="Wheels"}
+wheels --version
+```
+
+You should see something like:
+
+``` title="illustrative — example version output"
+Wheels 4.0.0-SNAPSHOT+1523 (snapshot)
+LuCLI 0.3.7
+Java 21.0.8
+```
+
+The three-line format tells you the Wheels Module version, the underlying LuCLI version, and the JVM the wrapper picked up. If any of those lines is missing or reports an unexpected value, jump to troubleshooting below.
+
+Once the version check passes, `wheels info` inside a Wheels project gives you a deeper sanity check against a real app — datasource connection, environment, route count. See [App Inspection](../wheels-commands/app-inspection/) for the full output and how to read it.
+
+## Troubleshooting
+
+### `JAVA_HOME` not set or points at the wrong JDK
+
+The Homebrew wrapper sets `JAVA_HOME` inside its own process, so a missing or wrong `JAVA_HOME` in your shell doesn't break `wheels`. But if you're calling `java` directly — or running a manual install — the CLI fails fast with a "Java 21 required" message when `JAVA_HOME` isn't pointed at a JDK 21 install. On Apple Silicon macOS, Homebrew stages `openjdk@21` at `/opt/homebrew/Cellar/openjdk@21/<version>/libexec/openjdk.jdk/Contents/Home`; export that path and re-run.
+
+### `wheels: command not found` after install
+
+On macOS, Homebrew's shim directory has to be on your `PATH` — `/opt/homebrew/bin` on Apple Silicon, `/usr/local/bin` on Intel. Run `brew --prefix` to confirm, check your `PATH`, and add the shim directory if it's missing. A fresh shell (`exec $SHELL -l`) often fixes this without any config change.
+
+On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be on every user's default `PATH`. If it isn't, run `dpkg -L wheels` (Debian/Ubuntu) or `rpm -ql wheels` (Fedora/RHEL) to confirm the package landed and the binary is at the expected path. A reopened shell (`exec $SHELL -l`) clears any stale `PATH` cache from the previous session.
+
+### Conflict with a standalone LuCLI install sharing `~/.lucli/`
+
+The wheels formula deliberately isolates runtime state under `~/.wheels/` (via `LUCLI_HOME`) so a standalone `lucli` install — which uses `~/.lucli/` — stays out of the way. If you previously had LuCLI installed directly and see odd module-resolution errors, check that the wrapper set `LUCLI_HOME` correctly (`wheels system env` will dump the resolved environment) and that `~/.wheels/modules/wheels/` contains a current `Module.cfc` and `.module-version` file.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Quick Start"
+    href="../quick-start/"
+    description="From a fresh shell to a running Wheels app in under five minutes."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../configuration/"
+    description="Profiles, environment, module.json — how LuCLI and the Wheels Module are configured."
+  />
+  <LinkCard
+    title="Creating a Project"
+    href="../wheels-commands/creating-a-project/"
+    description="wheels new and wheels create app — scaffolding a fresh Wheels project after install."
+  />
+</CardGrid>

@@ -1,0 +1,45 @@
+---
+title: "wheels deploy proxy boot"
+description: First-time install of the kamal-proxy singleton on every host.
+type: reference
+sidebar:
+  label: "boot"
+  order: 1
+---
+
+Install and run the `kamal-proxy` singleton on every host. First-run verb — pair with [`setup`](/v4-0-1-snapshot/command-line-tools/commands/deploy/setup/) which calls this automatically.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy proxy boot [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+For every host across every role (the proxy is a per-host singleton):
+
+``` title="docker command issued per host"
+docker run -d --restart unless-stopped \
+  --name kamal-proxy \
+  --network kamal \
+  --publish 80:80 --publish 443:443 \
+  -v /home/<user>/.config/kamal-proxy:/config \
+  basecamp/kamal-proxy:v0.8.6 \
+  run
+```
+
+Fails fast if port 80 or 443 is occupied on any host.
+
+## Example
+
+```bash title="example"
+wheels deploy proxy boot
+```

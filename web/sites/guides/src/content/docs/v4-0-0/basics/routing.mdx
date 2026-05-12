@@ -1,0 +1,156 @@
+---
+title: Routing
+description: Define routes — resources, nested resources, namespaced routes, custom patterns, and route helpers.
+type: howto
+sidebar:
+  order: 1
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Define the URL surface of your app in `config/routes.cfm`. This page shows how to wire simple routes, resource routes, nested resources, namespaced sections, and pattern constraints — then how to call the matching helpers from your views and controllers.
+
+**You'll learn:**
+
+- How to define a single route with `get`, `post`, `patch`, `delete`
+- How `resources()` produces seven REST routes in one line
+- How to nest resources and namespace an admin section
+- How to constrain placeholder patterns with regex
+- Which helper reads which route at call time
+
+<Aside type="note">
+  You should already know how the router matches URLs from [How Routing Works](/v4-0-0/core-concepts/how-routing-works/). This page is the hands-on version — every example is a real `config/routes.cfm` fragment.
+</Aside>
+
+## Define a simple route
+
+`config/routes.cfm` is a plain CFM file loaded at boot. Wrap the mapper DSL in `<cfscript>`; call `mapper()`, chain matchers, and close with `.end()`. The minimum useful route is a single `get` with a name, a pattern, and a controller#action target.
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .get(name="hello", pattern="/hello", to="main##hello")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+`name="hello"` is the handle your helpers pass — `linkTo(route="hello")` builds the URL, `redirectTo(route="hello")` navigates to it. `pattern="/hello"` is the URL shape. `to="main##hello"` is the double-hash form of `controller##action` (two hashes because CFML treats a single `#` as an expression delimiter). `.wildcard()` is the catch-all that always comes last.
+
+## Resource routes
+
+`resources()` is where most routing happens. One call generates seven REST routes plus the named helpers that go with them.
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .resources(name="posts", binding=true)
+    .root(to="posts##index", method="get")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+This gives you `GET /posts`, `GET /posts/new`, `POST /posts`, `GET /posts/:key`, `GET /posts/:key/edit`, `PATCH /posts/:key`, and `DELETE /posts/:key` — plus the named routes `posts`, `newPost`, `post`, and `editPost`. `binding=true` turns on route model binding: the member actions (`show`, `edit`, `update`, `delete`) see a pre-loaded `params.post` instance without calling `findByKey` themselves.
+
+## Trim the resource with `only` or `except`
+
+Skip the actions you don't need. Pass `only="..."` to allow-list, or `except="..."` to deny-list.
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .resources(name="comments", only="create")
+    .resources(name="posts", except="delete")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+`comments` gets one route (`POST /comments`). `posts` gets six (every REST action except `DELETE /posts/:key`). The named routes that correspond to trimmed-away actions don't exist — `linkTo(route="newComment")` would throw `Wheels.RouteNotFound` in the first example.
+
+## Nested resources
+
+To build a URL like `/posts/:postKey/comments`, nest the inner resource via the `callback` argument. Wheels passes the mapper in; call `.resources()` on that parameter, not on the outer `mapper()`.
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .resources(name="posts", callback=function(map) {
+        map.resources(name="comments", only="create");
+    })
+    .wildcard()
+.end();
+</cfscript>
+```
+
+The nested resource produces `POST /posts/:postKey/comments → comments##create` with named route `postComments`. Inside the `Comments` controller, the parent key is available as `params.postKey`. Rails-style inline blocks (`.resources("posts", function(r) { ... })`) are not supported — use the `callback=` named argument.
+
+## Namespaced sections
+
+Group a set of controllers under a shared URL prefix and a subfolder. `.namespace(name="admin")` prefixes URLs with `/admin` and loads controllers from `app/controllers/admin/`.
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .namespace(name="admin", callback=function(map) {
+        map.resources("posts");
+    })
+    .resources("posts")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+URLs become `/admin/posts`, `/admin/posts/:key`, and so on; the controller class is `admin/Posts.cfc`. The outer `.resources("posts")` still serves the public `/posts` URLs — namespaces don't replace the non-namespaced routes, they sit alongside them.
+
+## Constrain pattern placeholders
+
+Pattern placeholders are written as `[name]`. By default any non-slash string matches. Pass a `constraints` struct to restrict a placeholder to a regex.
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .get(
+        name="postArchive",
+        pattern="/posts/[year]/[month]",
+        to="posts##archive",
+        constraints={year="\d{4}", month="\d{2}"}
+    )
+    .resources("posts")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+With the constraint, `/posts/2026/04` matches and fills `params.year="2026"`, `params.month="04"`. `/posts/foo/bar` does not match — the router moves on to the next route. Without the constraint, `/posts/foo/bar` would match and `params.year="foo"`.
+
+## Route helpers
+
+Every route with a `name` is reachable by name from anywhere in your app. The helpers take the name, resolve it to a URL, and fill in placeholders from named arguments.
+
+- `linkTo(route="post", key=post.id, text="View")` — renders an `<a href="/posts/123">`
+- `urlFor(route="newPost")` — returns the URL string
+- `redirectTo(route="posts")` — 302 redirect in a controller action
+- `buttonTo(route="post", key=post.id, text="Delete", method="delete")` — small form for non-GET verbs
+- `startFormTag(route="post", key=post.id, method="put")` — opens a form that posts to the route
+
+Rename the resource once in `routes.cfm` and every helper updates. See [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/) for `startFormTag` examples in context.
+
+## Listing all routes
+
+When a route isn't matching what you expect, print the registered route table. `wheels routes` shows every route's method, path, controller#action, and name. For a smoke test that your CLI is installed and responding:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+Then in your app directory, run `wheels routes` to see the full table.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="How Routing Works" href="/v4-0-0/core-concepts/how-routing-works/" description="The match algorithm, resource expansion, and route model binding." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="Where route params land and what to do with them." />
+  <LinkCard title="Middleware Pipeline" href="/v4-0-0/core-concepts/middleware-pipeline/" description="What runs before the router sees the request." />
+</CardGrid>

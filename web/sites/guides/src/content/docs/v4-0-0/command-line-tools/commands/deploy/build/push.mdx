@@ -1,0 +1,39 @@
+---
+title: "wheels deploy build push"
+description: docker build + docker push on the control machine.
+type: reference
+sidebar:
+  label: "push"
+  order: 2
+---
+
+Build the image locally and push it to the configured registry. Runs on the control machine; no SSH, no remote hosts.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy build push [--version=<v>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | Tag for the pushed image. Defaults to git short sha. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the `docker build` + `docker push` commands without executing. |
+
+## Behavior
+
+Uses the `builder:` block in `deploy.yml`:
+
+1. `docker build` with `context`, `dockerfile`, `args`, and `arch` from config.
+2. `docker push <image>:<version>`.
+
+If `builder.remote:` is set, the build happens on the remote builder over SSH instead of locally. Multi-arch builds require `docker buildx` (run [`build create`](/v4-0-0/command-line-tools/commands/deploy/build/create/) once).
+
+## Example
+
+```bash title="example"
+wheels deploy build push
+```

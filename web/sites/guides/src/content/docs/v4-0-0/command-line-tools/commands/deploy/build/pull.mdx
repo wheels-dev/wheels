@@ -1,0 +1,36 @@
+---
+title: "wheels deploy build pull"
+description: docker pull the image on every host in parallel.
+type: reference
+sidebar:
+  label: "pull"
+  order: 3
+---
+
+`docker pull <image>:<version>` on every host in every role, in parallel.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy build pull [--version=<v>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | Version to pull. Defaults to git short sha. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Fans out over SSH. Each host pulls independently; a slow host doesn't block the others.
+
+Assumes the image is already pushed — use [`build push`](/v4-0-0/command-line-tools/commands/deploy/build/push/) first, or [`build deliver`](/v4-0-0/command-line-tools/commands/deploy/build/deliver/) for both.
+
+## Example
+
+```bash title="example"
+wheels deploy build pull --version=abc1234
+```

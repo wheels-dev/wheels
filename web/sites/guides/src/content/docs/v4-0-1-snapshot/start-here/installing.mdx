@@ -1,0 +1,311 @@
+---
+title: Installing Wheels
+description: Install the Wheels CLI on macOS, Windows, or Linux.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, Tabs, TabItem, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Install the `wheels` CLI. Five minutes.
+
+**You'll learn:**
+
+- How to install Wheels on macOS, Windows, or Linux
+- How to verify the install worked
+- How to upgrade later
+
+<Aside type="tip" title="Adobe ColdFusion or BoxLang user?">
+The `wheels` CLI bundles a Lucee runtime — that's the easiest path for development and what the rest of these docs assume. The framework itself runs on Adobe ColdFusion 2023/2025 and BoxLang too; you'll use CommandBox to manage the engine instead of the bundled CLI. See [CFML Engines](/v4-0-1-snapshot/start-here/cfml-engines/) for the setup.
+</Aside>
+
+<Aside type="note">
+  **Prerequisite:** Java 21 or newer. `wheels` bundles a CFML runtime (Lucee) that targets JDK 21. Install it from [Adoptium](https://adoptium.net/) if you don't already have it, or on macOS:
+
+  ```bash title="your shell"
+  brew install openjdk@21
+  ```
+
+  On macOS, `openjdk@21` is keg-only — Homebrew won't symlink it into `/opt/homebrew`. The `wheels` CLI handles this itself, but if you want to call `java` directly (or use it from an IDE, Maven, Gradle, etc.) you'll also need to set `JAVA_HOME` and add it to your `PATH`. See [Troubleshooting](#troubleshooting) below.
+</Aside>
+
+## Choose a channel
+
+Wheels ships on two parallel channels. The instructions below install **stable** (`wheels`) — the right pick for ~95% of users. If you want bleeding-edge (`wheels-be`, tracks every merge to `develop`), see [Release Channels](/v4-0-1-snapshot/start-here/release-channels/) for the comparison and install steps.
+
+The two are mutually exclusive — both expose the `wheels` binary. You install one, not both. You can switch later without losing any of your already-scaffolded apps.
+
+## Install the CLI
+
+<Tabs>
+
+<TabItem label="macOS" icon="apple">
+
+<Aside type="tip" title="Don't have Homebrew yet?">
+  The macOS steps below assume [Homebrew](https://brew.sh/) is installed. Check with:
+
+  ```bash title="your shell"
+  brew --version
+  ```
+
+  If you see "command not found", install Homebrew first using the official installer:
+
+  ```bash title="your shell"
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  ```
+
+  Heads-up while it runs:
+
+  - The installer asks for your account password — it needs `sudo` to create `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel).
+  - If Xcode Command Line Tools aren't already installed, the installer triggers them. That opens a system dialog and takes ~5–10 minutes before the brew install resumes.
+  - When the installer finishes, it prints a "Next steps" block with two commands you must run so `brew` lands on your `PATH`. On Apple Silicon those are:
+
+    ```bash title="your shell"
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+    ```
+
+    On Intel, replace `/opt/homebrew` with `/usr/local`.
+
+  Confirm with `brew --version` before continuing to step 1 below.
+
+  <Aside type="caution" title="Headless / non-interactive installs">
+    The official installer requires a TTY: it shells out to `sudo -n true` to check admin rights, which always prompts for a password and never succeeds in a non-interactive context (CI runners, provisioning scripts, agent shells, packer builds). Setting `NONINTERACTIVE=1` doesn't help — the sudo gate still fires. If you need to install Homebrew without a human at the keyboard, the supported options are:
+
+    - **User-prefix install (no sudo)**: `git clone https://github.com/Homebrew/brew ~/homebrew`, then add `~/homebrew/bin` to your `PATH`. Officially "unsupported" by the Homebrew team but works fine — the trade-off is no pre-built bottles, so every install becomes a source build (slower, sometimes much slower).
+    - **Pre-bake the image**: install Homebrew once interactively on a base image (Vagrant / Packer / Tart / Anka / VM template) and clone from there for headless work.
+    - **Provisioning frameworks**: Ansible's `community.general.homebrew` module and similar can drive an `expect`-style password prompt if you have a way to feed sudo credentials.
+
+    On a fresh agent/CI VM with no admin access, the path of least resistance is the user-prefix `git clone` install.
+  </Aside>
+</Aside>
+
+<Steps>
+
+1. Tap the Wheels Homebrew repo:
+
+   ```bash title="your shell"
+   brew tap wheels-dev/wheels
+   ```
+
+2. Install the CLI:
+
+   ```bash title="your shell"
+   brew install wheels
+   ```
+
+3. Verify:
+
+   ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+   wheels --version
+   ```
+
+   You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
+
+   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
+   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
+   </Aside>
+
+</Steps>
+
+</TabItem>
+
+<TabItem label="Windows" icon="seti:windows">
+
+<Aside type="caution" title="Don't run `choco install wheels`">
+The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x release and **cannot drive this tutorial**. Wheels v4 ships on Windows through [Scoop](https://scoop.sh) instead — see [CLI Installation](/v4-0-1-snapshot/command-line-tools/installation/#windows-scoop) for the full rationale.
+</Aside>
+
+<Steps>
+
+1. Install Scoop if you don't have it (skip if `scoop --version` already works):
+
+   ```powershell title="PowerShell"
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+   ```
+
+2. Add the Wheels bucket and install a channel:
+
+   ```powershell title="PowerShell"
+   scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
+   scoop install wheels        # stable - tracks v4.0.0 GA tags
+   # OR:
+   scoop install wheels-be     # bleeding-edge - tracks every develop merge
+   ```
+
+   Scoop pulls `java/openjdk21` automatically as a dependency. Both packages expose the same `wheels` shim on PATH — Scoop refuses to install both at once. See [Release Channels](/v4-0-1-snapshot/start-here/release-channels/) for the comparison.
+
+3. Verify:
+
+   ```powershell title="PowerShell"
+   wheels --version
+   ```
+
+   You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
+
+   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
+   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
+   </Aside>
+
+</Steps>
+
+Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI Installation → Manual JAR install](/v4-0-1-snapshot/command-line-tools/installation/#manual-jar-install) for the canonical version-pairing source.
+
+</TabItem>
+
+<TabItem label="Linux" icon="linux">
+
+Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repository at `apt.wheels.dev` / `yum.wheels.dev` is on the v4.0.x roadmap — until then, install the package directly from a GitHub Release. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
+
+<Aside type="caution" title="Trust model during Phase 1">
+During Phase 1 (before `apt.wheels.dev` / `yum.wheels.dev` are live), download integrity relies on GitHub's HTTPS transport — the `.deb`/`.rpm` artifacts ship without detached GPG signatures, so there's nothing for `apt-key` / `rpm --checksig` to verify against. Phase 2 adds GPG-signed apt/yum repositories. For now, `wheels-dev/wheels/releases` is the trust root.
+</Aside>
+
+<Steps>
+
+1. Download and install the latest Wheels release:
+
+   ```bash title="Debian / Ubuntu — stable"
+   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+   curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+   sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+   ```
+
+   ```bash title="Fedora / RHEL — stable"
+   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+   sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+   ```
+
+   <Aside type="note" title="Want bleeding-edge?">
+   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Because every release there is a GitHub *pre-release*, `api.github.com/.../releases/latest` returns nothing — use `/releases` and pick the first entry. Snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`); the on-disk asset filename uses a dot in the same slot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. Self-contained snippets:
+
+   ```bash title="Debian / Ubuntu — bleeding-edge"
+   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+   curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   ```
+
+   ```bash title="Fedora / RHEL — bleeding-edge"
+   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+   sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+   ```
+
+   The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-1-snapshot/start-here/release-channels/).
+   </Aside>
+
+2. Verify:
+
+   ```bash title="your shell"
+   wheels --version
+   ```
+
+   You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
+
+   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
+   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
+   </Aside>
+
+</Steps>
+
+</TabItem>
+
+</Tabs>
+
+## Upgrading
+
+<Tabs>
+
+<TabItem label="macOS" icon="apple">
+
+```bash title="your shell"
+brew update
+brew upgrade wheels
+```
+
+</TabItem>
+
+<TabItem label="Windows" icon="seti:windows">
+
+Upgrade through Scoop — it pulls the latest LuCLI launcher and Wheels Module from the [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) bucket:
+
+```powershell title="PowerShell"
+scoop update wheels
+# or, for the bleeding-edge channel:
+scoop update wheels-be
+```
+
+</TabItem>
+
+<TabItem label="Linux" icon="linux">
+
+Re-run the install command for your distro — `apt`/`dnf` upgrades the package in place when it sees a newer version:
+
+```bash title="Debian / Ubuntu"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+```
+
+```bash title="Fedora / RHEL"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+sudo dnf upgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+```
+
+For the bleeding-edge channel, run the install snippet from the [bleeding-edge Aside](#install-the-cli) — it points at `wheels-dev/wheels-snapshots` and `apt`/`dnf` will treat each new snapshot as an upgrade.
+
+The first `wheels` invocation after upgrade syncs the new framework module into `~/.wheels/modules/wheels/` automatically.
+
+</TabItem>
+
+</Tabs>
+
+## Troubleshooting
+
+**`wheels: command not found`**
+
+Your shell's `PATH` doesn't include the CLI. Restart your shell first — most installs only put the binary on `PATH` for new shell sessions. On macOS, confirm Homebrew's bin path is in `PATH`: `echo $PATH | tr ':' '\n' | grep brew`. On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be on every user's default `PATH`; if it's not, check `dpkg -L wheels` (Debian) or `rpm -ql wheels` (RHEL) to confirm the package installed and the binary is where expected.
+
+**`Error: unable to find Java runtime`**
+
+Install Java 21+ from [Adoptium](https://adoptium.net/). On macOS: `brew install openjdk@21`. The `wheels` wrapper resolves Java on its own, but anything else (`java -version`, IDEs, Maven, Gradle) needs `JAVA_HOME` and `PATH` set in your shell profile:
+
+```bash title="~/.zshrc or ~/.bashrc"
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
+If you installed from Adoptium directly instead of Homebrew, use whatever `/usr/libexec/java_home -v 21` prints for `JAVA_HOME`.
+
+**`brew: cask 'wheels' has no formulae to install from`**
+
+You skipped `brew tap wheels-dev/wheels`. Run the tap command, then re-run the install.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Your First 15 Minutes"
+    href="/v4-0-1-snapshot/start-here/first-15-minutes/"
+    description="Zero to a running page."
+  />
+  <LinkCard
+    title="Build a Blog"
+    href="/v4-0-1-snapshot/start-here/tutorial/"
+    description="The real introduction. Three and a half hours."
+  />
+  <LinkCard
+    title="Upgrading Wheels"
+    href="/v4-0-1-snapshot/upgrading/"
+    description="Move between Wheels versions."
+  />
+</CardGrid>

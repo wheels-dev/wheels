@@ -1,0 +1,207 @@
+---
+title: Functional Tests
+description: Single-feature end-to-end tests without a browser — route matching, middleware, filters, action, and view render through real HTTP.
+type: howto
+sidebar:
+  order: 6
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Functional tests exercise one feature slice through the entire server-side request pipeline — middleware, router, filters, action, view render — and assert on the response a browser would actually receive. They sit one layer below browser tests (no JavaScript) and one layer above controller tests (broader scope, same `TestClient`). This page walks the patterns: pipeline-level assertions, middleware effects, CORS and rate-limit verification, route model binding, filter-driven redirects, and validation error paths.
+
+**You'll learn:**
+
+- What functional tests verify that model, controller, and integration tests don't
+- How functional differs from integration — scope, not tooling
+- How to assert that middleware, the router, filters, the action, and the view all cooperate on one request
+- How to test middleware response effects (security headers, CORS, rate limits) through the real response
+- How to test error paths — 404 from route model binding, redirects from auth filters, 200 re-render from validation failures
+
+<Aside type="note">
+  You should already know the request lifecycle. See [The Request Lifecycle](/v4-0-1-snapshot/core-concepts/request-lifecycle/). For the testing runtime, see [Controller Tests](/v4-0-1-snapshot/testing/controller-tests/).
+</Aside>
+
+## Functional vs integration
+
+Both functional and integration tests use `TestClient` and hit the running app through real HTTP. The difference is scope — what question each kind of test is asking.
+
+An **integration test** covers a user journey. It chains several requests on one client, often across several controllers and sometimes with multiple users, and asserts the journey ends in the expected database state. That's the shape in [Integration Tests](/v4-0-1-snapshot/testing/integration-tests/).
+
+A **functional test** covers one feature slice end-to-end. One HTTP request, full pipeline — middleware runs, the router dispatches, filters fire, the action renders the view, the response comes back. It's broader than a [controller test](/v4-0-1-snapshot/testing/controller-tests/) (which asserts on the action in isolation) and narrower than an integration test (which chains requests). Reach for a functional test when you want to verify the whole server-side stack cooperates on one scenario — security headers present, the route matched the right action, filters behaved, the view rendered, the response shape is correct.
+
+## A functional spec — full pipeline exercise
+
+The canonical shape: one request, assertions that span the layers it crossed.
+
+```cfm {test:compile} title="tests/specs/functional/PostsShowSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts show — full request pipeline", () => {
+            it("matches the route, loads the record, renders the view", () => {
+                var post = model("Post").create(title="T", body="B", status="published");
+
+                $testClient().get("/posts/##post.id##")
+                    .assertOk()
+                    .assertHeader("Content-Type", "text/html; charset=UTF-8")
+                    .assertSee("<h1>T</h1>")
+                    .assertSee("B");
+            });
+        });
+    }
+}
+```
+
+The assertion chain reads as a trace of the request. `assertOk` confirms the router matched a real action and no filter short-circuited. `assertHeader` confirms the response came back as HTML, not JSON or a redirect. The two `assertSee` calls confirm the view actually rendered the record. If any layer misbehaves — a route typo, a filter that redirects, a view that swallowed the record — one of these fails and tells you which.
+
+## Testing middleware effects
+
+Middleware runs before the controller; whatever headers it adds show up on every response. The built-in `SecurityHeaders` middleware ships four headers by default — `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, and `Referrer-Policy` — and a functional test is the natural place to verify they actually arrive.
+
+```cfm {test:compile} title="tests/specs/functional/SecurityHeadersSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Security headers", () => {
+            it("applies default security headers on every response", () => {
+                $testClient().get("/posts")
+                    .assertOk()
+                    .assertHeader("X-Frame-Options", "SAMEORIGIN")
+                    .assertHeader("X-Content-Type-Options", "nosniff")
+                    .assertHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+            });
+        });
+    }
+}
+```
+
+`assertHeader(name)` (one argument) checks presence; `assertHeader(name, value)` checks the exact value. `Content-Security-Policy`, `Strict-Transport-Security`, and `Permissions-Policy` are opt-in — `SecurityHeaders` only emits them when you configure them explicitly (or, for HSTS, when the environment is `production`). Don't assert on opt-in headers unless your app turns them on.
+
+## Testing CORS
+
+With the `Cors` middleware registered for `allowOrigins="https://myapp.com"`, a functional test confirms the middleware sees the request `Origin` and returns the matching `Access-Control-Allow-Origin`.
+
+```cfm {test:compile} title="tests/specs/functional/CorsSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("CORS on /api", () => {
+            it("echoes the allowed origin on a real request", () => {
+                $testClient()
+                    .withHeader("Origin", "https://myapp.com")
+                    .get("/api/posts")
+                    .assertOk()
+                    .assertHeader("Access-Control-Allow-Origin", "https://myapp.com");
+            });
+        });
+    }
+}
+```
+
+`withHeader` attaches the request header; the assertion reads the response header the middleware set. See [CORS](/v4-0-1-snapshot/digging-deeper/cors/) for configuration options and preflight semantics.
+
+## Testing rate limits
+
+The `RateLimiter` middleware caps requests per window and returns `429 Too Many Requests` with a `Retry-After` header once the limit is exceeded. A functional test proves the limit actually triggers — fire requests until the response flips, then assert.
+
+```cfm {test:compile} title="tests/specs/functional/RateLimitSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Rate limit on /api", () => {
+            it("returns 429 after the window maxes out", () => {
+                var client = $testClient();
+
+                // bust through the limit
+                for (var i = 1; i <= 61; i++) {
+                    client.get("/api/posts");
+                    if (client.statusCode() == 429) break;
+                }
+
+                expect(client.statusCode()).toBe(429);
+                client.assertHeader("Retry-After");
+            });
+        });
+    }
+}
+```
+
+Reuse one client so the rate-limit key (by default, the client IP) stays stable across the loop. See [Rate Limiting](/v4-0-1-snapshot/digging-deeper/rate-limiting/) for strategies (`fixedWindow`, `slidingWindow`, `tokenBucket`) and storage options.
+
+## Testing route model binding
+
+With route model binding enabled, a request for a missing record returns a 404 before the action runs — the dispatcher throws `Wheels.RecordNotFound` when `findByKey` comes back empty. A functional test proves the whole chain wires up: the router extracted the key, the binder tried to load, the 404 handler rendered.
+
+```cfm {test:compile} title="tests/specs/functional/PostsNotFoundSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts show — missing record", () => {
+            it("returns 404 when the post doesn't exist", () => {
+                $testClient().get("/posts/999999")
+                    .assertNotFound();
+            });
+        });
+    }
+}
+```
+
+`assertNotFound()` is sugar for `assertStatus(404)`. See [Route Model Binding](/v4-0-1-snapshot/digging-deeper/route-model-binding/) for how binding resolves the key into `params.post`.
+
+## Testing authentication filters
+
+A `before` filter that redirects unauthenticated users produces a 302 response, not a rendered view. The TestClient doesn't auto-follow redirects — `assertRedirect` inspects the `Location` header on the intercepted response.
+
+```cfm {test:compile} title="tests/specs/functional/PostsNewAuthSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts new — unauthenticated", () => {
+            it("redirects to /login", () => {
+                $testClient().get("/posts/new")
+                    .assertRedirect(to="/login");
+            });
+        });
+    }
+}
+```
+
+A functional test here covers more than the filter alone — it confirms the route mapped `GET /posts/new` to `new`, the filter fired before the action, and the redirect target is literally the login URL. A controller-level filter test could assert the filter's return value, but only a functional test proves the whole chain responds with `Location: /login`.
+
+## Testing validation error paths
+
+A failing validation re-renders the form with the submitted values and error messages. Wheels convention is to return 200 with the `new` or `edit` template, not a 422 — the request succeeded in the HTTP sense; the domain object failed to save.
+
+```cfm {test:compile} title="tests/specs/functional/PostsCreateInvalidSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts create — validation failure", () => {
+            it("re-renders the new form with error messages", () => {
+                $testClient()
+                    .post("/posts", {"post[title]": "", "post[body]": "B"})
+                    .assertOk()
+                    .assertSee("can")
+                    .assertSee("t be empty");
+            });
+        });
+    }
+}
+```
+
+The split assertion sidesteps an apostrophe-encoding gotcha: Wheels HTML-escapes error messages, so `can't` renders as `can&##39;t`. A single `assertSee("can't be empty")` would miss the encoded form. `assertSeeInOrder(["can", "t be empty"])` is an equivalent one-liner when you want to assert the two fragments appear in that order.
+
+## When to choose functional over integration
+
+- **Functional:** "Does *this feature* work end-to-end?" One HTTP request, one spec, full server-side pipeline.
+- **Integration:** "Does *this user journey* work?" Multiple requests chained on one (or several) clients, often across several controllers.
+- Both run through `TestClient` against real HTTP; scope is the only difference. Functional tests catch regressions in the middleware-router-filter-action-view seam; integration tests catch regressions across journeys that span features.
+
+A rough heuristic: if the spec title reads like a single feature statement ("attaches CORS headers for allowed origins", "re-renders the new form on validation failure"), it's functional. If it reads like a verb phrase describing what a user does ("signs up, posts, and comments"), it's integration.
+
+## When to choose browser over functional
+
+Functional tests cover the server side only — what HTML the server ships on the first request. They can't exercise JavaScript, Turbo Frame/Stream swaps, client-side validation, or form submissions wired to `fetch`. For any flow whose behaviour emerges in the browser after the initial HTML, write a browser test instead. For pure server-rendered flows — classic form POST, redirect, GET — functional tests cover the same ground an order of magnitude faster. See [Browser Tests](/v4-0-1-snapshot/testing/browser-tests/) for the Playwright-backed DSL.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Integration Tests" href="/v4-0-1-snapshot/testing/integration-tests/" description="Multi-step workflows, cookie-jar session state, and cross-controller assertions on database state." />
+  <LinkCard title="Controller Tests" href="/v4-0-1-snapshot/testing/controller-tests/" description="Single-action response shape, redirects, filters, flash messages, and JSON responses." />
+  <LinkCard title="Browser Tests" href="/v4-0-1-snapshot/testing/browser-tests/" description="Real browser automation via Playwright for JavaScript, Turbo, and UI-driven flows." />
+  <LinkCard title="Middleware Pipeline" href="/v4-0-1-snapshot/core-concepts/middleware-pipeline/" description="How middleware wraps every request — the layer your functional tests exercise before the controller." />
+</CardGrid>

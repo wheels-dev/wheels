@@ -1,0 +1,90 @@
+---
+title: "wheels deploy"
+description: The wheels deploy verb surface — 25 top-level verbs plus nine subcommand groups, mirrored from Kamal 2.4.0.
+type: reference
+sidebar:
+  order: 11
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`wheels deploy` is the Kamal-compatible deploy orchestrator built into the Wheels CLI. Every verb runs locally on the control machine — there is no agent on the target hosts. Commands fan out over SSH, stream prefixed output back, and honor `--dry-run` uniformly.
+
+For the end-to-end walk, start at [Your First Deploy](/v4-0-1-snapshot/deployment/first-deploy/). For the configuration schema, see [deploy.yml Reference](/v4-0-1-snapshot/deployment/config-reference/). This page is the dry verb index.
+
+## Top-level verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`wheels deploy`](/v4-0-1-snapshot/command-line-tools/commands/deploy/deploy/) | Rolling zero-downtime deploy. The everyday verb. |
+| [`wheels deploy setup`](/v4-0-1-snapshot/command-line-tools/commands/deploy/setup/) | First-run deploy — includes proxy and accessory boot. |
+| [`wheels deploy redeploy`](/v4-0-1-snapshot/command-line-tools/commands/deploy/redeploy/) | Re-run the deploy flow without version bump. |
+| [`wheels deploy rollback`](/v4-0-1-snapshot/command-line-tools/commands/deploy/rollback/) | Route traffic back to a previous version. |
+| [`wheels deploy config`](/v4-0-1-snapshot/command-line-tools/commands/deploy/config/) | Print the resolved `deploy.yml` config. |
+| [`wheels deploy init`](/v4-0-1-snapshot/command-line-tools/commands/deploy/init/) | Stamp out `deploy.yml` and `.kamal/secrets`. |
+| [`wheels deploy version`](/v4-0-1-snapshot/command-line-tools/commands/deploy/version/) | Show the mirrored Kamal and kamal-proxy versions. |
+| [`wheels deploy audit`](/v4-0-1-snapshot/command-line-tools/commands/deploy/audit/) | Tail the on-host audit log. |
+| [`wheels deploy details`](/v4-0-1-snapshot/command-line-tools/commands/deploy/details/) | Aggregate app + proxy + accessory state. |
+| [`wheels deploy docs`](/v4-0-1-snapshot/command-line-tools/commands/deploy/docs/) | Print embedded per-topic help. |
+| [`wheels deploy remove`](/v4-0-1-snapshot/command-line-tools/commands/deploy/remove/) | Destructive teardown. Requires `--confirm`. |
+
+## Subcommand groups
+
+<CardGrid>
+  <LinkCard
+    title="wheels deploy app"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/app/"
+    description="App container lifecycle: boot, start, stop, logs, containers, images, live, maintenance, remove."
+  />
+  <LinkCard
+    title="wheels deploy proxy"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/"
+    description="kamal-proxy singleton lifecycle: boot, reboot, start, stop, restart, details, logs, remove."
+  />
+  <LinkCard
+    title="wheels deploy accessory"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/accessory/"
+    description="Sidecar container lifecycle — mirrors app verbs, scoped to a named accessory."
+  />
+  <LinkCard
+    title="wheels deploy build"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/build/"
+    description="Docker image lifecycle: deliver, push, pull, create, remove, details, dev."
+  />
+  <LinkCard
+    title="wheels deploy registry"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/registry/"
+    description="Registry authentication: setup, login, logout, remove."
+  />
+  <LinkCard
+    title="wheels deploy server"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/server/"
+    description="Host-level operations: exec, bootstrap."
+  />
+  <LinkCard
+    title="wheels deploy prune"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/prune/"
+    description="Cleanup: all, images, containers."
+  />
+  <LinkCard
+    title="wheels deploy lock"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/lock/"
+    description="Deploy-lock management: acquire, release, status."
+  />
+  <LinkCard
+    title="wheels deploy secrets"
+    href="/v4-0-1-snapshot/command-line-tools/commands/deploy/secrets/"
+    description="Secret-store integration: fetch, extract, print."
+  />
+</CardGrid>
+
+## Global flags
+
+Every `wheels deploy` verb accepts these:
+
+| Flag | Description |
+|------|-------------|
+| `--config=<path>` | Path to `deploy.yml`. Default `config/deploy.yml`. |
+| `--destination=<name>` | Overlay `deploy.<name>.yml` and `.kamal/secrets.<name>`. |
+| `--dry-run` | Print the commands that would run, prefixed by host. No network. |
+| `--version=<v>` | Version label (default: `git rev-parse --short HEAD`). |

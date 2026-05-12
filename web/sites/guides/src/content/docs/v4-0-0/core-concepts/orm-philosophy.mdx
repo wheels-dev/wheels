@@ -1,0 +1,54 @@
+---
+title: ORM Philosophy
+description: Why Wheels models carry behavior — ActiveRecord-style ORM, fat models, and what that means for your code.
+type: concept
+sidebar:
+  order: 4
+---
+
+Wheels is an ActiveRecord-style ORM: one class per table, one instance per row, and behavior attached to the row itself. That shape is inherited from Rails and shared with Laravel's Eloquent. Knowing why Wheels picks this pattern tells you where new code belongs and which mistakes the pattern invites.
+
+**You'll learn:**
+
+- What ActiveRecord and DataMapper are, and how they differ
+- Where Wheels sits on that axis
+- What ActiveRecord means in practice for your code
+- The common misreadings of the pattern
+- When to reach for a service object instead
+
+## ActiveRecord vs DataMapper
+
+In the ActiveRecord pattern, the model class *is* the row. Loading a `User` returns an object whose properties are the columns and whose methods know how to save, validate, and relate that row. You call `user.save()`, and the row updates. Validations and lifecycle hooks live on the model. Rails' `ActiveRecord::Base`, Laravel's Eloquent, and Wheels' `Model` are all in this family.
+
+In the DataMapper pattern, models are plain data objects — dumb by design — and a separate repository or mapper handles persistence. You don't call `user.save()`; you call `userRepository.save(user)`. The user object doesn't know how to save itself. Django's ORM sits closer to this end of the spectrum.
+
+Wheels is ActiveRecord. That's the lens for everything else in this section.
+
+## What this means for your code
+
+- **Models carry behavior.** A `User` has `user.authenticate(password)` as a method on the class — not a separate `AuthService.authenticate(user, password)`. The verb that acts on a user is a method on `User`.
+- **Validations live on the model.** `validatesPresenceOf("email")` is declared in `config()`, and every caller — controller, background job, seed script, test — gets the same rule enforced on every `save()`. `user.valid()` and `user.errors()` return per-instance state.
+- **Lifecycle callbacks are methods on the model.** `beforeSave`, `afterCreate`, and `beforeValidation` hang off the class. They are not external observers or event listeners wired up somewhere else; the row's lifecycle is the class's concern.
+- **Persistence is per-instance.** `user.save()`, `user.delete()`, and `user.update(email="new@example.com")` all act on the instance you're holding. There is no repository object between you and the database.
+- **Finders return instances.** `model("User").findByKey(id)` gives you a `User` object ready to call methods on. Chainable scopes, the query builder, and `findAll(include="...")` compose filters and eager-load associations without writing SQL.
+
+## What this doesn't mean
+
+The pattern is easy to over-apply. Three common misreadings:
+
+- **Models don't have to do everything.** Complex workflows belong in `app/lib/` service objects. A `Post` has `publish()`, but a `PublishingWorkflow` that coordinates five models, sends email, and queues a job belongs in `app/lib/`, called from the controller action. The models involved stay lean; the orchestration lives one layer up.
+- **Models aren't the only domain objects.** Plain CFCs in `app/lib/` are the right home for value objects (a `Money` calculator), presenters (a `UserPresenter` that formats dates for a view), and orchestration. Reaching for `Model` because "it's the only class I know how to write" is how tableless `Model` classes become a crutch for things that were never meant to be saved.
+- **Models don't have to hit the database every time.** Scopes, the chainable query builder, `include=` for eager loading, and `findEach` for batch processing all keep finders efficient. The pattern tells you where the code lives, not how often it runs.
+
+## The "fat model" pitfall
+
+When a model grows past several hundred lines, the instinct is that ActiveRecord has failed — that the domain needs a DataMapper split, a repository layer, a separate validator. The actual diagnosis is nearly always different: the model has absorbed orchestration that wasn't its job. A `User` that knows how to sign up, send emails, charge a card, sync with a CRM, and audit itself isn't a user anymore. It's a signup flow, wearing a user's clothes.
+
+The fix keeps the pattern. Extract the orchestration into `app/lib/SignupFlow.cfc` — a service object that accepts a `User` (or several models) and coordinates the cross-cutting work. The model keeps its validations, its callbacks, and the methods that act on a single row. The service keeps the multi-step logic. This is a code organization problem, not a pattern problem.
+
+## See also
+
+- [MVC in Wheels](/v4-0-0/core-concepts/mvc-in-wheels/) — where the model layer sits
+- [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) — hands-on model authoring
+- [Associations](/v4-0-0/basics/associations/) — modeling relationships
+- [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/) — efficient finders
