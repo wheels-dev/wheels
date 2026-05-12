@@ -80,7 +80,7 @@ service: ${APP_NAME}
 image: ${REGISTRY}/${APP_NAME}
 ```
 
-`${VAR}` references resolve through the same lookup chain Kamal uses: CLI `--env` overrides → `.kamal/secrets` (with destination overlay) → `System.getenv` → empty string. Only uppercase-and-underscore tokens are expanded, so shell-style `${service}` placeholders elsewhere in the config aren't captured by accident. For the handful of cases that use ERB for control flow or computed values, the resolution moves into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and the result is referenced back through `${VAR}`. The [migrating-from-kamal guide](https://guides.wheels.dev/v4-0-0-snapshot/deployment/migrating-from-kamal/) walks through each pattern.
+`${VAR}` references resolve through the same lookup chain Kamal uses: CLI `--env` overrides → `.kamal/secrets` (with destination overlay) → `System.getenv` → empty string. Only uppercase-and-underscore tokens are expanded, so shell-style `${service}` placeholders elsewhere in the config aren't captured by accident. For the handful of cases that use ERB for control flow or computed values, the resolution moves into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and the result is referenced back through `${VAR}`. The [migrating-from-kamal guide](https://guides.wheels.dev/v4-0-0/deployment/migrating-from-kamal/) walks through each pattern.
 
 The net effect is that `wheels deploy` is *more* schema-compatible with Kamal than the "we replaced X with Y" framing would suggest. There is no new syntax to learn. The single change is a removal — ERB out, everything else identical.
 
@@ -137,15 +137,15 @@ The CFML code lives in `cli/lucli/services/deploy/`. Three direct dependencies �
 
 Tests live in `cli/lucli/tests/specs/deploy/` and extend the same `wheels.wheelstest` base class the rest of the framework uses. A `FakeSshPool` records every command for offline assertions. A real-SSH fixture (`tools/deploy-sshd-up.sh`) brings up a disposable sshd for the couple of specs that need to exercise real transport.
 
-The full architecture reference — covering the code layout, the commands-are-strings invariant, the URLClassLoader JAR isolation, and the non-goals — lives in the guides under [Architecture of `wheels deploy`](https://guides.wheels.dev/v4-0-0-snapshot/deployment/architecture/). It is the place to start if you want to extend, debug, or evaluate the implementation.
+The full architecture reference — covering the code layout, the commands-are-strings invariant, the URLClassLoader JAR isolation, and the non-goals — lives in the guides under [Architecture of `wheels deploy`](https://guides.wheels.dev/v4-0-0/deployment/architecture/). It is the place to start if you want to extend, debug, or evaluate the implementation.
 
 ## Where to go next
 
-- [Your first deploy](https://guides.wheels.dev/v4-0-0-snapshot/deployment/first-deploy/) is the hands-on walkthrough — scaffold through first rollout.
-- [Migrating from Kamal](https://guides.wheels.dev/v4-0-0-snapshot/deployment/migrating-from-kamal/) is the guide for teams coming from Ruby Kamal, including the full compatibility contract and the ERB-to-Mustache conversion.
-- [Architecture of `wheels deploy`](https://guides.wheels.dev/v4-0-0-snapshot/deployment/architecture/) covers the port strategy, the commands-are-strings invariant, and the classloader isolation in depth.
-- [Deployment landing page](https://guides.wheels.dev/v4-0-0-snapshot/deployment/) covers when to reach for `wheels deploy` versus the VM or Compose paths.
-- [Config reference](https://guides.wheels.dev/v4-0-0-snapshot/deployment/config-reference/), [secrets](https://guides.wheels.dev/v4-0-0-snapshot/deployment/secrets/), [hooks](https://guides.wheels.dev/v4-0-0-snapshot/deployment/hooks/), [accessories](https://guides.wheels.dev/v4-0-0-snapshot/deployment/accessories/).
+- [Your first deploy](https://guides.wheels.dev/v4-0-0/deployment/first-deploy/) is the hands-on walkthrough — scaffold through first rollout.
+- [Migrating from Kamal](https://guides.wheels.dev/v4-0-0/deployment/migrating-from-kamal/) is the guide for teams coming from Ruby Kamal, including the full compatibility contract and the ERB-to-Mustache conversion.
+- [Architecture of `wheels deploy`](https://guides.wheels.dev/v4-0-0/deployment/architecture/) covers the port strategy, the commands-are-strings invariant, and the classloader isolation in depth.
+- [Deployment landing page](https://guides.wheels.dev/v4-0-0/deployment/) covers when to reach for `wheels deploy` versus the VM or Compose paths.
+- [Config reference](https://guides.wheels.dev/v4-0-0/deployment/config-reference/), [secrets](https://guides.wheels.dev/v4-0-0/deployment/secrets/), [hooks](https://guides.wheels.dev/v4-0-0/deployment/hooks/), [accessories](https://guides.wheels.dev/v4-0-0/deployment/accessories/).
 
 If you are currently running a Wheels app in production with ad-hoc deploy tooling — or running Ruby Kamal alongside Wheels — we would love to hear what the switch to `wheels deploy` is like. The command is new, the design space for polish in 4.0.x is open, and the feedback loop from early adopters is what will shape it.
 

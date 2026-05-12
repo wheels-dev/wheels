@@ -127,7 +127,7 @@ interface CollectionEntry {
  *
  * Caller provides `entries` from `await getCollection('docs')` so this
  * function stays framework-agnostic and testable. `entryId` is the
- * current route's entry id (e.g., 'v4-0-0-snapshot/introduction/readme/
+ * current route's entry id (e.g., 'v4-0-1-snapshot/start-here/installing/
  * beginner-tutorial-hello-world').
  *
  * Returns { options, currentVersion } or null if we couldn't resolve
