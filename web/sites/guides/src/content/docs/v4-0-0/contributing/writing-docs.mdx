@@ -15,7 +15,7 @@ The v4 guides live in `web/sites/guides/` as a Starlight site. Every page is an 
 - Where pages live and how to name a new file
 - The three frontmatter shapes — `howto`, `reference`, `section` (landing)
 - How to tag code blocks for the `verify-docs` harness (`{test:compile}`, `{test:cli}`, `{test:tutorial}`)
-- How to wire your page into `src/sidebars/v4-0-0-snapshot.json`
+- How to wire your page into `src/sidebars/v4-0-0.json`
 - The local workflow: write → `pnpm verify:docs` → `pnpm build` → PR
 
 <Aside type="note">
@@ -24,13 +24,13 @@ The v4 guides live in `web/sites/guides/` as a Starlight site. Every page is an 
 
 ## Site layout
 
-Every published page lives under a versioned content folder. The v4 snapshot is frozen at `v4-0-0-snapshot/`; a future `v4-1-0/` will sit beside it.
+Every published page lives under a versioned content folder. The v4.0.0 stable docs are at `v4-0-0/`; the next in-development snapshot is `v4-0-1-snapshot/` (clone of `v4-0-0/` at GA time, diverges as fixes/features land) will sit beside it.
 
 <FileTree>
 - web/sites/guides/
   - src/
     - content/docs/
-      - v4-0-0-snapshot/
+      - v4-0-0/
         - start-here/
         - core-concepts/
         - basics/
@@ -43,7 +43,7 @@ Every published page lives under a versioned content folder. The v4 snapshot is 
         - upgrading/
         - glossary/
     - sidebars/
-      - v4-0-0-snapshot.json
+      - v4-0-0.json
   - scripts/verify-docs/
     - VALIDATION.md
     - verify-docs.mjs
@@ -159,9 +159,9 @@ See `web/sites/guides/scripts/verify-docs/VALIDATION.md` for the full schema, ed
 
 ## Wire the sidebar
 
-The sidebar is an explicit JSON tree — no auto-discovery. Edit `web/sites/guides/src/sidebars/v4-0-0-snapshot.json` and add your page under the matching section's `items` array.
+The sidebar is an explicit JSON tree — no auto-discovery. Edit `web/sites/guides/src/sidebars/v4-0-0.json` and add your page under the matching section's `items` array.
 
-```json title="web/sites/guides/src/sidebars/v4-0-0-snapshot.json"
+```json title="web/sites/guides/src/sidebars/v4-0-0.json"
 {
   "label": "Contributing & Project",
   "link": "/v4-0-0/contributing/",
@@ -191,7 +191,7 @@ The `label` is what appears in the sidebar; `link` is the URL. Nested groups use
 
 4. **Build the site.** `pnpm build` runs Astro's full build, link-check, and sidebar validation. If the build passes locally, CI will pass.
 
-5. **Wire the sidebar.** Add your entry to `src/sidebars/v4-0-0-snapshot.json`. Rebuild to confirm it renders.
+5. **Wire the sidebar.** Add your entry to `src/sidebars/v4-0-0.json`. Rebuild to confirm it renders.
 
 6. **Open a PR.** Branch name prefixed per your workflow (the project convention is `peter/…` for the project lead; match what your contributor guidelines specify). Commit message follows the commitlint rules — the scope is `docs`. Example: `docs(docs): add writing-documentation howto`.
 
