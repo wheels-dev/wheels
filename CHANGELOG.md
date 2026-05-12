@@ -18,7 +18,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
-# [4.0.0](https://github.com/wheels-dev/wheels/releases/tag/v4.0.0) => 2026-05-11
+# [4.0.0](https://github.com/wheels-dev/wheels/releases/tag/v4.0.0) => 2026-05-12
 
 > **Wheels 4.0** — the release that started as 3.1 and grew into a major version. Closes multiple framework-maturity gaps against Rails, Laravel, and Django. See [docs/releases/wheels-4.0-audit.md](docs/releases/wheels-4.0-audit.md) for the full audit trail (260+ merged PRs since 3.0.0). Contributors: @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta.
 
@@ -101,7 +101,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Playwright CLI commands for browser testing (#2013, #2021)
 
 **Distribution (new in 4.0)**
-- **macOS** — Homebrew tap at [`wheels-dev/wheels`](https://github.com/wheels-dev/homebrew-wheels) with separate formulae for stable (`wheels`) and bleeding-edge (`wheels-be`) channels. Daily auto-update workflow polls the upstream release feeds and opens PRs.
+- **macOS** — Homebrew tap at [`wheels-dev/homebrew-wheels`](https://github.com/wheels-dev/homebrew-wheels) with separate formulae for stable (`wheels`) and bleeding-edge (`wheels-be`) channels. Daily auto-update workflow polls the upstream release feeds and opens PRs.
 - **Windows** — Scoop bucket at [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) with `wheels` / `wheels-be` manifests. Hourly auto-update via the community Excavator bot. Legacy Chocolatey `wheels` package on `community.chocolatey.org` (CommandBox-based v1.x) is no longer maintained — see [Windows install docs](web/sites/guides/src/content/docs/v4-0-0-snapshot/start-here/installing.mdx) for the migration. (#2545, #2552)
 - **Linux** — `.deb` and `.rpm` packages built by `nfpm` on every release and uploaded to the GitHub Release alongside the existing zip artifacts. The package installs `/usr/bin/wheels`, depends on OpenJDK 21, and on first run syncs the framework module into `~/.wheels/`. Native `apt`/`yum` repositories at `apt.wheels.dev` / `yum.wheels.dev` are planned for 4.0.x. (#2545)
 - **WinGet** — manifest drafts for `Wheels.Wheels` and `Wheels.WheelsBE` staged for post-GA submission to the `microsoft/winget-pkgs` community repo. (#2557)
