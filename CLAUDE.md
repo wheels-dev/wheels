@@ -633,6 +633,7 @@ curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
 - **Application scope**: Adobe CF doesn't support function members on the `application` scope. Pass a plain struct context instead.
 - **Closure this**: CFML closures capture `this` from the declaring scope. Use `var ctx = {ref: obj}` to share references across closures.
 - **Bracket-notation function call**: `obj["key"]()` crashes Adobe CF 2021/2023 parser inside closures. Split into two statements: `var fn = obj["key"]; fn()`.
+- **Inline closure as constructor named arg**: `new Foo(callback = function(){...})` crashes Adobe CF with `ArrayStoreException: ASTcffunction` and takes down the **entire** TestBox bundle because `getComponentMetadata()` triggers eager compilation of every CFC in the directory. Hoist the closure into a local var first: `var fn = function(){...}; new Foo(callback = fn)`. No behavior change on Lucee/BoxLang.
 - **Array by-value in struct literals**: Adobe CF copies arrays by value in `{arr = myArray}`. Closures that append to the copy won't affect the original. Reference via parent struct instead: `{owner = parentStruct}` then `owner.arr`.
 - **`private` mixin functions not integrated**: `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helper functions in mixin CFCs (`vendor/wheels/model/*.cfc`, view helpers, etc.) MUST use `public` access. Use `$` prefix for internal scope instead of `private` keyword. BoxLang handles this differently, so `private` may pass BoxLang tests but fail Lucee/Adobe.
 
