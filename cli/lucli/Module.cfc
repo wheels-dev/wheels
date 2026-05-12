@@ -4115,13 +4115,7 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		// Template variable context — all config values flow through here.
-		// `datasourcesBlock` is the JSON fragment substituted into lucee.json
-		// at the `"datasources": {{datasourcesBlock}}` site: the SQLite pair
-		// by default, or an empty `{}` when `--no-sqlite` was passed. Without
-		// this gate the rendered lucee.json pointed Lucee at jdbc:sqlite
-		// paths even with `--no-sqlite`, and the engine auto-created empty
-		// db/*.sqlite files on first connection (GH ##2621).
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
 		var context = {
 			"appName": appName,
 			"datasourceName": opts.datasource,
@@ -4316,15 +4310,6 @@ component extends="modules.BaseModule" {
 		}
 	}
 
-	/**
-	 * Build the JSON object substituted into `lucee.json`'s
-	 * `"datasources": {{datasourcesBlock}}` site for the default (SQLite-on)
-	 * path. Lives next to configureSQLiteDatabase() because both encode the
-	 * same dev/test datasource pair — the lucee.json variant for the engine
-	 * to bind on boot, the config/app.cfm variant for runtime overrides.
-	 * `--no-sqlite` substitutes the literal `"{}"` instead, suppressing the
-	 * pair so Lucee never auto-creates db/*.sqlite files (GH #2621).
-	 */
 	private string function buildSQLiteDatasourcesBlock(required string datasourceName) {
 		var nl = chr(10);
 		var pad = "      ";
@@ -4338,7 +4323,7 @@ component extends="modules.BaseModule" {
 		block &= inner & '"host": "",' & nl;
 		block &= inner & '"password": "",' & nl;
 		block &= inner & '"username": ""' & nl;
-		block &= pad & "},"  & nl;
+		block &= pad & "}," & nl;
 		block &= pad & '"#datasourceName#_test": {' & nl;
 		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
 		block &= inner & '"database": "#datasourceName#_test",' & nl;

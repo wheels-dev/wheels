@@ -1,20 +1,3 @@
-/**
- * Regression: `wheels new <app> --no-sqlite` must NOT embed the SQLite
- * datasource entries in the scaffolded lucee.json. Issue 2621.
- *
- * The bug: `cli/lucli/templates/app/lucee.json` hardcoded the
- * `org.sqlite.JDBC` datasource pair for {{datasourceName}} and
- * {{datasourceName}}_test. `scaffoldNewApp()` honored `--no-sqlite` only
- * for `configureSQLiteDatabase()` (the db/*.sqlite + config/app.cfm
- * injection), so even with the flag set, the rendered lucee.json still
- * pointed Lucee at jdbc:sqlite paths and the engine auto-created empty
- * database files on first connection.
- *
- * Fix: the template now uses a `{{datasourcesBlock}}` placeholder and
- * `Module.cfc::scaffoldNewApp()` threads `opts.noSQLite` into the
- * context so the substituted block is either the SQLite pair (default)
- * or an empty `{}` object (when `--no-sqlite` is set).
- */
 component extends="wheels.WheelsTest" {
 
 	function run() {
