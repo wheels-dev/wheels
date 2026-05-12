@@ -1,8 +1,23 @@
 Wheels Framework
-================
+Copyright 2006-2026 The Wheels Framework Authors
 
-This product is licensed under the Apache License, Version 2.0
-(see LICENSE in the repository root).
+This product includes software developed by:
+
+  - Per Djurner and the original CFWheels contributors (2006-)
+    https://github.com/cfwheels/cfwheels
+
+  - Andy Bellenie, Tony Petruzzi, Chris Peters, and the broader
+    CFWheels community of contributors and maintainers
+
+  - Tom King and contributors to the original Wheels CLI (2016-)
+    (see "Wheels CLI MIT relicensing" below)
+
+For the full list of contributors, see the project's Git history:
+  git log --format='%aN <%aE>' | sort -u
+
+------------------------------------------------------------------
+
+Wheels CLI MIT relicensing
 
 Portions of the cli/ directory derive from wheels-cli, originally
 released as a standalone CommandBox module by Tom King under the
@@ -15,3 +30,6 @@ relicensed under the Apache License, Version 2.0. The original MIT
 copyright notice is retained here in accordance with the MIT
 License's notice-retention clause and Apache License 2.0,
 Section 4(c).
+
+This product is licensed under the Apache License, Version 2.0
+(see LICENSE).
