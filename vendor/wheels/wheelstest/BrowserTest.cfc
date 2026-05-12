@@ -261,9 +261,7 @@ component extends="wheels.WheelsTest" {
             var artifactDir = this.browserArtifactPath
                 ?: expandPath("/tests/_output/browser");
 
-            if (!directoryExists(artifactDir)) {
-                directoryCreate(artifactDir, true);
-            }
+            $ensureArtifactDir(artifactDir);
 
             var rawName = arguments.spec.name ?: "unknown_spec";
             var safeName = reReplace(rawName, "[^a-zA-Z0-9_\-]", "_", "all");
@@ -277,6 +275,23 @@ component extends="wheels.WheelsTest" {
             // Best-effort: page may have crashed, context may be closed.
             // Swallow to avoid masking the real test failure.
         }
+    }
+
+    /**
+     * Ensures the artifact directory exists, creating it (and any missing
+     * parents) when necessary. Routes through java.io.File.mkdirs() rather
+     * than directoryCreate(path, true) because Adobe ColdFusion rejects the
+     * Lucee-only second-argument createPath flag with "Parameter validation
+     * error for the DIRECTORYCREATE function. The function takes 1
+     * parameter." — see issue #2614. mkdirs() recurses parents uniformly on
+     * every engine; the same canonical workaround lives in
+     * `services/packages/ManifestCache.cfc::$ensureDir` from #2567.
+     */
+    public void function $ensureArtifactDir(required string path) {
+        if (directoryExists(arguments.path)) {
+            return;
+        }
+        createObject("java", "java.io.File").init(arguments.path).mkdirs();
     }
 
     /**
