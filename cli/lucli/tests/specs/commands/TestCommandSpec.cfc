@@ -242,6 +242,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				$tearDown(sandbox);
 			});
 
+			it("does NOT match a .env key whose name ends in DATASOURCE_NAME", () => {
+				// Pre-fix, the .env matcher had no start-of-line anchor, so
+				// `MY_DATASOURCE_NAME=wrongkey` false-matched on its trailing
+				// DATASOURCE_NAME substring. With (?:^|\n) anchoring it doesn't.
+				var sandbox = $scaffold(envBody = "MY_DATASOURCE_NAME=wrongkey");
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("(unknown)");
+				$tearDown(sandbox);
+			});
+
 		});
 
 	}
