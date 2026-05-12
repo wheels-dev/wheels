@@ -70,7 +70,24 @@ sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEE
 
 The package lays down `/usr/bin/wheels` (a shell wrapper), `/opt/wheels/lucli` (the LuCLI launcher), `/opt/wheels/module/` (the staged Wheels Module), and `/opt/wheels/sqlite-jdbc.jar` (auto-staged into Lucee Express on first run). The wrapper mirrors the Homebrew flow: probes `/usr/lib/jvm/` for OpenJDK 21, exports `LUCLI_HOME=$HOME/.wheels`, syncs the staged module into `~/.wheels/modules/wheels/` on first run or version mismatch, then execs LuCLI.
 
-For the bleeding-edge channel (every merge to `develop`), substitute `wheels-dev/wheels-snapshots` for `wheels-dev/wheels` in the URLs above. Snapshot filenames contain dots in place of the SemVer hyphen — `wheels_4.0.0.snapshot.1825_amd64.deb` for tag `v4.0.0-snapshot.1825`. The version metadata *inside* the `.deb`/`.rpm` preserves the canonical `~snapshot.N` form, so `dpkg --compare-versions` and `rpmvercmp` order it below the next GA correctly.
+The bleeding-edge channel publishes `.deb`/`.rpm` to [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) on every merge to `develop`. Every release there is a GitHub *pre-release*, so `api.github.com/.../releases/latest` returns nothing — use `/releases` and take the first entry. The asset filename also differs: snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`) but the on-disk asset name uses a dot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. The substitution converts the tag's hyphen-form to the URL's dot-form:
+
+```bash title="illustrative — Debian / Ubuntu (bleeding-edge)"
+SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
+sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+```
+
+```bash title="illustrative — Fedora / RHEL (bleeding-edge)"
+SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+```
+
+The version metadata *inside* the `.deb`/`.rpm` preserves the canonical `~snapshot.N` form, so `dpkg --compare-versions` and `rpmvercmp` order pre-releases below the next GA correctly.
 
 <Aside type="note" title="Native apt/yum repositories">
 The download-and-install flow above is the v4.0 GA story. Native `apt`/`yum` repositories at `apt.wheels.dev` and `yum.wheels.dev` are on the v4.0.x roadmap — once they're live, you'll be able to add a sources list once and `sudo apt install wheels` / `sudo dnf install wheels` will pull new versions automatically via `apt update`. The package format on disk doesn't change.

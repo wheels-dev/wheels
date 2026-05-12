@@ -157,21 +157,11 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
 
 <TabItem label="Linux" icon="linux">
 
-Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repository at `apt.wheels.dev` / `yum.wheels.dev` is on the v4.0.x roadmap — until then, install the package directly from a GitHub Release. The package installs `/usr/bin/wheels`, depends on OpenJDK 21, and on first run syncs the framework module into `~/.wheels/`.
+Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repository at `apt.wheels.dev` / `yum.wheels.dev` is on the v4.0.x roadmap — until then, install the package directly from a GitHub Release. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
 
 <Steps>
 
-1. Install OpenJDK 21:
-
-   ```bash title="Debian / Ubuntu"
-   sudo apt install openjdk-21-jre-headless
-   ```
-
-   ```bash title="Fedora / RHEL"
-   sudo dnf install java-21-openjdk-headless
-   ```
-
-2. Download and install the latest Wheels release:
+1. Download and install the latest Wheels release:
 
    ```bash title="Debian / Ubuntu — stable"
    WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
@@ -187,10 +177,27 @@ Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repos
    ```
 
    <Aside type="note" title="Want bleeding-edge?">
-   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Substitute `wheels-dev/wheels-snapshots` for `wheels-dev/wheels` in the URLs above. Note that snapshot version strings in the *filename* use dots in place of the SemVer hyphen — e.g. `wheels_4.0.0.snapshot.1825_amd64.deb` for tag `v4.0.0-snapshot.1825`. The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` orders the version correctly relative to GA. See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/).
+   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Because every release there is a GitHub *pre-release*, `api.github.com/.../releases/latest` returns nothing — use `/releases` and pick the first entry. Snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`); the on-disk asset filename uses a dot in the same slot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. Self-contained snippets:
+
+   ```bash title="Debian / Ubuntu — bleeding-edge"
+   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+   curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   ```
+
+   ```bash title="Fedora / RHEL — bleeding-edge"
+   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+   sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+   ```
+
+   The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/).
    </Aside>
 
-3. Verify:
+2. Verify:
 
    ```bash title="your shell"
    wheels --version
@@ -249,6 +256,8 @@ WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/relea
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
 sudo dnf upgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
 ```
+
+For the bleeding-edge channel, run the install snippet from the [bleeding-edge Aside](#install-the-cli) — it points at `wheels-dev/wheels-snapshots` and `apt`/`dnf` will treat each new snapshot as an upgrade.
 
 The first `wheels` invocation after upgrade syncs the new framework module into `~/.wheels/modules/wheels/` automatically.
 
