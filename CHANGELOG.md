@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Fixed
+
+- Stop the generated app's `_gitignore` and `app/plugins/README.md` from advertising the broken `wheels packages install` / `wheels install` verbs; point users at the canonical `wheels packages add` verb (#2610)
+
+----
+
 # [4.0.0](https://github.com/wheels-dev/wheels/releases/tag/v4.0.0) => 2026-05-12
 
 > **Wheels 4.0** — the release that started as 3.1 and grew into a major version. Closes multiple framework-maturity gaps against Rails, Laravel, and Django. See [docs/releases/wheels-4.0-audit.md](docs/releases/wheels-4.0-audit.md) for the full audit trail (260+ merged PRs since 3.0.0). Contributors: @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta.
