@@ -403,14 +403,7 @@ component extends="wheels.WheelsTest" {
 		})
 
 		describe("Defensive guard for struct/array values on non-association properties", () => {
-			// Regression coverage for issue #2412: a struct value reaching
-			// `this.<prop>` via setProperties() silently propagates through to
-			// user callbacks (e.g. `beforeValidation` doing LCase(this.email)),
-			// where Lucee raises "Can't cast Complex Object Type Struct to
-			// String" pointing at the user's callback line. The framework
-			// should raise a clearer error at the assignment boundary so the
-			// stack trace points at the actual root cause (malformed form
-			// data shape, not the user callback).
+			// Regression coverage for issue #2412.
 
 			it("throws Wheels.PropertyIsIncorrectType when a struct is mass-assigned to a non-association property", () => {
 				expect(function() {
@@ -425,9 +418,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("still accepts struct values for properties registered as nested associations", () => {
-				// Author has hasOne('profile') with nestedProperties enabled,
-				// so a struct here is legitimate nested-attribute traffic and
-				// must not trigger the defensive guard.
+				// Author's hasOne('profile') has nestedProperties enabled.
 				_author = g.model("author").new({
 					firstName = "Eve",
 					lastName = "Tester",
