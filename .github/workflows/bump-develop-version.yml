@@ -68,9 +68,17 @@ jobs:
           # no 'v' prefix (release.yml sources from wheels.json, which is
           # bare SemVer), but workflow_dispatch input might.
           STRIPPED="${RAW_RELEASED_VERSION#v}"
+          # Fail loud on bad input — the primary repository_dispatch path is
+          # guaranteed bare SemVer (release.yml only fires this for
+          # CHANNEL=stable, which has already filtered out -snapshot/-rc
+          # suffixes), so a mismatch here means the workflow_dispatch fallback
+          # was used with an unparseable version. Exiting 0 would let the
+          # downstream "Update wheels.json" step write '"version": ""' and
+          # open a malformed PR; exit 1 keeps the run red so the operator
+          # can re-fire with corrected input. See #2615 review.
           if [[ ! "${STRIPPED}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "Released version '${RAW_RELEASED_VERSION}' doesn't match SemVer M.m.p — skipping bump."
-            exit 0
+            echo "::error::Released version '${RAW_RELEASED_VERSION}' doesn't match SemVer M.m.p — cannot bump."
+            exit 1
           fi
           MAJOR="${BASH_REMATCH[1]}"
           MINOR="${BASH_REMATCH[2]}"
