@@ -1,0 +1,407 @@
+---
+title: "deploy.yml Reference"
+description: Every top-level key in config/deploy.yml — what it configures, what the defaults are, and the shapes it accepts.
+type: reference
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+This is the complete `deploy.yml` schema. `wheels deploy` loads `config/deploy.yml` on every invocation, validates it against this schema, and hands it to every subcommand. Unknown top-level keys fail fast with a line-scoped error; required keys that are missing fail with a pointer to the file.
+
+<Aside type="note" title="You should already know">
+You've read [Your First Deploy](/v4-0-1-snapshot/deployment/first-deploy/) and understand the shape of a working deploy. This page is the dry reference — no narrative, just the schema.
+</Aside>
+
+## Required keys
+
+Three keys are required. Omitting any of them stops the loader with `deploy.yml: missing required key: '<name>'`.
+
+| Key | Type | Purpose |
+|-----|------|---------|
+| `service` | string | Short, stable name. Drives container naming (`<service>-<role>-<version>`) and the Docker label that scopes every `wheels deploy` query. |
+| `image` | string | Registry path excluding the tag (e.g. `myorg/myapp`). `wheels deploy` appends a version. |
+| `servers` | array or map | One or more hosts. See [`servers`](#servers) below. |
+
+## All allowed top-level keys
+
+The loader rejects any top-level key not on this list. Case-insensitive.
+
+```text title="Allowed top-level keys (illustrative — do not type)"
+service, image, servers, registry, builder, env, ssh, proxy, boot,
+healthcheck, hooks, accessories, volumes, labels, logging,
+retain_containers, minimum_version, asset_path, require_destination,
+allow_empty_roles, run_directory, readiness_delay
+```
+
+## `service`
+
+The name threaded through every container, label, and lock file on the server.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+service: myapp
+```
+
+Containers are named `<service>-<role>-<version>` (`myapp-web-abc1234`). Accessories are named `<service>-<accessory>` (`myapp-db`). The lock file is `/tmp/kamal_deploy_lock_<service>`. Keep it short and stable — renaming later means manually cleaning up every host.
+
+## `image`
+
+The registry path for the app image, excluding the tag.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+image: myorg/myapp           # Docker Hub
+image: ghcr.io/myorg/myapp   # GHCR — include the registry host
+```
+
+`wheels deploy` tags every build with a version (short git sha by default) and produces a pull target like `myorg/myapp:abc1234`. Pair with `registry.server` when the registry isn't Docker Hub.
+
+## `servers`
+
+The hosts Wheels deploys to. Three shapes, increasing in expressiveness.
+
+### Bare list (implicit `web` role)
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+servers:
+  - 192.0.2.10
+  - 192.0.2.11
+```
+
+Every host joins an implicit role named `web`. Simplest shape for single-role apps.
+
+### Named roles
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+servers:
+  web:
+    - 192.0.2.10
+  job:
+    - 192.0.2.11
+```
+
+Any number of roles. The `web` role is special — it's the only one the proxy routes public traffic to. Other roles (`job`, `worker`, `sidekiq`) are started and stopped like `web` but don't receive a `kamal-proxy deploy` call.
+
+### Roles with options
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+servers:
+  web:
+    hosts:
+      - 192.0.2.10
+    env:
+      clear:
+        WHEELS_MAX_THREADS: 8
+    options:
+      memory: 2gb
+      cpus: 2
+    labels:
+      my-label: value
+    cmd: /app/bin/web
+```
+
+- `hosts:` — required when using the map shape.
+- `env:` — merges over the top-level `env:`. See [`env`](#env).
+- `options:` — additional `docker run` flags (`memory`, `cpus`, `user`, `publish`, etc.).
+- `labels:` — extra labels attached to the container, on top of the four Wheels adds (`service`, `role`, `destination`, `version`).
+- `cmd:` — overrides the container entrypoint for this role. Useful when one image runs as `web` under one command and as `job` under another.
+
+Host strings accept `user@host`, `host:port`, and `user@host:port`. IPv6 literals must be bracketed (`[::1]:22`). Multiple colons without brackets are rejected.
+
+## `registry`
+
+Where images are pushed and pulled.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+registry:
+  server: ghcr.io            # optional — defaults to Docker Hub
+  username: myorg
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+```
+
+- `server:` — hostname. Omit for Docker Hub.
+- `username:` — identity used for `docker login`. Literal string.
+- `password:` — array of secret keys. `wheels deploy` resolves the first key against `.kamal/secrets` and passes it to `docker login --password-stdin`.
+
+For ECR, set `username: AWS` and point `password:` at an env var that you populate via a `$(aws ecr get-login-password)` in `.kamal/secrets` — ECR tokens rotate every 12 hours.
+
+## `builder`
+
+How and where Docker images are built.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+builder:
+  context: .
+  dockerfile: Dockerfile
+  arch:
+    - amd64
+    - arm64
+  args:
+    WHEELS_VERSION: "4.0.0"
+  remote: ssh://deploy@builder.example.com
+```
+
+- `context:` — build context. Default `.`.
+- `dockerfile:` — path relative to context. Default `Dockerfile`.
+- `arch:` — target architectures. Single-arch defaults to whatever the host running the build is. Multi-arch requires `docker buildx` (which `wheels deploy build create` sets up for you).
+- `args:` — map of `--build-arg` values.
+- `remote:` — SSH URL of a remote builder. Faster than local QEMU emulation when you're on an arm64 Mac building amd64 images.
+
+## `env`
+
+Environment variables for app containers, split into `clear` (baked into `deploy.yml`, safe under git) and `secret` (resolved from `.kamal/secrets` at deploy time).
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+env:
+  clear:
+    WHEELS_ENV: production
+    WHEELS_LOG_TO_STDOUT: "1"
+  secret:
+    - DATABASE_URL
+    - WHEELS_RELOAD_PASSWORD
+```
+
+Per-role overrides merge over the top level.
+
+| Layer | Wins over |
+|-------|-----------|
+| role `clear` | role `secret`, top-level `clear`, top-level `secret` |
+| role `secret` | top-level `clear`, top-level `secret` |
+| top-level `clear` | top-level `secret` |
+| top-level `secret` | — |
+
+Changes to `env` take effect on next deploy only; running containers keep their original values.
+
+## `ssh`
+
+How `wheels deploy` connects to hosts.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+ssh:
+  user: deploy
+  port: 22
+  proxy: bastion.example.com
+  keys_only: false
+```
+
+- `user:` — SSH user. Defaults to the current local user. If not root, `wheels deploy` wraps root-requiring commands with `sudo -n`.
+- `port:` — TCP port. Default 22.
+- `proxy:` — bastion host. Maps to OpenSSH's `ProxyJump`; every connection first hops through this host.
+- `keys_only:` — if true, disables agent-based auth and requires explicit `keys:`.
+
+SSH config picks up your usual `~/.ssh/config`, `~/.ssh/known_hosts`, and `ssh-agent` — you don't re-declare that here.
+
+## `proxy`
+
+Configuration for `kamal-proxy`, the singleton reverse proxy on every host.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+proxy:
+  host: app.example.com
+  app_port: 3000
+  ssl: true
+  healthcheck:
+    path: /up
+    timeout: 30
+  forward_headers: true
+  buffering:
+    requests: true
+    responses: true
+```
+
+- `host:` — the public hostname. Used for TLS SNI and Let's Encrypt issuance.
+- `app_port:` — port the app listens on inside the container. Default 3000. Wheels apps typically bind whatever `wheels start` binds; make sure the `Dockerfile` EXPOSE matches.
+- `ssl:` — if true, `kamal-proxy` requests a Let's Encrypt cert for `host` on first boot. Set false if you terminate TLS in front of the proxy.
+- `healthcheck:` — new container must return 2xx at `healthcheck.path` within `healthcheck.timeout` seconds or the proxy refuses to cut traffic over.
+- `forward_headers:` — if true, `X-Forwarded-For`, `X-Forwarded-Proto`, and related headers pass through. Turn on when the app trusts them.
+- `buffering:` — enable request/response buffering. Useful for slow clients on fast backends.
+
+## `accessories`
+
+Sidecar containers — databases, caches, queues — that run alongside the app but aren't part of the rolling deploy. Booted once and left alone.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+accessories:
+  redis:
+    image: redis:7
+    host: 192.0.2.20
+    port: 6379
+  db:
+    image: postgres:16
+    host: 192.0.2.20
+    port: 5432
+    env:
+      clear:
+        POSTGRES_USER: app
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - /data/pg:/var/lib/postgresql/data
+    files:
+      - config/init.sql:/docker-entrypoint-initdb.d/init.sql
+```
+
+See [Accessories](/v4-0-1-snapshot/deployment/accessories/) for the full walk-through.
+
+## `volumes`, `labels`
+
+Top-level defaults that every role inherits unless overridden.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+volumes:
+  - ./storage:/rails/storage
+
+labels:
+  environment: production
+```
+
+Role-level `volumes` and `labels` merge over these.
+
+## `hooks`
+
+Path override for the `.kamal/hooks/` directory. Rarely used; the default is fine.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+hooks:
+  path: .kamal/hooks
+```
+
+See [Hooks](/v4-0-1-snapshot/deployment/hooks/) for what the scripts look like.
+
+## `healthcheck`
+
+Legacy top-level healthcheck config (pre-kamal-proxy). New deploys should configure health checks under `proxy.healthcheck:` instead. Accepted for back-compat with Kamal's pre-2.0 config shape.
+
+## `boot`
+
+Controls the rolling boot sequence.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+boot:
+  limit: 25%
+  wait: 2
+```
+
+- `limit:` — how many hosts boot in parallel. Default 1 (strict sequential). Set to `25%` or an absolute number to parallelize.
+- `wait:` — seconds to pause between each host's completion and the next host's start. Default 0.
+
+## `logging`
+
+Docker logging driver and options. Passed through to `docker run --log-driver` / `--log-opt`.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+logging:
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+```
+
+## `retain_containers`
+
+How many old containers to keep on each host for rollback. Default 5. Older ones are pruned during `wheels deploy prune all`.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+retain_containers: 10
+```
+
+## `minimum_version`
+
+Require the CLI to be at least this version. Causes a fail-fast error if the installed `wheels` CLI is older.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+minimum_version: "4.0.0"
+```
+
+## `asset_path`
+
+Path inside the container for long-lived static assets. Used by the asset-swap path for zero-downtime JS/CSS rotation.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+asset_path: /app/public/assets
+```
+
+## `require_destination`
+
+If true, every command must pass `--destination=<name>`. Guards against deploying the wrong environment by default.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+require_destination: true
+```
+
+## `allow_empty_roles`
+
+If true, a role with an empty `hosts:` list doesn't fail validation. Useful when a role is temporarily scaled to zero.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+allow_empty_roles: true
+```
+
+## `run_directory`
+
+Working directory inside the container. Default is the image's configured `WORKDIR`. Override when the image ships without one.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+run_directory: /app
+```
+
+## `readiness_delay`
+
+Seconds to wait after `docker run` before asking the proxy to cut over. Default 0. Set when your app needs a head start before the health check starts succeeding (database migrations running in-container on boot, for example).
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+readiness_delay: 5
+```
+
+## Variable interpolation
+
+`deploy.yml` supports a single, deliberately small interpolation form: `${UPPER_SNAKE}` env-var tokens. This is the same syntax Ruby Kamal supports natively, with the same lookup order:
+
+1. CLI `--env` overrides (test/CI shims).
+2. `.kamal/secrets` (and `.kamal/secrets.<destination>` when `--destination` is set).
+3. `System.getenv(VAR)` on the machine running `wheels deploy`.
+4. Empty string for unset vars.
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
+```
+
+Only uppercase-and-underscore tokens are expanded — `${APP_NAME}` matches; lowercase `${service}` is left alone, which keeps shell-style placeholders elsewhere in the config from being captured by accident.
+
+No loops, conditionals, or method calls. If you need logic (e.g. different values per destination), resolve it in `.kamal/secrets` or a `.kamal/secrets.<destination>` overlay first and reference the result with `${VAR}`.
+
+<Aside type="caution" title="No ERB">
+Ruby Kamal supports `<%= ... %>` ERB inside `deploy.yml`. Wheels does not — rendering ERB would require embedding a Ruby runtime in the CFML CLI. This is the single schema divergence. Most ERB-using configs convert mechanically by replacing `<%= ENV["X"] %>` with `${X}`. See [Migrating from Kamal](/v4-0-1-snapshot/deployment/migrating-from-kamal/) for the full conversion patterns.
+</Aside>
+
+## Destination overlays
+
+`--destination production` loads `config/deploy.yml` and then deep-merges `config/deploy.production.yml` on top. Arrays are replaced; maps merge recursively. Use overlays to split shared config from per-environment overrides:
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+service: myapp
+image: myorg/myapp
+
+servers:
+  web:
+    - 192.0.2.10
+```
+
+```yaml title="config/deploy.staging.yml (illustrative — do not type)"
+servers:
+  web:
+    - staging.example.com
+
+proxy:
+  host: staging.example.com
+```
+
+## Validation errors
+
+Three classes of error, all emitted as `deploy.yml: <message>`:
+
+- `missing required key: '<name>'` — one of `service`, `image`, `servers` is absent.
+- `unknown top-level key: '<name>'` — typo or unsupported key. Cross-check against the allowlist above.
+- `invalid host: '<string>'` — host string has more than one colon without IPv6 brackets.

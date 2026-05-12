@@ -1,0 +1,38 @@
+---
+title: "wheels deploy server exec"
+description: Run an arbitrary command on every host (or one filtered host).
+type: reference
+sidebar:
+  label: "exec"
+  order: 1
+---
+
+Run a command on every host. Filter to one host with `--host=`.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy server exec --cmd=<command> [--host=<host>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--cmd=<command>` | **Required.** Shell command to run remotely. Throws `DeployServerCli.MissingCommand` if absent. |
+| `--host=<host>` | Limit to one host. Must match a host declared in `deploy.yml` — throws `DeployServerCli.UnknownHost` otherwise. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the command without executing. |
+
+## Behavior
+
+SSHes in parallel (or to one host) and runs `--cmd` verbatim. Output is prefixed by host.
+
+Useful for smoke-testing connectivity, reading environment details, or running one-off diagnostic commands without writing a hook.
+
+## Example
+
+```bash title="illustrative — requires live SSH hosts"
+wheels deploy server exec --cmd="uptime"
+wheels deploy server exec --cmd="docker ps" --host=192.0.2.10
+```

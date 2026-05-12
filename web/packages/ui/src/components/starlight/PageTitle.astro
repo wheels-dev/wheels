@@ -14,7 +14,7 @@ const frontmatterCategory = (entry.data as { category?: string }).category;
 let eyebrow: string | null = frontmatterCategory ?? null;
 
 if (!eyebrow) {
-	// id looks like 'v4-0-0-snapshot/command-line-tools/quick-start'.
+	// id looks like 'v4-0-1-snapshot/command-line-tools/quick-start'.
 	// Strip the version prefix, then take the first segment.
 	const withoutVersion = id.replace(/^v[^/]+\//, '');
 	const firstSegment = withoutVersion.split('/')[0] ?? '';

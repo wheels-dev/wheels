@@ -1,0 +1,23 @@
+---
+title: "wheels deploy registry"
+description: Registry authentication verbs — setup, login, logout, remove.
+type: reference
+sidebar:
+  label: "registry"
+  order: 60
+---
+
+Registry authentication on every host. `setup` and `remove` are aliases for `login` and `logout` respectively, kept for parity with Kamal.
+
+## Verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`setup`](/v4-0-0/command-line-tools/commands/deploy/registry/setup/) | Alias for `login`. |
+| [`login`](/v4-0-0/command-line-tools/commands/deploy/registry/login/) | `docker login` on every host. |
+| [`logout`](/v4-0-0/command-line-tools/commands/deploy/registry/logout/) | `docker logout`. |
+| [`remove`](/v4-0-0/command-line-tools/commands/deploy/registry/remove/) | Alias for `logout`. |
+
+## Password resolution
+
+The `registry.password:` array in `deploy.yml` names secret keys. `wheels deploy` reads the first one via `SecretResolver` (which expands `$(...)` in `.kamal/secrets`) and pipes it into `docker login --password-stdin`. Passing `--password=<value>` on the CLI overrides the resolved secret.

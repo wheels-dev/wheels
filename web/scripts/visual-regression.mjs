@@ -46,7 +46,7 @@ const SITES = [
 	{
 		name: 'guides',
 		dist: resolve(WEB_ROOT, 'sites/guides/dist'),
-		canary: '/v4-0-0-snapshot/start-here/tutorial/',
+		canary: '/v4-0-0/start-here/tutorial/',
 	},
 	{
 		name: 'api',

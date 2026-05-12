@@ -1,0 +1,33 @@
+---
+title: hasErrors()
+description: "Returns <code>true</code> if the object has any errors."
+sidebar:
+  label: hasErrors()
+  order: 0
+---
+
+## Signature
+
+`hasErrors()` — returns `boolean`
+
+**Available in:** `model`
+**Category:** Error Functions
+
+## Description
+
+Returns <code>true</code> if the object has any errors.
+You can also limit to only check a specific property or name for errors.
+
+
+
+## Parameters
+
+<div class="wd-params-table">
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `property` | `string` | no | — | Name of the property to check if there are any errors set on. |
+| `name` | `string` | no | — | Error name to check if there are any errors set with. |
+
+</div>
+

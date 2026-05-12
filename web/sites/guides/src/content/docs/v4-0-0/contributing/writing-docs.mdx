@@ -1,0 +1,220 @@
+---
+title: Writing documentation
+description: How to add or edit a page in the Wheels v4 guides — file layout, frontmatter, verify-docs harness, sidebar wiring, and the review loop.
+type: howto
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, LinkCard, FileTree, Steps } from '@astrojs/starlight/components';
+
+The v4 guides live in `web/sites/guides/` as a Starlight site. Every page is an `.mdx` file under a versioned content tree, every non-illustrative code block is validated by the `verify-docs` harness, and every entry in the sidebar is wired up explicitly in a JSON file. This guide walks you end-to-end: pick a Diátaxis type, write the frontmatter, test your code blocks, add the sidebar entry, and open a PR.
+
+**You'll learn:**
+
+- Where pages live and how to name a new file
+- The three frontmatter shapes — `howto`, `reference`, `section` (landing)
+- How to tag code blocks for the `verify-docs` harness (`{test:compile}`, `{test:cli}`, `{test:tutorial}`)
+- How to wire your page into `src/sidebars/v4-0-0.json`
+- The local workflow: write → `pnpm verify:docs` → `pnpm build` → PR
+
+<Aside type="note">
+  You should already be comfortable with Markdown and MDX. If you haven't opened a Wheels PR before, start with [Pull Requests](/v4-0-0/contributing/pull-requests/). Security issues follow a different path — see the disclosure note on the [Contributing index](/v4-0-0/contributing/).
+</Aside>
+
+## Site layout
+
+Every published page lives under a versioned content folder. The v4.0.0 stable docs are at `v4-0-0/`; the next in-development snapshot, `v4-0-1-snapshot/` (cloned from `v4-0-0/` at GA time, diverges as fixes/features land), sits beside it.
+
+<FileTree>
+- web/sites/guides/
+  - src/
+    - content/docs/
+      - v4-0-0/
+        - start-here/
+        - core-concepts/
+        - basics/
+        - digging-deeper/
+        - testing/
+        - command-line-tools/
+        - contributing/
+          - index.mdx
+          - writing-docs.mdx
+        - upgrading/
+        - glossary/
+    - sidebars/
+      - v4-0-0.json
+  - scripts/verify-docs/
+    - VALIDATION.md
+    - verify-docs.mjs
+    - drivers/
+      - cli.mjs
+      - compile.mjs
+      - tutorial.mjs
+  - STYLE.md
+  - package.json
+</FileTree>
+
+The path on disk is the URL. `contributing/writing-docs.mdx` renders at `/v4-0-0/contributing/writing-docs/`. Directory landing pages are named `index.mdx`. Use kebab-case filenames; the slug segment comes directly from the filename.
+
+## Pick a Diátaxis type
+
+Every page frontmatter carries `type:`, and the quadrant determines the shape of the page. One type per page — no mixing. From the [style guide](https://github.com/wheels-dev/wheels/blob/develop/web/sites/guides/STYLE.md):
+
+- **`tutorial`** — learning-oriented, hand-held. The reader builds something alongside you. Ends with Checkpoint and Troubleshooting. Use this only inside `start-here/tutorial/`.
+- **`howto`** — task-oriented. The reader knows what they want; you show them how. Ends with a Related `<CardGrid>`.
+- **`concept`** — understanding-oriented. "Why Wheels does X." No commands, no steps. Ends with a See-also block.
+- **`reference`** — information-oriented. Dry, tables and lists, no narrative.
+- **`section`** — the landing page for a top-level sidebar section (e.g., `contributing/index.mdx`). Not a Diátaxis quadrant strictly, but we use it for hub pages.
+
+If a page feels like it needs two types, it's two pages. Split it.
+
+## Frontmatter shapes
+
+Copy one of the three canonical shapes below. All three are YAML between `---` fences at the very top of the file — no blank line above them, two-space indentation under `sidebar:`.
+
+A **howto** page:
+
+```yaml title="frontmatter — howto page"
+---
+title: Running tests locally
+description: The wheels test CLI, tools/test-local.sh, filtering, and the Docker cross-engine matrix.
+type: howto
+sidebar:
+  order: 9
+---
+```
+
+A **reference** page:
+
+```yaml title="frontmatter — reference page"
+---
+title: Form helpers
+description: Every form helper, its signature, and an example — the full table.
+type: reference
+sidebar:
+  order: 4
+---
+```
+
+A **section** landing page (`index.mdx` for a top-level sidebar category):
+
+```yaml title="frontmatter — section landing"
+---
+title: Contributing & Project
+description: How Wheels is maintained and the four ways you can help move the framework forward.
+type: section
+sidebar:
+  order: 8
+---
+```
+
+`sidebar.order` controls ordering when the sidebar is auto-generated; it's cosmetic when the sidebar is explicitly wired (which ours is), but it still controls fallback ordering in search and metadata. Keep it consistent with the order you wire into the JSON.
+
+## Validate code blocks with the harness
+
+Every non-illustrative fenced code block carries a `{test:*}` meta flag. The harness — `pnpm verify:docs` — parses those flags, runs each block through the right driver, and fails the build on mismatches. The canonical spec lives in `web/sites/guides/scripts/verify-docs/VALIDATION.md`; three drivers ship today.
+
+### `{test:compile}` for CFML syntax
+
+Pipes the block body into `wheels cfml` and passes if it exits 0. Use this on any CFML snippet you want to guarantee actually parses.
+
+```cfm {test:compile}
+component extends="Model" {
+  function config() {
+    validatesPresenceOf("title");
+  }
+}
+```
+
+### `{test:cli ...}` for CLI invocations
+
+Runs `cmd` in a fresh fixture app and asserts against stdout, stderr, or exit code. Useful for `wheels` commands whose output you want to pin.
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+Supported attrs: `cmd="..."`, `asserts-stdout`, `asserts-stderr`, `asserts-output` (either stream), `asserts-exit=N`, `step=N`. No shell features — no pipes, redirects, `&&`, or quoted args with spaces. The harness spawns the program directly.
+
+### `{test:tutorial ...}` for the tutorial fixture
+
+The tutorial-specific driver. Each block writes a file into a shared `blog-tutorial` fixture app at a given step, optionally asserting an HTTP response or row count afterward. Mostly used inside `start-here/tutorial/` — you won't reach for it in a howto unless you're extending the tutorial itself.
+
+Meta-syntax for documenting the harness (as on this page) is tricky because the harness also parses nested fences. Keep illustrative meta examples inside prose, not inside a fenced block that claims to be tested.
+
+### Illustrative blocks
+
+Blocks that cannot or should not compile get a title instead of a test flag — the harness ignores any block with no `{test:*}`.
+
+```cfm title="illustrative — do not type"
+someAPI.callThat.doesntExistYet();
+```
+
+<Aside type="caution">
+  **`##` escaping inside CFML blocks.** CFML treats `#` as an expression delimiter. In fenced code blocks you're writing CFML the reader will copy — a CSS-style `#111` in a string needs to be `##111` so it parses. This bites most often in color literals and HTML entity examples. MDX itself also uses curly braces for JSX expressions, so if you need a literal `{` in prose, escape it: `\{`. For MDX comments, use `{/* ... */}` — HTML comments don't render.
+</Aside>
+
+See `web/sites/guides/scripts/verify-docs/VALIDATION.md` for the full schema, edge cases, and the fallback-mode caveat that applies when LuCLI's `wheels cfml` doesn't exit non-zero on CFML errors.
+
+## Wire the sidebar
+
+The sidebar is an explicit JSON tree — no auto-discovery. Edit `web/sites/guides/src/sidebars/v4-0-0.json` and add your page under the matching section's `items` array.
+
+```json title="web/sites/guides/src/sidebars/v4-0-0.json"
+{
+  "label": "Contributing & Project",
+  "link": "/v4-0-0/contributing/",
+  "items": [
+    { "label": "Writing documentation", "link": "/v4-0-0/contributing/writing-docs/" }
+  ]
+}
+```
+
+The `label` is what appears in the sidebar; `link` is the URL. Nested groups use the same shape — a `label` plus an `items` array, optionally with a `link` for a landing page. Look at the `Start Here > Tutorial` entry for a nested example.
+
+## The local workflow
+
+<Steps>
+
+1. **Write the page.** Pick the type, drop in the frontmatter, structure by the style guide's rules (1-sentence summary + "You'll learn" list, `<Aside>` for assumptions, no headings deeper than `###`).
+
+2. **Tag every code block.** `{test:compile}` for CFML, `{test:cli cmd="..."}` for CLI, `{test:tutorial ...}` inside the tutorial. Anything that can't compile gets `title="illustrative — do not type"`.
+
+3. **Run the harness against your page.**
+
+   ```bash title="from web/sites/guides/"
+   pnpm verify:docs src/content/docs/v4-0-0/contributing/writing-docs.mdx
+   ```
+
+   Omit the path to check the whole site. The `pnpm verify:docs` script is defined in `web/sites/guides/package.json` and runs `node scripts/verify-docs/verify-docs.mjs`.
+
+4. **Build the site.** `pnpm build` runs Astro's full build, link-check, and sidebar validation. If the build passes locally, CI will pass.
+
+5. **Wire the sidebar.** Add your entry to `src/sidebars/v4-0-0.json`. Rebuild to confirm it renders.
+
+6. **Open a PR.** Branch name prefixed per your workflow (the project convention is `peter/…` for the project lead; match what your contributor guidelines specify). Commit message follows the commitlint rules — the scope is `docs`. Example: `docs(docs): add writing-documentation howto`.
+
+</Steps>
+
+## Close with a Related CardGrid
+
+Every howto ends with a Related `<CardGrid>`. Three or four `<LinkCard>`s — adjacent guides the reader will plausibly want next, with a terse description each. Match the tone of the rest of the site: no marketing copy, no exclamation marks.
+
+## Common gotchas
+
+- **CFML `##` in fenced blocks.** As above — CFML's `#` is the expression delimiter, so literal `#` characters in strings must be doubled. This is the single most common reason a `{test:compile}` block fails unexpectedly.
+- **MDX curly braces.** MDX parses `{ ... }` as a JSX expression. In prose, escape as `\{`. For comments, use `{/* like this */}` — HTML comments render literally in MDX.
+- **Frontmatter YAML indentation.** Two spaces, no tabs. `sidebar:` needs `order:` on the following line indented by exactly two spaces. A stray tab silently breaks the frontmatter and every page's `<title>` renders as its filename.
+- **Don't mix Diátaxis types in one page.** A howto that drifts into conceptual explanation should either split, or move the concept to a sibling `concept` page and link to it. Every page carries exactly one `type:`.
+- **Don't reorder the sidebar for your page.** Add at the correct position up-front — inserting later is a review thrash.
+- **Close CFML code blocks with `cfm`, not `cfml`.** Starlight's syntax highlighter and the harness both key on `cfm`. `bash`, `json`, `yaml`, `mdx` work as you'd expect.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Pull Requests" href="/v4-0-0/contributing/pull-requests/" description="Fork-and-pull workflow, branch naming, definition of done, and the review loop." />
+  <LinkCard title="Coding Standards" href="/v4-0-0/contributing/coding-standards/" description="Formatting rules, commit-message scopes, and the cross-engine gotchas to avoid." />
+  <LinkCard title="Contributing & Project" href="/v4-0-0/contributing/" description="How the project is run, who the core team is, and the four ways you can help." />
+  <LinkCard title="Running Tests Locally" href="/v4-0-0/testing/running-tests-locally/" description="A howto built in this style — a good reference when you're shaping your own." />
+</CardGrid>

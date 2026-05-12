@@ -1,0 +1,35 @@
+---
+title: "wheels deploy proxy reboot"
+description: Stop, remove, and re-install the kamal-proxy container on every host.
+type: reference
+sidebar:
+  label: "reboot"
+  order: 2
+---
+
+Stop, remove, and re-install `kamal-proxy` on every host. Useful after bumping the pinned image tag.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy proxy reboot [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Per host: `docker stop kamal-proxy && docker rm kamal-proxy`, then the same `docker run` as [`proxy boot`](/v4-0-0/command-line-tools/commands/deploy/proxy/boot/).
+
+Traffic drops while the proxy is down. Plan for a brief outage or stagger reboots host-by-host.
+
+## Example
+
+```bash title="example"
+wheels deploy proxy reboot
+```

@@ -1,0 +1,37 @@
+---
+title: "wheels deploy app stop"
+description: docker stop the app containers for the given version.
+type: reference
+sidebar:
+  label: "stop"
+  order: 3
+---
+
+`docker stop` app containers for the given version. Containers remain on disk — use `app remove` to delete them.
+
+## Synopsis
+
+```  title="Synopsis"
+wheels deploy app stop --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | **Required.** |
+| `--role=<name>` | Limit to one role. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Behavior
+
+Emits `docker stop <service>-<role>-<version>` on every host in the target role(s). The proxy is not notified — in-flight requests to the stopped container will fail until you cut traffic elsewhere or restart.
+
+For traffic-safe shutdown, use `wheels deploy rollback` to the previous version first.
+
+## Example
+
+```bash title="Example"
+wheels deploy app stop --version=abc1234
+```

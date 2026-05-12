@@ -1,0 +1,256 @@
+---
+title: Query Builder and Scopes
+description: Chainable query builder, reusable scopes, enum declarations, and batch processing for large result sets.
+type: howto
+sidebar:
+  order: 10
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The `findAll(where="...")` surface works for simple queries, but Wheels ships four more tools for the queries that outgrow a raw WHERE string. The chainable query builder composes conditions safely. Scopes name reusable fragments. Enums turn named property values into auto-generated checkers and scopes. And batch processing keeps you out of memory trouble on large result sets. This page covers all four.
+
+**You'll learn:**
+
+- How to chain `where`, `orderBy`, `limit` into a single fluent query
+- How to declare scopes that compose across a model
+- How to declare dynamic scopes that accept parameters
+- How to declare enums and use the checkers and scopes they generate
+- How to stream large tables with `findEach` and `findInBatches`
+
+<Aside type="note">
+  You should already know how to define models and use finders. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
+</Aside>
+
+## Chainable query builder
+
+Most finders accept `where="..."` as a raw string: `model("Post").findAll(where="status = 'published' AND publishedAt <= NOW()")`. That's fine for a short condition, but it breaks down quickly. Strings require manual quoting, are painful to assemble conditionally, and are the natural home for SQL injection mistakes when user input enters the expression.
+
+The query builder exposes `where`, `orderBy`, `limit`, and the rest as chainable methods on the model class. Each method returns a query object, so you keep composing until you call a terminal method — `get()`, `first()`, or `count()` — that runs the SQL. Values passed to builder methods are auto-quoted through the database adapter; there's no string concatenation into SQL.
+
+```cfm {test:compile}
+component extends="Controller" {
+    function index() {
+        posts = model("Post")
+            .where("status", "published")
+            .where("publishedAt", "<=", Now())
+            .orderBy("publishedAt", "DESC")
+            .limit(25)
+            .get();
+    }
+}
+```
+
+The two-argument form of `where` means equality. The three-argument form takes an operator in the middle — `>`, `<`, `>=`, `<=`, `!=`, `LIKE`, and so on. Stack multiple `.where(...)` calls and they AND together.
+
+### Builder methods
+
+| Method | SQL it produces |
+|--------|-----------------|
+| `where(column, value)` | `column = value` |
+| `where(column, operator, value)` | `column <operator> value` |
+| `orWhere(...)` | Same calling conventions as `where`, OR-combined with prior clauses |
+| `whereNull(column)` | `column IS NULL` |
+| `whereNotNull(column)` | `column IS NOT NULL` |
+| `whereBetween(column, low, high)` | `column BETWEEN low AND high` |
+| `whereIn(column, list)` | `column IN (...)` |
+| `whereNotIn(column, list)` | `column NOT IN (...)` |
+| `orderBy(column, direction)` | `ORDER BY column direction` (direction defaults to `ASC`) |
+| `limit(n)` | `LIMIT n` |
+| `offset(n)` | `OFFSET n` |
+| `get()` | Executes, returns a query of all matching rows |
+| `first()` | Executes, returns the first matching row |
+| `count()` | Executes `COUNT(*)`, returns an integer |
+
+Here's a longer example that exercises several of these:
+
+```cfm {test:compile}
+component extends="Controller" {
+    function search() {
+        products = model("Product")
+            .whereIn("categoryId", [1, 2, 3])
+            .whereBetween("price", 10, 100)
+            .whereNotNull("publishedAt")
+            .orWhere("featured", true)
+            .orderBy("name", "ASC")
+            .limit(50)
+            .offset(100)
+            .get();
+
+        totalMatches = model("Product")
+            .whereIn("categoryId", [1, 2, 3])
+            .whereBetween("price", 10, 100)
+            .count();
+    }
+}
+```
+
+<Aside type="tip">
+  Values in builder calls are auto-parameterized through the model's database adapter. That's the point. Use the builder whenever user input flows into a query value — you get the readability of a fluent API and the safety of parameter binding in one call.
+</Aside>
+
+## Scopes — reusable query fragments
+
+Scopes are named pieces of a query that you declare once on a model and call as methods on the model class. `model("User").active()`. `model("Post").published().recent()`. They chain, compose with each other, and compose with the query builder. When the same filter shows up on two or more pages, turn it into a scope.
+
+Declare scopes in `config()` using the `scope()` function. The `name` argument is what you'll call on the model class. The `where` and `order` arguments hold the SQL fragments.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        scope(name="active", where="status = 'active'");
+        scope(name="recent", order="createdAt DESC");
+    }
+}
+```
+
+With those two declarations, every Wheels finder on `User` gains `.active()` and `.recent()` methods. Chain them and each adds to the accumulated query:
+
+```cfm {test:compile}
+component extends="Controller" {
+    function index() {
+        users = model("User").active().recent().findAll();
+        totalActive = model("User").active().count();
+    }
+}
+```
+
+Scopes compose with the query builder the same way — a scope call returns a chainable query object, so `.where(...)` picks up where the scope left off.
+
+### Dynamic scopes
+
+Static `where` strings can't accept parameters. When a scope needs an argument — "filter by this role", "posts after this date" — declare it with a `handler` instead. The handler is a private method on the model that returns a struct of query options. Anything you'd pass to `findAll` — `where`, `order`, `include`, `select` — is a valid key.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        scope(name="byRole", handler="scopeByRole");
+    }
+
+    private struct function scopeByRole(required string role) {
+        return { where: "role = '#arguments.role#'" };
+    }
+}
+```
+
+Call it like any other scope: `model("User").byRole("admin").findAll()`. Arguments passed to the scope call flow straight into the handler.
+
+<Aside type="caution">
+  Handler-returned `where` strings are still strings — if the argument came from user input, interpolate it only after you've validated or escaped it. For user-supplied values, pair the scope with a builder call: `model("User").byRole("admin").where("status", params.status).get()`.
+</Aside>
+
+## Enums — named property values
+
+Enums declare that a property takes one of a fixed set of named values. Wheels auto-generates three things when you declare one: an inclusion validation so the value is always valid, a boolean checker method per value on model instances (`post.isDraft()`, `post.isPublished()`), and a scope per value on the model class (`model("Post").draft()`, `model("Post").published()`). You write one line of config; the framework wires the rest.
+
+Values can be declared two ways. The list form maps each name to an identical stored string. The struct form lets you map names to different stored values — an integer, a different string, whatever you want in the database.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        enum(property="status", values="draft,published,archived");
+    }
+}
+```
+
+The list form above stores the literal strings `"draft"`, `"published"`, and `"archived"` in the `status` column.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        enum(property="priority", values={low: 0, medium: 1, high: 2});
+    }
+}
+```
+
+The struct form stores integers `0`, `1`, or `2` in the `priority` column, but you interact with them by name everywhere in your code.
+
+Once declared, the generated checkers and scopes are available with no extra setup:
+
+```cfm {test:compile}
+component extends="Controller" {
+    function index() {
+        draftPosts = model("Post").draft().findAll();
+        publishedPosts = model("Post").published().findAll();
+    }
+
+    function show() {
+        post = model("Post").findByKey(params.key);
+        if (post.isDraft()) {
+            redirectTo(route="posts", error="Not published yet");
+        }
+    }
+}
+```
+
+Declare as many enums per model as you need. Each property gets its own checkers and scopes.
+
+## Batch processing — findEach and findInBatches
+
+Loading a hundred thousand rows with `findAll()` is a memory disaster. The batch APIs load and yield in chunks so the whole result set never sits in memory at once. Reach for them whenever you're iterating a result set that could outgrow what fits comfortably in RAM — a good rule of thumb is 10,000 rows or more, but lower if each row is wide.
+
+There are two options. `findEach` calls your callback once per record, loading and discarding batches transparently. `findInBatches` calls your callback once per batch, handing you a query of up to `batchSize` rows. Use `findEach` when each record is processed independently; use `findInBatches` when you're doing something like a bulk write or a CSV export that benefits from seeing groups at a time.
+
+```cfm {test:compile}
+component extends="Model" {
+    public void function resendAllReminders() {
+        findEach(batchSize=1000, callback=function(user) {
+            arguments.user.sendReminderEmail();
+        });
+    }
+}
+```
+
+`findEach` defaults to `batchSize=1000` and orders by the primary key ascending so pagination stays consistent across batches. The callback receives one model instance at a time.
+
+```cfm {test:compile}
+component extends="Model" {
+    public void function exportAll() {
+        findInBatches(batchSize=500, callback=function(users) {
+            // arguments.users is a query of up to 500 rows
+            exportToCSV(arguments.users);
+        });
+    }
+}
+```
+
+`findInBatches` defaults to `batchSize=500` and yields a query per invocation by default. Pass `returnAs="objects"` or `returnAs="structs"` if you'd rather receive an array.
+
+Both methods accept the same filter arguments as `findAll` — `where`, `order`, `include`, `select`. And both compose with scopes: `model("User").active().findEach(batchSize=500, callback=function(user) { ... })` streams only the active users.
+
+## Combining features
+
+Scopes, enums, and the builder all return the same chainable query object, so they compose freely. A controller action pulling the dashboard of published posts owned by the current user reads like English:
+
+```cfm {test:compile}
+component extends="Controller" {
+    function dashboard() {
+        posts = model("Post")
+            .published()
+            .where("userId", session.userId)
+            .orderBy("publishedAt", "DESC")
+            .limit(10)
+            .get();
+    }
+}
+```
+
+`.published()` is generated by an enum on `Post`. `.where(...)` and `.orderBy(...)` and `.limit(...)` are builder methods. `.get()` is the terminal that runs the SQL. One chain, all four tools.
+
+## When to use what
+
+The four features overlap — you could write most queries with just the raw `where` string if you wanted. The guidance below is about readability and safety, not strict rules.
+
+- **Raw `where="..."` string.** Simplest case. One or two conditions, no user input being interpolated into the SQL. `model("Post").findAll(where="status = 'published'", order="publishedAt DESC")`.
+- **Query builder.** Multiple conditions, conditional assembly based on search form input, or anywhere user input flows into a value. The auto-quoting is the safety net.
+- **Scopes.** When the same query fragment appears on two or more pages, give it a name. You'll thank yourself the first time the filter changes.
+- **Enums.** When a property takes one of a fixed set of named values. The auto-generated checkers and scopes save boilerplate everywhere the property is read.
+- **Batch processing.** When the result set is too big to fit in memory comfortably. Rule of thumb: 10,000 rows or more, or fewer if each row is wide.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Models and the ORM" href="/v4-0-0/basics/models-and-the-orm/" description="The model surface this page builds on — finders, persistence, validations." />
+  <LinkCard title="Associations" href="/v4-0-0/basics/associations/" description="Scopes and the builder chain onto association queries the same way they chain onto the model class." />
+  <LinkCard title="Migrations" href="/v4-0-0/basics/migrations/" description="Defining the columns and indexes the queries on this page run against." />
+</CardGrid>

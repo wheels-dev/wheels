@@ -1,0 +1,36 @@
+---
+title: "wheels deploy version"
+description: Print the mirrored Kamal and kamal-proxy versions.
+type: reference
+sidebar:
+  label: "version"
+  order: 7
+---
+
+Print the Kamal version this port mirrors and the pinned `kamal-proxy` image tag.
+
+## Synopsis
+
+```  title="synopsis — illustrative"
+wheels deploy version
+```
+
+## Flags
+
+None.
+
+## Output
+
+```  title="sample output — illustrative"
+wheels-deploy mirrors kamal 2.4.0 / kamal-proxy v0.8.6
+```
+
+The Kamal version tracks the Ruby source of truth each `wheels deploy` release is audited against. The `kamal-proxy` tag is pinned in the default `proxy.image` so every deploy picks up the same binary.
+
+Bumping either version is a release-time decision, not a runtime flag — see the release notes for the current Wheels CLI.
+
+## Example
+
+```bash {test:cli cmd="wheels deploy version" asserts-output="kamal"}
+wheels deploy version
+```

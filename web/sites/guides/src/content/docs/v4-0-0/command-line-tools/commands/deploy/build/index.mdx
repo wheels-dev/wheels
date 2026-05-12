@@ -1,0 +1,30 @@
+---
+title: "wheels deploy build"
+description: Docker image lifecycle verbs — deliver, push, pull, create, remove, details, dev.
+type: reference
+sidebar:
+  label: "build"
+  order: 50
+---
+
+Docker image lifecycle. Most build verbs run **locally** on the control machine; only `pull` fans out to every host.
+
+## Verbs
+
+| Verb | Runs | Purpose |
+|------|------|---------|
+| [`deliver`](/v4-0-0/command-line-tools/commands/deploy/build/deliver/) | local + remote | `push` then `pull`. |
+| [`push`](/v4-0-0/command-line-tools/commands/deploy/build/push/) | local | Build and push image. |
+| [`pull`](/v4-0-0/command-line-tools/commands/deploy/build/pull/) | remote | Pull image on every host. |
+| [`create`](/v4-0-0/command-line-tools/commands/deploy/build/create/) | local | Set up a buildx builder. |
+| [`remove`](/v4-0-0/command-line-tools/commands/deploy/build/remove/) | local | Tear down the buildx builder. |
+| [`details`](/v4-0-0/command-line-tools/commands/deploy/build/details/) | local | Inspect the buildx builder. |
+| [`dev`](/v4-0-0/command-line-tools/commands/deploy/build/dev/) | local | Build a dev-tagged image for local use. |
+
+## When to use these directly
+
+`wheels deploy` already calls `push` and `pull` as part of the rolling flow. Reach for `build` verbs directly when you want to:
+
+- Preview the exact `docker build` / `docker push` command that will run (`--dry-run`).
+- Build on CI and push without deploying.
+- Pull a fresh image onto every host without advancing versions.

@@ -1,0 +1,38 @@
+---
+title: post()
+description: "Create a route that matches a URL requiring an HTTP <code>POST</code> method. We recommend using this matcher to expose actions that create database records."
+sidebar:
+  label: post()
+  order: 0
+---
+
+## Signature
+
+`post()` — returns `struct`
+
+**Available in:** `mapper`
+**Category:** Routing
+
+## Description
+
+Create a route that matches a URL requiring an HTTP <code>POST</code> method. We recommend using this matcher to expose actions that create database records.
+
+
+
+## Parameters
+
+<div class="wd-params-table">
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `name` | `string` | no | — | Camel-case name of route to reference when build links and form actions (e.g., `blogPosts`). |
+| `pattern` | `string` | no | — | Overrides the URL pattern that will match the route. The default value is a dasherized version of `name` (e.g., a `name` of `blogPosts` generates a pattern of `blog-posts`). |
+| `to` | `string` | no | — | Set `controller##action` combination to map the route to. You may use either this argument or a combination of `controller` and `action`. |
+| `controller` | `string` | no | — | Map the route to a given controller. This must be passed along with the `action` argument. |
+| `action` | `string` | no | — | Map the route to a given action within the `controller`. This must be passed along with the `controller` argument. |
+| `package` | `string` | no | — | Indicates a subfolder that the controller will be referenced from (but not added to the URL pattern). For example, if you set this to `admin`, the controller will be located at `admin/YourController.cfc`, but the URL path will not contain `admin/`. |
+| `on` | `string` | no | — | If this route is within a nested resource, you can set this argument to `member` or `collection`. A `member` route contains a reference to the resource's `key`, while a `collection` route does not. |
+| `redirect` | `string` | no | — | Redirect via 302 to this URL when this route is matched. Has precedence over controller/action. Use either an absolute link like `/about/`, or a full canonical link. |
+
+</div>
+

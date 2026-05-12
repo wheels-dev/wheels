@@ -1,0 +1,188 @@
+---
+title: "Creating a Project"
+description: Scaffold a new Wheels application with wheels new and wheels create — flags, generated directory layout, and common bootstrap recipes.
+type: reference
+sidebar:
+  order: 1
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Two commands bootstrap a fresh Wheels project: `wheels new` is the primary entry point, and `wheels create app` is a thin alias that reaches the same code path. Both scaffold a project directory from the bundled template, install the framework into `vendor/wheels/`, wire an embedded database, and write a starter controller and view.
+
+**You'll use this for:**
+
+- Creating a new Wheels application from scratch.
+- Understanding which files and directories the scaffold writes.
+- Customising the initial port, datasource name, reload password, or embedded database choice.
+
+## Overview
+
+`wheels new <name>` is the canonical form. It takes an app name as a positional argument and a handful of flags that tweak the generated configuration. On completion you get a directory named `<name>` with a bootable Wheels app inside — `cd <name> && wheels start` will run it.
+
+`wheels create app <name>` dispatches to the same implementation after stripping the `app` type token. It exists so that `wheels create` can eventually grow additional subtypes without breaking the invocation shape. For today, `wheels new foo` and `wheels create app foo` are interchangeable. `wheels generate app foo` also reaches the same path.
+
+Both commands refuse to run if the target directory already exists, and both roll back the directory if framework installation fails so you can retry cleanly.
+
+### `wheels new`
+
+Scaffold a new Wheels project directory.
+
+#### Synopsis
+
+``` title="synopsis"
+wheels new <name> [flags]
+```
+
+#### Description
+
+Creates a new application in `<name>/` under the current working directory. SQLite is configured as the zero-config datasource by default; pass `--setup-h2` to use H2 instead, or `--no-sqlite` to skip embedded-database setup entirely. The scaffold installs the framework into `vendor/wheels/`, writes a `config/app.cfm` with the chosen datasource, and drops a starter `Main` controller plus index view.
+
+#### Arguments
+
+| Name | Required | Description |
+|---|---|---|
+| `<name>` | yes | Directory and app name. Used as the default datasource name (lowercased) and as the reload password unless overridden. |
+
+#### Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--port=<number>` | `8080` | Server port written into `lucee.json`. The shutdown port is `port + 1`. |
+| `--datasource=<name>` | app name (lowercased) | Datasource name registered in `config/app.cfm`. |
+| `--reload-password=<pw>` | random | Password required by `?reload=true&password=…`. A random value is generated when the flag is omitted. |
+| `--setup-h2` | off | Configure H2 as the embedded database instead of SQLite. Creates `db/h2/` and writes H2 datasource entries. |
+| `--no-sqlite` | off | Skip embedded-database setup entirely. Use when you plan to wire an external datasource yourself. |
+| `--no-open-browser` | off | Don't open a browser on `wheels start`. Sets `openBrowser: false` in the generated config. |
+
+#### Example
+
+```bash {test:cli cmd="wheels new myblog --no-open-browser" asserts-output="myblog"}
+wheels new myblog --no-open-browser
+```
+
+#### Output
+
+Prints each file and directory it creates, a summary block with the resolved port/datasource/reload password, and the next-step hint (`cd <name>` then `wheels start`).
+
+### `wheels create`
+
+Create application components. In the current release the only supported subtype is `app`, which dispatches to `wheels new`.
+
+#### Synopsis
+
+``` title="synopsis"
+wheels create <type> <name> [flags]
+```
+
+#### Description
+
+`wheels create` is a dispatcher. `wheels create app <name>` forwards the remaining arguments to `wheels new`, so every flag documented above works identically here. Running `wheels create` with no arguments prints the list of supported types.
+
+#### Arguments
+
+| Name | Required | Description |
+|---|---|---|
+| `<type>` | yes | Component type to create. Currently only `app` is supported. |
+| `<name>` | yes | Passed through to the underlying command — for `app`, the new application's directory name. |
+
+#### Flags
+
+For `wheels create app`, every flag from `wheels new` is accepted and forwarded verbatim. See the [flag table](#flags) above.
+
+#### Example
+
+```bash {test:cli cmd="wheels create app myblog --port=3000 --setup-h2" asserts-output="myblog"}
+wheels create app myblog --port=3000 --setup-h2
+```
+
+#### Output
+
+Identical to `wheels new` — the command forwards to the same implementation.
+
+## What gets generated
+
+A fresh project has the following top-level layout:
+
+```text title="generated directory layout"
+myblog/
+  app/
+    controllers/          # Main.cfc starter controller
+    models/
+    views/                # main/index.cfm starter view
+    migrator/migrations/
+    events/
+    global/
+    helpers/
+    jobs/
+    lib/
+    mailers/
+    plugins/
+    snippets/
+  config/                 # app.cfm, settings.cfm, routes.cfm
+  db/                     # development.sqlite (or db/h2/ with --setup-h2)
+  public/                 # images/, javascripts/, stylesheets/, files/, miscellaneous/
+  tests/
+    specs/
+      models/
+      controllers/
+      functional/
+  vendor/
+    wheels/               # framework installed by the scaffolder
+  .env
+  .gitignore
+  lucee.json
+```
+
+The `.env` file is created from the template's `_env` stub and carries environment-specific values; it is gitignored by the generated `.gitignore`. `lucee.json` pins the server port and shutdown port to the flags you passed. `config/app.cfm` carries the datasource configuration — SQLite by default, H2 under `--setup-h2`, or no datasource block under `--no-sqlite`.
+
+## Common workflows
+
+### Create and start in one line
+
+```bash title="illustrative — chained shell commands"
+wheels new myblog --no-open-browser && cd myblog && wheels start
+```
+
+`--no-open-browser` keeps the browser from popping open on server boot — useful when you want to drive things yourself or you're chaining commands in a script.
+
+### Create with H2 instead of SQLite
+
+```bash {test:cli cmd="wheels new myblog --setup-h2" asserts-output="myblog"}
+wheels new myblog --setup-h2
+```
+
+H2 is a pure-Java embedded database that ships with Lucee, so no JDBC download is needed on first run. The scaffold creates `db/h2/` and registers both the app datasource and a `wheelstestdb` datasource for the test suite.
+
+### Create with an explicit port and datasource name
+
+```bash {test:cli cmd="wheels new myblog --port=3000 --datasource=blogdb" asserts-output="myblog"}
+wheels new myblog --port=3000 --datasource=blogdb
+```
+
+The port lands in `lucee.json`, the datasource name lands in `config/app.cfm`. The reload password is still randomised unless you pass `--reload-password=…`.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Quick Start"
+    href="../quick-start/"
+    description="End-to-end walkthrough from wheels new to a running CRUD resource."
+  />
+  <LinkCard
+    title="Code Generation"
+    href="../code-generation/"
+    description="wheels generate — models, controllers, scaffolds, migrations, routes, tests."
+  />
+  <LinkCard
+    title="Database"
+    href="../database/"
+    description="wheels migrate, wheels seed, wheels db — schema and seed workflows."
+  />
+  <LinkCard
+    title="Dev Server"
+    href="../dev-server/"
+    description="wheels start, wheels stop, wheels reload — running your app locally."
+  />
+</CardGrid>

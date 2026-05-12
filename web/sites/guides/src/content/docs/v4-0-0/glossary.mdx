@@ -1,0 +1,165 @@
+---
+title: Glossary
+description: Wheels terminology, one-line definitions linked to the guide pages that explain them in full.
+type: reference
+sidebar:
+  order: 10
+---
+
+Terms that carry a specific Wheels meaning. Each entry links to the guide page where the concept is explained in full.
+
+## A
+
+**Action.** A public method on a controller that handles one request — reads `params`, calls models, picks a response. See [MVC in Wheels](/v4-0-0/core-concepts/mvc-in-wheels/) and [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/).
+
+**ActiveRecord.** The ORM pattern Wheels implements — one class per table, one instance per row, behavior attached to the row itself (≈ Rails: ActiveRecord). See [ORM Philosophy](/v4-0-0/core-concepts/orm-philosophy/).
+
+**Association.** A declared relationship between two models (`hasMany`, `belongsTo`, `hasOne`) that generates dynamic methods for navigating between records. See [Associations](/v4-0-0/basics/associations/).
+
+**Auto-wiring.** The DI container's no-args fallback — when a registered component's `init()` takes parameters matching other registered names, the container resolves and injects them automatically. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/).
+
+## B
+
+**Backoff.** The delay between retry attempts on a failed job. Wheels uses exponential backoff — `Min(baseDelay * 2^attempt, maxDelay)`. See [Background Jobs](/v4-0-0/digging-deeper/background-jobs/).
+
+**Batch processing.** Memory-safe iteration over large result sets via `findEach` (record at a time) or `findInBatches` (chunk at a time). See [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/).
+
+**`beforeAction` filter.** A private controller method registered to run before an action — the place for authentication, record loading, and ownership checks. See [The Request Lifecycle](/v4-0-0/core-concepts/request-lifecycle/).
+
+## C
+
+**Callback.** A lifecycle hook on a model (`beforeSave`, `afterCreate`, `afterFind`, and the rest) registered in `config()` and run around persistence events. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
+
+**Convention over configuration.** The philosophy that file names and class names imply table names, view paths, foreign keys, and routes without explicit registration. See [Conventions over Configuration](/v4-0-0/core-concepts/conventions-over-configuration/).
+
+**`createTable`.** The migration method that returns a table-builder object; column methods chain off it until `.create()` flushes the `CREATE TABLE` to the database. See [Migrations](/v4-0-0/basics/migrations/).
+
+## D
+
+**DataMapper.** The ORM pattern Wheels is *not* — plain data objects plus a separate repository that handles persistence. Contrasted with ActiveRecord. See [ORM Philosophy](/v4-0-0/core-concepts/orm-philosophy/).
+
+**DI container.** The service container registered in `config/services.cfm` — you map names to components and resolve them by name anywhere in the app. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/).
+
+**Dispatch.** The stage that picks a controller and action from `config/routes.cfm` and resolves route model bindings before filters run. See [The Request Lifecycle](/v4-0-0/core-concepts/request-lifecycle/).
+
+**Dynamic scope.** A scope declared with `handler=` instead of a static `where=` string — the handler is a private method that returns query options per call, so it can read per-request state. See [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/).
+
+## E
+
+**Eager loading.** Joining associated tables into a finder's query with `include=` to avoid N+1 queries. See [Associations](/v4-0-0/basics/associations/).
+
+**Enum.** A declaration that a property takes one of a fixed set of named values, auto-generating an inclusion validation, boolean checkers, and scopes. See [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/).
+
+**Environment.** One of `development`, `testing`, `production`, or `maintenance` — determined by `WHEELS_ENV` and controlling which `config/<environment>/settings.cfm` overrides load. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/).
+
+## F
+
+**Filter.** A private controller method registered in `config()` that runs around actions — `beforeAction` for auth and record loading, `afterAction` for logging. See [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/).
+
+**Finder.** A read method on a model — `findAll`, `findOne`, `findByKey`, `exists`, `count` — that queries the database and returns rows as query objects or model instances. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
+
+**Flash.** A struct that survives exactly one redirect — write with `flashInsert` (or `redirectTo(..., success="...")`), read with `flash()` on the next request. See [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/).
+
+**Foreign key.** The column on the child table that points at the parent. Inferred as `<singular>Id` from the association name; override with `foreignKey=`. See [Associations](/v4-0-0/basics/associations/).
+
+## H
+
+**`hasMany` / `belongsTo` / `hasOne`.** The three association declarations. Parent models name the child side with `hasMany` or `hasOne`; child models name the parent side with `belongsTo`. See [Associations](/v4-0-0/basics/associations/).
+
+## I
+
+**Idempotent.** A job, seed, or handler that can run twice without changing the outcome — a hard requirement for `perform()` because every job will eventually run twice. See [Background Jobs](/v4-0-0/digging-deeper/background-jobs/) and [Seeding](/v4-0-0/basics/seeding/).
+
+**`inject()`.** The declarative injection call inside a controller's `config()` — the container resolves each named service once per instantiation and assigns it to `this.<name>`. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/).
+
+## J
+
+**Job.** A CFC in `app/jobs/` that extends `wheels.Job` and implements `perform(struct data)` — enqueued for asynchronous processing by the `wheels jobs work` worker. See [Background Jobs](/v4-0-0/digging-deeper/background-jobs/).
+
+## L
+
+**Layout.** The outer template at `app/views/layout.cfm` that wraps every rendered view via `includeContent()`. Override per-action with `renderView(layout=...)` or per-controller with `usesLayout()`. See [Views, Layouts, Partials](/v4-0-0/basics/views-layouts-partials/).
+
+## M
+
+**Mapper.** The fluent `mapper()` chain in `config/routes.cfm` that declares routes, resources, scopes, and the final `.wildcard()`. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/).
+
+**Middleware.** A `(request, next)` function in the dispatch chain that runs before any controller is instantiated — the right home for CORS, rate limiting, security headers, tenant resolution, and auth gates. See [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/).
+
+**Migration.** A versioned CFC in `app/migrator/migrations/` with `up()` and `down()` methods that carry the schema forward and back. See [Migrations](/v4-0-0/basics/migrations/).
+
+**Mixin target.** The `provides.mixins` value in a package manifest — an allowlist of framework components (`controller`, `model`, `application`, `dispatch`, `mapper`, `base`, `sqlserver`, `mysql`, `postgresql`, `h2`, `test`) plus the special values `global` (inject everywhere) and `none` (opt out). There is no separate `view` target — views run in the controller's `variables` scope, so `controller` already makes methods callable from views. See [Packages](/v4-0-0/digging-deeper/packages/).
+
+**MVC.** Model-View-Controller — the layering rule Wheels applies the ActiveRecord way: fat models, thin controllers, dumb views. See [MVC in Wheels](/v4-0-0/core-concepts/mvc-in-wheels/).
+
+## N
+
+**Named route.** A route declared with a `name` argument; helpers like `linkTo`, `redirectTo`, `urlFor`, `buttonTo`, and `startFormTag` look routes up by name rather than by URL string. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/).
+
+**Nested resource.** A resource declared inside another via the `callback` form of `.resources(...)` so its URLs nest under the parent. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/).
+
+## P
+
+**Package.** An optional first-party module distributed as a standalone repository (indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) and activated by being installed into `vendor/<name>/`. `PackageLoader` discovers and loads each on startup inside its own try/catch. See [Packages](/v4-0-0/digging-deeper/packages/).
+
+**`package.json`.** The manifest at the root of every package — `name`, `version`, `wheelsVersion`, `provides.mixins`, `provides.middleware`, `dependencies`. See [Packages](/v4-0-0/digging-deeper/packages/).
+
+**Partial.** A view fragment whose filename starts with an underscore (`_form.cfm`), included via `includePartial(partial="form")` or rendered directly with `renderPartial`. See [Views, Layouts, Partials](/v4-0-0/basics/views-layouts-partials/).
+
+**Polymorphic association.** An association where the same child model can belong to more than one parent type, distinguished by a `<name>Type` string column alongside `<name>Id`. See [Associations](/v4-0-0/basics/associations/).
+
+**Primary key.** The column Wheels treats as the row's identity — `id` by convention; override with `setPrimaryKey()`. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
+
+**Priority queue.** A named queue on `wheels_jobs.queue` that the worker drains ahead of others when run with `--queue=critical,default,low`. See [Background Jobs](/v4-0-0/digging-deeper/background-jobs/).
+
+## Q
+
+**Query builder.** The chainable, auto-quoted fluent API — `.where().orderBy().limit().get()` — for composing queries without writing raw `WHERE` strings. See [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/).
+
+## R
+
+**Rate limiter.** The built-in `wheels.middleware.RateLimiter` that throttles requests using fixed-window, sliding-window, or token-bucket strategies. See [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/).
+
+**`references()`.** The migration shortcut that adds a `<name>Id` integer column plus a foreign-key constraint to the parent's `id`. See [Migrations](/v4-0-0/basics/migrations/).
+
+**Request lifecycle.** The eight-stage pipeline a request passes through — middleware, dispatch, controller instantiation, `beforeAction` filters, action, `afterAction` filters, view rendering, response. See [The Request Lifecycle](/v4-0-0/core-concepts/request-lifecycle/).
+
+**Resource.** A `.resources("name")` call that expands into seven REST routes (index, new, create, show, edit, update, delete) plus their named helpers. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/).
+
+**Route model binding.** The dispatch-stage behavior that loads `params.<singular>` from the database before the action runs — enabled per-resource with `binding=true` or globally with `set(routeModelBinding=true)`. See [Route Model Binding](/v4-0-0/digging-deeper/route-model-binding/).
+
+**Row scoping.** The multi-tenancy strategy that stores all tenants' data in one schema and filters every query by a `tenantId` column (usually via a `currentTenant` scope). See [Multi-tenancy](/v4-0-0/digging-deeper/multi-tenancy/).
+
+## S
+
+**Scope (query).** A named, reusable query fragment declared with `scope()` in `config()` and called as a chainable method on the model class — e.g. `model("User").active().recent()`. See [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/).
+
+**Scope (routing).** A `.scope(path="/api", ...)` block in `config/routes.cfm` that groups routes under a common path prefix, middleware set, or binding default. See [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/).
+
+**`seedOnce()`.** The idempotent seed function that looks up a record by `uniqueProperties` and creates it only if missing — safe to re-run any time. See [Seeding](/v4-0-0/basics/seeding/).
+
+**`set()`.** The sole API for writing framework settings — `set(key=value)` in `config/settings.cfm` or a per-environment override file. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/).
+
+**`sharedModel()`.** A `config()` declaration that opts a model out of tenant datasource routing — used on global tables like `Tenant`, `Plan`, or feature flags. See [Multi-tenancy](/v4-0-0/digging-deeper/multi-tenancy/).
+
+**Singleton.** A DI scope — `.asSingleton()` — that registers one instance for the life of the application. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/).
+
+## T
+
+**`tenant()`.** The helper that returns the current tenant struct (or `{}` if none is active) anywhere framework functions are callable. See [Multi-tenancy](/v4-0-0/digging-deeper/multi-tenancy/).
+
+**`TenantResolver`.** The middleware at `wheels.middleware.TenantResolver` that populates `request.wheels.tenant` per request and unlocks per-request datasource switching. See [Multi-tenancy](/v4-0-0/digging-deeper/multi-tenancy/).
+
+**`timestamps()`.** The migration column helper that adds `createdAt`, `updatedAt`, **and** a soft-delete `deletedAt` column in one call. See [Migrations](/v4-0-0/basics/migrations/).
+
+**Transient.** The default DI scope — a new instance is returned every time the name is resolved. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/).
+
+## V
+
+**Validation.** A declaration in `config()` (`validatesPresenceOf`, `validatesUniquenessOf`, `validatesFormatOf`, and the rest) that runs on every `save()` and blocks the write when any rule fails. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
+
+## W
+
+**`wheels` CLI.** The command-line surface for generators, migrations, seeds, jobs, and the test runner — `wheels generate`, `wheels migrate`, `wheels seed`, `wheels jobs work`, `wheels test`. See [Migrations](/v4-0-0/basics/migrations/) and [Background Jobs](/v4-0-0/digging-deeper/background-jobs/).
+
+**Wildcard route.** The `.wildcard()` call that must come last in `config/routes.cfm` — it catches anything that fell through and maps `/controller/action` conventionally. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/).

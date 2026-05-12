@@ -1,0 +1,33 @@
+---
+title: "wheels deploy prune containers"
+description: Prune old containers beyond the retention window on every host.
+type: reference
+sidebar:
+  label: "containers"
+  order: 3
+---
+
+Prune old containers beyond `retain_containers:` on every host. The current live container and everything in the retention window survives.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy prune containers [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Per host, walks the service-labelled container list, sorts by creation time, and `docker rm`s anything older than the retention window. Older versions become unrollbackable after this — check [`wheels deploy app containers`](/v4-0-0/command-line-tools/commands/deploy/app/containers/) first if you might need them.
+
+## Example
+
+```bash title="example"
+wheels deploy prune containers
+```
