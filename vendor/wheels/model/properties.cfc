@@ -577,6 +577,17 @@ component {
 				value = arguments.value,
 				association = arguments.associations[arguments.property]
 			);
+		} else if (
+			(IsStruct(arguments.value) || IsArray(arguments.value))
+			&& StructKeyExists(variables.wheels.class, "properties")
+			&& StructKeyExists(variables.wheels.class.properties, arguments.property)
+		) {
+			// Scoped to real DB columns so loaded hasMany arrays and control-param leakage still pass through. See #2412.
+			Throw(
+				type = "Wheels.PropertyIsIncorrectType",
+				message = "Cannot assign a #(IsArray(arguments.value) ? 'array' : 'struct')# value to scalar column `#arguments.property#` on the `#variables.wheels.class.modelName#` model.",
+				extendedInfo = "Property `#arguments.property#` is a scalar database column, but `setProperties()` was called with a #(IsArray(arguments.value) ? 'array' : 'struct')# value for it. This usually means upstream form data arrived in an unexpected shape — most commonly a curl POST body using bracket-nested keys without an `=` separator (e.g. `user[email][nested@key]`), which Lucee's form parser turns into a nested-struct path so `params.user.email` ends up shaped like a struct instead of a string. If you actually want to accept structured data here, the property must be declared as an association with `hasOne`, `hasMany`, or `belongsTo` and have mass-assignment enabled via `nestedProperties()`."
+			);
 		} else {
 			this[arguments.property] = arguments.value;
 		}

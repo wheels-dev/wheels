@@ -402,6 +402,51 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Defensive guard for struct/array values on non-association properties", () => {
+			// Regression coverage for issue #2412.
+
+			it("throws Wheels.PropertyIsIncorrectType when a struct is mass-assigned to a non-association property", () => {
+				expect(function() {
+					g.model("author").new({firstName = {"nested@key" = ""}})
+				}).toThrow("Wheels.PropertyIsIncorrectType")
+			})
+
+			it("throws Wheels.PropertyIsIncorrectType when an array is mass-assigned to a non-association property", () => {
+				expect(function() {
+					g.model("author").new({firstName = ["unexpected", "values"]})
+				}).toThrow("Wheels.PropertyIsIncorrectType")
+			})
+
+			it("still accepts struct values for properties registered as nested associations", () => {
+				// Author's hasOne('profile') has nestedProperties enabled.
+				_author = g.model("author").new({
+					firstName = "Eve",
+					lastName = "Tester",
+					profile = {dateOfBirth = "2000-01-01"}
+				})
+				expect(_author.firstName).toBe("Eve")
+				expect(IsObject(_author.profile)).toBeTrue()
+			})
+
+			it("still accepts scalar values for normal properties (regression guard)", () => {
+				_author = g.model("author").new({firstName = "Eve", lastName = "Tester"})
+				expect(_author.firstName).toBe("Eve")
+				expect(_author.lastName).toBe("Tester")
+			})
+
+			it("still accepts empty arrays for hasMany properties with nestedProperties enabled (regression for PR ##2601 review)", () => {
+				_gallery = g.model("gallery").new({title = "Empty Photos Gallery", photos = []})
+				expect(_gallery.title).toBe("Empty Photos Gallery")
+			})
+
+			it("still accepts arrays of model objects for hasMany properties with nestedProperties enabled (regression for PR ##2601 review)", () => {
+				var _p1 = g.model("photo").new({filename = "p1.jpg", DESCRIPTION1 = "first"})
+				var _p2 = g.model("photo").new({filename = "p2.jpg", DESCRIPTION1 = "second"})
+				_gallery = g.model("gallery").new({title = "Object Photos Gallery", photos = [_p1, _p2]})
+				expect(_gallery.title).toBe("Object Photos Gallery")
+			})
+		})
+
 		describe("Tests that propertyIsBlank", () => {
 
 			it("return false when property is set", () => {
