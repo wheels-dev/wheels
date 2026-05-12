@@ -9,7 +9,11 @@ param name="request.wheels.params.format" default="html";
 };
 
 for (r in application.wheels.routes){
-	if ((StructKeyExists(r, "controller") && r.controller EQ "wheels.public") || (StructKeyExists(r, "pattern") && r.pattern eq "/wheels/app/tests")) {
+	if (
+		(StructKeyExists(r, "controller") && r.controller EQ "wheels.public")
+		|| (StructKeyExists(r, "pattern") && r.pattern EQ "/wheels/app/tests")
+		|| (StructKeyExists(r, "pattern") && Left(r.pattern, 9) EQ "/_browser")
+	) {
 		ArrayAppend(routes.internalRoutes, r);
 	} else {
 		ArrayAppend(routes.appRoutes, r);

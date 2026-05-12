@@ -176,7 +176,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 
 ## The DSL — auth fixtures
 
-`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode and sets `session.userId` and `session.userEmail` server-side — no real login form, no password hashing, no redirect handshake. Use it when the spec's intent is "what does an authenticated user see", not "what does the login form do".
+`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode and sets `session.userId` and `session.userEmail` server-side — no real login form, no password hashing, no redirect handshake. Use it when the spec's intent is "what does an authenticated user see", not "what does the login form do". All `/_browser/*` fixture routes appear under the **Internal** tab in the Routes UI (`/wheels/routes`), not Application — they are framework-owned and do not correspond to files in your app.
 
 ```cfm {test:compile} title="tests/specs/browser/AuthenticatedSpec.cfc"
 component extends="wheels.wheelstest.BrowserTest" {
