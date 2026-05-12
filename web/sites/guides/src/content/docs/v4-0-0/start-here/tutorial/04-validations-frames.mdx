@@ -136,7 +136,7 @@ The form partial needs a `<turbo-frame>` with an `id` that the server will reuse
    </cfoutput>
    ```
 
-   Same shape as Part 3's `_form.cfm`, just wrapped in a `<turbo-frame>`. The form helpers emit their own `<label>` wrappers; passing `label="..."` sets the visible text. Don't add an outer `<label>` around them — that produces nested `<label>` elements (the gotcha called out in [Part 3](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/#the-form-partial)).
+   Same shape as Part 3's `_form.cfm`, just wrapped in a `<turbo-frame>`. The form helpers emit their own `<label>` wrappers; passing `label="..."` sets the visible text. Don't add an outer `<label>` around them — that produces nested `<label>` elements (the gotcha called out in [Part 3](/v4-0-0/start-here/tutorial/03-crud-scaffold/#the-form-partial)).
 
 </Steps>
 
@@ -232,4 +232,4 @@ Three things to verify in the browser:
 
 In Part 5 you'll add a `Comment` model, associate it with `Post` via `hasMany`/`belongsTo`, and use Turbo Streams to append new comments to the show page without reloading — the same feel as the Frame swap, but for collections.
 
-The validation API you just used is documented in full at [Validation and Error Display](/v4-0-0-snapshot/basics/validation-and-errors/). The form helpers (including the `data-auto-id` attribute for test selectors) are covered in [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/).
+The validation API you just used is documented in full at [Validation and Error Display](/v4-0-0/basics/validation-and-errors/). The form helpers (including the `data-auto-id` attribute for test selectors) are covered in [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/).

@@ -229,7 +229,7 @@ Three actions, three responsibilities:
 - `delete` is the logout action. It clears `session.userId` and redirects.
 
 <Aside type="tip" title="Why a dynamic finder, not a `where=` string">
-  You'll see two patterns in older code: dynamic finders like `findOneByEmail(value)` and explicit `where=` finders. The dynamic finders parameterize the value automatically — Wheels turns `findOneByEmail(emailVal)` into a prepared statement with a bound parameter. Writing `findOne(where="email = '#emailVal#'")` would interpolate the user input straight into SQL, which is a SQL injection vulnerability. Stick to dynamic finders for single-column lookups; reach for `where=` only when you need an operator other than equality, and always use `cfqueryparam`-style binding via the [chainable query builder](/v4-0-0-snapshot/basics/models-and-the-orm/#chainable-query-builder).
+  You'll see two patterns in older code: dynamic finders like `findOneByEmail(value)` and explicit `where=` finders. The dynamic finders parameterize the value automatically — Wheels turns `findOneByEmail(emailVal)` into a prepared statement with a bound parameter. Writing `findOne(where="email = '#emailVal#'")` would interpolate the user input straight into SQL, which is a SQL injection vulnerability. Stick to dynamic finders for single-column lookups; reach for `where=` only when you need an operator other than equality, and always use `cfqueryparam`-style binding via the [chainable query builder](/v4-0-0/basics/models-and-the-orm/#chainable-query-builder).
 </Aside>
 
 ### Protect the Posts controller
@@ -750,4 +750,4 @@ Whether you stopped at 6a or continued to 6b, the user-facing behavior should be
 
 Part 7 covers testing and deploying the blog. You'll write your first model spec and controller spec using Wheels' BDD syntax, then add one browser test that drives a real Chromium through the signup flow. The chapter ends with a high-level deployment overview — how Wheels apps go to production and what changes in `config/production/settings.cfm`.
 
-The DI container you used to wire `SessionStrategy` in 6b is a core framework feature. See [The Dependency Injection Container](/v4-0-0-snapshot/core-concepts/dependency-injection/) for when to reach for it vs plain `new SomeClass()`.
+The DI container you used to wire `SessionStrategy` in 6b is a core framework feature. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/) for when to reach for it vs plain `new SomeClass()`.

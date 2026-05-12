@@ -78,7 +78,7 @@ Three quick checks before running anything:
    - `proxy.host` is the public hostname. `ssl: true` auto-issues a Let's Encrypt cert. If you point `proxy.host` at a CDN or custom reverse proxy instead, set `ssl: false`.
    - `registry.username` is the identity used for `docker login`. `password:` names one or more environment variables that resolve to the actual password — the password itself lives in `.kamal/secrets`.
 
-   See [deploy.yml Reference](/v4-0-0-snapshot/deployment/config-reference/) for every key.
+   See [deploy.yml Reference](/v4-0-0/deployment/config-reference/) for every key.
 
 3. **Populate `.kamal/secrets`.**
 
@@ -95,7 +95,7 @@ Three quick checks before running anything:
 
    The `$(...)` form runs through `bash` at deploy time — any command-line tool that prints to stdout works: `op`, `bw`, `aws secretsmanager get-secret-value`, `doppler secrets get`, or plain `cat config/master.key`.
 
-   See [Secrets](/v4-0-0-snapshot/deployment/secrets/) for the full adapter list.
+   See [Secrets](/v4-0-0/deployment/secrets/) for the full adapter list.
 
 4. **Configure env in `deploy.yml`.**
 
@@ -200,22 +200,22 @@ Three failure modes you'll hit at least once:
 <CardGrid>
   <LinkCard
     title="deploy.yml Reference"
-    href="/v4-0-0-snapshot/deployment/config-reference/"
+    href="/v4-0-0/deployment/config-reference/"
     description="Every top-level key in deploy.yml, in detail."
   />
   <LinkCard
     title="Secrets"
-    href="/v4-0-0-snapshot/deployment/secrets/"
+    href="/v4-0-0/deployment/secrets/"
     description="The 5 adapters for pulling values out of your vault."
   />
   <LinkCard
     title="Accessories"
-    href="/v4-0-0-snapshot/deployment/accessories/"
+    href="/v4-0-0/deployment/accessories/"
     description="Pinning databases, caches, and search to your deploy flow."
   />
   <LinkCard
     title="Hooks"
-    href="/v4-0-0-snapshot/deployment/hooks/"
+    href="/v4-0-0/deployment/hooks/"
     description="Local shell scripts that fire around every deploy."
   />
 </CardGrid>

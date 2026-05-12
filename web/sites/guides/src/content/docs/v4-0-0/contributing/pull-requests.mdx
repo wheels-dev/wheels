@@ -18,7 +18,7 @@ The Wheels repo accepts contributions through standard GitHub pull requests agai
 - What to expect during review, iteration, and merge
 
 <Aside type="note">
-  You should already know your way around Git and GitHub, and have a local Wheels dev environment working. If `wheels start` doesn't run yet, start with [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/) — it walks through `JAVA_HOME`, the `wheels` CLI, and SQLite.
+  You should already know your way around Git and GitHub, and have a local Wheels dev environment working. If `wheels start` doesn't run yet, start with [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) — it walks through `JAVA_HOME`, the `wheels` CLI, and SQLite.
 </Aside>
 
 ## Fork, clone, and set upstream
@@ -66,7 +66,7 @@ bash tools/test-local.sh model        # just model specs
 bash tools/test-local.sh security     # just security specs
 ```
 
-The script creates the SQLite test databases, starts a disposable LuCLI server on port 8080 if one isn't already up, runs the suite, prints a coloured pass/fail summary, and cleans up on exit. See [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/) for the full command surface, filter aliases, and the Docker cross-engine matrix for pre-merge verification.
+The script creates the SQLite test databases, starts a disposable LuCLI server on port 8080 if one isn't already up, runs the suite, prints a coloured pass/fail summary, and cleans up on exit. See [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) for the full command surface, filter aliases, and the Docker cross-engine matrix for pre-merge verification.
 
 <Aside type="caution">
   If any test fails locally, fix it before pushing. Don't rely on CI to find problems for you — iterating through CI is slow for you and noisy for reviewers.
@@ -131,7 +131,7 @@ During review you'll see:
 
 - **Inline comments on the diff** — respond per-comment; push follow-up commits on the same branch rather than force-pushing. The PR updates automatically.
 - **Requests for missing pieces** — test coverage, a `CHANGELOG.md` entry, a `.ai/wheels/` doc. These are listed in the template for a reason; add them rather than arguing they don't apply.
-- **Cross-engine fixes** — if CI flags Adobe CF or BoxLang failures a local Lucee run didn't catch, consult the cross-engine gotcha list in [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/#cross-engine-gotchas). Verify your fix against the local Docker container for that engine before pushing.
+- **Cross-engine fixes** — if CI flags Adobe CF or BoxLang failures a local Lucee run didn't catch, consult the cross-engine gotcha list in [Running Tests Locally](/v4-0-0/testing/running-tests-locally/#cross-engine-gotchas). Verify your fix against the local Docker container for that engine before pushing.
 
 Keep your branch up to date if review takes long enough that `develop` drifts:
 
@@ -157,6 +157,6 @@ A handful of optional follow-ups keep your local environment clean:
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Running Tests Locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="The test-local.sh script, filter flags, and the Docker cross-engine matrix." />
-  <LinkCard title="Contributing overview" href="/v4-0-0-snapshot/contributing/" description="How the contributing section is organised and what else lives here." />
+  <LinkCard title="Running Tests Locally" href="/v4-0-0/testing/running-tests-locally/" description="The test-local.sh script, filter flags, and the Docker cross-engine matrix." />
+  <LinkCard title="Contributing overview" href="/v4-0-0/contributing/" description="How the contributing section is organised and what else lives here." />
 </CardGrid>

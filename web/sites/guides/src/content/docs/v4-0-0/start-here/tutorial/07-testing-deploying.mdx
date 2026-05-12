@@ -81,7 +81,7 @@ Every spec is a CFC that extends `wheels.WheelsTest`. The `run()` method contain
 - `expect(x).toBeArray()` / `toBeStruct()` / `toBeQuery()` — type checks
 - `expect(x).toInclude(substring)` / `toHaveKey(name)` / `toHaveLength(n)` — content checks
 
-That's enough vocabulary to cover the first hundred specs you'll write. See [Testing](/v4-0-0-snapshot/testing/) for the full matcher list.
+That's enough vocabulary to cover the first hundred specs you'll write. See [Testing](/v4-0-0/testing/) for the full matcher list.
 
 <Aside type="caution">
   A spec CFC must extend `wheels.WheelsTest`, not `wheels.Test`. The latter is the legacy RocketUnit base — it doesn't have `describe`, `it`, or `expect`. If you see "toBeTrue is not a function," that's the cause.
@@ -153,7 +153,7 @@ For Phase 1 of the tutorial, one smoke-test spec is enough: verify that `GET /po
 
 </Steps>
 
-`$testClient().get("/posts")` makes a real HTTP request to your test server — the full pipeline fires: middleware, route match, controller instantiation, `config()`, filter chain, `index()` action, view render. `.assertOk()` asserts a 200 response. Chainable assertions cover redirects, response bodies, headers, cookies, and JSON. See [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/) for the full API.
+`$testClient().get("/posts")` makes a real HTTP request to your test server — the full pipeline fires: middleware, route match, controller instantiation, `config()`, filter chain, `index()` action, view render. `.assertOk()` asserts a 200 response. Chainable assertions cover redirects, response bodies, headers, cookies, and JSON. See [Controller Tests](/v4-0-0/testing/controller-tests/) for the full API.
 
 ## Browser spec — full signup to post to comment
 
@@ -247,7 +247,7 @@ To run only the browser specs:
 wheels test --filter=browser
 ```
 
-The `--filter` flag narrows the run to specs whose path contains the argument. Other filters accept `models`, `controllers`, or a full directory path. The exact syntax is still settling; see [CLI Reference](/v4-0-0-snapshot/command-line-tools/) for the current options.
+The `--filter` flag narrows the run to specs whose path contains the argument. Other filters accept `models`, `controllers`, or a full directory path. The exact syntax is still settling; see [CLI Reference](/v4-0-0/command-line-tools/) for the current options.
 
 <Aside type="note">
   `wheels test` runs against `db/test.sqlite` — a second SQLite file scaffolded alongside `db/development.sqlite` when you ran `wheels new`. The first time the test DB is empty, the framework includes `tests/populate.cfm` to apply your migrations. Subsequent runs reuse the schema until you delete the file. This means `[email protected]` from chapter 6's manual signup walkthrough lives ONLY in `db/development.sqlite` — chapter 7's signup spec gets a clean slate every run. Pass `--no-test-db` if you want app tests to run against the dev DB instead.
@@ -261,7 +261,7 @@ The `--filter` flag narrows the run to specs whose path contains the argument. O
 
 A Wheels app is a Java web application. You package the app (your code plus `vendor/wheels/` plus your config) and run it on a CFML engine — Lucee or Adobe ColdFusion — on whatever server you choose. Two paths are common in 2026: a Docker container shipped with [Kamal](https://kamal-deploy.org/), or a plain VM provisioned with Ansible, Chef, or Puppet. The tutorial recommends Kamal.
 
-Kamal is the deploy tool extracted from the Rails ecosystem. You describe your app, your servers, and your domain in a `config/deploy.yml`; `kamal setup` provisions the box the first time (installs Docker, pulls your image, wires up a reverse proxy with automatic TLS); `kamal deploy` ships every subsequent change with zero-downtime rolling restarts. Wheels ships a starter `Dockerfile` and a Kamal config template so you can get from "tests pass" to "it's live" in one afternoon. The full walkthrough — image build, secrets, TLS, migrations at boot — lives in [Deployment & Operations](/v4-0-0-snapshot/deployment/).
+Kamal is the deploy tool extracted from the Rails ecosystem. You describe your app, your servers, and your domain in a `config/deploy.yml`; `kamal setup` provisions the box the first time (installs Docker, pulls your image, wires up a reverse proxy with automatic TLS); `kamal deploy` ships every subsequent change with zero-downtime rolling restarts. Wheels ships a starter `Dockerfile` and a Kamal config template so you can get from "tests pass" to "it's live" in one afternoon. The full walkthrough — image build, secrets, TLS, migrations at boot — lives in [Deployment & Operations](/v4-0-0/deployment/).
 
 Whichever path you take, the production checklist is the same: serve HTTPS, set `environment=production` in `config/environment.cfm`, disable the development reload endpoint, point the app at a real database (Postgres or MySQL, not the SQLite file you've been using), set up log rotation, and run migrations automatically on each deploy. Each of those gets a dedicated page in the Deployment section.
 
@@ -296,7 +296,7 @@ Three things to verify before moving on:
 
 ## Troubleshooting
 
-**"Model spec fails with `cannot find Post.cfc`."** The test runner runs against `db/test.sqlite` (separate from your dev DB so chapter 6's manual signup doesn't leak in). The framework auto-runs `tests/populate.cfm` the first time the test DB is empty — that file ships with `wheels new` and runs your migrations against the test database. If you've customised `populate.cfm` and removed the `migrateToLatest()` call, restore it. Pass `--no-test-db` if you want the run to share the dev datasource. See [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) for ways to add test-specific seed data.
+**"Model spec fails with `cannot find Post.cfc`."** The test runner runs against `db/test.sqlite` (separate from your dev DB so chapter 6's manual signup doesn't leak in). The framework auto-runs `tests/populate.cfm` the first time the test DB is empty — that file ships with `wheels new` and runs your migrations against the test database. If you've customised `populate.cfm` and removed the `migrateToLatest()` call, restore it. Pass `--no-test-db` if you want the run to share the dev datasource. See [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) for ways to add test-specific seed data.
 
 **"Browser spec hangs for thirty seconds, then times out."** Playwright isn't installed. Run `wheels browser setup` — it downloads ~370MB and prints a progress bar. Once it completes, re-run the spec. If it still hangs, check that `this.browserTestSkipped` isn't incorrectly set; the guard clause should short-circuit when the JARs are missing, not when they're present.
 
@@ -305,9 +305,9 @@ Three things to verify before moving on:
 ## What to read next
 
 <CardGrid>
-  <LinkCard title="Bonus: Style with wheels-basecoat" href="/v4-0-0-snapshot/start-here/tutorial/08-bonus-basecoat/" description="Optional 30-min chapter. Install your first package and rewrite the post view with shadcn/ui-quality components." />
-  <LinkCard title="Core Concepts" href="/v4-0-0-snapshot/core-concepts/" description="Request lifecycle, MVC, ORM philosophy, DI container, middleware pipeline." />
-  <LinkCard title="Digging Deeper" href="/v4-0-0-snapshot/digging-deeper/" description="Background jobs, email, file uploads, caching, multi-tenancy, packages, SSE." />
-  <LinkCard title="Testing" href="/v4-0-0-snapshot/testing/" description="Full WheelsTest patterns, more browser tests, CI setup, fixtures." />
-  <LinkCard title="CLI Reference" href="/v4-0-0-snapshot/command-line-tools/" description="Every wheels command." />
+  <LinkCard title="Bonus: Style with wheels-basecoat" href="/v4-0-0/start-here/tutorial/08-bonus-basecoat/" description="Optional 30-min chapter. Install your first package and rewrite the post view with shadcn/ui-quality components." />
+  <LinkCard title="Core Concepts" href="/v4-0-0/core-concepts/" description="Request lifecycle, MVC, ORM philosophy, DI container, middleware pipeline." />
+  <LinkCard title="Digging Deeper" href="/v4-0-0/digging-deeper/" description="Background jobs, email, file uploads, caching, multi-tenancy, packages, SSE." />
+  <LinkCard title="Testing" href="/v4-0-0/testing/" description="Full WheelsTest patterns, more browser tests, CI setup, fixtures." />
+  <LinkCard title="CLI Reference" href="/v4-0-0/command-line-tools/" description="Every wheels command." />
 </CardGrid>

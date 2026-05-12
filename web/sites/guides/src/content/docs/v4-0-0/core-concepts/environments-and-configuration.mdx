@@ -34,8 +34,8 @@ Configuration loads from a small set of files in `config/`. The framework reads 
 - `config/settings.cfm` — shared defaults that apply to every environment. Middleware list, datasource name, reload password.
 - `config/environment.cfm` — reads the active environment name, typically from `WHEELS_ENV` with a sane default.
 - `config/<environment>/settings.cfm` — per-environment overrides. `config/development/settings.cfm`, `config/testing/settings.cfm`, `config/production/settings.cfm`. Loaded *after* the shared file, so these win.
-- `config/services.cfm` — DI container registrations. See [The Dependency Injection Container](/v4-0-0-snapshot/core-concepts/dependency-injection/).
-- `config/routes.cfm` — route definitions. See [How Routing Works](/v4-0-0-snapshot/core-concepts/how-routing-works/).
+- `config/services.cfm` — DI container registrations. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/).
+- `config/routes.cfm` — route definitions. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/).
 
 The per-environment override directory is only read for the environment you're in. `config/production/settings.cfm` never runs in development, which is exactly what you want when production is where the caching and HTTPS enforcement belong.
 
@@ -68,6 +68,6 @@ Local development uses `.env` files; production uses a secrets manager (1Passwor
 
 ## See also
 
-- [The Dependency Injection Container](/v4-0-0-snapshot/core-concepts/dependency-injection/) — also loaded at boot
-- [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) — environment-variable setup
-- [Deployment Overview](/v4-0-0-snapshot/deployment/) — environment per deploy target
+- [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/) — also loaded at boot
+- [Installing Wheels](/v4-0-0/start-here/installing/) — environment-variable setup
+- [Deployment Overview](/v4-0-0/deployment/) — environment per deploy target

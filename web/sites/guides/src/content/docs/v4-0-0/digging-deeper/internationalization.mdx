@@ -27,7 +27,7 @@ Wheels 4.0 does not ship i18n primitives — no `t()` helper, no `locales/` conv
 </Aside>
 
 <Aside type="note">
-  You should already know how [middleware](/v4-0-0-snapshot/core-concepts/middleware-pipeline/) and [views](/v4-0-0-snapshot/basics/views-layouts-partials/) work. Translation lookup runs in a view helper; locale detection runs in middleware.
+  You should already know how [middleware](/v4-0-0/core-concepts/middleware-pipeline/) and [views](/v4-0-0/basics/views-layouts-partials/) work. Translation lookup runs in a view helper; locale detection runs in middleware.
 </Aside>
 
 ## Detect the locale
@@ -189,7 +189,7 @@ mapper()
 
 Every request now has `params.locale` populated. Your `LocaleResolver` middleware already picks that up as step 2 in the precedence chain, so the rest of the stack stays unchanged. Add a root-level redirect to your default locale if bare `/` requests need to land on `/en/`.
 
-Make sure locale-scoped routes come before `.wildcard()` — see [how route ordering works](/v4-0-0-snapshot/core-concepts/how-routing-works/).
+Make sure locale-scoped routes come before `.wildcard()` — see [how route ordering works](/v4-0-0/core-concepts/how-routing-works/).
 
 ## Forms and validation
 
@@ -208,16 +208,16 @@ Both are workarounds — they leak through whenever core Wheels generates a mess
   <LinkCard
     title="Middleware Pipeline"
     description="Locale detection runs here — the natural home for request-level concerns that every controller should see resolved."
-    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+    href="/v4-0-0/core-concepts/middleware-pipeline/"
   />
   <LinkCard
     title="Views, Layouts, Partials"
     description="Where your t() helper gets called. Helpers in app/views/helpers.cfm are auto-loaded into every view."
-    href="/v4-0-0-snapshot/basics/views-layouts-partials/"
+    href="/v4-0-0/basics/views-layouts-partials/"
   />
   <LinkCard
     title="Controllers and Actions"
     description="Set the Lucee locale from a beforeAction filter, or read request.locale to branch on language in an action."
-    href="/v4-0-0-snapshot/basics/controllers-and-actions/"
+    href="/v4-0-0/basics/controllers-and-actions/"
   />
 </CardGrid>

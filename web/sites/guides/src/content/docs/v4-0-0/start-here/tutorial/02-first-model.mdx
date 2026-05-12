@@ -20,7 +20,7 @@ You'll add a `Post` model, create the `posts` table via a migration, seed two re
 Estimated time: 25 minutes.
 
 <Aside type="note">
-  This builds on [Part 1](/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/). You need the `blog` app from Part 1, with the dev server able to start on port 8080.
+  This builds on [Part 1](/v4-0-0/start-here/tutorial/01-hello-wheels/). You need the `blog` app from Part 1, with the dev server able to start on port 8080.
 </Aside>
 
 ## Where we left off
@@ -146,7 +146,7 @@ A few things to notice:
 
 - `up()` runs when applying the migration; `down()` reverses it.
 - `createTable(name="posts")` returns a builder. You add typed columns on it, then call `t.create()` to emit the DDL.
-- `t.timestamps()` adds three `datetime` columns at once: `createdAt`, `updatedAt`, and `deletedAt`. The first two are obvious bookkeeping; `deletedAt` is the soft-delete marker (covered in [Part 5](/v4-0-0-snapshot/start-here/tutorial/05-comments-streams/#checkpoint)). Don't add any of them by hand.
+- `t.timestamps()` adds three `datetime` columns at once: `createdAt`, `updatedAt`, and `deletedAt`. The first two are obvious bookkeeping; `deletedAt` is the soft-delete marker (covered in [Part 5](/v4-0-0/start-here/tutorial/05-comments-streams/#checkpoint)). Don't add any of them by hand.
 - `status` is stored as a short string matching the enum values. Wheels doesn't require a database-level enum type.
 - The `transaction { try ... catch ... }` shape looks verbose. It's what the generator produces too; it ensures partial schema changes roll back cleanly.
 
@@ -353,6 +353,6 @@ wheels reload
 
 ## What's next
 
-In [Part 3: CRUD Scaffold](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/) you'll throw most of Part 2's hand-written code away and let `wheels generate scaffold` produce the full create/read/update/delete stack. You'll also tour the Wheels package system and get a first look at Hotwire ahead of Part 4, where Turbo Frames land for real.
+In [Part 3: CRUD Scaffold](/v4-0-0/start-here/tutorial/03-crud-scaffold/) you'll throw most of Part 2's hand-written code away and let `wheels generate scaffold` produce the full create/read/update/delete stack. You'll also tour the Wheels package system and get a first look at Hotwire ahead of Part 4, where Turbo Frames land for real.
 
-Want a reference-level tour of what you just built? See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/) and [Migrations](/v4-0-0-snapshot/basics/migrations/).
+Want a reference-level tour of what you just built? See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) and [Migrations](/v4-0-0/basics/migrations/).

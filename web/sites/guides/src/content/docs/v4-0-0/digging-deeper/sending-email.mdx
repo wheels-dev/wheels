@@ -20,7 +20,7 @@ This page shows you how to send email from a Wheels app. You'll configure SMTP, 
 - How to point dev at a local capture tool and prod at a real SMTP provider
 
 <Aside type="note">
-  You should already know: basic Wheels controllers, generators, and the `params` struct. Finish the [tutorial](/v4-0-0-snapshot/start-here/tutorial/) first. If you've never enqueued a background job before, skim [Background Jobs](/v4-0-0-snapshot/digging-deeper/background-jobs/) — the async section below builds on it.
+  You should already know: basic Wheels controllers, generators, and the `params` struct. Finish the [tutorial](/v4-0-0/start-here/tutorial/) first. If you've never enqueued a background job before, skim [Background Jobs](/v4-0-0/digging-deeper/background-jobs/) — the async section below builds on it.
 </Aside>
 
 ## The one function
@@ -166,7 +166,7 @@ component extends="Controller" {
 
 Pass IDs through the job payload, not model instances — a serialized model re-hydrated from the queue drifts from the live record. The job fetches fresh on the worker.
 
-A worker process picks up the job and runs `perform()`; retries happen automatically with exponential backoff. See [Background Jobs](/v4-0-0-snapshot/digging-deeper/background-jobs/) for the full job lifecycle, worker CLI, and retry tuning.
+A worker process picks up the job and runs `perform()`; retries happen automatically with exponential backoff. See [Background Jobs](/v4-0-0/digging-deeper/background-jobs/) for the full job lifecycle, worker CLI, and retry tuning.
 
 ## Multi-part HTML + plain text
 
@@ -245,7 +245,7 @@ set(functionName="sendEmail",
     password=application.wo.env("POSTMARK_TOKEN"));
 ```
 
-Set the env var once in your deploy config; the same mailer code now routes mail correctly in every environment. See [Environments and Configuration](/v4-0-0-snapshot/core-concepts/environments-and-configuration/) for the full per-environment settings pipeline.
+Set the env var once in your deploy config; the same mailer code now routes mail correctly in every environment. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/) for the full per-environment settings pipeline.
 
 <Aside type="tip">
   To see what an email would look like without delivering it, pass `deliver=false` to `sendEmail()`. Wheels renders the body, composes the arguments, and returns the struct — useful in tests and in dev when you just want to eyeball the HTML.
@@ -267,7 +267,7 @@ Each provider has its own sender-verification and domain-setup flow (SPF, DKIM, 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Background Jobs" href="/v4-0-0-snapshot/digging-deeper/background-jobs/" description="Run the mail send on a worker so the request returns immediately." />
-  <LinkCard title="Authentication Patterns" href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/" description="Welcome emails, password-reset tokens, and the signup flow that triggers them." />
-  <LinkCard title="Environments and Configuration" href="/v4-0-0-snapshot/core-concepts/environments-and-configuration/" description="How per-environment settings load, including SMTP credentials." />
+  <LinkCard title="Background Jobs" href="/v4-0-0/digging-deeper/background-jobs/" description="Run the mail send on a worker so the request returns immediately." />
+  <LinkCard title="Authentication Patterns" href="/v4-0-0/digging-deeper/authentication-patterns/" description="Welcome emails, password-reset tokens, and the signup flow that triggers them." />
+  <LinkCard title="Environments and Configuration" href="/v4-0-0/core-concepts/environments-and-configuration/" description="How per-environment settings load, including SMTP credentials." />
 </CardGrid>

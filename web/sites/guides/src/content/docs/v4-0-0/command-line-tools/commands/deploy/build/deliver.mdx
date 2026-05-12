@@ -7,7 +7,7 @@ sidebar:
   order: 1
 ---
 
-Build, push, and pull a new image. Equivalent to `push` followed by `pull`. Skips the rolling traffic switch that [`wheels deploy`](/v4-0-0-snapshot/command-line-tools/commands/deploy/deploy/) would add.
+Build, push, and pull a new image. Equivalent to `push` followed by `pull`. Skips the rolling traffic switch that [`wheels deploy`](/v4-0-0/command-line-tools/commands/deploy/deploy/) would add.
 
 ## Synopsis
 
@@ -28,7 +28,7 @@ wheels deploy build deliver [--version=<v>] [--destination=<name>] [--dry-run]
 1. Runs locally: `docker build` → `docker push`.
 2. Runs remotely on every host: `docker pull`.
 
-No container is started — use [`wheels deploy`](/v4-0-0-snapshot/command-line-tools/commands/deploy/deploy/) for a full rollout.
+No container is started — use [`wheels deploy`](/v4-0-0/command-line-tools/commands/deploy/deploy/) for a full rollout.
 
 ## Example
 

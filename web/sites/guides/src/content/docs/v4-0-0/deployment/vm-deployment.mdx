@@ -17,7 +17,7 @@ This page shows you how to run a Wheels app on a traditional Linux VM — no con
 - How to terminate TLS in nginx, reverse-proxy to Lucee on loopback, and rotate logs
 
 <Aside type="note">
-  You should already know how Wheels reads its configuration — see [Environments and Configuration](/v4-0-0-snapshot/core-concepts/environments-and-configuration/). You need root (or sudo) on a Linux host and a domain pointed at its public IP.
+  You should already know how Wheels reads its configuration — see [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/). You need root (or sudo) on a Linux host and a domain pointed at its public IP.
 </Aside>
 
 ## Why deploy to a VM
@@ -115,7 +115,7 @@ RELOAD_PASSWORD=...
 EOF
 ```
 
-Wheels reads these at boot via `application.wo.env("VAR_NAME")`. See [Environments and Configuration](/v4-0-0-snapshot/core-concepts/environments-and-configuration/#secrets-handling) for where that lookup happens.
+Wheels reads these at boot via `application.wo.env("VAR_NAME")`. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/#secrets-handling) for where that lookup happens.
 
 ## systemd unit
 
@@ -146,7 +146,7 @@ WantedBy=multi-user.target
 
 Key pieces:
 
-- `EnvironmentFile=` loads the `.env` into the service's environment. `WHEELS_ENV=production` is what flips Wheels into [production mode](/v4-0-0-snapshot/core-concepts/environments-and-configuration/#environment-detection).
+- `EnvironmentFile=` loads the `.env` into the service's environment. `WHEELS_ENV=production` is what flips Wheels into [production mode](/v4-0-0/core-concepts/environments-and-configuration/#environment-detection).
 - `WorkingDirectory=/opt/myapp/current` is the symlink — systemd re-resolves it on every restart, so a deploy swap picks up the new release without editing the unit.
 - `Restart=on-failure` with `RestartSec=5` gives the process five seconds between restarts. If your init script does a graceful shutdown, also set `TimeoutStopSec=30`.
 - `User=lucee` runs the process as an unprivileged account. Don't run Lucee as root. Create the user up front: `sudo useradd --system --home /opt/myapp --shell /usr/sbin/nologin lucee`.
@@ -229,7 +229,7 @@ sudo certbot --nginx -d myapp.example.com
 Certbot edits the nginx config to wire the cert paths and installs a renewal timer. `sudo certbot renew --dry-run` verifies renewal works before the cert actually expires.
 
 <Aside type="note">
-  `X-Forwarded-Proto` is what tells Wheels the request came in over HTTPS even though Lucee itself is listening on plain HTTP inside the box. Without it, `isSecure()`-style checks and protocol-aware redirects misfire. See [HTTPS Detection](/v4-0-0-snapshot/digging-deeper/security/https-detection/).
+  `X-Forwarded-Proto` is what tells Wheels the request came in over HTTPS even though Lucee itself is listening on plain HTTP inside the box. Without it, `isSecure()`-style checks and protocol-aware redirects misfire. See [HTTPS Detection](/v4-0-0/digging-deeper/security/https-detection/).
 </Aside>
 
 ## Firewall
@@ -359,17 +359,17 @@ Major-version upgrades (Lucee 6 → 7, 7 → 8) deserve a staging run first. See
 <CardGrid>
   <LinkCard
     title="Environments and Configuration"
-    href="/v4-0-0-snapshot/core-concepts/environments-and-configuration/"
+    href="/v4-0-0/core-concepts/environments-and-configuration/"
     description="Where production settings live and how WHEELS_ENV flips the app into production mode."
   />
   <LinkCard
     title="Deployment overview"
-    href="/v4-0-0-snapshot/deployment/"
+    href="/v4-0-0/deployment/"
     description="The shape of a production-ready Wheels deploy and the deploy targets we document."
   />
   <LinkCard
     title="Multi-tenancy"
-    href="/v4-0-0-snapshot/digging-deeper/multi-tenancy/"
+    href="/v4-0-0/digging-deeper/multi-tenancy/"
     description="If this VM hosts more than one tenant — wiring TenantResolver and isolating data."
   />
 </CardGrid>

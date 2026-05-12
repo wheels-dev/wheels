@@ -19,7 +19,7 @@ The v4 guides live in `web/sites/guides/` as a Starlight site. Every page is an 
 - The local workflow: write → `pnpm verify:docs` → `pnpm build` → PR
 
 <Aside type="note">
-  You should already be comfortable with Markdown and MDX. If you haven't opened a Wheels PR before, start with [Pull Requests](/v4-0-0-snapshot/contributing/pull-requests/). Security issues follow a different path — see the disclosure note on the [Contributing index](/v4-0-0-snapshot/contributing/).
+  You should already be comfortable with Markdown and MDX. If you haven't opened a Wheels PR before, start with [Pull Requests](/v4-0-0/contributing/pull-requests/). Security issues follow a different path — see the disclosure note on the [Contributing index](/v4-0-0/contributing/).
 </Aside>
 
 ## Site layout
@@ -55,7 +55,7 @@ Every published page lives under a versioned content folder. The v4 snapshot is 
   - package.json
 </FileTree>
 
-The path on disk is the URL. `contributing/writing-docs.mdx` renders at `/v4-0-0-snapshot/contributing/writing-docs/`. Directory landing pages are named `index.mdx`. Use kebab-case filenames; the slug segment comes directly from the filename.
+The path on disk is the URL. `contributing/writing-docs.mdx` renders at `/v4-0-0/contributing/writing-docs/`. Directory landing pages are named `index.mdx`. Use kebab-case filenames; the slug segment comes directly from the filename.
 
 ## Pick a Diátaxis type
 
@@ -164,9 +164,9 @@ The sidebar is an explicit JSON tree — no auto-discovery. Edit `web/sites/guid
 ```json title="web/sites/guides/src/sidebars/v4-0-0-snapshot.json"
 {
   "label": "Contributing & Project",
-  "link": "/v4-0-0-snapshot/contributing/",
+  "link": "/v4-0-0/contributing/",
   "items": [
-    { "label": "Writing documentation", "link": "/v4-0-0-snapshot/contributing/writing-docs/" }
+    { "label": "Writing documentation", "link": "/v4-0-0/contributing/writing-docs/" }
   ]
 }
 ```
@@ -184,7 +184,7 @@ The `label` is what appears in the sidebar; `link` is the URL. Nested groups use
 3. **Run the harness against your page.**
 
    ```bash title="from web/sites/guides/"
-   pnpm verify:docs src/content/docs/v4-0-0-snapshot/contributing/writing-docs.mdx
+   pnpm verify:docs src/content/docs/v4-0-0/contributing/writing-docs.mdx
    ```
 
    Omit the path to check the whole site. The `pnpm verify:docs` script is defined in `web/sites/guides/package.json` and runs `node scripts/verify-docs/verify-docs.mjs`.
@@ -213,8 +213,8 @@ Every howto ends with a Related `<CardGrid>`. Three or four `<LinkCard>`s — ad
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Pull Requests" href="/v4-0-0-snapshot/contributing/pull-requests/" description="Fork-and-pull workflow, branch naming, definition of done, and the review loop." />
-  <LinkCard title="Coding Standards" href="/v4-0-0-snapshot/contributing/coding-standards/" description="Formatting rules, commit-message scopes, and the cross-engine gotchas to avoid." />
-  <LinkCard title="Contributing & Project" href="/v4-0-0-snapshot/contributing/" description="How the project is run, who the core team is, and the four ways you can help." />
-  <LinkCard title="Running Tests Locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="A howto built in this style — a good reference when you're shaping your own." />
+  <LinkCard title="Pull Requests" href="/v4-0-0/contributing/pull-requests/" description="Fork-and-pull workflow, branch naming, definition of done, and the review loop." />
+  <LinkCard title="Coding Standards" href="/v4-0-0/contributing/coding-standards/" description="Formatting rules, commit-message scopes, and the cross-engine gotchas to avoid." />
+  <LinkCard title="Contributing & Project" href="/v4-0-0/contributing/" description="How the project is run, who the core team is, and the four ways you can help." />
+  <LinkCard title="Running Tests Locally" href="/v4-0-0/testing/running-tests-locally/" description="A howto built in this style — a good reference when you're shaping your own." />
 </CardGrid>

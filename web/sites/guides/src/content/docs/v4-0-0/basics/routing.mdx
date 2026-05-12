@@ -19,7 +19,7 @@ Define the URL surface of your app in `config/routes.cfm`. This page shows how t
 - Which helper reads which route at call time
 
 <Aside type="note">
-  You should already know how the router matches URLs from [How Routing Works](/v4-0-0-snapshot/core-concepts/how-routing-works/). This page is the hands-on version — every example is a real `config/routes.cfm` fragment.
+  You should already know how the router matches URLs from [How Routing Works](/v4-0-0/core-concepts/how-routing-works/). This page is the hands-on version — every example is a real `config/routes.cfm` fragment.
 </Aside>
 
 ## Define a simple route
@@ -135,7 +135,7 @@ Every route with a `name` is reachable by name from anywhere in your app. The he
 - `buttonTo(route="post", key=post.id, text="Delete", method="delete")` — small form for non-GET verbs
 - `startFormTag(route="post", key=post.id, method="put")` — opens a form that posts to the route
 
-Rename the resource once in `routes.cfm` and every helper updates. See [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/) for `startFormTag` examples in context.
+Rename the resource once in `routes.cfm` and every helper updates. See [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/) for `startFormTag` examples in context.
 
 ## Listing all routes
 
@@ -150,7 +150,7 @@ Then in your app directory, run `wheels routes` to see the full table.
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="How Routing Works" href="/v4-0-0-snapshot/core-concepts/how-routing-works/" description="The match algorithm, resource expansion, and route model binding." />
-  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="Where route params land and what to do with them." />
-  <LinkCard title="Middleware Pipeline" href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/" description="What runs before the router sees the request." />
+  <LinkCard title="How Routing Works" href="/v4-0-0/core-concepts/how-routing-works/" description="The match algorithm, resource expansion, and route model binding." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="Where route params land and what to do with them." />
+  <LinkCard title="Middleware Pipeline" href="/v4-0-0/core-concepts/middleware-pipeline/" description="What runs before the router sees the request." />
 </CardGrid>

@@ -102,7 +102,7 @@ The reload password gates the **HTTP** endpoint `?reload=true` — it's an ACL a
 
 This matches how Rails (no reload password concept; `bin/rails restart`/deploy tooling instead), Laravel (`php artisan optimize:clear` and friends never authenticate), Symfony (`bin/console cache:clear`), Django (`manage.py runserver`/`migrate`), and Phoenix (`mix phx.server`) treat the CLI/HTTP boundary. The CLI carries owner-of-the-project trust by definition.
 
-If you need to keep `wheels reload` itself behind a credential check (e.g. a shared dev box where multiple users have shell access), gate it at the OS level with file permissions on `.env`. See [Security Hardening — Reload password](/v4-0-0-snapshot/deployment/security-hardening/#reload-password) for the full threat model.
+If you need to keep `wheels reload` itself behind a credential check (e.g. a shared dev box where multiple users have shell access), gate it at the OS level with file permissions on `.env`. See [Security Hardening — Reload password](/v4-0-0/deployment/security-hardening/#reload-password) for the full threat model.
 </Aside>
 
 #### Example

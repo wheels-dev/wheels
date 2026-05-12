@@ -18,14 +18,14 @@ This page shows you how to use controller filters to enforce access rules. You'l
 - How to extract complex authorization into a policy object
 
 <Aside type="note">
-  You should already know: how filters register in `config()` and why they must be `private` (see [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/)), plus one authentication strategy (see [Authentication Patterns](/v4-0-0-snapshot/digging-deeper/authentication-patterns/)). This page assumes a logged-in user lives at `session.userId` — the exact mechanism doesn't matter here.
+  You should already know: how filters register in `config()` and why they must be `private` (see [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/)), plus one authentication strategy (see [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/)). This page assumes a logged-in user lives at `session.userId` — the exact mechanism doesn't matter here.
 </Aside>
 
 ## The filter API — recap
 
 Filters register in `config()` with `filters(through="methodName", only="...", except="...", type="before")`. The `through` method must exist on the controller and must be declared `private` — a public filter becomes a routable action. Call `redirectTo()` or `renderText()` inside the filter to short-circuit the request; the action never runs and no further before-filters fire.
 
-For the full argument list, placement semantics, and a run-through of the order of operations, see [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/). This page focuses on what to put inside the filter.
+For the full argument list, placement semantics, and a run-through of the order of operations, see [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/). This page focuses on what to put inside the filter.
 
 ## Authentication gate
 
@@ -94,7 +94,7 @@ component extends="Controller" {
 }
 ```
 
-`params.post` is a model instance populated by route model binding, not a raw struct. Without binding, `params.post` doesn't exist and the dev-mode warning fires telling you to enable it. See [Route Model Binding](/v4-0-0-snapshot/basics/routing/) for the one-line fix (`binding=true` on the resource).
+`params.post` is a model instance populated by route model binding, not a raw struct. Without binding, `params.post` doesn't exist and the dev-mode warning fires telling you to enable it. See [Route Model Binding](/v4-0-0/basics/routing/) for the one-line fix (`binding=true` on the resource).
 
 <Aside type="tip">
   Ownership checks are cheap: one comparison. If you find yourself hitting the database inside the filter to reload the record, stop — either turn on route model binding and reuse `params.post`, or pull the authorization decision out into a policy object (below).
@@ -125,7 +125,7 @@ component extends="Controller" {
 }
 ```
 
-On the model side, keep role predicates out of ad-hoc WHERE strings. Use a named scope or the query builder — see [Query Builder and Scopes](/v4-0-0-snapshot/basics/query-builder-and-scopes/) for `model("User").where("role", "admin").get()` and the `scope(name="admins", where="role = 'admin'")` shorthand.
+On the model side, keep role predicates out of ad-hoc WHERE strings. Use a named scope or the query builder — see [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/) for `model("User").where("role", "admin").get()` and the `scope(name="admins", where="role = 'admin'")` shorthand.
 
 ## `verifies()` — type and presence guards
 
@@ -209,7 +209,7 @@ component extends="Controller" {
 }
 ```
 
-Register `PostPolicy` in the DI container so controllers resolve it by name instead of `new`-ing it every request — see [The Dependency Injection Container](/v4-0-0-snapshot/core-concepts/dependency-injection/) for `di.map("postPolicy").to("app.lib.PostPolicy").asSingleton()` and the matching `inject("postPolicy")` declaration.
+Register `PostPolicy` in the DI container so controllers resolve it by name instead of `new`-ing it every request — see [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/) for `di.map("postPolicy").to("app.lib.PostPolicy").asSingleton()` and the matching `inject("postPolicy")` declaration.
 
 ## Filter order
 
@@ -245,7 +245,7 @@ If `authenticate` redirects, the chain stops — `ownershipCheck` and `loadCateg
 
 ## Testing filters
 
-Filter methods are `private`, so you can't call them directly from a spec. Exercise them through the controller action and assert on the response — a redirect when access is denied, the rendered view when it's allowed. The [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/) guide walks through the full pattern using the `TestClient` — a real HTTP client with chainable assertions.
+Filter methods are `private`, so you can't call them directly from a spec. Exercise them through the controller action and assert on the response — a redirect when access is denied, the rendered view when it's allowed. The [Controller Tests](/v4-0-0/testing/controller-tests/) guide walks through the full pattern using the `TestClient` — a real HTTP client with chainable assertions.
 
 ## Related guides
 
@@ -253,21 +253,21 @@ Filter methods are `private`, so you can't call them directly from a spec. Exerc
   <LinkCard
     title="Authentication Patterns"
     description="Wire session, JWT, and token strategies. Pairs with this page — auth first, authz second."
-    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    href="/v4-0-0/digging-deeper/authentication-patterns/"
   />
   <LinkCard
     title="Controllers and Actions"
     description="The filter API, the action lifecycle, render and redirect. Start here if the recap above felt thin."
-    href="/v4-0-0-snapshot/basics/controllers-and-actions/"
+    href="/v4-0-0/basics/controllers-and-actions/"
   />
   <LinkCard
     title="Routing"
     description="Route model binding — the `binding=true` switch that makes `params.post` a model instance."
-    href="/v4-0-0-snapshot/basics/routing/"
+    href="/v4-0-0/basics/routing/"
   />
   <LinkCard
     title="Tutorial Part 6: Authentication"
     description="End-to-end walk-through of the canonical `authenticate` + `ownershipCheck` pair in a real blog."
-    href="/v4-0-0-snapshot/start-here/tutorial/06-authentication/"
+    href="/v4-0-0/start-here/tutorial/06-authentication/"
   />
 </CardGrid>

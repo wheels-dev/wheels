@@ -30,7 +30,7 @@ Uses the `builder:` block in `deploy.yml`:
 1. `docker build` with `context`, `dockerfile`, `args`, and `arch` from config.
 2. `docker push <image>:<version>`.
 
-If `builder.remote:` is set, the build happens on the remote builder over SSH instead of locally. Multi-arch builds require `docker buildx` (run [`build create`](/v4-0-0-snapshot/command-line-tools/commands/deploy/build/create/) once).
+If `builder.remote:` is set, the build happens on the remote builder over SSH instead of locally. Multi-arch builds require `docker buildx` (run [`build create`](/v4-0-0/command-line-tools/commands/deploy/build/create/) once).
 
 ## Example
 

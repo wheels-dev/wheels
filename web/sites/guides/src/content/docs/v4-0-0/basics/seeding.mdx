@@ -18,7 +18,7 @@ Seeds are the records your app can't live without — system roles, feature flag
 - How to run seeds from the CLI and scaffold new seed files
 
 <Aside type="note">
-  You should already know how to define models and write migrations. See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/) and [Migrations](/v4-0-0-snapshot/basics/migrations/).
+  You should already know how to define models and write migrations. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) and [Migrations](/v4-0-0/basics/migrations/).
 </Aside>
 
 ## Why seeds — and not migrations
@@ -139,12 +139,12 @@ For any of those, write a one-off migration or a script under `app/lib/` that yo
 
 Tests should not run production seeds. The test harness has its own fixture setup — `tests/populate.cfm` in the WheelsTest convention — that builds whatever records each spec needs and tears them down between runs. Pointing the seeder at a test database would couple your specs to whatever rows happen to live in `seeds.cfm`, which is the opposite of what fixtures are for.
 
-Testing content lands in Phase 2b; until then, see the stub at [Testing](/v4-0-0-snapshot/testing/).
+Testing content lands in Phase 2b; until then, see the stub at [Testing](/v4-0-0/testing/).
 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="The finders and create() calls seedOnce() wraps for idempotency." />
-  <LinkCard title="Migrations" href="/v4-0-0-snapshot/basics/migrations/" description="Schema changes belong here, not in seeds — and vice versa." />
-  <LinkCard title="Database and Multiple Datasources" href="/v4-0-0-snapshot/basics/database-and-multiple-datasources/" description="Configuring the connection seeds run against." />
+  <LinkCard title="Models and the ORM" href="/v4-0-0/basics/models-and-the-orm/" description="The finders and create() calls seedOnce() wraps for idempotency." />
+  <LinkCard title="Migrations" href="/v4-0-0/basics/migrations/" description="Schema changes belong here, not in seeds — and vice versa." />
+  <LinkCard title="Database and Multiple Datasources" href="/v4-0-0/basics/database-and-multiple-datasources/" description="Configuring the connection seeds run against." />
 </CardGrid>

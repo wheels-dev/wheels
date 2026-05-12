@@ -24,7 +24,7 @@ wheels deploy proxy reboot [--destination=<name>] [--dry-run]
 
 ## Behavior
 
-Per host: `docker stop kamal-proxy && docker rm kamal-proxy`, then the same `docker run` as [`proxy boot`](/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/boot/).
+Per host: `docker stop kamal-proxy && docker rm kamal-proxy`, then the same `docker run` as [`proxy boot`](/v4-0-0/command-line-tools/commands/deploy/proxy/boot/).
 
 Traffic drops while the proxy is down. Plan for a brief outage or stagger reboots host-by-host.
 

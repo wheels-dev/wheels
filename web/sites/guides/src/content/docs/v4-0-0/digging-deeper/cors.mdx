@@ -21,7 +21,7 @@ This page shows you how to let a browser on `https://client.example.com` call yo
 - How to debug failures with the browser console and `curl`
 
 <Aside type="note">
-  You should already know how middleware runs. See [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/).
+  You should already know how middleware runs. See [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/).
 </Aside>
 
 ## What CORS is
@@ -141,24 +141,24 @@ When a cross-origin request fails, work through this checklist:
 
 ## SSE and CORS
 
-`EventSource` — the browser API behind [Server-Sent Events](/v4-0-0-snapshot/digging-deeper/server-sent-events/) — can't send custom headers and relies on the browser's ambient cookie flow for authentication. If your SSE endpoint is cross-origin, you need `allowCredentials=true` and session cookies, and the allowed origin must be listed explicitly (no `"*"`). Everything else follows the rules above.
+`EventSource` — the browser API behind [Server-Sent Events](/v4-0-0/digging-deeper/server-sent-events/) — can't send custom headers and relies on the browser's ambient cookie flow for authentication. If your SSE endpoint is cross-origin, you need `allowCredentials=true` and session cookies, and the allowed origin must be listed explicitly (no `"*"`). Everything else follows the rules above.
 
 ## Related guides
 
 <CardGrid>
   <LinkCard
     title="Middleware Pipeline"
-    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+    href="/v4-0-0/core-concepts/middleware-pipeline/"
     description="How middleware runs, composes, and scopes across routes."
   />
   <LinkCard
     title="Server-Sent Events"
-    href="/v4-0-0-snapshot/digging-deeper/server-sent-events/"
+    href="/v4-0-0/digging-deeper/server-sent-events/"
     description="Stream events to the browser — pair with CORS for cross-origin SSE."
   />
   <LinkCard
     title="Authentication Patterns"
-    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    href="/v4-0-0/digging-deeper/authentication-patterns/"
     description="Cross-origin auth with cookies vs tokens."
   />
 </CardGrid>

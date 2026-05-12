@@ -19,7 +19,7 @@ Wheels ships a form helper for every native HTML input type. Most of them come i
 - What `data-auto-id` is, why it was added, and how to opt out
 
 <Aside type="note">
-  You should already know how controller data reaches the view. See [Views, Layouts, Partials](/v4-0-0-snapshot/basics/views-layouts-partials/).
+  You should already know how controller data reaches the view. See [Views, Layouts, Partials](/v4-0-0/basics/views-layouts-partials/).
 </Aside>
 
 ## startFormTag and endFormTag
@@ -38,7 +38,7 @@ Every Wheels form opens with `startFormTag` and closes with `endFormTag`. The he
 Key behaviours:
 
 - Generates `<form action="..." method="post">` with CSRF token auto-included.
-- `route="..."` uses named routes — see [Routing](/v4-0-0-snapshot/basics/routing/).
+- `route="..."` uses named routes — see [Routing](/v4-0-0/basics/routing/).
 - `method="put"` / `method="delete"` — Wheels emits a hidden `_method` field that gets translated server-side. Browsers only send GET and POST natively, so Wheels (like Rails, Laravel, and friends) uses the hidden field convention to expose the full set of REST verbs.
 
 ## Object-bound helpers — the core pattern
@@ -74,7 +74,7 @@ The canonical form pattern wraps inputs in labels, calls `errorMessagesFor` at t
 </cfoutput>
 ```
 
-The controller side is then just `model("Post").new(params.post)` — the `post[...]` field names deserialize straight into a nested struct. See [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/) for the params handling.
+The controller side is then just `model("Post").new(params.post)` — the `post[...]` field names deserialize straight into a nested struct. See [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) for the params handling.
 
 ## Every object-bound helper
 
@@ -156,7 +156,7 @@ Opt out globally in `config/settings.cfm` with `set(formHelperDataAutoId=false)`
 </cfoutput>
 ```
 
-The summary block only renders when the object has errors — on a new-form render before any submit, nothing appears. See [Validation and Error Display](/v4-0-0-snapshot/basics/validation-and-errors/) for the validations that populate these errors.
+The summary block only renders when the object has errors — on a new-form render before any submit, nothing appears. See [Validation and Error Display](/v4-0-0/basics/validation-and-errors/) for the validations that populate these errors.
 
 ## Labels
 
@@ -171,12 +171,12 @@ The third and most common pattern is in the canonical example above: skip the `l
 
 Wrap a form (or the block that contains it) in a `<turbo-frame id="...">`. When the user submits, Turbo intercepts the response and replaces just that frame's contents — no full-page reload, no scroll reset. The controller action is unchanged; only the response template needs to render a matching frame.
 
-See tutorial [Part 4: Validations + Turbo Frames](/v4-0-0-snapshot/start-here/tutorial/04-validations-frames/) for a worked example, including the server-side render.
+See tutorial [Part 4: Validations + Turbo Frames](/v4-0-0/start-here/tutorial/04-validations-frames/) for a worked example, including the server-side render.
 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="How params.post becomes a model — filters, params, render helpers." />
-  <LinkCard title="Views, Layouts, Partials" href="/v4-0-0-snapshot/basics/views-layouts-partials/" description="Where form markup lives — partials, layouts, escaping." />
-  <LinkCard title="Routing" href="/v4-0-0-snapshot/basics/routing/" description="Named routes, resources, and the URLs startFormTag resolves to." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="How params.post becomes a model — filters, params, render helpers." />
+  <LinkCard title="Views, Layouts, Partials" href="/v4-0-0/basics/views-layouts-partials/" description="Where form markup lives — partials, layouts, escaping." />
+  <LinkCard title="Routing" href="/v4-0-0/basics/routing/" description="Named routes, resources, and the URLs startFormTag resolves to." />
 </CardGrid>

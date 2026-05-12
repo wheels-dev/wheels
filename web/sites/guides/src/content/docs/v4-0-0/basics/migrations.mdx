@@ -20,12 +20,12 @@ Migrations are versioned CFCs that carry your schema forward and back. Each one 
 - When a migration can't be reversed and how to signal that honestly
 
 <Aside type="note">
-  A migration describes schema — the tables and columns your models map to. For the model side — finders, validations, callbacks — see [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/).
+  A migration describes schema — the tables and columns your models map to. For the model side — finders, validations, callbacks — see [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
 </Aside>
 
 ## Running migrations
 
-Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `schema_migrations`, so the app has to be running (or at least reachable) for them to work — see [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) for the server setup.
+Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `schema_migrations`, so the app has to be running (or at least reachable) for them to work — see [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
 wheels --version
@@ -73,7 +73,7 @@ component extends="wheels.migrator.Migration" hint="Create posts table" {
 Three things to note:
 
 1. `createTable("posts")` returns a table-builder object. Every column method — `t.string`, `t.integer`, `t.datetime` — mutates that builder. Nothing hits the database until `t.create()`.
-2. `t.timestamps()` creates `createdAt`, `updatedAt`, **and** a soft-delete column (`deletedAt`). Don't also add those columns by hand — you'll get duplicate-column errors. See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/) for how Wheels populates them automatically on save.
+2. `t.timestamps()` creates `createdAt`, `updatedAt`, **and** a soft-delete column (`deletedAt`). Don't also add those columns by hand — you'll get duplicate-column errors. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) for how Wheels populates them automatically on save.
 3. The column-builder methods use `columnNames` (plural) and `allowNull` — not `columnName` and `null`. A single call can create several same-typed columns at once: `t.string(columnNames="firstName,lastName", limit=60)`.
 
 ## Column types
@@ -99,7 +99,7 @@ These are the column-builder methods defined on `TableDefinition`. Every one tak
 | `t.references(referenceNames=, foreignKey=, onDelete=)` | INT + FK | creates `<name>Id` and a FK constraint |
 | `t.timestamps()` | creates `createdAt`, `updatedAt`, `deletedAt` | no arguments |
 
-`t.references(referenceNames="user")` is the shortcut for the common case of a foreign key: it adds an integer column named `userId`, plus a FK constraint pointing at `users.id`. Pass `polymorphic=true` to also create a `userType` string column for [polymorphic associations](/v4-0-0-snapshot/basics/associations/#polymorphic-associations). Pass `foreignKey=false` to skip the constraint and leave only the column — useful when the referenced table lives in another datasource.
+`t.references(referenceNames="user")` is the shortcut for the common case of a foreign key: it adds an integer column named `userId`, plus a FK constraint pointing at `users.id`. Pass `polymorphic=true` to also create a `userType` string column for [polymorphic associations](/v4-0-0/basics/associations/#polymorphic-associations). Pass `foreignKey=false` to skip the constraint and leave only the column — useful when the referenced table lives in another datasource.
 
 ## Indexes
 
@@ -121,7 +121,7 @@ component extends="wheels.migrator.Migration" hint="Index posts publishedAt" {
 
 If you don't pass `indexName`, Wheels generates one by joining the table name and first column — in this case `posts_publishedAt`. For multi-column indexes or when you want a predictable name, pass `indexName` explicitly. `removeIndex` always needs the name.
 
-Pass `unique=true` on `addIndex` to create a unique constraint, which is what [`validatesUniquenessOf`](/v4-0-0-snapshot/basics/validation-and-errors/) should sit on top of to race-proof the check at the database level.
+Pass `unique=true` on `addIndex` to create a unique constraint, which is what [`validatesUniquenessOf`](/v4-0-0/basics/validation-and-errors/) should sit on top of to race-proof the check at the database level.
 
 ## Foreign keys
 
@@ -147,7 +147,7 @@ component extends="wheels.migrator.Migration" hint="Add fk: comments.postId -> p
 `addForeignKey()` takes four required arguments and generates a constraint name like `FK_<table>_<referenceTable>`. The `down()` drops it by that generated name — `dropForeignKey(table=, keyName=)`. There's also `addReference()` / `dropReference()` for the convention case where the column is `<singular>Id` and the table is `<plural>`: `addReference(table="comments", referenceName="post")` does the same thing as the long form above.
 
 <Aside type="caution">
-  The public `addForeignKey()` method doesn't take `onDelete` or `onUpdate` — those options are only available on `t.references()` inside `createTable()`. If you need cascade behavior on a FK added later, drop and recreate the constraint inside the transaction, or drop the whole table and recreate it. Application-level cascade via `hasMany(name=..., dependent="delete")` is the simpler path; see [Associations](/v4-0-0-snapshot/basics/associations/).
+  The public `addForeignKey()` method doesn't take `onDelete` or `onUpdate` — those options are only available on `t.references()` inside `createTable()`. If you need cascade behavior on a FK added later, drop and recreate the constraint inside the transaction, or drop the whole table and recreate it. Application-level cascade via `hasMany(name=..., dependent="delete")` is the simpler path; see [Associations](/v4-0-0/basics/associations/).
 </Aside>
 
 ## Adding, removing, renaming columns
@@ -200,7 +200,7 @@ component extends="wheels.migrator.Migration" hint="Remove deprecated teaser" {
 
 ## Seeding via migrations — avoid, but if you must
 
-Real seed data — users, roles, reference lookups — belongs in `app/db/seeds.cfm` where it runs idempotently via `seedOnce()`. See [Seeding](/v4-0-0-snapshot/basics/seeding/) for that path. Don't use migrations for seed data in long-lived projects: a `INSERT` in a migration runs exactly once, so editing the inserted row later means writing another migration to update it, and fresh clones of the repo end up with whatever the most recent migration wrote.
+Real seed data — users, roles, reference lookups — belongs in `app/db/seeds.cfm` where it runs idempotently via `seedOnce()`. See [Seeding](/v4-0-0/basics/seeding/) for that path. Don't use migrations for seed data in long-lived projects: a `INSERT` in a migration runs exactly once, so editing the inserted row later means writing another migration to update it, and fresh clones of the repo end up with whatever the most recent migration wrote.
 
 That said, you'll occasionally want a migration to backfill data for a schema change — for example, populating a new column from an existing one. When you do, use inline SQL with `NOW()` for timestamps. Parameter binding in `execute()` is unreliable across databases, and database-specific date functions (`CURRENT_TIMESTAMP`, `GETDATE()`, `SYSDATETIME()`) don't port. `NOW()` works across MySQL, PostgreSQL, SQL Server, H2, and SQLite.
 
@@ -248,8 +248,8 @@ Generated migration files are named `<YYYYMMDDHHMMSS>_<snake_case_name>.cfc` —
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="Models map to the tables migrations create — finders, persistence, validations." />
-  <LinkCard title="Associations" href="/v4-0-0-snapshot/basics/associations/" description="The foreign-key columns that hasMany and belongsTo read from — defined here, declared there." />
-  <LinkCard title="Seeding" href="/v4-0-0-snapshot/basics/seeding/" description="Idempotent seed data via seedOnce() — the right home for reference records." />
-  <LinkCard title="Database and Multiple Datasources" href="/v4-0-0-snapshot/basics/database-and-multiple-datasources/" description="Configuring the connection migrations run against, and targeting a non-default datasource." />
+  <LinkCard title="Models and the ORM" href="/v4-0-0/basics/models-and-the-orm/" description="Models map to the tables migrations create — finders, persistence, validations." />
+  <LinkCard title="Associations" href="/v4-0-0/basics/associations/" description="The foreign-key columns that hasMany and belongsTo read from — defined here, declared there." />
+  <LinkCard title="Seeding" href="/v4-0-0/basics/seeding/" description="Idempotent seed data via seedOnce() — the right home for reference records." />
+  <LinkCard title="Database and Multiple Datasources" href="/v4-0-0/basics/database-and-multiple-datasources/" description="Configuring the connection migrations run against, and targeting a non-default datasource." />
 </CardGrid>

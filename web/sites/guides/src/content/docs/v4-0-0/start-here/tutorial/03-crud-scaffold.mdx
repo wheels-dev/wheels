@@ -310,7 +310,7 @@ wheels reload
 3. From the index, click "New post", fill the form, submit — a third post appears on the index page.
 
 <Aside type="note" title="CSRF protection blocks bare-curl POSTs">
-The first `curl` smoke-test is fine because it's a GET. Form-driven POST/PUT/DELETE from a browser also works — the layout exposes `<meta name="csrf-token">` and Turbo attaches the token to every write request. But a bare `curl -X POST` from your shell is rejected with `Wheels.InvalidAuthenticityToken` — that's [CSRF protection](/v4-0-0-snapshot/security/csrf-protection/) doing its job, not a bug. Use the browser for the write steps in the tutorial; if you script smoke tests later, scrape the token from a `GET /posts/new` first.
+The first `curl` smoke-test is fine because it's a GET. Form-driven POST/PUT/DELETE from a browser also works — the layout exposes `<meta name="csrf-token">` and Turbo attaches the token to every write request. But a bare `curl -X POST` from your shell is rejected with `Wheels.InvalidAuthenticityToken` — that's [CSRF protection](/v4-0-0/security/csrf-protection/) doing its job, not a bug. Use the browser for the write steps in the tutorial; if you script smoke tests later, scrape the token from a `GET /posts/new` first.
 </Aside>
 
 ## Troubleshooting
@@ -323,6 +323,6 @@ The first `curl` smoke-test is fine because it's a GET. Form-driven POST/PUT/DEL
 
 ## What's next
 
-In [Part 4: Validations + Turbo Frames](/v4-0-0-snapshot/start-here/tutorial/04-validations-frames/) you'll add `validatesPresenceOf` to the `Post` model, wrap the form in a `<turbo-frame>`, and watch inline validation errors update without a page reload.
+In [Part 4: Validations + Turbo Frames](/v4-0-0/start-here/tutorial/04-validations-frames/) you'll add `validatesPresenceOf` to the `Post` model, wrap the form in a `<turbo-frame>`, and watch inline validation errors update without a page reload.
 
-The scaffold's generated controller is a great starting point for [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/). The `_form.cfm` it emits is unpacked in [Views, Layouts, Partials](/v4-0-0-snapshot/basics/views-layouts-partials/).
+The scaffold's generated controller is a great starting point for [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/). The `_form.cfm` it emits is unpacked in [Views, Layouts, Partials](/v4-0-0/basics/views-layouts-partials/).

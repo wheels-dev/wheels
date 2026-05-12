@@ -19,7 +19,7 @@ Browser tests drive a real Chromium through Playwright. They click buttons, type
 - Cross-engine caveats (dialogs are Lucee-only)
 
 <Aside type="note">
-  You should already know BDD basics. See [Model Tests](/v4-0-0-snapshot/testing/model-tests/). For non-browser HTTP tests that don't need JavaScript or Turbo, prefer [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/), [Functional Tests](/v4-0-0-snapshot/testing/functional-tests/), or [View & Form Tests](/v4-0-0-snapshot/testing/view-and-form-tests/).
+  You should already know BDD basics. See [Model Tests](/v4-0-0/testing/model-tests/). For non-browser HTTP tests that don't need JavaScript or Turbo, prefer [Controller Tests](/v4-0-0/testing/controller-tests/), [Functional Tests](/v4-0-0/testing/functional-tests/), or [View & Form Tests](/v4-0-0/testing/view-and-form-tests/).
 </Aside>
 
 ## Install Playwright
@@ -292,7 +292,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 }
 ```
 
-See [View & Form Tests](/v4-0-0-snapshot/testing/view-and-form-tests/) for the same `data-auto-id` pattern applied to non-browser tests, and [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/) for how the attribute is generated.
+See [View & Form Tests](/v4-0-0/testing/view-and-form-tests/) for the same `data-auto-id` pattern applied to non-browser tests, and [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/) for how the attribute is generated.
 
 ## Cross-engine caveats
 
@@ -316,38 +316,38 @@ When a spec fails, the `aroundEach` hook captures a screenshot and HTML dump to 
 
 The CI workflow sets `WHEELS_CI=true`, which `BrowserTest.beforeAll` interprets as an opt-out from running browser specs (they're skipped via `this.browserTestSkipped = true`). To run browser specs in CI, also set `WHEELS_BROWSER_CI_ENABLE=true` and ensure Playwright is installed on the runner. CI caches the Playwright JARs and Chromium via the `browser-manifest.json` hash; first runs pay the download cost once.
 
-Set `WHEELS_BROWSER_TEST_BASE_URL` so `visit("/path")` resolves to the right origin on the CI runner. For local work, the default `http://localhost:8080` matches `wheels server run --port=8080`. See [CI Integration](/v4-0-0-snapshot/testing/ci-integration/) for the full workflow.
+Set `WHEELS_BROWSER_TEST_BASE_URL` so `visit("/path")` resolves to the right origin on the CI runner. For local work, the default `http://localhost:8080` matches `wheels server run --port=8080`. See [CI Integration](/v4-0-0/testing/ci-integration/) for the full workflow.
 
 ## When to skip browser tests
 
 Browser tests are the slowest layer of the pyramid — every spec boots Chromium, loads the page, and drives real user interactions. Reach for them when the behavior requires JavaScript, Turbo, or real-browser event ordering. For everything else, prefer a faster layer:
 
-- Server-rendered HTML, redirects, status codes → [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/)
-- Rendered markup without JS → [View & Form Tests](/v4-0-0-snapshot/testing/view-and-form-tests/)
-- Multi-controller flows without UI assertions → [Functional Tests](/v4-0-0-snapshot/testing/functional-tests/)
-- Model behavior → [Model Tests](/v4-0-0-snapshot/testing/model-tests/)
+- Server-rendered HTML, redirects, status codes → [Controller Tests](/v4-0-0/testing/controller-tests/)
+- Rendered markup without JS → [View & Form Tests](/v4-0-0/testing/view-and-form-tests/)
+- Multi-controller flows without UI assertions → [Functional Tests](/v4-0-0/testing/functional-tests/)
+- Model behavior → [Model Tests](/v4-0-0/testing/model-tests/)
 
 ## Related guides
 
 <CardGrid>
   <LinkCard
     title="View & Form Tests"
-    href="/v4-0-0-snapshot/testing/view-and-form-tests/"
+    href="/v4-0-0/testing/view-and-form-tests/"
     description="Test rendered HTML without launching a browser — data-auto-id and body assertions."
   />
   <LinkCard
     title="Forms and Form Helpers"
-    href="/v4-0-0-snapshot/basics/forms-and-form-helpers/"
+    href="/v4-0-0/basics/forms-and-form-helpers/"
     description="How Wheels form helpers emit id and data-auto-id attributes."
   />
   <LinkCard
     title="Controller Tests"
-    href="/v4-0-0-snapshot/testing/controller-tests/"
+    href="/v4-0-0/testing/controller-tests/"
     description="TestClient-driven request specs — faster than browser for non-JS flows."
   />
   <LinkCard
     title="Model Tests"
-    href="/v4-0-0-snapshot/testing/model-tests/"
+    href="/v4-0-0/testing/model-tests/"
     description="BDD primer — describe, it, matchers, lifecycle hooks."
   />
 </CardGrid>

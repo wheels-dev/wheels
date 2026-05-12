@@ -19,16 +19,16 @@ Functional tests exercise one feature slice through the entire server-side reque
 - How to test error paths — 404 from route model binding, redirects from auth filters, 200 re-render from validation failures
 
 <Aside type="note">
-  You should already know the request lifecycle. See [The Request Lifecycle](/v4-0-0-snapshot/core-concepts/request-lifecycle/). For the testing runtime, see [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/).
+  You should already know the request lifecycle. See [The Request Lifecycle](/v4-0-0/core-concepts/request-lifecycle/). For the testing runtime, see [Controller Tests](/v4-0-0/testing/controller-tests/).
 </Aside>
 
 ## Functional vs integration
 
 Both functional and integration tests use `TestClient` and hit the running app through real HTTP. The difference is scope — what question each kind of test is asking.
 
-An **integration test** covers a user journey. It chains several requests on one client, often across several controllers and sometimes with multiple users, and asserts the journey ends in the expected database state. That's the shape in [Integration Tests](/v4-0-0-snapshot/testing/integration-tests/).
+An **integration test** covers a user journey. It chains several requests on one client, often across several controllers and sometimes with multiple users, and asserts the journey ends in the expected database state. That's the shape in [Integration Tests](/v4-0-0/testing/integration-tests/).
 
-A **functional test** covers one feature slice end-to-end. One HTTP request, full pipeline — middleware runs, the router dispatches, filters fire, the action renders the view, the response comes back. It's broader than a [controller test](/v4-0-0-snapshot/testing/controller-tests/) (which asserts on the action in isolation) and narrower than an integration test (which chains requests). Reach for a functional test when you want to verify the whole server-side stack cooperates on one scenario — security headers present, the route matched the right action, filters behaved, the view rendered, the response shape is correct.
+A **functional test** covers one feature slice end-to-end. One HTTP request, full pipeline — middleware runs, the router dispatches, filters fire, the action renders the view, the response comes back. It's broader than a [controller test](/v4-0-0/testing/controller-tests/) (which asserts on the action in isolation) and narrower than an integration test (which chains requests). Reach for a functional test when you want to verify the whole server-side stack cooperates on one scenario — security headers present, the route matched the right action, filters behaved, the view rendered, the response shape is correct.
 
 ## A functional spec — full pipeline exercise
 
@@ -96,7 +96,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-`withHeader` attaches the request header; the assertion reads the response header the middleware set. See [CORS](/v4-0-0-snapshot/digging-deeper/cors/) for configuration options and preflight semantics.
+`withHeader` attaches the request header; the assertion reads the response header the middleware set. See [CORS](/v4-0-0/digging-deeper/cors/) for configuration options and preflight semantics.
 
 ## Testing rate limits
 
@@ -123,7 +123,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-Reuse one client so the rate-limit key (by default, the client IP) stays stable across the loop. See [Rate Limiting](/v4-0-0-snapshot/digging-deeper/rate-limiting/) for strategies (`fixedWindow`, `slidingWindow`, `tokenBucket`) and storage options.
+Reuse one client so the rate-limit key (by default, the client IP) stays stable across the loop. See [Rate Limiting](/v4-0-0/digging-deeper/rate-limiting/) for strategies (`fixedWindow`, `slidingWindow`, `tokenBucket`) and storage options.
 
 ## Testing route model binding
 
@@ -142,7 +142,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-`assertNotFound()` is sugar for `assertStatus(404)`. See [Route Model Binding](/v4-0-0-snapshot/digging-deeper/route-model-binding/) for how binding resolves the key into `params.post`.
+`assertNotFound()` is sugar for `assertStatus(404)`. See [Route Model Binding](/v4-0-0/digging-deeper/route-model-binding/) for how binding resolves the key into `params.post`.
 
 ## Testing authentication filters
 
@@ -195,13 +195,13 @@ A rough heuristic: if the spec title reads like a single feature statement ("att
 
 ## When to choose browser over functional
 
-Functional tests cover the server side only — what HTML the server ships on the first request. They can't exercise JavaScript, Turbo Frame/Stream swaps, client-side validation, or form submissions wired to `fetch`. For any flow whose behaviour emerges in the browser after the initial HTML, write a browser test instead. For pure server-rendered flows — classic form POST, redirect, GET — functional tests cover the same ground an order of magnitude faster. See [Browser Tests](/v4-0-0-snapshot/testing/browser-tests/) for the Playwright-backed DSL.
+Functional tests cover the server side only — what HTML the server ships on the first request. They can't exercise JavaScript, Turbo Frame/Stream swaps, client-side validation, or form submissions wired to `fetch`. For any flow whose behaviour emerges in the browser after the initial HTML, write a browser test instead. For pure server-rendered flows — classic form POST, redirect, GET — functional tests cover the same ground an order of magnitude faster. See [Browser Tests](/v4-0-0/testing/browser-tests/) for the Playwright-backed DSL.
 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Integration Tests" href="/v4-0-0-snapshot/testing/integration-tests/" description="Multi-step workflows, cookie-jar session state, and cross-controller assertions on database state." />
-  <LinkCard title="Controller Tests" href="/v4-0-0-snapshot/testing/controller-tests/" description="Single-action response shape, redirects, filters, flash messages, and JSON responses." />
-  <LinkCard title="Browser Tests" href="/v4-0-0-snapshot/testing/browser-tests/" description="Real browser automation via Playwright for JavaScript, Turbo, and UI-driven flows." />
-  <LinkCard title="Middleware Pipeline" href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/" description="How middleware wraps every request — the layer your functional tests exercise before the controller." />
+  <LinkCard title="Integration Tests" href="/v4-0-0/testing/integration-tests/" description="Multi-step workflows, cookie-jar session state, and cross-controller assertions on database state." />
+  <LinkCard title="Controller Tests" href="/v4-0-0/testing/controller-tests/" description="Single-action response shape, redirects, filters, flash messages, and JSON responses." />
+  <LinkCard title="Browser Tests" href="/v4-0-0/testing/browser-tests/" description="Real browser automation via Playwright for JavaScript, Turbo, and UI-driven flows." />
+  <LinkCard title="Middleware Pipeline" href="/v4-0-0/core-concepts/middleware-pipeline/" description="How middleware wraps every request — the layer your functional tests exercise before the controller." />
 </CardGrid>

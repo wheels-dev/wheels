@@ -20,7 +20,7 @@ Controller tests exercise the full request pipeline: routing, filters, action di
 - How to test JSON responses with `assertJson` and `assertJsonPath`
 
 <Aside type="note">
-  You should already know how controller actions and filters work. See [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/) and [Authorization & Filters](/v4-0-0-snapshot/digging-deeper/authorization-and-filters/). For the BDD basics — `describe`, `it`, `expect` — see [Model Tests](/v4-0-0-snapshot/testing/model-tests/).
+  You should already know how controller actions and filters work. See [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) and [Authorization & Filters](/v4-0-0/digging-deeper/authorization-and-filters/). For the BDD basics — `describe`, `it`, `expect` — see [Model Tests](/v4-0-0/testing/model-tests/).
 </Aside>
 
 ## Minimal spec shape
@@ -237,13 +237,13 @@ it("creates a post inside a rollback", () => {
 });
 ```
 
-The [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) guide covers the full `populate.cfm` pattern and strategies for keeping specs independent when the suite grows.
+The [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) guide covers the full `populate.cfm` pattern and strategies for keeping specs independent when the suite grows.
 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Model Tests" href="/v4-0-0-snapshot/testing/model-tests/" description="Validations, callbacks, custom methods, associations, and scopes — the bulk of a healthy suite." />
-  <LinkCard title="Authorization & Filters" href="/v4-0-0-snapshot/digging-deeper/authorization-and-filters/" description="Declaring before filters, role checks, and ownership guards — the behavior your controller specs assert." />
-  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="How actions map to routes, how params are parsed, how rendering and redirects work." />
-  <LinkCard title="Testing Overview" href="/v4-0-0-snapshot/testing/" description="Test categories, where specs live, how the runner boots, and setup files that matter." />
+  <LinkCard title="Model Tests" href="/v4-0-0/testing/model-tests/" description="Validations, callbacks, custom methods, associations, and scopes — the bulk of a healthy suite." />
+  <LinkCard title="Authorization & Filters" href="/v4-0-0/digging-deeper/authorization-and-filters/" description="Declaring before filters, role checks, and ownership guards — the behavior your controller specs assert." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="How actions map to routes, how params are parsed, how rendering and redirects work." />
+  <LinkCard title="Testing Overview" href="/v4-0-0/testing/" description="Test categories, where specs live, how the runner boots, and setup files that matter." />
 </CardGrid>

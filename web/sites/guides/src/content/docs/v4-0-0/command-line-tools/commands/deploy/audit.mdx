@@ -27,7 +27,7 @@ wheels deploy audit [--tail=<N>] [--destination=<name>] [--dry-run]
 
 Dispatches `tail -n <N> /tmp/kamal-audit.log` to every host in parallel, prefixes output by host. Entries are plain text — one event per line.
 
-The audit log is on ephemeral `/tmp`, so it doesn't survive host reboots. For durable audit, pipe the log into your observability stack via a hook — see [Hooks](/v4-0-0-snapshot/deployment/hooks/).
+The audit log is on ephemeral `/tmp`, so it doesn't survive host reboots. For durable audit, pipe the log into your observability stack via a hook — see [Hooks](/v4-0-0/deployment/hooks/).
 
 ## Example
 

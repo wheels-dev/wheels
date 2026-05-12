@@ -19,7 +19,7 @@ Validations live on the model and run automatically on `save()` and `update()`. 
 - How to write custom validation methods and when to scope validations with `when` or `condition`
 
 <Aside type="note">
-  You should already know why validations live on the model. See [ORM Philosophy](/v4-0-0-snapshot/core-concepts/orm-philosophy/).
+  You should already know why validations live on the model. See [ORM Philosophy](/v4-0-0/core-concepts/orm-philosophy/).
 </Aside>
 
 ## Declaring validations
@@ -107,7 +107,7 @@ The fastest way to show every error is `errorMessagesFor`. Drop it above the for
 </cfoutput>
 ```
 
-The argument is the view-scope variable name — `"post"` here matches `posts` in the `new` action. See [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/) for the wider form flow this slots into.
+The argument is the view-scope variable name — `"post"` here matches `posts` in the `new` action. See [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/) for the wider form flow this slots into.
 
 ## Per-field error display
 
@@ -177,7 +177,7 @@ component extends="Model" {
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Forms and Form Helpers" href="/v4-0-0-snapshot/basics/forms-and-form-helpers/" description="The object-bound form helpers that pair with errorMessagesFor." />
-  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="The create / update flow that triggers validations." />
-  <LinkCard title="ORM Philosophy" href="/v4-0-0-snapshot/core-concepts/orm-philosophy/" description="Why validations live on the model, not the controller." />
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-0/basics/forms-and-form-helpers/" description="The object-bound form helpers that pair with errorMessagesFor." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="The create / update flow that triggers validations." />
+  <LinkCard title="ORM Philosophy" href="/v4-0-0/core-concepts/orm-philosophy/" description="Why validations live on the model, not the controller." />
 </CardGrid>

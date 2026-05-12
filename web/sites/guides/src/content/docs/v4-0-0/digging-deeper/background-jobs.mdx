@@ -21,7 +21,7 @@ This page shows you how to move slow work out of the request cycle. You'll defin
 - How to test `perform()` in isolation
 
 <Aside type="note">
-  You should already know how models work — see [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/). Jobs persist to a `wheels_jobs` table; every enqueued job is a row. The table auto-creates on first use, so there's no migration to run.
+  You should already know how models work — see [Models and the ORM](/v4-0-0/basics/models-and-the-orm/). Jobs persist to a `wheels_jobs` table; every enqueued job is a row. The table auto-creates on first use, so there's no migration to run.
 </Aside>
 
 ## Define a job
@@ -253,21 +253,21 @@ Run it from a cron or scheduled task. A weekly purge of completed rows older tha
   <LinkCard
     title="Models and the ORM"
     description="Jobs persist as rows. Read this first if `model().findByKey()` and callbacks aren't second nature yet."
-    href="/v4-0-0-snapshot/basics/models-and-the-orm/"
+    href="/v4-0-0/basics/models-and-the-orm/"
   />
   <LinkCard
     title="Authorization & Filters"
     description="The previous page in Digging Deeper. Filters run before actions; jobs run after them."
-    href="/v4-0-0-snapshot/digging-deeper/authorization-and-filters/"
+    href="/v4-0-0/digging-deeper/authorization-and-filters/"
   />
   <LinkCard
     title="Testing"
     description="How to spec `perform()` in isolation, fake external services, and keep job tests fast."
-    href="/v4-0-0-snapshot/testing/"
+    href="/v4-0-0/testing/"
   />
   <LinkCard
     title="Environments and Configuration"
     description="Where to tune worker intervals and retry caps per environment (dev, staging, production)."
-    href="/v4-0-0-snapshot/core-concepts/environments-and-configuration/"
+    href="/v4-0-0/core-concepts/environments-and-configuration/"
   />
 </CardGrid>

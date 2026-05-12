@@ -11,7 +11,7 @@ import { Aside } from '@astrojs/starlight/components';
 This is the complete `deploy.yml` schema. `wheels deploy` loads `config/deploy.yml` on every invocation, validates it against this schema, and hands it to every subcommand. Unknown top-level keys fail fast with a line-scoped error; required keys that are missing fail with a pointer to the file.
 
 <Aside type="note" title="You should already know">
-You've read [Your First Deploy](/v4-0-0-snapshot/deployment/first-deploy/) and understand the shape of a working deploy. This page is the dry reference — no narrative, just the schema.
+You've read [Your First Deploy](/v4-0-0/deployment/first-deploy/) and understand the shape of a working deploy. This page is the dry reference — no narrative, just the schema.
 </Aside>
 
 ## Required keys
@@ -242,7 +242,7 @@ accessories:
       - config/init.sql:/docker-entrypoint-initdb.d/init.sql
 ```
 
-See [Accessories](/v4-0-0-snapshot/deployment/accessories/) for the full walk-through.
+See [Accessories](/v4-0-0/deployment/accessories/) for the full walk-through.
 
 ## `volumes`, `labels`
 
@@ -267,7 +267,7 @@ hooks:
   path: .kamal/hooks
 ```
 
-See [Hooks](/v4-0-0-snapshot/deployment/hooks/) for what the scripts look like.
+See [Hooks](/v4-0-0/deployment/hooks/) for what the scripts look like.
 
 ## `healthcheck`
 
@@ -373,7 +373,7 @@ Only uppercase-and-underscore tokens are expanded — `${APP_NAME}` matches; low
 No loops, conditionals, or method calls. If you need logic (e.g. different values per destination), resolve it in `.kamal/secrets` or a `.kamal/secrets.<destination>` overlay first and reference the result with `${VAR}`.
 
 <Aside type="caution" title="No ERB">
-Ruby Kamal supports `<%= ... %>` ERB inside `deploy.yml`. Wheels does not — rendering ERB would require embedding a Ruby runtime in the CFML CLI. This is the single schema divergence. Most ERB-using configs convert mechanically by replacing `<%= ENV["X"] %>` with `${X}`. See [Migrating from Kamal](/v4-0-0-snapshot/deployment/migrating-from-kamal/) for the full conversion patterns.
+Ruby Kamal supports `<%= ... %>` ERB inside `deploy.yml`. Wheels does not — rendering ERB would require embedding a Ruby runtime in the CFML CLI. This is the single schema divergence. Most ERB-using configs convert mechanically by replacing `<%= ENV["X"] %>` with `${X}`. See [Migrating from Kamal](/v4-0-0/deployment/migrating-from-kamal/) for the full conversion patterns.
 </Aside>
 
 ## Destination overlays

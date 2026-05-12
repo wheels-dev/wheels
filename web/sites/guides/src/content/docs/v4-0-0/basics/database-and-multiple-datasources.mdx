@@ -19,7 +19,7 @@ Every Wheels model reads and writes through a named datasource. Most apps have e
 - What Wheels 4.0 supports across database engines
 
 <Aside type="note">
-  You should already know how to define models. See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/).
+  You should already know how to define models. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
 </Aside>
 
 ## The default datasource
@@ -44,7 +44,7 @@ set(dataSourceUserName = application.wo.env("DB_USER"));
 set(dataSourcePassword = application.wo.env("DB_PASSWORD"));
 ```
 
-Environment-specific settings are loaded after the shared ones, so whatever you set here wins. Read secrets from the environment with `application.wo.env("VAR_NAME")` — never commit credentials into the repo. See [Environments and Configuration](/v4-0-0-snapshot/core-concepts/environments-and-configuration/) for the full configuration loading order.
+Environment-specific settings are loaded after the shared ones, so whatever you set here wins. Read secrets from the environment with `application.wo.env("VAR_NAME")` — never commit credentials into the repo. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/) for the full configuration loading order.
 
 ## Per-model override
 
@@ -161,7 +161,7 @@ component extends="Model" {
 
 The `?` placeholder plus the `parameters` array gets you parameter binding through `cfqueryparam`. Never concatenate user input into the SQL string — that's the canonical SQL-injection gap. A hardening walkthrough lands in Phase 2b; until then the rule is: if a value comes from `params`, `session`, or any request-scoped source, it goes through a placeholder, not through string interpolation.
 
-For queries that return model instances rather than a raw query result, stay with `findAll(where="...")` or the [query builder](/v4-0-0-snapshot/basics/query-builder-and-scopes/). Raw `queryExecute()` is for the cases where you genuinely want a query object, not an array of objects.
+For queries that return model instances rather than a raw query result, stay with `findAll(where="...")` or the [query builder](/v4-0-0/basics/query-builder-and-scopes/). Raw `queryExecute()` is for the cases where you genuinely want a query object, not an array of objects.
 
 ## Connection pooling
 
@@ -182,8 +182,8 @@ The Wheels 4.0 core test suite runs on Lucee 7 + SQLite for day-to-day developme
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="Defining a model, finders, persistence, and the non-convention overrides this page extends." />
-  <LinkCard title="Query Builder and Scopes" href="/v4-0-0-snapshot/basics/query-builder-and-scopes/" description="Chainable queries, reusable scopes, enums, and batch processing — the safe alternative to raw SQL." />
-  <LinkCard title="Migrations" href="/v4-0-0-snapshot/basics/migrations/" description="Schema changes, column types, and indexes. The table structure your datasource exposes." />
-  <LinkCard title="Environments and Configuration" href="/v4-0-0-snapshot/core-concepts/environments-and-configuration/" description="The configuration loading order. Datasource settings usually differ per environment." />
+  <LinkCard title="Models and the ORM" href="/v4-0-0/basics/models-and-the-orm/" description="Defining a model, finders, persistence, and the non-convention overrides this page extends." />
+  <LinkCard title="Query Builder and Scopes" href="/v4-0-0/basics/query-builder-and-scopes/" description="Chainable queries, reusable scopes, enums, and batch processing — the safe alternative to raw SQL." />
+  <LinkCard title="Migrations" href="/v4-0-0/basics/migrations/" description="Schema changes, column types, and indexes. The table structure your datasource exposes." />
+  <LinkCard title="Environments and Configuration" href="/v4-0-0/core-concepts/environments-and-configuration/" description="The configuration loading order. Datasource settings usually differ per environment." />
 </CardGrid>

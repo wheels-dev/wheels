@@ -19,7 +19,7 @@ A view is a `.cfm` template that runs after your action finishes. It renders ins
 - Which helpers to reach for when you need a link, an image, or an asset tag
 
 <Aside type="note">
-  You should already know MVC basics. See [MVC in Wheels](/v4-0-0-snapshot/core-concepts/mvc-in-wheels/).
+  You should already know MVC basics. See [MVC in Wheels](/v4-0-0/core-concepts/mvc-in-wheels/).
 </Aside>
 
 ## View file structure
@@ -67,7 +67,7 @@ The underscore isn't decorative — it's how Wheels tells a partial apart from a
 
 ## Rendering the action view
 
-After the controller action returns, Wheels looks for a view matching the controller and action. `Posts#index` renders `app/views/posts/index.cfm`. You don't call a render function unless you want something other than the default — see [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/) for `renderView(action="summary")` and the other overrides.
+After the controller action returns, Wheels looks for a view matching the controller and action. `Posts#index` renders `app/views/posts/index.cfm`. You don't call a render function unless you want something other than the default — see [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) for `renderView(action="summary")` and the other overrides.
 
 ## Overriding layouts
 
@@ -122,13 +122,13 @@ Partial scope is isolated. The partial doesn't see the surrounding view's local 
 
 Inside `app/views/comments/_comment.cfm`, the named argument `comment` is available as a local variable — `comment.body`, `comment.author`, and so on. Cross-controller partials take a path: `includePartial(partial="shared/header")` loads `app/views/shared/_header.cfm`.
 
-`renderPartial` is the controller-side equivalent — use it from an action when you want to return a partial as the full response (Turbo Frame swaps, AJAX updates). Same partial file, same arguments; the difference is who calls it. See [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/).
+`renderPartial` is the controller-side equivalent — use it from an action when you want to return a partial as the full response (Turbo Frame swaps, AJAX updates). Same partial file, same arguments; the difference is who calls it. See [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/).
 
 ## Escaping and safety
 
 Anything a user typed — a search term, a comment body, a profile bio — must be escaped before it lands in HTML. The `h()` helper wraps `EncodeForHTML` and is the one-character way to do it in a view: `h(userSubmittedText)`.
 
-Wheels 4.0 form helpers escape their input by default (see [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/)). Outside the form helpers, escaping is on you. Never interpolate user input into a view unescaped — that's the classic XSS gap.
+Wheels 4.0 form helpers escape their input by default (see [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/)). Outside the form helpers, escaping is on you. Never interpolate user input into a view unescaped — that's the classic XSS gap.
 
 ```cfm {test:compile} title="app/views/search/show.cfm"
 <cfoutput>
@@ -147,12 +147,12 @@ The helpers you'll reach for most often in view code:
 - `javaScriptIncludeTag("app.js")` — renders `<script src>` against `public/javascripts/`.
 - `h(value)` — HTML-escape a string before interpolating it.
 
-Form and field helpers (`textField`, `emailField`, `submitTag`, and friends) get their own page — see [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/).
+Form and field helpers (`textField`, `emailField`, `submitTag`, and friends) get their own page — see [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/).
 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="What runs before the view — filters, params, render overrides." />
-  <LinkCard title="Forms and Form Helpers" href="/v4-0-0-snapshot/basics/forms-and-form-helpers/" description="Object-bound inputs, HTML5 field helpers, submit tags." />
-  <LinkCard title="Conventions over Configuration" href="/v4-0-0-snapshot/core-concepts/conventions-over-configuration/" description="Why the filename conventions on this page are load-bearing." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="What runs before the view — filters, params, render overrides." />
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-0/basics/forms-and-form-helpers/" description="Object-bound inputs, HTML5 field helpers, submit tags." />
+  <LinkCard title="Conventions over Configuration" href="/v4-0-0/core-concepts/conventions-over-configuration/" description="Why the filename conventions on this page are load-bearing." />
 </CardGrid>

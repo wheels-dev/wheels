@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page is for readers who want to understand how `wheels deploy` is put together — whether you're extending it, debugging it, evaluating it against other deploy tools, or just curious about the port strategy. If you're just trying to ship an app, start with [Your First Deploy](/v4-0-0-snapshot/deployment/first-deploy/) instead.
+This page is for readers who want to understand how `wheels deploy` is put together — whether you're extending it, debugging it, evaluating it against other deploy tools, or just curious about the port strategy. If you're just trying to ship an app, start with [Your First Deploy](/v4-0-0/deployment/first-deploy/) instead.
 
 **You'll learn:**
 
@@ -53,7 +53,7 @@ Two choices in that table warrant commentary.
 If you have a working Ruby Kamal setup, you can run `wheels deploy config` against your existing `config/deploy.yml` and see the resolved configuration — without changing anything on your servers.
 </Aside>
 
-See [Migrating from Kamal](/v4-0-0-snapshot/deployment/migrating-from-kamal/) for the complete switch-over checklist.
+See [Migrating from Kamal](/v4-0-0/deployment/migrating-from-kamal/) for the complete switch-over checklist.
 
 ## The one divergence: ERB removed
 
@@ -154,9 +154,9 @@ Tests live in `cli/lucli/tests/specs/deploy/` and extend `wheels.wheelstest.syst
 
 Naming what `wheels deploy` deliberately isn't helps calibrate when to reach for it:
 
-- **Not Kubernetes.** `wheels deploy` drives `docker` remotely over SSH, not the Kubernetes API. For k8s, use your existing pipeline; see [Docker Deployment](/v4-0-0-snapshot/deployment/docker-deployment/) for image hygiene guidance.
-- **Not systemd-native.** For servlet-container deploys under systemd (CommandBox, Tomcat, Jetty), stay on that path — see [VM and bare-metal deployment](/v4-0-0-snapshot/deployment/vm-deployment/).
-- **Not Compose-only.** Single-host Docker Compose is simpler via [Docker Deployment](/v4-0-0-snapshot/deployment/docker-deployment/). `wheels deploy` adds value at 2+ servers.
+- **Not Kubernetes.** `wheels deploy` drives `docker` remotely over SSH, not the Kubernetes API. For k8s, use your existing pipeline; see [Docker Deployment](/v4-0-0/deployment/docker-deployment/) for image hygiene guidance.
+- **Not systemd-native.** For servlet-container deploys under systemd (CommandBox, Tomcat, Jetty), stay on that path — see [VM and bare-metal deployment](/v4-0-0/deployment/vm-deployment/).
+- **Not Compose-only.** Single-host Docker Compose is simpler via [Docker Deployment](/v4-0-0/deployment/docker-deployment/). `wheels deploy` adds value at 2+ servers.
 - **Not a Windows server target.** Kamal doesn't support Windows servers; `wheels deploy` inherits that limitation. Windows developer workstations are best-effort.
 - **Not Ruby-Kamal-plugin-compatible.** Shell-script hooks in `.kamal/hooks/` work unchanged; the Ruby `Kamal::Commands` plugin API is Ruby-specific.
 - **Not a Wheels reload mechanism.** It ships the container; the in-process `?reload=true` endpoint is a separate concern.
@@ -164,8 +164,8 @@ Naming what `wheels deploy` deliberately isn't helps calibrate when to reach for
 ## Related reading
 
 <CardGrid>
-  <LinkCard title="Your first deploy" href="/v4-0-0-snapshot/deployment/first-deploy/" description="Hands-on walkthrough — scaffold, configure, ship." />
-  <LinkCard title="Migrating from Kamal" href="/v4-0-0-snapshot/deployment/migrating-from-kamal/" description="Full compatibility contract and switch-over checklist." />
-  <LinkCard title="deploy.yml reference" href="/v4-0-0-snapshot/deployment/config-reference/" description="Every config key, what it does, defaults." />
-  <LinkCard title="Deployment landing" href="/v4-0-0-snapshot/deployment/" description="When to reach for wheels deploy vs. other paths." />
+  <LinkCard title="Your first deploy" href="/v4-0-0/deployment/first-deploy/" description="Hands-on walkthrough — scaffold, configure, ship." />
+  <LinkCard title="Migrating from Kamal" href="/v4-0-0/deployment/migrating-from-kamal/" description="Full compatibility contract and switch-over checklist." />
+  <LinkCard title="deploy.yml reference" href="/v4-0-0/deployment/config-reference/" description="Every config key, what it does, defaults." />
+  <LinkCard title="Deployment landing" href="/v4-0-0/deployment/" description="When to reach for wheels deploy vs. other paths." />
 </CardGrid>

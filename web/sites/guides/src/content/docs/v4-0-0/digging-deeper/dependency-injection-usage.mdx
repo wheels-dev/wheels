@@ -19,7 +19,7 @@ This page is the hands-on companion to the DI concept tour. You already know wha
 - Avoid the service-locator anti-pattern
 
 <Aside type="note">
-  You should already know what the DI container is. See [The Dependency Injection Container](/v4-0-0-snapshot/core-concepts/dependency-injection/) for the concept tour. [Tutorial Part 6b](/v4-0-0-snapshot/start-here/tutorial/06-authentication/) shows a real registration for `SessionStrategy` — this page unpacks patterns beyond that.
+  You should already know what the DI container is. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/) for the concept tour. [Tutorial Part 6b](/v4-0-0/start-here/tutorial/06-authentication/) shows a real registration for `SessionStrategy` — this page unpacks patterns beyond that.
 </Aside>
 
 ## Registration, recapped
@@ -33,7 +33,7 @@ di.map("emailService").to("app.lib.EmailService").asSingleton();
 di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
-`map()` and `bind()` are the same method — `bind()` reads better for interface-style names. Full API tour lives on the [concept page](/v4-0-0-snapshot/core-concepts/dependency-injection/); the rest of this guide assumes you've registered services this way.
+`map()` and `bind()` are the same method — `bind()` reads better for interface-style names. Full API tour lives on the [concept page](/v4-0-0/core-concepts/dependency-injection/); the rest of this guide assumes you've registered services this way.
 
 ## Swapping a strategy for a test double
 
@@ -137,7 +137,7 @@ di.map("jwtStrategyFactory").to("app.lib.JwtStrategyFactory").asSingleton();
 // var jwt = service("jwtStrategyFactory").build();
 ```
 
-If you need the factory output to *itself* be registered under a name (so consumers call `service("jwtStrategy")` directly), register the strategy at app-init time after the factory has built it — the authenticator-wiring pattern in [Authentication Patterns](/v4-0-0-snapshot/digging-deeper/authentication-patterns/) does exactly this.
+If you need the factory output to *itself* be registered under a name (so consumers call `service("jwtStrategy")` directly), register the strategy at app-init time after the factory has built it — the authenticator-wiring pattern in [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/) does exactly this.
 
 ## Auto-wiring `init()` parameters
 
@@ -194,7 +194,7 @@ component extends="Controller" {
 }
 ```
 
-This is the pattern [Tutorial Part 6b](/v4-0-0-snapshot/start-here/tutorial/06-authentication/) uses to wire `authenticator` and `currentUser` into the controllers that need them. It keeps dependencies declared at the top of the file where a reader can see them, rather than scattered across action methods.
+This is the pattern [Tutorial Part 6b](/v4-0-0/start-here/tutorial/06-authentication/) uses to wire `authenticator` and `currentUser` into the controllers that need them. It keeps dependencies declared at the top of the file where a reader can see them, rather than scattered across action methods.
 
 ## The service-locator anti-pattern
 
@@ -250,22 +250,22 @@ When `service("name")` throws `Wheels.Injector` or hands back the wrong thing, r
 <CardGrid>
   <LinkCard
     title="The Dependency Injection Container"
-    href="/v4-0-0-snapshot/core-concepts/dependency-injection/"
+    href="/v4-0-0/core-concepts/dependency-injection/"
     description="The concept tour — what the container does, the three scopes, when to reach for it."
   />
   <LinkCard
     title="Authentication Patterns"
-    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    href="/v4-0-0/digging-deeper/authentication-patterns/"
     description="Canonical DI use — registering Authenticator, SessionStrategy, JwtStrategy."
   />
   <LinkCard
     title="Multi-tenancy"
-    href="/v4-0-0-snapshot/digging-deeper/multi-tenancy/"
+    href="/v4-0-0/digging-deeper/multi-tenancy/"
     description="Tenant-scoped resolvers — the request-scoped resolver pattern applied to tenants."
   />
   <LinkCard
     title="Testing"
-    href="/v4-0-0-snapshot/testing/"
+    href="/v4-0-0/testing/"
     description="BDD specs, fixtures, and how DI swapping enables test doubles cleanly."
   />
 </CardGrid>

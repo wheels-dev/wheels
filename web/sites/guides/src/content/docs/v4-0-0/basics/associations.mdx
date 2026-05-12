@@ -19,7 +19,7 @@ Associations are how models reach each other. You declare the relationship once 
 - How to avoid N+1 queries with `include`
 
 <Aside type="note">
-  You should already know how to define a model. See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/).
+  You should already know how to define a model. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
 </Aside>
 
 ## The three kinds
@@ -35,7 +35,7 @@ Every relationship in Wheels is one of three declarations. You always declare bo
 The pair `Post hasMany(name="comments")` + `Comment belongsTo(name="post")` is the most common shape in any Wheels app. You'll see it in the tutorial, and you'll write it dozens of times in your own code.
 
 <Aside type="caution">
-  Associations follow the same argument rule as every other `config()` call: either all positional or all named. `hasMany("comments", dependent="delete")` is **invalid** — it mixes styles. Write `hasMany(name="comments", dependent="delete")` instead. See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/) for why.
+  Associations follow the same argument rule as every other `config()` call: either all positional or all named. `hasMany("comments", dependent="delete")` is **invalid** — it mixes styles. Write `hasMany(name="comments", dependent="delete")` instead. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) for why.
 </Aside>
 
 ## hasMany + belongsTo (the most common pair)
@@ -307,8 +307,8 @@ Wheels resolves the parent at runtime by reading `commentableType` on each row. 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="The model surface associations build on — finders, persistence, callbacks." />
-  <LinkCard title="Query Builder and Scopes" href="/v4-0-0-snapshot/basics/query-builder-and-scopes/" description="Composing the where clauses and scopes that filter association queries." />
-  <LinkCard title="Migrations" href="/v4-0-0-snapshot/basics/migrations/" description="Defining the foreign-key columns associations depend on." />
-  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="Where nested creation and eager loading live in a typical request." />
+  <LinkCard title="Models and the ORM" href="/v4-0-0/basics/models-and-the-orm/" description="The model surface associations build on — finders, persistence, callbacks." />
+  <LinkCard title="Query Builder and Scopes" href="/v4-0-0/basics/query-builder-and-scopes/" description="Composing the where clauses and scopes that filter association queries." />
+  <LinkCard title="Migrations" href="/v4-0-0/basics/migrations/" description="Defining the foreign-key columns associations depend on." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="Where nested creation and eager loading live in a typical request." />
 </CardGrid>

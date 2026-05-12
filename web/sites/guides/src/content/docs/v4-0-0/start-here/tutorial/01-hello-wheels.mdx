@@ -17,7 +17,7 @@ You'll create a new Wheels app called `blog`, start the dev server, and add a `/
 - How reload works
 
 <Aside type="note">
-  This is Part 1 of the [Build a Blog tutorial](/v4-0-0-snapshot/start-here/tutorial/). You don't need Wheels or CFML experience — just general programming background.
+  This is Part 1 of the [Build a Blog tutorial](/v4-0-0/start-here/tutorial/). You don't need Wheels or CFML experience — just general programming background.
 </Aside>
 
 ## Where we left off
@@ -26,13 +26,13 @@ This is Part 1. You're starting with nothing. By the end, you'll have a working 
 
 ## Install the Wheels CLI
 
-If you haven't yet, see [Installing Wheels](/v4-0-0-snapshot/start-here/installing/) for macOS, Windows, and Linux.
+If you haven't yet, see [Installing Wheels](/v4-0-0/start-here/installing/) for macOS, Windows, and Linux.
 
 <Aside type="tip" title="Already installed? Make sure you're on the latest snapshot.">
   Wheels 4.0 ships frequent snapshot releases — the tutorial assumes you're on the current one. If you installed a while back, refresh first:
 
   - **macOS / Linux (Homebrew):** `brew update && brew upgrade wheels`
-  - **Windows / other:** see [Installing → Upgrading](/v4-0-0-snapshot/start-here/installing/#upgrading)
+  - **Windows / other:** see [Installing → Upgrading](/v4-0-0/start-here/installing/#upgrading)
 
   Then re-run `wheels --version` and confirm the version matches the [latest release](https://github.com/wheels-dev/wheels/releases).
 </Aside>
@@ -142,7 +142,7 @@ Three directories matter right now:
 The other top-level `app/` directories (`events/`, `global/`, `jobs/`, `lib/`, `mailers/`, `migrator/`, `models/`, `plugins/`, `snippets/`) are scaffolding for features you'll meet later — background jobs, mailers, application events, model definitions, generator templates. Leave them alone for now. The remaining root-level files are framework configuration: `lucee.json` configures the Lucee runtime, `.env` holds environment variables (the dev server's reload password lives here), and `config/app.cfm` plus the rest of `config/` configure the framework itself.
 
 <Aside type="tip">
-  **On styling:** the generated `app/views/layout.cfm` includes [simple.css](https://simplecss.org/) via CDN — a classless stylesheet that gives semantic HTML a clean, modern look without any markup changes. Wheels' form helpers (`#textField()#`, `#startFormTag()#`, etc.) already emit the right tags, so your scaffolded views render polished from the very first page. Remove the `<link>` if you're bringing your own CSS. For a fuller component kit with proper buttons, cards, and form helpers, see the [optional bonus chapter](/v4-0-0-snapshot/start-here/tutorial/08-bonus-basecoat/) at the end of the tutorial — it walks through installing `wheels-basecoat`.
+  **On styling:** the generated `app/views/layout.cfm` includes [simple.css](https://simplecss.org/) via CDN — a classless stylesheet that gives semantic HTML a clean, modern look without any markup changes. Wheels' form helpers (`#textField()#`, `#startFormTag()#`, etc.) already emit the right tags, so your scaffolded views render polished from the very first page. Remove the `<link>` if you're bringing your own CSS. For a fuller component kit with proper buttons, cards, and form helpers, see the [optional bonus chapter](/v4-0-0/start-here/tutorial/08-bonus-basecoat/) at the end of the tutorial — it walks through installing `wheels-basecoat`.
 
   **On Turbo:** a fresh `wheels new` ships with only the core framework. Turbo (for SPA-like page transitions and inline form errors) lands in Part 4 via a CDN script tag. For now, everything is plain server-rendered HTML.
 </Aside>
@@ -214,7 +214,7 @@ Expected: `<h1>Hello, World</h1>` in the response body (plus any layout wrapping
 
 ## Troubleshooting
 
-**`wheels: command not found`** — PATH doesn't see the CLI. See [Installing Wheels](/v4-0-0-snapshot/start-here/installing/).
+**`wheels: command not found`** — PATH doesn't see the CLI. See [Installing Wheels](/v4-0-0/start-here/installing/).
 
 **`Route '/hello' not found`** — you added the route but didn't reload. Run `wheels reload`.
 
@@ -222,4 +222,4 @@ Expected: `<h1>Hello, World</h1>` in the response body (plus any layout wrapping
 
 ## What's next
 
-In [Part 2](/v4-0-0-snapshot/start-here/tutorial/02-first-model/) you'll add your first model, write a migration, and seed real data. The browser-render-a-page part is done; now you meet the database.
+In [Part 2](/v4-0-0/start-here/tutorial/02-first-model/) you'll add your first model, write a migration, and seed real data. The browser-render-a-page part is done; now you meet the database.

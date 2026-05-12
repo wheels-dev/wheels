@@ -20,7 +20,7 @@ This page shows you the framework-provided security primitives a Wheels app shou
 - How to disable `showErrorInformation` for production
 
 <Aside type="note">
-  You should already know how the middleware pipeline runs. See [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/).
+  You should already know how the middleware pipeline runs. See [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/).
 </Aside>
 
 ## Register SecurityHeaders
@@ -228,11 +228,11 @@ set(middleware = [
 
 ## Rate limiting
 
-`wheels.middleware.RateLimiter` is your first line of defense against credential stuffing, scraping, and accidental self-DoS from a runaway client. It adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers and responds `429` with `Retry-After` when the bucket is empty. See [Rate Limiting](/v4-0-0-snapshot/digging-deeper/rate-limiting/) for strategies, storage backends, and key functions.
+`wheels.middleware.RateLimiter` is your first line of defense against credential stuffing, scraping, and accidental self-DoS from a runaway client. It adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers and responds `429` with `Retry-After` when the bucket is empty. See [Rate Limiting](/v4-0-0/digging-deeper/rate-limiting/) for strategies, storage backends, and key functions.
 
 ## CORS
 
-Cross-origin restrictions are a browser-enforced policy, not a server-enforced one — but your server has to opt in for the browser to let requests through. Use `wheels.middleware.Cors` with an explicit origin allowlist; never wildcard `*` on credentialed endpoints. Full reference: [CORS](/v4-0-0-snapshot/digging-deeper/cors/).
+Cross-origin restrictions are a browser-enforced policy, not a server-enforced one — but your server has to opt in for the browser to let requests through. Use `wheels.middleware.Cors` with an explicit origin allowlist; never wildcard `*` on credentialed endpoints. Full reference: [CORS](/v4-0-0/digging-deeper/cors/).
 
 ## Production error pages
 
@@ -282,22 +282,22 @@ For dependency and engine monitoring:
 <CardGrid>
   <LinkCard
     title="Middleware Pipeline"
-    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+    href="/v4-0-0/core-concepts/middleware-pipeline/"
     description="How middleware runs, composes, and scopes across routes."
   />
   <LinkCard
     title="Rate Limiting"
-    href="/v4-0-0-snapshot/digging-deeper/rate-limiting/"
+    href="/v4-0-0/digging-deeper/rate-limiting/"
     description="Strategies, storage backends, and key functions for the RateLimiter middleware."
   />
   <LinkCard
     title="CORS"
-    href="/v4-0-0-snapshot/digging-deeper/cors/"
+    href="/v4-0-0/digging-deeper/cors/"
     description="Cross-origin request handling with the Cors middleware."
   />
   <LinkCard
     title="Authentication Patterns"
-    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    href="/v4-0-0/digging-deeper/authentication-patterns/"
     description="Session, JWT, and token strategies for HTML and JSON apps."
   />
 </CardGrid>

@@ -20,7 +20,7 @@ Model tests are the bulk of a healthy suite. A single spec file mirrors a single
 - The common pitfalls that cause "works alone, fails in the suite" failures
 
 <Aside type="note">
-  You should already know how to define a model. See [Models and the ORM](/v4-0-0-snapshot/basics/models-and-the-orm/). For the BDD basics — where specs live, how the runner boots — see [Testing](/v4-0-0-snapshot/testing/).
+  You should already know how to define a model. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/). For the BDD basics — where specs live, how the runner boots — see [Testing](/v4-0-0/testing/).
 </Aside>
 
 ## Minimal spec shape
@@ -219,7 +219,7 @@ it("tests a destructive operation in isolation", () => {
 });
 ```
 
-The default transaction mode in the test runner is `none` — writes persist across specs unless you roll them back explicitly. If a spec that passes on its own fails when run with the rest of the suite, look for leftover rows from an earlier spec. The [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) guide covers the full setup pattern, `populate.cfm` contents, and strategies for keeping specs independent.
+The default transaction mode in the test runner is `none` — writes persist across specs unless you roll them back explicitly. If a spec that passes on its own fails when run with the rest of the suite, look for leftover rows from an earlier spec. The [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) guide covers the full setup pattern, `populate.cfm` contents, and strategies for keeping specs independent.
 
 ## Common pitfalls
 
@@ -231,8 +231,8 @@ The default transaction mode in the test runner is `none` — writes persist acr
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="Defining models, declaring config(), finders and creators." />
-  <LinkCard title="Validation and Error Display" href="/v4-0-0-snapshot/basics/validation-and-errors/" description="The validation helpers you're testing — presence, length, uniqueness, format." />
-  <LinkCard title="Associations" href="/v4-0-0-snapshot/basics/associations/" description="hasMany, belongsTo, dependent=delete, and the association methods your specs exercise." />
-  <LinkCard title="Query Builder and Scopes" href="/v4-0-0-snapshot/basics/query-builder-and-scopes/" description="Named scopes, dynamic scopes, and enum-generated scopes." />
+  <LinkCard title="Models and the ORM" href="/v4-0-0/basics/models-and-the-orm/" description="Defining models, declaring config(), finders and creators." />
+  <LinkCard title="Validation and Error Display" href="/v4-0-0/basics/validation-and-errors/" description="The validation helpers you're testing — presence, length, uniqueness, format." />
+  <LinkCard title="Associations" href="/v4-0-0/basics/associations/" description="hasMany, belongsTo, dependent=delete, and the association methods your specs exercise." />
+  <LinkCard title="Query Builder and Scopes" href="/v4-0-0/basics/query-builder-and-scopes/" description="Named scopes, dynamic scopes, and enum-generated scopes." />
 </CardGrid>

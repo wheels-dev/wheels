@@ -25,7 +25,7 @@ wheels deploy accessory reboot --name=<name|all> [--destination=<name>] [--dry-r
 
 ## Behavior
 
-Per accessory: `docker stop <service>-<name>`, `docker rm <service>-<name>`, then the same `docker run` as [`accessory boot`](/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/boot/). Downtime lasts until the new container passes its health check (if declared).
+Per accessory: `docker stop <service>-<name>`, `docker rm <service>-<name>`, then the same `docker run` as [`accessory boot`](/v4-0-0/command-line-tools/commands/deploy/accessory/boot/). Downtime lasts until the new container passes its health check (if declared).
 
 ## Example
 

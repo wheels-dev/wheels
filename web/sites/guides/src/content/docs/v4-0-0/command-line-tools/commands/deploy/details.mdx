@@ -26,8 +26,8 @@ wheels deploy details [--destination=<name>] [--dry-run]
 
 Per host, in parallel, runs three things:
 
-1. App `docker ps` filtered by `label=service=<service>` (same as [`wheels deploy app containers`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/containers/)).
-2. Proxy `docker ps` filtered to the `kamal-proxy` container (same as [`wheels deploy proxy details`](/v4-0-0-snapshot/command-line-tools/commands/deploy/proxy/details/)).
+1. App `docker ps` filtered by `label=service=<service>` (same as [`wheels deploy app containers`](/v4-0-0/command-line-tools/commands/deploy/app/containers/)).
+2. Proxy `docker ps` filtered to the `kamal-proxy` container (same as [`wheels deploy proxy details`](/v4-0-0/command-line-tools/commands/deploy/proxy/details/)).
 3. For each accessory, a filtered `docker ps` on its pinned host.
 
 Output is prefixed by host, then by role.

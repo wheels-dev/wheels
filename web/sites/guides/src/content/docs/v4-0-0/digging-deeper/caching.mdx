@@ -155,7 +155,7 @@ Wheels keeps cache entries in `application.wheels.cache` — an in-memory struct
 Tune any of these in `config/settings.cfm` via `set(defaultCacheTime=15)`, etc.
 
 <Aside type="caution">
-  The in-memory cache is **per-node**. If you run three app servers behind a load balancer, each has its own cache. That's fine when TTLs are short (5-30 minutes) and staleness across nodes is tolerable. When you need one shared cache across a fleet, front the app with a reverse-proxy page cache (Nginx, Cloudflare, CloudFront) — see [Deployment](/v4-0-0-snapshot/deployment/). Per-node in-memory caching plus an edge cache covers most production workloads.
+  The in-memory cache is **per-node**. If you run three app servers behind a load balancer, each has its own cache. That's fine when TTLs are short (5-30 minutes) and staleness across nodes is tolerable. When you need one shared cache across a fleet, front the app with a reverse-proxy page cache (Nginx, Cloudflare, CloudFront) — see [Deployment](/v4-0-0/deployment/). Per-node in-memory caching plus an edge cache covers most production workloads.
 </Aside>
 
 ## Invalidate from the model
@@ -219,7 +219,7 @@ component extends="Controller" {
 
 `appendToKey` takes a comma-separated list of dot-notation paths. Wheels evaluates each at request time and appends the value to the cache key. Supported scopes: `session`, `request`, `application`, `arguments`, `variables`. Pass more than one (`appendToKey="session.userId,session.tenantId"`) to key per user *and* per tenant.
 
-For multi-tenant apps, see [Multi-tenancy](/v4-0-0-snapshot/digging-deeper/multi-tenancy/) for the tenant-scoped key pattern.
+For multi-tenant apps, see [Multi-tenancy](/v4-0-0/digging-deeper/multi-tenancy/) for the tenant-scoped key pattern.
 
 ## When not to cache
 
@@ -234,7 +234,7 @@ Caching always trades correctness for speed. Don't reach for it when:
 
 Wheels's in-memory cache lives inside your CFML process. For truly static pages — documentation, marketing, blog posts — push caching further out: a reverse proxy (Nginx, HAProxy) or a CDN (Cloudflare, CloudFront, Fastly) serves the HTML without touching your app at all.
 
-Configure edge caching at the deploy layer, not in Wheels. The [Deployment](/v4-0-0-snapshot/deployment/) guide covers setting `Cache-Control` headers from your controller, letting Kamal's proxy or your CDN honor them, and purging the edge cache when a model saves.
+Configure edge caching at the deploy layer, not in Wheels. The [Deployment](/v4-0-0/deployment/) guide covers setting `Cache-Control` headers from your controller, letting Kamal's proxy or your CDN honor them, and purging the edge cache when a model saves.
 
 ## Debugging cached responses
 
@@ -259,21 +259,21 @@ Three ways to confirm what you're seeing:
   <LinkCard
     title="Models and the ORM"
     description="Cache invalidation lives in model callbacks. Read this first if `afterSave` and `afterDelete` aren't second nature yet."
-    href="/v4-0-0-snapshot/basics/models-and-the-orm/"
+    href="/v4-0-0/basics/models-and-the-orm/"
   />
   <LinkCard
     title="Views, Layouts, Partials"
     description="Where fragment caching lives — `includePartial(cache=N)` slots into any view."
-    href="/v4-0-0-snapshot/basics/views-layouts-partials/"
+    href="/v4-0-0/basics/views-layouts-partials/"
   />
   <LinkCard
     title="Background Jobs"
     description="The previous page in Digging Deeper. Cache-warming jobs are a common pairing with action caching."
-    href="/v4-0-0-snapshot/digging-deeper/background-jobs/"
+    href="/v4-0-0/digging-deeper/background-jobs/"
   />
   <LinkCard
     title="Deployment & Operations"
     description="Edge and reverse-proxy caching — where truly static pages belong."
-    href="/v4-0-0-snapshot/deployment/"
+    href="/v4-0-0/deployment/"
   />
 </CardGrid>

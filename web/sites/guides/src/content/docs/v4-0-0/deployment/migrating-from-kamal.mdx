@@ -119,7 +119,7 @@ Before removing `kamal` from your ecosystem:
 
 1. **Scan `deploy.yml` for ERB.** `grep -n '<%' config/deploy.yml`. Every match needs conversion.
 2. **Review `.kamal/secrets` for shell compatibility.** `wheels deploy` evaluates the file through `bash`; if you relied on `sh`-only behavior, nothing changes, but confirm.
-3. **Install the Wheels CLI on every control machine that runs deploys.** See [installing the CLI](/v4-0-0-snapshot/command-line-tools/installation/).
+3. **Install the Wheels CLI on every control machine that runs deploys.** See [installing the CLI](/v4-0-0/command-line-tools/installation/).
 4. **Run `wheels deploy config` and diff against `kamal config`.** Every field wheels emits should match kamal's. The reverse isn't true — wheels emits a subset during Phase 1.
 5. **Run `wheels deploy --dry-run`.** Every command it would run, printed with host prefixes. Confirm it matches what you expect.
 6. **Deploy a non-critical environment first.** Staging before production. Verify logs, health checks, rollback.
@@ -139,17 +139,17 @@ These Ruby Kamal features have no `wheels deploy` equivalent and won't get one:
 <CardGrid>
   <LinkCard
     title="deploy.yml Reference"
-    href="/v4-0-0-snapshot/deployment/config-reference/"
+    href="/v4-0-0/deployment/config-reference/"
     description="Every key in the schema, with the ${VAR} interpolation rules."
   />
   <LinkCard
     title="Your First Deploy"
-    href="/v4-0-0-snapshot/deployment/first-deploy/"
+    href="/v4-0-0/deployment/first-deploy/"
     description="The walkthrough to confirm wheels deploy works on your stack."
   />
   <LinkCard
     title="Hooks"
-    href="/v4-0-0-snapshot/deployment/hooks/"
+    href="/v4-0-0/deployment/hooks/"
     description="Your Ruby Kamal hooks port over unchanged — KAMAL_ env is preserved."
   />
 </CardGrid>

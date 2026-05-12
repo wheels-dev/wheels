@@ -46,7 +46,7 @@ Four rules, in order:
 4. **Run your full test suite against the new version before deploying.** If you don't have one, the upgrade is also the moment to start — even a handful of smoke tests will catch 90% of regressions.
 
 <Aside type="caution">
-  Wheels 4.0 deprecates the legacy `plugins/` system in favor of first-party packages distributed as standalone repos (indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) and installed into `vendor/<name>/`. If your 3.x app depends on plugins, read [Packages](/v4-0-0-snapshot/digging-deeper/packages/) alongside the 3.x→4.x guide — it explains the new activation model.
+  Wheels 4.0 deprecates the legacy `plugins/` system in favor of first-party packages distributed as standalone repos (indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) and installed into `vendor/<name>/`. If your 3.x app depends on plugins, read [Packages](/v4-0-0/digging-deeper/packages/) alongside the 3.x→4.x guide — it explains the new activation model.
 </Aside>
 
 ## Upgrade guides
@@ -55,11 +55,11 @@ Four rules, in order:
   <LinkCard
     title="3.x to 4.x"
     description="The current critical upgrade path. Covers middleware pipeline, package system replacing plugins, chainable query builder, route model binding, and every breaking change in 4.0."
-    href="/v4-0-0-snapshot/upgrading/3x-to-4x/"
+    href="/v4-0-0/upgrading/3x-to-4x/"
   />
   <LinkCard
     title="2.x to 3.x"
     description="The CFWheels to Wheels rebrand, test framework migration to WheelsTest BDD, and the foundational changes in 3.0. Kept here as a pointer for apps still on 2.x."
-    href="/v4-0-0-snapshot/upgrading/2x-to-3x/"
+    href="/v4-0-0/upgrading/2x-to-3x/"
   />
 </CardGrid>

@@ -19,7 +19,7 @@ Integration tests cover the journeys a user actually takes — signup, login, cr
 - When a flow genuinely needs a browser test instead
 
 <Aside type="note">
-  You should already know BDD basics and the `TestClient` API. See [Model Tests](/v4-0-0-snapshot/testing/model-tests/) and [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/).
+  You should already know BDD basics and the `TestClient` API. See [Model Tests](/v4-0-0/testing/model-tests/) and [Controller Tests](/v4-0-0/testing/controller-tests/).
 </Aside>
 
 ## The test-type spectrum
@@ -151,7 +151,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-The `finally` block is what makes this safe: even if an assertion fails midway, the rollback still runs and the next spec sees a clean table. Cross-link to [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) for the full fixture-lifecycle pattern — when to use rollback, when to use populate data, when to seed per-spec.
+The `finally` block is what makes this safe: even if an assertion fails midway, the rollback still runs and the next spec sees a clean table. Cross-link to [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) for the full fixture-lifecycle pattern — when to use rollback, when to use populate data, when to seed per-spec.
 
 ## Cross-controller workflows
 
@@ -175,8 +175,8 @@ Integration tests are faster than browser tests but can't exercise JavaScript. I
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Controller Tests" href="/v4-0-0-snapshot/testing/controller-tests/" description="Single-action response shape, redirects, filters, flash messages, and JSON responses." />
-  <LinkCard title="Model Tests" href="/v4-0-0-snapshot/testing/model-tests/" description="Validations, callbacks, custom methods, associations, and scopes — the bulk of a healthy suite." />
-  <LinkCard title="View & Form Tests" href="/v4-0-0-snapshot/testing/view-and-form-tests/" description="Rendering partials, form helper output, and error display." />
-  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="Finders, associations, and the persistence APIs your integration tests assert against." />
+  <LinkCard title="Controller Tests" href="/v4-0-0/testing/controller-tests/" description="Single-action response shape, redirects, filters, flash messages, and JSON responses." />
+  <LinkCard title="Model Tests" href="/v4-0-0/testing/model-tests/" description="Validations, callbacks, custom methods, associations, and scopes — the bulk of a healthy suite." />
+  <LinkCard title="View & Form Tests" href="/v4-0-0/testing/view-and-form-tests/" description="Rendering partials, form helper output, and error display." />
+  <LinkCard title="Models and the ORM" href="/v4-0-0/basics/models-and-the-orm/" description="Finders, associations, and the persistence APIs your integration tests assert against." />
 </CardGrid>

@@ -20,7 +20,7 @@ The fast path for day-to-day development is Lucee 7 + SQLite, driven by `wheels 
 - The common failure modes — `JAVA_HOME` unset, port conflicts, missing Playwright JARs
 
 <Aside type="note">
-  You should already know what a spec looks like. See [Model Tests](/v4-0-0-snapshot/testing/model-tests/) for BDD shape and [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) for the populate lifecycle.
+  You should already know what a spec looks like. See [Model Tests](/v4-0-0/testing/model-tests/) for BDD shape and [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) for the populate lifecycle.
 </Aside>
 
 ## Prerequisites
@@ -62,7 +62,7 @@ wheels test --ci
 The supported flags today are `--filter=<dir>`, `--reporter=<simple|json|tap>`, `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>` (only honoured with `--core`), `--verbose` / `-v`, `--ci`, `--core` (force framework-core mode when the auto-detect doesn't pick it up), and `--no-test-db` (don't auto-swap to `<datasource>_test`). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter.
 
 <Aside type="note" title="--db is for --core only">
-The framework's matrix self-tests (`--core`) wire up a `wheelstestdb_<engine>` datasource per supported engine — that's what `--db` selects between. App tests run against the datasource your project is configured for; passing `--db` to an app run prints a warning and is otherwise ignored. To run your app suite against a different engine, set the engine in your shell environment before invoking `wheels test` — see [the testing CLI reference](/v4-0-0-snapshot/command-line-tools/wheels-commands/testing/#testing-against-different-engines) for the env-var pattern. This matches Rails (`DATABASE_URL`), Laravel (`DB_CONNECTION`), Symfony (`APP_ENV=test`), and Phoenix (`MIX_ENV`) — DB selection is a process-level concern, not a per-invocation flag.
+The framework's matrix self-tests (`--core`) wire up a `wheelstestdb_<engine>` datasource per supported engine — that's what `--db` selects between. App tests run against the datasource your project is configured for; passing `--db` to an app run prints a warning and is otherwise ignored. To run your app suite against a different engine, set the engine in your shell environment before invoking `wheels test` — see [the testing CLI reference](/v4-0-0/command-line-tools/wheels-commands/testing/#testing-against-different-engines) for the env-var pattern. This matches Rails (`DATABASE_URL`), Laravel (`DB_CONNECTION`), Symfony (`APP_ENV=test`), and Phoenix (`MIX_ENV`) — DB selection is a process-level concern, not a per-invocation flag.
 </Aside>
 
 <Aside type="tip">
@@ -221,8 +221,8 @@ lucli server stop
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Fixtures & Test Data" href="/v4-0-0-snapshot/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle, test models, and per-spec isolation." />
-  <LinkCard title="Browser Tests" href="/v4-0-0-snapshot/testing/browser-tests/" description="Installing Playwright and running browser specs locally." />
-  <LinkCard title="Testing Overview" href="/v4-0-0-snapshot/testing/" description="The shape of the test suite and when to reach for each test type." />
-  <LinkCard title="Model Tests" href="/v4-0-0-snapshot/testing/model-tests/" description="BDD specs for validations, callbacks, scopes, and associations." />
+  <LinkCard title="Fixtures & Test Data" href="/v4-0-0/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle, test models, and per-spec isolation." />
+  <LinkCard title="Browser Tests" href="/v4-0-0/testing/browser-tests/" description="Installing Playwright and running browser specs locally." />
+  <LinkCard title="Testing Overview" href="/v4-0-0/testing/" description="The shape of the test suite and when to reach for each test type." />
+  <LinkCard title="Model Tests" href="/v4-0-0/testing/model-tests/" description="BDD specs for validations, callbacks, scopes, and associations." />
 </CardGrid>

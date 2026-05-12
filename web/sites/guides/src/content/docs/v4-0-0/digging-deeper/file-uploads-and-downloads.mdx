@@ -20,7 +20,7 @@ This page shows you how to accept file uploads, validate and store them, and ser
 - How to stream large files and lock down who can fetch them
 
 <Aside type="note">
-  You should already know: Wheels controllers, the `params` struct, and form helpers. Finish the [tutorial](/v4-0-0-snapshot/start-here/tutorial/) first. Skim [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/) and [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/) if either feels shaky.
+  You should already know: Wheels controllers, the `params` struct, and form helpers. Finish the [tutorial](/v4-0-0/start-here/tutorial/) first. Skim [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/) and [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) if either feels shaky.
 </Aside>
 
 ## The upload form
@@ -217,13 +217,13 @@ Uploads and downloads are where apps leak the most. The short list:
 - **Verify content server-side.** Don't trust `contentType` from the browser. For images, `isImageFile()` parses the bytes. For PDFs, check magic bytes (`%PDF`). For anything else, a library that actually parses the format beats a string comparison on the header.
 - **Serve from a separate origin.** Put user uploads on `uploads.example.com`, not the main app domain. A malicious SVG uploaded to the app origin can run JavaScript in your users' sessions; on a separate origin, the same-origin policy contains it. Set `Content-Disposition: attachment` as belt-and-braces so the browser downloads rather than renders.
 - **Authorize every download.** Don't hand out predictable URLs like `/uploads/42/avatar.png` from the web root. Route downloads through a controller action that checks ownership, then emits `sendFile()`. Short-lived signed URLs are fine for object-storage backends.
-- **Rate limit.** Both sides. Upload endpoints invite abuse (disk fill, compute-heavy validation); download endpoints invite scraping. Pair with [Rate Limiting](/v4-0-0-snapshot/digging-deeper/rate-limiting/) per IP and per user.
+- **Rate limit.** Both sides. Upload endpoints invite abuse (disk fill, compute-heavy validation); download endpoints invite scraping. Pair with [Rate Limiting](/v4-0-0/digging-deeper/rate-limiting/) per IP and per user.
 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Forms and Form Helpers" href="/v4-0-0-snapshot/basics/forms-and-form-helpers/" description="Where fileField and startFormTag come from." />
-  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="Filters, params, and the action lifecycle the upload flow sits inside." />
-  <LinkCard title="Background Jobs" href="/v4-0-0-snapshot/digging-deeper/background-jobs/" description="Generate thumbnails, transcode video, or virus-scan uploads on a worker." />
-  <LinkCard title="Rate Limiting" href="/v4-0-0-snapshot/digging-deeper/rate-limiting/" description="Throttle both upload and download endpoints per IP and per user." />
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-0/basics/forms-and-form-helpers/" description="Where fileField and startFormTag come from." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="Filters, params, and the action lifecycle the upload flow sits inside." />
+  <LinkCard title="Background Jobs" href="/v4-0-0/digging-deeper/background-jobs/" description="Generate thumbnails, transcode video, or virus-scan uploads on a worker." />
+  <LinkCard title="Rate Limiting" href="/v4-0-0/digging-deeper/rate-limiting/" description="Throttle both upload and download endpoints per IP and per user." />
 </CardGrid>

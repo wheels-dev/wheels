@@ -18,7 +18,7 @@ These are the rules for code that ships in `vendor/wheels/`. They exist because 
 - What the docs and review process expect of you
 
 <Aside type="note">
-  You should already be comfortable with CFML components and Wheels' model/controller basics. If you're about to edit `vendor/wheels/`, skim [Cross-engine compatibility](/v4-0-0-snapshot/troubleshooting/cross-engine-compatibility/) alongside this page.
+  You should already be comfortable with CFML components and Wheels' model/controller basics. If you're about to edit `vendor/wheels/`, skim [Cross-engine compatibility](/v4-0-0/troubleshooting/cross-engine-compatibility/) alongside this page.
 </Aside>
 
 ## Naming
@@ -182,7 +182,7 @@ curl -sf "http://localhost:60006/wheels/core/tests?db=sqlite&format=json" > /tmp
 curl -sf "http://localhost:62025/wheels/core/tests?db=sqlite&format=json" > /tmp/adobe2025.json
 ```
 
-If either returns HTTP 417 (test failures) or non-zero counts, fix before pushing. See [Running tests locally](/v4-0-0-snapshot/testing/running-tests-locally/) for the full engine-port table and database targets.
+If either returns HTTP 417 (test failures) or non-zero counts, fix before pushing. See [Running tests locally](/v4-0-0/testing/running-tests-locally/) for the full engine-port table and database targets.
 
 <Aside type="caution">
   Do not iterate on Adobe CF failures through CI. Run the Adobe container locally, reproduce, fix, re-run. Round-tripping through GitHub Actions burns ~20 minutes per attempt.
@@ -192,7 +192,7 @@ If either returns HTTP 417 (test failures) or non-zero counts, fix before pushin
 
 Code changes that touch a public surface must update the guides in the same PR:
 
-- **New public API** (framework function, CLI command, middleware, package hook) — add a guide page under the matching section of `web/sites/guides/src/content/docs/v4-0-0-snapshot/`. Pick the Diátaxis type (`tutorial`, `howto`, `concept`, `reference`) and follow `web/sites/guides/STYLE.md`.
+- **New public API** (framework function, CLI command, middleware, package hook) — add a guide page under the matching section of `web/sites/guides/src/content/docs/v4-0-0/`. Pick the Diátaxis type (`tutorial`, `howto`, `concept`, `reference`) and follow `web/sites/guides/STYLE.md`.
 - **Behaviour change to an existing API** — update the existing guide. Do not leave the old wording in place and patch only the release notes.
 - **Internal refactor with no surface change** — no docs update needed.
 
@@ -210,7 +210,7 @@ Maintainers flag issues; they do not rewrite your branch for you.
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Running tests locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="The wheels test CLI, tools/test-local.sh, and the Docker cross-engine matrix." />
-  <LinkCard title="Conventions over configuration" href="/v4-0-0-snapshot/core-concepts/conventions-over-configuration/" description="Why Wheels names things the way it does, and when to override." />
-  <LinkCard title="Submitting pull requests" href="/v4-0-0-snapshot/contributing/pull-requests/" description="The fork-branch-test-submit flow and how to pass commitlint on the first try." />
+  <LinkCard title="Running tests locally" href="/v4-0-0/testing/running-tests-locally/" description="The wheels test CLI, tools/test-local.sh, and the Docker cross-engine matrix." />
+  <LinkCard title="Conventions over configuration" href="/v4-0-0/core-concepts/conventions-over-configuration/" description="Why Wheels names things the way it does, and when to override." />
+  <LinkCard title="Submitting pull requests" href="/v4-0-0/contributing/pull-requests/" description="The fork-branch-test-submit flow and how to pass commitlint on the first try." />
 </CardGrid>

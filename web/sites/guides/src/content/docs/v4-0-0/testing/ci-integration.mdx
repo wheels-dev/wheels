@@ -20,7 +20,7 @@ The pattern that works for Wheels in CI is the same pattern that works locally �
 - Common CI failures and what they actually mean
 
 <Aside type="note">
-  You should already know how to run tests locally. See [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/) for `wheels test`, `tools/test-local.sh`, and the Docker Compose map of ports and databases.
+  You should already know how to run tests locally. See [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) for `wheels test`, `tools/test-local.sh`, and the Docker Compose map of ports and databases.
 </Aside>
 
 ## GitHub Actions — minimum viable
@@ -133,7 +133,7 @@ The cache key hashes `browser-manifest.json` so a Playwright version bump invali
 
 ## Cross-engine matrix via Docker
 
-`pr.yml` covers Lucee 7 + SQLite. For the full cross-engine story, you run Docker Compose from the repo root and hit each engine's port directly — the same pattern documented in [Running Tests Locally](/v4-0-0-snapshot/testing/running-tests-locally/). Wrapped in a GitHub Actions matrix, every cell is an independent runner:
+`pr.yml` covers Lucee 7 + SQLite. For the full cross-engine story, you run Docker Compose from the repo root and hit each engine's port directly — the same pattern documented in [Running Tests Locally](/v4-0-0/testing/running-tests-locally/). Wrapped in a GitHub Actions matrix, every cell is an independent runner:
 
 ```yaml title=".github/workflows/compat-matrix.yml"
 jobs:
@@ -260,8 +260,8 @@ GitLab CI, CircleCI, Jenkins, Buildkite — the shape is identical. Install Java
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Running Tests Locally" href="/v4-0-0-snapshot/testing/running-tests-locally/" description="The fast path with wheels test and tools/test-local.sh, plus the Docker cross-engine matrix." />
-  <LinkCard title="Browser Tests" href="/v4-0-0-snapshot/testing/browser-tests/" description="Installing Playwright, writing browser specs, and the beforeEach/afterEach lifecycle." />
-  <LinkCard title="Testing Overview" href="/v4-0-0-snapshot/testing/" description="The shape of the test suite and when to reach for each test type." />
-  <LinkCard title="Fixtures & Test Data" href="/v4-0-0-snapshot/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle, test models, and per-spec isolation." />
+  <LinkCard title="Running Tests Locally" href="/v4-0-0/testing/running-tests-locally/" description="The fast path with wheels test and tools/test-local.sh, plus the Docker cross-engine matrix." />
+  <LinkCard title="Browser Tests" href="/v4-0-0/testing/browser-tests/" description="Installing Playwright, writing browser specs, and the beforeEach/afterEach lifecycle." />
+  <LinkCard title="Testing Overview" href="/v4-0-0/testing/" description="The shape of the test suite and when to reach for each test type." />
+  <LinkCard title="Fixtures & Test Data" href="/v4-0-0/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle, test models, and per-spec isolation." />
 </CardGrid>

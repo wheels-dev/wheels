@@ -19,7 +19,7 @@ Every Wheels app spends most of its time talking to models. A model is a CFC tha
 - Where to put custom methods so they read naturally from controllers and views
 
 <Aside type="note">
-  You should already know why models carry behavior. See [ORM Philosophy](/v4-0-0-snapshot/core-concepts/orm-philosophy/).
+  You should already know why models carry behavior. See [ORM Philosophy](/v4-0-0/core-concepts/orm-philosophy/).
 </Aside>
 
 ## Defining a model
@@ -50,7 +50,7 @@ When the table, key, or column names don't match the defaults, override them in 
 
 - `tableName("old_blog_entries")` — non-convention table name.
 - `setPrimaryKey("entryId")` — non-`id` primary key.
-- `dataSource("legacy_db")` — non-default datasource. See [Database and Multiple Datasources](/v4-0-0-snapshot/basics/database-and-multiple-datasources/) when this lands for the wider multi-database story.
+- `dataSource("legacy_db")` — non-default datasource. See [Database and Multiple Datasources](/v4-0-0/basics/database-and-multiple-datasources/) when this lands for the wider multi-database story.
 - `property(name="publishedAt", column="pub_date")` — the property on the model is `publishedAt`, the column in the table is `pub_date`. The view and controller never see the column name.
 
 ```cfm {test:compile}
@@ -77,7 +77,7 @@ The finders read from the database. Every finder below is a method on the class,
 | `exists(where="...")` | Boolean | Checking existence without loading |
 | `count(where="...")` | Integer | Counting without loading |
 
-`findAll` returns a **query object**, not an array. Loop it with `<cfloop query="...">` or pass `returnAs="objects"` when you want an array of model instances (at the cost of per-row object construction). `findOne` and `findByKey` return a single model instance, or `false` when nothing matches — always guard with `IsObject(record)` before using it. For conditions more complex than a simple `where` clause, see [Query Builder and Scopes](/v4-0-0-snapshot/basics/query-builder-and-scopes/).
+`findAll` returns a **query object**, not an array. Loop it with `<cfloop query="...">` or pass `returnAs="objects"` when you want an array of model instances (at the cost of per-row object construction). `findOne` and `findByKey` return a single model instance, or `false` when nothing matches — always guard with `IsObject(record)` before using it. For conditions more complex than a simple `where` clause, see [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/).
 
 ```cfm {test:compile}
 component extends="Controller" {
@@ -121,7 +121,7 @@ component extends="Controller" {
 }
 ```
 
-Both `save()` and `create()` run validations first; if any fail, the write is skipped and the record is returned with errors attached. See [Validation and Error Display](/v4-0-0-snapshot/basics/validation-and-errors/) for how that flow surfaces to the view.
+Both `save()` and `create()` run validations first; if any fail, the write is skipped and the record is returned with errors attached. See [Validation and Error Display](/v4-0-0/basics/validation-and-errors/) for how that flow surfaces to the view.
 
 ## Updating records
 
@@ -231,8 +231,8 @@ This is rarely needed. Most apps don't use DB-computed columns, and when they do
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Associations" href="/v4-0-0-snapshot/basics/associations/" description="hasMany, belongsTo, hasOne — navigating relationships with include and dependent." />
-  <LinkCard title="Query Builder and Scopes" href="/v4-0-0-snapshot/basics/query-builder-and-scopes/" description="Injection-safe query composition for anything more complex than a where string." />
-  <LinkCard title="Validation and Error Display" href="/v4-0-0-snapshot/basics/validation-and-errors/" description="How save returns false, how the errors flow back to the view." />
-  <LinkCard title="Migrations" href="/v4-0-0-snapshot/basics/migrations/" description="Defining the tables those models map to." />
+  <LinkCard title="Associations" href="/v4-0-0/basics/associations/" description="hasMany, belongsTo, hasOne — navigating relationships with include and dependent." />
+  <LinkCard title="Query Builder and Scopes" href="/v4-0-0/basics/query-builder-and-scopes/" description="Injection-safe query composition for anything more complex than a where string." />
+  <LinkCard title="Validation and Error Display" href="/v4-0-0/basics/validation-and-errors/" description="How save returns false, how the errors flow back to the view." />
+  <LinkCard title="Migrations" href="/v4-0-0/basics/migrations/" description="Defining the tables those models map to." />
 </CardGrid>

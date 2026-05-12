@@ -19,7 +19,7 @@ A controller is the CFC that runs after the router picks a route and before the 
 - How to render a view, a partial, text, or JSON — and how to redirect with a flash message
 
 <Aside type="note">
-  You should already know how routes map to actions. See [How Routing Works](/v4-0-0-snapshot/core-concepts/how-routing-works/). This page picks up on the controller side of that arrow.
+  You should already know how routes map to actions. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/). This page picks up on the controller side of that arrow.
 </Aside>
 
 ## Write your first controller
@@ -134,7 +134,7 @@ component extends="Controller" {
 }
 ```
 
-How `params.post` gets populated from `<input name="post[firstName]">` is the form helper's job — see [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/).
+How `params.post` gets populated from `<input name="post[firstName]">` is the form helper's job — see [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/).
 
 ## Rendering
 
@@ -246,13 +246,13 @@ component extends="Controller" {
 }
 ```
 
-Wheels 4.0 also ships an allowlist mechanism on the model itself for the cases where the explicit form gets tedious. The [Security Hardening](/v4-0-0-snapshot/digging-deeper/security-hardening/) page has the deep dive; until then, the explicit-pick pattern above is what every controller in the tutorial uses.
+Wheels 4.0 also ships an allowlist mechanism on the model itself for the cases where the explicit form gets tedious. The [Security Hardening](/v4-0-0/digging-deeper/security-hardening/) page has the deep dive; until then, the explicit-pick pattern above is what every controller in the tutorial uses.
 
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Routing" href="/v4-0-0-snapshot/basics/routing/" description="How URLs become controller#action targets." />
-  <LinkCard title="Views, Layouts, and Partials" href="/v4-0-0-snapshot/basics/views-layouts-partials/" description="What renders after your action finishes." />
-  <LinkCard title="Validation and Errors" href="/v4-0-0-snapshot/basics/validation-and-errors/" description="The errors your controller branches on when save fails." />
-  <LinkCard title="Forms and Form Helpers" href="/v4-0-0-snapshot/basics/forms-and-form-helpers/" description="How input names become nested params." />
+  <LinkCard title="Routing" href="/v4-0-0/basics/routing/" description="How URLs become controller#action targets." />
+  <LinkCard title="Views, Layouts, and Partials" href="/v4-0-0/basics/views-layouts-partials/" description="What renders after your action finishes." />
+  <LinkCard title="Validation and Errors" href="/v4-0-0/basics/validation-and-errors/" description="The errors your controller branches on when save fails." />
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-0/basics/forms-and-form-helpers/" description="How input names become nested params." />
 </CardGrid>

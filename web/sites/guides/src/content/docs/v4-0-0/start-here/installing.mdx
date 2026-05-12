@@ -17,7 +17,7 @@ Install the `wheels` CLI. Five minutes.
 - How to upgrade later
 
 <Aside type="tip" title="Adobe ColdFusion or BoxLang user?">
-The `wheels` CLI bundles a Lucee runtime — that's the easiest path for development and what the rest of these docs assume. The framework itself runs on Adobe ColdFusion 2023/2025 and BoxLang too; you'll use CommandBox to manage the engine instead of the bundled CLI. See [CFML Engines](/v4-0-0-snapshot/start-here/cfml-engines/) for the setup.
+The `wheels` CLI bundles a Lucee runtime — that's the easiest path for development and what the rest of these docs assume. The framework itself runs on Adobe ColdFusion 2023/2025 and BoxLang too; you'll use CommandBox to manage the engine instead of the bundled CLI. See [CFML Engines](/v4-0-0/start-here/cfml-engines/) for the setup.
 </Aside>
 
 <Aside type="note">
@@ -32,7 +32,7 @@ The `wheels` CLI bundles a Lucee runtime — that's the easiest path for develop
 
 ## Choose a channel
 
-Wheels ships on two parallel channels. The instructions below install **stable** (`wheels`) — the right pick for ~95% of users. If you want bleeding-edge (`wheels-be`, tracks every merge to `develop`), see [Release Channels](/v4-0-0-snapshot/start-here/release-channels/) for the comparison and install steps.
+Wheels ships on two parallel channels. The instructions below install **stable** (`wheels`) — the right pick for ~95% of users. If you want bleeding-edge (`wheels-be`, tracks every merge to `develop`), see [Release Channels](/v4-0-0/start-here/release-channels/) for the comparison and install steps.
 
 The two are mutually exclusive — both expose the `wheels` binary. You install one, not both. You can switch later without losing any of your already-scaffolded apps.
 
@@ -114,7 +114,7 @@ The two are mutually exclusive — both expose the `wheels` binary. You install 
 <TabItem label="Windows" icon="seti:windows">
 
 <Aside type="caution" title="Don't run `choco install wheels`">
-The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x release and **cannot drive this tutorial**. Wheels v4 ships on Windows through [Scoop](https://scoop.sh) instead — see [CLI Installation](/v4-0-0-snapshot/command-line-tools/installation/#windows-scoop) for the full rationale.
+The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x release and **cannot drive this tutorial**. Wheels v4 ships on Windows through [Scoop](https://scoop.sh) instead — see [CLI Installation](/v4-0-0/command-line-tools/installation/#windows-scoop) for the full rationale.
 </Aside>
 
 <Steps>
@@ -135,7 +135,7 @@ The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x relea
    scoop install wheels-be     # bleeding-edge - tracks every develop merge
    ```
 
-   Scoop pulls `java/openjdk21` automatically as a dependency. Both packages expose the same `wheels` shim on PATH — Scoop refuses to install both at once. See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/) for the comparison.
+   Scoop pulls `java/openjdk21` automatically as a dependency. Both packages expose the same `wheels` shim on PATH — Scoop refuses to install both at once. See [Release Channels](/v4-0-0/start-here/release-channels/) for the comparison.
 
 3. Verify:
 
@@ -151,7 +151,7 @@ The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x relea
 
 </Steps>
 
-Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI Installation → Manual JAR install](/v4-0-0-snapshot/command-line-tools/installation/#manual-jar-install) for the canonical version-pairing source.
+Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI Installation → Manual JAR install](/v4-0-0/command-line-tools/installation/#manual-jar-install) for the canonical version-pairing source.
 
 </TabItem>
 
@@ -198,7 +198,7 @@ During Phase 1 (before `apt.wheels.dev` / `yum.wheels.dev` are live), download i
    sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
    ```
 
-   The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/).
+   The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-0/start-here/release-channels/).
    </Aside>
 
 2. Verify:
@@ -295,17 +295,17 @@ You skipped `brew tap wheels-dev/wheels`. Run the tap command, then re-run the i
 <CardGrid>
   <LinkCard
     title="Your First 15 Minutes"
-    href="/v4-0-0-snapshot/start-here/first-15-minutes/"
+    href="/v4-0-0/start-here/first-15-minutes/"
     description="Zero to a running page."
   />
   <LinkCard
     title="Build a Blog"
-    href="/v4-0-0-snapshot/start-here/tutorial/"
+    href="/v4-0-0/start-here/tutorial/"
     description="The real introduction. Three and a half hours."
   />
   <LinkCard
     title="Upgrading Wheels"
-    href="/v4-0-0-snapshot/upgrading/"
+    href="/v4-0-0/upgrading/"
     description="Move between Wheels versions."
   />
 </CardGrid>

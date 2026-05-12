@@ -39,15 +39,15 @@ Pick the one that matches what you want to do. Every path is welcome and every p
 
 ### Code
 
-Bug fixes, new features, performance work, refactors. If you're changing files in `vendor/wheels/` or adding framework behaviour, this is your path. Start from an issue — either one that already exists or one you open to describe the problem before you write code. Breaking changes and anything touching core functionality should be discussed in an issue *before* a PR lands. See [Pull Requests](/v4-0-0-snapshot/contributing/pull-requests/) for the full flow and [Coding Standards](/v4-0-0-snapshot/contributing/coding-standards/) for style and structure rules.
+Bug fixes, new features, performance work, refactors. If you're changing files in `vendor/wheels/` or adding framework behaviour, this is your path. Start from an issue — either one that already exists or one you open to describe the problem before you write code. Breaking changes and anything touching core functionality should be discussed in an issue *before* a PR lands. See [Pull Requests](/v4-0-0/contributing/pull-requests/) for the full flow and [Coding Standards](/v4-0-0/contributing/coding-standards/) for style and structure rules.
 
 ### Documentation
 
-Fixing a typo, clarifying a guide, adding a missing example, filling a gap. Docs PRs are exempt from the test-writing requirement but still go through review. The [Writing Documentation](/v4-0-0-snapshot/contributing/writing-docs/) guide covers the Diátaxis split (tutorial / how-to / concept / reference), the verify-docs harness that compiles every tagged code block, and the style rules that keep the site consistent.
+Fixing a typo, clarifying a guide, adding a missing example, filling a gap. Docs PRs are exempt from the test-writing requirement but still go through review. The [Writing Documentation](/v4-0-0/contributing/writing-docs/) guide covers the Diátaxis split (tutorial / how-to / concept / reference), the verify-docs harness that compiles every tagged code block, and the style rules that keep the site consistent.
 
 ### Packages
 
-First-party packages are standalone repositories under `wheels-dev/` (e.g. [`wheels-sentry`](https://github.com/wheels-dev/wheels-sentry), [`wheels-hotwire`](https://github.com/wheels-dev/wheels-hotwire)), indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry. Good candidates: opt-in integrations (error trackers, UI toolkits, front-end frameworks) that don't belong in the framework core. A new package needs a `package.json` manifest, tests in `<package>/tests/`, and a docs page under Digging Deeper. See [Packages](/v4-0-0-snapshot/digging-deeper/packages/) for the manifest shape and activation model; submit your package to the registry per its `CONTRIBUTING.md`.
+First-party packages are standalone repositories under `wheels-dev/` (e.g. [`wheels-sentry`](https://github.com/wheels-dev/wheels-sentry), [`wheels-hotwire`](https://github.com/wheels-dev/wheels-hotwire)), indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry. Good candidates: opt-in integrations (error trackers, UI toolkits, front-end frameworks) that don't belong in the framework core. A new package needs a `package.json` manifest, tests in `<package>/tests/`, and a docs page under Digging Deeper. See [Packages](/v4-0-0/digging-deeper/packages/) for the manifest shape and activation model; submit your package to the registry per its `CONTRIBUTING.md`.
 
 ### Issue triage
 
@@ -62,17 +62,17 @@ Security issues do not go in public issues. Email `webmaster@wheels.dev` with th
 <CardGrid>
   <LinkCard
     title="Pull Requests"
-    href="/v4-0-0-snapshot/contributing/pull-requests/"
+    href="/v4-0-0/contributing/pull-requests/"
     description="Fork-and-pull workflow, branch naming, definition of done, and what reviewers look for."
   />
   <LinkCard
     title="Coding Standards"
-    href="/v4-0-0-snapshot/contributing/coding-standards/"
+    href="/v4-0-0/contributing/coding-standards/"
     description="Formatting rules, commit-message scopes, cross-engine gotchas, and the anti-patterns to avoid."
   />
   <LinkCard
     title="Writing Documentation"
-    href="/v4-0-0-snapshot/contributing/writing-docs/"
+    href="/v4-0-0/contributing/writing-docs/"
     description="Diátaxis page types, the Starlight component set, and the verify-docs harness for tested examples."
   />
 </CardGrid>

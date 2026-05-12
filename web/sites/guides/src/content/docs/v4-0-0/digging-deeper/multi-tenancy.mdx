@@ -18,7 +18,7 @@ This page shows you how to run a single Wheels app that serves many tenants — 
 - How to test tenant isolation and key caches per tenant
 
 <Aside type="note">
-  You should already know how middleware runs (see [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/)) and how models connect to datasources (see [Database and Multiple Datasources](/v4-0-0-snapshot/basics/database-and-multiple-datasources/)).
+  You should already know how middleware runs (see [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/)) and how models connect to datasources (see [Database and Multiple Datasources](/v4-0-0/basics/database-and-multiple-datasources/)).
 </Aside>
 
 ## Three tenancy strategies
@@ -142,7 +142,7 @@ component extends="Model" {
 }
 ```
 
-The handler method runs on each call to `.currentTenant()`, so it sees the current request's tenant every time. See [Query Builder and Scopes](/v4-0-0-snapshot/basics/query-builder-and-scopes/#dynamic-scopes) for the full dynamic-scope pattern.
+The handler method runs on each call to `.currentTenant()`, so it sees the current request's tenant every time. See [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/#dynamic-scopes) for the full dynamic-scope pattern.
 
 Use it like any other scope:
 
@@ -289,7 +289,7 @@ Tests should exercise the middleware too: hit a protected action with and withou
 
 ## Caching per tenant
 
-If you use [caching](/v4-0-0-snapshot/digging-deeper/caching/), every cache key must include the tenant ID. A cache leak across tenants is a classic tenancy vulnerability — user A loads the page, their rendered HTML lands in the cache under a tenant-less key, user B on a different tenant gets user A's HTML.
+If you use [caching](/v4-0-0/digging-deeper/caching/), every cache key must include the tenant ID. A cache leak across tenants is a classic tenancy vulnerability — user A loads the page, their rendered HTML lands in the cache under a tenant-less key, user B on a different tenant gets user A's HTML.
 
 The `appendToKey` argument on `caches()` reads dot-notation paths from `request`, `arguments`, `application`, `session`, or `variables` — it doesn't invoke private controller methods. Stash the tenant ID into `request` in a `before` filter, then reference it:
 
@@ -324,22 +324,22 @@ For fragment caches and query caches, build the tenant ID into the key yourself:
 <CardGrid>
   <LinkCard
     title="Middleware Pipeline"
-    href="/v4-0-0-snapshot/core-concepts/middleware-pipeline/"
+    href="/v4-0-0/core-concepts/middleware-pipeline/"
     description="How TenantResolver fits into the middleware chain — and the order middleware runs."
   />
   <LinkCard
     title="Database and Multiple Datasources"
-    href="/v4-0-0-snapshot/basics/database-and-multiple-datasources/"
+    href="/v4-0-0/basics/database-and-multiple-datasources/"
     description="Registering datasources, per-model overrides, and connection pooling."
   />
   <LinkCard
     title="Caching"
-    href="/v4-0-0-snapshot/digging-deeper/caching/"
+    href="/v4-0-0/digging-deeper/caching/"
     description="Cache keys, invalidation, and per-tenant keying."
   />
   <LinkCard
     title="Authentication Patterns"
-    href="/v4-0-0-snapshot/digging-deeper/authentication-patterns/"
+    href="/v4-0-0/digging-deeper/authentication-patterns/"
     description="Tenant-scoped user accounts and session handling."
   />
 </CardGrid>
