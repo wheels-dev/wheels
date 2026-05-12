@@ -16,15 +16,13 @@
 
     // Resolve the test directory. Default to tests.specs (the convention
     // every Wheels app has), but allow ?directory= to scope to a subdir
-    // like tests.specs.models. Only accept dotted paths beginning with
-    // "tests." to avoid arbitrary CFC compilation.
-    local.testDirectory = "tests.specs";
-    if (StructKeyExists(url, "directory") && Len(Trim(url.directory))) {
-        local.requested = Trim(url.directory);
-        if (ReFindNoCase("^tests(\.[a-zA-Z0-9_]+)*$", local.requested)) {
-            local.testDirectory = local.requested;
-        }
-    }
+    // like tests.specs.models. The resolver only accepts dotted paths
+    // beginning with "tests." so a malicious caller can't trick TestBox
+    // into compiling arbitrary CFCs (e.g. ?directory=vendor.wheels.lib).
+    // Extracted to TestDirectoryResolver so the regression spec for
+    // issue #2489 can exercise the regex without spinning up HTTP.
+    local.dirResolver = new wheels.tests._assets.dispatch.TestDirectoryResolver();
+    local.testDirectory = local.dirResolver.resolveDirectory(url);
 
     // Resolve the target datasource. When url.useTestDB=true and a
     // <dataSourceName>_test datasource is registered, swap to it for

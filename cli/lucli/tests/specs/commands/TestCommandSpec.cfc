@@ -157,6 +157,123 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("$resolveAppTestDataSource (issue 2489)", () => {
+
+			it("returns (unknown) when neither .env nor settings.cfm define a datasource", () => {
+				var sandbox = $scaffold(settingsBody = "");
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("(unknown)");
+				$tearDown(sandbox);
+			});
+
+			it("appends _test to dataSourceName from config/settings.cfm when useTestDB is true", () => {
+				var sandbox = $scaffold(settingsBody = 'set(dataSourceName="myapp");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("myapp_test");
+				$tearDown(sandbox);
+			});
+
+			it("returns base unchanged when useTestDB is false", () => {
+				var sandbox = $scaffold(settingsBody = 'set(dataSourceName="myapp");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(false)).toBe("myapp");
+				$tearDown(sandbox);
+			});
+
+			it("does NOT pick up coreTestDataSourceName as if it were dataSourceName", () => {
+				// Reporter's exact configuration: only coreTestDataSourceName is
+				// set. The previous regex matched the trailing dataSourceName
+				// substring and produced `testappdb_test_test`. After the fix
+				// we should fall through to (unknown) because no real
+				// `dataSourceName` is configured.
+				var sandbox = $scaffold(settingsBody = 'set(coreTestDataSourceName="testappdb_test");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("(unknown)");
+				$tearDown(sandbox);
+			});
+
+			it("ignores commented-out dataSourceName lines", () => {
+				var body =
+					"// set(dataSourceName=" & chr(34) & "commented_out" & chr(34) & ");" & chr(10) &
+					"set(dataSourceName=" & chr(34) & "actualapp" & chr(34) & ");";
+				var sandbox = $scaffold(settingsBody = body);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("actualapp_test");
+				$tearDown(sandbox);
+			});
+
+			it("ignores dataSourceName inside CFML block comments", () => {
+				var body =
+					"/* set(dataSourceName=" & chr(34) & "blocked" & chr(34) & "); */" & chr(10) &
+					"set(dataSourceName=" & chr(34) & "active" & chr(34) & ");";
+				var sandbox = $scaffold(settingsBody = body);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("active_test");
+				$tearDown(sandbox);
+			});
+
+			it("ignores dataSourceName inside tag-style CFML comments", () => {
+				var body =
+					"<!--- set(dataSourceName=" & chr(34) & "blocked" & chr(34) & "); --->" & chr(10) &
+					"set(dataSourceName=" & chr(34) & "tagactive" & chr(34) & ");";
+				var sandbox = $scaffold(settingsBody = body);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("tagactive_test");
+				$tearDown(sandbox);
+			});
+
+			it("does not double-append _test when dataSourceName already ends with _test", () => {
+				// Defensive guard: even if the user's app datasource happens to
+				// be named `myapp_test`, surfacing `myapp_test_test` in the
+				// preamble is more confusing than helpful.
+				var sandbox = $scaffold(settingsBody = 'set(dataSourceName="myapp_test");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("myapp_test");
+				$tearDown(sandbox);
+			});
+
+			it("prefers .env DATASOURCE_NAME over config/settings.cfm", () => {
+				var sandbox = $scaffold(
+					settingsBody = 'set(dataSourceName="from_settings");',
+					envBody      = "DATASOURCE_NAME=from_env"
+				);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("from_env_test");
+				$tearDown(sandbox);
+			});
+
+		});
+
+	}
+
+	/**
+	 * Build an isolated temp project rooted under /tmp so each spec can
+	 * lay down its own config/settings.cfm and .env without polluting the
+	 * suite-level fixture. Returns the temp root path.
+	 */
+	private string function $scaffold(
+		string settingsBody = "",
+		string envBody = ""
+	) {
+		var tempBase = getTempDirectory() & "wheels-cli-resolver-" & createUUID();
+		directoryCreate(tempBase & "/config", true, true);
+		directoryCreate(tempBase & "/vendor/wheels", true, true);
+
+		var nl = chr(10);
+		var settingsContent = "<cfscript>" & nl & arguments.settingsBody & nl & "</cfscript>" & nl;
+		fileWrite(tempBase & "/config/settings.cfm", settingsContent);
+
+		if (Len(arguments.envBody)) {
+			fileWrite(tempBase & "/.env", arguments.envBody & nl);
+		}
+
+		return tempBase;
+	}
+
+	private void function $tearDown(required string tempRoot) {
+		if (Len(arguments.tempRoot) > 10 && directoryExists(arguments.tempRoot)) {
+			directoryDelete(arguments.tempRoot, true);
+		}
 	}
 
 }
