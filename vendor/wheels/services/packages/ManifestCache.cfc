@@ -125,8 +125,17 @@ component {
 		// Adobe CF's DirectoryCreate accepts only a single argument — passing
 		// the Lucee-only createPath flag crashes the Tools → Packages page on
 		// fresh ACF installs (#2567). Java's File.mkdirs() recurses parents
-		// uniformly on every engine.
-		CreateObject("java", "java.io.File").init(arguments.path).mkdirs();
+		// uniformly on every engine. mkdirs() returns false when the directory
+		// already exists OR when creation fails (e.g. permission denied);
+		// re-check DirectoryExists so a benign concurrent-creation race
+		// doesn't masquerade as a real failure.
+		local.created = CreateObject("java", "java.io.File").init(arguments.path).mkdirs();
+		if (!local.created && !DirectoryExists(arguments.path)) {
+			Throw(
+				type = "Wheels.Packages.CacheDir",
+				message = "Could not create cache directory '#arguments.path#'."
+			);
+		}
 	}
 
 	private string function $defaultRoot() {
