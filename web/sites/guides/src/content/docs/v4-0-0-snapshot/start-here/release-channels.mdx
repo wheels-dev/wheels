@@ -81,13 +81,18 @@ Each channel ships `.deb` and `.rpm` packages on its respective releases page:
 - **Bleeding-edge**: [github.com/wheels-dev/wheels-snapshots/releases](https://github.com/wheels-dev/wheels-snapshots/releases)
 
 ```bash title="Debian / Ubuntu (stable)"
-curl -fsSLO https://github.com/wheels-dev/wheels/releases/latest/download/wheels_<version>_amd64.deb
-sudo apt install ./wheels_<version>_amd64.deb
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
 ```
 
 ```bash title="Fedora / RHEL (bleeding-edge)"
-curl -fsSLO https://github.com/wheels-dev/wheels-snapshots/releases/latest/download/wheels-<version>.x86_64.rpm
-sudo dnf install ./wheels-<version>.x86_64.rpm
+# The bleeding-edge channel publishes only pre-releases, so use /releases (not /releases/latest).
+WHEELS_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+WHEELS_FILENAME_VER="${WHEELS_TAG//-/.}"  # GitHub Releases rewrites ~ to . in filenames
+sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels-${WHEELS_FILENAME_VER}.x86_64.rpm"
 ```
 
 Apt and yum repos at `apt.wheels.dev` / `yum.wheels.dev` are coming — they'll let you `apt upgrade wheels` instead of re-downloading.
@@ -102,16 +107,27 @@ GitHub Releases doesn't allow `~` in asset filenames, so the SemVer pre-release 
 
 ## Switching channels
 
-The `wheels` and `wheels-be` packages declare a Homebrew `conflicts_with` so they can't coexist. To switch:
+The `wheels` and `wheels-be` packages can't coexist — they both install a binary named `wheels`. Homebrew enforces this via `conflicts_with`; the Linux `.deb`/`.rpm` packages declare `Conflicts:` / `Replaces:` so `apt`/`dnf` does the replacement in one step. Scoop refuses to install both at once.
 
-```bash title="stable → bleeding-edge"
+```bash title="macOS — stable → bleeding-edge"
 brew uninstall wheels
 brew install wheels-be
 ```
 
-```bash title="bleeding-edge → stable"
+```bash title="macOS — bleeding-edge → stable"
 brew uninstall wheels-be
 brew install wheels
+```
+
+```bash title="Linux — switch by installing the other package"
+# apt/dnf sees the Conflicts: + Replaces: metadata and swaps the packages atomically.
+# Use the install snippet from the appropriate channel above with wheels-be / wheels
+# substituted in the URL — apt/dnf removes the old one as part of the transaction.
+```
+
+```powershell title="Windows (Scoop) — stable → bleeding-edge"
+scoop uninstall wheels
+scoop install wheels-be
 ```
 
 ### What happens to your apps when you switch

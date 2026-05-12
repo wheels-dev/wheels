@@ -157,21 +157,38 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
 
 <TabItem label="Linux" icon="linux">
 
+Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repository at `apt.wheels.dev` / `yum.wheels.dev` is on the v4.0.x roadmap — until then, install the package directly from a GitHub Release. The package installs `/usr/bin/wheels`, depends on OpenJDK 21, and on first run syncs the framework module into `~/.wheels/`.
+
 <Steps>
 
-1. Install via the official installer script:
+1. Install OpenJDK 21:
 
-   ```bash title="your shell"
-   curl -fsSL https://get.wheels.dev/install.sh | bash
+   ```bash title="Debian / Ubuntu"
+   sudo apt install openjdk-21-jre-headless
    ```
 
-   The script downloads the latest release into `~/.wheels/bin/` and adds it to your `PATH`.
-
-2. Reload your shell or source the updated profile:
-
-   ```bash title="your shell"
-   exec "$SHELL"
+   ```bash title="Fedora / RHEL"
+   sudo dnf install java-21-openjdk-headless
    ```
+
+2. Download and install the latest Wheels release:
+
+   ```bash title="Debian / Ubuntu — stable"
+   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+   curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+   sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+   ```
+
+   ```bash title="Fedora / RHEL — stable"
+   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+   sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+   ```
+
+   <Aside type="note" title="Want bleeding-edge?">
+   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Substitute `wheels-dev/wheels-snapshots` for `wheels-dev/wheels` in the URLs above. Note that snapshot version strings in the *filename* use dots in place of the SemVer hyphen — e.g. `wheels_4.0.0.snapshot.1825_amd64.deb` for tag `v4.0.0-snapshot.1825`. The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` orders the version correctly relative to GA. See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/).
+   </Aside>
 
 3. Verify:
 
@@ -218,11 +235,22 @@ scoop update wheels-be
 
 <TabItem label="Linux" icon="linux">
 
-Re-run the installer script — it detects existing installs and upgrades in place:
+Re-run the install command for your distro — `apt`/`dnf` upgrades the package in place when it sees a newer version:
 
-```bash title="your shell"
-curl -fsSL https://get.wheels.dev/install.sh | bash
+```bash title="Debian / Ubuntu"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
 ```
+
+```bash title="Fedora / RHEL"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+sudo dnf upgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+```
+
+The first `wheels` invocation after upgrade syncs the new framework module into `~/.wheels/modules/wheels/` automatically.
 
 </TabItem>
 
@@ -232,7 +260,7 @@ curl -fsSL https://get.wheels.dev/install.sh | bash
 
 **`wheels: command not found`**
 
-Your shell's `PATH` doesn't include the CLI. Restart your shell, or on Linux source `~/.wheels/env` manually. On macOS, confirm Homebrew's bin path is in `PATH`: `echo $PATH | tr ':' '\n' | grep brew`.
+Your shell's `PATH` doesn't include the CLI. Restart your shell first — most installs only put the binary on `PATH` for new shell sessions. On macOS, confirm Homebrew's bin path is in `PATH`: `echo $PATH | tr ':' '\n' | grep brew`. On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be on every user's default `PATH`; if it's not, check `dpkg -L wheels` (Debian) or `rpm -ql wheels` (RHEL) to confirm the package installed and the binary is where expected.
 
 **`Error: unable to find Java runtime`**
 

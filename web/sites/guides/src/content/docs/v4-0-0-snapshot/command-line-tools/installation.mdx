@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the wheels binary via Homebrew, Scoop (Windows), or a manual JAR download, and verify your setup.
+description: Install the wheels binary via Homebrew (macOS), .deb/.rpm (Linux), Scoop (Windows), or a manual JAR download, and verify your setup.
 type: reference
 sidebar:
   order: 2
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-The `wheels` binary is distributed through three channels: Homebrew for macOS and Linux, Scoop for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
+The `wheels` binary is distributed through four channels: Homebrew for macOS, `.deb`/`.rpm` packages for Linux, Scoop for Windows, and a direct JAR download for anyone who wants to wire it up by hand. Each channel installs the same two artifacts — the LuCLI launcher and the Wheels Module that ships the framework commands.
 
 **You'll use this for:**
 
@@ -19,7 +19,7 @@ The `wheels` binary is distributed through three channels: Homebrew for macOS an
 
 ## Requirements
 
-The CLI runs on Java 21. On macOS and Linux, the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper, so you don't have to wire up a system JDK. If you're installing manually — or on Windows without Scoop — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
+The CLI runs on Java 21. On macOS the Homebrew formula installs `openjdk@21` for you and sets `JAVA_HOME` inside the `wheels` wrapper. On Linux the `.deb`/`.rpm` package declares OpenJDK 21 as a runtime dependency, so `apt`/`dnf` pulls it in alongside `wheels`. The wrapper probes `/usr/lib/jvm/` for a Java 21 install and exports `JAVA_HOME` itself. If you're installing manually — or on Windows without Scoop — grab a JDK 21 build from [Adoptium](https://adoptium.net/) or Homebrew:
 
 ```bash title="illustrative — system JDK setup"
 brew install openjdk@21
@@ -28,7 +28,7 @@ java -version
 
 You should see `openjdk version "21.0.x"` in the output. On Apple Silicon macOS, Homebrew's `openjdk@21` isn't symlinked into `/usr/bin/java` by default — the wheels formula handles this by exporting `JAVA_HOME` itself, but if you call `java` directly you'll need to set it manually.
 
-## macOS and Linux (Homebrew)
+## macOS (Homebrew)
 
 Tap the formula repository and install:
 
@@ -48,6 +48,33 @@ The first time you invoke `wheels`, the wrapper:
 5. Execs the LuCLI launcher with your arguments.
 
 On upgrades (`brew upgrade wheels`), the staged module version bumps; the next `wheels` invocation notices the mismatch and refreshes `~/.wheels/modules/wheels/` in place.
+
+## Linux (`.deb` / `.rpm`)
+
+Wheels ships native packages for x86_64 Debian/Ubuntu (`.deb`) and Fedora/RHEL (`.rpm`) hosts on every release. Both are built by `nfpm` on the release workflow and uploaded to the GitHub Release alongside the zip/tar artifacts. The package declares an OpenJDK 21 runtime dependency so `apt`/`dnf` pulls a JDK in automatically when needed.
+
+Install the latest stable release:
+
+```bash title="illustrative — Debian / Ubuntu"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+```
+
+```bash title="illustrative — Fedora / RHEL"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+```
+
+The package lays down `/usr/bin/wheels` (a shell wrapper), `/opt/wheels/lucli` (the LuCLI launcher), `/opt/wheels/module/` (the staged Wheels Module), and `/opt/wheels/sqlite-jdbc.jar` (auto-staged into Lucee Express on first run). The wrapper mirrors the Homebrew flow: probes `/usr/lib/jvm/` for OpenJDK 21, exports `LUCLI_HOME=$HOME/.wheels`, syncs the staged module into `~/.wheels/modules/wheels/` on first run or version mismatch, then execs LuCLI.
+
+For the bleeding-edge channel (every merge to `develop`), substitute `wheels-dev/wheels-snapshots` for `wheels-dev/wheels` in the URLs above. Snapshot filenames contain dots in place of the SemVer hyphen — `wheels_4.0.0.snapshot.1825_amd64.deb` for tag `v4.0.0-snapshot.1825`. The version metadata *inside* the `.deb`/`.rpm` preserves the canonical `~snapshot.N` form, so `dpkg --compare-versions` and `rpmvercmp` order it below the next GA correctly.
+
+<Aside type="note" title="Native apt/yum repositories">
+The download-and-install flow above is the v4.0 GA story. Native `apt`/`yum` repositories at `apt.wheels.dev` and `yum.wheels.dev` are on the v4.0.x roadmap — once they're live, you'll be able to add a sources list once and `sudo apt install wheels` / `sudo dnf install wheels` will pull new versions automatically via `apt update`. The package format on disk doesn't change.
+</Aside>
 
 ## Windows (Scoop)
 
@@ -102,7 +129,7 @@ Pick LuCLI and Wheels Module versions that are known to be paired — the Homebr
 
 ## Verifying installation
 
-After any of the three paths, confirm the binary resolves and reports a version:
+After any of the four paths, confirm the binary resolves and reports a version:
 
 ```bash {test:cli cmd="wheels --version" asserts-output="Wheels"}
 wheels --version
@@ -126,9 +153,11 @@ Once the version check passes, `wheels info` inside a Wheels project gives you a
 
 The Homebrew wrapper sets `JAVA_HOME` inside its own process, so a missing or wrong `JAVA_HOME` in your shell doesn't break `wheels`. But if you're calling `java` directly — or running a manual install — the CLI fails fast with a "Java 21 required" message when `JAVA_HOME` isn't pointed at a JDK 21 install. On Apple Silicon macOS, Homebrew stages `openjdk@21` at `/opt/homebrew/Cellar/openjdk@21/<version>/libexec/openjdk.jdk/Contents/Home`; export that path and re-run.
 
-### `wheels: command not found` after `brew install wheels`
+### `wheels: command not found` after install
 
-Homebrew's shim directory has to be on your `PATH`. On Apple Silicon macOS that's `/opt/homebrew/bin`; on Intel macOS and Linux it's `/usr/local/bin`. Run `brew --prefix` to confirm, check your `PATH`, and add the shim directory if it's missing. A fresh shell (`exec $SHELL -l`) often fixes this without any config change.
+On macOS, Homebrew's shim directory has to be on your `PATH` — `/opt/homebrew/bin` on Apple Silicon, `/usr/local/bin` on Intel. Run `brew --prefix` to confirm, check your `PATH`, and add the shim directory if it's missing. A fresh shell (`exec $SHELL -l`) often fixes this without any config change.
+
+On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be on every user's default `PATH`. If it isn't, run `dpkg -L wheels` (Debian/Ubuntu) or `rpm -ql wheels` (Fedora/RHEL) to confirm the package landed and the binary is at the expected path. A reopened shell (`exec $SHELL -l`) clears any stale `PATH` cache from the previous session.
 
 ### Conflict with a standalone LuCLI install sharing `~/.lucli/`
 
