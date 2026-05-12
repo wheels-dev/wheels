@@ -342,9 +342,11 @@ component {
 		var issues = [];
 		var content = fileRead(arguments.path);
 		var fileName = listLast(arguments.path, "/\");
+		var activeContent = $stripCfmlComments(content);
 
-		// Check extends
-		if (!findNoCase('extends="Model"', content) && !findNoCase("extends='Model'", content)) {
+		// Check extends (against comment-stripped content so a commented-out
+		// `extends="Model"` doesn't satisfy the substring match — see #2491).
+		if (!findNoCase('extends="Model"', activeContent) && !findNoCase("extends='Model'", activeContent)) {
 			arrayAppend(issues, {
 				file: arguments.path,
 				severity: "error",
@@ -368,8 +370,9 @@ component {
 		var issues = [];
 		var content = fileRead(arguments.path);
 		var fileName = listLast(arguments.path, "/\");
+		var activeContent = $stripCfmlComments(content);
 
-		if (!findNoCase('extends="Controller"', content) && !findNoCase("extends='Controller'", content)) {
+		if (!findNoCase('extends="Controller"', activeContent) && !findNoCase("extends='Controller'", activeContent)) {
 			arrayAppend(issues, {
 				file: arguments.path,
 				severity: "error",
@@ -378,6 +381,14 @@ component {
 		}
 
 		return issues;
+	}
+
+	private string function $stripCfmlComments(required string source) {
+		var result = arguments.source;
+		result = reReplace(result, "<!---[\s\S]*?--->", "", "all");
+		result = reReplace(result, "/\*[\s\S]*?\*/", "", "all");
+		result = reReplace(result, "//[^\r\n]*", "", "all");
+		return result;
 	}
 
 	private array function validateRoutes(required string path) {

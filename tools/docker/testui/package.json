@@ -10,7 +10,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "description": "Wheels TestUI - Modern test runner interface",
   "dependencies": {
     "@types/node": "^22.15.18",
