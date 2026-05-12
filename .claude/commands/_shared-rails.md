@@ -42,6 +42,16 @@ they are honored. Violating them is a bug — fix the prompt, not the rails.
   short noun that helps a reader skim history (e.g. `model`, `web/blog`),
   or omit it entirely. Don't agonize over which scope is "right."
 - **Subject ≤ 100 chars, not ALL-CAPS.** Sentence-case is fine.
+- **DCO sign-off required.** Every commit you author MUST end with the
+  trailer `Signed-off-by: wheels-bot[bot] <wheels-bot[bot]@users.noreply.github.com>`
+  matching the configured git author identity. Use `git commit -s` (the
+  caller workflow's `git config` for `user.name` / `user.email` makes this
+  the right value automatically) or append the trailer manually before the
+  `Co-authored-by:` lines. The [DCO GitHub App](https://github.com/apps/dco)
+  is a required status check on every PR and will block merges if any
+  commit is missing the trailer. See
+  [`CONTRIBUTING.md` § DCO](../../CONTRIBUTING.md#developer-certificate-of-origin-dco)
+  for the contributor-facing explanation.
 - **Branch naming** for bot-authored work: `fix/bot-<issue>-<slug>` or
   `feature/bot-<slug>`. The caller workflow creates the branch — do not
   create branches yourself.

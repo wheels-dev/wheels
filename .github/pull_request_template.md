@@ -18,6 +18,7 @@ Closes #
 
 <!-- All items must be checked for new features and enhancements -->
 
+- [ ] **DCO sign-off** -- Every commit carries `Signed-off-by:` (use `git commit -s`); see [CONTRIBUTING.md](../blob/develop/CONTRIBUTING.md#developer-certificate-of-origin-dco)
 - [ ] **Tests** -- Unit tests covering happy path, edge cases, and error conditions
 - [ ] **Framework Docs** -- New or updated MDX page under `web/sites/guides/src/content/docs/v4-0-0-snapshot/` with matching sidebar entry
 - [ ] **AI Reference Docs** -- New or updated file in `.ai/wheels/` directory

@@ -120,11 +120,13 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 
    ```bash
    git add <files>
-   git commit -m "<message>"
+   git commit -s -m "<message>"
    ```
 
-   The workflow's "Push branch" step pushes after this prompt
-   completes.
+   The `-s` flag is required — every commit must carry a `Signed-off-by:`
+   trailer matching the configured git author (DCO enforcement; see
+   `_shared-rails.md`). The workflow's "Push branch" step pushes after
+   this prompt completes.
 
 7. **Post the address-review comment** on the PR:
 

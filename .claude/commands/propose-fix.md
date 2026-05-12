@@ -138,8 +138,10 @@ is enforced by code, so don't skip steps.
     - `docs: clarify migration seed pattern for cross-DB compatibility`
 
     The caller workflow handles the actual `git push` — your job is to
-    `git add` the right files and `git commit` cleanly. Do **not** use
-    `--amend` or `--force`.
+    `git add` the right files and `git commit -s` cleanly. The `-s` flag
+    is required: every commit must carry a `Signed-off-by:` trailer
+    matching the configured git author (DCO enforcement; see
+    `_shared-rails.md`). Do **not** use `--amend` or `--force`.
 
 11. **Open the draft PR.** Use `gh pr create --draft --base develop`. The
     PR body must:
