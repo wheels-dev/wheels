@@ -1,0 +1,130 @@
+---
+title: Your First 15 Minutes
+description: A skim-level walkthrough that gets something running fast, before any concepts.
+type: tutorial
+sidebar:
+  order: 4
+---
+
+import { Aside, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Fifteen minutes. Zero explanations. You run commands, you see results, you know whether Wheels fits your brain. If it does, move on to the [full tutorial](/v4-0-1-snapshot/start-here/tutorial/) — that's where you'll actually learn how things work.
+
+**You'll learn:**
+
+- Whether Wheels feels right for you
+- What a scaffolded Wheels app looks like
+- Where to go next
+
+<Aside type="note">
+  Assumes you've [installed the CLI](/v4-0-1-snapshot/start-here/installing/). `wheels --version` should print a version line.
+</Aside>
+
+## 1. Create an app (3 min)
+
+First, confirm the CLI is installed:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+Then create a new app:
+
+```bash title="your shell"
+wheels new hello
+cd hello
+```
+
+This creates a SQLite-backed Wheels app called `hello` and drops you into its directory. The scaffold takes a couple of seconds.
+
+## 2. Start the server (2 min)
+
+```bash title="your shell"
+wheels start
+```
+
+You'll see log lines ending with something like `Server started successfully`. Open [http://localhost:8080](http://localhost:8080) in your browser. A welcome page appears: "Welcome to hello. Your Wheels application is running."
+
+The dev server stays running in the background. Leave the terminal open.
+
+## 3. Add a page (5 min)
+
+<Steps>
+
+1. Open `config/routes.cfm`. You'll see a `mapper()...end()` block wrapped in `<cfscript>`. Inside `mapper()`, add a line so the file looks like:
+
+   ```cfm {test:compile}
+   mapper()
+       .get(name="greet", pattern="/greet", to="main##greet")
+       .wildcard()
+       .root(to="main##index", method="get")
+   .end();
+   ```
+
+   `.get(...)` declares: when a GET request hits `/greet`, run the `greet` action on the `Main` controller.
+
+2. Open `app/controllers/Main.cfc` and add a `greet` action:
+
+   ```cfm {test:compile}
+   component extends="Controller" {
+       function index() {
+       }
+       function greet() {
+       }
+   }
+   ```
+
+   Wheels renders the view at `app/views/main/greet.cfm`.
+
+3. Create `app/views/main/greet.cfm`:
+
+   ```cfm title="app/views/main/greet.cfm"
+   <h1>Hello from Wheels</h1>
+   <p>This page didn't exist a minute ago.</p>
+   ```
+
+4. Tell Wheels to pick up the changes:
+
+   ```bash title="your shell"
+   wheels reload
+   ```
+
+</Steps>
+
+## 4. Verify (2 min)
+
+```bash title="your shell"
+curl -s http://localhost:8080/greet
+```
+
+You should see `<h1>Hello from Wheels</h1>` in the response.
+
+## 5. What just happened (3 min)
+
+Three pieces moved:
+
+- **Route** — `routes.cfm` mapped a URL to a controller action. URL lookup is convention-driven; `/greet` → `main##greet` means "the `greet` function on the `Main` controller."
+- **Controller** — `Main.cfc`'s `greet` action ran. It did nothing visible; it just existed, so Wheels proceeded to render the view.
+- **View** — `app/views/main/greet.cfm` rendered. The path is conventional: `views/<controller>/<action>.cfm`.
+
+That's it. Every request is a variant of the same three-beat dance: route, controller action, view. The [full tutorial](/v4-0-1-snapshot/start-here/tutorial/) fills in models, migrations, forms, validations, and the rest.
+
+## Where to next
+
+<CardGrid>
+  <LinkCard
+    title="Build a Blog"
+    href="/v4-0-1-snapshot/start-here/tutorial/"
+    description="The real introduction — 7 parts, 3.5 hours, builds a complete app."
+  />
+  <LinkCard
+    title="Core Concepts"
+    href="/v4-0-1-snapshot/core-concepts/"
+    description="The mental model: request lifecycle, MVC, ORM philosophy."
+  />
+  <LinkCard
+    title="CLI Reference"
+    href="/v4-0-1-snapshot/command-line-tools/"
+    description="Every command in the wheels CLI."
+  />
+</CardGrid>

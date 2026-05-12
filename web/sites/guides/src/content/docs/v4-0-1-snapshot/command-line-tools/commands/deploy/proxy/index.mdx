@@ -1,0 +1,27 @@
+---
+title: "wheels deploy proxy"
+description: kamal-proxy singleton lifecycle — boot, reboot, start, stop, restart, details, logs, remove.
+type: reference
+sidebar:
+  label: "proxy"
+  order: 30
+---
+
+The `kamal-proxy` container is a singleton per host. Every proxy verb iterates **all** hosts (across every role) and applies the same command.
+
+## Verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`boot`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/boot/) | First-time install + run. |
+| [`reboot`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/reboot/) | Stop, remove, and re-install. |
+| [`start`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/start/) | `docker start` the existing proxy. |
+| [`stop`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/stop/) | `docker stop` the proxy. |
+| [`restart`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/restart/) | `docker restart` the proxy. |
+| [`details`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/details/) | `docker ps` filtered to `kamal-proxy`. |
+| [`logs`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/logs/) | Tail the proxy logs. |
+| [`remove`](/v4-0-1-snapshot/command-line-tools/commands/deploy/proxy/remove/) | Stop + remove the proxy container. |
+
+## Port collisions
+
+`kamal-proxy` binds :80 and :443 directly on the host. If nginx, Traefik, or any other process is already on those ports, `proxy boot` fails fast. Stop the conflicting service before booting the proxy.

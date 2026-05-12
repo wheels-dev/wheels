@@ -1,0 +1,68 @@
+---
+title: The Dependency Injection Container
+description: The service container Wheels ships with — what it does, the three scopes, and when to reach for it.
+type: concept
+sidebar:
+  order: 5
+---
+
+Wheels ships a small dependency injection container. You register named components at app boot and resolve them by name wherever you need them. Knowing what the container does, what the three lifetimes mean, and when *not* to use it will keep you from registering everything or registering nothing.
+
+**You'll learn:**
+
+- What the container stores and why you'd reach for it
+- Where registrations live and how `map()` and `bind()` differ
+- The three scopes — transient, singleton, request — and when each fits
+- The two ways to resolve a service, plus auto-wiring on `init()`
+- When plain `new` is still the right answer
+
+## What the container does
+
+The container holds named references to components. Your code asks for a name, the container hands back an instance. That's the whole job. The indirection is the point: consumers don't know which concrete class they got, only that something registered under `emailService` answered their call. They don't construct it, they don't know its dotted path, and they don't know whether it's a fresh object or a shared one.
+
+That indirection lets you swap implementations without rewriting consumers. A test can register a `MockEmailService` under the same name; a staging environment can register a `SandboxNotifier` where production uses `SlackNotifier`; a per-request service can read the current tenant from the request scope without every caller threading it through. The consumers don't change — the registration does.
+
+## Registration
+
+Registrations live in `config/services.cfm`. Environment-specific overrides live in `config/<environment>/services.cfm` and load after the base file, so `config/testing/services.cfm` can replace production bindings with test doubles.
+
+```cfm title="illustrative — config/services.cfm"
+var di = injector();
+di.map("emailService").to("app.lib.EmailService").asSingleton();
+di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+```
+
+`map()` and `bind()` are equivalent — `bind()` just reads better when the name you're registering represents an interface or abstraction. The file loads once at application start and again on `wheels reload`; it is not consulted per request.
+
+## The three scopes
+
+| Scope | Lifetime | Use when |
+|-------|----------|----------|
+| `transient` (default) | New instance each resolve | Stateless helpers, no shared state needed |
+| `.asSingleton()` | One per application | Stateless services with expensive construction |
+| `.asRequestScoped()` | One per HTTP request | Per-request state (current user, tenant) |
+
+Request-scoped instances live in `request.$wheelsDICache` and vanish when the request ends. Singletons live for the life of the application — they survive every request until the app reloads. The default, transient, hands back a new instance every time; reach for it when a service carries no cached state and construction is cheap.
+
+## Resolving
+
+Two ways to get a service out of the container:
+
+**Lazy lookup.** Call `service("emailService")` anywhere in your code — controllers, views, models, service objects. The container resolves the name on the spot. Good for infrequent or conditional use, where paying for resolution only when you need it is the right trade.
+
+**Declarative injection.** Call `inject("emailService, currentUser")` in a controller's `config()` method. The container then resolves every named service once per controller instantiation and assigns each to `this.<name>`. Action code reads `this.emailService.send(...)` without a resolution call on every line.
+
+## Auto-wiring
+
+When you register a component whose `init()` takes arguments, the container inspects the parameter names and auto-resolves any that match registered mappings — provided you didn't pass an `initArguments` struct yourself. A service whose `init()` declares `required any emailService, required any logger` gets both injected automatically when both names are registered. Constructor injection for the common case, without an opt-in decorator on every class. Explicit `initArguments` always win; auto-wiring is just the no-args fallback.
+
+## When NOT to use the container
+
+Plain `new app.lib.Foo()` is fine for stateless components you never swap. The container earns its keep when one of two things is true: you will swap implementations (a test double, an environment-specific strategy, a feature-flagged alternative), or lifecycle matters (a per-request tenant resolver, a singleton holding a shared HTTP client pool). Registering every model and every partial helper just because the container exists turns `config/services.cfm` into a second routing file no one wants to read. Register what benefits from the seam; instantiate the rest directly.
+
+## See also
+
+- [Middleware Pipeline](/v4-0-1-snapshot/core-concepts/middleware-pipeline/) — also registered at boot
+- [Controllers and Actions](/v4-0-1-snapshot/basics/controllers-and-actions/) — the hands-on `inject()` pattern
+- [Tutorial Part 6b: Built-in Auth](/v4-0-1-snapshot/start-here/tutorial/06-authentication/) — canonical real usage

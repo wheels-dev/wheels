@@ -1,0 +1,30 @@
+---
+title: "wheels deploy accessory details"
+description: docker ps filtered to the named accessory container.
+type: reference
+sidebar:
+  label: "details"
+  order: 6
+---
+
+`docker ps --filter name=<service>-<name>` on each of the accessory's hosts. Confirms it's up and shows uptime.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy accessory details --name=<name|all> [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Example
+
+```bash title="example"
+wheels deploy accessory details --name=db
+```

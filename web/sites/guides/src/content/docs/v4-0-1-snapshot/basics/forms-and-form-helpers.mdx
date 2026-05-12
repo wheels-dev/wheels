@@ -1,0 +1,182 @@
+---
+title: Forms and Form Helpers
+description: Every form helper Wheels ships — object-bound and tag-style — plus the data-auto-id attribute for stable test selectors.
+type: howto
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Wheels ships a form helper for every native HTML input type. Most of them come in two flavours — an **object-bound** version that reads from and writes to a model, and a **tag-style** version that doesn't. This page walks every helper, shows the canonical form pattern, and documents the new `data-auto-id` attribute that makes browser tests stable across naming conventions.
+
+**You'll learn:**
+
+- How `startFormTag` / `endFormTag` wire a form to a named route and include CSRF automatically
+- The object-bound pattern — one call per field, values and errors wired to the model
+- Every object-bound helper Wheels ships, including the HTML5 inputs
+- When to reach for the tag-style variants instead
+- What `data-auto-id` is, why it was added, and how to opt out
+
+<Aside type="note">
+  You should already know how controller data reaches the view. See [Views, Layouts, Partials](/v4-0-1-snapshot/basics/views-layouts-partials/).
+</Aside>
+
+## startFormTag and endFormTag
+
+Every Wheels form opens with `startFormTag` and closes with `endFormTag`. The helper generates the `<form>` element, resolves the URL from a named route, and automatically includes a CSRF token as a hidden field.
+
+```cfm {test:compile}
+<cfoutput>
+    ##startFormTag(route="posts", method="post")##
+        <input type="text" name="post[title]">
+        <button type="submit">Create</button>
+    ##endFormTag()##
+</cfoutput>
+```
+
+Key behaviours:
+
+- Generates `<form action="..." method="post">` with CSRF token auto-included.
+- `route="..."` uses named routes — see [Routing](/v4-0-1-snapshot/basics/routing/).
+- `method="put"` / `method="delete"` — Wheels emits a hidden `_method` field that gets translated server-side. Browsers only send GET and POST natively, so Wheels (like Rails, Laravel, and friends) uses the hidden field convention to expose the full set of REST verbs.
+
+## Object-bound helpers — the core pattern
+
+Most Wheels form helpers take an `objectName` and a `property`. The helper looks up the model instance in the view's scope, reads the property off it to fill in the `value`, and generates the right `name`, `id`, and `data-auto-id` so the controller can round-trip the value back into a model on submit.
+
+A field call like `textField(objectName="post", property="title")` generates:
+
+- `name="post[title]"` — the controller sees this as `params.post.title`
+- `id="post-title"` — stable DOM id for labels and CSS
+- `data-auto-id="post_title"` — underscore variant for test selectors (see below)
+
+The canonical form pattern wraps inputs in labels, calls `errorMessagesFor` at the top, and ends with a submit button:
+
+```cfm {test:compile}
+<cfoutput>
+    ##startFormTag(route="posts")##
+        ##errorMessagesFor("post")##
+        <label>
+            Title
+            ##textField(objectName="post", property="title")##
+        </label>
+        <label>
+            Body
+            ##textArea(objectName="post", property="body", rows=6)##
+        </label>
+        <label>
+            Status
+            ##select(objectName="post", property="status", options="draft,published,archived")##
+        </label>
+        <button type="submit">Save</button>
+    ##endFormTag()##
+</cfoutput>
+```
+
+The controller side is then just `model("Post").new(params.post)` — the `post[...]` field names deserialize straight into a nested struct. See [Controllers and Actions](/v4-0-1-snapshot/basics/controllers-and-actions/) for the params handling.
+
+## Every object-bound helper
+
+| Helper            | Renders                            | Common options                        |
+|-------------------|------------------------------------|---------------------------------------|
+| `textField`       | `<input type="text">`              | `type` (overrideable), `placeholder`  |
+| `passwordField`   | `<input type="password">`          | `placeholder`                         |
+| `emailField`      | `<input type="email">`             | `placeholder`, `required`             |
+| `urlField`        | `<input type="url">`               | `placeholder`                         |
+| `numberField`     | `<input type="number">`            | `min`, `max`, `step`                  |
+| `telField`        | `<input type="tel">`               | `placeholder`, `pattern`              |
+| `searchField`     | `<input type="search">`            | `placeholder`                         |
+| `colorField`      | `<input type="color">`             | — (value is a hex colour)             |
+| `rangeField`      | `<input type="range">`             | `min`, `max`, `step`                  |
+| `dateField`       | `<input type="date">`              | `min`, `max` (both as `YYYY-MM-DD`)   |
+| `hiddenField`     | `<input type="hidden">`            | —                                     |
+| `fileField`       | `<input type="file">`              | `accept`, `multiple`                  |
+| `textArea`        | `<textarea>`                       | `rows`, `cols`                        |
+| `select`          | `<select>`                         | `options`, `includeBlank`, `multiple` |
+| `checkBox`        | `<input type="checkbox">` + hidden companion for the unchecked state | `checkedValue`, `uncheckedValue` |
+| `radioButton`     | `<input type="radio">`             | `tagValue` (the value this button submits) |
+
+Every helper also accepts the standard Wheels form options — `label`, `labelPlacement`, `prepend`, `append`, `prependToLabel`, `appendToLabel`, `errorElement`, `errorClass`, `encode` — plus any raw HTML attribute (`class`, `placeholder`, `required`, `autofocus`, and so on) which is passed through to the rendered tag.
+
+See `vendor/wheels/view/formsobject.cfc` for the full argument surface.
+
+<Aside type="note">
+  **`checkBox` emits two inputs.** A single checkbox only submits its `name` when it's checked, which means unchecking a box sends no value at all and the controller never learns the user cleared it. `checkBox` works around this by also rendering a hidden `<input type="hidden" name="..." value="0">` just before the real checkbox. On submit, the last value wins: checked → `1`, unchecked → `0`. The underlying model always sees one of the two.
+</Aside>
+
+<Aside type="note">
+  **Wheels has no HTML5 `datetime-local` helper.** For date/time combined input, use the classic `dateTimeSelect(objectName=..., property=...)` which renders a group of `<select>` dropdowns for year, month, day, hour, minute. Dedicated `dateTimeField` / `timeField` helpers are not in 4.0 — drop down to `textField(..., type="datetime-local")` if you want the native picker.
+</Aside>
+
+## Tag-style helpers
+
+When you're not bound to a model — a login form, a search bar, a one-off contact form — the object-bound helpers are the wrong tool. Every object-bound helper has a **`Tag` suffix variant** that takes `name=` and `value=` directly:
+
+- `textFieldTag`, `passwordFieldTag`, `emailFieldTag`, `urlFieldTag`, `numberFieldTag`, `telFieldTag`, `searchFieldTag`, `colorFieldTag`, `rangeFieldTag`, `dateFieldTag`
+- `hiddenFieldTag`, `fileFieldTag`, `textAreaTag`, `selectTag`, `checkBoxTag`, `radioButtonTag`
+
+```cfm {test:compile}
+<cfoutput>
+    ##startFormTag(route="search", method="get")##
+        ##textFieldTag(name="q", value=params.q ?: "", placeholder="Search...")##
+        <button type="submit">Go</button>
+    ##endFormTag()##
+</cfoutput>
+```
+
+Tag-style helpers never emit `data-auto-id` — their `id` is already a plain name with no dash/underscore ambiguity, so the companion attribute would just be noise.
+
+## data-auto-id — stable test selectors (new in 4.0)
+
+Wheels object-bound helpers emit `id="post-title"` with a **dash** between the object name and the property. Every other major web framework — Rails, Django, Laravel — uses an **underscore**: `id="post_title"`. Developers coming from those frameworks write browser tests targeting `#post_title`, then spend hours chasing a silent selector miss.
+
+In 4.0, every object-bound helper also emits `data-auto-id="post_title"`. Tests target either the dashed id (stable, never changing) or the underscore `data-auto-id` attribute:
+
+```html title="illustrative — rendered HTML"
+<input type="text" name="post[title]" id="post-title" data-auto-id="post_title">
+```
+
+Both selectors work. `#post-title` remains the canonical DOM id — nothing about it has changed. `[data-auto-id="post_title"]` is the new escape hatch for tests written against the framework-agnostic underscore convention.
+
+Opt out globally in `config/settings.cfm` with `set(formHelperDataAutoId=false)`. It's on by default.
+
+## Error messages
+
+`errorMessagesFor(objectName)` renders a summary block at the top of the form listing every validation error on the object. Pair it with per-field inline errors if you want — `errorMessageOn(objectName=..., property=...)` renders a single error for a single property, or use your own CSS to style fields based on the presence of validation errors.
+
+```cfm {test:compile}
+<cfoutput>
+    ##startFormTag(route="posts")##
+        ##errorMessagesFor("post")##
+        ##textField(objectName="post", property="title")##
+        ##textArea(objectName="post", property="body")##
+        <button>Save</button>
+    ##endFormTag()##
+</cfoutput>
+```
+
+The summary block only renders when the object has errors — on a new-form render before any submit, nothing appears. See [Validation and Error Display](/v4-0-1-snapshot/basics/validation-and-errors/) for the validations that populate these errors.
+
+## Labels
+
+Wheels does not ship a standalone `label()` helper. Labels are a first-class argument on every object-bound form helper via `label=` and `labelPlacement=`:
+
+- `textField(objectName="post", property="title", label="Post title")` — wraps the input in a `<label for="post-title">Post title</label>` with `labelPlacement` controlling whether the text comes `before` (default), `after`, or `around` the input.
+- `label=false` suppresses the auto-label — use this when you want to write the `<label>` tag by hand (for icons, extra classes, or explicit `for` attributes).
+
+The third and most common pattern is in the canonical example above: skip the `label` argument entirely and wrap the helper call inside a raw `<label>` element in your markup. The browser associates the label with the input via containment, no `for="..."` attribute needed.
+
+## Form submission with Turbo Frames
+
+Wrap a form (or the block that contains it) in a `<turbo-frame id="...">`. When the user submits, Turbo intercepts the response and replaces just that frame's contents — no full-page reload, no scroll reset. The controller action is unchanged; only the response template needs to render a matching frame.
+
+See tutorial [Part 4: Validations + Turbo Frames](/v4-0-1-snapshot/start-here/tutorial/04-validations-frames/) for a worked example, including the server-side render.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Controllers and Actions" href="/v4-0-1-snapshot/basics/controllers-and-actions/" description="How params.post becomes a model — filters, params, render helpers." />
+  <LinkCard title="Views, Layouts, Partials" href="/v4-0-1-snapshot/basics/views-layouts-partials/" description="Where form markup lives — partials, layouts, escaping." />
+  <LinkCard title="Routing" href="/v4-0-1-snapshot/basics/routing/" description="Named routes, resources, and the URLs startFormTag resolves to." />
+</CardGrid>

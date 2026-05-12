@@ -1,0 +1,17 @@
+---
+title: "wheels packages registry"
+description: Manage the local registry cache and inspect registry configuration.
+type: reference
+sidebar:
+  label: "registry"
+  order: 7
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Verbs for managing the local registry cache.
+
+<CardGrid>
+  <LinkCard title="refresh" href="./refresh" description="Bust the 24h manifest cache." />
+  <LinkCard title="info" href="./info" description="Print registry URL, branch, and cache state." />
+</CardGrid>

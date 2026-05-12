@@ -1,0 +1,80 @@
+---
+title: MVC in Wheels
+description: How Wheels interprets Model-View-Controller — where behavior lives, what controllers should never do, and why Wheels models are fat on purpose.
+type: concept
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Model-View-Controller is a layering rule: each layer owns a single kind of behavior, and the others don't reach into it. Wheels applies the rule the ActiveRecord way — models are rich, controllers are thin, views are dumb. Knowing which layer owns what tells you where every new piece of code should land.
+
+**You'll learn:**
+
+- Where the boundary lines run between model, view, and controller
+- What each layer owns and what it should never do
+- The naming conventions that wire the layers together
+- Common violations and how to unwind them
+- Why Wheels defaults to fat models and thin controllers
+
+<Aside type="note">
+  This is the conceptual tour. The [Controllers and Actions](/v4-0-1-snapshot/basics/controllers-and-actions/) page has the hands-on version — how to write an action step by step.
+</Aside>
+
+## The three layers
+
+### Model
+
+Models own domain logic. Validations, callbacks, associations, database reads and writes, business rules, calculated values. A model knows how to load itself from the database, how to save itself back, what counts as valid, and what to do when it's saved. Everything a `Post` means as a business object lives in `app/models/Post.cfc`.
+
+Wheels models extend `Model` and follow ActiveRecord: one class per table, one instance per row. Rules about the data — "email must be unique," "published posts need a body" — are declared in `config()` and enforced on every save, no matter who called it. That's the point of putting them on the model: a validation here protects the controller, the background job, the seed script, and the test all at once.
+
+### View
+
+Views render output. An `.cfm` template in `app/views/<controller>/<action>.cfm` takes variables the action set up and turns them into HTML (or JSON, or anything else). Helpers handle formatting, forms, and links. The layout wraps the action's view with shared chrome.
+
+A view should not read the database. It should not compute business values. It should not decide what the user is allowed to see. If a view needs a sorted list of published posts, the controller builds the list and passes it in; the view loops over it. When logic starts creeping into `.cfm` files, it belongs somewhere else — usually a model method or a helper.
+
+### Controller
+
+Controllers orchestrate one request. An action reads `params`, asks models for data, decides what happened, and picks a response — render this view, redirect there, return JSON. Filters handle cross-action work like authentication or record loading. Services from the DI container handle side-effects like sending mail.
+
+Thin controllers are the goal. The ideal action is a handful of lines: a model call, a branch on success or failure, and a render or redirect. When an action gets long, the logic usually wants to move down into the model (if it's about the domain) or across into a service object in `app/lib/` (if it's about coordinating several models or external systems).
+
+## What Wheels conventions enforce
+
+Naming is the glue. The framework maps file names to classes, classes to tables, and actions to views without you wiring anything up.
+
+| You create | Wheels wires |
+|------------|--------------|
+| `app/models/Post.cfc` | Model class `Post`, table `posts`, primary key `id` |
+| `app/controllers/Posts.cfc` | Controller `Posts`, view dir `app/views/posts/`, default route via `.resources("posts")` |
+| Action `index` on `Posts` | Renders `app/views/posts/index.cfm` through `app/views/layout.cfm` |
+| `config/routes.cfm` with `.resources("posts")` | Seven routes, named `posts`/`newPost`/`post`/`editPost` |
+| `hasMany(name="comments")` on `Post` | Expects `postId` on `comments`; provides `post.comments()` + `post.createComment()` |
+
+Break the convention and you configure your way back. Rename a table, and the model needs `tableName("tbl_posts")`. Rename the primary key, and it needs `setPrimaryKey("post_id")`. The defaults exist so the common case needs no configuration — the overrides exist for the rest.
+
+## Common violations
+
+These are the patterns that turn a healthy Wheels app into a tangled one. Each is a sign that logic is in the wrong layer.
+
+- **Database calls in a view.** If a template calls `model("Post").findAll(...)`, move the call to the controller action and pass the result in. Views should receive data, not fetch it.
+- **Validation logic in a controller.** If an action checks whether `params.user.email` already exists before calling `save()`, delete the check and add `validatesUniquenessOf(property="email")` to the model. The model already runs validations on save.
+- **Business calculations sprawling across actions.** An action with five `findAll` calls, nested loops, and a total at the bottom is a service object in disguise. Extract it into `app/lib/` (for example, `app/lib/MonthlyReport.cfc`) and have the action call it.
+- **Per-action `if (params.json) { ... }` branches.** Use `provides("html,json")` in `config()` and let format detection pick the view. One action, two templates, no branching in the controller body.
+- **Logic buried in `<cfif>` chains in a view.** If a view contains multiple nested conditionals deciding what to show, either compute the decision in the controller (as a boolean variable) or extract the branch into a partial.
+
+## Why fat models
+
+Models are called from more than one place. The same `Post` class gets used by a web controller, a background job that publishes scheduled posts, a seed script that populates a dev database, and tests that exercise validations. A rule on the model runs in all four contexts. A rule in a controller runs in one.
+
+Duplicating the rule in the other three callers is the best case. Forgetting to duplicate it is the normal case, and that's how invalid data ends up in production — a background job bypasses the controller, skips a check that only lived there, and writes a row no one expected. Putting the rule on the model means there is one place to change it and one place to get it wrong. The controller shrinks, the model absorbs the responsibility it was always going to own, and every caller inherits the guarantee for free.
+
+## See also
+
+- [The Request Lifecycle](/v4-0-1-snapshot/core-concepts/request-lifecycle/) — where each layer runs in the pipeline
+- [ORM Philosophy](/v4-0-1-snapshot/core-concepts/orm-philosophy/) — why ActiveRecord-style
+- [Conventions over Configuration](/v4-0-1-snapshot/core-concepts/conventions-over-configuration/) — the naming rules in depth
+- [Controllers and Actions](/v4-0-1-snapshot/basics/controllers-and-actions/) — the hands-on how-to
