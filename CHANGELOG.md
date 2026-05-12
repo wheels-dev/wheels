@@ -18,9 +18,9 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
-## [Unreleased]
+# [4.0.0](https://github.com/wheels-dev/wheels/releases/tag/v4.0.0) => 2026-05-12
 
-> **Wheels 4.0** — the release that started as 3.1 and grew into a major version. Closes multiple framework-maturity gaps against Rails, Laravel, and Django. See [docs/releases/wheels-4.0-audit.md](docs/releases/wheels-4.0-audit.md) for the full audit trail (185 merged PRs since 3.0.0). Contributors: @bpamiri, @zainforbjs, @chapmandu, @mlibbe.
+> **Wheels 4.0** — the release that started as 3.1 and grew into a major version. Closes multiple framework-maturity gaps against Rails, Laravel, and Django. See [docs/releases/wheels-4.0-audit.md](docs/releases/wheels-4.0-audit.md) for the full audit trail (260+ merged PRs since 3.0.0). Contributors: @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta.
 
 ### Added
 
@@ -100,6 +100,12 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - LuCLI tier 1 commands module + WheelsTest test suite (#2092, #2093)
 - Playwright CLI commands for browser testing (#2013, #2021)
 
+**Distribution (new in 4.0)**
+- **macOS** — Homebrew tap at [`wheels-dev/homebrew-wheels`](https://github.com/wheels-dev/homebrew-wheels) with separate formulae for stable (`wheels`) and bleeding-edge (`wheels-be`) channels. Daily auto-update workflow polls the upstream release feeds and opens PRs.
+- **Windows** — Scoop bucket at [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) with `wheels` / `wheels-be` manifests. Hourly auto-update via the community Excavator bot. Legacy Chocolatey `wheels` package on `community.chocolatey.org` (CommandBox-based v1.x) is no longer maintained — see [Windows install docs](web/sites/guides/src/content/docs/v4-0-0-snapshot/start-here/installing.mdx) for the migration. (#2545, #2552)
+- **Linux** — `.deb` and `.rpm` packages built by `nfpm` on every release and uploaded to the GitHub Release alongside the existing zip artifacts. The package installs `/usr/bin/wheels`, depends on OpenJDK 21, and on first run syncs the framework module into `~/.wheels/`. Native `apt`/`yum` repositories at `apt.wheels.dev` / `yum.wheels.dev` are planned for 4.0.x. (#2545)
+- **WinGet** — manifest drafts for `Wheels.Wheels` and `Wheels.WheelsBE` staged for post-GA submission to the `microsoft/winget-pkgs` community repo. (#2557)
+
 **Configuration & developer experience**
 - `env()` helper for cross-scope environment variable access (#1985)
 - Pre-request logging (#1895)
@@ -154,6 +160,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Fixed
 
+- `scoop install wheels` / `scoop install wheels-be` on Windows no longer aborts with `Can't shim 'wheels.cmd': File doesn't exist.` Scoop's install order is `pre_install` → bin shim creation → `post_install`, but the bucket's manifest generator (`tools/distribution-drafts/scoop/build-manifests.py`) emitted the `wheels.cmd` launcher in `post_install` — so the shim step ran first, failed because the file wasn't there yet, and aborted before the launcher was ever written. Moved the launcher emit into `pre_install` (both `wheels` and `wheels-be` manifests are byte-identical apart from the renamed key). (#2603)
 - Model `$setProperty` now throws `Wheels.PropertyIsIncorrectType` when a struct or array value is mass-assigned to a property that isn't declared as a nested association, instead of silently overwriting `this.<property>` and producing a confusing `Can't cast Complex Object Type Struct to String` deep inside a user callback. The most common upstream cause is form data shaped by a curl POST whose body uses bracket-nested keys without an `=` separator (e.g. `--data-urlencode "user[email][badkey]"`); Lucee's form parser turns that into a nested-struct path so `params.user.email` arrives shaped like a struct. Legitimate nested-attribute assignments (`hasOne`/`hasMany`/`belongsTo` with `nestedProperties()` enabled) continue to work unchanged. Also corrects the chapter 6 tutorial's curl gotcha note: the failure mode is the missing `=` separator, not `@` encoding per se. (#2412)
 - `wheels test` preamble no longer prints `<base>_test_test` for apps that only declare `coreTestDataSourceName`. `$resolveAppTestDataSource` in `cli/lucli/Module.cfc` searched `config/settings.cfm` with the regex `dataSourceName\s*=\s*"([^"]*)"`, which case-insensitively matched the trailing substring inside `set(coreTestDataSourceName="testappdb_test")` and then re-appended `_test`. The matcher now uses `\bdataSourceName\b` and strips CFML comments before the lookup (matching the pattern already used by `info()`), and guards against re-appending `_test` if the resolved base already ends in `_test`. Extracted the app-runner's `?directory=` regex into a `TestDirectoryResolver` helper alongside `TestDbResolver` so the silent-fallback path (a bare `?directory=models` collapsing to `tests.specs`) is unit-testable instead of HTTP-only. (#2489)
 - Core test suite no longer crashes on Adobe ColdFusion 2023/2025 with `java.lang.ArrayStoreException: coldfusion.compiler.ASTcffunction`. `vendor/wheels/tests/specs/middleware/RateLimiterSpec.cfc` passed 12 inline `keyFunction = function(req) { ... }` literals as named arguments to `new wheels.middleware.RateLimiter(...)`; Adobe CF's bytecode generator (`ExprAssembler.invokeNew` → `generateSetVarCode`) rejects function-AST nodes in that array slot and the failure fires from `getComponentMetadata()`, eagerly crashing every CFC in the bundle directory and forcing every database matrix cell on `adobe2023`/`adobe2025` to HTTP 500. All 12 closures are now hoisted into local `var keyFn = ...` declarations above the constructor call, matching the existing workaround in `SessionStrategySpec.cfc`. No behavior change on Lucee/BoxLang. Trap documented in `.ai/wheels/cross-engine-compatibility.md` and `CLAUDE.md` "Known cross-engine gotchas" list. (#2568, #2599)
@@ -210,7 +217,7 @@ This release includes 40+ security-hardening PRs. Key themes:
 - **Public GUI production gate** — `/wheels/*` routes (`info`, `routes`, `testbox`, `runner`, `consoleeval`, `migrator`, `build`, etc.) now hard-abort with HTTP 404 in `production` even when a developer has explicitly set `enablePublicComponent=true`. The dispatch-layer gate also returns 404 with a `Not Found` body instead of a silent blank HTTP 200, so the surface can no longer be fingerprinted. Only `index()` (the congratulations page) remains respect-the-toggle, so dev/testing ergonomics are unchanged. (#2233)
 - **Known security limitations** documented for operators (#2078).
 
-----
+---
 
 
 # [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
