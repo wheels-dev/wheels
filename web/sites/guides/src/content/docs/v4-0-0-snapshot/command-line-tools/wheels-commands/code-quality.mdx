@@ -91,8 +91,8 @@ wheels validate
 
 `wheels validate` uses the same `analysis` service but calls its `validate()` method, which runs four targeted checks:
 
-- **Models** — iterates `app/models/*.cfc` and flags problems like mixed association argument styles.
-- **Controllers** — iterates `app/controllers/*.cfc` looking for convention violations (public filter functions, missing `extends="Controller"`, etc.).
+- **Models** — iterates `app/models/*.cfc` and flags problems like mixed association argument styles or a missing `extends="Model"` in the active (uncommented) component declaration; a commented-out `extends="Model"` does not satisfy the check.
+- **Controllers** — iterates `app/controllers/*.cfc` looking for convention violations (public filter functions, missing `extends="Controller"` in the active component declaration, etc.).
 - **Routes** — parses `config/routes.cfm` for syntax problems.
 - **Views** — walks `app/views/` for `.cfm` files missing `cfparam` declarations.
 
