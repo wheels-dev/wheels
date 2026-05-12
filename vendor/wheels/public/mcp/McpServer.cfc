@@ -1105,14 +1105,16 @@ Provide migration code following Wheels conventions."
 			local.appRoot = getDirectoryFromPath(local.publicDirClean) & "/";
 			local.fullTargetDir = local.appRoot & local.targetDir;
 
-			// Debug logging removed - path resolution working correctly
-
 			// Clean up path separators
 			local.fullTargetDir = replace(local.fullTargetDir, "\\", "/", "all");
 			local.fullTargetDir = replace(local.fullTargetDir, "//", "/", "all");
 
 			if (!directoryExists(local.fullTargetDir)) {
-				directoryCreate(local.fullTargetDir, true);
+				// Adobe CF rejects directoryCreate(path, true) — see #2614. Use mkdirs() instead.
+				local.created = createObject("java", "java.io.File").init(local.fullTargetDir).mkdirs();
+				if (!local.created && !directoryExists(local.fullTargetDir)) {
+					throw(type="Wheels.Mcp.TestDir", message="Could not create test directory '#local.fullTargetDir#'.");
+				}
 			}
 
 			// Generate test file content
