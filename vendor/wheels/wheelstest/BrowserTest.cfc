@@ -282,7 +282,10 @@ component extends="wheels.WheelsTest" {
         if (directoryExists(arguments.path)) {
             return;
         }
-        createObject("java", "java.io.File").init(arguments.path).mkdirs();
+        var created = createObject("java", "java.io.File").init(arguments.path).mkdirs();
+        if (!created && !directoryExists(arguments.path)) {
+            throw(type="Wheels.BrowserTest.ArtifactDir", message="Could not create artifact directory '#arguments.path#'.");
+        }
     }
 
     /**
