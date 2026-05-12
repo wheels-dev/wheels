@@ -1,0 +1,17 @@
+Wheels Framework
+================
+
+This product is licensed under the Apache License, Version 2.0
+(see LICENSE in the repository root).
+
+Portions of the cli/ directory derive from wheels-cli, originally
+released as a standalone CommandBox module by Tom King under the
+MIT License:
+
+    Copyright (c) 2016 Tom King
+
+The wheels-cli source was incorporated into the Wheels monorepo and
+relicensed under the Apache License, Version 2.0. The original MIT
+copyright notice is retained here in accordance with the MIT
+License's notice-retention clause and Apache License 2.0,
+Section 4(c).
