@@ -1280,8 +1280,9 @@ Provide migration code following Wheels conventions."
 			return "Error: Only 'wheels' commands are allowed.";
 		}
 
-		// Strip "wheels " prefix once — used by both primary and fallback paths
-		local.strippedArgs = trim(mid(arguments.command, 7));
+		// Strip "wheels " prefix once — used by both primary and fallback paths.
+		// 3-arg mid() is required for Adobe CF compatibility; Lucee/BoxLang accept 2 args.
+		local.strippedArgs = trim(mid(arguments.command, 7, len(arguments.command)));
 
 		if (!len(local.strippedArgs)) {
 			return "Error: Missing subcommand. Allowed: #allowedSubcommands#";

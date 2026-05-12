@@ -23,6 +23,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ### Fixed
 
 - Stop the generated app's `_gitignore` and `app/plugins/README.md` from advertising the broken `wheels packages install` / `wheels install` verbs; point users at the canonical `wheels packages add` verb (#2610)
+- Use the Adobe-safe 3-argument `mid()` form when stripping the `wheels` prefix in the MCP command executor and its security spec; the prior 2-arg call crashed the entire `security/` test bundle on Adobe ColdFusion (#2613)
 
 ----
 
