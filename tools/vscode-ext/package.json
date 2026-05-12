@@ -16,7 +16,7 @@
 	"bugs": {
 		"url": "https://github.com/wheels-dev/wheels/issues"
 	},
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"categories": [
 		"Snippets",
 		"Linters",

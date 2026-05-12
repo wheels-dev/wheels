@@ -3,6 +3,7 @@
 	"version": "0.0.0",
 	"type": "module",
 	"private": true,
+	"license": "Apache-2.0",
 	"exports": {
 		"./components/Header.astro": "./src/components/Header.astro",
 		"./components/Footer.astro": "./src/components/Footer.astro",
