@@ -103,10 +103,10 @@ component output="false" {
 
 	function onApplicationStart() {
 		application.env = duplicate(this.env);
-		injector = new wheels.Injector("wheels.Bindings");
+		application.wheelsdi = new wheels.Injector("wheels.Bindings");
 
 		/* wheels/global object */
-		application.wo = injector.getInstance("global");
+		application.wo = application.wheelsdi.getInstance("global");
 		initArgs.path="wheels";
 		initArgs.filename="onapplicationstart";
 		application.wheelsdi.getInstance(name = "wheels.events.onapplicationstart", initArguments = initArgs).$init(this);
@@ -274,8 +274,8 @@ component output="false" {
 
 	public void function onError( any Exception, string EventName ) {
 		try {
-			injector = new wheels.Injector("wheels.Bindings");
-			application.wo = injector.getInstance("global");
+			application.wheelsdi = new wheels.Injector("wheels.Bindings");
+			application.wo = application.wheelsdi.getInstance("global");
 
 			// Make exception available to the event template
 			request.wheels = request.wheels ?: {};
