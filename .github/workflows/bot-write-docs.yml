@@ -3,7 +3,7 @@ name: Wheels Bot — Write Docs
 # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing
 # `wheels-bot:docs-confidence:high` OR `wheels-bot:docs-confidence:medium`
 # (the docs-request path's auto-fire markers). Medium fires because
-# write-docs has its own step-2 safety net for structural docs-architecture
+# write-docs has its own step-4 safety net for structural docs-architecture
 # decisions (posts `wheels-bot:docs-held:<issue>` instead of opening a PR).
 # workflow_dispatch is preserved for manual reruns.
 on:

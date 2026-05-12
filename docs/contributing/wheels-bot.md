@@ -333,7 +333,7 @@ they make every workflow safely retryable.
 | `wheels-bot:triage-confidence:high` | Triggers propose-fix on the bug path. |
 | `wheels-bot:triage-confidence:medium` | Triggers propose-fix on the bug path. Sensitive areas are caught by propose-fix's step-4 safety net. |
 | `wheels-bot:docs-confidence:high` | Triggers write-docs on the docs-request path. |
-| `wheels-bot:docs-confidence:medium` | Triggers write-docs on the docs-request path. Structural docs decisions are caught by write-docs's safety net. |
+| `wheels-bot:docs-confidence:medium` | Triggers write-docs on the docs-request path. Structural docs decisions are caught by write-docs's step-4 safety net. |
 | `wheels-bot:research:<issue>` | Research stage processed this issue. |
 | `wheels-bot:research-confidence:high` | Triggers propose-fix on the framework-design path. |
 | `wheels-bot:research-confidence:medium` | Triggers propose-fix on the framework-design path. |
