@@ -27,6 +27,11 @@ echo "Built on $(date)" > "${BUILD_DIR}/wheels/${BUILD_LABEL}"
 echo "Copying core files..."
 cp -r vendor/wheels/* "${BUILD_DIR}/wheels/"
 
+# Apache 2.0 §4(a) requires LICENSE in every distributed artifact and §4(d)
+# requires NOTICE to propagate to derivatives.
+cp LICENSE "${BUILD_DIR}/wheels/"
+cp NOTICE "${BUILD_DIR}/wheels/"
+
 # Copy docs
 echo "Copying docs..."
 rm -rf "${BUILD_DIR}/wheels/docs"
