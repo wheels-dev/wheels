@@ -577,6 +577,27 @@ component {
 				value = arguments.value,
 				association = arguments.associations[arguments.property]
 			);
+		} else if (IsStruct(arguments.value) || IsArray(arguments.value)) {
+			// Defensive: a struct / array reached the assignment boundary
+			// without matching any nested-attribute association branch above.
+			// Without this guard, the value silently overwrites this.<property>
+			// and surfaces much later as a confusing cast error inside a user
+			// callback — e.g. `LCase(this.email)` blowing up with
+			// "Can't cast Complex Object Type Struct to String" while pointing
+			// at the user's beforeValidation line instead of at the bad input
+			// shape. See issue #2412 for the originating fresh-VM report.
+			//
+			// The most common upstream cause is form data shaped by curl
+			// mistakes such as `--data-urlencode "user[email][test@example.com]"`
+			// (bracket-nested key with no `=` separator), which Lucee's form
+			// parser interprets as a nested-struct path. `params.user.email`
+			// then arrives as a struct (`{"test@example.com": ""}`) instead
+			// of a string.
+			Throw(
+				type = "Wheels.PropertyIsIncorrectType",
+				message = "Cannot assign a #(IsArray(arguments.value) ? 'array' : 'struct')# value to property `#arguments.property#` on the `#variables.wheels.class.modelName#` model.",
+				extendedInfo = "Property `#arguments.property#` is not configured as a nested association, but `setProperties()` was called with a #(IsArray(arguments.value) ? 'array' : 'struct')# value for it. This usually means upstream form data arrived in an unexpected shape — most commonly a curl POST body using bracket-nested keys without an `=` separator (e.g. `user[email][nested@key]`), which Lucee's form parser turns into a nested-struct path so `params.user.email` ends up shaped like a struct instead of a string. If you actually want to accept structured data here, declare the association with `hasOne`, `hasMany`, or `belongsTo` and enable mass-assignment by calling `nestedProperties()`."
+			);
 		} else {
 			this[arguments.property] = arguments.value;
 		}

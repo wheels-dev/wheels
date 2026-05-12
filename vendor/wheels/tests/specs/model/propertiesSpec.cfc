@@ -402,6 +402,48 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Defensive guard for struct/array values on non-association properties", () => {
+			// Regression coverage for issue #2412: a struct value reaching
+			// `this.<prop>` via setProperties() silently propagates through to
+			// user callbacks (e.g. `beforeValidation` doing LCase(this.email)),
+			// where Lucee raises "Can't cast Complex Object Type Struct to
+			// String" pointing at the user's callback line. The framework
+			// should raise a clearer error at the assignment boundary so the
+			// stack trace points at the actual root cause (malformed form
+			// data shape, not the user callback).
+
+			it("throws Wheels.PropertyIsIncorrectType when a struct is mass-assigned to a non-association property", () => {
+				expect(function() {
+					g.model("author").new({firstName = {"nested@key" = ""}})
+				}).toThrow("Wheels.PropertyIsIncorrectType")
+			})
+
+			it("throws Wheels.PropertyIsIncorrectType when an array is mass-assigned to a non-association property", () => {
+				expect(function() {
+					g.model("author").new({firstName = ["unexpected", "values"]})
+				}).toThrow("Wheels.PropertyIsIncorrectType")
+			})
+
+			it("still accepts struct values for properties registered as nested associations", () => {
+				// Author has hasOne('profile') with nestedProperties enabled,
+				// so a struct here is legitimate nested-attribute traffic and
+				// must not trigger the defensive guard.
+				_author = g.model("author").new({
+					firstName = "Eve",
+					lastName = "Tester",
+					profile = {dateOfBirth = "2000-01-01"}
+				})
+				expect(_author.firstName).toBe("Eve")
+				expect(IsObject(_author.profile)).toBeTrue()
+			})
+
+			it("still accepts scalar values for normal properties (regression guard)", () => {
+				_author = g.model("author").new({firstName = "Eve", lastName = "Tester"})
+				expect(_author.firstName).toBe("Eve")
+				expect(_author.lastName).toBe("Tester")
+			})
+		})
+
 		describe("Tests that propertyIsBlank", () => {
 
 			it("return false when property is set", () => {
