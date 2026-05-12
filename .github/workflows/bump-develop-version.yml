@@ -2,12 +2,23 @@
 #
 # Workflow:
 #   1. Maintainer cuts v4.0.1 (or whatever) on main.
-#   2. release.yml publishes to wheels-dev/wheels Releases.
-#   3. THIS workflow fires on the published release event, opens a PR against
-#      develop bumping wheels.json's version to (just-released-patch + 1).
+#   2. release.yml publishes to wheels-dev/wheels Releases AND fires a
+#      `bump-develop` repository_dispatch at this repo (only for stable
+#      channel — snapshots and RCs don't bump develop).
+#   3. THIS workflow fires on that dispatch, opens a PR against develop
+#      bumping wheels.json's version to (just-released-patch + 1).
 #   4. Maintainer rubberstamps the PR.
-#   5. Next develop merge fires snapshot.yml with the new target
-#      embedded in the snapshot version string.
+#   5. Next develop merge fires snapshot.yml with the new target embedded
+#      in the snapshot version string.
+#
+# Why repository_dispatch instead of `release: published`?
+#   release.yml's "Create GitHub Release" step uses the default GITHUB_TOKEN,
+#   and per GitHub Actions docs, events emitted by GITHUB_TOKEN don't trigger
+#   downstream workflows (with exceptions for workflow_dispatch and
+#   repository_dispatch). The release:published event therefore never reached
+#   us on the v4.0.0 GA. release.yml already fires repository_dispatch with
+#   DOWNSTREAM_DISPATCH_TOKEN (a PAT) for homebrew/scoop, so we piggyback
+#   on that proven channel. See #2609.
 #
 # This is the "no version decisions ahead of time" piece — the maintainer
 # decides at GA tag time whether the release is a patch / minor / major;
@@ -17,8 +28,17 @@
 name: Bump Develop Version
 
 on:
-  release:
-    types: [published]
+  repository_dispatch:
+    types: [bump-develop]
+  # Manual fallback — if release.yml's dispatch step ever fails or the
+  # maintainer wants to re-run after a missed event, they can fire this
+  # by hand with the version they want to bump *from* (e.g., 4.0.0).
+  workflow_dispatch:
+    inputs:
+      released_version:
+        description: 'Version that was just released (bare SemVer, e.g. 4.0.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -28,46 +48,28 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     env:
-      # All event payload fields hoisted to env. Eligibility (non-prerelease,
-      # main branch) is enforced inside the run: block below — keeping it out
-      # of the if: clause to satisfy the workflow-injection security hook.
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
-      RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
-      RELEASE_TARGET_COMMITISH: ${{ github.event.release.target_commitish }}
+      # repository_dispatch carries the version in client_payload.version
+      # (set by release.yml's dispatch step). workflow_dispatch supplies it
+      # via inputs.released_version. One of the two is always present.
+      # Hoisted to env to keep ${{ ... }} interpolation out of run: blocks,
+      # per the workflow-injection security hook. The value is regex-validated
+      # in "Compute next snapshot target" before downstream use.
+      RAW_RELEASED_VERSION: ${{ github.event.client_payload.version || inputs.released_version }}
     steps:
-      - name: Check eligibility
-        id: gate
-        run: |
-          # Skip if it's a pre-release or wasn't cut from main. The native
-          # if: clause would do this with cleaner syntax but tripped the
-          # workflow-injection hook by referencing ${ {github.event.release.*} }.
-          if [ "${RELEASE_PRERELEASE}" = "true" ]; then
-            echo "Skipping pre-release: ${RELEASE_TAG}"
-            echo "eligible=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          if [ "${RELEASE_TARGET_COMMITISH}" != "main" ]; then
-            echo "Skipping release from non-main branch: ${RELEASE_TARGET_COMMITISH}"
-            echo "eligible=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          echo "eligible=true" >> $GITHUB_OUTPUT
-
       - name: Checkout develop
-        if: steps.gate.outputs.eligible == 'true'
         uses: actions/checkout@v6
         with:
           ref: develop
           fetch-depth: 1
 
       - name: Compute next snapshot target
-        if: steps.gate.outputs.eligible == 'true'
         run: |
-          # Strip leading 'v' if present (we tag as v4.0.1 but version field
-          # is bare 4.0.1 in wheels.json).
-          RELEASED_VERSION="${RELEASE_TAG#v}"
-          if [[ ! "${RELEASED_VERSION}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "Released tag ${RELEASE_TAG} doesn't match SemVer M.m.p — skipping bump."
+          # Strip leading 'v' if present. The dispatch payload normally has
+          # no 'v' prefix (release.yml sources from wheels.json, which is
+          # bare SemVer), but workflow_dispatch input might.
+          STRIPPED="${RAW_RELEASED_VERSION#v}"
+          if [[ ! "${STRIPPED}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Released version '${RAW_RELEASED_VERSION}' doesn't match SemVer M.m.p — skipping bump."
             exit 0
           fi
           MAJOR="${BASH_REMATCH[1]}"
@@ -75,12 +77,11 @@ jobs:
           PATCH="${BASH_REMATCH[3]}"
           NEXT_PATCH=$((PATCH + 1))
           NEW_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
-          echo "Released: ${RELEASED_VERSION} -> next snapshot target: ${NEW_VERSION}"
+          echo "Released: ${STRIPPED} -> next snapshot target: ${NEW_VERSION}"
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
-          echo "RELEASED_VERSION=${RELEASED_VERSION}" >> $GITHUB_ENV
+          echo "RELEASED_VERSION=${STRIPPED}" >> $GITHUB_ENV
 
       - name: Update wheels.json
-        if: steps.gate.outputs.eligible == 'true'
         run: |
           jq --arg v "${NEW_VERSION}" '.version = $v' wheels.json > wheels.json.tmp
           mv wheels.json.tmp wheels.json
@@ -88,7 +89,6 @@ jobs:
           jq '.version' wheels.json
 
       - name: Open bump PR
-        if: steps.gate.outputs.eligible == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           branch: "auto-bump/develop-${{ env.NEW_VERSION }}"
