@@ -1,0 +1,4 @@
+service: demo
+image: acme/demo
+servers: [1.2.3.4]
+bogus_field: true

@@ -10,7 +10,7 @@
     "packageDirectory":"vendor/wheels",
     "homepage":"https://wheels.dev/",
     "documentation":"https://wheels.dev/docs",
-    "changelog":"https://github.com/wheels-dev/wheels/blob/master/CHANGELOG.md",
+    "changelog":"https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md",
     "bugs":"https://github.com/wheels-dev/wheels/issues",
 		"contributors":[
 			"Peter Amiri <peter@alurium.com>"
@@ -32,7 +32,7 @@
     "license":[
         {
             "type":"Apache License 2.0",
-            "URL":"https://github.com/wheels-dev/wheels/blob/master/LICENSE"
+            "URL":"https://github.com/wheels-dev/wheels/blob/main/LICENSE"
         }
     ]
 }

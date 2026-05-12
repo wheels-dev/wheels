@@ -14,9 +14,23 @@ on:
         required: true
       FORGEBOX_PASS:
         required: true
+      # Optional — when present, the build job's "Dispatch downstream package
+      # managers" step fires repository_dispatch on homebrew/chocolatey-wheels
+      # so their auto-update workflows pick up the new release in ~5min instead
+      # of waiting for the daily cron. When absent, the step warns and exits 0.
+      DOWNSTREAM_DISPATCH_TOKEN:
+        required: false
+      # Required when this workflow is invoked from develop (snapshot context) so
+      # the snapshot release can be published to wheels-dev/wheels-snapshots
+      # instead of wheels-dev/wheels. Stable (main) builds don't use this and
+      # rely on the default GITHUB_TOKEN. See .github/RELEASE_PLAYBOOK.md for
+      # the channel architecture.
+      WHEELS_SNAPSHOTS_TOKEN:
+        required: false
 
 env:
   WHEELS_PRERELEASE: false
+  LUCLI_VERSION: "0.3.7"
 
 jobs:
   #############################################
@@ -28,22 +42,33 @@ jobs:
     steps:
       - name: Checkout Repository
         id: Checkout-Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          cd ./templates/base/src
-          pwd
-          cat box.json
-          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
-          # main or snapshot
-          echo "BRANCH=main" >> $GITHUB_ENV
-          if [ $GITHUB_REF == 'refs/heads/develop' ]
-          then
+          cat wheels.json
+          BASE_VERSION=$(jq -r '.version' wheels.json)
+          echo "Base version from wheels.json: ${BASE_VERSION}"
+          # Develop builds carry a -snapshot.N pre-release identifier; main builds
+          # are stable releases. The snapshot identifier uses '.' (not '+') so it
+          # is a SemVer pre-release identifier, not build metadata. Per SemVer §10,
+          # build metadata (after '+') MUST be ignored in precedence comparisons —
+          # which would make snapshot N and N+1 sort equal in brew/choco. The '.'
+          # form sorts numerically, so 4.0.1-snapshot.1657 > 4.0.1-snapshot.1656.
+          if [ "$GITHUB_REF" == "refs/heads/develop" ]; then
+            echo "WHEELS_VERSION=${BASE_VERSION}-snapshot.${RUN_NUMBER}" >> $GITHUB_ENV
             echo "BRANCH=develop" >> $GITHUB_ENV
+          else
+            # Stable release: BASE_VERSION is the GA version, no build qualifier.
+            # The run number is captured in the GitHub Actions history; embedding
+            # it in the artifact version is SemVer-meaningless for a GA tag.
+            echo "WHEELS_VERSION=${BASE_VERSION}" >> $GITHUB_ENV
+            echo "BRANCH=main" >> $GITHUB_ENV
           fi
 
       - name: Make build scripts executable
@@ -70,10 +95,13 @@ jobs:
             exit 1
           fi
 
-          # Check that version doesn't contain SNAPSHOT for main releases
-          if echo "$WHEELS_VERSION" | grep -qi "snapshot"; then
-            echo "ERROR: Version contains SNAPSHOT but this is a main branch release"
-            echo "Please remove SNAPSHOT suffix from box.json files before releasing."
+          # Check that source version in wheels.json is clean (no -snapshot suffix).
+          # The workflow injects -snapshot.N for develop builds automatically.
+          BASE_VERSION=$(jq -r '.version' wheels.json)
+          if echo "$BASE_VERSION" | grep -qi "snapshot"; then
+            echo "ERROR: Version in wheels.json contains snapshot suffix ($BASE_VERSION)"
+            echo "Source files should have clean versions (e.g., 3.1.0)."
+            echo "The workflow adds -snapshot.N automatically for develop builds."
             exit 1
           fi
 
@@ -99,7 +127,13 @@ jobs:
         run: |
          ./tools/build/scripts/prepare-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
+      # CommandBox is only needed for the ForgeBox publish below; it has no
+      # other consumer in this workflow. Develop snapshots no longer publish
+      # to ForgeBox (they go to wheels-dev/wheels-snapshots via Create Snapshot
+      # Pre-Release further down), so we save ~30s of CommandBox install on
+      # every snapshot run by gating this to stable releases only.
       - name: Install CommandBox
+        if: github.ref == 'refs/heads/main'
         run: |
           curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
           echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
@@ -129,20 +163,30 @@ jobs:
               exit 1
             fi
 
-            # Check if box.json exists
-            if [ ! -f "$PACKAGE_DIR/box.json" ]; then
-              echo "ERROR: box.json not found in $PACKAGE_DIR!"
+            # Locate the package manifest. Prefer wheels.json (post-rename in 4.0)
+            # over box.json (legacy CommandBox/ForgeBox format). All ForgeBox-bound
+            # artifacts (wheels-base-template, wheels-cli, wheels-starter-app)
+            # carry box.json; wheels-core ships both manifests during the
+            # transition window. This validator prefers wheels.json when present.
+            local MANIFEST=""
+            if [ -f "$PACKAGE_DIR/wheels.json" ]; then
+              MANIFEST="$PACKAGE_DIR/wheels.json"
+            elif [ -f "$PACKAGE_DIR/box.json" ]; then
+              MANIFEST="$PACKAGE_DIR/box.json"
+            else
+              echo "ERROR: neither wheels.json nor box.json found in $PACKAGE_DIR!"
               exit 1
             fi
+            echo "  Manifest: $(basename $MANIFEST)"
 
-            # Validate box.json syntax
-            if ! jq empty "$PACKAGE_DIR/box.json" 2>/dev/null; then
-              echo "ERROR: Invalid JSON in $PACKAGE_DIR/box.json"
+            # Validate manifest syntax
+            if ! jq empty "$MANIFEST" 2>/dev/null; then
+              echo "ERROR: Invalid JSON in $MANIFEST"
               exit 1
             fi
 
             # Extract and display version
-            local VERSION=$(jq -r '.version' "$PACKAGE_DIR/box.json")
+            local VERSION=$(jq -r '.version' "$MANIFEST")
             echo "  Version: $VERSION"
 
             # Check that version matches expected version
@@ -173,7 +217,14 @@ jobs:
           echo "All packages validated successfully!"
           echo "=========================================="
 
+      # ForgeBox publishing is stable-only (main branch). Snapshots publish to
+      # wheels-dev/wheels-snapshots via the Create Snapshot Pre-Release step
+      # downstream — that's the canonical bleeding-edge channel post-4.0.
+      # Once ForgeBox is fully deprecated, this entire step (and all the
+      # ForgeBox-shaped Prepare* / Install CommandBox / Validate steps above)
+      # can be deleted as cleanup.
       - name: Publish All Packages to ForgeBox
+        if: github.ref == 'refs/heads/main'
         run: |
           # Publish stable release and mark as current/stable version
           ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true" "true"
@@ -189,8 +240,54 @@ jobs:
           ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
+      - name: Build Wheels Module Tarball
+        env:
+          MODULE_VERSION: ${{ env.WHEELS_VERSION }}
+        run: |
+          mkdir -p "artifacts/wheels/${MODULE_VERSION}"
+          # Bundle codegen templates into the module so Templates.cfc::resolveTemplateDir()
+          # finds them at moduleRoot/templates/codegen/ in installed distributions.
+          # Without this, every template-driven generator (model, controller, view,
+          # scaffold, helper, api-resource) fails or emits empty output. See #1944.
+          mkdir -p cli/lucli/templates/codegen
+          cp -R cli/src/templates/. cli/lucli/templates/codegen/
+          # Substitute @build.version@ placeholders in the LuCLI module before
+          # tarring. Without this, module.json ships with the literal placeholder
+          # (or a stale hardcoded version), causing BaseModule.version() to return
+          # the wrong value at runtime and the dev toolbar / `wheels --help` to
+          # report a stale version. Mirrors the substitution prepare-cli.sh does
+          # for the wheels-cli ForgeBox artifact. See #2326.
+          find cli/lucli -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) -exec sed -i.bak "s/@build\.version@/${MODULE_VERSION}/g" {} \;
+          find cli/lucli -name "*.bak" -delete
+          tar czf "artifacts/wheels/${MODULE_VERSION}/wheels-module-${MODULE_VERSION}.tar.gz" -C cli/lucli .
+          cd cli/lucli && zip -r "../../artifacts/wheels/${MODULE_VERSION}/wheels-module-${MODULE_VERSION}.zip" . && cd ../..
+          cd artifacts/wheels/${{ env.WHEELS_VERSION }}
+          md5sum wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.md5 || md5 -r wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.md5
+          sha512sum wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.tar.gz > wheels-module-${{ env.WHEELS_VERSION }}.tar.gz.sha512
+          md5sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5 || md5 -r wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.md5
+          sha512sum wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512 || shasum -a 512 wheels-module-${{ env.WHEELS_VERSION }}.zip > wheels-module-${{ env.WHEELS_VERSION }}.zip.sha512
+
+      # Build .deb / .rpm Linux packages alongside the zip artifacts. nfpm
+      # needs no Linux-specific build host (it's a single Go binary), so this
+      # runs on the same ubuntu-latest runner as the rest of the pipeline.
+      # Generates wheels_<v>_amd64.deb and wheels-<v>.x86_64.rpm in dist/.
+      # See tools/distribution-drafts/linux-packages/ for the nfpm configs.
+      - name: Install nfpm
+        run: |
+          NFPM_VERSION="2.40.0"
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
+            | sudo tar -xzf - -C /usr/local/bin nfpm
+          nfpm --version
+
+      - name: Build Linux packages (.deb / .rpm)
+        env:
+          WHEELS_VERSION: ${{ env.WHEELS_VERSION }}
+          CHANNEL: stable
+          OUT_DIR: artifacts/wheels/${{ env.WHEELS_VERSION }}
+        run: bash tools/distribution-drafts/linux-packages/build-linux-packages.sh
+
       - name: Upload Wheels Base Template Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-base-template
           path: |
@@ -200,7 +297,7 @@ jobs:
             artifacts/wheels/wheels-base-template-be.zip
 
       - name: Upload Wheels Core Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-core
           path: |
@@ -210,7 +307,7 @@ jobs:
             artifacts/wheels/wheels-core-be.zip
 
       - name: Upload Wheels CLI Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-cli
           path: |
@@ -220,7 +317,7 @@ jobs:
             artifacts/wheels/wheels-cli-be.zip
       
       - name: Upload Wheels Starter App Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-starter-app
           path: |
@@ -228,9 +325,19 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
             artifacts/wheels/wheels-starter-app-be.zip
-      
+
+      - name: Upload Wheels Module Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-artifacts-module
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.sha512
+
       - name: Upload All Wheels Artifacts (Combined)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-all
           path: |
@@ -238,7 +345,7 @@ jobs:
 
       - name: Upload Workflow Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-release
           path: |
@@ -259,25 +366,261 @@ jobs:
           echo "Release notes extracted to release-notes.md"
           cat release-notes.md
 
+      # Wrapped in Wandalen/wretry.action@v3 to recover from transient
+      # GitHub Actions artifact-upload flakes — observed pattern is
+      # `##[error]other side closed` mid-stream after most assets upload
+      # successfully (e.g. SNAPSHOT+1655 lost wheels-core-*.zip while 17/18
+      # other assets uploaded fine). softprops/action-gh-release is safe
+      # to retry because `overwrite_files: true` makes it idempotent: on
+      # retry it attaches to the existing release and only re-uploads
+      # missing or stale assets. attempt_delay is in milliseconds.
+      #
+      # Pinned to v2.6.2: softprops/action-gh-release@v3.0.0 (released
+      # 2026-04-12) introduced a regression where `.zip.sha512` asset
+      # uploads fail deterministically with `##[error]The "chunk"
+      # argument must be of type string or an instance of Buffer,
+      # TypedArray, or DataView. Received an instance of ArrayBuffer`.
+      # Because the error is deterministic, the Wandalen retry-wrap
+      # above runs all 3 attempts with the same result and exits 1.
+      # First seen on SNAPSHOT+1656; same error on +1657. Re-pin to @v3
+      # once upstream ships a fix. v2.6.2 was cut on the same day as
+      # v3.0.0 and is the last known-good release for this repo's
+      # upload pattern.
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v1
+        id: gh-release-final
+        uses: Wandalen/wretry.action@v3
         with:
-          tag_name: v${{ env.WHEELS_VERSION }}
-          name: Wheels ${{ env.WHEELS_VERSION }}
-          body_path: release-notes.md
-          draft: false
-          prerelease: ${{ env.WHEELS_PRERELEASE }}
-          files: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+          action: softprops/action-gh-release@v2.6.2
+          attempt_limit: 3
+          attempt_delay: 30000
+          with: |
+            tag_name: v${{ env.WHEELS_VERSION }}
+            name: Wheels ${{ env.WHEELS_VERSION }}
+            body_path: release-notes.md
+            draft: false
+            prerelease: ${{ env.WHEELS_PRERELEASE }}
+            overwrite_files: true
+            files: |
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
+
+      #############################################
+      # Create Snapshot Pre-Release (develop only)
+      #############################################
+
+      # Same retry-wrap rationale as the stable Create-GitHub-Release step
+      # above. Both branches need the wrap because the same flake fires on
+      # any release upload regardless of branch.
+      #
+      # Snapshots publish to a separate repo (wheels-dev/wheels-snapshots) so
+      # the main repo's Releases page stays curated for GA tags only. Without
+      # the redirect, ~200-500 snapshot releases per year would drown the
+      # ~6-12 GA releases. Requires WHEELS_SNAPSHOTS_TOKEN — a fine-grained PAT
+      # with Contents:write on wheels-dev/wheels-snapshots, passed through via
+      # workflow_call from snapshot.yml.
+      - name: Create Snapshot Pre-Release
+        if: github.ref != 'refs/heads/main'
+        id: gh-release-snapshot
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: softprops/action-gh-release@v2.6.2
+          attempt_limit: 3
+          attempt_delay: 30000
+          with: |
+            tag_name: v${{ env.WHEELS_VERSION }}
+            name: Wheels ${{ env.WHEELS_VERSION }} (snapshot)
+            body: |
+              Automated snapshot from `wheels-dev/wheels` develop branch.
+
+              Install:
+              ```
+              brew upgrade wheels-be
+              ```
+            draft: false
+            prerelease: true
+            overwrite_files: true
+            repository: wheels-dev/wheels-snapshots
+            token: ${{ secrets.WHEELS_SNAPSHOTS_TOKEN }}
+            files: |
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
+
+      #############################################
+      # Dispatch downstream package managers
+      #
+      # Fires repository_dispatch on wheels-dev/homebrew-wheels and
+      # wheels-dev/chocolatey-wheels so their auto-update workflows pick
+      # up the new release within minutes instead of waiting up to 24h
+      # for their daily cron. Both repos have:
+      #   on:
+      #     repository_dispatch:
+      #       types: [wheels-released]
+      #
+      # Requires DOWNSTREAM_DISPATCH_TOKEN — a fine-grained PAT (or app
+      # token) with `metadata: read` + `actions: write` on the two
+      # downstream repos. If the secret is unset, this step warns and
+      # exits 0 so the release itself isn't blocked; cron will catch up.
+      #############################################
+      - name: Dispatch downstream package managers
+        if: steps.gh-release-final.outcome == 'success' || steps.gh-release-snapshot.outcome == 'success'
+        env:
+          GH_DISPATCH_TOKEN: ${{ secrets.DOWNSTREAM_DISPATCH_TOKEN }}
+          WHEELS_RELEASE_VERSION: ${{ env.WHEELS_VERSION }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_DISPATCH_TOKEN:-}" ]; then
+            echo "::warning::DOWNSTREAM_DISPATCH_TOKEN is not set on the repository — homebrew/chocolatey auto-update will fall back to the daily cron tick."
+            exit 0
+          fi
+
+          # Derive the channel from the version string. The tap's auto-update.yml
+          # uses this to decide which formula to bump:
+          #   stable        → Formula/wheels.rb     (sources from wheels-dev/wheels)
+          #   bleeding-edge → Formula/wheels-be.rb  (sources from wheels-dev/wheels-snapshots)
+          # The version string already encodes this — `*-snapshot.*` is BE,
+          # `*-rc.*` is RC, anything else SemVer-clean is stable. Sniffing here
+          # rather than using a separate event type keeps backwards-compat with
+          # taps still on the older single-channel handler.
+          if echo "${WHEELS_RELEASE_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
+            CHANNEL="bleeding-edge"
+          elif echo "${WHEELS_RELEASE_VERSION}" | grep -qE '\-rc\.'; then
+            CHANNEL="release-candidate"
+          else
+            CHANNEL="stable"
+          fi
+          echo "Channel: ${CHANNEL}"
+
+          # Static event type, fixed repo list — no untrusted input flows
+          # into the curl arguments. WHEELS_RELEASE_VERSION is generated
+          # earlier in the same workflow from wheels.json + run number.
+          for repo in homebrew-wheels chocolatey-wheels; do
+            echo "Dispatching wheels-released to wheels-dev/${repo}..."
+            http_status=$(curl -sS -o /tmp/dispatch-resp.txt -w "%{http_code}" \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_DISPATCH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/wheels-dev/${repo}/dispatches" \
+              -d "{\"event_type\":\"wheels-released\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\",\"channel\":\"${CHANNEL}\"}}" )
+
+            # GitHub returns 204 No Content on success.
+            if [ "${http_status}" != "204" ]; then
+              echo "::warning::Dispatch to wheels-dev/${repo} returned HTTP ${http_status}: $(cat /tmp/dispatch-resp.txt)"
+            else
+              echo "  ✓ ${repo} dispatched (channel=${CHANNEL})"
+            fi
+          done
+
+          echo "Downstream package manager workflows dispatched (homebrew + chocolatey)."
+
+  #############################################
+  # Smoke-test the built module against a clean install.
+  #
+  # Installs the just-built wheels-module-*.tar.gz into an isolated LUCLI_HOME,
+  # extracts wheels-core-*.zip for WHEELS_FRAMEWORK_PATH, then runs every
+  # template-driven generator against a scratch project. Catches packaging
+  # regressions like #1944 (codegen templates unbundled) that the monorepo
+  # test suite can't surface because it exercises source paths, not the
+  # built distribution. See #2208.
+  #############################################
+  smoke-test-distribution:
+    name: Smoke Test Installed Distribution
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+          lucli --version
+
+      - name: Download built module artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-module
+          path: smoke-artifacts/module/
+
+      - name: Download built core artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-core
+          path: smoke-artifacts/core/
+
+      - name: Locate artifacts
+        id: artifacts
+        run: |
+          MODULE_TAR=$(find smoke-artifacts/module -name 'wheels-module-*.tar.gz' | head -1)
+          CORE_ZIP=$(find smoke-artifacts/core -name 'wheels-core-*.zip' ! -name '*-be.zip' | head -1)
+          if [[ -z "$MODULE_TAR" || -z "$CORE_ZIP" ]]; then
+            echo "::error::Artifacts not found. module=$MODULE_TAR core=$CORE_ZIP"
+            find smoke-artifacts -type f
+            exit 1
+          fi
+          echo "module_tar=$MODULE_TAR" >> "$GITHUB_OUTPUT"
+          echo "core_zip=$CORE_ZIP"     >> "$GITHUB_OUTPUT"
+
+      - name: Run smoke test
+        env:
+          MODULE_TAR: ${{ steps.artifacts.outputs.module_tar }}
+          CORE_ZIP: ${{ steps.artifacts.outputs.core_zip }}
+        run: |
+          bash tools/ci/smoke-test-module.sh "$MODULE_TAR" "$CORE_ZIP"
+
+      - name: Upload smoke-test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs
+          path: |
+            smoke-artifacts/
+          retention-days: 7

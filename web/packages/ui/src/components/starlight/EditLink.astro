@@ -1,0 +1,93 @@
+---
+// EditLink override.
+//
+// Guides MDX is authored directly at
+// web/sites/guides/src/content/docs/<version>/*.mdx, so the edit link points
+// straight at that file. API pages are rendered from generated JSON
+// (docs/api/v{version}.json); the default editUrl would point at the
+// generated markdown which gets overwritten on regen, so for API pages we
+// fall back to GitHub code-search for the function name.
+
+const route = Astro.locals.starlightRoute;
+const entry = route.entry;
+const id = entry.id;
+
+// Distinguish guides vs api by the page title's frontmatter shape. API
+// pages have titles like 'resources()' — a bare identifier with empty
+// parens. Guides pages have prose titles ('Beginner Tutorial: Hello
+// World'). This signal is stable in dev + prod and doesn't depend on
+// Astro.site being set to a specific hostname.
+const titleRaw = String(entry.data.title ?? '');
+const isApiFunction = /^[A-Za-z_]\w*\(\)\s*$/.test(titleRaw);
+
+let href: string | null = null;
+let label = 'Edit this page on GitHub';
+
+if (isApiFunction) {
+	const fnName = titleRaw.replace(/\(\)\s*$/, '').trim();
+	if (fnName) {
+		const q = encodeURIComponent(`function ${fnName}`);
+		href = `https://github.com/wheels-dev/wheels/search?q=repo%3Awheels-dev%2Fwheels+${q}&type=code`;
+		label = 'View source on GitHub';
+	}
+} else {
+	// Guides. entry.id already includes the version segment (e.g.
+	// 'v4-0-0-snapshot/basics/associations'), which matches the on-disk layout.
+	href = `https://github.com/wheels-dev/wheels/edit/develop/web/sites/guides/src/content/docs/${id}.mdx`;
+}
+---
+
+{
+	href && (
+		<a class="wd-edit-link" href={href} rel="noopener">
+			<svg
+				class="wd-edit-link__icon"
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M12 20h9" />
+				<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+			</svg>
+			<span>{label}</span>
+		</a>
+	)
+}
+
+<style>
+	.wd-edit-link {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-2) var(--space-3);
+		margin-top: var(--space-5);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		background: transparent;
+		color: var(--color-fg-muted);
+		font-size: var(--text-sm);
+		font-weight: 500;
+		text-decoration: none;
+		transition:
+			border-color 0.15s,
+			color 0.15s,
+			background 0.15s;
+	}
+
+	.wd-edit-link:hover {
+		border-color: var(--color-brand);
+		color: var(--color-brand);
+		background: var(--color-brand-soft);
+	}
+
+	.wd-edit-link__icon {
+		color: var(--color-brand);
+		flex-shrink: 0;
+	}
+</style>

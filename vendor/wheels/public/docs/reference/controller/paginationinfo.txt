@@ -1,0 +1,42 @@
+//--------------------------------------------------------------------
+// Example 1: Basic usage — display the default summary text for a
+// paginated query (e.g. "Showing 26-50 of 1,000 records")
+
+// Controller code
+param name="params.page" type="integer" default="1";
+posts = model("Post").findAll(page=params.page, perPage=25, order="createdAt DESC");
+
+// View code
+<cfoutput>
+    #paginationInfo()#
+</cfoutput>
+// -> "Showing 26-50 of 1,000 records"
+
+
+//--------------------------------------------------------------------
+// Example 2: Custom format string using available tokens
+// Tokens: [startRow], [endRow], [totalRecords], [currentPage], [totalPages]
+
+// View code
+<cfoutput>
+    #paginationInfo(format="Page [currentPage] of [totalPages] ([totalRecords] total)")#
+</cfoutput>
+// -> "Page 2 of 40 (1,000 total)"
+
+
+//--------------------------------------------------------------------
+// Example 3: Multiple paginated queries on the same page using handles
+
+// Controller code
+param name="params.postPage" type="integer" default="1";
+param name="params.commentPage" type="integer" default="1";
+posts    = model("Post").findAll(handle="posts", page=params.postPage, perPage=10, order="createdAt DESC");
+comments = model("Comment").findAll(handle="comments", page=params.commentPage, perPage=5, order="createdAt DESC");
+
+// View code
+<cfoutput>
+    Posts: #paginationInfo(handle="posts")#
+    Comments: #paginationInfo(handle="comments")#
+</cfoutput>
+// -> "Posts: Showing 1-10 of 87 records"
+// -> "Comments: Showing 1-5 of 342 records"

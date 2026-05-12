@@ -1,0 +1,38 @@
+---
+import Header from '@wheels-dev/ui/components/Header.astro';
+import Footer from '@wheels-dev/ui/components/Footer.astro';
+import '@wheels-dev/ui/styles/tokens.css';
+import '@wheels-dev/ui/styles/base.css';
+
+interface Props {
+	title: string;
+	description?: string;
+	current?: 'landing' | 'guides' | 'api' | 'blog';
+}
+const { title, description = 'Wheels — a CFML MVC framework.', current = 'landing' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+	</head>
+	<body>
+		<Header current={current} />
+		<main><slot /></main>
+		<Footer />
+
+		<style is:global>
+			main {
+				max-width: var(--max-width);
+				margin: 0 auto;
+				padding: 2rem 1.5rem;
+				min-height: 60vh;
+			}
+		</style>
+	</body>
+</html>

@@ -1,0 +1,10 @@
+// 1. Basic check box bound to a boolean model property
+#checkBox(objectName="photo", property="isPublic", label="Display this photo publicly.")#
+
+// 2. Custom checked and unchecked values (e.g. "yes" / "no" instead of 1 / 0)
+#checkBox(objectName="user", property="agreedToTerms", checkedValue="yes", uncheckedValue="no", label="I agree to the terms of service.")#
+
+// 3. Check boxes for a nested association (photos belonging to a user)
+<cfloop from="1" to="#ArrayLen(user.photos)#" index="i">
+    #checkBox(objectName="user", association="photos", position=i, property="isPublic", label="Make public: #user.photos[i].title#")#
+</cfloop>

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       new_version:
-        description: 'New version number (e.g., 3.0.1-SNAPSHOT or 3.1.0-SNAPSHOT)'
+        description: 'New version number (e.g., 3.1.1 or 3.2.0). No -SNAPSHOT suffix — the release workflow adds it automatically for develop builds.'
         required: true
         type: string
       bump_type:
@@ -16,10 +16,10 @@ on:
         required: true
         type: choice
         options:
-          - patch-snapshot
-          - minor-snapshot
-          - major-snapshot
-        default: patch-snapshot
+          - patch
+          - minor
+          - major
+        default: patch
 
 jobs:
   bump-version:
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -40,53 +40,60 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
+      - name: Make scripts executable
+        run: chmod +x tools/build/scripts/*.sh
+
       - name: Update Version Numbers
+        env:
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          NEW_VERSION="${{ github.event.inputs.new_version }}"
           echo "Updating to version: $NEW_VERSION"
 
-          # Update templates/base/src/box.json
-          jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
-            templates/base/src/box.json > templates/base/src/box.json.tmp
-          mv templates/base/src/box.json.tmp templates/base/src/box.json
+          # Update root wheels.json (was box.json pre-4.0; the legacy
+          # `dependencies."wheels-core"` field is dropped in the slim schema).
+          jq --arg version "$NEW_VERSION" '.version = $version' \
+            wheels.json > wheels.json.tmp
+          mv wheels.json.tmp wheels.json
 
           # Update examples/starter-app/box.json
           jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
             examples/starter-app/box.json > examples/starter-app/box.json.tmp
           mv examples/starter-app/box.json.tmp examples/starter-app/box.json
 
-          # Update CHANGELOG.md
-          sed -i "1a\\# [$NEW_VERSION](https://github.com/wheels-dev/wheels/tree/develop) => TBD\n\n### Controller Enhancements\n\n### Model Enhancements\n\n### View Enhancements\n\n### Bug Fixes\n\n### Miscellaneous\n\n### Guides\n\n### Potentially Breaking Changes\n\n---\n" CHANGELOG.md
-
           echo "Version updated to $NEW_VERSION"
 
-      - name: Commit Changes
+      - name: Generate Changelog from Merged PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          git add templates/base/src/box.json
+          ./tools/build/scripts/generate-changelog.sh "$NEW_VERSION" "" --write
+
+      - name: Commit Changes
+        env:
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
+        run: |
+          git add wheels.json
           git add examples/starter-app/box.json
           git add CHANGELOG.md
 
-          git commit -m "$(cat <<'EOF'
-          Bump version to ${{ github.event.inputs.new_version }}
+          git commit -m "Bump version to $NEW_VERSION
 
-          Automated version bump after release using GitHub Actions.
-
-          🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-          Co-Authored-By: Claude <noreply@anthropic.com>
-          EOF
-          )"
+          Automated version bump and changelog generation using GitHub Actions."
 
           git push origin main
 
       - name: Create Summary
+        env:
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
+          BUMP_TYPE: ${{ github.event.inputs.bump_type }}
         run: |
           echo "## Version Bump Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**New Version:** ${{ github.event.inputs.new_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Bump Type:** ${{ github.event.inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**New Version:** $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Bump Type:** $BUMP_TYPE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Files Updated:" >> $GITHUB_STEP_SUMMARY
-          echo "- templates/base/src/box.json" >> $GITHUB_STEP_SUMMARY
+          echo "- wheels.json" >> $GITHUB_STEP_SUMMARY
           echo "- examples/starter-app/box.json" >> $GITHUB_STEP_SUMMARY
-          echo "- CHANGELOG.md" >> $GITHUB_STEP_SUMMARY
+          echo "- CHANGELOG.md (auto-generated from merged PRs)" >> $GITHUB_STEP_SUMMARY

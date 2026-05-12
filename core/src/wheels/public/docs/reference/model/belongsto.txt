@@ -1,5 +1,0 @@
-// Specify that instances of this model belong to an author. (The table for this model should have a foreign key set on it, typically named `authorid`.)
-belongsTo("author");
-
-// Same as above, but because we have broken away from the foreign key naming convention, we need to set `modelName` and `foreignKey`.
-belongsTo(name="bookWriter", modelName="author", foreignKey="authorId");

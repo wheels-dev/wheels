@@ -1,0 +1,65 @@
+# nfpm config for the bleeding-edge channel `wheels-be` package (.deb / .rpm).
+#
+# Mirror of nfpm-wheels.yaml with three differences:
+#   - package name: wheels-be
+#   - version interpolated from WHEELS_VERSION which already includes the
+#     -snapshot.N suffix on develop builds
+#   - conflicts with the wheels package so users can't install both
+#
+# Build with:
+#   nfpm pkg --packager deb --target dist/wheels-be_${WHEELS_VERSION}_amd64.deb
+#   nfpm pkg --packager rpm --target dist/wheels-be-${WHEELS_VERSION}.x86_64.rpm
+
+name: wheels-be
+arch: amd64
+platform: linux
+version: ${WHEELS_VERSION}
+section: devel
+priority: optional
+maintainer: Wheels Team <hello@wheels.dev>
+description: |
+  Wheels — CFML MVC framework — bleeding-edge channel.
+  Same CLI as the stable `wheels` package, but tracks develop snapshots.
+  Updates on every merge to wheels-dev/wheels develop branch.
+vendor: Wheels
+homepage: https://wheels.dev
+license: Apache-2.0
+contents:
+  - src: ./build/lucli
+    dst: /opt/wheels/lucli
+    file_info:
+      mode: 0755
+  - src: ./build/module/
+    dst: /opt/wheels/module/
+    type: tree
+  - src: ./build/framework/
+    dst: /opt/wheels/module/vendor/wheels/
+    type: tree
+  - src: ./build/sqlite-jdbc.jar
+    dst: /opt/wheels/sqlite-jdbc.jar
+    file_info:
+      mode: 0644
+  - src: ./build/wrapper.sh
+    dst: /usr/bin/wheels
+    file_info:
+      mode: 0755
+overrides:
+  deb:
+    depends:
+      - openjdk-21-jre-headless | openjdk-21-jre
+    conflicts:
+      - wheels
+    replaces:
+      - wheels
+  rpm:
+    depends:
+      - java-21-openjdk-headless
+    conflicts:
+      - wheels
+deb:
+  fields:
+    Bugs: https://github.com/wheels-dev/wheels/issues
+rpm:
+  group: Development/Tools
+  signature:
+    key_file: ${NFPM_RPM_SIGN_KEY:-}

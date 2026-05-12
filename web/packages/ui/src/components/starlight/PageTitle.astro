@@ -1,0 +1,57 @@
+---
+// PageTitle override.
+//
+// Adds a category eyebrow above the H1 and tightens typography to match
+// the landing/blog design system. Category resolves in this order:
+//   1. entry.data.category (if the author set it in frontmatter)
+//   2. First non-version path segment (e.g., v3-0-0/models/foo → "Models")
+
+const route = Astro.locals.starlightRoute;
+const entry = route.entry;
+const id = entry.id;
+
+const frontmatterCategory = (entry.data as { category?: string }).category;
+let eyebrow: string | null = frontmatterCategory ?? null;
+
+if (!eyebrow) {
+	// id looks like 'v4-0-0-snapshot/command-line-tools/quick-start'.
+	// Strip the version prefix, then take the first segment.
+	const withoutVersion = id.replace(/^v[^/]+\//, '');
+	const firstSegment = withoutVersion.split('/')[0] ?? '';
+	if (firstSegment && firstSegment !== 'index') {
+		eyebrow = firstSegment
+			.split('-')
+			.map((w) => (w.length > 0 ? w[0]!.toUpperCase() + w.slice(1) : w))
+			.join(' ');
+	}
+}
+---
+
+<div class="wd-page-title">
+	{eyebrow && <p class="wd-page-title__eyebrow">{eyebrow}</p>}
+	<h1 id="_top">{entry.data.title}</h1>
+</div>
+
+<style>
+	.wd-page-title {
+		margin-top: var(--space-3);
+	}
+
+	.wd-page-title__eyebrow {
+		font-size: var(--text-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-brand);
+		margin: 0 0 var(--space-2);
+	}
+
+	.wd-page-title h1 {
+		font-size: var(--text-4xl);
+		line-height: var(--leading-tight);
+		letter-spacing: var(--tracking-tight);
+		font-weight: 700;
+		color: var(--color-fg);
+		margin: 0;
+	}
+</style>

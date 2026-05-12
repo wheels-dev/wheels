@@ -1,2 +1,0 @@
-// Instruct CFWheels to call the `fixObj` method after an object has been initialized (i.e. after creating it or fetching it with a finder method).
-afterInitialization("fixObj");

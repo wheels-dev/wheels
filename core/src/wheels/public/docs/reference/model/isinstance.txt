@@ -1,8 +1,0 @@
-// Use the passed in `id` when we're not already in an instance
-function memberIsAdmin(){
-	if(isInstance()){
-		return this.admin;
-	} else {
-		return this.findByKey(arguments.id).admin;
-	}
-}

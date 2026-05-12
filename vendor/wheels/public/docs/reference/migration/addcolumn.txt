@@ -1,0 +1,22 @@
+// 1. Add a simple string column to an existing table
+addColumn(table="members", columnType="string", columnName="status", limit=50);
+
+// 2. Add a boolean column with a default value and no NULLs allowed
+addColumn(
+    table="members",
+    columnType="boolean",
+    columnName="isActive",
+    default=1,
+    allowNull=false
+);
+
+// 3. Add a decimal column with precision and scale (e.g. for a price field)
+addColumn(
+    table="products",
+    columnType="decimal",
+    columnName="price",
+    precision=10,
+    scale=2,
+    default=0,
+    allowNull=false
+);

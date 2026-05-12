@@ -1,0 +1,26 @@
+// 1. Check if a new user object passes validation before proceeding
+user = model("User").new(params.user);
+
+if (user.valid()) {
+    // object passed all validations, safe to proceed
+    redirectTo(action="dashboard");
+} else {
+    renderView(action="new");
+}
+
+// 2. Validate without running before/after validation callbacks
+user = model("User").new(params.user);
+
+if (user.valid(callbacks=false)) {
+    user.save(callbacks=false);
+}
+
+// 3. Validate the object and any associated (nested) objects together
+order = model("Order").new(params.order);
+
+if (order.valid(validateAssociations=true)) {
+    order.save();
+} else {
+    // errors may include issues from associated line items
+    writeOutput(order.errorsAsHTML());
+}

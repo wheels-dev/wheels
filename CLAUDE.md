@@ -1,1035 +1,1079 @@
-# CLAUDE.md
+# Wheels Framework
 
-This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
+CFML MVC framework with ActiveRecord ORM. Models in `app/models/`, controllers in `app/controllers/`, views in `app/views/`, migrations in `app/migrator/migrations/`, config in `config/`, tests in `tests/`.
 
-## 🚨 MANDATORY: Pre-Implementation Workflow
+## Directory Layout
 
-**AI ASSISTANTS MUST FOLLOW THIS EXACT ORDER:**
-
-### 🛑 STEP 1: CHECK MCP TOOLS AVAILABILITY (ALWAYS FIRST)
-```bash
-# Check if .mcp.json exists - if YES, MCP tools are MANDATORY
-ls .mcp.json
+```
+app/controllers/    app/models/    app/views/    app/views/layout.cfm
+app/migrator/migrations/    app/db/seeds.cfm    app/db/seeds/
+app/events/    app/global/    app/lib/
+app/mailers/    app/jobs/    app/plugins/    app/snippets/
+config/settings.cfm    config/routes.cfm    config/environment.cfm
+plugins/    public/    tests/    vendor/    .env (never commit)
 ```
 
-**If `.mcp.json` exists, YOU MUST:**
-- ✅ Use `mcp__wheels__*` tools for ALL development tasks
-- ❌ NEVER use CLI commands (`wheels g`, `wheels test`, etc.)
-- ❌ NEVER use bash/curl for Wheels operations
+## Development Tools
 
-### 🛑 STEP 2: VERIFY MCP TOOLS WORK
-```javascript
-// Test MCP server connection BEFORE any development
-mcp__wheels__wheels_server(action="status")
-```
+Prefer MCP tools when the Wheels MCP server is available (`mcp__wheels__*`). Fall back to CLI otherwise.
 
-### 🛑 STEP 3: Load Documentation
-1. **📖 Load Relevant .ai Documentation**
-   - Check if `.ai/` folder exists in project root
-   - Load appropriate documentation sections:
-     - For models: Read `.ai/wheels/database/` and `.ai/cfml/components/`
-     - For controllers: Read `.ai/wheels/controllers/` and `.ai/cfml/syntax/`
-     - For CFML syntax: Read `.ai/cfml/syntax/` and `.ai/cfml/best-practices/`
-     - For patterns: Read `.ai/wheels/patterns/` and `.ai/wheels/snippets/`
+| Task | MCP | CLI |
+|------|-----|-----|
+| Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
+| Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels migrate latest\|up\|down\|info` |
+| Test | `wheels_test()` | `wheels test run` |
+| Reload | `wheels_reload()` | `?reload=true&password=...` |
+| Server | `wheels_server(action="status")` | `wheels start\|stop\|status` |
+| Analyze | `wheels_analyze(target="all")` | — |
+| Admin | — | `wheels g admin ModelName` |
+| Seed | — | `wheels seed` (legacy alias: `wheels db:seed`) |
 
-2. **✅ Validate Against Standards**
-   - Confirm implementation matches patterns in `.ai/wheels/patterns/`
-   - Verify CFML syntax follows `.ai/cfml/best-practices/`
-   - Check security practices from `.ai/wheels/security/`
-   - Ensure naming conventions match `.ai/wheels/core-concepts/`
+## Critical Anti-Patterns (Top 10)
 
-3. **🔍 Use Established Code Examples**
-   - Reference code templates from `.ai/wheels/snippets/`
-   - Follow model patterns from `.ai/wheels/database/models/`
-   - Apply controller patterns from `.ai/wheels/controllers/`
+These are the most common mistakes when generating Wheels code. Check every time.
 
-**If `.ai/` folder is not available, use the MCP resources:**
-- `wheels://.ai/cfml/syntax` - CFML language fundamentals
-- `wheels://.ai/wheels/patterns` - Framework patterns
-- `wheels://.ai/wheels/snippets` - Code examples
-
-## 🎯 Slash Commands (NEW!)
-
-**The Wheels MCP server now supports slash commands for faster development workflows!**
-
-### ✅ Available Slash Commands
-
-Use these slash commands in supported MCP clients:
-
-- **`/wheels-develop`** - Complete end-to-end development workflow
-  - Example: `/wheels-develop create a blog with posts and comments`
-  - Parameters: `task` (required), `verbose` (optional), `skip_browser_test` (optional)
-
-- **`/wheels-generate`** - Generate Wheels components
-  - Example: `/wheels-generate model User name:string,email:string`
-  - Parameters: `type` (required), `name` (required), `attributes` (optional), `actions` (optional)
-
-- **`/wheels-migrate`** - Run database migrations
-  - Example: `/wheels-migrate latest`
-  - Parameters: `action` (required: latest, up, down, reset, info)
-
-- **`/wheels-test`** - Run tests
-  - Example: `/wheels-test`
-  - Parameters: `target` (optional), `verbose` (optional)
-
-- **`/wheels-server`** - Manage development server
-  - Example: `/wheels-server status`
-  - Parameters: `action` (required: start, stop, restart, status)
-
-- **`/wheels-reload`** - Reload application
-  - Example: `/wheels-reload`
-  - Parameters: `password` (optional)
-
-- **`/wheels-analyze`** - Analyze project structure
-  - Example: `/wheels-analyze all`
-  - Parameters: `target` (required: models, controllers, routes, migrations, tests, all), `verbose` (optional)
-
-### 🚀 Slash Command Benefits
-
-- **Faster workflows** - Single command for complex operations
-- **Natural language** - Describe what you want to build
-- **Integrated testing** - Automatic validation and browser testing
-- **Documentation loading** - Auto-loads relevant .ai docs
-- **Error handling** - Intelligent error recovery
-
-## Quick Start
-
-### MCP-Enabled Wheels Development
-
-**🚨 CRITICAL: If `.mcp.json` exists, use MCP tools exclusively**
-
-### ✅ Common Development Tasks (MCP Tools)
-- **Create a model**: `mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string,active:boolean")`
-- **Create a controller**: `mcp__wheels__wheels_generate(type="controller", name="Users", actions="index,show,new,create,edit,update,delete")`
-- **Create full scaffold**: `mcp__wheels__wheels_generate(type="scaffold", name="Product", attributes="name:string,price:decimal,instock:boolean")`
-- **Run migrations**: `mcp__wheels__wheels_migrate(action="latest")` or `mcp__wheels__wheels_migrate(action="up")` or `mcp__wheels__wheels_migrate(action="down")`
-- **Run tests**: `mcp__wheels__wheels_test()`
-- **Reload application**: `mcp__wheels__wheels_reload()`
-- **Check server status**: `mcp__wheels__wheels_server(action="status")`
-- **Analyze project**: `mcp__wheels__wheels_analyze(target="all")`
-
-### ❌ Legacy CLI Commands (DO NOT USE if .mcp.json exists)
-~~- Create a model: `wheels g model User name:string,email:string,active:boolean`~~
-~~- Create a controller: `wheels g controller Users index,show,new,create,edit,update,delete`~~
-~~- Create full scaffold: `wheels g scaffold Product name:string,price:decimal,instock:boolean`~~
-~~- Run migrations: `wheels dbmigrate latest` `wheels dbmigrate up` `wheels dbmigrate down`~~
-~~- Run tests: `wheels test run`~~
-~~- Reload application: Visit `/?reload=true&password=yourpassword`~~
-
-**⚠️ Only use CLI commands if:**
-1. `.mcp.json` does not exist
-2. MCP tools are not available
-3. You are setting up a new Wheels project from scratch
-
-## 🔍 MCP Workflow Validation
-
-**Before proceeding with ANY development task, AI assistants MUST verify:**
-
-### ✅ MCP Tools Checklist
-1. **Check MCP availability**: `ls .mcp.json` (if exists → MCP is mandatory)
-2. **Test MCP connection**: `mcp__wheels__wheels_server(action="status")`
-3. **Verify MCP tools list**: `ListMcpResourcesTool(server="wheels")`
-
-### 🚨 Enforcement Rules
-- **If ANY of the following are detected, STOP and use MCP tools instead:**
-  - Using `wheels g` commands
-  - Using `wheels dbmigrate` commands
-  - Using `wheels test` commands
-  - Using `wheels server` commands
-  - Using `curl` for Wheels operations
-  - Using bash commands for Wheels development
-
-### 🔄 Correct MCP Usage Pattern
-```javascript
-// 1. Always check server status first
-mcp__wheels__wheels_server(action="status")
-
-// 2. Use MCP tools for all operations
-mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string")
-mcp__wheels__wheels_migrate(action="latest")
-mcp__wheels__wheels_test()
-mcp__wheels__wheels_reload()
-
-// 3. Analyze results
-mcp__wheels__wheels_analyze(target="all")
-```
-
-## 📚 MCP Tool Usage Examples
-
-### 🎯 Complete Development Workflow Example
-```javascript
-// 1. Start every session by checking MCP availability
-mcp__wheels__wheels_server(action="status")
-
-// 2. Create a complete blog system
-mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text,published:boolean")
-mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create,edit,update,delete")
-mcp__wheels__wheels_migrate(action="latest")
-
-// 3. Test and validate
-mcp__wheels__wheels_test()
-mcp__wheels__wheels_analyze(target="all")
-
-// 4. Reload when making configuration changes
-mcp__wheels__wheels_reload()
-```
-
-### ❌ WRONG: CLI-Based Approach (DO NOT USE)
-```bash
-# These commands are FORBIDDEN when .mcp.json exists
-wheels g model Post title:string,content:text,published:boolean
-wheels g controller Posts index,show,new,create,edit,update,delete
-wheels dbmigrate latest
-wheels test run
-curl "http://localhost:8080/?reload=true"
-```
-
-### ✅ CORRECT: MCP-Based Approach (MANDATORY)
-```javascript
-// Always use MCP tools - they provide better integration and error handling
-mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text,published:boolean")
-mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create,edit,update,delete")
-mcp__wheels__wheels_migrate(action="latest")
-mcp__wheels__wheels_test()
-mcp__wheels__wheels_reload()
-```
-
-### 🔍 Debugging with MCP Tools
-```javascript
-// Check project status
-mcp__wheels__wheels_analyze(target="all", verbose=true)
-
-// Check migrations
-mcp__wheels__wheels_migrate(action="info")
-
-// Validate models
-mcp__wheels__wheels_validate(model="all")
-
-// Check server status
-mcp__wheels__wheels_server(action="status")
-```
-
-## Application Architecture
-
-### MVC Framework Structure
-Wheels follows the Model-View-Controller (MVC) architectural pattern:
-
-- **Models** (`/app/models/`): Data layer with ActiveRecord ORM, validation, associations
-- **Views** (`/app/views/`): Presentation layer with CFML templates, layouts, partials
-- **Controllers** (`/app/controllers/`): Request handling, business logic coordination
-- **Configuration** (`/config/`): Application settings, routes, environment configurations
-- **Database** (`/app/migrator/migrations/`): Version-controlled schema changes
-- **Assets** (`/public/`): Static files, CSS, JavaScript, images
-- **Tests** (`/tests/`): TestBox unit and integration tests
-
-### Directory Structure
-```
-/
-├── app/                  (Application code)
-│   ├── controllers/      (Request handlers)
-│   ├── models/           (Data layer)
-│   ├── views/            (Templates)
-│   ├── migrator/         (Database migrations)
-│   ├── events/           (Application events)
-│   ├── global/           (Global functions)
-│   ├── mailers/          (Email components)
-│   ├── jobs/             (Background jobs)
-│   ├── lib/              (Custom libraries)
-│   ├── plugins/          (Third-party plugins)
-│   └── snippets/         (Code templates)
-├── config/               (Configuration files)
-│   ├── app.cfm           (Application.cfc this scope settings)
-│   ├── environment.cfm   (Current environment)
-│   ├── routes.cfm        (URL routing)
-│   ├── settings.cfm      (Framework settings)
-│   └── [environment]/    (Environment-specific overrides)
-├── public/               (Web-accessible files)
-│   ├── files/            (User uploads, sendFile() content)
-│   ├── images/           (Image assets)
-│   ├── javascripts/      (JavaScript files)
-│   ├── stylesheets/      (CSS files)
-│   ├── miscellaneous/    (Miscellaneous files)
-│   ├── Application.cfc   (Framework bootstrap)
-│   └── index.cfm         (Entry point)
-├── tests/                (Test files)
-├── vendor/               (Dependencies)
-├── .env                  (Environment variables - NEVER commit)
-├── box.json              (Package configuration)
-└── server.json           (CommandBox server configuration)
-```
-
-## Development Commands
-
-### Code Generation
-```bash
-# Generate MVC components
-wheels g model User name:string,email:string,active:boolean
-wheels g controller Users index,show,new,create,edit,update,delete
-wheels g view users/dashboard
-
-# Generate full CRUD scaffold
-wheels g scaffold Product name:string,price:decimal,instock:boolean
-
-# Generate database migrations
-wheels g migration CreateUsersTable
-wheels g migration AddEmailToUsers --attributes="email:string:index"
-
-# Generate other components
-wheels g mailer UserNotifications --methods="welcome,passwordReset"
-wheels g job ProcessOrders --queue=high
-wheels g test model User
-wheels g helper StringUtils
-```
-
-### Migration Management
-```bash
-# Check migration status
-wheels dbmigrate info
-
-# Migration to Latest
-wheels dbmigrate latest
-
-# Migration to version 0
-wheels dbmigrate reset
-
-# Migration one version UP
-wheels dbmigrate up
-
-# Migration one version DOWN
-wheels dbmigrate down
-```
-
-### Server Management
-```bash
-# Start/stop development server
-wheels server start
-wheels server stop
-wheels server restart
-
-# View server status
-wheels server status
-
-# View server logs
-wheels server log --follow
-```
-
-### Testing
-```bash
-# Run all tests
-wheels test run
-```
-
-## Configuration Management
-
-### Environment Settings
-Set your environment in `/config/environment.cfm`:
+### 1. Mixed Argument Styles
+Wheels functions cannot mix positional and named arguments. This is the #1 error source.
 ```cfm
-<cfscript>
-    set(environment="development");
-</cfscript>
+// WRONG — mixed positional + named
+hasMany("comments", dependent="delete");
+validatesPresenceOf("name", message="Required");
+
+// RIGHT — all named when using options
+hasMany(name="comments", dependent="delete");
+validatesPresenceOf(properties="name", message="Required");
+
+// RIGHT — positional only (no options)
+hasMany("comments");
+validatesPresenceOf("name");
 ```
 
-**Available Environments:**
-- `development` - Local development with debug info
-- `testing` - Automated testing environment  
-- `maintenance` - Maintenance mode with limited access
-- `production` - Live production environment
-
-### Framework Settings
-Configure global settings in `/config/settings.cfm`:
+### 2. Query vs Array Confusion in Views
+Model finders return query objects, not arrays. Loop accordingly.
 ```cfm
-<cfscript>
-    // Database configuration
-    set(dataSourceName="myapp-dev");
-    set(dataSourceUserName="username");
-    set(dataSourcePassword="password");
-    
-    // URL rewriting
-    set(URLRewriting="On");
-    
-    // Reload password
-    set(reloadPassword="mypassword");
-    
-    // Error handling
-    set(showErrorInformation=true);
-    set(sendEmailOnError=false);
-</cfscript>
+// WRONG
+<cfloop array="#users#" index="user">
+
+// RIGHT
+<cfloop query="users">
+    #users.firstName#
+</cfloop>
 ```
 
-### Environment-Specific Overrides
-Create environment-specific settings in `/config/[environment]/settings.cfm`:
+### 3. Nested Resource Routes — Use Callback Syntax
+Wheels supports nested resources via the `callback` parameter or `nested=true` with manual `end()`. Do NOT use Rails-style inline function blocks.
 ```cfm
-// /config/production/settings.cfm
-<cfscript>
-    set(dataSourceName="myapp-prod");
-    set(showErrorInformation=false);
-    set(sendEmailOnError=true);
-    set(cachePages=true);
-</cfscript>
+// WRONG — Rails-style inline (not supported)
+.resources("posts", function(r) { r.resources("comments"); })
+
+// RIGHT — callback syntax (recommended)
+.resources(name="posts", callback=function(map) {
+    map.resources("comments");
+})
+
+// RIGHT — manual nested=true + end()
+.resources(name="posts", nested=true)
+    .resources("comments")
+.end()
+
+// RIGHT — flat separate declarations (no URL nesting)
+.resources("posts")
+.resources("comments")
 ```
 
-## URL Routing
-
-### Default Route Pattern
-URLs follow the pattern: `[controller]/[action]/[key]`
-
-**Examples:**
-- `/users` → `Users.cfc`, `index()` action
-- `/users/show/12` → `Users.cfc`, `show()` action, `params.key = 12`
-
-### Custom Routes
-Define custom routes in `/config/routes.cfm`:
+### 4. HTML5 Form Helpers Available
+Wheels provides dedicated HTML5 input helpers. Use them instead of manual type attributes.
 ```cfm
-<cfscript>
-mapper()
-    // Named routes
-    .get(name="login", to="sessions##new")
-    .post(name="authenticate", to="sessions##create")
-    
-    // RESTful resources
-    .resources("users")
-    .resources("products", except="destroy")
+// Object-bound helpers
+#emailField(objectName="user", property="email")#
+#urlField(objectName="user", property="website")#
+#numberField(objectName="product", property="quantity", min="1", max="100")#
+#telField(objectName="user", property="phone")#
+#dateField(objectName="event", property="startDate")#
+#colorField(objectName="theme", property="primaryColor")#
+#rangeField(objectName="settings", property="volume", min="0", max="100")#
+#searchField(objectName="search", property="query")#
 
-    // Nested resources - use separate declarations
-    .resources("users")
-    .resources("orders")
-    
-    // Root route
-    .root(to="home##index", method="get")
-    
-    // Wildcard (keep last)
-    .wildcard()
-.end();
-</cfscript>
+// Tag-based helpers
+#emailFieldTag(name="email", value="")#
+#numberFieldTag(name="qty", value="1", min="0", step="1")#
 ```
 
-### Route Helpers
+### 5. Migration Seed Data — Use Direct SQL
+Parameter binding in `execute()` is unreliable. Use inline SQL for seed data.
 ```cfm
-// Link generation
-#linkTo(route="user", key=user.id, text="View User")#
-#linkTo(controller="products", action="index", text="All Products")#
+// WRONG
+execute(sql="INSERT INTO roles (name) VALUES (?)", parameters=[{value="admin"}]);
 
-// Form generation
-#startFormTag(route="user", method="put", key=user.id)#
-
-// URL generation
-#urlFor(route="users")#
-
-// Redirects in controllers
-redirectTo(route="user", key=user.id);
+// RIGHT
+execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
 ```
 
-## Model-View-Controller Patterns
+### 6. Route Order Matters
+Routes are matched first-to-last. Wrong order = wrong matches.
+```
+Order: MCP routes → resources → custom named routes → root → wildcard (last!)
+```
 
-### Controller Structure
+### 7. timestamps() Includes createdAt, updatedAt, and deletedAt
+Don't also add separate datetime columns for these.
 ```cfm
-component extends="Controller" {
+// WRONG — duplicates
+t.timestamps();
+t.datetime(columnNames="createdAt");
 
-    function config() {
-        // Filters for authentication/authorization
-        filters(through="authenticate", except="index");
-        filters(through="findUser", only="show,edit,update,delete");
-        
-        // Parameter verification
-        verifies(except="index,new,create", params="key", paramsTypes="integer");
-        
-        // Content type support
-        provides("html,json");
-    }
+// RIGHT
+t.timestamps();  // creates createdAt, updatedAt, AND deletedAt (soft-delete)
+```
+Note: `t.timestamps()` adds three columns, not two — the third is the soft-delete marker. Verified against `vendor/wheels/migrator/TableDefinition.cfc`.
 
-    function index() {
-        users = model("User").findAll(order="createdat DESC");
-    }
+### 8. Database-Agnostic Dates in Migrations
+Use `NOW()` — it works across MySQL, PostgreSQL, SQL Server, H2, SQLite.
+```cfm
+// WRONG — database-specific
+execute("INSERT INTO users (name, createdAt) VALUES ('Admin', CURRENT_TIMESTAMP)");
 
-    function create() {
-        user = model("User").new(params.user);
-        
-        if (user.save()) {
-            redirectTo(route="user", key=user.id, success="User created!");
-        } else {
-            renderView(action="new");
-        }
-    }
-
-    private function authenticate() {
-        if (!session.authenticated) {
-            redirectTo(controller="sessions", action="new");
-        }
-    }
-
-    function sendWelcomeEmail() {
-        sendEmail(
-            template="users/welcome",
-            from="noreply@myapp.com",
-            to=user.email,
-            subject="Welcome to MyApp!",
-            user=user
-        );
-    }
-
-    function downloadReport() {
-        sendFile(
-            file="report.pdf",
-            name="Monthly Report.pdf",
-            type="application/pdf",
-            disposition="attachment",
-            directory="/reports/"
-        );
-    }
-
-    function requireSSL() {
-        if (!isSecure()) {
-            redirectTo(protocol="https");
-        }
-    }
-}
+// RIGHT
+execute("INSERT INTO users (name, createdAt, updatedAt) VALUES ('Admin', NOW(), NOW())");
 ```
 
-### Model Structure
+### 9. Controller Filters Must Be Private
+Filter functions (authentication, data loading) must be declared `private`.
+```cfm
+// WRONG — public filter becomes a routable action
+function authenticate() { ... }
+
+// RIGHT
+private function authenticate() { ... }
+```
+
+### 10. Always cfparam View Variables
+Every variable passed from controller to view needs a cfparam declaration.
+```cfm
+// At top of every view file
+<cfparam name="users" default="">
+<cfparam name="user" default="">
+```
+
+## Wheels Conventions
+
+- **config()**: All model associations/validations/callbacks and controller filters/verifies go in `config()`
+- **Naming**: Models are singular PascalCase (`User.cfc`), controllers are plural PascalCase (`Users.cfc`), table names are plural lowercase (`users`)
+- **Parameters**: `params.key` for URL key, `params.user` for form struct, `params.user.firstName` for nested
+- **extends**: Models extend `"Model"`, controllers extend `"Controller"`, tests extend `"wheels.WheelsTest"` (legacy: `"wheels.Test"` for RocketUnit)
+- **Associations**: All named params when using options: `hasMany(name="orders")`, `belongsTo(name="user")`, `hasOne(name="profile")`
+- **Validations**: Property param is `property` (singular) for single, `properties` (plural) for list: `validatesPresenceOf(properties="name,email")`
+
+## Model Quick Reference
+
 ```cfm
 component extends="Model" {
-
     function config() {
-        // Associations
-        hasMany("orders");
-        belongsTo("role");
-        
+        // Table/key (only if non-conventional)
+        tableName("tbl_users");
+        setPrimaryKey("userId");
+
+        // Associations — all named params when using options
+        hasMany(name="orders", dependent="delete");
+        belongsTo(name="role");
+
         // Validations
-        validatesPresenceOf("firstname,lastname,email");
+        validatesPresenceOf("firstName,lastName,email");
         validatesUniquenessOf(property="email");
         validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
-        
+
         // Callbacks
-        beforeSave("hashPassword");
-        afterCreate("sendWelcomeEmail");
+        beforeSave("sanitizeInput");
 
-        // Nested properties for associations
-        nestedProperties(association="addresses", allowDelete=true, autoSave=true);
+        // Query scopes — reusable, composable query fragments
+        scope(name="active", where="status = 'active'");
+        scope(name="recent", order="createdAt DESC");
+        scope(name="byRole", handler="scopeByRole");  // dynamic scope
 
-        // Custom finder methods (Wheels doesn't have scope() - use custom finder methods instead)
+        // Enums — named values with auto-generated checkers and scopes
+        enum(property="status", values="draft,published,archived");
+        enum(property="priority", values={low: 0, medium: 1, high: 2});
     }
 
-    function findByEmail(required string email) {
-        return findOne(where="email = '#arguments.email#'");
-    }
-
-    function findActive() {
-        return findAll(where="active = 1");
-    }
-
-    function findFirst() {
-        return findFirst(property="createdAt");
-    }
-
-    function fullName() {
-        return trim("#firstname# #lastname#");
-    }
-
-    function reload() {
-        // Reload this model instance from the database
-        return super.reload();
+    // Dynamic scope handler (must return struct with query keys)
+    private struct function scopeByRole(required string role) {
+        return {where: "role = '#arguments.role#'"};
     }
 }
 ```
 
-### View Structure
+Finders: `model("User").findAll()`, `model("User").findOne(where="...")`, `model("User").findByKey(params.key)`.
+Create: `model("User").new(params.user)` then `.save()`, or `model("User").create(params.user)`.
+Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
+
+### Scopes (Composable Query Fragments)
 ```cfm
-<!-- Layout: /app/views/layout.cfm -->
-<cfoutput>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    #csrfMetaTags()#
-    <title>#contentFor("title", "MyApp")#</title>
-    #styleSheetLinkTag("application")#
-</head>
-<body>
-    <main>
-        #flashMessages()#
-        #includeContent()#
-    </main>
-    #javaScriptIncludeTag("application")#
-</body>
-</html>
-</cfoutput>
-
-<!-- View: /app/views/users/index.cfm -->
-<cfparam name="users">
-<cfoutput>
-#contentFor("title", "Users")#
-
-<h1>Users</h1>
-#linkTo(route="newUser", text="New User", class="btn btn-primary")#
-
-<cfif users.recordCount>
-    <table class="table">
-        <cfloop query="users">
-        <tr>
-            <td>#linkTo(route="user", key=users.id, text=users.firstname)#</td>
-            <td>#users.email#</td>
-            <td>
-                #linkTo(route="editUser", key=users.id, text="Edit")#
-                #buttonTo(route="user", method="delete", key=users.id, 
-                         text="Delete", confirm="Are you sure?")#
-            </td>
-        </tr>
-        </cfloop>
-    </table>
-<cfelse>
-    <p>No users found.</p>
-</cfif>
-</cfoutput>
+// Chain scopes together — each adds to the query
+model("User").active().recent().findAll();
+model("User").byRole("admin").findAll(page=1, perPage=25);
+model("User").active().recent().count();
 ```
 
-## Database Migrations
+### Chainable Query Builder (Injection-Safe)
+```cfm
+// Fluent alternative to raw WHERE strings — values are auto-quoted
+model("User")
+    .where("status", "active")
+    .where("age", ">", 18)
+    .whereNotNull("emailVerifiedAt")
+    .orderBy("name", "ASC")
+    .limit(25)
+    .get();
 
-### Migration Workflow
+// Combine with scopes
+model("User").active().where("role", "admin").get();
+
+// Other builder methods: orWhere, whereNull, whereBetween, whereIn, whereNotIn
+```
+
+### Enums (Named Property Values)
+```cfm
+// Auto-generated boolean checkers
+user.isDraft();       // true/false
+user.isPublished();   // true/false
+
+// Auto-generated scopes per value
+model("User").draft().findAll();
+model("User").published().findAll();
+```
+
+### Batch Processing (Memory-Efficient)
+```cfm
+// Process one record at a time (loads in batches internally)
+model("User").findEach(batchSize=1000, callback=function(user) {
+    user.sendReminderEmail();
+});
+
+// Process in batch groups (callback receives query/array)
+model("User").findInBatches(batchSize=500, callback=function(users) {
+    processUserBatch(users);
+});
+
+// Works with scopes and conditions
+model("User").active().findEach(batchSize=500, callback=function(user) { /* ... */ });
+```
+
+## Middleware Quick Reference
+
+Middleware runs at the dispatch level, before controller instantiation. Each implements `handle(request, next)`.
+
+```cfm
+// config/settings.cfm — global middleware (runs on every request)
+set(middleware = [
+    new wheels.middleware.RequestId(),
+    new wheels.middleware.SecurityHeaders(),
+    new wheels.middleware.Cors(allowOrigins="https://myapp.com")
+]);
+```
+
+```cfm
+// config/routes.cfm — route-scoped middleware
+mapper()
+    .scope(path="/api", middleware=["app.middleware.ApiAuth"])
+        .resources("users")
+    .end()
+.end();
+```
+
+Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`. Custom middleware: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+
+## DI Container Quick Reference
+
+Register services in `config/services.cfm` (loaded at app start, environment overrides supported):
+
+```cfm
+var di = injector();
+di.map("emailService").to("app.lib.EmailService").asSingleton();
+di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+```
+
+Resolve with `service()` anywhere, or use `inject()` in controller `config()`:
+
+```cfm
+// In any controller/view
+var svc = service("emailService");
+
+// Declarative injection in controller config()
+function config() {
+    inject("emailService, currentUser");
+}
+function create() {
+    this.emailService.send(to=user.email);  // resolved per-request
+}
+```
+
+Scopes: transient (default, new each call), `.asSingleton()` (app lifetime), `.asRequestScoped()` (per-request via `request.$wheelsDICache`). Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed. `bind()` = semantic alias for `map()`.
+### Rate Limiting
+
+```cfm
+// Fixed window (default) — 60 requests per 60 seconds
+new wheels.middleware.RateLimiter()
+
+// Sliding window — smoother enforcement
+new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="slidingWindow")
+
+// Token bucket — allows bursts up to capacity, refills steadily
+new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
+
+// Database-backed storage (auto-creates wheels_rate_limits table)
+new wheels.middleware.RateLimiter(storage="database")
+
+// Custom key function (rate limit per API key instead of IP)
+new wheels.middleware.RateLimiter(keyFunction=function(req) {
+    return req.cgi.http_x_api_key ?: "anonymous";
+})
+```
+
+Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` (default) or `database`. Adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers. Returns `429 Too Many Requests` with `Retry-After` when limit exceeded.
+
+## Package System
+
+Optional first-party modules are distributed as standalone repositories and installed into `vendor/<name>/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
+
+Public author-facing guide: [Packages](web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/packages.mdx) — manifest fields, mixin targets, lifecycle, service providers, lazy loading, testing, publishing flow. Submission workflow: [wheels-packages/CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md).
+
+Six first-party packages live in standalone repos under `wheels-dev/`, indexed by the `wheels-dev/wheels-packages` registry:
+
+- `wheels-dev/wheels-sentry` — error tracking
+- `wheels-dev/wheels-hotwire` — Turbo/Stimulus
+- `wheels-dev/wheels-basecoat` — UI components
+- `wheels-dev/wheels-legacy-adapter` — 3.x → 4.x compatibility shims
+- `wheels-dev/wheels-i18n` — internationalization (JSON or DB-backed translations, pluralization)
+- `wheels-dev/wheels-seo-suite` — SEO tooling (meta tags, Open Graph, sitemaps, robots.txt, debug panel)
+
+```
+vendor/                # Runtime: framework core + installed packages
+  wheels/              #   Framework core (excluded from package discovery)
+  wheels-sentry/       #   Installed package
+plugins/               # DEPRECATED: legacy plugins still work with warning
+```
+
+### package.json Manifest
+
+```json
+{
+    "name": "wheels-sentry",
+    "version": "1.0.0",
+    "author": "PAI Industries",
+    "description": "Sentry error tracking",
+    "wheelsVersion": ">=3.0",
+    "provides": {
+        "mixins": "controller",
+        "services": [],
+        "middleware": []
+    },
+    "dependencies": {}
+}
+```
+
+**`provides.mixins`**: Comma-delimited targets from the allowlist `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus the special values `global` (inject into all targets) and `none` (explicit opt-out). Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`). Unknown targets (typos, `view`, `service`, etc.) are rejected with a clear error — view helpers belong in `controller` mixins since Wheels views execute in the controller's variables scope.
+
+### Installing a Package
+
+Use the `wheels packages` CLI. Resolves names against the `wheels-dev/wheels-packages` registry, verifies sha256, extracts to `vendor/<name>/`.
+
 ```bash
-# Generate new migration
-wheels g migration CreateUsersTable
-
-# Generate migration with attributes
-wheels g migration AddEmailToUsers --attributes="email:string:index"
-
-# Run pending migrations
-wheels dbmigrate latest
-
-# Rollback migrations
-wheels dbmigrate down
+wheels packages list                          # browse the registry
+wheels packages search <query>                # name/description/tag match
+wheels packages show <name>                   # detail page
+wheels packages add <name>                    # latest compat version (canonical verb)
+wheels packages add <name>@<version>          # pin
+wheels packages add <name> --force            # overwrite an existing vendor/<name>
+wheels packages update <name> --yes           # explicit update
+wheels packages update --all --yes            # update every installed package
+wheels packages remove <name>                 # delete vendor/<name>
+wheels packages registry refresh              # bust the 24h cache
+wheels packages registry info                 # show registry URL + cache state
 ```
 
-### Migration Example
+Override the registry with `WHEELS_PACKAGES_REGISTRY=<org>/<repo>` (defaults to `wheels-dev/wheels-packages`). Restart or `wheels reload` after install.
+
+### Error Isolation
+
+Each package loads in its own try/catch. A broken package is logged and skipped — the app and other packages continue normally.
+
+### Testing Packages
+
+```bash
+# Run a specific package's tests (package must be in vendor/)
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.wheels-sentry.tests"
+```
+
+## Routing Quick Reference
+
 ```cfm
-component extends="wheels.migrator.Migration" {
+// config/routes.cfm
+mapper()
+    .resources("users")                              // standard CRUD
+    .resources("products", except="delete")           // skip actions
+    .resources(name="posts", callback=function(map) { // nested resources
+        map.resources("comments");
+        map.resources("tags");
+    })
+    .get(name="login", to="sessions##new")           // named route
+    .post(name="authenticate", to="sessions##create")
+    .root(to="home##index", method="get")            // homepage
+    .wildcard()                                       // keep last!
+.end();
+```
 
-    function up() {
-        transaction {
-            t = createTable(name="users", force=false);
-            t.string(columnNames="firstName,lastName", allowNull=false);
-            t.string(columnNames="email", limit=100, allowNull=false);
-            t.boolean(columnNames="active", default=true);
-            t.timestamps();
-            t.create();
-            
-            addIndex(table="users", columnNames="email", unique=true);
-        }
-    }
+Helpers: `linkTo(route="user", key=user.id, text="View")`, `urlFor(route="users")`, `redirectTo(route="user", key=user.id)`, `startFormTag(route="user", method="put", key=user.id)`.
 
-    function down() {
-        dropTable("users");
-    }
+### Route Model Binding
+
+Automatically resolves `params.key` into a model instance before the controller action runs. The instance lands in `params.<singularModelName>` (e.g., `params.user`). Throws `Wheels.RecordNotFound` (404) if the record doesn't exist; silently skips if the model class doesn't exist.
+
+```cfm
+// Per-resource — convention: singularize controller name → model
+.resources(name="users", binding=true)
+
+// Explicit model name override
+.resources(name="posts", binding="BlogPost")  // resolves BlogPost, stored in params.blogPost
+
+// Scope-level — all nested resources inherit binding
+.scope(path="/api", binding=true)
+    .resources("users")     // params.user
+    .resources("products")  // params.product
+.end()
+
+// Global — enable for all resource routes
+set(routeModelBinding=true);  // in config/settings.cfm
+```
+
+In the controller, use the resolved instance directly:
+```cfm
+function show() {
+    user = params.user;  // already a model object, no findByKey needed
 }
 ```
 
-### Column Types
-```cfm
-t.string(columnNames="name", limit=255, allowNull=false, default="");
-t.text(columnNames="description", allowNull=true);
-t.integer(columnNames="count", allowNull=false, default=0);
-t.decimal(columnNames="price", precision=10, scale=2);
-t.boolean(columnNames="active", default=false);
-t.date(columnNames="eventDate");
-t.datetime(columnNames="createdAt"); // Use for createdAt/updatedAt only when not using timestamps(); OK for other columns
-t.timestamps();  // Creates createdAt and updatedAt
-t.integer(columnNames="userId", allowNull=false);  // Foreign key
-```
+## Pagination View Helpers
 
-### Advanced Migration Features
+Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recommended all-in-one helper is `paginationNav()`.
 
 ```cfm
-// Create database views
-component extends="wheels.migrator.Migration" {
-    function up() {
-        v = createView(name="activeUsers");
-        v.sql("SELECT id, name, email FROM users WHERE active = 1");
-        v.create();
-    }
-}
+// All-in-one nav (wraps first/prev/page-numbers/next/last in <nav>)
+#paginationNav()#
+#paginationNav(showInfo=true, showFirst=false, showLast=false, navClass="my-pagination")#
 
-// Modify existing tables
-component extends="wheels.migrator.Migration" {
-    function up() {
-        t = changeTable(name="users");
-        t.string(columnNames="middleName", limit=100);
-        t.change();
-
-        // Add indexes
-        addIndex(table="users", columnNames="email", unique=true);
-        addIndex(table="users", columnNames="lastName,firstName");
-
-        // Rename tables
-        renameTable(oldName="user_profiles", newName="profiles");
-    }
-
-    function down() {
-        removeIndex(table="users", indexName="users_email");
-        removeIndex(table="users", indexName="users_lastName_firstName");
-        renameTable(oldName="profiles", newName="user_profiles");
-
-        t = changeTable(name="users");
-        t.removeColumn(columnNames="middleName");
-        t.change();
-    }
-}
+// Individual helpers for custom layouts
+#paginationInfo()#            // "Showing 26-50 of 1,000 records"
+#firstPageLink()#             // link to page 1
+#previousPageLink()#          // link to previous page
+#pageNumberLinks()#           // windowed page number links (default windowSize=2)
+#nextPageLink()#              // link to next page
+#lastPageLink()#              // link to last page
+#pageNumberLinks(windowSize=5, classForCurrent="active")#
 ```
 
-## Testing
+Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
 
-### Test Structure
-```
-tests/
-├── Test.cfc               (Base test component)
-├── controllers/           (Controller tests)
-├── models/                (Model tests)
-└── integration/           (Integration tests)
-```
+## Testing Quick Reference
 
-### Model Testing
+**All new tests use WheelsTest BDD syntax.** RocketUnit (`test_` prefix, `assert()`) is legacy only — never use it for new tests.
+
+### Two test suites
+- **App tests**: `/wheels/app/tests` — project-specific tests in `tests/specs/`. Uses `tests/populate.cfm` for test data and `tests/TestRunner.cfc` for setup.
+- **Core tests**: `/wheels/core/tests` — framework tests in `vendor/wheels/tests/specs/`. Uses `vendor/wheels/tests/populate.cfm`. This is what CI runs across all engines × databases.
+
+**Critical**: Core tests use `directory="wheels.tests.specs"` which compiles EVERY CFC in the directory. One compilation error in any spec file crashes the entire suite for that engine.
+
 ```cfm
-component extends="wheels.Testbox" {
-
-    function beforeAll() {
-        // Setup for all tests in this spec
-        variables.testData = {};
-    }
-
-    function afterAll() {
-        // Cleanup after all tests
-    }
-
-    function beforeEach() {
-        // Setup before each test
-        variables.user = "";
-    }
-
-    function afterEach() {
-        // Cleanup after each test
-        if (isObject(variables.user)) {
-            variables.user.delete();
-        }
-    }
-
+// tests/specs/models/MyFeatureSpec.cfc
+component extends="wheels.WheelsTest" {
     function run() {
-        describe("User Model", function() {
-            
-            it("should be invalid when no data provided", function() {
+        describe("My Feature", () => {
+            it("validates presence of name", () => {
                 var user = model("User").new();
-                expect(user.valid()).toBeFalse("User should be invalid without data");
-                expect(arrayLen(user.allErrors())).toBeGT(0, "Should have validation errors");
-            });
-
-            it("should create user with valid data", function() {
-                var userData = {
-                    firstname = "John",
-                    lastname = "Doe", 
-                    email = "john@example.com"
-                };
-                
-                var user = model("User").create(userData);
-                
-                expect(isObject(user)).toBeTrue("Should return user object");
-                expect(user.valid()).toBeTrue("User should be valid");
-                expect(user.firstname).toBe("John", "Should set firstname correctly");
+                expect(user.valid()).toBeFalse();
             });
         });
     }
 }
 ```
 
-## Security Best Practices
+- **Specs**: `tests/specs/models/`, `tests/specs/controllers/`, `tests/specs/functional/`
+- **Test models**: `tests/_assets/models/` (use `table()` to map to test tables)
+- **Test data**: `tests/populate.cfm` (DROP + CREATE tables, seed data)
+- **Runner URL**: `/wheels/app/tests?format=json&directory=tests.specs.models`
+- **Force reload**: append `&reload=true` after adding new model CFCs
+- **Closure gotcha**: CFML closures can't access outer `local` vars — use shared structs (`var result = {count: 0}`)
+- **Scope gotcha in test infra**: Wheels internal functions (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
+- **`#` escape gotcha**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiters. In string literals, escape as `&##111;`. Comments (`//`) are fine since they aren't evaluated. Unescaped `#` in strings causes "Invalid Syntax Closing [#] not found" compilation errors that crash the **entire** test suite (not just that file).
+- **`$clearRoutes()` in test specs**: Test CFCs that manipulate routes must define their own `$clearRoutes()` method — it is NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc`.
+- **`Left(str, 0)` crashes Lucee 7**: Use a ternary guard: `local.match.pos[1] > 1 ? Left(str, local.match.pos[1] - 1) : ""`
+- Run with MCP `wheels_test()` or CLI `wheels test run`
 
-### CSRF Protection
-```cfm
-// In controllers
-function config() {
-    protectsFromForgery(); // Enable CSRF protection
-}
+## Running Tests Locally (Wheels CLI — Recommended)
 
-// In forms
-#startFormTag(route="user", method="put", key=user.id)#
-    #hiddenFieldTag("authenticityToken", authenticityToken())#
-    <!-- form fields -->
-#endFormTag()#
+**IMPORTANT: Always run the test suite before pushing.** Do not rely on CI alone.
 
-// In layout head
-#csrfMetaTags()#
-```
+> **`wheels` IS the CLI.** Wheels is built on the LuCLI runtime, but we ship the runtime under the `wheels` brand. End users only ever interact with the CLI as `wheels` — there is no separate `lucli` binary on a normal install. When older docs or scripts mention "install LuCLI" or invoke `lucli`, they pre-date the rebrand and are being migrated to `wheels`.
 
-### Input Validation
-```cfm
-// Parameter verification
-function config() {
-    verifies(only="show,edit,update,delete", params="key", paramsTypes="integer");
-    verifies(only="create,update", params="user", paramsTypes="struct");
-}
-
-// Model validation
-function config() {
-    validatesPresenceOf("firstname,lastname,email");
-    validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
-    validatesLengthOf(property="password", minimum=8);
-}
-```
-
-### SQL Injection Prevention
-```cfm
-// Use model methods (automatically sanitized)
-users = model("User").findAll(where="email = '#params.email#'");
-
-// Or use cfqueryparam in custom queries
-sql = "SELECT * FROM users WHERE email = :email";
-users = queryExecute(sql, { email = { value = params.email, cfsqltype = "cf_sql_varchar" } }, {datasource = yourDatasourceName});
-```
-
-## Performance Optimization
-
-### Caching
-```cfm
-// Page caching
-function config() {
-    caches(action="index", time=30); // Cache for 30 minutes
-}
-
-// Query caching
-users = model("User").findAll(cache=60); // Cache for 60 minutes
-```
-
-### Database Optimization
-```cfm
-// Use includes to avoid N+1 queries
-users = model("User").findAll(include="role,orders");
-
-// Use select to limit columns
-users = model("User").findAll(select="id,firstname,lastname,email");
-
-// Use pagination
-users = model("User").findAll(page=params.page, perPage=25);
-```
-
-## Deployment
-
-### Production Configuration
-```cfm
-// /config/production/settings.cfm
-<cfscript>
-    // Database
-    set(dataSourceName="myapp-prod");
-    
-    // Security
-    set(showErrorInformation=false);
-    set(sendEmailOnError=true);
-    
-    // Performance
-    set(cachePages=true);
-    set(cachePartials=true);
-    set(cacheQueries=true);
-</cfscript>
-```
-
-### Environment Variables
-Use `.env` file for sensitive configuration (never commit to version control):
+### Fastest method: one command
 ```bash
-# .env
-DATABASE_URL=mysql://user:pass@localhost:3306/myapp_prod
-SMTP_HOST=smtp.example.com
-API_KEY=your-secret-api-key
+bash tools/test-local.sh              # run all core tests
+bash tools/test-local.sh model        # run model tests only
+bash tools/test-local.sh security     # run security tests only
 ```
 
-Access in configuration:
+The script handles everything: creates SQLite DBs, starts a Wheels CLI server if needed, runs tests, reports results, cleans up. No Docker required.
+
+### Prerequisites (one-time setup)
+```bash
+# Install the Wheels CLI (4.0.0+ recommended)
+brew install wheels   # or download from GitHub releases
+# Java 21 required
+brew install openjdk@21
+```
+
+### Manual method (if you need a persistent server)
+```bash
+cd /path/to/wheels
+sqlite3 wheelstestdb.db "SELECT 1;"
+sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+wheels start --port=8080
+
+# In another terminal:
+curl -s "http://localhost:8080/?reload=true&password=wheels"
+curl -sf "http://localhost:8080/wheels/core/tests?db=sqlite&format=json" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(f'{d[\"totalPass\"]} pass, {d[\"totalFail\"]} fail, {d[\"totalError\"]} error')"
+```
+
+### Run specific test directories
+```bash
+bash tools/test-local.sh model        # vendor/wheels/tests/specs/model/
+bash tools/test-local.sh controller   # vendor/wheels/tests/specs/controller/
+bash tools/test-local.sh view         # vendor/wheels/tests/specs/view/
+bash tools/test-local.sh security     # vendor/wheels/tests/specs/security/
+bash tools/test-local.sh middleware   # vendor/wheels/tests/specs/middleware/
+bash tools/test-local.sh dispatch     # vendor/wheels/tests/specs/dispatch/
+bash tools/test-local.sh migrator     # vendor/wheels/tests/specs/migrator/
+```
+
+## Running Tests Locally (Docker matrix)
+
+Docker is the authoritative way to reproduce CI's `compat-matrix.yml` workflow
+(every engine × every database) before pushing. Source is bind-mounted via
+[compose.yml](compose.yml) at `./:/wheels-test-suite`, so edit-reload-test
+cycles don't require image rebuilds — only the Wheels application reloads
+between iterations.
+
+### `tools/test-matrix.sh` — local mirror of `compat-matrix.yml`
+
+```bash
+tools/test-matrix.sh                       # Lucee 7 + SQLite (happy path, fastest)
+tools/test-matrix.sh lucee7 mysql          # Lucee 7 + MySQL
+tools/test-matrix.sh lucee7 sqlite,mysql   # Multiple DBs against one engine
+tools/test-matrix.sh lucee6,lucee7 sqlite  # Multiple engines against one DB
+tools/test-matrix.sh --all                 # Full matrix (every engine × every DB)
+tools/test-matrix.sh --rebuild lucee7      # Force `docker compose build` (image cache stale)
+tools/test-matrix.sh --down                # Tear everything down
+```
+
+Mirrors CI exactly: engine + DB containers come up under
+`COMPOSE_PROJECT_NAME=wheels` (so containers are named `wheels-<service>-1`,
+matching every assertion in `compat-matrix.yml`); engine restarts between DB
+runs to clear cached model metadata; warmup curl before each test run; same
+test URL (`/wheels/core/tests?db=<db>&format=json`); same JSON parsing.
+
+Default behavior: containers stay running between invocations (fast iteration
+for repeated runs against the same engine/DB). Edit framework code → `--reload`
+isn't needed if you're hitting the test endpoint, since `wheels/core/tests`
+re-evaluates each request. For full app reload (model metadata, package
+discovery): `curl "http://localhost:<port>/?reload=true&password=wheels"`.
+
+### Engines and ports (mirror `compat-matrix.yml` matrix)
+| Engine | Port |
+|--------|------|
+| lucee6 | 60006 |
+| lucee7 | 60007 |
+| adobe2023 | 62023 |
+| adobe2025 | 62025 |
+| boxlang | 60001 |
+
+`compose.yml` also defines `lucee5`, `adobe2018`, `adobe2021` services for
+historical reasons; they are NOT in the CI matrix and should be considered
+unsupported for new development.
+
+### Databases (mirror `compat-matrix.yml` DATABASES env)
+
+`sqlite`, `h2` (Lucee only), `mysql`, `postgres`, `sqlserver`, `cockroachdb`,
+`oracle`. SQLite and H2 are file-based (no container needed). The rest spawn
+their own service containers.
+
+### Manual ad-hoc invocations (skip the wrapper)
+
+If you want to script something the wrapper doesn't cover, the underlying
+moves are documented in [.github/workflows/compat-matrix.yml](.github/workflows/compat-matrix.yml).
+Always set `COMPOSE_PROJECT_NAME=wheels` first so container names match CI.
+
+```bash
+export COMPOSE_PROJECT_NAME=wheels
+docker compose up -d lucee7 mysql
+# wait for ready (see compat-matrix.yml lines 79-124 for canonical readiness check)
+curl -s "http://localhost:60007/wheels/core/tests?db=mysql&format=json&directory=tests.specs.controller" > /tmp/results.json
+```
+
+### Known cross-engine gotchas
+
+**Always verify Adobe CF fixes locally before pushing** — don't iterate via CI. Test against the local container directly:
+```bash
+curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass',0),'pass',d.get('totalFail',0),'fail',d.get('totalError',0),'error')"
+```
+
+- **struct.map()**: Lucee/Adobe resolve `obj.map()` as the built-in struct member function, not the CFC method. Use `mapInstance()` on the Injector.
+- **Application scope**: Adobe CF doesn't support function members on the `application` scope. Pass a plain struct context instead.
+- **Closure this**: CFML closures capture `this` from the declaring scope. Use `var ctx = {ref: obj}` to share references across closures.
+- **Bracket-notation function call**: `obj["key"]()` crashes Adobe CF 2021/2023 parser inside closures. Split into two statements: `var fn = obj["key"]; fn()`.
+- **Inline closure as constructor named arg**: `new Foo(callback = function(){...})` crashes Adobe CF with `ArrayStoreException: ASTcffunction` and takes down the **entire** TestBox bundle because `getComponentMetadata()` triggers eager compilation of every CFC in the directory. Hoist the closure into a local var first: `var fn = function(){...}; new Foo(callback = fn)`. No behavior change on Lucee/BoxLang.
+- **Array by-value in struct literals**: Adobe CF copies arrays by value in `{arr = myArray}`. Closures that append to the copy won't affect the original. Reference via parent struct instead: `{owner = parentStruct}` then `owner.arr`.
+- **`private` mixin functions not integrated**: `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helper functions in mixin CFCs (`vendor/wheels/model/*.cfc`, view helpers, etc.) MUST use `public` access. Use `$` prefix for internal scope instead of `private` keyword. BoxLang handles this differently, so `private` may pass BoxLang tests but fail Lucee/Adobe.
+
+### CI soft-fail databases
+`SOFT_FAIL_DBS` in `.github/workflows/compat-matrix.yml` (lines 389, 519) is currently empty (`""`) — **all databases, including CockroachDB, are hard-gated in CI**. To mark a database as soft-fail (failures logged as warnings but not blocking the build), add it to `SOFT_FAIL_DBS` in both locations. Remove a database from the list once its tests are fixed.
+
+### Cleanup
+```bash
+tools/test-matrix.sh --down    # Stop and remove all containers + network
+```
+
+## Local Onboarding Harness
+
+`tools/test-onboarding.sh` simulates the brand-new-user fresh-install flow without
+touching the user's daily wheels install. It is the right tool when:
+
+- Fixing CLI / framework / template code that affects the `wheels new` →
+  `wheels start` → `wheels migrate latest` cliff.
+- Validating cliff fixes BEFORE asking for a fresh-VM tutorial run.
+- Iterating on dotted-path resolution, Lucee bundle issues, or generated
+  config emission.
+
+```bash
+bash tools/test-onboarding.sh             # symlink-mount worktree (default)
+MODE=copy bash tools/test-onboarding.sh   # closer to brew-install simulation
+BASELINE=1 bash tools/test-onboarding.sh  # use the brew-installed wheels
+KEEP_TEMP=1 bash tools/test-onboarding.sh # preserve temp dirs for inspection
+FROM_PHASE=4 bash tools/test-onboarding.sh # skip earlier phases when iterating
+```
+
+The harness uses `LUCLI_HOME` isolation (writes only into `mktemp -d`), reuses
+the user's existing Lucee Express via symlink to skip the ~74MB redownload, and
+runs ~90 seconds end-to-end through 7 phases mirroring the fresh-VM onboarding
+journal format. Output is directly comparable to fresh-VM run reports.
+
+| Phase | Covers | Fresh-VM findings |
+|---|---|---|
+| 1 | Setup isolated `LUCLI_HOME`, framework path, Lucee Express symlink | — |
+| 2 | `wheels new` (no duplicate `create` lines, file tree, no `bundleName`) | F1, F3, F4 |
+| 3 | Server boot via `wheels start` + sqlite-jdbc shim | (formula simulation) |
+| 4 | Migration cliff — verify the actual sqlite db has tables, not just exit 0 | F2, F5 |
+| 5 | Seed (cfscript wrapper + `seedOnce` idempotency) | F3-orig |
+| 6 | CRUD walkthrough (tutorial chapters 2-3 happy path) | tutorial verification |
+| 7 | `wheels packages list` | F7 (currently SKIP pending follow-up) |
+
+Output uses `✓` / `✗` / `-` per check. A green local run is a strong predictor
+of a green fresh-VM run; the SKIP markers signal known pending issues that are
+expected to fail until their respective follow-up PRs ship.
+
+Deeper reference: [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md).
+
+## Auto-Migration Quick Reference
+
+Generate migrations from model/DB schema diffs. Rename detection via explicit hints (authoritative) + heuristic suggestions (normalized-token + Levenshtein).
+
 ```cfm
-<cfscript>
-    if (FileExists(ExpandPath("/.env"))) {
-        set(dataSourceName=GetEnv("DATABASE_NAME"));
-        set(dataSourceUserName=GetEnv("DATABASE_USER"));
-        set(dataSourcePassword=GetEnv("DATABASE_PASSWORD"));
-    }
-</cfscript>
+// Programmatic
+var am = CreateObject("component", "wheels.migrator.AutoMigrator");
+
+// Single model
+var d = am.diff("User");
+var d = am.diff("User", {renames: {"full_name": "fullName"}});
+var d = am.diff("User", {heuristicThreshold: 0.85});
+
+// All models (per-model hints keyed by model name)
+var all = am.diffAll({
+    hints: {"User": {renames: {"full_name": "fullName"}}},
+    heuristicThreshold: 0.7
+});
+
+// Write migration CFC from diff result
+am.writeMigration(d, "rename_name_field");
 ```
 
-## 🚨 MANDATORY: Native MCP Server
+```bash
+# CLI
+wheels dbmigrate diff User                                    # preview
+wheels dbmigrate diff User --rename=full_name:fullName        # with hint
+wheels dbmigrate diff User --write --name=rename_name         # commit file
+wheels dbmigrate diff --threshold=0.85                        # all models, stricter
+wheels dbmigrate diff --rename=User.full_name:fullName        # diffAll hint
+```
 
-**This Wheels application includes a native CFML MCP (Model Context Protocol) server that MUST be used by AI assistants for all development tasks.**
+**Diff result struct:**
+```
+{modelName, tableName,
+ addColumns, removeColumns, changeColumns,        // pruned of rename pairs
+ renameColumns,       // confirmed renames (emitted into up/down)
+ suggestedRenames}    // heuristic candidates for display
+```
 
-**🔴 CRITICAL RULE: If `.mcp.json` exists, ALL development MUST use MCP tools - no exceptions.**
+**Limits:** PK renames not detected; rename + type change requires separate migrations; calculated properties excluded from diff.
 
-The MCP server eliminates the need for Node.js dependencies and provides AI coding assistants with direct, integrated access to your Wheels application.
+## Database Seeding Quick Reference
 
-### Accessing the MCP Server
+Convention-based, idempotent seeding with CLI support.
 
-The MCP server is available at `/wheels/mcp` and supports:
-- **Resources**: Documentation, guides, project context, patterns
-- **Tools**: Code generation (models, controllers, views, migrations)
-- **Prompts**: Context-aware help for Wheels development
+```cfm
+// app/db/seeds.cfm — Shared seeds (runs in all environments)
+seedOnce(modelName="Role", uniqueProperties="name", properties={
+    name: "admin", description: "Administrator"
+});
+seedOnce(modelName="Role", uniqueProperties="name", properties={
+    name: "member", description: "Regular member"
+});
 
-### MCP Client Configuration
+// app/db/seeds/development.cfm — Dev-only seeds (runs after seeds.cfm)
+seedOnce(modelName="User", uniqueProperties="email", properties={
+    firstName: "Dev", lastName: "User", email: "dev@example.com"
+});
+```
 
-Configure your AI coding assistant to use the native MCP server:
+**CLI** (canonical Wheels CLI form; `wheels db:seed` is the legacy CommandBox alias — prefer the short form):
+```bash
+wheels seed                             # Run convention seeds (auto-detect env)
+wheels seed --environment=production    # Seed for specific environment
+wheels seed --generate                  # Legacy: random test data
+wheels generate seed                    # Create app/db/seeds.cfm
+wheels generate seed --all              # Create seeds.cfm + dev/prod stubs
+```
+Note: the `--count` / `--models` / `--dataFile` flags on `--generate` only exist on the legacy CommandBox `wheels db:seed` surface; the Wheels CLI's `wheels seed` ignores them.
+
+**`seedOnce()`** — idempotent: checks `uniqueProperties` via `findOne()`, creates only if not found. Re-running seeds is always safe.
+
+**Execution order:** `app/db/seeds.cfm` (shared) → `app/db/seeds/<environment>.cfm` (env-specific). Wrapped in a transaction.
+
+**Seeder component:** `application.wheels.seeder` (initialized alongside migrator). Call `application.wheels.seeder.runSeeds()` programmatically.
+
+## Background Jobs Quick Reference
+
+```cfm
+// Define a job: app/jobs/SendWelcomeEmailJob.cfc
+component extends="wheels.Job" {
+    function config() {
+        super.config();
+        this.queue = "mailers";
+        this.maxRetries = 5;
+    }
+    public void function perform(struct data = {}) {
+        sendEmail(to=data.email, subject="Welcome!", from="app@example.com");
+    }
+}
+
+// Enqueue from a controller
+job = new app.jobs.SendWelcomeEmailJob();
+job.enqueue(data={email: user.email});           // immediate
+job.enqueueIn(seconds=300, data={email: "..."});  // delayed 5 minutes
+job.enqueueAt(runAt=scheduledDate, data={});       // at specific time
+
+// Process jobs (call from scheduled task or controller)
+job = new wheels.Job();
+result = job.processQueue(queue="mailers", limit=10);
+
+// Queue management
+stats = job.queueStats();          // {pending, processing, completed, failed, total}
+job.retryFailed(queue="mailers");  // retry all failed jobs
+job.purgeCompleted(days=7);        // clean up old completed jobs
+```
+
+**Job Worker CLI** — persistent daemon for processing jobs:
+```bash
+wheels jobs work                           # process all queues
+wheels jobs work --queue=mailers --interval=3  # specific queue, 3s poll
+wheels jobs status                         # per-queue breakdown
+wheels jobs status --format=json           # JSON output
+wheels jobs retry --queue=mailers          # retry failed jobs
+wheels jobs purge --completed --failed --older-than=30
+wheels jobs monitor                        # live dashboard
+```
+
+**Configurable backoff**: `this.baseDelay = 2` and `this.maxDelay = 3600` in job `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`.
+
+The `wheels_jobs` table is auto-created by `Job.cfc::$ensureJobTable()` on first enqueue or processing — no migration needed. (The older `20260221000001_createwheels_jobs_table.cfc` migration is vestigial; Phase 2b drift audit confirmed auto-create is now the path.)
+
+## Deploy Quick Reference
+
+`wheels deploy` ships your Dockerized Wheels app to production Linux servers via SSH. Ported from Basecamp Kamal's developer CLI — same `config/deploy.yml` schema, same on-server conventions (container names, labels, network, lock path), invokes the same `kamal-proxy` Go binary for zero-downtime rollover. No Ruby runtime required.
+
+    wheels deploy init                     # scaffold config/deploy.yml + .kamal/secrets
+    wheels deploy setup                    # one-time server bootstrap + first deploy
+    wheels deploy                          # rolling deploy
+    wheels deploy --dry-run                # print commands without executing
+    wheels deploy rollback v1              # roll back to a previous version
+    wheels deploy config                   # print resolved config as YAML
+    wheels deploy version                  # show Kamal version this port mirrors
+
+### Subcommands
+
+```cfm
+wheels deploy app <verb>         // boot/start/stop/details/containers/images/logs/live/maintenance/remove
+wheels deploy proxy <verb>       // boot/reboot/start/stop/restart/details/logs/remove
+wheels deploy accessory <verb>   // boot/reboot/start/stop/restart/details/logs/remove (sidecars: db/redis/search)
+wheels deploy build <verb>       // deliver/push/pull/create/remove/details/dev
+wheels deploy registry <verb>    // setup/login/logout/remove
+wheels deploy server <verb>      // exec/bootstrap
+wheels deploy prune <verb>       // all/images/containers [--keep=N]
+wheels deploy lock <verb>        // acquire/release/status (manual — normal deploys auto-lock)
+wheels deploy secrets <verb>     // fetch/extract/print (adapters: op/bitwarden/aws/lastpass/doppler)
+wheels deploy audit              // tail /tmp/kamal-audit.log on each server
+wheels deploy details            // aggregate app + proxy + accessory status
+wheels deploy remove --confirm   // teardown all app/proxy/accessory containers
+wheels deploy docs [section]     // in-terminal config reference
+```
+
+### On-server parity contract (byte-compatible with Ruby Kamal)
+
+- Container names: `<service>-<role>-<version>`
+- Labels: `service=`, `role=`, `destination=`, `version=`
+- Docker network: `kamal`
+- Lock file: `/tmp/kamal_deploy_lock_<service>`
+- Proxy config: `/home/<user>/.config/kamal-proxy/`
+- Hook env prefix: `KAMAL_*` (never `WHEELS_*` — user hooks migrate unchanged)
+
+A server managed by Ruby Kamal can be taken over by `wheels deploy` without cleanup.
+
+### Architecture
+
+```
+cli/lucli/services/deploy/
+├── cli/*.cfc             DeployMainCli + Deploy<App|Proxy|Accessory|Build|Registry|Server|Prune|Lock|Secrets>Cli
+├── commands/*.cfc        Base + Docker/App/Proxy/Builder/Registry/Auditor/Lock/Hook/Accessory/PruneCommands
+├── config/*.cfc          Config + Role/Env/Builder/Proxy/Registry/Ssh/Accessory/Validator/ConfigLoader
+├── lib/*.cfc             JarLoader/Mustache/Yaml/SshClient/SshPool/FakeSshPool/Output/SecretResolver
+└── secrets/*.cfc         BaseAdapter + OnePassword/Bitwarden/AwsSecrets/LastPass/Doppler adapters
+
+cli/lucli/lib/deploy/*.jar  jmustache, snakeyaml, sshj + BouncyCastle transitives (URLClassLoader-isolated)
+cli/lucli/templates/deploy/ Mustache templates for `wheels deploy init` output
+```
+
+Commands-are-strings invariant: every `*Commands.cfc` method returns a shell-command string; only `*Cli.cfc` and the orchestrator execute them. That's why `--dry-run` is trivial and unit tests run without network.
+
+### Critical gotchas
+
+1. **Kamal-compatible schema, ONE divergence.** ERB in `deploy.yml` is NOT supported (rendering it would require embedding a Ruby runtime). Kamal's native `${VAR}` env-var interpolation is preserved unchanged — uppercase-snake tokens resolve via `envOverride → .kamal/secrets → System.getenv → ""` (see `ConfigLoader.$interpolate`). Mustache (`{{...}}`) is used only by `wheels deploy init` to scaffold a fresh `deploy.yml`/`secrets`; it is NOT applied to `deploy.yml` at runtime. Everything else in `config/deploy.yml` is byte-identical to Kamal 2.4.0.
+2. **Hook env prefix is `KAMAL_`, not `WHEELS_`.** This is deliberate — it means Ruby Kamal users' existing `.kamal/hooks/` scripts work unchanged.
+3. **`app live` / `app maintenance` use a marker file** (`/tmp/kamal-maintenance-<svc>`) rather than kamal-proxy native maintenance mode. Phase 2 simplification; Phase 3 follow-up will align with Kamal's proxy-native semantics.
+4. **`wheels deploy remove` is destructive and requires `--confirm`.** Bare `wheels deploy remove` throws without touching anything.
+5. **Lucee reserved scope names in subagent-authored deploy code.** `client`, `session`, `application` — use `ssh`/`sc`, `sess`, `app` instead. Bit us multiple times during the port.
+6. **No `--dry-run` flag in Ruby Kamal 2.4.0.** The `tools/deploy-config-diff.sh` harness compares config-layer output only. Byte-identical command-string parity is aspirational; see `tools/deploy-dry-run-diff.sh` for the plan.
+
+### Testing
+
+`cli/lucli/tests/specs/deploy/` extends `wheels.wheelstest.system.BaseSpec`. Run with:
+
+    bash tools/test-cli-local.sh
+
+Fixtures at `cli/lucli/tests/_fixtures/deploy/configs/` (`minimal.yml`, `full.yml`, `with-accessories.yml`, `invalid/*.yml`). `FakeSshPool.cfc` records every command for offline assertions; no sshd needed for unit tests. `SshClientSpec` + `SshPoolSpec` exercise real SSH via the fixture at `cli/lucli/tests/_fixtures/deploy/sshd/` (brought up by `tools/deploy-sshd-up.sh`).
+
+### Reference docs
+
+- User guides: `docs/src/working-with-wheels/deployment/` (first-deploy, config-reference, accessories, secrets, hooks, migrating-from-kamal)
+- Per-verb CLI reference: `docs/src/command-line-tools/commands/deploy/`
+- Design spec: `docs/superpowers/specs/2026-04-20-wheels-deploy-kamal-port-design.md`
+- Implementation plan: `docs/superpowers/plans/2026-04-20-wheels-deploy-kamal-port.md`
+- Retrospective: `docs/superpowers/plans/2026-04-21-phase1-retrospective.md`
+
+## Server-Sent Events (SSE) Quick Reference
+
+```cfm
+// In a controller action — single event response
+function notifications() {
+    var data = model("Notification").findAll(where="userId=#params.userId#");
+    renderSSE(data=SerializeJSON(data), event="notifications", id=params.lastId);
+}
+
+// Streaming multiple events (long-lived connection)
+function stream() {
+    var writer = initSSEStream();
+    for (var item in items) {
+        sendSSEEvent(writer=writer, data=SerializeJSON(item), event="update");
+    }
+    closeSSEStream(writer=writer);
+}
+
+// Check if request is from EventSource
+if (isSSERequest()) { renderSSE(data="..."); }
+```
+
+Client-side: `const es = new EventSource('/controller/notifications');`
+
+## Browser Testing Quick Reference
+
+Shipped in v4.0 across PRs #2113, #2115, #2116. Specs extend `wheels.wheelstest.BrowserTest` and drive a real Chromium through `this.browser` — a fluent DSL wrapping Playwright Java.
+
+```cfm
+// vendor/wheels/tests/specs/browser/LoginBrowserSpec.cfc
+component extends="wheels.wheelstest.BrowserTest" {
+
+    this.browserEngine = "chromium";   // chromium only in PR 1
+
+    function run() {
+        // browserDescribe() wraps describe() with beforeEach/afterEach that
+        // create a fresh Page per `it`. WheelsTest's BDD lifecycle only treats
+        // beforeAll/afterAll as class-level, so we register per-it hooks
+        // from inside the suite body via this helper.
+        browserDescribe("Login flow", () => {
+            it("can load a page and read its title", () => {
+                if (this.browserTestSkipped) return;
+                this.browser.visitUrl("data:text/html,<title>Hi</title><h1>x</h1>")
+                            .assertTitleContains("Hi");
+            });
+        });
+    }
+}
+```
+
+Install Playwright locally before first run (~370MB download: JARs + Chromium):
+
+```bash
+wheels browser setup              # downloads JARs + Chromium
+```
+
+Then run browser specs via the normal test suite:
+```bash
+bash tools/test-local.sh                    # skips browser specs if JARs missing
+```
+
+### Implemented DSL methods
+
+- **Navigation:** visit, visitUrl, back, forward, refresh, visitRoute
+- **Interaction:** click, press, fill, type, clear, select, check, uncheck, attach, dragAndDrop
+- **Keyboard:** keys, pressEnter, pressTab, pressEscape
+- **Waiting:** waitFor, waitForText, waitForUrl
+- **Scoping:** within(selector, callback)
+- **Cookies:** setCookie, deleteCookie, cookie, clearCookies
+- **Auth:** loginAs, logout
+- **Dialogs:** acceptDialog, dismissDialog, dialogMessage (Lucee-only via createDynamicProxy)
+- **Viewport:** resize, resizeToMobile, resizeToTablet, resizeToDesktop
+- **Script:** script (returns `page.evaluate` result), pause
+- **Assertions (text/vis/presence):** assertSee, assertDontSee, assertSeeIn, assertVisible, assertMissing, assertPresent, assertNotPresent
+- **Assertions (URL/title/query):** assertUrlIs, assertUrlContains, assertTitleContains, assertQueryStringHas, assertQueryStringMissing, assertRouteIs
+- **Assertions (form):** assertInputValue, assertChecked, assertHasClass
+- **Terminals:** currentUrl, title, pageSource, text, value, screenshot
+
+### Key gotchas
+
+- **`##` in selectors** — CFML requires `##` to emit literal `#`. `"##email"` → `"#email"` at runtime.
+- **`client` is a Lucee reserved scope.** `var client = ...` in a closure throws "client scope is not enabled". Use `var c = ...` or `var bc = ...`.
+- **Data URLs work for most tests** — no server needed for ~95% of DSL coverage. Full HTTP integration (cookies, form submits, redirects) needs a running fixture app; that wiring is the same as Wheels Web app bootstrap (separate server + baseUrl).
+- **`this.browserTestSkipped`** — when Playwright JARs aren't installed (fresh CI, clean machine), `beforeAll` sets this flag and `browserDescribe`'s hooks short-circuit. All `it`s should check `if (this.browserTestSkipped) return;` to stay green on CI.
+- **CI runs browser tests** — `pr.yml` and `snapshot.yml` install Playwright JARs + Chromium (cached via `browser-manifest.json` hash). Browser specs run as part of the normal test suite. `WHEELS_BROWSER_TEST_BASE_URL=http://localhost:60007` is set automatically.
+- **Fixture routes** — `/_browser/login-as` and `/_browser/logout` are mounted automatically in test mode. They must come before `.wildcard()` in routes.cfm. In the Routes UI (`/wheels/routes`) all `/_browser/*` routes appear under the **Internal** tab, not Application.
+- **Dialogs are Lucee-only** — `acceptDialog`, `dismissDialog`, `dialogMessage` use `createDynamicProxy` which is Lucee-specific. Specs skip gracefully on other engines.
+
+Full reference: `.ai/wheels/testing/browser-testing.md`.
+
+## Reference Docs
+
+Deeper documentation lives in `.ai/` — Claude will search it automatically when needed:
+- `.ai/wheels/cross-engine-compatibility.md` — **Start here** for Lucee/Adobe cross-engine gotchas
+- `.ai/cfml/` — CFML language reference (syntax, data types, components, control flow, best practices)
+- `.ai/wheels/core-concepts/` — MVC architecture, ORM mapping, routing conventions, Rails comparison
+- `.ai/wheels/models/` — ORM details, associations, validations, scopes, enums, batch processing
+- `.ai/wheels/controllers/` — actions, filters, rendering (JSON/views/redirects), security, SSE, parameter verification
+- `.ai/wheels/views/` — layouts, partials, form helpers (including HTML5), link helpers, pagination, forms
+- `.ai/wheels/database/` — migrations, queries, associations, validations, seeding
+- `.ai/wheels/configuration/` — routing, environments, settings, DI container, multi-tenancy, security
+- `.ai/wheels/middleware/` — pipeline structure, rate limiting, tenant resolver
+- `.ai/wheels/jobs/` — background job queue, retries, priority queues
+- `.ai/wheels/mcp/` — AI agent integration via the Wheels CLI's stdio MCP (setup, tool reference, auto-discovery)
+- `.ai/wheels/packages/` — first-party packages (sentry, hotwire, basecoat) + activation model
+- `.ai/wheels/cli/` — generators (model, controller, scaffold, admin, migrations)
+- `.ai/wheels/testing/` — WheelsTest BDD, browser testing, browser automation patterns, **onboarding harness** (fresh-install simulation for cliff fixes)
+- `.ai/wheels/security/` — CSRF protection, HTTPS detection
+- `.ai/wheels/patterns/` — authentication, CRUD, validation templates
+- `.ai/wheels/snippets/` — copy-paste model + controller examples
+- `.ai/wheels/troubleshooting/` — common errors, form helper errors
+
+## Commit Message Conventions
+
+This repo uses commitlint. The canonical rules live in `commitlint.config.js`; this section reflects them. If the two ever disagree, the config wins.
+
+### Format
+
+`type(scope): subject` — scope is optional.
+
+- **type** is required.
+- **scope** is optional and unrestricted. Pick a short noun that helps a reader skim `git log` (e.g. `model`, `cli`, `web/blog`), or omit it entirely. There is no allowlist — pick what fits.
+- **subject** is required, must not be empty, must not be ALL-CAPS, and the full header must be ≤ 100 chars.
+
+### Valid types
+
+`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+
+### Suggested scopes (not enforced)
+
+These are common scopes used in this repo. None are required, and you can use scopes outside this list freely.
+
+- Framework layers: `model`, `controller`, `view`, `router`, `middleware`, `migration`, `cli`, `test`, `config`, `di`, `job`, `mailer`, `plugin`, `sse`, `seed`, `docs`
+- Static-site monorepo (under `web/`): `web`, `web/ui`, `web/landing`, `web/blog`, `web/guides`, `web/api`, `web/packages`
+
+### Subject rules
+
+- Must not be empty.
+- Must not be ALL-CAPS (e.g., `fix: FIX BUG` is rejected).
+- Sentence-case, start-case, and pascal-case are allowed — proper nouns like `Giscus`, `CockroachDB`, `Buttondown` keep their canonical capitalization.
+- Header (`type(scope): subject`) capped at 100 chars.
+
+## Branding
+
+The project name is **Wheels** (not "CFWheels"). The rebrand happened at v3.0. Always use "Wheels" in new code, comments, commit messages, PR descriptions, and documentation.
+
+## MCP Server
+
+**Canonical surface (Wheels 4.0+):** the Wheels CLI's stdio MCP server at `wheels mcp wheels`. Configure your AI IDE with:
 
 ```json
-{
-  "mcpServers": {
-    "wheels": {
-      "type": "http",
-      "url": "http://localhost:8080/wheels/mcp"
-    }
-  }
-}
+{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
 ```
 
-Replace `8080` with your development server port.
+Or run `wheels mcp setup` to generate `.mcp.json` + `.opencode.json` automatically.
 
-### Available Tools
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions, prefixed with the module name (`wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_reload`, `wheels_seed`, `wheels_analyze`, `wheels_validate`, `wheels_routes`, `wheels_info`, `wheels_destroy`, `wheels_doctor`, `wheels_stats`, `wheels_notes`, `wheels_db`, `wheels_upgrade`, `wheels_create`, `wheels_deploy`). CLI-only tools (`mcp`, `d`, `new`, `console`, `start`, `stop`, `browser`) are hidden from MCP `tools/list` via `mcpHiddenTools()`.
 
-- `wheels_generate` - Generate components (models, controllers, etc.)
-- `wheels_migrate` - Run database migrations
-- `wheels_test` - Execute tests
-- `wheels_server` - Manage development server
-- `wheels_reload` - Reload application
+Workflow orchestration (multi-step planning, feature development) is not a framework concern — use your preferred Claude Code plugin (Superpowers, feature-dev, etc.). The framework ships deterministic Wheels operations via MCP; the model orchestrates.
 
-### Route Configuration
+**Deprecated:** The in-dev-server HTTP endpoint at `/wheels/mcp` (routed from `vendor/wheels/public/views/mcp.cfm`). Emits a deprecation notice and warning log on first request. Scheduled for removal in a future release — migrate to the stdio surface. See `docs/command-line-tools/commands/mcp/mcp-configuration-guide.md`.
 
-The MCP server routes are pre-configured in `/config/routes.cfm`:
+## Wheels Bot
 
-```cfm
-.post(pattern="/wheels/mcp", to="##mcp")
-.get(pattern="/wheels/mcp", to="##mcp")
-```
+`wheels-bot[bot]` is a custom GitHub App that runs Claude-powered automation on issues and PRs in `wheels-dev/wheels`. Five stages, all opt-out via the `[skip-claude]` label or repo variable `WHEELS_BOT_ENABLED=false`. Slash-command prompts live in `.claude/commands/`; workflows in `.github/workflows/bot-*.yml`. Full docs: [`docs/contributing/wheels-bot.md`](docs/contributing/wheels-bot.md).
 
-These routes must come before the `.wildcard()` route to function correctly.
+| Stage | Trigger | Model | Output |
+|---|---|---|---|
+| Triage | issue opened/reopened | Opus | Comment classifying as `bug` / `framework-design` / `other` (+ confidence on `bug` path). Reads code with the allowlisted tools to resolve uncertainty before rating. |
+| Research | bot triage emits `framework-design` marker | Opus | Comment comparing Rails / Laravel / Django / Phoenix / Spring Boot / +1 and recommending a Wheels-idiomatic path (+ confidence). |
+| Propose Fix | bot triage emits `triage-confidence:high` OR research emits `research-confidence:high` (or `workflow_dispatch`) | Opus | TDD-mandatory draft PR on branch `fix/bot-<issue>-<slug>`. Spec-then-implementation, both required by `bot-tdd-gate.yml`. |
+| Reviewer A | PR opened / synchronized / ready_for_review | Sonnet | Single PR review with line comments, verdict, and `wheels-bot:review-a:<pr>:<sha>` marker. |
+| Reviewer B | Reviewer A submits a review | Sonnet | PR comment critiquing A for sycophancy, false positives, and missed issues. Loop cap = 3 rounds. |
 
-## Common Patterns
+**Marker conventions** (HTML comments, used for idempotency):
+- `<!-- wheels-bot:triage:<issue> -->` + `<!-- wheels-bot:triage-class:<bug|framework-design|other> -->` (+ optional `<!-- wheels-bot:triage-confidence:high -->`)
+- `<!-- wheels-bot:research:<issue> -->` (+ optional `<!-- wheels-bot:research-confidence:high -->`)
+- `<!-- wheels-bot:fix:<issue> -->` / `<!-- wheels-bot:fix-held:<issue> -->`
+- `<!-- wheels-bot:review-a:<pr>:<sha> -->`
+- `<!-- wheels-bot:review-b:<pr>:<sha>:<round> -->`
+- `<!-- wheels-bot:auto-close:<issue> -->`
 
-### Service Layer Pattern
-```cfm
-// /app/lib/UserService.cfc
-component {
-    
-    function createUser(required struct userData) {
-        local.user = model("User").new(arguments.userData);
-        
-        transaction {
-            if (local.user.save()) {
-                sendWelcomeEmail(local.user);
-                return local.user;
-            } else {
-                transaction action="rollback";
-                return false;
-            }
-        }
-    }
-}
-```
+**Allow-listed scopes per stage**: every bot-authored commit must conform to the `commitlint.config.js` allowlist (see § Commit Message Conventions). The bot's prompt (`.claude/commands/_shared-rails.md`) re-states the allowlist verbatim.
 
-### API Development
-```cfm
-// API base controller
-component extends="wheels.Controller" {
-    
-    function config() {
-        provides("json");
-        filters(through="authenticate");
-    }
-    
-    private function authenticate() {
-        // API authentication logic
-    }
-}
+**Kill switch**: flip the repo variable `WHEELS_BOT_ENABLED` to `false` to halt every bot workflow without code changes. Add the `[skip-claude]` label (or `[skip-claude]` in the title) to halt activity on a single issue/PR.
 
-// API endpoint
-function index() {
-    users = model("User").findAll();
-    renderWith(data={users=users});
-}
-```
-
-### Error Handling
-```cfm
-// Global error handler in Application.cfc
-function onError(exception, eventname) {
-    if (get("environment") == "production") {
-        WriteLog(file="application", text=exception.message, type="error");
-        include "/app/views/errors/500.cfm";
-    } else {
-        return true; // Let ColdFusion handle it
-    }
-}
-```
-
-## Common Issues and Troubleshooting
-
-### Association Errors
-**"Missing argument name" in hasMany()**
-This error occurs when mixing positional and named parameters in Wheels function calls:
-
-❌ **Incorrect (mixed parameter styles):**
-```cfm
-hasMany("comments", dependent="delete");  // Error: can't mix positional and named
-```
-
-✅ **Correct (consistent named parameters):**
-```cfm
-hasMany(name="comments", dependent="delete");
-```
-
-✅ **Also correct (all positional):**
-```cfm
-hasMany("comments");
-```
-
-Wheels requires consistent parameter syntax - either all positional or all named parameters.
-
-### Routing Issues
-**Incorrect .resources() syntax**
-Wheels resource routing syntax differs from Rails:
-
-❌ **Incorrect (Rails-style nested):**
-```cfm
-.resources("posts", function(nested) {
-    nested.resources("comments");
-})
-```
-
-✅ **Correct (separate declarations):**
-```cfm
-.resources("posts")
-.resources("comments")
-```
-
-**Route ordering matters:** resources → custom routes → root → wildcard
-
-### Form Helper Limitations
-Wheels has more limited form helpers compared to Rails:
-
-❌ **Not available:**
-```cfm
-#emailField()#    // Doesn't exist
-#label(text="Name")#    // text parameter not supported
-```
-
-✅ **Use instead:**
-```cfm
-#textField(type="email")#
-<label>Name</label>
-```
-
-### Migration Data Seeding
-Parameter binding in migrations can be unreliable. Use direct SQL:
-
-❌ **Problematic:**
-```cfm
-execute(sql="INSERT INTO posts (title) VALUES (?)", parameters=[{value=title}]);
-```
-
-✅ **Reliable:**
-```cfm
-execute("INSERT INTO posts (title, createdAt, updatedAt) VALUES ('My Post', NOW(), NOW())");
-```
-
-### Debugging Tips
-1. Check Wheels documentation - don't assume Rails conventions work
-2. Use simple patterns first, add complexity incrementally
-3. Test associations and routes in isolation
-4. Use `?reload=true` after configuration changes
-5. Check debug footer for route information
+**Auto-fire safety net**: the bot is permitted to chain stages (triage → research → propose-fix), but each handoff requires `*-confidence:high` and the propose-fix prompt auto-downgrades on sensitive areas (security, migrations, deploy, DI). All bot PRs land as `--draft` and require a human approving review on `develop`.

@@ -1,0 +1,19 @@
+# Generated output — never format
+**/dist/
+**/.astro/
+**/node_modules/
+**/pnpm-lock.yaml
+**/pagefind/
+
+# Generated API reference markdown (produced by web/scripts/generate-api-docs.mjs).
+# Formatting these would mean a prettier pass after every regen for no benefit.
+sites/api/src/content/docs/v*/
+
+# Authored guides MDX + sidebar manifests. Kept out of prettier so authors
+# control their own formatting (prettier + MDX + Starlight components can
+# mangle intentional line breaks and component attributes).
+sites/guides/src/content/docs/v*/
+sites/guides/src/sidebars/
+
+# Lockfiles and binaries
+*.svg

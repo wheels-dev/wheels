@@ -1,0 +1,58 @@
+//--------------------------------------------------------------------
+// Example 1: Basic usage — render a full pagination nav for a
+// paginated query (first, previous, page numbers, next, last links)
+
+// Controller code
+param name="params.page" type="integer" default="1";
+posts = model("Post").findAll(page=params.page, perPage=25, order="createdAt DESC");
+
+// View code
+<cfoutput>
+    #paginationNav()#
+</cfoutput>
+// -> <nav class="pagination"><a href="/posts?page=1">1</a> <a href="/posts?page=2">2</a> ...</nav>
+
+
+//--------------------------------------------------------------------
+// Example 2: Show pagination info text alongside the nav links,
+// and use a custom CSS class on the wrapping nav element
+
+// View code
+<cfoutput>
+    #paginationNav(showInfo=true, navClass="pagination-bar")#
+</cfoutput>
+// -> <nav class="pagination-bar">Showing 1-25 of 87 records <a href="...">1</a> ...</nav>
+
+
+//--------------------------------------------------------------------
+// Example 3: Minimal nav — page numbers only (no first/last links)
+
+// View code
+<cfoutput>
+    #paginationNav(showFirst=false, showLast=false)#
+</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 4: Multiple paginated queries on the same page using handles
+
+// Controller code
+param name="params.postPage" type="integer" default="1";
+param name="params.commentPage" type="integer" default="1";
+posts    = model("Post").findAll(handle="posts", page=params.postPage, perPage=10, order="createdAt DESC");
+comments = model("Comment").findAll(handle="comments", page=params.commentPage, perPage=5, order="createdAt DESC");
+
+// View code
+<cfoutput>
+    #paginationNav(handle="posts")#
+    #paginationNav(handle="comments")#
+</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 5: Show pagination even when there is only one page of results
+
+// View code
+<cfoutput>
+    #paginationNav(showSinglePage=true)#
+</cfoutput>

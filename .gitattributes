@@ -1,0 +1,21 @@
+# Mark vendor/wheels/ as framework source code (not a third-party dependency)
+vendor/wheels/** linguist-vendored=false
+
+# Exclude dev-only directories from release archives
+cli/ export-ignore
+tools/ export-ignore
+docs/ export-ignore
+examples/ export-ignore
+design_docs/ export-ignore
+test-artifacts/ export-ignore
+.ai/ export-ignore
+.claude/ export-ignore
+.github/ export-ignore
+.vscode/ export-ignore
+compose.yml export-ignore
+MONOREPO.md export-ignore
+CONTRIBUTING.md export-ignore
+CODE_OF_CONDUCT.md export-ignore
+CLAUDE-SKILLS-ANALYSIS.md export-ignore
+SKILLS-IMPLEMENTATION-SUMMARY.md export-ignore
+RELEASE-CANDIDATE.md export-ignore

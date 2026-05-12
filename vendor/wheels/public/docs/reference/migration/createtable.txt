@@ -1,0 +1,23 @@
+// 1. Create a users table with standard columns and timestamps
+t = createTable(name="users");
+	t.string(columnNames="firstName,lastName", default="", allowNull=false, limit=50);
+	t.string(columnNames="email", default="", allowNull=false, limit=255);
+	t.string(columnNames="passwordHash", default="", allowNull=true, limit=500);
+	t.boolean(columnNames="verified", default=false);
+	t.integer(columnNames="roleId", default=0, allowNull=false);
+	t.timestamps();
+t.create();
+
+// 2. Create a table with a custom string primary key (disabling the auto integer id)
+t = createTable(name="tokens", id=false);
+	t.primaryKey(name="id", allowNull=false, type="string", limit=36);
+	t.string(columnNames="userId", allowNull=false, limit=36);
+	t.datetime(columnNames="expiresAt", allowNull=false);
+	t.timestamps();
+t.create();
+
+// 3. Create a join table with composite primary keys and force=true to recreate if it already exists
+t = createTable(name="userRoles", id=false, force=true);
+	t.primaryKey(name="userId", allowNull=false, limit=11);
+	t.primaryKey(name="roleId", allowNull=false, limit=11);
+t.create();

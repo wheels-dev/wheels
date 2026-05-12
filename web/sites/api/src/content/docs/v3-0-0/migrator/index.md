@@ -1,0 +1,53 @@
+---
+title: Migrator
+description: "48 Migrator functions in Wheels 3.0.0."
+---
+
+- [`addColumn()`](/v3-0-0/migrator/addcolumn/) — Adds a new column to an existing table.
+- [`addForeignKey()`](/v3-0-0/migrator/addforeignkey/) — Adds a foreign key constraint between two tables. This ensures that values in one table’s column must exist in the refer
+- [`addIndex()`](/v3-0-0/migrator/addindex/) — Adds a database index on one or more columns of a table. Indexes speed up queries that filter, sort, or join on those co
+- [`addRecord()`](/v3-0-0/migrator/addrecord/) — Inserts a new record into a table. This function is only available inside a migration CFC and is part of the Wheels migr
+- [`addReference()`](/v3-0-0/migrator/addreference/) — Adds a reference column and a foreign key constraint to a table in one step. This is a shortcut for creating an integer 
+- [`bigInteger()`](/v3-0-0/migrator/biginteger/) — Adds one or more big integer columns to a table definition in a migration. Use this when you need columns capable of sto
+- [`binary()`](/v3-0-0/migrator/binary/) — Adds one or more binary columns to a table definition in a migration. Use this for storing raw binary data, such as file
+- [`boolean()`](/v3-0-0/migrator/boolean/) — Adds one or more boolean columns to a table definition in a migration. Use this for columns that store true/false values
+- [`change()`](/v3-0-0/migrator/change/) — Used in migrations to alter an existing table in the database. This function allows you to modify the structure of a tab
+- [`changeColumn()`](/v3-0-0/migrator/changecolumn/) — Changes the definition of an existing column in a database table. This function is used in migration CFCs to update colu
+- [`changeTable()`](/v3-0-0/migrator/changetable/) — Creates a table definition object used to store and apply modifications to an existing table in the database. This funct
+- [`char()`](/v3-0-0/migrator/char/) — Adds one or more CHAR columns to a table definition in a migration. Use this function to define fixed-length string colu
+- [`column()`](/v3-0-0/migrator/column/) — Adds a column to a table definition in a migration. This function is used when defining or altering database tables. It 
+- [`create()`](/v3-0-0/migrator/create/) — The create() method is used to create a database table based on the table definition that has been built using the migra
+- [`createMigration()`](/v3-0-0/migrator/createmigration/) — The createMigration() method is used to generate a new migration file for managing database schema changes. While you ca
+- [`createTable()`](/v3-0-0/migrator/createtable/) — The createTable() function is used in migration CFCs to define a new database table. It returns a TableDefinition object
+- [`createView()`](/v3-0-0/migrator/createview/) — The createView() function is used in migration CFCs to define a new database view. It returns a ViewDefinition object, o
+- [`date()`](/v3-0-0/migrator/date/) — date() is a table definition function used in a migration CFC to add one or more DATE columns to a table.
+- [`datetime()`](/v3-0-0/migrator/datetime/) — Adds datetime columns to a table definition when creating or altering a table in a migration. These columns store both d
+- [`decimal()`](/v3-0-0/migrator/decimal/) — Adds decimal (numeric) columns to a table definition when creating or altering tables via a migration CFC.
+- [`down()`](/v3-0-0/migrator/down/) — down() defines the steps to revert a database migration. It’s executed when rolling back a migration, typically to undo 
+- [`dropForeignKey()`](/v3-0-0/migrator/dropforeignkey/) — dropForeignKey() is used to remove a foreign key constraint from a table in the database. This is typically done during 
+- [`dropReference()`](/v3-0-0/migrator/dropreference/) — dropReference() is used to remove a foreign key constraint from a table in the database using the reference name that wa
+- [`dropTable()`](/v3-0-0/migrator/droptable/) — dropTable() is used to remove a table from the database entirely. This is a destructive operation, so all data in the ta
+- [`dropView()`](/v3-0-0/migrator/dropview/) — dropView() is used to remove a database view entirely. A view is a saved query that acts like a virtual table, so this o
+- [`execute()`](/v3-0-0/migrator/execute/) — execute() allows you to run a raw SQL query directly from a migration file. This is useful when you need to perform oper
+- [`float()`](/v3-0-0/migrator/float/) — The float() function is used in a table definition during a migration to add one or more float-type columns to a databas
+- [`getAvailableMigrations()`](/v3-0-0/migrator/getavailablemigrations/) — The getAvailableMigrations() function scans the migration folder (by default /app/migrator/migrations/) and returns an a
+- [`getCurrentMigrationVersion()`](/v3-0-0/migrator/getcurrentmigrationversion/) — The getCurrentMigrationVersion() function returns the version number of the latest migration that has been applied to th
+- [`integer()`](/v3-0-0/migrator/integer/) — Adds one or more integer columns to a table definition during a migration. You can optionally specify a limit, default v
+- [`migrateTo()`](/v3-0-0/migrator/migrateto/) — Migrates the database schema to a specified version. This function is primarily intended for programmatic database migra
+- [`migrateToLatest()`](/v3-0-0/migrator/migratetolatest/) — Migrates the database schema to the latest available migration version. This is a shortcut for migrateTo(version) withou
+- [`primaryKey()`](/v3-0-0/migrator/primarykey/) — Used inside migration table definitions to define a primary key for the table. By default, it creates a single-column in
+- [`redoMigration()`](/v3-0-0/migrator/redomigration/) — Allows you to rerun a specific database migration version. This can be useful for testing migrations, correcting issues 
+- [`references()`](/v3-0-0/migrator/references/) — Used when defining a table schema to add reference columns that act as foreign keys, linking the table to other tables i
+- [`removeColumn()`](/v3-0-0/migrator/removecolumn/) — Used to delete a column from a database table within a migration CFC. This is useful when you need to remove obsolete or
+- [`removeIndex()`](/v3-0-0/migrator/removeindex/) — Used to delete an index from a database table within a migration CFC. Indexes are typically added to improve query perfo
+- [`removeRecord()`](/v3-0-0/migrator/removerecord/) — Used to delete specific records from a database table within a migration CFC. This is useful when you need to clean up o
+- [`renameColumn()`](/v3-0-0/migrator/renamecolumn/) — Used to change the name of an existing column in a database table within a migration CFC. This is useful when you need t
+- [`renameTable()`](/v3-0-0/migrator/renametable/) — Used to change the name of an existing database table within a migration CFC. This is helpful when you want to standardi
+- [`string()`](/v3-0-0/migrator/string/) — Used to add one or more string (VARCHAR) columns to a database table. It supports specifying default values, nullability
+- [`text()`](/v3-0-0/migrator/text/) — Used within a migration to add one or more text columns to a database table definition. Text columns are designed for st
+- [`time()`](/v3-0-0/migrator/time/) — Adds one or more TIME columns to a table definition in a migration. Only available in a migrator CFC.
+- [`timestamp()`](/v3-0-0/migrator/timestamp/) — Used to add one or more <code>TIMESTAMP</code> (or <code>DATETIME</code>) columns to a table definition. It lets you spe
+- [`timestamps()`](/v3-0-0/migrator/timestamps/) — Shortcut for adding Wheels’ convention-based automatic timestamp and soft delete columns to a table definition during mi
+- [`uniqueidentifier()`](/v3-0-0/migrator/uniqueidentifier/) — Used to add one or more UUID (Universally Unique Identifier) columns to a table definition. These columns are useful for
+- [`up()`](/v3-0-0/migrator/up/) — Defines the actions to migrate your database schema forward. It is called when applying a migration and is typically pai
+- [`updateRecord()`](/v3-0-0/migrator/updaterecord/) — Allows you to update an existing record in a database table directly from within a migration CFC. This function is parti

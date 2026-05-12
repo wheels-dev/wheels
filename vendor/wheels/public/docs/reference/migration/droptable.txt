@@ -1,0 +1,42 @@
+// 1. Drop a table in the down() migration (reversing a createTable in up())
+component extends="wheels.migrator.Migration" hint="Add products table" {
+
+	function up() {
+		t = createTable(name="products");
+		t.string(columnNames="name", allowNull=false);
+		t.decimal(columnNames="price", precision=10, scale=2);
+		t.boolean(columnNames="active", default=1);
+		t.timestamps();
+		t.create();
+	}
+
+	function down() {
+		dropTable("products");
+	}
+
+}
+
+// 2. Drop multiple tables in a single down() migration
+component extends="wheels.migrator.Migration" hint="Add orders and line items tables" {
+
+	function up() {
+		t = createTable(name="lineItems");
+		t.integer(columnNames="orderId");
+		t.integer(columnNames="productId");
+		t.integer(columnNames="quantity");
+		t.timestamps();
+		t.create();
+
+		t = createTable(name="orders");
+		t.integer(columnNames="userId");
+		t.string(columnNames="status");
+		t.timestamps();
+		t.create();
+	}
+
+	function down() {
+		dropTable("lineItems");
+		dropTable("orders");
+	}
+
+}

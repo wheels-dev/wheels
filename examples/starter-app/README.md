@@ -8,7 +8,7 @@ This repository contains a **user management and authentication web application*
 
 ## Installation
 
-See [Installation](https://github.com/wheels-dev/Wheels-example-app/wiki/Installation)
+See the [Quick Start](#quick-start) section below for setup instructions.
 
 ## Key Features
 
@@ -122,11 +122,10 @@ plugins/            # Third-party plugins
 
 ### Backend
 
-- **3.0.0-snapshot** - MVC Framework
+- **3.1.0-snapshot** - MVC Framework
 - **Lucee 5,6,7, Adobe 2018-2025, Boxlang** - CFML Engine
 - **Database** - MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, H2
-- **WireBox** - Dependency injection
-- **TestBox** - Testing framework
+- **WheelsTest** - Testing framework (vendored with Wheels)
 
 ### Frontend
 
@@ -294,10 +293,10 @@ tests/
 
 ```bash
 # Run all tests
-box testbox run
+wheels test run
 
 # Run specific test suite
-box testbox run --directory tests/requests/
+wheels test run --directory tests/requests/
 ```
 
 ## Support & Resources
@@ -305,7 +304,7 @@ box testbox run --directory tests/requests/
 ### Documentation
 
 - [Wheels Guides](https://wheels.dev/guides)
-- [Wheels Api Reference](https://wheels.dev/api/v3.0.0)
+- [Wheels Api Reference](https://wheels.dev/api/v3.1.0)
 
 ### Community
 

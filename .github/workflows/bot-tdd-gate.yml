@@ -1,0 +1,84 @@
+name: Wheels Bot — TDD Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [develop]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  tdd-gate:
+    name: Bot PR TDD Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Decide if this PR is bot-authored
+        id: classify
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          is_bot=false
+          is_docs=false
+          if [[ "$PR_AUTHOR" == "wheels-bot[bot]" ]]; then
+            is_bot=true
+          elif [[ "$PR_HEAD" =~ ^bot/ || "$PR_HEAD" =~ ^fix/bot- || "$PR_HEAD" =~ ^docs/bot- ]]; then
+            is_bot=true
+          fi
+          if [[ "$PR_HEAD" =~ ^docs/bot- ]]; then
+            is_docs=true
+          fi
+          echo "is_bot=$is_bot" >> "$GITHUB_OUTPUT"
+          echo "is_docs=$is_docs" >> "$GITHUB_OUTPUT"
+          if [[ "$is_bot" == "false" ]]; then
+            echo "Human-authored PR — gate is a no-op."
+          elif [[ "$is_docs" == "true" ]]; then
+            echo "Docs-only bot PR (docs/bot-* branch) — TDD invariant doesn't apply, gate is a no-op."
+          fi
+
+      - name: Checkout
+        if: steps.classify.outputs.is_bot == 'true' && steps.classify.outputs.is_docs == 'false'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify bot PR contains spec + implementation changes
+        if: steps.classify.outputs.is_bot == 'true' && steps.classify.outputs.is_docs == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          changed=$(gh pr diff "$PR_NUMBER" --name-only)
+          echo "Files changed in this PR:"
+          echo "$changed"
+          echo "---"
+
+          spec_changes=$(echo "$changed" | grep -E '^(tests/specs/|vendor/wheels/tests/specs/)' || true)
+          if [[ -z "$spec_changes" ]]; then
+            echo "::error::Bot PRs must include a failing-then-passing spec under tests/specs/ or vendor/wheels/tests/specs/"
+            echo ""
+            echo "This PR was authored by the bot (or on a bot branch) but contains no spec changes."
+            echo "Either add a spec, or close this PR and reopen with one."
+            exit 1
+          fi
+
+          impl_changes=$(echo "$changed" | grep -vE '^(tests/|vendor/wheels/tests/|\.ai/|CHANGELOG\.md|docs/|web/|\.github/)' || true)
+          if [[ -z "$impl_changes" ]]; then
+            echo "::error::Bot PR has tests but no implementation"
+            echo ""
+            echo "Spec changes were found but no implementation files. A bot fix should change at least one file outside tests/, .ai/, docs/, and CHANGELOG.md."
+            exit 1
+          fi
+
+          echo "TDD gate passed: spec changes + implementation changes both present."
+          echo ""
+          echo "Spec files:"
+          echo "$spec_changes" | sed 's/^/  /'
+          echo ""
+          echo "Implementation files:"
+          echo "$impl_changes" | sed 's/^/  /'

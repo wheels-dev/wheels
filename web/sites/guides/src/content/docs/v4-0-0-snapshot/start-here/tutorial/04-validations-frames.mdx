@@ -1,0 +1,235 @@
+---
+title: "Part 4: Validations and Turbo Frames"
+description: Add validations to the Post model. Wrap the form in a <turbo-frame> so errors come back inline without a page reload.
+type: tutorial
+sidebar:
+  order: 4
+---
+
+import { Aside, Steps, FileTree } from '@astrojs/starlight/components';
+
+You'll put validation rules on the `Post` model, wrap the form in a Turbo Frame, and watch invalid submissions re-render the form inline — no page flash, no scroll jump, no lost input.
+
+**You'll learn:**
+
+- Where validations live and when Wheels runs them
+- How `errorMessagesFor` renders model errors in a view
+- What a `<turbo-frame>` is and how it swaps DOM in place
+- How the controller cooperates with Turbo by rendering just a partial on failure
+
+Estimated time: 30 minutes.
+
+<Aside type="note">
+  This builds directly on Part 3's scaffold. The controller, views, and form partial you hand-wrote there are the starting point. You'll edit three files: `app/models/Post.cfc`, `app/views/layout.cfm`, `app/views/posts/_form.cfm`, plus two actions in `app/controllers/Posts.cfc`.
+</Aside>
+
+## Where we left off
+
+Part 3 gave you a full seven-action CRUD cycle: controller, four views, shared form partial, and `.resources("posts")` in the routes.
+
+<FileTree>
+- blog
+  - app
+    - controllers
+      - Controller.cfc
+      - Main.cfc
+      - Posts.cfc
+    - db
+      - seeds.cfm
+    - migrator
+      - migrations
+        - 20260419120000_create_posts_table.cfc
+    - models
+      - Post.cfc
+    - views
+      - layout.cfm
+      - main
+        - index.cfm
+        - hello.cfm
+      - posts
+        - index.cfm
+        - show.cfm
+        - new.cfm
+        - edit.cfm
+        - _form.cfm
+  - config
+    - routes.cfm
+    - settings.cfm
+  - db
+    - development.sqlite
+</FileTree>
+
+Schema recap: `posts(id, title, body, status, publishedAt, createdAt, updatedAt)` with `status` constrained to `draft`, `published`, or `archived`. The seed file inserted two posts. `config/routes.cfm` has a bare `.resources(name="posts")` — all seven REST routes active, no `only` restriction.
+
+## Why validations live on the model
+
+Validations belong on the model, not the controller. Any code path that saves a `Post` — a web form, a background job, a seed script, a REPL — should enforce the same rules. Putting them on the model guarantees that.
+
+Wheels runs validations when you call `.save()` or `.update()`. If any rule fails, the call returns `false` and the model's `.errors()` collection fills up. The controller's only job is to check the return value. On `true`, redirect. On `false`, re-render the form. The `_form.cfm` partial already calls `errorMessagesFor("post")` — it'll render any errors Wheels collected.
+
+## Add validations
+
+<Steps>
+
+1. Replace `app/models/Post.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Model" {
+       function config() {
+           enum(property="status", values="draft,published,archived");
+           validatesPresenceOf("title,body");
+           validatesLengthOf(property="title", maximum=120, allowBlank=true);
+       }
+   }
+   ```
+
+</Steps>
+
+Two new lines, two rules:
+
+- `validatesPresenceOf("title,body")` — both `title` and `body` must be non-empty strings. The comma-separated form is a shortcut for "apply this validation to each of these properties with no extra options." When you need per-property options (a custom message, a condition), switch to `property="title"` (singular) and add them as named arguments.
+- `validatesLengthOf(property="title", maximum=120, allowBlank=true)` — `title` can't exceed 120 characters. `property` is singular here because you're passing options — mixing positional and named arguments isn't allowed in Wheels.
+
+The `allowBlank=true` on `validatesLengthOf` matters: without it, *every* validation in Wheels treats a blank value as a failure of itself (not just `validatesPresenceOf`), so submitting an empty title would raise BOTH `Title can't be empty` AND `Title is the wrong length` even though zero characters is well under the 120-character cap. Setting `allowBlank=true` on the length rule says "let the presence rule handle the empty case; only fire when there's actually a value to measure." Carry the same pattern to other secondary validations (`validatesFormatOf`, `validatesInclusionOf`, etc.) when you also have a `validatesPresenceOf` on the same property.
+
+When someone submits the form with a blank title, `post.save()` returns `false` and `post.errors()` contains an entry like `{property: "title", message: "Title can't be empty"}`. `errorMessagesFor("post")` in the form partial renders that as a list.
+
+## Load Turbo in the layout
+
+A `<turbo-frame>` is an HTML element shipped by the [Hotwire Turbo](https://turbo.hotwired.dev/) library. When a link or form inside a frame is activated, Turbo intercepts the navigation, fetches the response, finds the element with a matching `id` in the returned HTML, and swaps only that frame's contents. The rest of the page stays exactly where it was — no flash, no scroll jump, no lost input in other fields.
+
+For the frame to do anything, Turbo has to be loaded on the page. The `hotwire` package (introduced conceptually in Part 3) handles this automatically when activated. Until you activate it, include Turbo from a CDN.
+
+<Steps>
+
+1. Add this near the end of the `<head>` block in `app/views/layout.cfm`:
+
+   ```cfm title="app/views/layout.cfm (head section)"
+   <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.0/dist/turbo.es2017-esm.min.js"></script>
+   ```
+
+</Steps>
+
+That one tag gives you Turbo Drive (SPA-like page transitions) globally, plus the Frame and Stream features. Once the `hotwire` package is installable on your CLI, this manual include goes away — the package drops a bundled Turbo build into `public/` and wires the tag for you.
+
+## Wrap the form in a Turbo Frame
+
+The form partial needs a `<turbo-frame>` with an `id` that the server will reuse in its response. Pick any id you like — `post_form` is clear.
+
+<Steps>
+
+1. Replace `app/views/posts/_form.cfm`:
+
+   ```cfm title="app/views/posts/_form.cfm"
+   <cfparam name="post" default="">
+   <cfoutput>
+   <turbo-frame id="post_form">
+       #errorMessagesFor("post")#
+       #startFormTag(action=IsNumeric(post.id ?: "") ? "update" : "create", key=post.id ?: "")#
+           #textField(objectName="post", property="title", label="Title")#
+           #textArea(objectName="post", property="body", label="Body")#
+           #select(objectName="post", property="status", options="draft,published,archived", label="Status")#
+           #dateField(objectName="post", property="publishedAt", label="Published at")#
+           <button type="submit">Save</button>
+       #endFormTag()#
+   </turbo-frame>
+   </cfoutput>
+   ```
+
+   Same shape as Part 3's `_form.cfm`, just wrapped in a `<turbo-frame>`. The form helpers emit their own `<label>` wrappers; passing `label="..."` sets the visible text. Don't add an outer `<label>` around them — that produces nested `<label>` elements (the gotcha called out in [Part 3](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/#the-form-partial)).
+
+</Steps>
+
+The id `post_form` is the contract. When the controller responds to a failed submit, the response must contain a `<turbo-frame id="post_form">` with the new contents. Turbo scans the response, finds that element, and swaps it in.
+
+## Make the controller cooperate
+
+The `create` and `update` actions in Part 3 re-rendered the full `new` or `edit` view on failure. That works fine for a plain-HTML form, but with Turbo Frames in the picture it sends back an entire HTML page when all Turbo wants is the frame. The fix: render just the form partial, without the app layout.
+
+<Steps>
+
+1. Replace `app/controllers/Posts.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Controller" {
+       function index() {
+           posts = model("Post").findAll(order="publishedAt DESC");
+       }
+       function show() {
+           post = params.post;
+       }
+       function new() {
+           post = model("Post").new();
+       }
+       function create() {
+           post = model("Post").new(params.post);
+           if (post.save()) {
+               redirectTo(route="post", key=post.id);
+           } else {
+               renderPartial(partial="form", post=post, layout=false);
+           }
+       }
+       function edit() {
+           post = params.post;
+       }
+       function update() {
+           post = params.post;
+           if (post.update(params.post)) {
+               redirectTo(route="post", key=post.id);
+           } else {
+               renderPartial(partial="form", post=post, layout=false);
+           }
+       }
+       function delete() {
+           post = params.post;
+           post.delete();
+           redirectTo(route="posts");
+       }
+   }
+   ```
+
+</Steps>
+
+`renderPartial(partial="form", post=post, layout=false)` renders `app/views/posts/_form.cfm` only — no surrounding layout, no other views. Because the partial's root element is `<turbo-frame id="post_form">`, the response is exactly what Turbo needs. Turbo finds the matching frame on the current page and swaps the contents in place. The URL doesn't change, nothing else on the page moves, the user sees the errors render above the fields.
+
+Note that the success path is unchanged: `redirectTo` still issues a full HTTP redirect. Turbo Drive handles that naturally — the browser follows the redirect, Turbo fetches the new page, and swaps the body.
+
+## Try it
+
+```bash title="your shell"
+wheels reload
+```
+
+Open `http://localhost:8080/posts/new` in your browser. Clear the Title field and click Save. The form reappears with "Title can't be empty" above the fields — the URL hasn't changed, the page didn't flash, and any text you typed in Body is still there. That's the Turbo Frame swap.
+
+Now put the title back, paste 200 characters into it, and submit again. You'll see "Title is the wrong length" — same inline replacement, no full reload. (You can override the default message by passing `message="Title is too long (maximum is 120 characters)"` to `validatesLengthOf` if you want the constraint number in the error.)
+
+Fix both fields and save. Redirect to `/posts/:id`, same as before. The failure path and success path diverge only in what the controller renders; the rest is Turbo doing its job.
+
+## Smoke test
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+## Checkpoint
+
+Three things to verify in the browser:
+
+1. Submitting the form with an empty Title shows "Title can't be empty" inline. No page flash, URL unchanged.
+2. Submitting with a 200-character Title shows "Title is the wrong length" inline. Same behavior.
+3. A valid submission redirects to `/posts/:id` and displays the new post.
+
+## Troubleshooting
+
+**Page reloads on invalid submission instead of showing errors inline** — Turbo isn't loaded on the page. Check that the `<script type="module" src="...turbo...">` tag is in `app/views/layout.cfm`. Open browser DevTools, reload, and look for JavaScript errors or a failed request for the Turbo script.
+
+**Errors appear but the page refreshes anyway** — the controller is rendering the full view (`renderView(action="new")` left over from Part 3) instead of the partial. Switch both `create` and `update` failure branches to `renderPartial(partial="form", post=post, layout=false)`.
+
+**Errors don't appear at all** — the form partial is missing `#errorMessagesFor("post")#`, or the form isn't wrapped in `<turbo-frame>`, or the id on the frame doesn't match between the initial page and the response. Open DevTools, submit, and inspect the response body: it must contain `<turbo-frame id="post_form">`.
+
+## What's next
+
+In Part 5 you'll add a `Comment` model, associate it with `Post` via `hasMany`/`belongsTo`, and use Turbo Streams to append new comments to the show page without reloading — the same feel as the Frame swap, but for collections.
+
+The validation API you just used is documented in full at [Validation and Error Display](/v4-0-0-snapshot/basics/validation-and-errors/). The form helpers (including the `data-auto-id` attribute for test selectors) are covered in [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/).

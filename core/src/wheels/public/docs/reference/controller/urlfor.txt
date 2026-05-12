@@ -1,8 +1,0 @@
-<!--- Create the URL for the `logOut` action on the `account` controller, typically resulting in `/account/log-out` --->
-#urlFor(controller="account", action="logOut")#
-
-<!--- Create a URL with an anchor set on it --->
-#urlFor(action="comments", anchor="comment10")#
-
-<!--- Create a URL based on a route called `products`, which expects params for `categorySlug` and `productSlug` --->
-#urlFor(route="product", categorySlug="accessories", productSlug="battery-charger")#

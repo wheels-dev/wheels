@@ -1,0 +1,19 @@
+<!--- view code --->
+<head>
+    <!--- Includes `javascripts/main.js` --->
+    #javaScriptIncludeTag("main")#
+
+    <!--- Includes `javascripts/blog.js` and `javascripts/accordion.js` --->
+    #javaScriptIncludeTag("blog,accordion")#
+
+    <!--- Includes an external JavaScript file --->
+    #javaScriptIncludeTag("https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js")#
+
+    <!--- Uses a pipe delimiter instead of the default comma --->
+    #javaScriptIncludeTag(sources="app|utils|vendor", delim="|")#
+</head>
+
+<body>
+    <!--- Will still appear in the `head` --->
+    #javaScriptIncludeTag(source="tabs", head=true)#
+</body>

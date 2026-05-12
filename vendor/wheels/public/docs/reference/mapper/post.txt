@@ -1,0 +1,65 @@
+<cfscript>
+
+mapper()
+    // 1. Basic POST route using `to` shorthand (controller##action)
+    // Route name:  widgets
+    // Example URL: /sites/918/widgets
+    // Controller:  Widgets
+    // Action:      create
+    .post(name="widgets", pattern="sites/[siteKey]/widgets", to="widgets##create")
+
+    // 2. POST route using explicit `controller` and `action` arguments
+    // Route name:  wadgets
+    // Example URL: /wadgets
+    // Controller:  Wadgets
+    // Action:      create
+    .post(name="wadgets", controller="wadgets", action="create")
+
+    // 3. POST route with a custom URL pattern (e.g., format-bearing endpoint)
+    // Route name:  authenticate
+    // Example URL: /oauth/token.json
+    // Controller:  Tokens
+    // Action:      create
+    .post(name="authenticate", pattern="oauth/token.json", to="tokens##create")
+
+    // 4. POST route scoped to a package (subfolder) — package not in URL
+    // Route name:  usersPreferences
+    // Example URL: /preferences
+    // Controller:  users.Preferences
+    // Action:      create
+    .post(name="preferences", to="preferences##create", package="users")
+
+    // 5. POST route with both a custom pattern and a package
+    // Route name:  extranetOrders
+    // Example URL: /buy-now/orders
+    // Controller:  extranet.Orders
+    // Action:      create
+    .post(
+        name="orders",
+        pattern="buy-now/orders",
+        to="orders##create",
+        package="extranet"
+    )
+
+    // 6. POST route that issues a 302 redirect instead of dispatching to a controller
+    // Route name:  legacySignup
+    // Example URL: /signup  →  redirects to /register
+    .post(name="legacySignup", pattern="signup", redirect="/register")
+
+    // 7. POST routes nested inside a `resources` block using `on`
+    .resources(name="customers", nested=true)
+        // Route name:  leadsCustomers
+        // Example URL: /customers/leads
+        // Controller:  Leads
+        // Action:      create
+        .post(name="leads", to="leads##create", on="collection")
+
+        // Route name:  cancelCustomer
+        // Example URL: /customers/3209/cancel
+        // Controller:  Cancellations
+        // Action:      create
+        .post(name="cancel", to="cancellations##create", on="member")
+    .end()
+.end();
+
+</cfscript>

@@ -1,0 +1,29 @@
+// 1. Basic usage with a group of radio buttons sharing the same name
+<cfoutput>
+	<fieldset>
+		<legend>Gender</legend>
+		#radioButtonTag(name="gender", value="m", label="Male", checked=true)#
+		#radioButtonTag(name="gender", value="f", label="Female")#
+	</fieldset>
+</cfoutput>
+
+// 2. Place the label after the radio button instead of wrapping it
+<cfoutput>
+	#radioButtonTag(name="size", value="s", label="Small", labelPlacement="after")#
+	#radioButtonTag(name="size", value="m", label="Medium", labelPlacement="after")#
+	#radioButtonTag(name="size", value="l", label="Large", labelPlacement="after")#
+</cfoutput>
+
+// 3. Loop over a query to render one radio button per option
+// Controller
+sizes = model("Size").findAll(order="position");
+
+// View
+<cfoutput query="sizes">
+	#radioButtonTag(
+		name   = "sizeId",
+		value  = sizes.id,
+		label  = sizes.name,
+		checked = sizes.id EQ params.sizeId
+	)#
+</cfoutput>

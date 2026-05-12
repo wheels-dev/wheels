@@ -1,0 +1,12 @@
+// 1. Get the current value of a global Wheels setting
+setting = get("tableNamePrefix");
+// setting -> "" (or whatever prefix has been configured)
+
+// 2. Get the current value of a different global setting
+dsName = get("dataSourceName");
+// dsName -> "myAppDB"
+
+// 3. Get the default for a specific function argument
+// (useful for inspecting function-level defaults set via set())
+msg = get(functionName="validatesConfirmationOf", name="message");
+// msg -> "[property] should match confirmation"

@@ -274,7 +274,7 @@ Wheels follows the Model-View-Controller (MVC) architectural pattern:
 - **Configuration** (`/config/`): Application settings, routes, environment configurations
 - **Database** (`/app/migrator/migrations/`): Version-controlled schema changes
 - **Assets** (`/public/`): Static files, CSS, JavaScript, images
-- **Tests** (`/tests/`): TestBox unit and integration tests
+- **Tests** (`/tests/`): WheelsTest unit and integration tests
 
 ### Directory Structure
 ```
@@ -742,7 +742,7 @@ tests/
 
 ### Model Testing
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         // Setup for all tests in this spec

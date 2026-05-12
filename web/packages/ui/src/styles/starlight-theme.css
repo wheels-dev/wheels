@@ -1,0 +1,211 @@
+/*
+ * Starlight theme bridge for Wheels.
+ * Maps Starlight's internal --sl-* tokens onto our --color-* / --font-* tokens.
+ * Not imported in PR 1 — consumed by guides + api in PR 2 via `customCss`.
+ */
+
+:root {
+	/* Accents */
+	--sl-color-accent: var(--color-brand);
+	--sl-color-accent-low: var(--color-brand-soft);
+	--sl-color-accent-high: var(--color-brand-ink);
+
+	/* Text (Starlight uses "white" as strongest text in dark mode naming) */
+	--sl-color-white: var(--color-fg);
+	--sl-color-gray-1: var(--color-fg-muted);
+	--sl-color-gray-2: var(--color-fg-subtle);
+	--sl-color-gray-3: var(--color-border-strong);
+	--sl-color-gray-4: var(--color-border);
+	--sl-color-gray-5: var(--color-surface-2);
+	--sl-color-gray-6: var(--color-surface);
+	--sl-color-gray-7: var(--color-bg);
+
+	/* Surfaces */
+	--sl-color-bg: var(--color-bg);
+	--sl-color-bg-nav: var(--color-bg);
+	--sl-color-bg-sidebar: var(--color-surface);
+
+	/* Typography */
+	--sl-font: var(--font-sans);
+	--sl-font-mono: var(--font-mono);
+	--sl-text-code: var(--text-sm);
+
+	/* Radii */
+	--sl-radius-small: var(--radius-sm);
+	--sl-radius-medium: var(--radius);
+	--sl-radius-large: var(--radius-lg);
+
+	/* Layout */
+	--sl-sidebar-width: 18rem;
+	--sl-content-width: 45rem;
+}
+
+/* Custom prose-like tweaks to Starlight content area */
+:root[data-has-toc] .sl-markdown-content {
+	font-size: var(--text-base);
+	line-height: var(--leading-relaxed);
+}
+
+/* Code block styling — match hero install block on landing */
+.sl-markdown-content :not(pre) > code {
+	background: var(--color-surface-2);
+	border-radius: var(--radius-sm);
+	padding: 0.1em 0.35em;
+	font-family: var(--font-mono);
+	font-size: 0.875em;
+}
+
+/*
+ * Code block container — borrow radius and shadow, but leave background
+ * and text color to the active expressive-code theme. Forcing a fixed
+ * dark background here used to break light mode: expressive-code rendered
+ * GitHub-light token colors (designed for a white background) on the
+ * forced-dark background, producing unreadable blue-on-black and
+ * gray-on-black for keywords and comments.
+ *
+ * See astro.config.mjs `expressiveCode.themes` for the theme pair.
+ */
+.sl-markdown-content pre {
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+}
+
+/* ── Sidebar (Phase 3 Slice 1) ────────────────────────────────────
+ * Rules are unlayered so they beat Starlight's @layer starlight.core
+ * defaults. Scoped under #starlight__sidebar to stay narrow.
+ */
+
+/* Kill the vertical guide rule between nested levels. */
+#starlight__sidebar ul ul li {
+	border-inline-start-color: transparent;
+}
+
+/* Group labels: smaller, uppercase, muted — was lg + color-white. */
+#starlight__sidebar .large {
+	font-size: var(--text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--color-fg-subtle);
+}
+
+@media (min-width: 50rem) {
+	#starlight__sidebar .large {
+		font-size: var(--text-xs);
+	}
+}
+
+/* Leaf links: smaller, muted resting, surface hover. */
+#starlight__sidebar a {
+	font-size: var(--text-sm);
+	color: var(--color-fg-muted);
+	border-radius: var(--radius);
+}
+
+#starlight__sidebar a:hover,
+#starlight__sidebar a:focus {
+	color: var(--color-fg);
+	background: var(--color-surface-2);
+}
+
+/* Active page — brand-soft bg + brand-ink fg (was text-invert on accent). */
+#starlight__sidebar [aria-current='page'],
+#starlight__sidebar [aria-current='page']:hover,
+#starlight__sidebar [aria-current='page']:focus {
+	font-weight: 600;
+	color: var(--color-brand-ink);
+	background-color: var(--color-brand-soft);
+}
+
+/* Slightly tighter spacing between top-level groups. */
+#starlight__sidebar .top-level > li + li {
+	margin-top: var(--space-3);
+}
+
+/* ── Right-rail TOC (Phase 3 Slice 1) ────────────────────────────── */
+
+starlight-toc h2 {
+	font-size: var(--text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--color-fg-subtle);
+	margin: 0 0 var(--space-3);
+}
+
+starlight-toc a {
+	color: var(--color-fg-muted);
+	font-size: var(--text-sm);
+	line-height: var(--leading-normal);
+	border-inline-start: 2px solid transparent;
+	text-decoration: none;
+	transition:
+		color 0.1s,
+		border-color 0.1s;
+}
+
+starlight-toc a:hover,
+starlight-toc a:focus {
+	color: var(--color-fg);
+}
+
+starlight-toc a[aria-current='true'] {
+	color: var(--color-brand);
+	border-inline-start-color: var(--color-brand);
+	font-weight: 600;
+}
+
+/* ── PageTitle surround spacing (Phase 3 Slice 1) ───────────────── */
+
+.wd-page-title {
+	margin-bottom: var(--space-5);
+}
+
+/* ── API parameter tables ────────────────────────────────────────
+ * Emitted by web/scripts/generate-api-docs.mjs. Keep the structural
+ * columns (Name, Type, Required, Default) on a single line so type
+ * identifiers don't break mid-word; let the Description column absorb
+ * the slack. Scoped via .wd-params-table so prose tables elsewhere
+ * are unaffected.
+ */
+/* Wrap in an overflow:auto container so very wide rows can still scroll
+ * horizontally on narrow viewports — mirrors what Starlight does globally
+ * via `display: block; overflow: auto` on markdown tables, but we need to
+ * restore `display: table` on the <table> itself so the column-width
+ * algorithm (required by the width:1% idiom below) works. */
+.sl-markdown-content .wd-params-table {
+	overflow-x: auto;
+}
+
+.sl-markdown-content .wd-params-table table {
+	display: table;
+	table-layout: auto;
+	width: 100%;
+}
+
+.sl-markdown-content .wd-params-table th:nth-child(-n + 4),
+.sl-markdown-content .wd-params-table td:nth-child(-n + 4) {
+	white-space: nowrap;
+	/* width: 1% + nowrap is the canonical "shrink-to-content" idiom for
+	 * auto-layout tables — without it, browsers distribute all columns
+	 * evenly and the Description column ends up at ~1/5 of the width
+	 * instead of absorbing the slack. */
+	width: 1%;
+}
+
+.sl-markdown-content .wd-params-table th:nth-child(5),
+.sl-markdown-content .wd-params-table td:nth-child(5) {
+	width: auto;
+	word-break: break-word;
+}
+
+/* ── Prev/Next page footer ─────────────────────────────────────────
+ * Starlight ships .link-title at 1.5rem which is louder than needed
+ * on function reference pages where names like clearCachableActions()
+ * overflow two lines at 24px. Step it down to text-lg (18px) so the
+ * two cards read as navigation, not billboards.
+ */
+.pagination-links .link-title {
+	font-size: var(--text-lg);
+	font-weight: 600;
+}

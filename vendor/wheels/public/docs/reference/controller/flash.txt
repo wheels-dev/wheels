@@ -1,0 +1,12 @@
+// 1. Get the current value of a specific key in the Flash
+notice = flash("notice");
+// notice -> "Your profile was updated successfully."
+
+// 2. Get the entire Flash as a struct when no key is passed
+flashContents = flash();
+// flashContents -> {notice: "Record saved.", error: "Something went wrong."}
+
+// 3. Check for a key before reading it to avoid an empty-string fallback
+if (flashKeyExists("error")) {
+    errorMessage = flash("error");
+}

@@ -1,5 +1,0 @@
-// Create an empty migration file
-result=application.wheels.migrator.createMigration("MyMigrationFile");
-
-// Or Create a migration file from the create-table template
-result=application.wheels.migrator.createMigration("MyMigrationFile","create-table");

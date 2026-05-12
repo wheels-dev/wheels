@@ -34,9 +34,9 @@ component aliases="wheels plugin list" extends="../base" {
                 detailOutput.output("Searching, please wait...");
                 detailOutput.line();
 
-                // Get list of all cfwheels plugins slugs
+                // Get list of all wheels plugins slugs
                 var forgeboxResult = command('forgebox show')
-                    .params(type='cfwheels-plugins')
+                    .params(type='wheels-plugins')
                     .run(returnOutput=true);
 
                 var results = [];

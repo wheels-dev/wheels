@@ -1,0 +1,11 @@
+// 1. Truncate to a specific character length (defaults to "..." suffix)
+truncated = truncate(text="CFWheels is a framework for ColdFusion", length=20);
+// truncated -> "CFWheels is a fra..."
+
+// 2. Use a custom truncate string instead of the default ellipsis
+truncated = truncate(text="CFWheels is a framework for ColdFusion", truncateString=" (more)");
+// truncated -> "CFWheels is a framework fo (more)"
+
+// 3. Text shorter than the length limit is returned unchanged
+truncated = truncate(text="Hello", length=30);
+// truncated -> "Hello"

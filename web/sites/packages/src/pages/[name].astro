@@ -1,0 +1,192 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { listPackageNames, fetchManifest, fetchReadme, type Manifest } from '../lib/registry';
+import { renderMarkdown } from '../lib/markdown';
+
+export async function getStaticPaths() {
+  const names = await listPackageNames();
+  return Promise.all(
+    names.map(async (name) => {
+      const manifest = await fetchManifest(name);
+      const readmeSource = await fetchReadme(name).catch(() => '');
+      const readmeHtml = readmeSource ? await renderMarkdown(readmeSource) : '';
+      return {
+        params: { name },
+        props: { manifest, readmeHtml },
+      };
+    }),
+  );
+}
+
+interface Props {
+  manifest: Manifest;
+  readmeHtml: string;
+}
+
+const { manifest, readmeHtml } = Astro.props;
+const latest = manifest.versions[manifest.versions.length - 1];
+const homepage = manifest.homepage && /^https?:\/\//.test(manifest.homepage)
+  ? manifest.homepage
+  : '';
+// Reverse for display — newest first.
+const versionsDesc = [...manifest.versions].reverse();
+---
+
+<BaseLayout
+  title={`${manifest.name} — Wheels packages`}
+  description={manifest.description}
+>
+  <article class="package-detail">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/">Packages</a>
+      <span aria-hidden="true"> / </span>
+      <span>{manifest.name}</span>
+    </nav>
+
+    <header>
+      <h1>{manifest.name}</h1>
+      <span class="version-pill">v{latest.version}</span>
+    </header>
+
+    {manifest.description && <p class="description">{manifest.description}</p>}
+
+    {manifest.tags && manifest.tags.length > 0 && (
+      <ul class="tags" aria-label="Tags">
+        {manifest.tags.map((tag) => <li><span class="tag-chip">{tag}</span></li>)}
+      </ul>
+    )}
+
+    {homepage && (
+      <p class="homepage">
+        <a href={homepage} target="_blank" rel="noopener">Homepage ↗</a>
+      </p>
+    )}
+
+    <section class="install-section">
+      <h2>Install</h2>
+      <div class="install">
+        <code id="install-latest">wheels packages install {manifest.name}</code>
+        <button type="button" class="copy-btn" data-target="install-latest" aria-label={`Copy latest install command for ${manifest.name}`}>Copy</button>
+      </div>
+      <div class="install">
+        <code id="install-pinned">wheels packages install {manifest.name}@{latest.version}</code>
+        <button type="button" class="copy-btn" data-target="install-pinned" aria-label={`Copy pinned install command for ${manifest.name}`}>Copy</button>
+      </div>
+    </section>
+
+    <section class="versions-section">
+      <h2>Version history</h2>
+      <table class="versions-table">
+        <caption class="visually-hidden">Version history for {manifest.name}</caption>
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Published</th>
+            <th>Requires Wheels</th>
+            <th>sha256</th>
+          </tr>
+        </thead>
+        <tbody>
+          {versionsDesc.map((v) => (
+            <tr>
+              <td><code>{v.version}</code></td>
+              <td><time datetime={v.publishedAt}>{v.publishedAt.slice(0, 10)}</time></td>
+              <td><code>{v.wheelsVersion}</code></td>
+              <td>
+                <code title={v.sha256} class="sha">{v.sha256.slice(0, 12)}…</code>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+
+    {readmeHtml && (
+      <section class="readme-section">
+        <h2>README</h2>
+        <article class="prose" set:html={readmeHtml} />
+      </section>
+    )}
+  </article>
+</BaseLayout>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.copy-btn').forEach((btn) => {
+    const originalLabel = btn.textContent ?? 'Copy';
+    btn.addEventListener('click', async () => {
+      const targetId = btn.dataset.target;
+      if (!targetId) return;
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      const text = target.textContent ?? '';
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = originalLabel; }, 2000);
+      } catch (_err) {
+        // No-op for older browsers.
+      }
+    });
+  });
+</script>
+
+<style>
+  .package-detail { max-width: 64rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .breadcrumb { font-size: 0.875rem; color: var(--color-fg-muted, #555); margin-bottom: 1rem; }
+  .breadcrumb a { color: inherit; }
+  .package-detail header { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.5rem; }
+  .package-detail h1 { margin: 0; font-size: 2rem; }
+  .version-pill {
+    font-size: 0.875rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background: var(--color-surface-2, #f3f3f3);
+    color: var(--color-fg-muted, #555);
+  }
+  .description { font-size: 1.125rem; color: var(--color-fg-muted, #555); margin: 0 0 1rem; }
+  .tags { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: 0.375rem; }
+  .tag-chip {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    background: var(--color-brand-soft, #eef);
+    color: var(--color-brand, #335);
+  }
+  .homepage { margin: 0 0 2rem; font-size: 0.9375rem; }
+  .install-section, .versions-section, .readme-section { margin-top: 2.5rem; }
+  .install-section h2, .versions-section h2, .readme-section h2 {
+    font-size: 1.25rem; margin-bottom: 0.75rem;
+  }
+  .install { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .install code {
+    flex: 1;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.625rem;
+    background: var(--color-surface-2, #f3f3f3);
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .copy-btn {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--color-border, #e2e2e2);
+    background: var(--color-surface, #fff);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--color-surface-2, #f3f3f3); }
+  .versions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .versions-table th, .versions-table td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-border, #e2e2e2);
+  }
+  .versions-table th { font-weight: 600; color: var(--color-fg-muted, #555); }
+  .sha { cursor: help; }
+  .prose { max-width: 48rem; }
+</style>

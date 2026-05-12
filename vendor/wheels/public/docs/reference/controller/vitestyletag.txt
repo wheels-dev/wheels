@@ -1,0 +1,14 @@
+// 1. Emit a <link> tag for a standalone CSS entrypoint inline (default)
+// In development, returns an empty string — Vite injects CSS via the HMR JS client.
+// In production, outputs a fingerprinted <link rel="stylesheet"> tag.
+writeOutput(viteStyleTag("src/main.css"));
+
+// 2. Place the <link> tag in the <head> instead of inline
+// Passes the generated markup to $htmlHead() so it is buffered into the page <head>.
+// Returns an empty string; nothing is printed at the call site.
+viteStyleTag(entrypoint="src/main.css", head=true);
+
+// 3. Emit a <link> tag for a page-specific CSS entrypoint
+// Useful when a particular view has its own standalone stylesheet entrypoint
+// defined in your Vite config alongside the primary JS bundle.
+writeOutput(viteStyleTag("src/checkout.css"));

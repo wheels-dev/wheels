@@ -1,0 +1,10 @@
+// 1. Allow only `isActive` to be set through mass assignment (e.g. `updateAll()`, `new()`, `update()`).
+config() {
+	accessibleProperties("isActive");
+}
+
+// 2. Allow a comma-delimited list of properties to be set through mass assignment.
+//    Any property not in this list is silently ignored when set via mass assignment.
+config() {
+	accessibleProperties("firstName,lastName,email");
+}

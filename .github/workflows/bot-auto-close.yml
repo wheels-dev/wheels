@@ -1,0 +1,49 @@
+name: Wheels Bot — Auto-close stale triage
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-auto-close
+  cancel-in-progress: false
+
+jobs:
+  auto-close:
+    name: Auto-close stale triage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: vars.WHEELS_BOT_ENABLED == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 1
+
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Run Auto-close
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Daily cron triggers run as github-actions[bot]; manual workflow_dispatch
+          # may run as wheels-bot[bot] or a human. Allow both bot identities so the
+          # cron path doesn't fail-fast on the action's "non-human actor" check.
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /auto-close-stale-triage
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 15
+            --allowedTools "Bash(gh:*),Read,Grep,Glob"

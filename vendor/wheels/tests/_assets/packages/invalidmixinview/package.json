@@ -1,0 +1,8 @@
+{
+	"name": "wheels-invalidmixinview",
+	"version": "1.0.0",
+	"description": "Test fixture: declares a mixed valid+invalid mixin target list",
+	"provides": {
+		"mixins": "controller,view"
+	}
+}

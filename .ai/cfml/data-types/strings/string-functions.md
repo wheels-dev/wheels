@@ -115,4 +115,3 @@ len(trim(myString)) == 0; // empty check pattern
 - [String Literals](string-literals.md)
 - [String Interpolation](string-interpolation.md)
 - [Arrays](../arrays/array-methods.md)
-- [Regular Expressions](../../advanced/regex-patterns.md)

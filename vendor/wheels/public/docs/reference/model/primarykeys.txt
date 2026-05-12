@@ -1,0 +1,11 @@
+// 1. Get the name(s) of the primary key(s) for the User model (returns a comma-separated list for composite keys)
+keyNames = model("User").primaryKeys();
+// keyNames -> "id"
+
+// 2. Get the name of the first primary key in a model that uses a composite primary key (e.g., an OrderItem table keyed on orderId,productId)
+firstKey = model("OrderItem").primaryKeys(1);
+// firstKey -> "orderId"
+
+// 3. Get the second primary key in a composite key model
+secondKey = model("OrderItem").primaryKeys(2);
+// secondKey -> "productId"

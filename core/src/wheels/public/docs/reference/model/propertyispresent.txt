@@ -1,7 +1,0 @@
-// Get an object, set a value and then see if the property exists
-employee = model("employee").new();
-employee.firstName = "dude";
-return employee.propertyIsPresent("firstName"); // Returns true
-
-employee.firstName = "">
-return employee.propertyIsPresent("firstName"); // Returns false

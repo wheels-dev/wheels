@@ -1,8 +1,0 @@
-// Get a post object and then delete it from the database.
-post = model("post").findByKey(33);
-post.delete();
-
-// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `deleteComment` method below will call `comment.delete()` internally.)
-post = model("post").findByKey(params.postId);
-comment = model("comment").findByKey(params.commentId);
-post.deleteComment(comment);

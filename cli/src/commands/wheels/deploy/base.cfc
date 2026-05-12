@@ -25,7 +25,7 @@ component extends="../base" {
             var sshUser = deployConfig.ssh.user ?: "root";
             var lockDir = "/opt/.kamal/lock";
             
-            var checkResult = $execBash("ssh -o ConnectTimeout=5 " & sshUser & "@" & primaryServer & " 'test -d " & lockDir & " && echo EXISTS || echo FREE'");
+            var checkResult = $execBash("ssh -o ConnectTimeout=5 " & $shellEscape(sshUser) & "@" & $validateServerAddress(primaryServer) & " 'test -d " & $shellEscape(lockDir) & " && echo EXISTS || echo FREE'");
             
             return trim(checkResult.output) == "EXISTS";
         } catch (any e) {
@@ -79,7 +79,7 @@ component extends="../base" {
         var lockJson = serializeJSON(lockInfo);
         
         // Try to create lock directory atomically
-        var createResult = $execBash("ssh " & sshUser & "@" & primaryServer & " 'mkdir -p /opt/.kamal && mkdir " & lockDir & " && echo ''" & replace(lockJson, "'", "'\''", "all") & "'' > " & lockDir & "/info.json'");
+        var createResult = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(primaryServer) & " 'mkdir -p /opt/.kamal && mkdir " & $shellEscape(lockDir) & " && echo " & $shellEscape(lockJson) & " > " & $shellEscape(lockDir) & "/info.json'");
         
         if (createResult.exitCode == 0) {
             deployAuditLog("lock_acquired", lockInfo);
@@ -105,7 +105,7 @@ component extends="../base" {
         var lockDir = "/opt/.kamal/lock";
         
         // Remove lock
-        $execBash("ssh " & sshUser & "@" & primaryServer & " 'rm -rf " & lockDir & "'");
+        $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(primaryServer) & " 'rm -rf " & $shellEscape(lockDir) & "'");
         
         deployAuditLog("lock_released", {});
     }
@@ -233,6 +233,28 @@ component extends="../base" {
         return trim(result.output);
     }
     
+    /**
+     * Escapes a value for safe use in single-quoted shell strings.
+     * Wraps value in single quotes and escapes any embedded single quotes.
+     * Example: "it's here" -> 'it'\''s here'
+     */
+    string function $shellEscape(required string value) {
+        return "'" & Replace(arguments.value, "'", "'\''", "all") & "'";
+    }
+
+    /**
+     * Validates that a server address is a safe IP or hostname.
+     */
+    string function $validateServerAddress(required string address) {
+        if (!ReFind("^[a-zA-Z0-9\.\-\:]+$", arguments.address)) {
+            Throw(
+                type="Wheels.Deploy.InvalidServerAddress",
+                message="Server address '#arguments.address#' contains invalid characters."
+            );
+        }
+        return arguments.address;
+    }
+
     // Execute bash command helper
     struct function $execBash(required string command) {
         try {

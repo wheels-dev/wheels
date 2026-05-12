@@ -1,0 +1,13 @@
+# E2E deploy config — points at the single-host fixture at localhost:22024.
+#
+# Matches the minimal.yml shape used elsewhere so the ConfigLoader path
+# is exercised exactly as in production. REGISTRY_PASSWORD is stubbed via
+# ENV override in the spec (envOverride branch of the interpolator).
+service: demo
+image: acme/demo
+servers:
+  - localhost:22024
+registry:
+  username: demo
+  password:
+    - REGISTRY_PASSWORD

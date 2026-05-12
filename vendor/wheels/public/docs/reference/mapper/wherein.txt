@@ -1,0 +1,21 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a route variable to a fixed set of allowed string values
+    //    The [status] segment will only match "active", "inactive", or "pending"
+    .get(name="usersByStatus", pattern="users/[status]", to="users##byStatus")
+    .whereIn(variableName="status", values="active,inactive,pending")
+
+    // 2. Constrain a locale segment to a known list of supported languages
+    //    Requests like /en/home match; /xx/home returns a 404
+    .get(name="localizedHome", pattern="[locale]/home", to="home##index")
+    .whereIn(variableName="locale", values="en,fr,de,es")
+
+    // 3. Chain whereIn with whereNumber for mixed-type segment constraints
+    //    [type] must be one of the listed values; [id] must be numeric
+    .get(name="typedItem", pattern="items/[type]/[id]", to="items##show")
+    .whereIn(variableName="type", values="book,magazine,journal")
+    .whereNumber("id")
+.end();
+
+</cfscript>

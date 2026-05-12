@@ -1,0 +1,55 @@
+{
+  "name": "{{appName}}",
+  "lucee": {
+    "version": "7.0.0.395"
+  },
+  "port": {{port}},
+  "shutdownPort": {{shutdownPort}},
+  "webroot": "./public",
+  "openBrowser": {{openBrowser}},
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "128m"
+  },
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  },
+  "admin": {
+    "enabled": true,
+    "password": "{{reloadPassword}}"
+  },
+  "enableLucee": true,
+  "enableREST": false,
+  "monitoring": {
+    "enabled": false
+  },
+  "configuration": {
+    "datasources": {
+      "{{datasourceName}}": {
+        "class": "org.sqlite.JDBC",
+        "database": "{{datasourceName}}",
+        "dbdriver": "Other",
+        "dsn": "jdbc:sqlite:{project}/db/development.sqlite",
+        "host": "",
+        "password": "",
+        "username": ""
+      },
+      "{{datasourceName}}_test": {
+        "class": "org.sqlite.JDBC",
+        "database": "{{datasourceName}}_test",
+        "dbdriver": "Other",
+        "dsn": "jdbc:sqlite:{project}/db/test.sqlite",
+        "host": "",
+        "password": "",
+        "username": ""
+      }
+    },
+    "mappings": {
+      "/wheels": "../vendor/wheels",
+      "/app": "../app",
+      "/config": "../config",
+      "/tests": "../tests"
+    }
+  }
+}

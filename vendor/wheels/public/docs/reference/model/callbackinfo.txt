@@ -1,0 +1,27 @@
+// 1. Inspect all registered callbacks for a model
+info = model("Order").callbackInfo();
+// info is a struct keyed by callback type, each containing an array of method names:
+// {
+//   beforeSave:               ["stampUpdatedAt"],
+//   afterCreate:              ["sendConfirmationEmail"],
+//   afterSave:                ["clearCacheEntries"],
+//   beforeValidation:         [],
+//   beforeValidationOnCreate: [],
+//   afterValidation:          [],
+//   afterFind:                [],
+//   ...
+// }
+
+// 2. Check whether a specific callback type has any registered methods
+info = model("User").callbackInfo();
+if (arrayLen(info.beforeDelete)) {
+    writeOutput("User model has beforeDelete callbacks.");
+}
+
+// 3. Loop over all callback types and their methods for debugging
+info = model("Post").callbackInfo();
+for (callbackType in info) {
+    for (methodName in info[callbackType]) {
+        writeOutput(callbackType & ": " & methodName);
+    }
+}

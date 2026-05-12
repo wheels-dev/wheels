@@ -68,16 +68,16 @@ component extends="./base" {
                 execCmd &= " -it";
             }
             
-            execCmd &= " #containerName# #arguments.command#";
+            execCmd &= " " & $shellEscape(containerName) & " " & arguments.command;
             
             if (arguments.interactive) {
                 // For interactive mode, use native SSH
                 runCommand(
                     name="ssh",
-                    arguments="-t #sshUser#@#server# '#execCmd#'"
+                    arguments="-t " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " " & $shellEscape(execCmd)
                 );
             } else {
-                var result = $execBash("ssh #sshUser#@#server# '#execCmd#'");
+                var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " " & $shellEscape(execCmd));
                 
                 if (result.exitCode == 0) {
                     if (len(trim(result.output))) {

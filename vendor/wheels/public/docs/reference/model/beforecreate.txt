@@ -1,0 +1,9 @@
+// 1. Register a single callback method to run before a new object is created
+// Defined inside the model's config() function
+beforeCreate("setDefaults");
+
+// 2. Register multiple callback methods to run in sequence before creation
+beforeCreate("generateSlug,stampCreatedBy");
+
+// 3. Register callbacks using the named argument
+beforeCreate(methods="generateToken,normalizeEmail");

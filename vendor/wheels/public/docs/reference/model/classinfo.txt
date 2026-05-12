@@ -1,0 +1,42 @@
+// 1. Inspect all metadata for the User model
+info = model("User").classInfo();
+// info.modelName             -> "User"
+// info.tableName             -> "users"
+// info.primaryKeys           -> "id"
+// info.propertyNames         -> "id,firstName,lastName,email,createdAt,updatedAt"
+// info.properties            -> struct of column/type metadata keyed by property name
+// info.calculatedProperties  -> struct of SQL-expression properties keyed by property name
+// info.associations          -> struct of association definitions (belongsTo, hasMany, etc.)
+// info.validations           -> struct keyed by trigger (onSave, onCreate, onUpdate) with arrays of rules
+// info.enums                 -> struct of enum definitions keyed by property name
+// info.scopes                -> struct of named scope definitions
+// info.callbacks             -> struct of callback arrays keyed by callback type (beforeSave, afterCreate, etc.)
+// info.softDeletion          -> false (true when the model has a deletedAt column)
+
+// 2. List all association names and their types
+info = model("Article").classInfo();
+
+for (assocName in info.associations) {
+    assoc = info.associations[assocName];
+    writeOutput(assocName & " (" & assoc.type & ")");
+}
+
+// 3. Check soft-deletion and enumerate registered callbacks
+info = model("Post").classInfo();
+
+if (info.softDeletion) {
+    writeOutput("Post uses soft deletion.");
+}
+
+for (callbackType in info.callbacks) {
+    methods = info.callbacks[callbackType];
+    writeOutput(callbackType & ": " & arrayToList(methods));
+}
+
+// 4. Inspect calculated properties defined on the model
+info = model("Order").classInfo();
+
+for (propName in info.calculatedProperties) {
+    calcProp = info.calculatedProperties[propName];
+    writeOutput(propName & " => " & calcProp.sql);
+}

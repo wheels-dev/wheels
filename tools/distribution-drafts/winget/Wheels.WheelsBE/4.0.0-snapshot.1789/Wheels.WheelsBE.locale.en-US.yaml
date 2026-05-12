@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+
+PackageIdentifier: Wheels.WheelsBE
+PackageVersion: 4.0.0-snapshot.1789
+PackageLocale: en-US
+Publisher: Wheels Dev
+PublisherUrl: https://wheels.dev
+PublisherSupportUrl: https://github.com/wheels-dev/wheels/issues
+PrivacyUrl: https://wheels.dev/privacy
+Author: Wheels Dev Contributors
+PackageName: Wheels (Bleeding-Edge)
+PackageUrl: https://wheels.dev
+License: Apache-2.0
+LicenseUrl: https://github.com/wheels-dev/wheels/blob/main/LICENSE
+Copyright: Copyright (c) 2026 Wheels Dev
+ShortDescription: Wheels CFML MVC framework - bleeding-edge channel (develop snapshots).
+Description: |
+  Wheels is a full-stack MVC framework for CFML (ColdFusion / Lucee / BoxLang),
+  similar in spirit to Rails and Laravel.
+
+  This is the BLEEDING-EDGE channel. Tracks every merge to develop on
+  wheels-dev/wheels via the wheels-dev/wheels-snapshots release feed. New builds
+  publish multiple times per day. For stable use, install Wheels.Wheels instead.
+
+  Only one channel can be installed at a time. Switching channels:
+    winget uninstall Wheels.WheelsBE
+    winget install Wheels.Wheels
+Moniker: wheels-be
+Tags:
+- cfml
+- coldfusion
+- lucee
+- boxlang
+- mvc
+- framework
+- cli
+- bleeding-edge
+- snapshot
+ReleaseNotesUrl: https://github.com/wheels-dev/wheels-snapshots/releases/tag/v4.0.0-snapshot.1789
+Documentations:
+- DocumentLabel: Guides
+  DocumentUrl: https://guides.wheels.dev
+- DocumentLabel: Release Channels
+  DocumentUrl: https://guides.wheels.dev/v4-0-0-snapshot/start-here/release-channels/
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

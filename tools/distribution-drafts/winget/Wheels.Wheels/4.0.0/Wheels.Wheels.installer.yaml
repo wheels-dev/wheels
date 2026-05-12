@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+#
+# Installer manifest. DRAFT — InstallerUrl + InstallerSha256 below are
+# placeholders. Before submitting this PR to microsoft/winget-pkgs we
+# need to:
+#
+#   1. Build an actual installer artifact (see ../README.md for options
+#      — MSI via WiX or NSIS-wrapped self-extracting EXE).
+#   2. Upload it to the v4.0.0 GitHub release on wheels-dev/wheels.
+#   3. Compute its SHA-256 and update InstallerSha256 below.
+#   4. Update InstallerType to match what we built (nullsoft / inno /
+#      msi / wix).
+#
+# Until then this file is reference scaffolding — captures the metadata
+# we WILL ship so the actual submission becomes mechanical.
+
+PackageIdentifier: Wheels.Wheels
+PackageVersion: 4.0.0
+MinimumOSVersion: 10.0.17763.0  # Windows 10 1809 — required by openjdk21
+InstallerType: zip  # TODO: change to nullsoft|inno|msi|wix once installer built
+NestedInstallerType: portable  # placeholder; revisit when installer chosen
+Scope: user
+InstallModes:
+- interactive
+- silent
+- silentWithProgress
+UpgradeBehavior: install
+ReleaseDate: 2026-05-12
+Dependencies:
+  PackageDependencies:
+  - PackageIdentifier: EclipseAdoptium.Temurin.21.JDK
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/wheels-dev/wheels/releases/download/v4.0.0/wheels-windows-x64-4.0.0.zip  # PLACEHOLDER — build artifact does not yet exist
+  InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000  # PLACEHOLDER
+  NestedInstallerFiles:
+  - RelativeFilePath: wheels\bin\wheels.cmd
+    PortableCommandAlias: wheels
+ManifestType: installer
+ManifestVersion: 1.6.0

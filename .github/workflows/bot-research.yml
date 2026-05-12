@@ -1,0 +1,78 @@
+name: Wheels Bot — Cross-Framework Research
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue-number:
+        description: 'Issue number to research'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-research-${{ github.event.issue.number || inputs.issue-number }}
+  cancel-in-progress: false
+
+jobs:
+  research:
+    name: Cross-framework research
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing
+    # `wheels-bot:triage-class:framework-design`. workflow_dispatch is
+    # preserved for manual reruns.
+    # The bot-identity check is load-bearing: prevents humans from
+    # triggering research by quoting a marker in a comment reply.
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && (
+        github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'issue_comment'
+            && github.event.comment.user.login == 'wheels-bot[bot]'
+            && contains(github.event.comment.body, 'wheels-bot:triage-class:framework-design'))
+      )
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue-number }}
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 1
+
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: issue
+          target-number: ${{ env.ISSUE_NUMBER }}
+          marker-pattern: 'wheels-bot:research:${{ env.ISSUE_NUMBER }}'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Run Research
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          # When un-gated at Phase 4b, this workflow fires from wheels-bot[bot]
+          # comments containing the framework-design class marker. Allow that
+          # bot identity (and github-actions[bot] for consistency).
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /research-frameworks ${{ env.ISSUE_NUMBER }}
+          claude_args: |
+            --model claude-opus-4-7
+            --max-turns 400
+            --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git show:*),Bash(git grep:*),WebFetch,WebSearch,Read,Grep,Glob"

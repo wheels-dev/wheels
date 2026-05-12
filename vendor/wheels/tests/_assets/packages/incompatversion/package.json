@@ -1,0 +1,11 @@
+{
+	"name": "wheels-incompatversion",
+	"version": "1.0.0",
+	"description": "Test fixture: declares a wheelsVersion constraint the runtime cannot satisfy",
+	"wheelsVersion": ">=99.0",
+	"provides": {
+		"mixins": "controller",
+		"services": [],
+		"middleware": []
+	}
+}

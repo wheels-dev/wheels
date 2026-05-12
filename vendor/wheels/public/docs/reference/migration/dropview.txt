@@ -1,0 +1,34 @@
+// 1. Drop a view in the down() migration (reversing a createView in up())
+component extends="wheels.migrator.Migration" hint="Add active users view" {
+
+	function up() {
+		createView(name="activeUsers")
+			.selectStatement(sql="SELECT id, firstName, lastName, email FROM users WHERE deletedAt IS NULL")
+			.create();
+	}
+
+	function down() {
+		dropView(name="activeUsers");
+	}
+
+}
+
+// 2. Drop multiple views in a single down() migration
+component extends="wheels.migrator.Migration" hint="Add reporting views" {
+
+	function up() {
+		createView(name="publishedArticles")
+			.selectStatement(sql="SELECT id, title, authorId, publishedAt FROM articles WHERE publishedAt IS NOT NULL")
+			.create();
+
+		createView(name="activeAuthors")
+			.selectStatement(sql="SELECT id, firstName, lastName FROM users WHERE deletedAt IS NULL")
+			.create();
+	}
+
+	function down() {
+		dropView(name="publishedArticles");
+		dropView(name="activeAuthors");
+	}
+
+}

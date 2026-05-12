@@ -8,7 +8,7 @@
 			<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 			<cfoutput>#csrfMetaTags()#</cfoutput>
 			<title>#e(getSetting('general_sitename'))#</title>
-			<meta name="keywords" content="cfwheels,cfml,ruby,framework">
+			<meta name="keywords" content="wheels,cfml,ruby,framework">
 			<meta name="description" content="This is an example wheels Application">
 			<!---
 				CSS

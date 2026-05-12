@@ -1,4 +1,0 @@
-// In `models/User.cfc`, define the primary key as a column called `userID`.
-function config(){
-	setPrimaryKey("userID");
-}

@@ -1,0 +1,11 @@
+// 1. Basic URL field with a label
+#urlFieldTag(name="website", label="Website")#
+
+// 2. Pre-filled with a value from params and a placeholder attribute
+#urlFieldTag(name="homepage", label="Homepage", value=params.homepage, placeholder="https://example.com")#
+
+// 3. Label placed before the field with an extra CSS class
+#urlFieldTag(name="profileUrl", label="Profile URL", labelPlacement="before", class="form-control")#
+
+// 4. Field wrapped with markup using prepend and append
+#urlFieldTag(name="website", label="Website", prepend="<div class=""input-group"">", append="</div>")#

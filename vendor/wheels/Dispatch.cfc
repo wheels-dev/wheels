@@ -1,0 +1,759 @@
+component output="false" extends="wheels.Global"{
+
+
+	/**
+	 * Returns itself (the Dispatch object).
+	 */
+	public any function $init() {
+		// Initialize the middleware pipeline from application settings.
+		variables.$middlewarePipeline = $buildMiddlewarePipeline();
+		return this;
+	}
+
+	/**
+	 * Build the middleware pipeline from application.wheels.middleware (user-configured)
+	 * and application.wheels.pluginMiddleware (registered by plugins via onPluginLoad).
+	 * Plugin middleware runs after user-configured global middleware.
+	 */
+	private any function $buildMiddlewarePipeline() {
+		local.appKey = $appKey();
+		local.middlewareInstances = [];
+
+		// 1. Load user-configured global middleware.
+		local.configured = StructKeyExists(application[local.appKey], "middleware")
+			? application[local.appKey].middleware
+			: [];
+
+		for (local.item in local.configured) {
+			ArrayAppend(local.middlewareInstances, $resolveMiddlewareInstance(local.item));
+		}
+
+		// 2. Append plugin-registered middleware, sorted by priority and before/after constraints.
+		local.pluginMiddleware = $getPluginMiddlewareConfig();
+		if (ArrayLen(local.pluginMiddleware)) {
+			local.resolver = new wheels.middleware.MiddlewareOrderResolver();
+			local.sorted = local.resolver.resolve(local.pluginMiddleware);
+			for (local.entry in local.sorted) {
+				ArrayAppend(local.middlewareInstances, $resolveMiddlewareInstance(local.entry.middleware));
+			}
+		}
+
+		return new wheels.middleware.Pipeline(middleware = local.middlewareInstances);
+	}
+
+	/**
+	 * Retrieve plugin-registered middleware from the application scope.
+	 * Returns the pluginMiddleware array or an empty array if not present.
+	 */
+	private array function $getPluginMiddlewareConfig() {
+		local.appKey = $appKey();
+		if (StructKeyExists(application[local.appKey], "pluginMiddleware")) {
+			return application[local.appKey].pluginMiddleware;
+		}
+		return [];
+	}
+
+	/**
+	 * Resolve a middleware item: instantiate from component path string, or return as-is if already an object.
+	 */
+	private any function $resolveMiddlewareInstance(required any middleware) {
+		if (IsSimpleValue(arguments.middleware)) {
+			return CreateObject("component", arguments.middleware).init();
+		}
+		return arguments.middleware;
+	}
+
+	/**
+	 * Create a struct to hold the params, merge form and url scopes into it, add JSON body etc.
+	 */
+	public struct function $createParams(
+		required string path,
+		required struct route,
+		required struct formScope,
+		required struct urlScope
+	) {
+		local.rv = {};
+		local.rv = $mergeUrlAndFormScopes(params = local.rv, urlScope = arguments.urlScope, formScope = arguments.formScope);
+		local.rv = $parseJsonBody(params = local.rv);
+		local.rv = $mergeRoutePattern(params = local.rv, route = arguments.route, path = arguments.path);
+		local.rv = $deobfuscateParams(params = local.rv);
+		local.rv = $resolveRouteModelBinding(params = local.rv, route = arguments.route);
+		local.rv = $translateBlankCheckBoxSubmissions(params = local.rv);
+		local.rv = $translateDatePartSubmissions(params = local.rv);
+		local.rv = $createNestedParamStruct(params = local.rv);
+
+		// Do the routing / controller params after all other params so that we don't have more logic around params in arrays.
+		local.rv = $ensureControllerAndAction(params = local.rv, route = arguments.route);
+		local.rv = $addRouteFormat(params = local.rv, route = arguments.route);
+		local.rv = $addRouteName(params = local.rv, route = arguments.route);
+
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 */
+	public struct function $createNestedParamStruct(required struct params) {
+		local.rv = arguments.params;
+		for (local.key in local.rv) {
+			if (Find("[", local.key) && Right(local.key, 1) == "]") {
+				// Object form field.
+				local.name = SpanExcluding(local.key, "[");
+
+				// Use engine adapter for cross-engine bracket-parsing differences
+				local.nested = application.wheels.engineAdapter.parseFormKey(local.key, local.name);
+				if (!StructKeyExists(local.rv, local.name)) {
+					local.rv[local.name] = {};
+				}
+
+				// We need a reference to the struct so we can nest other structs if needed.
+				// Looping over the array allows for infinite nesting.
+				local.struct = local.rv[local.name];
+				local.iEnd = ArrayLen(local.nested);
+				for (local.i = 1; local.i <= local.iEnd; local.i++) {
+					if (IsStruct(local.struct)) {
+						local.item = local.nested[local.i];
+						if (!StructKeyExists(local.struct, local.item)) {
+							local.struct[local.item] = {};
+						}
+						if (local.i != local.iEnd) {
+							// Pass the new reference (structs pass a reference instead of a copy) to the next iteration.
+							local.struct = local.struct[local.item];
+						} else {
+							local.struct[local.item] = local.rv[local.key];
+						}
+					}
+				}
+
+				// Delete the original key so it doesn't show up in the params.
+				StructDelete(local.rv, local.key);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 */
+	public struct function $findMatchingRoute(
+		required string path,
+		string requestMethod = $getRequestMethod(),
+		array routes = application.wheels.routes,
+		component mapper = application.wheels.mapper
+	) {
+		// If this is a HEAD request, look for the corresponding GET route.
+		if (arguments.requestMethod == 'HEAD') {
+			arguments.requestMethod = 'GET';
+		}
+
+		local.methodKey = UCase(arguments.requestMethod);
+
+		// --- Fast path: Static route O(1) lookup ---
+		// Static routes (no variables in pattern) are indexed in a hash map at registration time.
+		// This avoids regex matching entirely for common static paths like /login, /about, etc.
+		if (StructKeyExists(application.wheels, "staticRoutes")) {
+			local.staticKey = local.methodKey & ":/" & arguments.path;
+			if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
+				local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
+			}
+			// Also try the root path.
+			if (!StructKeyExists(local, "rv") && !Len(arguments.path)) {
+				local.staticKey = local.methodKey & ":/";
+				if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
+					local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
+				}
+			}
+		}
+
+		// --- Fallback: Full linear scan ---
+		// Scan all routes in registration order, filtering by HTTP method.
+		if (!StructKeyExists(local, "rv")) {
+			for (local.route in arguments.routes) {
+				// If method doesn't match, skip this route.
+				if (StructKeyExists(local.route, "methods") && !ListFindNoCase(local.route.methods, arguments.requestMethod)) {
+					continue;
+				}
+
+				// Make sure route has been converted to regular expression.
+				if (!StructKeyExists(local.route, "regex")) {
+					local.route.regex = arguments.mapper.$patternToRegex(local.route.pattern);
+				}
+
+				// If route matches regular expression, set it for return.
+				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
+					local.rv = Duplicate(local.route);
+					break;
+				}
+			}
+		}
+
+		// If returned route contains a redirect, execute that asap.
+		if (StructKeyExists(local, "rv") && StructKeyExists(local.rv, "redirect")) {
+			$location(url = local.rv.redirect, addToken = false);
+		}
+
+		// Throw error if no route was found.
+		if (!StructKeyExists(local, "rv")) {
+			local.alternativeMatchingMethodsForURL = "";
+
+			// Try and provide some more information for why the route hasn't matched:
+			// For example, the developer is accidentally GETing to a route which only allows POST.
+			for (local.route in arguments.routes) {
+				// If route matches regular expression, append to alternatives to display.
+				// (regex was already compiled during the main matching loop above)
+				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
+					local.alternativeMatchingMethodsForURL = ListAppend(local.alternativeMatchingMethodsForURL, local.route.methods);
+				}
+			}
+
+			// If we have any routes which match the regex, but not the method, add this information to the error message.
+			if (Len(local.alternativeMatchingMethodsForURL)) {
+				$throwErrorOrShow404Page(
+					type = "Wheels.RouteNotFound",
+					message = "Incorrect HTTP Verb for route",
+					extendedInfo = "The `#arguments.path#` path does not allow `#EncodeForHTML(arguments.requestMethod)#` requests, only `#UCase(local.alternativeMatchingMethodsForURL)#` requests. Ensure you are using the correct HTTP Verb and that your `config/routes.cfm` file is configured correctly."
+				);
+			} else {
+				$throwErrorOrShow404Page(
+					type = "Wheels.RouteNotFound",
+					message = "Could not find a route that matched this request.",
+					extendedInfo = "Make sure there is a route configured in your `config/routes.cfm` file that matches the `#EncodeForHTML(arguments.path)#` request."
+				);
+			}
+		}
+
+		return local.rv;
+	}
+
+	/**
+	 * Return the path without the leading "/".
+	 */
+	public string function $getPathFromRequest(required string pathInfo, required string scriptName) {
+		if (arguments.pathInfo == arguments.scriptName || arguments.pathInfo == "/" || !Len(arguments.pathInfo)) {
+			return "";
+		} else {
+			return Right(arguments.pathInfo, Len(arguments.pathInfo) - 1);
+		}
+	}
+
+	/**
+	 * Parse incoming params, create controller object, call an action on it and return the response.
+	 * Called from index.cfm in the root so what we return here is the final result of the request processing.
+	 * This currently needs to be public as it's called from elsewhere
+	 */
+	public string function $request(
+		string pathInfo = request.cgi.path_info,
+		string scriptName = request.cgi.script_name,
+		struct formScope = form,
+		struct urlScope = url
+	) {
+		// If something has been set to the request.$wheelsAbortContent variable we just return it directly so it gets rendered.
+		// This is used for maintenance mode content.
+		if (StructKeyExists(request, "$wheelsAbortContent")) {
+			return request.$wheelsAbortContent;
+		}
+
+		if ($get("showDebugInformation")) {
+			$debugPoint("setup");
+		}
+
+		local.params = $paramParser(argumentCollection = arguments);
+
+		// Set params in the request scope as well so we can display it in the debug info outside of the controller context.
+		request.wheels.params = local.params;
+
+		if ($get("showDebugInformation")) {
+			$debugPoint("setup");
+		}
+
+		// Hi-jack any wheels controller requests for GUI
+		if (ListFirst(local.params.controller, '.') EQ "wheels") {
+			if (!application.wheels.enablePublicComponent) {
+				// Return 404 so the surface is not fingerprintable. A bare
+				// cfabort responds HTTP 200 with an empty body, which leaks
+				// the existence of the internal GUI routes. See issue #2233.
+				cfheader(statuscode=404);
+				cfcontent(type="text/plain");
+				writeOutput("Not Found");
+				cfabort;
+			} else {
+				// BoxLang compatibility: Check for null action parameter
+				if (IsNull(local.params.action) || !Len(local.params.action)) {
+					throw(
+						type="Wheels.ActionParameterMissing", 
+						message="The action parameter is missing or null. Controller: #local.params.controller#");
+				}
+
+				$engineAdapter().invokeMethod(application.wheels.public, local.params.action);
+				// The wheels controller methods handle their own output and abort
+				// So we need to ensure we don't continue processing
+				return "";
+			}
+		} else {
+			// Build the request context for middleware.
+			local.requestContext = {
+				params = local.params,
+				route = StructKeyExists(request.wheels, "currentRoute") ? request.wheels.currentRoute : {},
+				pathInfo = arguments.pathInfo,
+				method = $getRequestMethod()
+			};
+
+			// The core handler that middleware wraps around.
+			local.coreHandler = function(required struct request) {
+				local.ctrl = controller(name = arguments.request.params.controller, params = arguments.request.params);
+				local.ctrl.processAction();
+
+				if (local.ctrl.$performedRedirect()) {
+					$location(argumentCollection = local.ctrl.getRedirect());
+				}
+
+				local.ctrl.$flashClear();
+				return local.ctrl.response();
+			};
+
+			// Merge global + route-scoped middleware and run through the pipeline.
+			local.routeMiddleware = $getRouteMiddleware(local.params);
+			if (ArrayLen(local.routeMiddleware)) {
+				local.allMiddleware = [];
+				ArrayAppend(local.allMiddleware, variables.$middlewarePipeline.getMiddleware(), true);
+				ArrayAppend(local.allMiddleware, local.routeMiddleware, true);
+				local.pipeline = new wheels.middleware.Pipeline(middleware = local.allMiddleware);
+				return local.pipeline.run(request = local.requestContext, coreHandler = local.coreHandler);
+			}
+
+			return variables.$middlewarePipeline.run(request = local.requestContext, coreHandler = local.coreHandler);
+		}
+	}
+
+	/**
+	 * Resolve route-scoped middleware from the matched route's `middleware` property.
+	 * Returns an array of instantiated middleware components.
+	 */
+	private array function $getRouteMiddleware(required struct params) {
+		local.instances = [];
+		// The matched route is stored on request.wheels.currentRoute during $findMatchingRoute.
+		if (!StructKeyExists(request.wheels, "currentRoute") || !StructKeyExists(request.wheels.currentRoute, "middleware")) {
+			return local.instances;
+		}
+
+		local.routeMiddleware = request.wheels.currentRoute.middleware;
+		if (IsSimpleValue(local.routeMiddleware)) {
+			local.routeMiddleware = ListToArray(local.routeMiddleware);
+		}
+
+		for (local.item in local.routeMiddleware) {
+			ArrayAppend(local.instances, $resolveMiddlewareInstance(local.item));
+		}
+
+		return local.instances;
+	}
+
+	/**
+	 * Find the route that matches the path, create params struct and return it.
+	 */
+	public struct function $paramParser(
+		string pathInfo = request.cgi.path_info,
+		string scriptName = request.cgi.script_name,
+		struct formScope = form,
+		struct urlScope = url
+	) {
+		local.path = $getPathFromRequest(pathInfo = arguments.pathInfo, scriptName = arguments.scriptName);
+		local.route = $findMatchingRoute(path = local.path);
+
+		// Store the matched route so middleware and other components can inspect it.
+		request.wheels.currentRoute = local.route;
+
+		return $createParams(
+			path = local.path,
+			route = local.route,
+			formScope = arguments.formScope,
+			urlScope = arguments.urlScope
+		);
+	}
+
+	/**
+	 * Merges the URL and form scope into a single structure, URL scope has precedence.
+	 */
+	public struct function $mergeUrlAndFormScopes(
+		required struct params,
+		required struct urlScope,
+		required struct formScope
+	) {
+		StructAppend(arguments.params, arguments.formScope);
+		StructAppend(arguments.params, arguments.urlScope);
+
+		// Get rid of the unnecessary "fieldnames" key that ACF always adds to the form scope.
+		StructDelete(arguments.params, "fieldnames");
+
+		return arguments.params;
+	}
+
+	/**
+	 * If content type is JSON, deserialize it into a struct and add to the params struct.
+	 */
+	public struct function $parseJsonBody(required struct params) {
+		local.headers = request.wheels.httpRequestData.headers;
+		local.content = request.wheels.httpRequestData.content;
+		if (StructKeyExists(local.headers, "Content-Type")) {
+			// Content-Type may also include charset so we need only check the first item in the list
+			local.type = SpanExcluding(local.headers["Content-Type"], ";");
+
+			// Only proceed if the content type is JSON.
+			// Allow multiple JSON content types by checking the start and end of the string.
+			// This way we allow both "application/json" and "application/vnd.api+json" (JSON API) for example.
+			if (Left(local.type, 12) == "application/" && Right(local.type, 4) == "json") {
+				// On ACF we need to convert from binary to a string before we can work with it.
+				if (IsBinary(local.content)) {
+					local.content = ToString(local.content);
+				}
+
+				// If what we have now is valid JSON, deserialize it to a struct and append to params.
+				// Call with "false" so existing form and URL values take precedence.
+				if (IsJSON(local.content)) {
+					local.deserializedContent = DeserializeJSON(local.content);
+					if (IsStruct(local.deserializedContent)) {
+						StructAppend(arguments.params, local.deserializedContent, false);
+					}
+					// If the incoming root element is an array, add it to params in the _json key
+					// This appears to follow Rails conventions
+					if (IsArray(local.deserializedContent)) {
+						arguments.params['_json'] = local.deserializedContent;
+					}
+				}
+			}
+		}
+		return arguments.params;
+	}
+
+	/**
+	 * Parses the route pattern, identifies the variable markers within the pattern and assigns the value from the url variables with the path.
+	 */
+	public struct function $mergeRoutePattern(required struct params, required struct route, required string path) {
+		local.rv = arguments.params;
+		local.matches = ReFindNoCase(arguments.route.regex, arguments.path, 1, true);
+		local.iEnd = ArrayLen(local.matches.pos);
+		for (local.i = 2; local.i <= local.iEnd; local.i++) {
+			local.key = ListGetAt(arguments.route.foundVariables, local.i - 1);
+			local.rv[local.key] = Mid(arguments.path, local.matches.pos[local.i], local.matches.len[local.i]);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Loops through the params struct passed in and attempts to deobfuscate it.
+	 * Ignores the controller and action params values.
+	 */
+	public struct function $deobfuscateParams(required struct params) {
+		local.rv = arguments.params;
+		if ($get("obfuscateUrls")) {
+			for (local.key in local.rv) {
+				if (local.key != "controller" && local.key != "action") {
+					try {
+						local.rv[local.key] = deobfuscateParam(local.rv[local.key]);
+					} catch (any e) {
+					}
+				}
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Resolves a model instance from params.key when route model binding is enabled.
+	 * The resolved model is stored in params under the singularized controller name (e.g., params.user).
+	 * Throws Wheels.RecordNotFound if the record doesn't exist. Silently skips if the model class doesn't exist.
+	 */
+	public struct function $resolveRouteModelBinding(required struct params, required struct route) {
+		local.rv = arguments.params;
+
+		// Determine if binding is enabled: route-level takes precedence, then global setting.
+		local.binding = false;
+		if (StructKeyExists(arguments.route, "binding")) {
+			local.binding = arguments.route.binding;
+		} else if ($get("routeModelBinding")) {
+			local.binding = true;
+		}
+
+		// Skip if disabled or no key parameter exists.
+		if (IsBoolean(local.binding) && !local.binding) {
+			// Binding is off. Emit a dev-mode hint if this route looks like a binding
+			// candidate (has a key and dispatches to a member action). See gap tracker
+			// item #5: silent failure when developers write `params.post` without
+			// setting `binding=true`.
+			$maybeWarnRouteBinding(params = local.rv, route = arguments.route);
+			return local.rv;
+		}
+		if (!StructKeyExists(local.rv, "key")) {
+			return local.rv;
+		}
+
+		// Derive the model name.
+		if (IsSimpleValue(local.binding) && !IsBoolean(local.binding) && Len(local.binding)) {
+			// Explicit model name override (e.g., binding="BlogPost").
+			local.modelName = local.binding;
+		} else {
+			// Convention: singularize + capitalize controller name.
+			// Check params first, then fall back to route struct (controller may not be in params yet).
+			if (StructKeyExists(local.rv, "controller")) {
+				local.controllerName = local.rv.controller;
+			} else if (StructKeyExists(arguments.route, "controller")) {
+				local.controllerName = arguments.route.controller;
+			} else {
+				return local.rv;
+			}
+			local.modelName = capitalize(singularize(local.controllerName));
+		}
+
+		// Attempt to resolve the model instance.
+		try {
+			local.instance = model(local.modelName).findByKey(local.rv.key);
+		} catch (any e) {
+			// Model class doesn't exist — silently skip (don't break non-model routes).
+			return local.rv;
+		}
+
+		// If no record was found, throw a 404.
+		if (IsBoolean(local.instance) && !local.instance) {
+			$throwErrorOrShow404Page(
+				type = "Wheels.RecordNotFound",
+				message = "#local.modelName# record not found.",
+				extendedInfo = "A #local.modelName# record with key `#EncodeForHTML(local.rv.key)#` could not be found."
+			);
+		}
+
+		// Store the resolved model in params under the singular name.
+		local.paramKey = LCase(Left(local.modelName, 1)) & Mid(local.modelName, 2, Len(local.modelName) - 1);
+		local.rv[local.paramKey] = local.instance;
+
+		return local.rv;
+	}
+
+	/**
+	 * Emits a one-time dev-mode log warning when a route looks like a route-model-binding
+	 * candidate but binding is not enabled. The heuristic: params.key is present AND the
+	 * resolved action is one of the member binding-eligible actions (show, edit, update,
+	 * delete). Writes one line per unique controller+action pair per JVM process to avoid
+	 * log spam. Gated behind environment != "production" and suppressRouteBindingWarnings=false.
+	 * The warning points the developer at either the per-resource `binding=true` flag or the
+	 * global `routeModelBinding` setting. Safe to call regardless of state — returns silently
+	 * on any error so it never interferes with dispatch.
+	 */
+	public boolean function $maybeWarnRouteBinding(required struct params, required struct route) {
+		try {
+			// Resolve the settings namespace ($wheels or wheels depending on runtime).
+			local.appKey = $appKey();
+			local.settings = application[local.appKey];
+
+			// Gate: production skips entirely.
+			local.env = StructKeyExists(local.settings, "environment") ? local.settings.environment : "";
+			if (local.env == "production") {
+				return false;
+			}
+
+			// Gate: user opt-out.
+			if (StructKeyExists(local.settings, "suppressRouteBindingWarnings") && local.settings.suppressRouteBindingWarnings) {
+				return false;
+			}
+
+			// Only warn when a key is in the URL (binding wouldn't fire without one).
+			if (!StructKeyExists(arguments.params, "key")) {
+				return false;
+			}
+
+			// Only warn for member binding-eligible actions.
+			local.action = StructKeyExists(arguments.params, "action") ? arguments.params.action : (StructKeyExists(arguments.route, "action") ? arguments.route.action : "");
+			if (!ListFindNoCase("show,edit,update,delete", local.action)) {
+				return false;
+			}
+
+			// Derive controller (for log detail + dedup key).
+			local.controller = StructKeyExists(arguments.params, "controller") ? arguments.params.controller : (StructKeyExists(arguments.route, "controller") ? arguments.route.controller : "");
+			if (!Len(local.controller)) {
+				return false;
+			}
+
+			// Dedup: one warning per controller+action per application lifetime.
+			// Resets on reload (application scope rebuild).
+			if (!StructKeyExists(application, "$wheelsRouteBindingWarnings")) {
+				application.$wheelsRouteBindingWarnings = {};
+			}
+			local.dedupKey = local.controller & "##" & local.action;
+			if (StructKeyExists(application.$wheelsRouteBindingWarnings, local.dedupKey)) {
+				return false;
+			}
+			application.$wheelsRouteBindingWarnings[local.dedupKey] = true;
+
+			// Derive the singular name binding would use (matches $resolveRouteModelBinding logic).
+			local.modelName = capitalize(singularize(local.controller));
+			local.singular = LCase(Left(local.modelName, 1)) & Mid(local.modelName, 2, Len(local.modelName) - 1);
+			local.routeName = StructKeyExists(arguments.route, "name") ? arguments.route.name : "";
+
+			local.msg = "Wheels Route Binding Hint: #UCase(local.action)# on controller '#local.controller#'"
+				& (Len(local.routeName) ? " (route '#local.routeName#')" : "")
+				& " dispatched with params.key but route model binding is not enabled on this resource."
+				& " If you intended params.#local.singular# to be auto-loaded from the #local.modelName# model, add binding=true to the resource:"
+				& "  .resources(name=""#local.controller#"", binding=true)."
+				& " Or enable globally in config/settings.cfm: set(routeModelBinding=true)."
+				& " To silence this hint: set(suppressRouteBindingWarnings=true) in config/settings.cfm."
+				& " (Hint fires in development only.)";
+
+			writeLog(file="wheels", type="warning", text=local.msg);
+			return true;
+		} catch (any ignored) {
+			// Warning emission is best-effort; never block dispatch.
+			return false;
+		}
+	}
+
+	/**
+	 * Loops through the params struct and handle the cases where checkboxes are unchecked.
+	 */
+	public struct function $translateBlankCheckBoxSubmissions(required struct params) {
+		local.rv = arguments.params;
+		for (local.key in local.rv) {
+			if (FindNoCase("($checkbox)", local.key)) {
+				// If no other form parameter exists with this name it means that the checkbox was left blank.
+				// Therefore we force the value to the unchecked value for the checkbox.
+				// This gets around the problem that unchecked checkboxes don't post at all.
+				local.formParamName = ReplaceNoCase(local.key, "($checkbox)", "");
+				if (!StructKeyExists(local.rv, local.formParamName)) {
+					local.rv[local.formParamName] = local.rv[local.key];
+				}
+
+				StructDelete(local.rv, local.key);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Combines date parts into a single value.
+	 */
+	public struct function $translateDatePartSubmissions(required struct params) {
+		local.rv = arguments.params;
+		local.dates = {};
+		for (local.key in local.rv) {
+			if (ReFindNoCase(".*\((\$year|\$month|\$day|\$hour|\$minute|\$second|\$ampm)\)$", local.key)) {
+				local.temp = ListToArray(local.key, "(");
+				local.firstKey = local.temp[1];
+				local.secondKey = SpanExcluding(local.temp[2], ")");
+				if (!StructKeyExists(local.dates, local.firstKey)) {
+					local.dates[local.firstKey] = {};
+				}
+				local.dates[local.firstKey][ReplaceNoCase(local.secondKey, "$", "")] = local.rv[local.key];
+			}
+		}
+		for (local.key in local.dates) {
+			if (!StructKeyExists(local.dates[local.key], "year")) {
+				local.dates[local.key].year = 1899;
+			}
+			if (!StructKeyExists(local.dates[local.key], "month")) {
+				local.dates[local.key].month = 1;
+			}
+			if (!StructKeyExists(local.dates[local.key], "day")) {
+				local.dates[local.key].day = 1;
+			}
+			if (!StructKeyExists(local.dates[local.key], "hour")) {
+				local.dates[local.key].hour = 0;
+			}
+			if (!StructKeyExists(local.dates[local.key], "minute")) {
+				local.dates[local.key].minute = 0;
+			}
+			if (!StructKeyExists(local.dates[local.key], "second")) {
+				local.dates[local.key].second = 0;
+			}
+			if (StructKeyExists(local.dates[local.key], "ampm")) {
+				if (local.dates[local.key].ampm == "am" && local.dates[local.key].hour == 12) {
+					local.dates[local.key].hour = 0;
+				} else if (local.dates[local.key].ampm == "pm" && local.dates[local.key].hour != 12) {
+					local.dates[local.key].hour += 12;
+				}
+			}
+			try {
+				local.rv[local.key] = CreateDateTime(
+					local.dates[local.key].year,
+					local.dates[local.key].month,
+					local.dates[local.key].day,
+					local.dates[local.key].hour,
+					local.dates[local.key].minute,
+					local.dates[local.key].second
+				);
+			} catch (any e) {
+				local.rv[local.key] = "";
+			}
+			StructDelete(local.rv, local.key & "($year)");
+			StructDelete(local.rv, local.key & "($month)");
+			StructDelete(local.rv, local.key & "($day)");
+			StructDelete(local.rv, local.key & "($hour)");
+			StructDelete(local.rv, local.key & "($minute)");
+			StructDelete(local.rv, local.key & "($second)");
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Ensure that the controller and action params exist and are camelized.
+	 */
+	public struct function $ensureControllerAndAction(required struct params, required struct route) {
+		local.rv = arguments.params;
+		if (!StructKeyExists(local.rv, "controller")) {
+			local.rv.controller = arguments.route.controller;
+		}
+		if (!StructKeyExists(local.rv, "action")) {
+			local.rv.action = arguments.route.action;
+		}
+
+		// We now need to have dot notation allowed in the controller hence the \.
+		local.rv.controller = ReReplace(local.rv.controller, "[^0-9A-Za-z-_\.]", "", "all");
+
+		// Filter out illegal characters from the controller and action arguments.
+		local.rv.action = ReReplace(local.rv.action, "[^0-9A-Za-z-_\.]", "", "all");
+
+		// Convert controller to upperCamelCase via engine adapter
+		local.rv.controller = application.wheels.engineAdapter.controllerNameToUpperCamelCase(local.rv.controller);
+
+		// Action to normal camelCase.
+		local.rv.action = ReReplace(local.rv.action, "-([a-z])", "\u\1", "all");
+
+		return local.rv;
+	}
+
+	/**
+	 * Adds in the format variable from the route if it exists.
+	 */
+	public struct function $addRouteFormat(required struct params, required struct route) {
+		local.rv = arguments.params;
+		if (StructKeyExists(arguments.route, "formatVariable") && StructKeyExists(arguments.route, "format")) {
+			local.rv[arguments.route.formatVariable] = arguments.route.format;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Adds in the name variable from the route if it exists.
+	 */
+	public struct function $addRouteName(required struct params, required struct route) {
+		local.rv = arguments.params;
+		if (StructKeyExists(arguments.route, "name") && Len(arguments.route.name) && !StructKeyExists(local.rv, "route")) {
+			local.rv.route = arguments.route.name;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Determine HTTP verb used in request.
+	 */
+	public string function $getRequestMethod() {
+		// If request is a post, check for alternate verb.
+		if (request.cgi.request_method == "post" && StructKeyExists(form, "_method")) {
+			return form["_method"];
+		}
+
+		return request.cgi.request_method;
+	}
+
+	function onDIComplete(){
+		$engineAdapter().prepareDIComplete(variables, this);
+		new wheels.Plugins().$initializeMixins(variables);
+	}
+}

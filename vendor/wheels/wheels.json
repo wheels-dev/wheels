@@ -1,0 +1,7 @@
+{
+    "version": "@build.version@",
+    "buildNumber": "@build.number@",
+    "testbox": {
+        "runner": "/tests/runner.cfm"
+    }
+}

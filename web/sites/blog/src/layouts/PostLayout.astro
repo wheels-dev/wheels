@@ -1,0 +1,121 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import { formatDate } from '../utils/posts.ts';
+import type { Post } from '../utils/posts.ts';
+import Giscus from '../components/Giscus.astro';
+import RssPill from '@wheels-dev/ui/components/RssPill.astro';
+
+interface Props {
+	post: Post;
+}
+const { post } = Astro.props;
+const { data } = post;
+const eyebrow = data.categories && data.categories.length > 0 ? data.categories[0] : null;
+---
+
+<BaseLayout title={`${data.title} | Wheels Blog`} description={data.excerpt}>
+	<article class="post">
+		<header class="post__header">
+			<div class="post__eyebrow-row">
+				{eyebrow && <span class="post__eyebrow">{eyebrow}</span>}
+				<RssPill href="/rss.xml" label="RSS" class="post__rss" />
+			</div>
+			<h1 class="post__title">{data.title}</h1>
+			<p class="post__meta">
+				<span>{data.author}</span>
+				<span aria-hidden="true"> · </span>
+				<time datetime={data.publishedAt.toISOString()}>
+					{formatDate(data.publishedAt)}
+				</time>
+			</p>
+		</header>
+
+		{data.coverImage && <img class="post__cover" src={data.coverImage} alt="" />}
+
+		<div class="post__body prose">
+			<slot />
+		</div>
+
+		{
+			data.tags.length > 0 && (
+				<ul class="post__tags">
+					{data.tags.map((t) => (
+						<li>
+							<a href={`/tags/${t}/`}>#{t}</a>
+						</li>
+					))}
+				</ul>
+			)
+		}
+	</article>
+
+	<Giscus />
+
+	<style>
+		.post {
+			max-width: var(--max-width-prose);
+			margin: 0 auto;
+		}
+		.post__header {
+			margin-bottom: var(--space-6);
+		}
+		.post__eyebrow-row {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: var(--space-3);
+			margin-bottom: var(--space-3);
+			flex-wrap: wrap;
+		}
+		.post__eyebrow {
+			font-size: var(--text-xs);
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+			color: var(--color-brand);
+		}
+		.post__title {
+			font-size: var(--text-4xl);
+			line-height: var(--leading-tight);
+			letter-spacing: var(--tracking-tight);
+			margin: 0 0 var(--space-3);
+		}
+		.post__meta {
+			color: var(--color-fg-muted);
+			font-size: var(--text-sm);
+			margin: 0;
+		}
+		.post__cover {
+			width: 100%;
+			border-radius: var(--radius-lg);
+			margin-bottom: var(--space-6);
+			box-shadow: var(--shadow-sm);
+		}
+		.post__body {
+			margin-bottom: var(--space-7);
+		}
+		.post__tags {
+			list-style: none;
+			padding: var(--space-5) 0 0;
+			margin: 0;
+			border-top: 1px solid var(--color-border);
+			display: flex;
+			gap: var(--space-2);
+			flex-wrap: wrap;
+		}
+		.post__tags a {
+			display: inline-block;
+			padding: 0.15rem 0.6rem;
+			background: var(--color-brand-soft);
+			color: var(--color-brand-ink);
+			border-radius: var(--radius-pill);
+			font-size: var(--text-xs);
+			text-decoration: none;
+			font-weight: 500;
+		}
+		.post__tags a:hover {
+			background: var(--color-brand);
+			color: #fff;
+		}
+	</style>
+</BaseLayout>

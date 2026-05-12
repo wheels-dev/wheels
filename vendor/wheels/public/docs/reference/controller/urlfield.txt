@@ -1,0 +1,10 @@
+// 1. Basic URL field bound to an object property
+#urlField(objectName="profile", property="websiteUrl")#
+
+// 2. URL field with a custom label and a CSS class
+#urlField(label="Website URL", objectName="profile", property="websiteUrl", class="form-control")#
+
+// 3. Nested URL field for a contacts association (hasMany)
+<cfloop from="1" to="#ArrayLen(company.contacts)#" index="i">
+	#urlField(label="Contact Website ##i#", objectName="company", association="contacts", position=i, property="websiteUrl")#
+</cfloop>

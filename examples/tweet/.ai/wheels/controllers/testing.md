@@ -8,7 +8,7 @@ Comprehensive guide to testing Wheels controllers using TestBox 5 with modern BD
 ### Modern Test Structure (TestBox 5)
 ```cfm
 // tests/specs/controllers/ProductsControllerSpec.cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         // Setup once before all tests

@@ -1,0 +1,17 @@
+// 1. Display all error messages for a user object
+#errorMessagesFor(objectName="user")#
+// -> <ul class="error-messages"><li>Email is not a valid email address.</li><li>Username can't be blank.</li></ul>
+// -> (empty string when the object has no errors)
+
+// 2. Use a custom CSS class on the wrapping ul element
+#errorMessagesFor(objectName="user", class="form-errors")#
+// -> <ul class="form-errors"><li>Email is not a valid email address.</li></ul>
+
+// 3. Suppress duplicate error messages
+#errorMessagesFor(objectName="user", showDuplicates=false)#
+// -> <ul class="error-messages"><li>can't be blank.</li></ul>
+// (only one "can't be blank." entry even if multiple fields have the same message)
+
+// 4. Include errors from associated objects as well
+#errorMessagesFor(objectName="order", includeAssociations=true)#
+// -> <ul class="error-messages"><li>Name can't be blank.</li><li>Line items quantity must be greater than zero.</li></ul>

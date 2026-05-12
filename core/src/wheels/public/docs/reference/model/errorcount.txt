@@ -1,9 +1,0 @@
-// Check how many errors are set on the object
-if(author.errorCount() GTE 10){
-    // Do something to deal with this very erroneous author here...
-}
-
-// Check how many errors are associated with the `email` property
-if(author.errorCount("email") gt 0){
-    // Do something to deal with this erroneous author here...
-}

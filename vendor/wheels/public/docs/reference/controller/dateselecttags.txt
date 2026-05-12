@@ -1,0 +1,8 @@
+// 1. Basic date selection - the "Tag" version accepts `name` and `selected` directly instead of binding to a model object
+#dateSelectTags(name="dateStart", selected=params.dateStart)#
+
+// 2. Show only month and year fields (omit day)
+#dateSelectTags(name="expiration", selected=params.expiration, order="month,year")#
+
+// 3. Custom year range with a blank option and a label
+#dateSelectTags(name="birthdate", selected=params.birthdate, startYear=1920, endYear=2024, includeBlank=true, label="Date of Birth")#

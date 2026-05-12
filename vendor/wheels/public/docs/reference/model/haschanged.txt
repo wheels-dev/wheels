@@ -1,0 +1,30 @@
+// 1. Check if a specific property has changed before saving
+member = model("member").findByKey(params.memberId);
+member.email = params.newEmail;
+
+if (member.hasChanged("email")) {
+    // Send a confirmation email before committing the change
+    sendEmailChangeNotification(member);
+}
+
+// 2. Check if any property has changed (no argument)
+user = model("User").findByKey(params.userId);
+user.setProperties(params.user);
+
+if (user.hasChanged()) {
+    // At least one property differs from the persisted state
+    user.save();
+}
+
+// 3. Use the dynamic shorthand — automatically generated per property
+order = model("Order").findByKey(params.orderId);
+order.status = "shipped";
+
+if (order.statusHasChanged()) {
+    // Equivalent to: order.hasChanged("status")
+    notifyCustomer(order);
+}
+
+// 4. New (unsaved) objects always return true — no persisted record exists yet
+newPost = model("Post").new(title="Hello");
+writeOutput(newPost.hasChanged()); // -> true

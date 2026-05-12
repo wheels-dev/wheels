@@ -1,0 +1,11 @@
+// 1. Get the last user record (ordered by primary key descending)
+lastUser = model("User").findLastOne();
+// Returns a User object for the record with the highest primary key, or false if none exist.
+
+// 2. Get the most recently created post by ordering on a different property
+latestPost = model("Post").findLastOne(property="createdAt");
+// Returns the Post object with the latest createdAt value.
+
+// 3. Get the last active product, using a where clause alongside the property order
+lastActive = model("Product").findLastOne(property="updatedAt", where="isActive = 1");
+// Returns the most recently updated active product, or false if none exist.

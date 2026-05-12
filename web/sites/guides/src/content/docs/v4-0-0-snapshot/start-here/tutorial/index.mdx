@@ -1,0 +1,112 @@
+---
+title: "Tutorial: Build a Blog"
+description: A 7-part narrative tutorial. Build a complete Wheels 4.0 blog with Turbo and built-in auth. Takes about 3.5 hours.
+type: tutorial
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+You'll build a complete blog application. Posts with titles and bodies. Comments under each post. Users who sign up, log in, and can only edit their own content. Forms that validate inline without page reloads. One browser test that clicks through the whole flow.
+
+By the end you've touched every part of Wheels that matters in day-to-day work: models, migrations, seeds, scaffolds, validations, associations, forms, routes, filters, Turbo Frames, Turbo Streams, authentication, and tests.
+
+**You'll learn:** everything in The Basics and most of Digging Deeper. This tutorial is the single best introduction to Wheels 4.0.
+
+<Aside type="note">
+  **Audience:** you know how to program but you're new to Wheels. You don't need to know CFML — the tutorial introduces it as you go.
+
+  **Time:** about 3.5 hours end-to-end. You can pause between parts; each begins with a "Where we left off" recap.
+</Aside>
+
+## What you'll build
+
+A blog for an individual author. The final app supports:
+
+- **Posts** — a title, body, status (draft / published / archived), and publication date
+- **Comments** — readers can comment on published posts without signing up
+- **Users** — authors sign up with email and password, then manage their own posts
+- **Turbo UI** — form errors appear inline, new comments append without page reloads, page transitions have zero flash
+- **Tests** — one model spec, one controller spec, one browser spec clicking through the full flow
+
+## Technology stack
+
+- **Framework:** Wheels 4.0 on Lucee 7 (via the bundled `wheels` CLI)
+- **Database:** SQLite, zero setup. Same engine the tutorial runs against in CI.
+- **Frontend:** Turbo Drive for page transitions, Turbo Frames for inline errors, Turbo Streams for comment updates. Loaded from a CDN script tag in Part 4; the `hotwire` package is the eventual canonical home.
+- **Styling:** [simple.css](https://simplecss.org/), wired into the generated `app/views/layout.cfm` by `wheels new`. Classless — semantic HTML renders polished without any markup changes. The [`wheels-basecoat`](https://github.com/wheels-dev/wheels-basecoat) package is available as an optional shadcn/ui-quality component-kit upgrade after the tutorial.
+- **Auth:** Wheels' built-in `SessionStrategy` for session cookies. Hand-rolled version shown first for understanding, built-in version shown second for shipping.
+- **Tests:** WheelsTest (BDD), plus one Playwright-driven browser spec.
+
+## The seven parts
+
+| Part | Topic | Time |
+|------|-------|------|
+| [1. Hello, Wheels](/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/) | Scaffold an app. Add a route, a controller action, a view. | 20 min |
+| [2. Your First Model](/v4-0-0-snapshot/start-here/tutorial/02-first-model/) | Generate a Post model. Run a migration. Seed data. Build the index and show actions by hand. | 25 min |
+| [3. CRUD Scaffold](/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/) | Throw it away. Run `wheels generate scaffold`. Tour the generated files and meet Wheels' package system. | 25 min |
+| [4. Validations and Turbo Frames](/v4-0-0-snapshot/start-here/tutorial/04-validations-frames/) | Add model validations. Wrap the form in a `<turbo-frame>` so errors come back inline. | 30 min |
+| [5. Comments and Turbo Streams](/v4-0-0-snapshot/start-here/tutorial/05-comments-streams/) | Add a Comment model. Associate it with Post. Nested routes. Submit comments via Turbo Streams. | 35 min |
+| [6. Authentication](/v4-0-0-snapshot/start-here/tutorial/06-authentication/) | Hand-roll sessions first to understand the mental model. Then replace with `wheels.auth.SessionStrategy`. | 45 min |
+| [7. Testing and Deploying](/v4-0-0-snapshot/start-here/tutorial/07-testing-deploying/) | Model spec, controller spec, one browser spec. Deployment overview. What to read next. | 35 min |
+| [Bonus: Style with wheels-basecoat](/v4-0-0-snapshot/start-here/tutorial/08-bonus-basecoat/) | Optional. Install the basecoat package and convert the post view to shadcn/ui-quality components. Meets the Wheels package system end-to-end. | 30 min |
+
+## How each part works
+
+- **"Where we left off"** — the first section of every part after Part 1. A file tree and schema summary so you can resume without reading the previous part end-to-end.
+- **Numbered steps** — each change to the code is a numbered step in a `<Steps>` block. You'll see the file path, the before state when relevant, and the final content.
+- **Checkpoint** — before moving on, a concrete check you can run (usually `curl` against a URL or `wheels test`).
+- **Troubleshooting** — three common failure modes with fixes, including the error message you'd see.
+
+## Conventions used throughout
+
+- **SQLite.** All development runs against SQLite in `db/development.sqlite`. Zero setup. Matches the CI testing platform.
+- **Real names.** Code examples use `Post`, `Comment`, `user.email`, `publishedAt` — not `Foo`, `Bar`, or `someField`.
+- **Complete code.** Each block shows the whole function or view, not a fragment. You can always copy a block and have the feature work.
+- **Validated end-to-end.** Every code block in the tutorial is executed by the doc site's verify-docs harness against a real `wheels` CLI. If you see a block here, it compiles and runs.
+
+## Ready to start
+
+<CardGrid>
+  <LinkCard
+    title="Part 1: Hello, Wheels"
+    href="/v4-0-0-snapshot/start-here/tutorial/01-hello-wheels/"
+    description="20 minutes — scaffold an app, add a route"
+  />
+  <LinkCard
+    title="Part 2: Your First Model"
+    href="/v4-0-0-snapshot/start-here/tutorial/02-first-model/"
+    description="25 minutes — generators, migrations, seeds, finders"
+  />
+  <LinkCard
+    title="Part 3: CRUD Scaffold"
+    href="/v4-0-0-snapshot/start-here/tutorial/03-crud-scaffold/"
+    description="25 minutes — packages, scaffold, Turbo Drive"
+  />
+  <LinkCard
+    title="Part 4: Validations and Turbo Frames"
+    href="/v4-0-0-snapshot/start-here/tutorial/04-validations-frames/"
+    description="30 minutes — validations, inline errors, filters"
+  />
+  <LinkCard
+    title="Part 5: Comments and Turbo Streams"
+    href="/v4-0-0-snapshot/start-here/tutorial/05-comments-streams/"
+    description="35 minutes — associations, nested routes, streams"
+  />
+  <LinkCard
+    title="Part 6: Authentication"
+    href="/v4-0-0-snapshot/start-here/tutorial/06-authentication/"
+    description="45 minutes — hand-rolled first, then built-in"
+  />
+  <LinkCard
+    title="Part 7: Testing and Deploying"
+    href="/v4-0-0-snapshot/start-here/tutorial/07-testing-deploying/"
+    description="35 minutes — WheelsTest, browser tests, deployment"
+  />
+  <LinkCard
+    title="Bonus: Style with wheels-basecoat"
+    href="/v4-0-0-snapshot/start-here/tutorial/08-bonus-basecoat/"
+    description="30 minutes — optional. Install a package, swap the styling, meet the package system end-to-end."
+  />
+</CardGrid>

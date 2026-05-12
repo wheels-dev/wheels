@@ -1,0 +1,16 @@
+// 1. Get a post object and then delete it from the database.
+post = model("Post").findByKey(33);
+post.delete();
+
+// 2. Permanently delete a record even if the model uses soft deletes.
+user = model("User").findByKey(params.userId);
+user.delete(softDelete=false);
+
+// 3. Delete a record without running callbacks (e.g. skip `beforeDelete` / `afterDelete`).
+comment = model("Comment").findByKey(params.commentId);
+comment.delete(callbacks=false);
+
+// 4. If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `deleteComment` method below will call `comment.delete()` internally.)
+post = model("Post").findByKey(params.postId);
+comment = model("Comment").findByKey(params.commentId);
+post.deleteComment(comment);

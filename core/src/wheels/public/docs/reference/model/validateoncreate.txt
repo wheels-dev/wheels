@@ -1,9 +1,0 @@
-function config(){
-	// Register the `checkPhoneNumber` method below to be called to validate new objects before they are inserted.
-	validateOnCreate("checkPhoneNumber");
-}
-
-function checkPhoneNumber(){
-	// Make sure area code is `614`.
-	return Left(this.phoneNumber, 3) == "614";
-}

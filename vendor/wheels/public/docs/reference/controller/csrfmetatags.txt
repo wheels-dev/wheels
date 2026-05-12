@@ -1,0 +1,16 @@
+// 1. Include CSRF meta tags in your layout's <head> section
+//    so that JavaScript AJAX requests can read the token and send it
+//    as a request header when POSTing data to your application.
+<head>
+  <title>My App</title>
+  #csrfMetaTags()#
+</head>
+
+// 2. Reading the token in JavaScript (e.g. with fetch) using the meta tags above
+//    The rendered HTML will contain two meta tags like:
+//    <meta name="csrf-param" content="authenticityToken">
+//    <meta name="csrf-token" content="<generated-token>">
+//
+//    In your JavaScript you can then do:
+//    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+//    fetch('/posts', { method: 'POST', headers: { 'authenticityToken': token }, body: ... });

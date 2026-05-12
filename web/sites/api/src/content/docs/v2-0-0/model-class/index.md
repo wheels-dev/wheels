@@ -1,0 +1,40 @@
+---
+title: Model Class
+description: "35 Model Class functions in Wheels 2.0.0."
+---
+
+- [`average()`](/v2-0-0/model-class/average/) — Calculates the average value for a given property.
+- [`columnDataForProperty()`](/v2-0-0/model-class/columndataforproperty/) — Returns a struct with data for the named property.
+- [`columnForProperty()`](/v2-0-0/model-class/columnforproperty/) — Returns the column name mapped for the named model property.
+- [`columnNames()`](/v2-0-0/model-class/columnnames/) — Returns a list of column names in the table mapped to this model.
+- [`columns()`](/v2-0-0/model-class/columns/) — Returns an array of columns names for the table associated with this class.
+- [`count()`](/v2-0-0/model-class/count/) — Returns the number of rows that match the arguments (or all rows if no arguments are passed in).
+- [`create()`](/v2-0-0/model-class/create/) — Creates a new object, saves it to the database (if the validation permits it), and returns it.
+- [`deleteAll()`](/v2-0-0/model-class/deleteall/) — Deletes all records that match the <code>where</code> argument.
+- [`deleteByKey()`](/v2-0-0/model-class/deletebykey/) — Finds the record with the supplied key and deletes it.
+- [`deleteOne()`](/v2-0-0/model-class/deleteone/) — Gets an object based on conditions and deletes it.
+- [`exists()`](/v2-0-0/model-class/exists/) — Checks if a record exists in the table.
+- [`findAll()`](/v2-0-0/model-class/findall/) — Returns records from the database table mapped to this model according to the arguments passed in (use the <code>where</
+- [`findAllKeys()`](/v2-0-0/model-class/findallkeys/) — Returns all primary key values in a list.
+- [`findByKey()`](/v2-0-0/model-class/findbykey/) — Fetches the requested record by primary key and returns it as an object.
+- [`findFirst()`](/v2-0-0/model-class/findfirst/) — Fetches the first record ordered by primary key value.
+- [`findLast()`](/v2-0-0/model-class/findlast/) — Fetches the last record ordered by primary key value.
+- [`findOne()`](/v2-0-0/model-class/findone/) — Fetches the first record found based on the <code>WHERE</code> and <code>ORDER BY</code> clauses.
+- [`getTableNamePrefix()`](/v2-0-0/model-class/gettablenameprefix/) — Returns the table name prefix set for the table.
+- [`invokeWithTransaction()`](/v2-0-0/model-class/invokewithtransaction/) — Runs the specified method within a single database transaction.
+- [`isClass()`](/v2-0-0/model-class/isclass/) — Use this method to check whether you are currently in a class-level object.
+- [`isInstance()`](/v2-0-0/model-class/isinstance/) — Use this method to check whether you are currently in an instance object.
+- [`maximum()`](/v2-0-0/model-class/maximum/) — Calculates the maximum value for a given property.
+- [`minimum()`](/v2-0-0/model-class/minimum/) — Calculates the minimum value for a given property.
+- [`new()`](/v2-0-0/model-class/new/) — Creates a new object based on supplied <code>properties</code> and returns it.
+- [`onMissingMethod()`](/v2-0-0/model-class/onmissingmethod/) — This method is not designed to be called directly from your code, but provides functionality for dyanmic finders such as
+- [`primaryKey()`](/v2-0-0/model-class/primarykey/) — Returns the name of the primary key for this model's table.
+- [`primaryKeys()`](/v2-0-0/model-class/primarykeys/) — Alias for <code>primaryKey()</code>.
+- [`propertyNames()`](/v2-0-0/model-class/propertynames/) — Returns a list of property names ordered by their respective column's ordinal position in the database table.
+- [`save()`](/v2-0-0/model-class/save/) — Saves the object if it passes validation and callbacks.
+- [`sum()`](/v2-0-0/model-class/sum/) — Calculates the sum of values for a given property.
+- [`tableName()`](/v2-0-0/model-class/tablename/) — Returns the name of the database table that this model is mapped to.
+- [`updateAll()`](/v2-0-0/model-class/updateall/) — Updates all properties for the records that match the <code>where</code> argument.
+- [`updateByKey()`](/v2-0-0/model-class/updatebykey/) — Finds the object with the supplied <code>key</code> and saves it (if validation permits it) with the supplied <code>prop
+- [`updateOne()`](/v2-0-0/model-class/updateone/) — Gets an object based on the arguments used and updates it with the supplied <code>properties</code>.
+- [`validationTypeForProperty()`](/v2-0-0/model-class/validationtypeforproperty/) — Returns the validation type for the property.

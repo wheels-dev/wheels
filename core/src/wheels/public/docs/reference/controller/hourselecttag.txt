@@ -1,5 +1,0 @@
-<!---This "Tag" version of the function accepts a `name` and `selected` instead of binding to a model object --->
-#hourSelectTag(name="hourOfMeeting", selected=params.hourOfMeeting)#
-
-<!---Show 12 hours instead of 24 --->
-#hourSelectTag(name="hourOfMeeting", selected=params.hourOfMeeting, twelveHour=true)#

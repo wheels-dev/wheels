@@ -1,0 +1,34 @@
+// 1. Update a single column for all rows in a table
+updateRecord(
+    table = "settings",
+    value = "My Updated App"
+);
+
+// 2. Update specific columns using a where clause to target matching rows
+updateRecord(
+    table = "users",
+    where = "role = 'guest'",
+    active = false
+);
+
+// 3. Update multiple columns during a migration's up() function
+component extends="wheels.migrator.Migration" {
+    function up() {
+        updateRecord(
+            table = "users",
+            where = "id = 1",
+            firstName = "Bruce",
+            lastName = "Wayne",
+            email = "bruce@wayneenterprises.com"
+        );
+    }
+    function down() {
+        updateRecord(
+            table = "users",
+            where = "id = 1",
+            firstName = "Clark",
+            lastName = "Kent",
+            email = "clark@dailyplanet.com"
+        );
+    }
+}

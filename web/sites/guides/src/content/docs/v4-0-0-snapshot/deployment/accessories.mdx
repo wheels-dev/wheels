@@ -1,0 +1,138 @@
+---
+title: Accessories
+description: Sidecar containers — databases, caches, queues — booted alongside your app but outside the rolling deploy flow.
+type: howto
+sidebar:
+  order: 9
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Accessories are long-lived support containers that your app depends on but that aren't part of the rolling application deploy. Think databases, caches, and search indices. `wheels deploy` boots them once, leaves them alone, and lets you manage their lifecycle independently of the app.
+
+**You'll learn:**
+
+- When to use an accessory versus an externally-managed service
+- How to declare a Redis or Postgres accessory in `deploy.yml`
+- The independent lifecycle verbs — `boot`, `reboot`, `start`, `stop`, `logs`, `remove`
+- How accessories fit into the on-server label and naming scheme
+
+<Aside type="note" title="You should already know">
+You've read [Your First Deploy](/v4-0-0-snapshot/deployment/first-deploy/) and understand the overall deploy flow.
+</Aside>
+
+## When to use an accessory
+
+Accessories are convenient, not magical. They're a good fit when:
+
+- You're running a single-instance service (one Redis, one Postgres) and managing it alongside the app is simpler than running a managed service.
+- Your staging or dev environment shouldn't pay for managed Redis / RDS.
+- You want the database and the app rebuilt together when you tear down an environment (`wheels deploy remove`).
+
+Use a managed service — not an accessory — when:
+
+- You need HA, automated failover, or point-in-time recovery.
+- The service has its own ops story your team already runs (RDS, ElastiCache, Opensearch Service).
+- You're on Kubernetes and the cluster already has operators for the thing.
+
+Accessories are pinned to one host by default. They're not a clustering or replication story.
+
+## Minimal — Redis
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+accessories:
+  redis:
+    image: redis:7
+    host: 192.0.2.20
+    port: 6379
+```
+
+`wheels deploy accessory boot redis` on first deploy. Produces a container named `<service>-redis` on the named host, published on 6379. From the app side, connect to `redis://192.0.2.20:6379`.
+
+## Postgres with volume, env, and an init file
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+accessories:
+  db:
+    image: postgres:16
+    host: 192.0.2.20
+    port: 5432
+    env:
+      clear:
+        POSTGRES_USER: app
+        POSTGRES_DB: myapp_production
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - /data/pg:/var/lib/postgresql/data
+    files:
+      - config/init.sql:/docker-entrypoint-initdb.d/init.sql
+```
+
+- `env.secret:` pulls `POSTGRES_PASSWORD` from `.kamal/secrets` — never commit it to `deploy.yml`.
+- `volumes:` persists `/var/lib/postgresql/data` to the host so the database survives `docker rm`.
+- `files:` uploads local paths to the container filesystem at deploy time. Useful for initialization scripts, client certs, or any read-only payload the container needs.
+
+## Named containers and labels
+
+Accessory containers are named `<service>-<accessory>` — the example above yields `myapp-db` and `myapp-redis`. They carry the same `service=` label as your app containers, so `wheels deploy details` lists them alongside everything else.
+
+## Multi-host accessories
+
+Declare multiple hosts to run independent copies:
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+accessories:
+  redis:
+    image: redis:7
+    hosts:
+      - 192.0.2.20
+      - 192.0.2.21
+```
+
+Each host gets its own independent container. There is no clustering, no replication, no leader election — that's the accessory's job. If you need a Redis cluster, either configure it manually across the hosts or run it as a managed service.
+
+## Lifecycle verbs
+
+Every accessory has an independent lifecycle, scoped by name:
+
+```bash title="illustrative — do not type"
+wheels deploy accessory boot db              # first-time install
+wheels deploy accessory reboot db            # stop + remove + boot
+wheels deploy accessory start db             # docker start
+wheels deploy accessory stop db              # docker stop
+wheels deploy accessory restart db           # docker restart
+wheels deploy accessory details db           # docker ps filtered
+wheels deploy accessory logs db --tail=100   # tail container logs
+wheels deploy accessory remove db            # stop + rm
+```
+
+Pass `all` instead of a specific name to fan out:
+
+```bash title="illustrative — do not type"
+wheels deploy accessory boot all
+wheels deploy accessory stop all
+```
+
+`wheels deploy setup` boots every declared accessory as part of first-run. `wheels deploy remove` tears them down.
+
+## Accessories and `wheels deploy`
+
+Accessories are deliberately **not** part of the rolling `wheels deploy` flow. Running `wheels deploy` does not restart Redis, does not upgrade Postgres, and does not reboot anything under `accessories:`. That separation is the whole point — app deploys happen ten times a day, accessory changes happen rarely, and mixing the two is how you accidentally take the database down during a routine rollout.
+
+When you do want to change an accessory — a Redis version bump, a Postgres config reload — run the accessory verb explicitly.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="deploy.yml Reference"
+    href="/v4-0-0-snapshot/deployment/config-reference/"
+    description="The full schema, including the accessory block's options."
+  />
+  <LinkCard
+    title="Secrets"
+    href="/v4-0-0-snapshot/deployment/secrets/"
+    description="How .kamal/secrets feeds accessory env.secret lists."
+  />
+</CardGrid>

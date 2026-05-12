@@ -1,0 +1,8 @@
+// 1. Basic email field with a name and pre-filled value
+#emailFieldTag(name="userEmail", value="hello@example.com")#
+
+// 2. Email field with a label
+#emailFieldTag(label="Email Address", name="userEmail", value=params.userEmail)#
+
+// 3. Email field with a CSS class and placeholder passed as extra HTML attributes
+#emailFieldTag(name="contactEmail", value="", class="form-control", placeholder="you@example.com")#

@@ -1,0 +1,16 @@
+// 1. Get verification chain, remove the first item, and set it back.
+myVerificationChain = verificationChain();
+arrayDeleteAt(myVerificationChain, 1);
+setVerificationChain(myVerificationChain);
+
+// 2. Inspect the number of verifications registered on this controller.
+chain = verificationChain();
+writeOutput("Verifications registered: " & arrayLen(chain));
+
+// 3. Loop over the chain to find verifications that apply to a specific action.
+chain = verificationChain();
+for (item in chain) {
+	if (listFindNoCase(item.only, "create")) {
+		writeOutput("Verification applies to create: " & serializeJSON(item));
+	}
+}

@@ -1,2 +1,0 @@
-<!---  Basic usage usually involves a `label`, `name`, and `value` --->
-#fileFieldTag(label="Photo", name="photo", value=params.photo)#

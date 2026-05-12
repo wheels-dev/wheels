@@ -1,0 +1,11 @@
+// 1. Register a single method to run before a new object is validated
+// In models/User.cfc config()
+beforeValidationOnCreate("sanitizeEmail");
+
+// 2. Register multiple methods to run before a new object is validated
+// In models/Order.cfc config()
+beforeValidationOnCreate("setDefaultStatus,generateTrackingNumber");
+
+// 3. Use the `method` argument alias instead of `methods`
+// In models/Post.cfc config()
+beforeValidationOnCreate(method="normalizeSlug");

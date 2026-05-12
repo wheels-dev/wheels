@@ -1,1 +1,0 @@
-testController = controller("users", params);

@@ -1,0 +1,18 @@
+// 1. Create a new author in memory (not saved to the database)
+newAuthor = model("author").new();
+
+// 2. Create a new author by passing in a struct of properties
+newAuthor = model("author").new(params.authorStruct);
+
+// 3. Create a new author by passing in named arguments
+newAuthor = model("author").new(firstName="John", lastName="Doe");
+
+// 4. Create a new object without running callbacks
+newAuthor = model("author").new(firstName="Jane", callbacks=false);
+
+// 5. Create a new object and allow explicit assignment of timestamp properties
+newAuthor = model("author").new(firstName="Bob", createdAt="2024-01-01", allowExplicitTimestamps=true);
+
+// 6. Scoped call via a `hasMany` association (calls `model("order").new(customerId=aCustomer.id)` internally)
+aCustomer = model("customer").findByKey(params.customerId);
+anOrder = aCustomer.newOrder(shipping=params.shipping);

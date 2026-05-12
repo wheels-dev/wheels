@@ -1,0 +1,42 @@
+<cfscript>
+
+// 1. Basic versioned API routes using api() and version() together
+mapper()
+    .api()
+        .version(number=1)
+            // Route name:  apiV1Users
+            // Example URL: /api/v1/users
+            .resources("users")
+        .end()
+
+        .version(number=2)
+            // Route name:  apiV2Users
+            // Example URL: /api/v2/users
+            .resources("users")
+        .end()
+    .end()
+.end();
+
+// 2. Using a callback to define routes within the version scope
+mapper()
+    .api(callback=function(r) {
+        r.version(number=1, callback=function(r) {
+            // Route name:  apiV1Products
+            // Example URL: /api/v1/products
+            r.resources("products");
+        });
+    })
+.end();
+
+// 3. Overriding the path and name prefixes
+mapper()
+    .api()
+        .version(number=1, path="version-one", name="versionOne")
+            // Route name:  apiVersionOneOrders
+            // Example URL: /api/version-one/orders
+            .resources("orders")
+        .end()
+    .end()
+.end();
+
+</cfscript>

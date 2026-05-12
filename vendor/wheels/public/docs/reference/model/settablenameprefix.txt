@@ -1,0 +1,15 @@
+// 1. In `models/User.cfc`, prepend `tbl` to the default table name so
+//    Wheels queries the `tblusers` table instead of `users`.
+function config() {
+	setTableNamePrefix("tbl");
+}
+
+// 2. Use a schema-style prefix to namespace legacy tables shared across
+//    multiple applications on the same database.
+// models/Order.cfc
+component extends="Model" {
+	function config() {
+		setTableNamePrefix("legacy_");
+		// Wheels will now query `legacy_orders` for this model.
+	}
+}

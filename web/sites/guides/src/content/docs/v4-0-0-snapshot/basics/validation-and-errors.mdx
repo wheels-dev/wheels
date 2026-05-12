@@ -1,0 +1,183 @@
+---
+title: Validation and Error Display
+description: Built-in validations, when they fire, the errors API, and rendering errors inline.
+type: howto
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Validations live on the model and run automatically on `save()` and `update()`. Every failure collects onto the record as an error you can read from the controller or render into a view. This page walks the built-in helpers, the errors API, and the two patterns for surfacing errors back to the user.
+
+**You'll learn:**
+
+- How to declare validations in `config()` and which helpers ship with the framework
+- When validations fire — `save()`, `update()`, `create()`, and the manual `.valid()` trigger
+- How to read errors with `hasErrors()`, `errors()`, `errorsOn()`, and how to add your own with `addError()`
+- Two ways to render errors in a view — the summary helper and per-field output
+- How to write custom validation methods and when to scope validations with `when` or `condition`
+
+<Aside type="note">
+  You should already know why validations live on the model. See [ORM Philosophy](/v4-0-0-snapshot/core-concepts/orm-philosophy/).
+</Aside>
+
+## Declaring validations
+
+Validations are declared in the model's `config()` method. Each helper registers a rule; the framework runs them all every time the record is saved, collects the failures as errors, and short-circuits the save if any fail.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        validatesPresenceOf(properties="title,body");
+        validatesLengthOf(property="title", maximum=120);
+        validatesUniquenessOf(property="slug");
+    }
+}
+```
+
+<Aside type="caution">
+  **Do not mix positional and named arguments.** Wheels functions can't tolerate it — `validatesPresenceOf("name", message="Required")` breaks, because `"name"` is positional and `message=` is named. Use all-named when you pass options: `validatesPresenceOf(properties="name", message="Required")`. A single positional argument with no options is fine: `validatesPresenceOf("name")`.
+</Aside>
+
+The plural `properties="title,body"` and singular `property="title"` arguments are aliases for the same underlying value — use whichever reads better for the field count. Rules registered via these helpers all accept a `message` argument for a custom failure message.
+
+## Built-in validations
+
+Every helper below is a thin wrapper over the same registration machinery. The `property` / `properties` argument accepts either a single name or a comma-separated list.
+
+- `validatesPresenceOf(properties="name,email")` — value must not be blank.
+- `validatesLengthOf(property="title", maximum=120, minimum=3)` — length bounds. Also accepts `exactly` and `within` (a two-value list like `"3,120"`).
+- `validatesFormatOf(property="email", type="email")` — format check. Pass `regEx="..."` for a custom pattern, or `type` for one of the built-in types (`creditcard`, `date`, `email`, `eurodate`, `guid`, `ssn`, `telephone`, `time`, `URL`, `USdate`, `UUID`, `variableName`, `zipcode`, `boolean`).
+- `validatesUniquenessOf(property="email", scope="organizationId")` — runs a DB check; fails if another row already has the value. `scope` narrows the uniqueness check to rows matching one or more properties.
+- `validatesInclusionOf(property="status", list="draft,published,archived")` — value must appear in `list`.
+- `validatesExclusionOf(property="subdomain", list="admin,www,api")` — value must **not** appear in `list`. Useful for reserved words.
+- `validatesNumericalityOf(property="quantity", greaterThan=0)` — numeric checks. Also accepts `onlyInteger`, `odd`, `even`, `greaterThanOrEqualTo`, `equalTo`, `lessThan`, `lessThanOrEqualTo`.
+- `validatesConfirmationOf(property="password")` — matches `password` against `passwordConfirmation`. The confirmation field never gets saved to the database.
+
+## When validations fire
+
+Wheels runs validations automatically on most write paths. You can also trigger them manually without touching the database.
+
+- **`save()` and `update()`** — validations run before the write. If any fail, the call returns `false`, errors are attached to the record, and the database is never touched.
+- **`create()`** — shortcut for `new()` + `save()`; validations run the same way.
+- **`.valid()`** — manually run validations on an unsaved record. Returns `true` / `false` and populates errors. Use this when you need to validate before displaying a form, or in background work where you control the save later.
+- **`save(validate=false)`** — skip validations entirely. Rare, and only safe when you know the data is already clean (seeds, data imports, migrations).
+
+Both `create` and `update` callbacks fire at the right time: `when="onCreate"` rules only run for new records, `when="onUpdate"` rules only run when updating an existing row, `when="onSave"` (the default) runs in both cases.
+
+## The errors API
+
+When `save()` returns `false`, the record carries the failures with it. The controller's job is to check and re-render:
+
+```cfm {test:compile}
+component extends="Controller" {
+    function create() {
+        post = model("Post").new(params.post);
+        if (post.save()) {
+            redirectTo(route="post", key=post.id);
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+On the record itself, four methods cover the common cases:
+
+- `hasErrors()` — boolean. Pass a property name (`hasErrors("title")`) to narrow to a single field.
+- `errors()` — array of error structs. Each struct has `property` and `message`.
+- `errorsOn("title")` — array of error structs for a single property. Returns an empty array when none.
+- `addError(property="title", message="...")` — attach an error manually. Useful from a `beforeSave` callback or a custom validation method.
+
+Because `save()` already populates errors before returning `false`, there is nothing extra to do in the controller — just re-render the form and let the view read the record.
+
+## Inline rendering in views
+
+The fastest way to show every error is `errorMessagesFor`. Drop it above the form and Wheels renders a `<ul class="error-messages">` with one `<li>` per error. When there are no errors, it returns an empty string.
+
+```cfm {test:compile}
+<cfoutput>
+    ##startFormTag(route="posts")##
+        ##errorMessagesFor("post")##
+        ##textField(objectName="post", property="title")##
+        ##textArea(objectName="post", property="body")##
+        <button type="submit">Save</button>
+    ##endFormTag()##
+</cfoutput>
+```
+
+The argument is the view-scope variable name — `"post"` here matches `posts` in the `new` action. See [Forms and Form Helpers](/v4-0-0-snapshot/basics/forms-and-form-helpers/) for the wider form flow this slots into.
+
+## Per-field error display
+
+There is no dedicated per-field helper that matches the form-helper style, but two options cover every case.
+
+The short path is `errorMessageOn`, which returns the first error for a property (empty string when none):
+
+```cfm {test:compile}
+<cfoutput>
+    ##textField(objectName="post", property="title")##
+    ##errorMessageOn(objectName="post", property="title", wrapperElement="span", class="error")##
+</cfoutput>
+```
+
+For full control over markup, loop `errorsOn` yourself:
+
+```cfm {test:compile}
+<cfoutput>
+    <cfset titleErrors = post.errorsOn("title")>
+    <cfif ArrayLen(titleErrors) gt 0>
+        <span class="error">##titleErrors[1].message##</span>
+    </cfif>
+</cfoutput>
+```
+
+## Custom validations
+
+When a built-in helper doesn't cover the rule — cross-field checks, external lookups, conditional uniqueness — register a custom method. The method is `private`, returns nothing, and calls `addError()` whenever it decides the record is invalid.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        validate(methods="mustBeUniqueAcrossTenants");
+    }
+
+    private function mustBeUniqueAcrossTenants() {
+        if (model("Post").exists(where="slug='##this.slug##' AND orgId=##this.orgId##")) {
+            addError(property="slug", message="Already in use in this organization");
+        }
+    }
+}
+```
+
+Register one or more methods via `validate(methods="method1,method2")`. Use `validateOnCreate` or `validateOnUpdate` to limit the trigger. Inside the method, `this` is the record under validation — read any property off it and call `addError` (or `addErrorToBase` for record-wide errors that don't belong to a specific field).
+
+## Conditional validations
+
+Every built-in helper (and `validate` itself) accepts `when`, `condition`, and `unless`. Use them to scope a rule to a specific lifecycle event or to a runtime state.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        validatesPresenceOf(property="approverId", when="onUpdate");
+        validatesLengthOf(property="title", maximum=120, condition="status != 'draft'");
+    }
+}
+```
+
+- `when` — `"onSave"` (default, fires on create and update), `"onCreate"`, or `"onUpdate"`.
+- `condition` — CFML expression evaluated against the record. The rule runs only when it returns `true`.
+- `unless` — inverse of `condition`; the rule runs only when the expression returns `false`.
+
+<Aside type="tip">
+  Validations on associations — like requiring child records to be valid before the parent saves — are covered in the associations guide (coming up in this series). `validatesAssociated` is the relevant helper.
+</Aside>
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-0-snapshot/basics/forms-and-form-helpers/" description="The object-bound form helpers that pair with errorMessagesFor." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0-snapshot/basics/controllers-and-actions/" description="The create / update flow that triggers validations." />
+  <LinkCard title="ORM Philosophy" href="/v4-0-0-snapshot/core-concepts/orm-philosophy/" description="Why validations live on the model, not the controller." />
+</CardGrid>

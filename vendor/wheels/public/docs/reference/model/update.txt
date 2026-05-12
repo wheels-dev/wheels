@@ -1,0 +1,26 @@
+// 1. Find a post and update its title
+post = model("Post").findByKey(33);
+post.update(title="New version of Wheels just released");
+
+// 2. Update multiple properties from form/URL params on an existing object
+post = model("Post").findByKey(params.key);
+isSuccess = post.update(title="New version of Wheels just released", properties=params.post);
+
+// 3. Skip validations when updating (useful for admin operations)
+post = model("Post").findByKey(params.key);
+isSuccess = post.update(properties=params.post, validate=false);
+
+// 4. Scoped call via a hasOne association (setBio calls bio.update(authorId=author.id) internally)
+author = model("Author").findByKey(params.authorId);
+bio = model("Bio").findByKey(params.bioId);
+author.setBio(bio);
+
+// 5. Scoped call via a hasMany association (addCar calls car.update(ownerId=owner.id) internally)
+anOwner = model("Owner").findByKey(params.ownerId);
+aCar = model("Car").findByKey(params.carId);
+anOwner.addCar(aCar);
+
+// 6. Scoped call to disassociate a record (removeComment calls comment.update(postId="") internally)
+aPost = model("Post").findByKey(params.postId);
+aComment = model("Comment").findByKey(params.commentId);
+aPost.removeComment(aComment);

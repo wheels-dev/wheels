@@ -1,0 +1,17 @@
+// 1. Require a single property (must exist and not be blank)
+validatesPresenceOf("emailAddress");
+
+// 2. Require multiple properties at once
+validatesPresenceOf(properties="firstName,lastName,emailAddress");
+
+// 3. Supply a custom error message
+validatesPresenceOf(properties="title", message="A title is required.");
+
+// 4. Only validate on create (skip when updating an existing record)
+validatesPresenceOf(properties="password", when="onCreate");
+
+// 5. Conditionally require a property based on another property value
+validatesPresenceOf(properties="companyName", condition="this.accountType eq 'business'");
+
+// 6. Skip validation when a certain condition is true
+validatesPresenceOf(properties="bio", unless="this.isGuest()");

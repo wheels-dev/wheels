@@ -1,0 +1,30 @@
+// 1. Add a single reference column with a foreign key constraint
+// Creates a `userId` integer column and a foreign key pointing to the `users` table.
+t = createTable(name='posts');
+	t.string(columnNames='title', limit=255, allowNull=false);
+	t.references(referenceNames='user');
+	t.timestamps();
+t.create();
+
+// 2. Add multiple reference columns at once
+// Creates `authorId` and `categoryId` integer columns, each with a foreign key.
+t = createTable(name='articles');
+	t.string(columnNames='title', limit=255, allowNull=false);
+	t.references(referenceNames='author,category');
+	t.timestamps();
+t.create();
+
+// 3. Add a polymorphic reference (no foreign key, adds a `<name>type` string column)
+// Creates `commentableId` (integer) and `commentableType` (string) columns.
+t = createTable(name='comments');
+	t.text(columnNames='body', allowNull=false);
+	t.references(referenceNames='commentable', polymorphic=true);
+	t.timestamps();
+t.create();
+
+// 4. Add a reference with cascade delete and allow null
+t = createTable(name='attachments');
+	t.references(referenceNames='post', allowNull=true, onDelete='cascade');
+	t.string(columnNames='fileName', limit=255);
+	t.timestamps();
+t.create();

@@ -1,0 +1,11 @@
+// 1. Basic usage: embed the user's id as a hidden field
+#hiddenField(objectName="user", property="id")#
+// -> <input type="hidden" id="user-id" name="user[id]" value="42">
+
+// 2. Carry a token value using a class attribute for JavaScript hooks
+#hiddenField(objectName="user", property="csrfToken", class="js-token")#
+// -> <input type="hidden" id="user-csrf-token" name="user[csrfToken]" class="js-token" value="abc123">
+
+// 3. Nested form — pass the parent's id through a hasMany association
+#hiddenField(objectName="order", property="id", association="lineItems", position="1")#
+// -> <input type="hidden" id="order-line-items-1-id" name="order[lineItems][1][id]" value="7">

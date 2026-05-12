@@ -1,0 +1,3 @@
+# SQLite database files (created by wheels server start)
+*.sqlite
+*.db

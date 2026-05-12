@@ -1,0 +1,12 @@
+// 1. Obfuscate a primary key value before including it in a URL
+obfuscatedId = obfuscateParam(99);
+// obfuscatedId -> "a3f6c1" (an obfuscated hex string)
+
+// 2. Use an obfuscated key in a generated URL to hide the real record ID
+params.userKey = obfuscateParam(model("User").findOne().key());
+redirectTo(route="userProfile", key=params.userKey);
+
+// 3. Reverse the obfuscation with deobfuscateParam to get the original value back
+obfuscated = obfuscateParam(42);
+original = deobfuscateParam(obfuscated);
+// original -> "42"

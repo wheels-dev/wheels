@@ -1,0 +1,20 @@
+// 1. Send a PDF file to the user from the default files folder
+sendFile(file="wheels_tutorial_20081028_J657D6HX.pdf");
+
+// 2. Send the same file but give the user a friendlier name in the browser download dialog
+sendFile(file="wheels_tutorial_20081028_J657D6HX.pdf", name="Tutorial.pdf");
+
+// 3. Display the file inline in the browser instead of forcing a download dialog
+sendFile(file="report.pdf", disposition="inline");
+
+// 4. Send a file with an explicit MIME type
+sendFile(file="export.csv", type="text/csv", name="data-export.csv");
+
+// 5. Send a file located outside of the web root using an absolute directory path
+sendFile(file="invoice_2024_001.pdf", directory="/var/app/private/invoices");
+
+// 6. Send a file and delete it from the server after delivery (e.g., a temporary export)
+sendFile(file="temp_export_J657D6HX.csv", name="export.csv", deleteFile=true);
+
+// 7. Send a file stored in the RAM virtual file system
+sendFile(file="ram://generated_report.pdf", name="report.pdf");

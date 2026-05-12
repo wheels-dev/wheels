@@ -225,13 +225,15 @@ component {
         string baseDirectory = "",
         array properties = [],
         string belongsTo = "",
-        string hasMany = ""
+        string hasMany = "",
+        boolean admin = false,
+        array adminFields = []
     ) {
         var controllerName = capitalize(arguments.name);
         var viewDir = resolvePath("views/#lCase(controllerName)#", arguments.baseDirectory);
         var fileName = arguments.action & ".cfm";
         var filePath = viewDir & "/" & fileName;
-        
+
         // Check if file exists
         if (fileExists(filePath) && !arguments.force) {
             return {
@@ -240,36 +242,37 @@ component {
                 path: filePath
             };
         }
-        
+
         // Create view directory if needed
         if (!directoryExists(viewDir)) {
             directoryCreate(viewDir);
         }
-        
+
         // Determine template to use
         if (!len(arguments.template)) {
-            // Auto-detect template based on action name
+            // Select template directory based on admin flag
+            var templateDir = arguments.admin ? "admin" : "crud";
             switch (arguments.action) {
                 case "index":
-                    arguments.template = "crud/index.txt";
+                    arguments.template = "#templateDir#/index.txt";
                     break;
                 case "show":
-                    arguments.template = "crud/show.txt";
+                    arguments.template = "#templateDir#/show.txt";
                     break;
                 case "new":
-                    arguments.template = "crud/new.txt";
+                    arguments.template = "#templateDir#/new.txt";
                     break;
                 case "edit":
-                    arguments.template = "crud/edit.txt";
+                    arguments.template = "#templateDir#/edit.txt";
                     break;
                 case "_form":
-                    arguments.template = "crud/_form.txt";
+                    arguments.template = "#templateDir#/_form.txt";
                     break;
                 default:
                     arguments.template = "ViewContent.txt";
             }
         }
-        
+
         // Prepare template context
         var context = {
             controllerName: controllerName,
@@ -280,7 +283,12 @@ component {
             belongsTo: arguments.belongsTo,
             hasMany: arguments.hasMany
         };
-        
+
+        // Add admin field metadata to context when generating admin views
+        if (arguments.admin && arrayLen(arguments.adminFields)) {
+            context.adminFields = arguments.adminFields;
+        }
+
         // Generate from template
         try {
             var generatedPath = templateService.generateFromTemplate(
@@ -289,7 +297,7 @@ component {
                 context = context,
                 baseDirectory = arguments.baseDirectory
             );
-            
+
             return {
                 success: true,
                 path: generatedPath,

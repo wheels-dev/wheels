@@ -832,4 +832,3 @@ X-RateLimit-Reset: 1640995200
 - [Controller Architecture](./architecture.md)
 - [Controller Security](./security.md)
 - [Controller Rendering](./rendering.md)
-- [Authentication Patterns](../security/authentication.md)

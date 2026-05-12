@@ -1,0 +1,19 @@
+// 1. Inspect all validation rules defined on the User model
+info = model("User").validationInfo();
+// info is keyed by trigger: onSave, onCreate, onUpdate
+// Each key holds an array of rule structs, e.g.:
+// info.onSave[1] -> {method: "validatesPresenceOf", properties: "email", message: "can't be blank", ...}
+// info.onCreate -> []
+// info.onUpdate -> []
+
+// 2. Count how many rules fire on every save
+info = model("User").validationInfo();
+writeOutput("Rules on save: " & arrayLen(info.onSave));
+
+// 3. List the validation methods used across all triggers
+info = model("User").validationInfo();
+for (trigger in info) {
+    for (rule in info[trigger]) {
+        writeOutput(trigger & ": " & rule.method & " on " & rule.properties);
+    }
+}

@@ -3,18 +3,15 @@
   "description": "An open source CFML framework inspired by Ruby on Rails for rapid web application development",
   "folders": [
     "docs/api",
-    "docs/src",
-		"templates/base/src/app/snippets",
+    "web/sites/guides/src/content/docs",
+		"app/snippets",
 		"guides"
   ],
   "excludeFolders": [
     "cli",
-    "core",
     "design_docs",
-    "docs/overrides",
-    "docs/public",
     "examples",
-    "templates",
+    "vendor",
     "test-artifacts",
 		"tests",
 		"tools"
@@ -40,7 +37,7 @@
   ],
   "versions": [
     {
-      "tag": "v3.0.0",
+      "tag": "v3.1.0",
       "description": "Latest version with modern directory structure and enhanced features"
     },
     {

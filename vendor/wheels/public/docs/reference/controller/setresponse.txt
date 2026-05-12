@@ -1,0 +1,13 @@
+// 1. Override the response body with a plain string
+setResponse("Maintenance mode active. Please try again later.");
+
+// 2. Modify an already-rendered response in an after filter
+// (e.g. append a debug comment to every HTML response)
+private void function appendDebugComment() {
+    current = response();
+    setResponse(current & "<!-- rendered at #Now()# -->");
+}
+
+// 3. Replace the response with serialized data after a renderView() call
+// (useful in tests or custom middleware-style filters)
+setResponse(serializeJSON({status: "ok", timestamp: Now()}));

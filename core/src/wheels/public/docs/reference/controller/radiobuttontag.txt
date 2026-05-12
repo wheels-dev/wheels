@@ -1,8 +1,0 @@
-// Basic usage usually involves a `label`, `name`, `value`, and `checked` value 
-<cfoutput>
-	<fieldset>
-		<legend>Gender</legend>
-		#radioButtonTag(name="gender", value="m", label="Male", checked=true)#<br>
-		#radioButtonTag(name="gender", value="f", label="Female")#
-	</fieldset>
-</cfoutput>

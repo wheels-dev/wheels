@@ -1,0 +1,8 @@
+// 1. Basic usage - the "Tag" version accepts `name` and `selected` directly instead of binding to a model object
+#dateTimeSelectTags(name="dateTimeStart", selected=params.dateTimeStart)#
+
+// 2. Show only month/day for the date portion and hour/minute for the time portion
+#dateTimeSelectTags(name="dateTimeStart", selected=params.dateTimeStart, dateOrder="month,day", timeOrder="hour,minute")#
+
+// 3. Custom year range, 15-minute steps, 12-hour format, and a label
+#dateTimeSelectTags(name="scheduledAt", selected=params.scheduledAt, startYear=2020, endYear=2030, minuteStep=15, twelveHour=true, label="Scheduled Date & Time")#

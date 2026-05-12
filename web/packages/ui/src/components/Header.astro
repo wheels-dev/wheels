@@ -1,0 +1,210 @@
+---
+import Logo from './Logo.astro';
+
+interface Props {
+	current?: 'landing' | 'guides' | 'api' | 'blog' | 'packages';
+}
+const { current } = Astro.props;
+
+const links = [
+	{ label: 'Home', href: 'https://wheels.dev/', key: 'landing' },
+	{ label: 'Guides', href: 'https://guides.wheels.dev/', key: 'guides' },
+	{ label: 'API', href: 'https://api.wheels.dev/', key: 'api' },
+	{ label: 'Blog', href: 'https://blog.wheels.dev/', key: 'blog' },
+	{ label: 'Packages', href: 'https://packages.wheels.dev/', key: 'packages' },
+];
+---
+
+<header class="wd-header" data-current={current ?? 'landing'}>
+	<div class="wd-header__lockup">
+		<a class="wd-header__brand" href="https://wheels.dev/" aria-label="wheels.dev home">
+			<Logo variant="lockup" size="md" />
+		</a>
+		<slot name="after-brand" />
+	</div>
+
+	{
+		Astro.slots.has('search') && (
+			<div class="wd-header__search">
+				<slot name="search" />
+			</div>
+		)
+	}
+
+	<button
+		class="wd-header__toggle"
+		type="button"
+		aria-label="Toggle menu"
+		aria-expanded="false"
+		aria-controls="wd-header-nav"
+	>
+		<span></span><span></span><span></span>
+	</button>
+
+	<nav id="wd-header-nav" class="wd-header__nav" aria-label="Primary">
+		{
+			links.map((l) => (
+				<a href={l.href} class:list={['wd-header__link', { 'is-current': current === l.key }]}>
+					{l.label}
+				</a>
+			))
+		}
+		<a
+			class="wd-header__link wd-header__link--external"
+			href="https://github.com/wheels-dev/wheels"
+		>
+			GitHub <span aria-hidden="true">↗</span>
+		</a>
+		<slot name="in-nav-drawer" />
+	</nav>
+</header>
+
+<script>
+	const header = document.querySelector('.wd-header');
+	const toggle = document.querySelector('.wd-header__toggle');
+	const nav = document.getElementById('wd-header-nav');
+
+	if (toggle && nav && header) {
+		toggle.addEventListener('click', () => {
+			const open = header.classList.toggle('is-open');
+			toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+		});
+	}
+
+	if (header) {
+		const onScroll = () => {
+			if (window.scrollY > 8) {
+				header.classList.add('is-scrolled');
+			} else {
+				header.classList.remove('is-scrolled');
+			}
+		};
+		onScroll();
+		window.addEventListener('scroll', onScroll, { passive: true });
+	}
+</script>
+
+<style>
+	.wd-header {
+		position: sticky;
+		top: 0;
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-4);
+		padding: 0 var(--space-5);
+		height: var(--header-height);
+		background: var(--color-bg);
+		border-bottom: 1px solid transparent;
+		font-family: var(--font-sans);
+		transition:
+			border-color 0.15s,
+			box-shadow 0.15s;
+	}
+
+	.wd-header.is-scrolled {
+		border-bottom-color: var(--color-border);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.wd-header__lockup {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.wd-header__brand {
+		display: inline-flex;
+		align-items: center;
+		text-decoration: none;
+	}
+
+	.wd-header__search {
+		display: flex;
+		align-items: center;
+		margin-left: auto;
+		min-width: 0;
+	}
+
+	.wd-header__search :global(site-search) {
+		display: flex;
+		align-items: center;
+	}
+
+	.wd-header__nav {
+		display: flex;
+		align-items: center;
+		gap: var(--space-5);
+	}
+
+	.wd-header__link {
+		color: var(--color-fg-muted);
+		text-decoration: none;
+		font-size: var(--text-sm);
+		font-weight: 500;
+	}
+
+	.wd-header__link:hover {
+		color: var(--color-fg);
+	}
+
+	.wd-header__link.is-current {
+		color: var(--color-brand);
+		font-weight: 600;
+	}
+
+	.wd-header__link--external {
+		color: var(--color-fg-muted);
+	}
+
+	.wd-header__toggle {
+		display: none;
+		flex-direction: column;
+		justify-content: center;
+		gap: 4px;
+		width: 40px;
+		height: 40px;
+		padding: 0 8px;
+		background: transparent;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		cursor: pointer;
+	}
+
+	.wd-header__toggle span {
+		display: block;
+		height: 2px;
+		background: var(--color-fg);
+		border-radius: 2px;
+	}
+
+	@media (max-width: 720px) {
+		.wd-header__toggle {
+			display: flex;
+		}
+
+		.wd-header__nav {
+			position: absolute;
+			top: var(--header-height);
+			right: 0;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: var(--space-3);
+			padding: var(--space-5);
+			background: var(--color-bg);
+			border-left: 1px solid var(--color-border);
+			border-bottom: 1px solid var(--color-border);
+			box-shadow: var(--shadow);
+			min-width: 220px;
+			transform: translateX(100%);
+			transition: transform 0.2s ease;
+			visibility: hidden;
+		}
+
+		.wd-header.is-open .wd-header__nav {
+			transform: translateX(0);
+			visibility: visible;
+		}
+	}
+</style>

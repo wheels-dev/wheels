@@ -1,0 +1,19 @@
+<!--- app/db/seeds/development.cfm --->
+<!--- Development-only seeds: test data --->
+<cfscript>
+
+// Dev admin user
+seedOnce(modelName="User", uniqueProperties="email", properties={
+	firstName: "Dev", lastName: "Admin",
+	email: "admin@example.com", roleId: 1
+});
+
+// Sample records for development
+for (var i = 1; i <= 10; i++) {
+	seedOnce(modelName="User", uniqueProperties="email", properties={
+		firstName: "Test", lastName: "User #i#",
+		email: "user#i#@example.com", roleId: 2
+	});
+}
+
+</cfscript>

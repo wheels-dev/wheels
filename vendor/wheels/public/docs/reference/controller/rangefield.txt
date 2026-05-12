@@ -1,0 +1,10 @@
+// 1. Basic range slider bound to a model object
+#rangeField(objectName="settings", property="volume")#
+
+// 2. Range slider with min, max, and step constraints
+#rangeField(label="Volume", objectName="settings", property="volume", min="0", max="100", step="5")#
+
+// 3. Range slider for a nested association (preferences within a user profile)
+<cfloop from="1" to="#ArrayLen(user.preferences)#" index="i">
+	#rangeField(label="Threshold ##i#", objectName="user", association="preferences", position=i, property="threshold", min="0", max="10", step="1")#
+</cfloop>

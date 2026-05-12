@@ -361,7 +361,6 @@ var validUser = createValidatedStruct(userSchema, {
 
 ## Related Concepts
 
-- [Struct Methods](struct-methods.md)
 - [Array Creation](../arrays/array-creation.md)
 - [Variables Scope](../scopes/variables-scope.md)
 - [Object-Oriented Programming](../../components/component-basics.md)

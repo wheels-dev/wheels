@@ -1,0 +1,8 @@
+// 1. Override a global `provides()` setting for a single action — only respond with HTML
+onlyProvides("html");
+
+// 2. Allow a specific action to respond with JSON and XML only
+onlyProvides("json,xml");
+
+// 3. Override the provides formats for a named action from within another context (e.g. config())
+onlyProvides(formats="json", action="create");

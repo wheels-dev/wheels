@@ -1,0 +1,24 @@
+// 1. Basic usage with a label and a pre-checked state
+<cfoutput>
+	#checkBoxTag(name="subscribe", value="1", label="Subscribe to our newsletter", checked=true)#
+</cfoutput>
+
+// 2. Render an unchecked check box that also submits a value when unchecked
+<cfoutput>
+	#checkBoxTag(name="agreeToTerms", value="1", uncheckedValue="0", label="I agree to the terms")#
+</cfoutput>
+
+// 3. Loop over a query to render one check box per option, checking those already selected
+// Controller
+toppings = model("Topping").findAll(order="name");
+selectedIds = "2,5,9"; // e.g. previously saved topping IDs as a comma-delimited list
+
+// View
+<cfoutput query="toppings">
+	#checkBoxTag(
+		name    = "toppingIds",
+		value   = toppings.id,
+		label   = toppings.name,
+		checked = listFindNoCase(selectedIds, toppings.id) GT 0
+	)#
+</cfoutput>

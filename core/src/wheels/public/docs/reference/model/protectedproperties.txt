@@ -1,4 +1,0 @@
-// In `models/User.cfc`, `firstName` and `lastName` cannot be changed through mass assignment operations like `updateAll()`.
-function config(){
-	protectedProperties("firstName,lastName");
-}

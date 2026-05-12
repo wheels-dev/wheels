@@ -1,9 +1,0 @@
-// Get the table name prefix for this user when running a custom query.
-<cffunction name="getDisabledUsers" returntype="query">
-	<cfquery datasource="#get('dataSourceName')#" name="local.disabledUsers">
-	SELECT *
-	FROM #this.getTableNamePrefix()#users
-	WHERE disabled = 1
-	</cfquery>
-	<cfreturn local.disabledUsers>
-</cffunction>

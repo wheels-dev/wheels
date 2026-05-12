@@ -1,0 +1,15 @@
+// 1. Respond to a CORS preflight OPTIONS request
+if (isOptions()) {
+    header(name = "Access-Control-Allow-Methods", value = "GET, POST, PUT, DELETE");
+    renderNothing();
+    return;
+}
+
+// 2. Restrict an action to only handle OPTIONS requests
+if (!isOptions()) {
+    redirectTo(action = "index");
+}
+
+// 3. Store the result to use in a conditional
+requestIsOptions = isOptions();
+// requestIsOptions -> true when the HTTP method is OPTIONS, false otherwise

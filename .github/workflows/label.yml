@@ -1,0 +1,25 @@
+name: Auto-Label PR
+
+# Uses pull_request_target so fork PRs receive a write-scoped GITHUB_TOKEN.
+# Safe: this workflow never checks out PR code — actions/labeler only reads
+# PR metadata and .github/labeler.yml from the base branch via the API.
+# No untrusted PR inputs (titles, bodies, branch names) are used in run steps,
+# so no workflow injection surface.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    branches:
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Auto-Label PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v6
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

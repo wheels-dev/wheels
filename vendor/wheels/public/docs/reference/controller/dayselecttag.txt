@@ -1,0 +1,8 @@
+// 1. Basic usage: render a day-of-month select for a standalone form (not bound to a model)
+#daySelectTag(name="day", selected=params.day)#
+
+// 2. Pre-select day 15 and include a blank prompt at the top
+#daySelectTag(name="birthDay", selected=15, includeBlank="-- Select Day --")#
+
+// 3. Wrap the control with a label and surrounding HTML via prepend/append
+#daySelectTag(name="day", selected=params.day, label="Day", prepend="<div class=""field"">", append="</div>")#

@@ -44,7 +44,7 @@ The Wheels CLI is part of a larger monorepo ecosystem:
 
 ### Key Dependencies
 - **ForgeBox Integration**: Downloads `wheels-base-template` package from ForgeBox during `wheels g app`
-- **Template Snippets**: Uses base template snippets from `/templates/base/src/app/snippets/`
+- **Template Snippets**: Uses base template snippets from `/app/snippets/`
 - **Core Patterns**: Generates code that follows core framework conventions (`$` prefix, `config()` methods)
 - **Version Sync**: Shares version numbers with other monorepo components
 

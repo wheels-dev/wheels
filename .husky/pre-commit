@@ -1,0 +1,21 @@
+# Check formatting of staged CFML files only (not the entire project)
+# Use POSIX-compatible redirect: husky invokes hooks via `sh`, where `&>` is
+# parsed as `&` (background) + `>`, so the original `command -v box &> /dev/null`
+# always succeeded regardless of whether box was installed and the loop below
+# ran `box cfformat check` against a missing binary.
+if command -v box >/dev/null 2>&1; then
+  STAGED_CFC=$(git diff --cached --name-only --diff-filter=ACM -- '*.cfc' '*.cfm')
+  if [ -n "$STAGED_CFC" ]; then
+    FAILED=0
+    for file in $STAGED_CFC; do
+      if [ -f "$file" ]; then
+        box cfformat check "$file" 2>/dev/null || FAILED=1
+      fi
+    done
+    if [ "$FAILED" -ne 0 ]; then
+      echo ""
+      echo "cfformat check failed on staged files. Run 'box run-script format' to fix."
+      exit 1
+    fi
+  fi
+fi

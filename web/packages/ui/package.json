@@ -1,0 +1,27 @@
+{
+	"name": "@wheels-dev/ui",
+	"version": "0.0.0",
+	"type": "module",
+	"private": true,
+	"license": "Apache-2.0",
+	"exports": {
+		"./components/Header.astro": "./src/components/Header.astro",
+		"./components/Footer.astro": "./src/components/Footer.astro",
+		"./components/Logo.astro": "./src/components/Logo.astro",
+		"./components/RssPill.astro": "./src/components/RssPill.astro",
+		"./components/starlight/Header.astro": "./src/components/starlight/Header.astro",
+		"./components/starlight/Footer.astro": "./src/components/starlight/Footer.astro",
+		"./components/starlight/SocialIcons.astro": "./src/components/starlight/SocialIcons.astro",
+		"./components/starlight/PageTitle.astro": "./src/components/starlight/PageTitle.astro",
+		"./components/starlight/EditLink.astro": "./src/components/starlight/EditLink.astro",
+		"./components/starlight/VersionSwitcher.astro": "./src/components/starlight/VersionSwitcher.astro",
+		"./data/versions": "./src/data/versions.ts",
+		"./styles/tokens.css": "./src/styles/tokens.css",
+		"./styles/base.css": "./src/styles/base.css",
+		"./styles/starlight-theme.css": "./src/styles/starlight-theme.css",
+		"./assets/*": "./src/assets/*"
+	},
+	"peerDependencies": {
+		"astro": "^5.0.0"
+	}
+}

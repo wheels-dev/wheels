@@ -1,0 +1,13 @@
+// 1. Disable automatic validations for this model (useful when automatic validations are enabled globally but you want to opt out for a specific model).
+component extends="Model" {
+	function config() {
+		automaticValidations(false);
+	}
+}
+
+// 2. Explicitly enable automatic validations for this model (useful when automatic validations are disabled globally but you want to opt in for a specific model).
+component extends="Model" {
+	function config() {
+		automaticValidations(true);
+	}
+}

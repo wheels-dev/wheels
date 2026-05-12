@@ -1,6 +1,0 @@
-// Update the `published` and `publishedAt` properties for all records that have `published=0`  
-recordsUpdated = model("post").updateAll( published=1, publishedAt=Now(), where="published=0" );
-
-// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `removeAllComments` method below will call `model("comment").updateAll(postid="", where="postId=#post.id#")` internally.)  
-post = model("post").findByKey(params.postId);
-post.removeAllComments();

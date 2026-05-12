@@ -31,6 +31,11 @@ rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --ex
 cp tools/build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
 cp tools/build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
 
+# Apache 2.0 §4(a) requires LICENSE in every distributed artifact and §4(d)
+# requires NOTICE to propagate to derivatives.
+cp LICENSE "${BUILD_DIR}/wheels-cli/"
+cp NOTICE "${BUILD_DIR}/wheels-cli/"
+
 # Replace version placeholders
 echo "Replacing version placeholders..."
 find "${BUILD_DIR}/wheels-cli" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) | while read file; do

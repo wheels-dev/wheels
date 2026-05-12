@@ -1,0 +1,49 @@
+// 1. Process all users in batches of 500 (default), logging each batch
+model("User").findInBatches(callback=function(batch) {
+	writeOutput("Processing " & batch.recordCount & " users");
+});
+
+// 2. Process active orders in batches of 200, filtered with a WHERE clause
+model("Order").findInBatches(
+	batchSize=200,
+	where="status='active'",
+	order="createdAt ASC",
+	callback=function(batch) {
+		// batch is a cfquery result set by default
+		for (local.i = 1; local.i <= batch.recordCount; local.i++) {
+			writeOutput(batch.orderId[local.i] & ": " & batch.total[local.i]);
+		}
+	}
+);
+
+// 3. Receive each batch as an array of model objects instead of a query
+model("User").findInBatches(
+	batchSize=100,
+	returnAs="objects",
+	where="active=1",
+	callback=function(batch) {
+		for (user in batch) {
+			user.sendNewsletter();
+		}
+	}
+);
+
+// 4. Receive each batch as an array of structs
+model("Product").findInBatches(
+	batchSize=250,
+	returnAs="structs",
+	select="id,name,price",
+	callback=function(batch) {
+		for (product in batch) {
+			writeOutput(product.name & " costs " & product.price);
+		}
+	}
+);
+
+// 5. Include soft-deleted records while processing in batches
+model("User").findInBatches(
+	includeSoftDeletes=true,
+	callback=function(batch) {
+		writeOutput("Batch has " & batch.recordCount & " records (including deleted)");
+	}
+);

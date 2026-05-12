@@ -14,7 +14,7 @@
  *  {code}
  *
  *  Here are the basic templates that are available for you that come from ForgeBox
- *  - Wheels Base Template - 3.0 Stable (default)
+ *  - Wheels Base Template - 4.0 Stable (default)
  *  - Wheels Base Template - Bleeding Edge
  *  - Wheels Template - HelloWorld
  *  - Wheels Template - HelloDynamic
@@ -43,11 +43,11 @@ component aliases="wheels g app" extends="../base" {
 
     // Map these shortcut names to the actual ForgeBox slugs
     variables.templateMap = {
-      'WheelsBaseTemplate'        : 'wheels-base-template@^3.0.0',
+      'WheelsBaseTemplate'        : 'wheels-base-template@^4.0.0',
       'BleedingEdge'              : 'wheels-base-template@BE',
-      'WheelsTemplateHTMX'        : 'cfwheels-template-htmx-alpine-simple',
+      'WheelsTemplateHTMX'        : 'wheels-template-htmx-alpine-simple',
       'WheelsStarterApp'          : 'wheels-starter-app',
-      'WheelsTodoMVCHTMX'         : 'cfwheels-todomvc-htmx'
+      'WheelsTodoMVCHTMX'         : 'wheels-todomvc-htmx'
     };
 
     return this;
@@ -55,7 +55,7 @@ component aliases="wheels g app" extends="../base" {
 
   /**
    * @name           The name of the app you want to create
-   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug). Default is Bleeding Edge
+   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug). Default is the stable Wheels Base Template (4.0).
    * @directory      The directory to create the app in
    * @reloadPassword The reload passwrod to set for the app
    * @datasourceName The datasource name to set for the app
@@ -68,7 +68,7 @@ component aliases="wheels g app" extends="../base" {
    **/
   function run(
     name     = 'MyApp',
-    template = 'wheels-base-template@^3.0.0',
+    template = 'wheels-base-template@^4.0.0',
     directory,
     reloadPassword = '',
     datasourceName,
@@ -85,6 +85,14 @@ component aliases="wheels g app" extends="../base" {
 
     // Initialize detail service
     var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
+
+    // Deprecation notice — legacy CommandBox surface is scheduled for removal in Wheels v5.0.
+    // Canonical 4.0+ CLI is LuCLI's `wheels new` (https://github.com/bpamiri/LuCLI).
+    details.getPrint().yellowBoldLine( "[DEPRECATED] 'wheels g app' (CommandBox wheels-cli) is deprecated." );
+    details.getPrint().yellowLine( "             Use LuCLI 'wheels new' instead — the canonical Wheels 4.0+ CLI." );
+    details.getPrint().yellowLine( "             Install: brew install lucli  (or see https://github.com/bpamiri/LuCLI)" );
+    details.getPrint().yellowLine( "             This command will be removed in Wheels v5.0." );
+    details.line();
 
     // set defaults based on app name
     if ( !len( arguments.directory ) ) {
@@ -211,14 +219,14 @@ component aliases="wheels g app" extends="../base" {
       )
       .run();
 
-    // Remove the cfwheels-base from the dependencies
+    // Remove the wheels-base from the dependencies
     command( 'tokenReplace' )
-      .params( path = 'box.json', token = '"cfwheels-base":"^2.2",', replacement = '' )
+      .params( path = 'box.json', token = '"wheels-base":"^2.2",', replacement = '' )
       .run();
 
-    // Remove the cfwheels-base from the install paths
+    // Remove the wheels-base from the install paths
     command( 'tokenReplace' )
-      .params( path = 'box.json', token = '"cfwheels-base":"base/",', replacement = '' )
+      .params( path = 'box.json', token = '"wheels-base":"base/",', replacement = '' )
       .run();
 
     // Add the H2 Lucee extension to the dependencies
@@ -248,10 +256,10 @@ component aliases="wheels g app" extends="../base" {
 
       // New Flashwrapper Plugin needed - install it via Forgebox
       if (!arguments.skipInstall) {
-        command( 'install cfwheels-flashmessages-bootstrap' ).run();
+        command( 'install wheels-flashmessages-bootstrap' ).run();
       } else {
         details.getPrint().yellowLine( "Skipping Bootstrap plugin installation (--skipInstall flag)" );
-        arrayAppend(nextSteps, "Install Bootstrap plugin: install cfwheels-flashmessages-bootstrap");
+        arrayAppend(nextSteps, "Install Bootstrap plugin: install wheels-flashmessages-bootstrap");
       }
 
       }
@@ -287,7 +295,7 @@ component aliases="wheels g app" extends="../base" {
   }
 
   /**
-   * Returns an array of cfwheels templates available
+   * Returns an array of wheels templates available
    */
   function templateComplete( ) {
     return variables.templateMap.keyList().listToArray();

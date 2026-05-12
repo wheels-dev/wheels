@@ -495,4 +495,4 @@ Submit contributions to: https://github.com/wheels-dev/wheels
 ---
 
 *Last Updated: [Current Date]*
-*Wheels Version: 3.0.0+*
+*Wheels Version: 3.1.0+*

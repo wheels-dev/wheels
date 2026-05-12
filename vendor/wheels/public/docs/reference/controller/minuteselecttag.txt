@@ -1,0 +1,14 @@
+// 1. Basic usage — the "Tag" version accepts a `name` and `selected` instead of binding to a model object
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", selected=params.minuteOfMeeting)#
+</cfoutput>
+
+// 2. Only show 15-minute intervals
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", selected=params.minuteOfMeeting, minuteStep=15)#
+</cfoutput>
+
+// 3. Include a blank option and add a label
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", selected=params.minuteOfMeeting, includeBlank=true, label="Minute")#
+</cfoutput>

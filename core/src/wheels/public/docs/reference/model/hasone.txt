@@ -1,8 +1,0 @@
-// Specify that instances of this model has one profile. (The table for the associated model, not the current, should have the foreign key set on it.)
-hasOne("profile");
-
-// Same as above but setting the `joinType` to `inner`, which basically means this model should always have a record in the `profiles` table.
-hasOne(name="profile", joinType="inner");
-
-// Automatically delete the associated `profile` whenever this object is deleted.
-hasMany(name="comments", dependent="delete");

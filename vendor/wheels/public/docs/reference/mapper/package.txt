@@ -1,0 +1,41 @@
+<cfscript>
+
+// 1. Scope controllers into a subfolder without adding the package name to the URL
+mapper()
+    .package("admin")
+        // Route name:  adminProducts
+        // Example URL: /products (no "admin" in the URL)
+        // Controller:  admin.Products
+        .resources("products")
+
+        // Example URL: /users (no "admin" in the URL)
+        // Controller:  admin.Users
+        .resources("users")
+    .end()
+.end();
+
+// 2. Use the `package` argument to override the subfolder name
+mapper()
+    .package(name="v2", package="api/v2")
+        // Route name:  v2Articles
+        // Example URL: /articles
+        // Controller:  api/v2.Articles
+        .resources("articles")
+    .end()
+.end();
+
+// 3. Nest a `package` inside a resource to scope sub-resource controllers
+mapper()
+    .resources(name="users", nested=true)
+        // Calling `package` here scopes nested routes to a subfolder without
+        // changing the URL structure.
+        .package("users")
+            // Route name:  usersProfile
+            // Example URL: /users/4321/profile
+            // Controller:  users.Profiles
+            .resource("profile")
+        .end()
+    .end()
+.end();
+
+</cfscript>

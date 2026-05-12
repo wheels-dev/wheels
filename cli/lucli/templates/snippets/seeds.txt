@@ -1,0 +1,21 @@
+<!--- app/db/seeds.cfm --->
+<!--- Shared seeds: run in all environments --->
+<cfscript>
+
+// Roles
+seedOnce(modelName="Role", uniqueProperties="name", properties={
+	name: "admin", description: "Administrator with full access"
+});
+seedOnce(modelName="Role", uniqueProperties="name", properties={
+	name: "member", description: "Regular member"
+});
+
+// Settings
+seedOnce(modelName="Setting", uniqueProperties="key", properties={
+	key: "site.name", value: "My Wheels App"
+});
+seedOnce(modelName="Setting", uniqueProperties="key", properties={
+	key: "site.perPage", value: "25"
+});
+
+</cfscript>

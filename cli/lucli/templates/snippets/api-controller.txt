@@ -1,0 +1,55 @@
+component extends="Controller" {
+
+	function config() {
+		// API controllers usually authenticate via API keys / bearer tokens
+		// rather than session cookies, so the session-based CSRF check from
+		// app/controllers/Controller.cfc doesn't apply. The explicit
+		// `protectsFromForgery(with="ignore")` call below opts out
+		// intentionally rather than relying on a missing super.config()
+		// call to drop the protection silently.
+		protectsFromForgery(with="ignore");
+		provides("json");
+		verifies(params="key", paramsTypes="integer", only="show,update,delete");
+		filters(through="findRecord", only="show,update,delete");
+	}
+
+	function index() {
+		var page = val(params.page) > 0 ? val(params.page) : 1;
+		records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");
+		renderWith(data=records, layout=false);
+	}
+
+	function show() {
+		renderWith(data=record, layout=false);
+	}
+
+	function create() {
+		record = model("Item").new(params.item);
+		if (record.save()) {
+			renderWith(data=record, layout=false, status=201);
+		} else {
+			renderWith(data={errors: record.allErrors()}, layout=false, status=422);
+		}
+	}
+
+	function update() {
+		if (record.update(properties=params.item)) {
+			renderWith(data=record, layout=false);
+		} else {
+			renderWith(data={errors: record.allErrors()}, layout=false, status=422);
+		}
+	}
+
+	function delete() {
+		record.delete();
+		renderWith(data={message: "Record deleted."}, layout=false);
+	}
+
+	private function findRecord() {
+		record = model("Item").findByKey(params.key);
+		if (!IsObject(record)) {
+			renderWith(data={error: "Record not found."}, layout=false, status=404);
+		}
+	}
+
+}

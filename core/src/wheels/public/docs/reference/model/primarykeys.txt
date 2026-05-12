@@ -1,2 +1,0 @@
-// Get a list of the names of the primary keys in the table mapped to the `employee` model (which is the `employees` table by default)
-keyNames = model("employee").primaryKeys();

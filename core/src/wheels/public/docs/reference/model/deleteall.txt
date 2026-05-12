@@ -1,6 +1,0 @@
-// Delete all inactive users without instantiating them (will skip validation and callbacks).
-recordsDeleted = model("user").deleteAll(where="inactive=1", instantiate=false);
-
-// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `deleteAllComments` method below will call `model("comment").deleteAll(where="postId=#post.id#")` internally.)
-post = model("post").findByKey(params.postId);
-howManyDeleted = post.deleteAllComments();

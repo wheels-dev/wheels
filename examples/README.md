@@ -11,7 +11,7 @@ A complete, production-ready starter application that showcases best practices f
 - **Modern Architecture**: Clean separation of concerns with MVC pattern
 - **Database Integration**: Complete model setup with migrations
 - **RESTful API**: Example endpoints following REST conventions
-- **Testing Suite**: Comprehensive test coverage with TestBox
+- **Testing Suite**: Comprehensive test coverage with WheelsTest
 - **Deployment Ready**: Docker configuration and deployment scripts
 
 ## Installation

@@ -1,0 +1,11 @@
+// 1. Basic usage - render hour, minute, and second selects unbound from a model object
+#timeSelectTags(name="timeOfMeeting", selected=params.timeOfMeeting)#
+
+// 2. Show only hour and minute fields
+#timeSelectTags(name="timeOfMeeting", selected=params.timeOfMeeting, order="hour,minute")#
+
+// 3. Use 12-hour format with AM/PM and jump minutes in 15-minute increments
+#timeSelectTags(name="appointmentTime", selected=params.appointmentTime, twelveHour=true, minuteStep=15, order="hour,minute")#
+
+// 4. Include a blank option and add a label
+#timeSelectTags(name="startTime", selected=params.startTime, includeBlank=true, label="Start Time")#

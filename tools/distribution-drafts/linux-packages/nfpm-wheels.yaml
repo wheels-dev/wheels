@@ -1,0 +1,72 @@
+# nfpm config for the stable channel `wheels` package (.deb / .rpm).
+#
+# nfpm is a Go binary that generates Linux packages from a single YAML config.
+# It does NOT need a Debian/RHEL-specific build environment — runs anywhere a
+# Go binary runs, including macOS dev machines and Ubuntu CI.
+#
+# Build with:
+#   nfpm pkg --packager deb --target dist/wheels_${VERSION}_amd64.deb
+#   nfpm pkg --packager rpm --target dist/wheels-${VERSION}.x86_64.rpm
+#
+# The version is interpolated from the WHEELS_VERSION env var at build time.
+
+name: wheels
+arch: amd64
+platform: linux
+version: ${WHEELS_VERSION}
+section: devel
+priority: optional
+maintainer: Wheels Team <hello@wheels.dev>
+description: |
+  Wheels — CFML MVC framework
+  Code generation, migrations, testing, and dev server management for Wheels apps.
+  Stable channel — updates only on GA releases.
+vendor: Wheels
+homepage: https://wheels.dev
+license: Apache-2.0
+contents:
+  # The LuCLI binary (renamed `wheels`) lives in /opt/wheels.
+  - src: ./build/lucli
+    dst: /opt/wheels/lucli
+    file_info:
+      mode: 0755
+  # The CLI module — what LuCLI dispatches `wheels new`, `wheels migrate`, etc. into.
+  - src: ./build/module/
+    dst: /opt/wheels/module/
+    type: tree
+  # Framework source — staged into vendor/wheels/ in scaffolded apps.
+  - src: ./build/framework/
+    dst: /opt/wheels/module/vendor/wheels/
+    type: tree
+  # SQLite JDBC — required at first run by the wrapper script (cliff fix from
+  # the fresh-VM onboarding journal).
+  - src: ./build/sqlite-jdbc.jar
+    dst: /opt/wheels/sqlite-jdbc.jar
+    file_info:
+      mode: 0644
+  # User-facing wrapper script. Sets JAVA_HOME, LUCLI_HOME, syncs the module
+  # to ~/.wheels/ on first run, then execs /opt/wheels/lucli.
+  - src: ./build/wrapper.sh
+    dst: /usr/bin/wheels
+    file_info:
+      mode: 0755
+overrides:
+  deb:
+    depends:
+      - openjdk-21-jre-headless | openjdk-21-jre
+    recommends:
+      - sqlite3   # not strictly required (driver bundled), but useful for the user
+  rpm:
+    depends:
+      - java-21-openjdk-headless
+    recommends:
+      - sqlite
+deb:
+  fields:
+    Bugs: https://github.com/wheels-dev/wheels/issues
+rpm:
+  group: Development/Tools
+  signature:
+    # The signing key is configured in CI via NFPM_RPM_PASSPHRASE +
+    # NFPM_RPM_SIGN_KEY env vars. Local builds skip signing.
+    key_file: ${NFPM_RPM_SIGN_KEY:-}

@@ -1,0 +1,25 @@
+services:
+  # Single sshd "host" for E2E deploy flow tests. Same openssh-server image as
+  # the plain sshd fixture, plus a shim layer that mocks `docker` and
+  # `kamal-proxy` by recording invocations to /tmp/docker-invocations.log.
+  #
+  # We deliberately avoid docker-in-docker (privileged mode + registry
+  # reachability = flaky on laptops and CI). The shims exercise the same
+  # code path (SshPool → SshClient → remote shell) that a real deploy uses;
+  # the only difference is what runs on the remote side.
+  #
+  # Port 22024 — distinct from the plain sshd fixture (22022/22023) so both
+  # fixtures can coexist during development.
+  e2e-host:
+    image: linuxserver/openssh-server:latest
+    environment:
+      PUBLIC_KEY_FILE: /keys/authorized_keys
+      USER_NAME: deploy
+      SUDO_ACCESS: "true"
+      PASSWORD_ACCESS: "false"
+    volumes:
+      - ./authorized_keys:/keys/authorized_keys:ro
+      - ./docker-shim.sh:/shims/docker-shim.sh:ro
+      - ./install-shims.sh:/custom-cont-init.d/10-install-shims:ro
+    ports:
+      - "22024:2222"

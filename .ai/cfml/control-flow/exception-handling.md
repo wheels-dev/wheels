@@ -277,6 +277,3 @@ function getDataWithFallback(id) {
 
 ## Related Concepts
 - [Conditionals](conditionals.md)
-- [Logging](../advanced/logging.md)
-- [Application Configuration](../advanced/application-cfc.md)
-- [Best Practices](../best-practices/error-handling.md)

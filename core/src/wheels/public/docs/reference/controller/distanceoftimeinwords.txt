@@ -1,7 +1,0 @@
-// Controller code.
-rightNow = Now();
-aWhileAgo = DateAdd("d", -30, rightNow);
-
-// View code.
-<!--- Will output: about 1 month --->
-#distanceOfTimeInWords(aWhileAgo, rightNow)#

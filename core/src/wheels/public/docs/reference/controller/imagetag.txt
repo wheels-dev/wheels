@@ -1,8 +1,0 @@
-<!--- Outputs an `img` tag for `images/logo.png` --->
-#imageTag("logo.png")#
-
-<!--- Outputs an `img` tag for `http://cfwheels.org/images/logo.png` --->
-#imageTag(source="http://cfwheels.org/images/logo.png", alt="ColdFusion on Wheels")#
-
-<!--- Outputs an `img` tag with the `class` attribute set --->
-#imageTag(source="logo.png", class="logo")#

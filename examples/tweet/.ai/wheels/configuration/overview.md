@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `/config` directory contains all configuration files for your Wheels application. In Wheels 3.0.0+, configuration was moved from `/app/config` to the root-level `/config` directory for better organization and clearer separation of concerns. These files control application behavior, database connections, routing, environment settings, and framework-wide defaults.
+The `/config` directory contains all configuration files for your Wheels application. In Wheels 3.1.0+, configuration was moved from `/app/config` to the root-level `/config` directory for better organization and clearer separation of concerns. These files control application behavior, database connections, routing, environment settings, and framework-wide defaults.
 
 ## File Structure and Purpose
 
@@ -87,7 +87,7 @@ if (get("environment") == "production") {
 
 ## Migration from Pre-3.0
 
-### Breaking Change in Wheels 3.0.0
+### Breaking Change in Wheels 3.1.0
 
 Configuration moved from `/app/config` to `/config` at root level.
 

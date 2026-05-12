@@ -1,9 +1,0 @@
-// Get a member object and change the `email` property on it
-member = model("member").findByKey(params.memberId);
-member.email = params.newEmail;
-
-// Get the previous value (what the `email` property was before it was changed)
-oldValue = member.changedFrom("email");
-
-// The above can also be done using a dynamic function like this
-oldValue = member.emailChangedFrom();

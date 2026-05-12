@@ -1,0 +1,28 @@
+---
+title: "wheels deploy prune"
+description: Clean up old containers and images — all, images, containers.
+type: reference
+sidebar:
+  label: "prune"
+  order: 80
+---
+
+Disk cleanup. Three verbs with increasing scope.
+
+## Verbs
+
+| Verb | Removes |
+|------|---------|
+| [`all`](/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/all/) | Old containers + old images. |
+| [`images`](/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/images/) | Old images only. |
+| [`containers`](/v4-0-0-snapshot/command-line-tools/commands/deploy/prune/containers/) | Old containers only. |
+
+## Retention policy
+
+`retain_containers:` in `deploy.yml` (default 5) controls how many old containers per host are kept. Prune verbs never touch the current live container or anything within the retention window. Older items are fair game.
+
+## When to prune
+
+- After several successful deploys, disk pressure grows on each host.
+- Before a container-registry rotation, to make sure you aren't pinning stale base images.
+- Never as part of a regular deploy flow — `wheels deploy` already prunes at the end.

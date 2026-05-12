@@ -109,12 +109,10 @@ component extends="./base" {
             print.yellowLine("Pushing to #server#...");
             
             // Create .kamal directory
-            $execBash("ssh #sshUser#@#server# 'mkdir -p /opt/#serviceName#/.kamal'");
+            $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'mkdir -p /opt/" & $shellEscape(serviceName) & "/.kamal'");
             
             // Write secrets file
-            var result = $execBash("ssh #sshUser#@#server# 'cat > /opt/#serviceName#/.kamal/secrets << EOF
-#secretsContent#
-EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cat > /opt/" & $shellEscape(serviceName) & "/.kamal/secrets << EOF" & chr(10) & secretsContent & chr(10) & "EOF" & chr(10) & "chmod 600 /opt/" & $shellEscape(serviceName) & "/.kamal/secrets'");
             
             if (result.exitCode == 0) {
                 print.greenLine("✓ Secrets pushed to #server#");
@@ -357,10 +355,10 @@ EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
     
     private struct function load1PasswordSecrets(required array keys, required string vault) {
         var secrets = {};
-        var vaultArg = len(arguments.vault) ? "--vault=#arguments.vault#" : "";
-        
+        var vaultArg = len(arguments.vault) ? "--vault=" & $shellEscape(arguments.vault) : "";
+
         for (var key in arguments.keys) {
-            var result = $execBash("op item get #key# #vaultArg# --fields password 2>/dev/null");
+            var result = $execBash("op item get " & $shellEscape(key) & " " & vaultArg & " --fields password 2>/dev/null");
             
             if (result.exitCode == 0 && len(trim(result.output))) {
                 secrets[key] = trim(result.output);
@@ -381,7 +379,7 @@ EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
         }
         
         for (var key in arguments.keys) {
-            var result = $execBash("bw get password #key# 2>/dev/null");
+            var result = $execBash("bw get password " & $shellEscape(key) & " 2>/dev/null");
             
             if (result.exitCode == 0 && len(trim(result.output))) {
                 secrets[key] = trim(result.output);
@@ -395,7 +393,7 @@ EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
         var secrets = {};
         
         for (var key in arguments.keys) {
-            var result = $execBash("lpass show --password #key# 2>/dev/null");
+            var result = $execBash("lpass show --password " & $shellEscape(key) & " 2>/dev/null");
             
             if (result.exitCode == 0 && len(trim(result.output))) {
                 secrets[key] = trim(result.output);
@@ -413,16 +411,17 @@ EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
     ) {
         switch(arguments.manager) {
             case "1password":
-                var vaultArg = len(arguments.vault) ? "--vault=#arguments.vault#" : "";
-                var result = $execBash("op item create --category=password --title=#arguments.key# password=#arguments.value# #vaultArg#");
+                var vaultArg = len(arguments.vault) ? "--vault=" & $shellEscape(arguments.vault) : "";
+                var result = $execBash("op item create --category=password --title=" & $shellEscape(arguments.key) & " password=" & $shellEscape(arguments.value) & " " & vaultArg);
                 return result.exitCode == 0;
-                
+
             case "bitwarden":
-                var result = $execBash("bw create item '{""name"":""#arguments.key#"",""type"":2,""secureNote"":{""type"":0},""notes"":""#arguments.value#""}'");
+                var bwPayload = serializeJSON({"name": arguments.key, "type": 2, "secureNote": {"type": 0}, "notes": arguments.value});
+                var result = $execBash("bw create item " & $shellEscape(bwPayload));
                 return result.exitCode == 0;
-                
+
             case "lastpass":
-                var result = $execBash("echo '#arguments.value#' | lpass add --non-interactive --password #arguments.key#");
+                var result = $execBash("echo " & $shellEscape(arguments.value) & " | lpass add --non-interactive --password " & $shellEscape(arguments.key));
                 return result.exitCode == 0;
         }
         

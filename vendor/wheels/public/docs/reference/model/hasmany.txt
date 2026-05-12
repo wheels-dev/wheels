@@ -1,0 +1,38 @@
+// 1. Basic usage – a Post has many comments (foreign key `postId` lives on the `comments` table)
+// In models/Post.cfc config()
+hasMany("comments");
+
+// 2. Set up a many-to-many shortcut so readers can access publications directly
+// In models/Reader.cfc config()
+hasMany(name="subscriptions", shortcut="publications");
+
+// 3. Automatically delete all associated comments (bypassing object instantiation) when the parent is deleted
+// In models/Post.cfc config()
+hasMany(name="comments", dependent="deleteAll");
+
+// 4. Instantiate and call each comment's beforeDelete callback when deleting dependents
+// In models/Post.cfc config()
+hasMany(name="comments", dependent="delete");
+
+// 5. Override the many-to-many shortcut chain when association names differ from model names
+// In models/Customer.cfc config()
+hasMany(name="subscriptions", shortcut="magazines", through="publication,subscriptions");
+// In models/Subscription.cfc config()
+belongsTo("customer");
+belongsTo("publication");
+// In models/Publication.cfc config()
+hasMany("subscriptions");
+
+// 6. Specify a custom foreign key when not following Wheels naming conventions
+// In models/Author.cfc config()
+hasMany(name="articles", foreignKey="writtenByAuthorId");
+
+// 7. Use an inner join instead of the default outer join when including the association
+// In models/Category.cfc config()
+hasMany(name="products", joinType="inner");
+
+// 8. Polymorphic hasMany – a model acts as a parent for a shared `comments` child model
+// In models/Photo.cfc config() (the `as` value matches the `polymorphic` interface name on the child)
+hasMany(name="comments", as="commentable");
+// In models/Comment.cfc config()
+belongsTo(name="commentable", polymorphic=true);

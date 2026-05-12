@@ -63,7 +63,7 @@ component {
         } else {
             application.wheels.dataSourceName = application.wheels.coreTestDataSourceName;
         }
-        application.testenv.db = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+        cfdbinfo(name="application.testenv.db", datasource=application.wheels.dataSourceName, type="version")
 
         local.populate = StructKeyExists(url, "populate") ? url.populate : true
         if (local.populate) {

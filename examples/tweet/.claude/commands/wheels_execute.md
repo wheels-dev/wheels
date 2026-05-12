@@ -924,7 +924,7 @@ hasMany(name="comments", dependent="delete");  // ✅ Continue
 #startFormTag(...)##authenticityToken()#  // ✅ Continue
 ```
 
-### Phase 4: TestBox BDD Test Suite Creation (10-20 minutes)
+### Phase 4: WheelsTest BDD Test Suite Creation (10-20 minutes)
 - **⏰ TIMING**: Tests are written AFTER implementation is complete (not before - this is not TDD)
 - **✅ REQUIREMENT**: Tests MUST be written BEFORE marking feature complete
 - **🧹 CLEANUP**: All tests must include proper `beforeEach()` and `afterEach()` for isolation
@@ -1367,7 +1367,7 @@ A feature is only considered complete when ALL of the following are true:
 - [ ] ✅ **MCP server connection validated before starting**
 - [ ] ✅ All relevant `.ai` documentation was consulted
 - [ ] ✅ No anti-patterns detected in generated code
-- [ ] ✅ **Comprehensive TestBox BDD test suite written and passing**
+- [ ] ✅ **Comprehensive WheelsTest BDD test suite written and passing**
 - [ ] ✅ **All model BDD specs pass (validations, associations, methods)**
 - [ ] ✅ **All controller BDD specs pass (actions, filters, security)**
 - [ ] ✅ **All integration BDD specs pass (user workflows, CRUD)**
@@ -1432,7 +1432,7 @@ The workflow automatically tests:
 Code will be automatically rejected if:
 - Any mixed argument styles are detected
 - Any `ArrayLen()` calls on model associations exist
-- **Any TestBox BDD spec fails**
+- **Any WheelsTest BDD spec fails**
 - **Test coverage is below 90%**
 - **Missing BDD specs for any component**
 - Any browser test fails
@@ -1454,19 +1454,19 @@ Code will be automatically rejected if:
 - Input validation must be implemented
 - SQL injection prevention must be verified
 
-## TestBox BDD Testing Requirements
+## WheelsTest BDD Testing Requirements
 
 ### Mandatory BDD Test Structure
 
-Every component MUST have comprehensive TestBox BDD specs using the following structure:
+Every component MUST have comprehensive WheelsTest BDD specs using the following structure:
 
 #### Model Specs (`/tests/specs/models/`)
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         // Setup database and test environment
-        application.testbox = new testbox.system.TestBox();
+        application.wheelstest = new wheels.wheelstest.system.TestBox();
     }
 
     function afterAll() {
@@ -1559,10 +1559,10 @@ component extends="wheels.Testbox" {
 
 #### Controller Specs (`/tests/specs/controllers/`)
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
-        application.testbox = new testbox.system.TestBox();
+        application.wheelstest = new wheels.wheelstest.system.TestBox();
     }
 
     function run() {
@@ -1659,7 +1659,7 @@ component extends="wheels.Testbox" {
 
 #### Integration Specs (`/tests/specs/integration/`)
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("Blog Workflow Integration", function() {
@@ -1763,7 +1763,7 @@ wheels test all --reporter=json
 - **Overall**: Minimum 90% total coverage across all components
 
 #### Test Data Management
-- Use TestBox's `beforeEach()` and `afterEach()` for test isolation
+- Use WheelsTest's `beforeEach()` and `afterEach()` for test isolation
 - Create test fixtures for complex scenarios
 - Always clean up test data to prevent test pollution
 - Use database transactions for faster test execution
@@ -1807,7 +1807,7 @@ Error: MCP server not responding
 → Fallback: Document why MCP unavailable, use CLI tools as last resort
 ```
 
-#### TestBox BDD Test Failure Recovery
+#### WheelsTest BDD Test Failure Recovery
 ```
 Error: BDD specs failing or missing
 → Load: .ai/wheels/testing/ documentation
@@ -1864,7 +1864,7 @@ Based on application type detected:
 - **Flexibility**: Claude Code can adapt the workflow dynamically
 - **Error Handling**: Better error recovery and human-readable feedback
 - **Documentation Integration**: Direct access to `.ai` folder without MCP resource limitations
-- **Comprehensive Testing**: TestBox BDD specs + Browser testing + Integration testing
+- **Comprehensive Testing**: WheelsTest BDD specs + Browser testing + Integration testing
 - **Test Coverage**: Mandatory 90%+ coverage with detailed analysis
 - **Quality Assurance**: No feature complete without passing test suite
 - **Reporting**: Rich, detailed reporting with screenshots, test results, and coverage analysis

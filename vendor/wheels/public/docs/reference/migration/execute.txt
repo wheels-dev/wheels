@@ -1,0 +1,15 @@
+// 1. Run a raw SQL statement during a migration
+execute(sql = "UPDATE users SET active = 1 WHERE active IS NULL");
+
+// 2. Create a database view with raw SQL
+execute(sql = "CREATE VIEW active_users AS SELECT * FROM users WHERE active = 1");
+
+// 3. Use execute() inside up() and down() to apply and reverse a custom SQL change
+component extends="wheels.migrator.Migration" {
+    function up() {
+        execute(sql = "ALTER TABLE orders ADD COLUMN notes TEXT");
+    }
+    function down() {
+        execute(sql = "ALTER TABLE orders DROP COLUMN notes");
+    }
+}

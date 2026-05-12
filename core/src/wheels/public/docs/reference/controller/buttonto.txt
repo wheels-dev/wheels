@@ -1,4 +1,0 @@
-#buttonTo(text="Delete Account", action="perFormDelete", disable="Wait...")#
-
-<!--- apply attributes to the input element by prefixing any arguments with "input"--->
-#buttonTo(text="Edit", action="edit", inputId="edit-button", inputClass="edit-button-class")#

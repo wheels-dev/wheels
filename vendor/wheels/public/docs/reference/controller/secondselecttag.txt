@@ -1,0 +1,8 @@
+// 1. Basic usage — render a seconds select for a countdown form
+#secondSelectTag(name="secondsToLaunch", selected=params.secondsToLaunch)#
+
+// 2. Only show 15-second intervals (0, 15, 30, 45)
+#secondSelectTag(name="secondsToLaunch", selected=params.secondsToLaunch, secondStep=15)#
+
+// 3. Include a blank option and wrap with a label
+#secondSelectTag(name="second", selected=params.second, includeBlank=true, label="Second")#

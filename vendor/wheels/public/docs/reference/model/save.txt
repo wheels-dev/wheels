@@ -1,0 +1,20 @@
+// 1. Save a user object to the database (automatically does INSERT or UPDATE depending on whether the record is new)
+user.save();
+
+// 2. Use save() in a conditional to handle success and failure
+if (user.save()) {
+	flashInsert(notice="The user was saved successfully!");
+	redirectTo(action="edit");
+} else {
+	flashInsert(alert="Please correct the errors below.");
+	renderView(action="edit");
+}
+
+// 3. Save without running validations (useful for administrative operations or data migrations)
+user.save(validate=false);
+
+// 4. Save using cfqueryparam only on specific properties (pass a list of property names)
+user.save(parameterize="firstName,lastName,email");
+
+// 5. Save and force a database reload of the object afterward (instead of using the request-level cache)
+user.save(reload=true);

@@ -1,8 +1,0 @@
-// Get the average salary for all employees.
-avgSalary = model("employee").average("salary");
-
-// Get the average salary for employees in a given department.
-avgSalary = model("employee").average(property="salary", where="departmentId=#params.key#");
-
-// Make sure a numeric value is always returned if no records are calculated.
-avgSalary = model("employee").average(property="salary", where="salary BETWEEN #params.min# AND #params.max#", ifNull=0);

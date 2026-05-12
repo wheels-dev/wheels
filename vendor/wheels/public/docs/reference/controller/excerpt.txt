@@ -1,0 +1,11 @@
+// 1. Extract text around a matching phrase with a custom radius
+result = excerpt(text="CFWheels is a Rails-like MVC framework for Adobe ColdFusion and Lucee", phrase="framework", radius=5);
+// result -> "...MVC framework for Ad..."
+
+// 2. Use the default radius of 100 characters
+result = excerpt(text="CFWheels is a powerful MVC framework built for ColdFusion developers who want to move fast.", phrase="powerful");
+// result -> "CFWheels is a powerful MVC framework built for ColdFusion developers who want to move fast."
+
+// 3. Customize the excerpt string used to indicate truncated text
+result = excerpt(text="The quick brown fox jumps over the lazy dog", phrase="fox", radius=5, excerptString=" [...]");
+// result -> " [...]brown fox jumps [...]"

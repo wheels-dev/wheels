@@ -232,5 +232,4 @@ isValid = validator.validate({ email: "user@domain.com" });
 ## Related Concepts
 - [Functions](../components/functions.md)
 - [Array Methods](../data-types/arrays/array-methods.md)
-- [Functional Programming](../best-practices/functional-patterns.md)
 - [Variable Scopes](../data-types/variable-scopes.md)

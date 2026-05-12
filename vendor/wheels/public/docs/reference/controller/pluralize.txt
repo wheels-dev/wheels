@@ -1,0 +1,14 @@
+// 1. Pluralize a word using standard rules
+writeOutput(pluralize("person"));
+// -> "people"
+
+// 2. Pluralize based on a count; returns count prepended to the word
+writeOutput(pluralize(word="comment", count=1));
+// -> "1 comment"
+
+writeOutput(pluralize(word="comment", count=5));
+// -> "5 comments"
+
+// 3. Pluralize based on a count but omit the count from the output
+writeOutput(pluralize(word="person", count=users.RecordCount, returnCount=false));
+// -> "people" (when RecordCount != 1) or "person" (when RecordCount == 1)

@@ -1,0 +1,37 @@
+---
+title: "wheels deploy audit"
+description: Tail the on-host audit log — who deployed what, when.
+type: reference
+sidebar:
+  label: "audit"
+  order: 8
+---
+
+Tail the on-host audit log. Every deploy appends an entry with the actor, version, and timestamp to `/tmp/kamal-audit.log` on every host; `audit` reads the last N lines from each host and streams them back.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy audit [--tail=<N>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--tail=<N>` | Number of trailing lines per host. Default 100. |
+| `--destination=<name>` | Overlay `deploy.<name>.yml`. |
+| `--dry-run` | Print the `tail` command that would run. |
+
+## Behavior
+
+Dispatches `tail -n <N> /tmp/kamal-audit.log` to every host in parallel, prefixes output by host. Entries are plain text — one event per line.
+
+The audit log is on ephemeral `/tmp`, so it doesn't survive host reboots. For durable audit, pipe the log into your observability stack via a hook — see [Hooks](/v4-0-0-snapshot/deployment/hooks/).
+
+## Example
+
+```bash title="illustrative — requires live deploy host"
+wheels deploy audit
+wheels deploy audit --tail=500 --destination=production
+```

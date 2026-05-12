@@ -2,6 +2,8 @@
 
 This document outlines the CLI commands that a modern Wheels framework should implement, inspired by Rails, Laravel, and leveraging CommandBox's native capabilities and the ForgeBox ecosystem.
 
+> **Note:** The testing-strategy sections below predate the WheelsTest fork decision. They recommend integrating the external `commandbox-testbox-cli` module. The actual direction taken in Wheels 4.0 was to fork TestBox in-house as WheelsTest and provide `wheels test run` / `wheels browser:test` natively via the Wheels CLI. Those sections are preserved for historical context but should be revised in a follow-up editorial pass.
+
 ## Philosophy: Embrace the Ecosystem
 
 Rather than building everything from scratch, we should leverage existing CommandBox modules from ForgeBox where possible, focusing our development efforts on Wheels-specific functionality.

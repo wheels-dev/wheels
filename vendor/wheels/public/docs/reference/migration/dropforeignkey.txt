@@ -1,0 +1,13 @@
+// 1. Drop a foreign key constraint by its explicit name
+// In the down() function, remove a foreign key added in up()
+dropForeignKey(table="orders", keyName="FK_orders_customers");
+
+// 2. Drop a foreign key that was created via addReference()
+// addReference() creates keys named FK_<table>_<pluralizedReference>
+// So addReference(table="comments", referenceName="post") creates "FK_comments_posts"
+dropForeignKey(table="comments", keyName="FK_comments_posts");
+
+// 3. Use inside a migration's down() to reverse an addForeignKey() call
+// up() called: addForeignKey(table="profiles", referenceTable="users", column="userId", referenceColumn="id")
+// down() reverses it:
+dropForeignKey(table="profiles", keyName="FK_profiles_users");

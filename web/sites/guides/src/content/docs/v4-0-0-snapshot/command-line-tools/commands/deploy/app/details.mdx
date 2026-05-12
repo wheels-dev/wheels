@@ -1,0 +1,37 @@
+---
+title: "wheels deploy app details"
+description: docker inspect for the app containers at the given version.
+type: reference
+sidebar:
+  label: "details"
+  order: 4
+---
+
+`docker inspect --format={{.State.Status}}` for the named container version on every host. Shows running / exited / paused state.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy app details --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | **Required.** |
+| `--role=<name>` | Limit to one role. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Emits `docker inspect --format={{.State.Status}} <service>-<role>-<version>` per host per role. Output is prefixed by host.
+
+For a broader sweep that shows every service-labelled container regardless of version, use [`app containers`](/v4-0-0-snapshot/command-line-tools/commands/deploy/app/containers/) instead.
+
+## Example
+
+```bash title="example"
+wheels deploy app details --version=abc1234
+```

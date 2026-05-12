@@ -1,0 +1,367 @@
+---
+title: "Part 5: Comments and Turbo Streams"
+description: Add a Comment model associated with Post. Nested routes. Submit comments via Turbo Streams — new comments appear inline without a page reload.
+type: tutorial
+sidebar:
+  order: 5
+---
+
+import { Aside, Steps, FileTree } from '@astrojs/starlight/components';
+
+You'll add a `Comment` model, nest its route under `Post`, and wire up a Turbo Stream so new comments slot into the show page the instant they're saved — no reload, no scroll jump.
+
+**You'll learn:**
+
+- How to declare a two-sided association with `hasMany` and `belongsTo`
+- How to nest resources with the `callback=` syntax
+- What a Turbo Stream is and how it differs from a Turbo Frame
+- How `include=` avoids the N+1 query problem
+
+Estimated time: 35 minutes.
+
+<Aside type="note">
+  This builds on Part 4. You already have a `Post` model with validations, a full seven-action `Posts` controller that renders the form partial on invalid submit, `_form.cfm` wrapped in a `<turbo-frame>`, and Turbo loaded via CDN in the layout.
+</Aside>
+
+## Where we left off
+
+Part 4 left you with inline-rendered validation errors via Turbo Frames. The schema is `posts(id, title, body, status, publishedAt, createdAt, updatedAt)`; `status` is enum-constrained; the layout pulls in Turbo from jsDelivr.
+
+<FileTree>
+- blog
+  - app
+    - controllers
+      - Controller.cfc
+      - Main.cfc
+      - Posts.cfc
+    - db
+      - seeds.cfm
+    - migrator
+      - migrations
+        - 20260419120000_create_posts_table.cfc
+    - models
+      - Post.cfc
+    - views
+      - layout.cfm
+      - main
+        - index.cfm
+        - hello.cfm
+      - posts
+        - index.cfm
+        - show.cfm
+        - new.cfm
+        - edit.cfm
+        - _form.cfm
+  - config
+    - routes.cfm
+    - settings.cfm
+  - db
+    - development.sqlite
+</FileTree>
+
+## What you're adding
+
+A `Comment` model with three fields — `postId`, `author`, `body` — plus timestamps. Each comment belongs to one post; each post has many comments. Deleting a post cascades to its comments.
+
+On the post show page, a form at the bottom posts to a nested route, `/posts/:postKey/comments`. When the server responds, it doesn't return a full page or even a Turbo Frame — it returns a `<turbo-stream>` element that tells Turbo to append a new `<article>` into the existing `<section id="comments">`. The rest of the page doesn't move.
+
+## Hand-write the Comment model
+
+<Steps>
+
+1. Create `app/models/Comment.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Model" {
+       function config() {
+           belongsTo(name="post");
+           validatesPresenceOf("author,body");
+       }
+   }
+   ```
+
+</Steps>
+
+`belongsTo(name="post")` declares the reverse side of the association. Wheels infers the foreign key column from the association name — `post` means `postId`. Because `belongsTo` is being called with a named option (`name`), all arguments have to be named; Wheels disallows mixing positional and named arguments in the same call.
+
+## Add the hasMany on Post
+
+<Steps>
+
+1. Replace `app/models/Post.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Model" {
+       function config() {
+           enum(property="status", values="draft,published,archived");
+           hasMany(name="comments", dependent="delete");
+           validatesPresenceOf("title,body");
+           validatesLengthOf(property="title", maximum=120, allowBlank=true);
+       }
+   }
+   ```
+
+</Steps>
+
+`hasMany(name="comments")` gives you two things for free on any `Post` instance:
+
+- `post.comments()` — returns a query of that post's comments.
+- `post.createComment(attrs)` — builds a new `Comment`, sets `postId` from the parent, calls `.save()`, and returns the (saved or error-laden) comment.
+
+`dependent="delete"` means that when you call `.delete()` on a post, Wheels issues a `DELETE FROM comments WHERE postId = ?` first. Without it, deleting a post with comments would either fail the foreign-key constraint or leave orphans, depending on the database.
+
+## Write the migration
+
+<Steps>
+
+1. Create `app/migrator/migrations/20260419130000_create_comments_table.cfc`:
+
+   ```cfm {test:compile}
+   component extends="wheels.migrator.Migration" hint="Create comments table" {
+       function up() {
+           transaction {
+               try {
+                   t = createTable(name="comments");
+                   t.integer(columnNames="postId", allowNull=false);
+                   t.string(columnNames="author", default="", allowNull=false, limit=80);
+                   t.text(columnNames="body", allowNull=false);
+                   t.timestamps();
+                   t.create();
+               } catch (any e) {
+                   local.exception = e;
+               }
+               if (StructKeyExists(local, "exception")) {
+                   transaction action="rollback";
+                   Throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
+               } else {
+                   transaction action="commit";
+               }
+           }
+       }
+       function down() {
+           transaction {
+               dropTable("comments");
+               transaction action="commit";
+           }
+       }
+   }
+   ```
+
+2. Run it:
+
+   ```bash title="your shell"
+   wheels migrate latest
+   ```
+
+</Steps>
+
+In real work you'd generate this migration with `wheels g migration createCommentsTable` (the same generator chapter 2 introduced), and the timestamp would be assigned automatically from the current time. The hardcoded `20260419130000` is fine for the tutorial — just pick a value later than your posts migration so the order is stable.
+
+## Nested routes
+
+The comment form will POST to `/posts/:postKey/comments`. Wheels builds that URL when you nest the `comments` resource inside `posts`.
+
+<Steps>
+
+1. Replace `config/routes.cfm`:
+
+   ```cfm {test:compile}
+   mapper()
+       .resources(name="posts", binding=true, callback=function(map) {
+           map.resources(name="comments", only="create");
+       })
+       .get(name="hello", pattern="/hello", to="main##hello")
+       .wildcard()
+       .root(to="posts##index", method="get")
+   .end();
+   ```
+
+</Steps>
+
+Two things to notice:
+
+- The nested resource lives inside `callback=function(map) { ... }`. The `map` parameter is the mapper Wheels passes in; call `map.resources(...)` on it, not the outer `mapper()`. Rails-style inline blocks like `.resources("posts", function(r) { r.resources(...) })` don't work in Wheels — you need the explicit `callback=` named argument.
+- `only="create"` trims the nested resource down to a single route: `POST /posts/:postKey/comments → comments##create`. We don't need a comments index, a show page, or an edit form — comments live on the post's show page.
+
+The generated route's named helper is `postComments` (`urlFor(route="postComments", postKey=5)` → `/posts/5/comments`). That's the name you'll use in the form.
+
+## The Comments controller
+
+<Steps>
+
+1. Create `app/controllers/Comments.cfc`:
+
+   ```cfm {test:compile}
+   component extends="Controller" {
+       function create() {
+           post = model("Post").findByKey(params.postKey);
+           comment = post.createComment(params.comment);
+           if (comment.hasErrors()) {
+               renderPartial(partial="form", post=post, comment=comment, layout=false);
+           } else {
+               renderPartial(partial="comment", comment=comment, layout=false);
+           }
+       }
+   }
+   ```
+
+</Steps>
+
+`params.postKey` comes from the nested route — it's whatever `:postKey` matched in the URL. `post.createComment(params.comment)` is the association setter; it copies the submitted attributes into a new `Comment`, stamps `postId` with `post.id`, and saves.
+
+On success, we render the `comment` partial — which, you'll see next, wraps its output in a `<turbo-stream>` element. On validation failure, we render the comment form partial with its errors, same pattern as Part 4's post form.
+
+## The form partial
+
+<Steps>
+
+1. Create `app/views/comments/_form.cfm`:
+
+   ```cfm title="app/views/comments/_form.cfm"
+   <cfparam name="post" default="">
+   <cfparam name="comment" default="">
+   <cfoutput>
+   <turbo-frame id="new_comment">
+       #errorMessagesFor("comment")#
+       #startFormTag(route="postComments", postKey=post.id)#
+           <label>Your name<br>
+               <input type="text" name="comment[author]">
+           </label>
+           <label>Your comment<br>
+               <textarea name="comment[body]"></textarea>
+           </label>
+           <button type="submit">Post comment</button>
+       #endFormTag()#
+   </turbo-frame>
+   </cfoutput>
+   ```
+
+</Steps>
+
+The form lives inside a `<turbo-frame id="new_comment">`. If the comment fails validation, the controller re-renders this partial and Turbo swaps the frame in place — same mechanics as Part 4.
+
+`startFormTag(route="postComments", postKey=post.id)` produces `<form action="/posts/5/comments" method="post">`. The `postKey` argument satisfies the `:postKey` placeholder from the nested route.
+
+The input names use the bracket form `comment[author]` and `comment[body]`. Wheels gathers bracket-named fields into a struct, so `params.comment` arrives in the controller as `{author: "...", body: "..."}` — ready to pass straight to `post.createComment()`.
+
+## The comment partial as a Turbo Stream
+
+<Steps>
+
+1. Create `app/views/comments/_comment.cfm`:
+
+   ```cfm title="app/views/comments/_comment.cfm"
+   <cfparam name="comment" default="">
+   <cfoutput>
+   <turbo-stream action="append" target="comments">
+       <template>
+           <article class="comment">
+               <strong>#comment.author#</strong>
+               <p>#comment.body#</p>
+           </article>
+       </template>
+   </turbo-stream>
+   </cfoutput>
+   ```
+
+</Steps>
+
+A Turbo Stream is a one-shot instruction from the server: "do this action, on this target, with this content." The attributes spell it out — `action="append"`, `target="comments"` — and the `<template>` inside holds the HTML to insert.
+
+When Turbo receives the response, it scans for `<turbo-stream>` elements, finds the element on the current page whose `id` matches the `target` attribute, and performs the named action. Here: find `<section id="comments">`, append the `<article>` from the template to it. Other valid actions include `prepend`, `replace`, `update`, and `remove` — pick whichever matches the DOM change you want.
+
+A Frame (Part 4) replaces one specific region with a new version of itself. A Stream can target any element on the page, and a single response can carry multiple `<turbo-stream>` elements — append one, remove another, replace a third. For adding a comment to a list, `append` is the right tool.
+
+## Wire up the post show view
+
+<Steps>
+
+1. Replace `app/views/posts/show.cfm`:
+
+   ```cfm title="app/views/posts/show.cfm"
+   <cfparam name="post" default="">
+   <cfoutput>
+   <h1>#post.title#</h1>
+   <p>#post.body#</p>
+   <p>status: #post.status#</p>
+   <p>
+       #linkTo(route="editPost", key=post.id, text="Edit")# ·
+       #buttonTo(route="post", key=post.id, text="Delete", method="delete")# ·
+       #linkTo(route="posts", text="← all posts")#
+   </p>
+
+   <section id="comments">
+       <h2>Comments</h2>
+       <cfset comments = post.comments()>
+       <cfloop query="comments">
+           <article class="comment">
+               <strong>#comments.author#</strong>
+               <p>#comments.body#</p>
+           </article>
+       </cfloop>
+   </section>
+
+   <cfset comment = model("Comment").new()>
+   #includePartial(partial="/comments/form", post=post, comment=comment)#
+   </cfoutput>
+   ```
+
+</Steps>
+
+`<section id="comments">` is the landing zone for the stream — its `id` must match the Turbo Stream's `target`. On first page load, the loop over `post.comments()` fills the section with the comments that already exist. Each subsequent submit appends one more `<article>` via the stream.
+
+`post.comments()` is the association method from `hasMany`. It returns a query, which is why the loop uses `query="comments"` and accesses columns as `comments.author` rather than `comment.author`.
+
+`includePartial(partial="/comments/form", post=post, comment=comment)` renders `app/views/comments/_form.cfm` below the list. The leading slash on `/comments/form` is what tells Wheels to resolve the path from the views root rather than as a subfolder of the current controller's view folder — without it, Wheels would look for `app/views/posts/comments/_form.cfm`. The new, unsaved `Comment` is built on the line above so the form partial's `errorMessagesFor("comment")` helper has a real model object to inspect on first render.
+
+## Fix the index to avoid N+1
+
+The post index doesn't call `post.comments()` today, but picture what happens if it did — say, to show a comment count next to each title. With ten posts, the page would run one query for the posts list, then ten more queries (one per post) to fetch each post's comments. That's the N+1 problem.
+
+The fix is `include=`, which tells the finder to eager-load the association in a single JOIN-backed query.
+
+<Steps>
+
+1. Update the `index` action in `app/controllers/Posts.cfc`:
+
+   ```cfm {test:compile}
+   function index() {
+       posts = model("Post").published().findAll(include="comments", order="publishedAt DESC");
+   }
+   ```
+
+</Steps>
+
+With `include="comments"`, Wheels issues one query that joins posts and comments. Calling `posts.comments()` (or any other access path through the association) doesn't hit the database again — the data is already in memory. Add `include=` whenever a view iterates over a collection and touches an association on each row.
+
+## Smoke test
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+## Checkpoint
+
+Three things to verify in the browser:
+
+1. `/posts/1` renders the post, an empty `<section id="comments">`, and the comment form below it.
+2. Filling in the comment form and clicking "Post comment" causes a new comment `<article>` to appear inside the comments section. The URL doesn't change, the rest of the page doesn't flicker, and the form inputs clear.
+3. Clicking Delete on the post removes both the post and its comments — no stale `comments.postId` rows visible to your controller's `findAll()` queries.
+
+<Aside type="note" title="Soft-delete is on by default">
+`wheels generate model/scaffold` writes a `deletedAt` column on every table, so `post.delete()` actually stamps `deletedAt = now()` instead of issuing a `DELETE FROM`. The cascade does the same to `comments`. Wheels finders (`model("Post").findAll()`, `model("Comment").findAll()`) hide soft-deleted rows automatically — that's why item 3 above feels like a hard delete from the app's perspective. If you connect to the SQLite file with `sqlite3 db/development.sqlite` and run `SELECT * FROM posts`, you'll see the row is still there with `deletedAt` set. To include soft-deleted records in finder results, pass `includeSoftDeletes=true` (e.g. `findAll(includeSoftDeletes=true)`); to actually remove a row from the table, call `post.delete(softDelete=false)`.
+</Aside>
+
+## Troubleshooting
+
+**Full page reload on submit instead of inline append** — Turbo isn't seeing a valid stream response. Open DevTools, submit the form, and inspect the network response body. It must be wrapped in a `<turbo-stream action="append" target="comments">` element, with a `<template>` inside. Also confirm the controller renders the partial with `layout=false` — a full HTML page with the stream buried inside it won't trigger stream handling.
+
+**`Wheels.RouteNotFound` for route `postComments`** — the nested callback isn't generating the route. Re-check `config/routes.cfm`: the call is `.resources(name="posts", callback=function(map) { map.resources(name="comments", only="create"); })`. Inside the callback, the parameter name is `map`, and you call `map.resources(...)` on it — not `mapper().resources(...)` and not `r.resources(...)`.
+
+**The comments section shows nothing even though comments exist** — check the loop. It should be `<cfloop query="comments">` with column access via `comments.author` and `comments.body` (the query variable's name), not `comment.author`. Model finders return queries, not arrays.
+
+## What's next
+
+In Part 6 you'll add a `User` model with signup and login. You'll build authentication by hand first — sessions, password hashing, a `beforeAction` filter — so you understand what's actually happening at each step, then swap in the built-in `wheels.auth.SessionStrategy` to see how much of that code Wheels ships out of the box.
+
+The `hasMany` / `belongsTo` pattern you just wired up — plus `dependent="delete"` and `include="comments"` — is covered in full at [Associations](/v4-0-0-snapshot/basics/associations/). For dynamic queries beyond raw `where=` strings, see [Query Builder and Scopes](/v4-0-0-snapshot/basics/query-builder-and-scopes/).

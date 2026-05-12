@@ -1,0 +1,102 @@
+---
+import { formatDate } from '../utils/posts.ts';
+import type { Post } from '../utils/posts.ts';
+
+interface Props {
+	post: Post;
+}
+const { post } = Astro.props;
+const { data } = post;
+---
+
+<article class="card">
+	<h2 class="card__title">
+		<a href={`/posts/${data.slug}/`}>{data.title}</a>
+	</h2>
+	<p class="card__meta">
+		<span>{data.author}</span>
+		<span aria-hidden="true"> · </span>
+		<time datetime={data.publishedAt.toISOString()}>
+			{formatDate(data.publishedAt)}
+		</time>
+	</p>
+	{data.excerpt && <p class="card__excerpt">{data.excerpt}</p>}
+	{
+		data.tags.length > 0 && (
+			<ul class="card__tags">
+				{data.tags.slice(0, 4).map((t) => (
+					<li>
+						<a href={`/tags/${t}/`}>#{t}</a>
+					</li>
+				))}
+			</ul>
+		)
+	}
+</article>
+
+<style>
+	.card {
+		padding: var(--space-5);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-sm);
+		transition:
+			box-shadow 0.15s,
+			border-color 0.15s,
+			transform 0.1s;
+	}
+	.card + .card {
+		margin-top: var(--space-4);
+	}
+	.card:hover {
+		box-shadow: var(--shadow);
+		border-color: var(--color-border-strong);
+		transform: translateY(-2px);
+	}
+	.card__title {
+		font-size: var(--text-2xl);
+		line-height: var(--leading-tight);
+		letter-spacing: var(--tracking-tight);
+		margin: 0 0 var(--space-2);
+	}
+	.card__title a {
+		color: var(--color-fg);
+		text-decoration: none;
+	}
+	.card__title a:hover {
+		color: var(--color-brand);
+	}
+	.card__meta {
+		color: var(--color-fg-muted);
+		font-size: var(--text-sm);
+		margin: 0 0 var(--space-3);
+	}
+	.card__excerpt {
+		margin: 0 0 var(--space-3);
+		color: var(--color-fg);
+		line-height: var(--leading-relaxed);
+	}
+	.card__tags {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		gap: var(--space-2);
+		flex-wrap: wrap;
+	}
+	.card__tags a {
+		display: inline-block;
+		padding: 0.15rem 0.6rem;
+		background: var(--color-brand-soft);
+		color: var(--color-brand-ink);
+		border-radius: var(--radius-pill);
+		font-size: var(--text-xs);
+		text-decoration: none;
+		font-weight: 500;
+	}
+	.card__tags a:hover {
+		background: var(--color-brand);
+		color: #fff;
+	}
+</style>

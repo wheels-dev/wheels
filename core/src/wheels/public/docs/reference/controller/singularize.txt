@@ -1,2 +1,0 @@
-// Singularize a word, will result in "language" 
-#singularize("languages")#

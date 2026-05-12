@@ -1,0 +1,4 @@
+# Minimal nginx image that serves "v2" on /. See Dockerfile.v1 for why this
+# isn't built by the default E2E lifecycle.
+FROM nginx:alpine
+RUN printf '%s\n' 'v2' > /usr/share/nginx/html/index.html

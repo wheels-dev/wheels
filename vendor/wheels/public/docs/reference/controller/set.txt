@@ -1,0 +1,12 @@
+// 1. Set the `URLRewriting` global setting to `Partial`.
+set(URLRewriting="Partial");
+
+// 2. Set default argument values for the `buttonTo` view helper.
+// This pattern works for most Wheels helper functions and their arguments.
+set(functionName="buttonTo", onlyPath=true, host="", protocol="", port=0, text="", confirm="", image="", disable="");
+
+// 3. Set default values for the `textField` form helper to control label placement and wrapping markup.
+set(functionName="textField", labelPlacement="before", prependToLabel="<div>", append="</div>", appendToLabel="<br>");
+
+// 4. Apply the same defaults to multiple helper functions at once by passing a comma-delimited list to `functionName`.
+set(functionName="textField,passwordField,textArea", labelPlacement="before");

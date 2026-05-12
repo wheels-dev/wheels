@@ -1,6 +1,0 @@
-// Delete the user that signed up last.
-result = model("user").deleteOne(order="signupDate DESC");
-
-// If you have a `hasOne` association setup from `user` to `profile` you can do a scoped call (the `deleteProfile` method below will call `model("profile").deleteOne(where="userId=#aUser.id#")` internally).
-aUser = model("user").findByKey(params.userId);
-aUser.deleteProfile();

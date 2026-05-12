@@ -1,0 +1,12 @@
+// 1. Get a reference to the User model and call a class-level finder on it
+user = model("User").findByKey(params.key);
+
+// 2. Find all active users by calling findAll() on the model reference
+activeUsers = model("User").findAll(where="active = 1", order="lastName");
+
+// 3. Create a new record via the model reference
+newPost = model("Post").new(title=params.title, body=params.body);
+newPost.save();
+
+// 4. Count records using the model reference
+totalOrders = model("Order").count(where="status = 'pending'");

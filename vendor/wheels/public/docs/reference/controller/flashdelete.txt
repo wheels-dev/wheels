@@ -1,0 +1,14 @@
+// 1. Delete a key from the Flash
+flashDelete(key="errorMessage");
+
+// 2. Check the return value — true if the key existed, false if it did not
+wasPresent = flashDelete(key="notice");
+// wasPresent -> true  (key existed and was removed)
+// wasPresent -> false (key did not exist in the Flash)
+
+// 3. Conditionally act on whether the key was actually removed
+if (flashDelete(key="warning")) {
+    // key existed; it has now been removed from the Flash
+} else {
+    // key was not present; nothing was changed
+}

@@ -1,0 +1,18 @@
+// 1. Mark the Tenant model as shared so it always reads from the central database
+// models/Tenant.cfc
+component extends="Model" {
+    function config() {
+        sharedModel();
+    }
+}
+
+// 2. Use sharedModel() for lookup tables that live in the central database,
+//    not in per-tenant databases
+// models/Plan.cfc
+component extends="Model" {
+    function config() {
+        sharedModel();
+        // All finder calls on Plan will use the default application datasource
+        // regardless of which tenant is currently active.
+    }
+}

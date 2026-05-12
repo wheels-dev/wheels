@@ -217,4 +217,3 @@ if (!isDefined("form.username") || !len(trim(form.username))) {
 - [Loops](loops.md)
 - [Exception Handling](exception-handling.md)
 - [Variables](../data-types/variables.md)
-- [Operators](../syntax/operators.md)

@@ -1,9 +1,0 @@
-// Get a member and send a welcome email, passing in a few custom variables to the template
-newMember = model("member").findByKey(params.member.id);
-sendEmail(
-	to=newMember.email,
-	template="myemailtemplate",
-	subject="Thank You for Becoming a Member",
-	recipientName=newMember.name,
-	startDate=newMember.startDate
-);

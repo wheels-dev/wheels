@@ -1,0 +1,11 @@
+// 1. Basic camelCase to hyphenated string
+result = hyphenize("myBlogPost");
+// result -> "my-blog-post"
+
+// 2. Single word (no change)
+result = hyphenize("hello");
+// result -> "hello"
+
+// 3. Used in URL slug generation
+slug = hyphenize("userProfileSettings");
+// slug -> "user-profile-settings"

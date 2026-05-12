@@ -1,0 +1,29 @@
+---
+title: isPost()
+description: "Returns whether the request came from a form <code>POST</code> submission or not."
+sidebar:
+  label: isPost()
+  order: 0
+---
+
+## Signature
+
+`isPost()` — returns `boolean`
+
+**Available in:** `controller`
+**Category:** Miscellaneous Functions
+
+## Description
+
+Returns whether the request came from a form <code>POST</code> submission or not.
+
+
+
+
+## Examples
+
+<pre><code class='javascript'>if (isPost()) {
+    writeOutput(&quot;This request was submitted via POST.&quot;);
+} else {
+    writeOutput(&quot;This request is not a POST request.&quot;);
+}</code></pre>

@@ -1,0 +1,19 @@
+// 1. Basic year select tag using the current request params as the selected value
+#yearSelectTag(name="yearOfBirthday", selected=params.yearOfBirthday)#
+
+// 2. Restrict the range to the past 50 years with a minimum of 18 years ago
+#yearSelectTag(
+    name="yearOfBirthday",
+    selected=params.yearOfBirthday,
+    startYear=Year(Now()) - 50,
+    endYear=Year(Now()) - 18
+)#
+
+// 3. Include a blank prompt and wrap with a label
+#yearSelectTag(
+    name="yearOfBirthday",
+    selected=params.yearOfBirthday,
+    includeBlank="- Select Year -",
+    label="Birth Year",
+    labelPlacement="before"
+)#

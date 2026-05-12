@@ -1,0 +1,17 @@
+// 1. In `models/User.cfc`, define the primary key as a column called `userID`
+//    instead of the Wheels default of `id`.
+component extends="Model" {
+	function config() {
+		setPrimaryKey("userID");
+	}
+}
+
+// 2. Define a composite primary key for a join model using two columns.
+//    `setPrimaryKeys()` is an alias for `setPrimaryKey()` that reads more
+//    naturally when multiple properties are involved.
+component extends="Model" {
+	function config() {
+		table("users_roles");
+		setPrimaryKeys("userID,roleID");
+	}
+}

@@ -1,0 +1,95 @@
+// 1. Reverse a table creation by dropping the table
+// Called automatically when rolling back this migration
+function down() {
+	transaction {
+		try {
+			dropTable("employees");
+		} catch (any e) {
+			local.exception = e;
+		}
+
+		if (structKeyExists(local, "exception")) {
+			transaction action="rollback";
+			throw(
+				errorCode = "1",
+				detail    = local.exception.detail,
+				message   = local.exception.message,
+				type      = "any"
+			);
+		} else {
+			transaction action="commit";
+		}
+	}
+}
+
+// 2. Reverse an addColumn() call by removing the column
+function down() {
+	transaction {
+		try {
+			removeColumn(table="users", columnName="biography");
+		} catch (any e) {
+			local.exception = e;
+		}
+
+		if (structKeyExists(local, "exception")) {
+			transaction action="rollback";
+			throw(
+				errorCode = "1",
+				detail    = local.exception.detail,
+				message   = local.exception.message,
+				type      = "any"
+			);
+		} else {
+			transaction action="commit";
+		}
+	}
+}
+
+// 3. Paired up() and down() inside a full migration component
+component extends="[extends]" hint="Add status column to orders" {
+
+	function up() {
+		transaction {
+			try {
+				addColumn(table="orders", columnType="string", columnName="status", limit=50, default="pending");
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (structKeyExists(local, "exception")) {
+				transaction action="rollback";
+				throw(
+					errorCode = "1",
+					detail    = local.exception.detail,
+					message   = local.exception.message,
+					type      = "any"
+				);
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+	function down() {
+		transaction {
+			try {
+				removeColumn(table="orders", columnName="status");
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (structKeyExists(local, "exception")) {
+				transaction action="rollback";
+				throw(
+					errorCode = "1",
+					detail    = local.exception.detail,
+					message   = local.exception.message,
+					type      = "any"
+				);
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+}

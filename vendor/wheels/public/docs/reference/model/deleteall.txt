@@ -1,0 +1,12 @@
+// 1. Delete all inactive users without instantiating them (skips callbacks and validations).
+recordsDeleted = model("User").deleteAll(where="inactive=1");
+
+// 2. Delete all inactive users and run their beforeDelete / afterDelete callbacks.
+recordsDeleted = model("User").deleteAll(where="inactive=1", instantiate=true);
+
+// 3. Permanently delete soft-deleted records (bypass the soft-delete column).
+recordsDeleted = model("User").deleteAll(where="inactive=1", softDelete=false);
+
+// 4. If you have a `hasMany` association from `Post` to `Comment`, you can use a scoped call. (The `deleteAllComments` method below calls `model("Comment").deleteAll(where="postId=#post.id#")` internally.)
+post = model("Post").findByKey(params.postId);
+howManyDeleted = post.deleteAllComments();
