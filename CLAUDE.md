@@ -1060,13 +1060,13 @@ Workflow orchestration (multi-step planning, feature development) is not a frame
 |---|---|---|---|
 | Triage | issue opened/reopened | Opus | Comment classifying as `bug` / `framework-design` / `other` (+ confidence on `bug` path). Reads code with the allowlisted tools to resolve uncertainty before rating. |
 | Research | bot triage emits `framework-design` marker | Opus | Comment comparing Rails / Laravel / Django / Phoenix / Spring Boot / +1 and recommending a Wheels-idiomatic path (+ confidence). |
-| Propose Fix | bot triage emits `triage-confidence:high` OR research emits `research-confidence:high` (or `workflow_dispatch`) | Opus | TDD-mandatory draft PR on branch `fix/bot-<issue>-<slug>`. Spec-then-implementation, both required by `bot-tdd-gate.yml`. |
+| Propose Fix | bot triage emits `triage-confidence:high\|medium` OR research emits `research-confidence:high\|medium` (or `workflow_dispatch`) | Opus | TDD-mandatory draft PR on branch `fix/bot-<issue>-<slug>`. Spec-then-implementation, both required by `bot-tdd-gate.yml`. |
 | Reviewer A | PR opened / synchronized / ready_for_review | Sonnet | Single PR review with line comments, verdict, and `wheels-bot:review-a:<pr>:<sha>` marker. |
 | Reviewer B | Reviewer A submits a review | Sonnet | PR comment critiquing A for sycophancy, false positives, and missed issues. Loop cap = 3 rounds. |
 
 **Marker conventions** (HTML comments, used for idempotency):
-- `<!-- wheels-bot:triage:<issue> -->` + `<!-- wheels-bot:triage-class:<bug|framework-design|other> -->` (+ optional `<!-- wheels-bot:triage-confidence:high -->`)
-- `<!-- wheels-bot:research:<issue> -->` (+ optional `<!-- wheels-bot:research-confidence:high -->`)
+- `<!-- wheels-bot:triage:<issue> -->` + `<!-- wheels-bot:triage-class:<bug|framework-design|other> -->` (+ optional `<!-- wheels-bot:triage-confidence:high|medium -->` — either fires propose-fix; low omitted)
+- `<!-- wheels-bot:research:<issue> -->` (+ optional `<!-- wheels-bot:research-confidence:high|medium -->` — either fires propose-fix; low omitted)
 - `<!-- wheels-bot:fix:<issue> -->` / `<!-- wheels-bot:fix-held:<issue> -->`
 - `<!-- wheels-bot:review-a:<pr>:<sha> -->`
 - `<!-- wheels-bot:review-b:<pr>:<sha>:<round> -->`
@@ -1076,4 +1076,4 @@ Workflow orchestration (multi-step planning, feature development) is not a frame
 
 **Kill switch**: flip the repo variable `WHEELS_BOT_ENABLED` to `false` to halt every bot workflow without code changes. Add the `[skip-claude]` label (or `[skip-claude]` in the title) to halt activity on a single issue/PR.
 
-**Auto-fire safety net**: the bot is permitted to chain stages (triage → research → propose-fix), but each handoff requires `*-confidence:high` and the propose-fix prompt auto-downgrades on sensitive areas (security, migrations, deploy, DI). All bot PRs land as `--draft` and require a human approving review on `develop`.
+**Auto-fire safety net**: the bot is permitted to chain stages (triage → research → propose-fix), and handoff fires on `*-confidence:high` OR `*-confidence:medium`. Low stays manual. Sensitive areas (security, middleware, migrations, deploy, DI, cross-engine) are caught by the propose-fix prompt's own step-4 safety net, which posts a `fix-held` marker instead of opening a PR. Reviewer A and B then critique whatever propose-fix produces, escalating to the Senior Advisor on deadlock. All bot PRs land as `--draft` and require a human approving review on `develop`.
