@@ -1,0 +1,13 @@
+// 1. Get all association names defined on a model
+names = model("User").associationNames();
+// names -> "profile,posts,comments"
+
+// 2. Check whether a specific association exists on the model
+if (listFindNoCase(model("Post").associationNames(), "comments")) {
+    // the Post model has a "comments" association
+}
+
+// 3. Iterate over each association name
+for (assocName in listToArray(model("Order").associationNames())) {
+    writeOutput(assocName);
+}

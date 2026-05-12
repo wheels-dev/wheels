@@ -1,0 +1,8 @@
+// 1. Basic file upload field with a label
+#fileFieldTag(name="photo", label="Profile Photo")#
+
+// 2. File upload field with a CSS class and no label
+#fileFieldTag(name="attachment", class="upload-input")#
+
+// 3. File upload field with label placement and wrapper HTML
+#fileFieldTag(name="resume", label="Upload Resume", labelPlacement="before", prepend="<div class='field'>", append="</div>")#

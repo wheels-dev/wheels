@@ -1,3 +1,0 @@
-<head>
-  #csrfMetaTags()#
-</head>

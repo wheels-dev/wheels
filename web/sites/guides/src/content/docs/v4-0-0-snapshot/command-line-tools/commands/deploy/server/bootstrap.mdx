@@ -1,0 +1,39 @@
+---
+title: "wheels deploy server bootstrap"
+description: Install Docker on a fresh host. Idempotent — safe to re-run.
+type: reference
+sidebar:
+  label: "bootstrap"
+  order: 2
+---
+
+Install Docker on every host. Idempotent — re-runs on already-installed hosts are no-ops.
+
+## Synopsis
+
+```txt title="synopsis"
+wheels deploy server bootstrap [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Per host:
+
+```sh title="per-host behavior"
+which docker >/dev/null 2>&1 || curl -fsSL https://get.docker.com | sh
+```
+
+The convenience script runs as root (or via `sudo`). For production hardening, install Docker through your usual config management instead — this is a fast-start verb, not a production setup.
+
+## Example
+
+```bash title="example"
+wheels deploy server bootstrap
+```

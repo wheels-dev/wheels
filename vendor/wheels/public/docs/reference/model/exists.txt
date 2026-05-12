@@ -1,0 +1,28 @@
+// 1. Check if any record exists in the table
+anyUsers = model("User").exists();
+
+// 2. Check if a record with a specific primary key exists
+result = model("User").exists(key=params.key);
+
+// 3. Check if a record matching a WHERE condition exists
+joeExists = model("User").exists(where="firstName = 'Joe'");
+
+// 4. Use the result in a conditional
+if (model("User").exists(key=params.userId)) {
+	// record was found, proceed
+}
+
+// 5. Include soft-deleted records in the check
+deletedExists = model("User").exists(where="email='old@example.com'", includeSoftDeletes=true);
+
+// 6. If you have a `belongsTo` association from `Comment` to `Post`, you can do a scoped call. (The `hasPost` method below calls `model("Post").exists(comment.postId)` internally.)
+comment = model("Comment").findByKey(params.commentId);
+commentHasAPost = comment.hasPost();
+
+// 7. If you have a `hasOne` association from `User` to `Profile`, you can do a scoped call. (The `hasProfile` method below calls `model("Profile").exists(where="userId=#user.id#")` internally.)
+user = model("User").findByKey(params.userId);
+userHasProfile = user.hasProfile();
+
+// 8. If you have a `hasMany` association from `Post` to `Comment`, you can do a scoped call. (The `hasComments` method below calls `model("Comment").exists(where="postId=#post.id#")` internally.)
+post = model("Post").findByKey(params.postId);
+postHasComments = post.hasComments();

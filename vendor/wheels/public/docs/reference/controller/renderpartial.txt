@@ -1,0 +1,18 @@
+// 1. Render the partial `_comment.cfm` located in the current controller's view folder
+renderPartial("comment");
+
+// 2. Render the partial at `app/views/shared/_comment.cfm` using an absolute path
+renderPartial("/shared/comment");
+
+// 3. Return the rendered partial as a string instead of sending it to the client
+commentHtml = renderPartial(partial="comment", returnAs="string");
+
+// 4. Render a shared partial wrapped in a layout and cache it for 5 minutes
+renderPartial(partial="/shared/sidebar", layout="/layouts/sidebar", cache=5);
+
+// 5. Render a partial using a named data-loading function to supply variables
+//    (the controller must have a private function named `comment` returning a struct)
+renderPartial(partial="comment", dataFunction="comment");
+
+// 6. Render a partial and force a specific HTTP status code (e.g. for AJAX responses)
+renderPartial(partial="/shared/error", status=422);

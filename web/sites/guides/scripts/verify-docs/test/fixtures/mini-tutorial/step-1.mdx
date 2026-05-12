@@ -1,0 +1,28 @@
+---
+title: Mini Step 1
+sidebar:
+  order: 1
+---
+
+```cfm {test:tutorial step=1 file="config/routes.cfm" mode="write"}
+<cfscript>
+mapper()
+    .get(name="ping", pattern="/ping", to="home##ping")
+    .root(to="home##index", method="get")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+```cfm {test:tutorial step=1 file="app/controllers/Home.cfc" mode="write"}
+component extends="Controller" {
+    function index() {}
+    function ping() {
+        renderText("pong");
+    }
+}
+```
+
+```bash {test:cli step=1 cmd="wheels reload"}
+wheels reload
+```

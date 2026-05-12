@@ -1,3 +1,0 @@
-// Migrate to a specific version
-// Returns a message with the result
-result=application.wheels.migrator.migrateTo(version);

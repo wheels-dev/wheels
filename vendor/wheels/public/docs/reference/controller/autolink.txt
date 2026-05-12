@@ -1,0 +1,15 @@
+// 1. Link both URLs and email addresses (default behavior)
+result = autoLink("Download CFWheels from http://cfwheels.org/download");
+// result -> "Download CFWheels from <a href="http://cfwheels.org/download">http://cfwheels.org/download</a>"
+
+// 2. Link email addresses only
+result = autoLink(text="Email us at info@cfwheels.org or visit http://cfwheels.org", link="emailAddresses");
+// result -> "Email us at <a href="mailto:info@cfwheels.org">info@cfwheels.org</a> or visit http://cfwheels.org"
+
+// 3. Link URLs only (skip email addresses)
+result = autoLink(text="Visit http://cfwheels.org or contact info@cfwheels.org", link="URLs");
+// result -> "Visit <a href="http://cfwheels.org">http://cfwheels.org</a> or contact info@cfwheels.org"
+
+// 4. Disable auto-linking of relative URLs
+result = autoLink(text="See /docs/guide for details or http://cfwheels.org for more.", relative=false);
+// result -> "See /docs/guide for details or <a href="http://cfwheels.org">http://cfwheels.org</a> for more."

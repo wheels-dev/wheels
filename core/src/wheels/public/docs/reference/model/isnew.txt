@@ -1,5 +1,0 @@
-// Create a new object and then check if it is new (yes, this example is ridiculous. It makes more sense in the context of callbacks for example)
-employee = model("employee").new()>
-<cfif employee.isNew()>
-    // Do something...
-</cfif>

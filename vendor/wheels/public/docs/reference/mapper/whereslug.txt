@@ -1,0 +1,17 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a single slug variable — matches "my-article-title" but not "My Article" or "abc123!"
+    .get(name="article", to="articles##show")
+    .whereSlug("slug")
+
+    // 2. Chain with another constraint helper after a resource route
+    .resources(name="posts")
+    .whereSlug("postSlug")
+
+    // 3. Constrain multiple slug variables at once using a comma-delimited list
+    .get(name="categoryPost", pattern="[category]/[postSlug]", to="posts##showByCategory")
+    .whereSlug("category,postSlug")
+.end();
+
+</cfscript>

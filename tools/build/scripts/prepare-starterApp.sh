@@ -30,6 +30,11 @@ shopt -s dotglob
 cp -r examples/starter-app/* "${BUILD_DIR}/"
 shopt -u dotglob
 
+# Apache 2.0 §4(a) requires LICENSE in every distributed artifact and §4(d)
+# requires NOTICE to propagate to derivatives.
+cp LICENSE "${BUILD_DIR}/"
+cp NOTICE "${BUILD_DIR}/"
+
 # Check Copied files
 echo "These files were copied"
 ls -la "${BUILD_DIR}/"

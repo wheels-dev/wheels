@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 # Check if this is development or production
 if [ "$1" == "dev" ]; then
   echo "Building development image..."
-  docker build -t cfwheels-testui-new-dev:latest -f Dockerfile.dev .
+  docker build -t wheels-testui-new-dev:latest -f Dockerfile.dev .
   
   echo "Starting development container..."
   docker run --rm -it \
@@ -21,16 +21,16 @@ if [ "$1" == "dev" ]; then
     -e NODE_ENV=development \
     -e VITE_API_BASE=/api \
     -e VITE_MOCK_API=true \
-    cfwheels-testui-new-dev:latest
+    wheels-testui-new-dev:latest
 else
   echo "Building production image..."
-  docker build -t cfwheels-testui-new:latest .
+  docker build -t wheels-testui-new:latest .
   
   echo "Starting production container..."
   docker run --rm -it \
     -p 3001:80 \
     --add-host=host.docker.internal:host-gateway \
-    cfwheels-testui-new:latest
+    wheels-testui-new:latest
 fi
 
 echo "Container is running. Press Ctrl+C to stop."

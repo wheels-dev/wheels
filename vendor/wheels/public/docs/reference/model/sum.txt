@@ -1,0 +1,15 @@
+// 1. Get the sum of all salaries
+allSalaries = model("Employee").sum("salary");
+
+// 2. Get the sum of all salaries for employees in a given country
+allAustralianSalaries = model("Employee").sum(property="salary", include="country", where="countryname='Australia'");
+
+// 3. Make sure a numeric value is always returned, even if there are no records analyzed by the query
+salarySum = model("Employee").sum(property="salary", where="salary BETWEEN #params.min# AND #params.max#", ifNull=0);
+
+// 4. Sum only distinct (unique) salary values
+distinctSum = model("Employee").sum(property="salary", distinct=true);
+
+// 5. Get the total salary per department using grouping
+byDepartment = model("Employee").sum(property="salary", group="departmentId");
+// byDepartment is a query with columns: departmentId, salarysum

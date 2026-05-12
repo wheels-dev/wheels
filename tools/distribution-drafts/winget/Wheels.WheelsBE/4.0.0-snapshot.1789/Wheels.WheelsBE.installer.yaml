@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+#
+# DRAFT — same caveats as Wheels.Wheels/.../installer.yaml. See
+# ../README.md for the installer-strategy decision still pending.
+#
+# NOTE: per the README, bleeding-edge may end up never shipping on WinGet
+# at all. WinGet's manual-merge cadence is incompatible with the
+# per-develop-merge BE release frequency — daily snapshot PRs to
+# microsoft/winget-pkgs would be noise. Scoop's hourly autoupdate
+# bucket-update bot is the better fit for BE.
+#
+# This file is kept for symmetry with the stable manifest + as a record
+# of the metadata convention if we ever change our minds.
+
+PackageIdentifier: Wheels.WheelsBE
+PackageVersion: 4.0.0-snapshot.1789
+MinimumOSVersion: 10.0.17763.0
+InstallerType: zip
+NestedInstallerType: portable
+Scope: user
+InstallModes:
+- interactive
+- silent
+- silentWithProgress
+UpgradeBehavior: install
+ReleaseDate: 2026-05-10
+Dependencies:
+  PackageDependencies:
+  - PackageIdentifier: EclipseAdoptium.Temurin.21.JDK
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/wheels-dev/wheels-snapshots/releases/download/v4.0.0-snapshot.1789/wheels-windows-x64-4.0.0-snapshot.1789.zip  # PLACEHOLDER
+  InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000  # PLACEHOLDER
+  NestedInstallerFiles:
+  - RelativeFilePath: wheels\bin\wheels.cmd
+    PortableCommandAlias: wheels
+ManifestType: installer
+ManifestVersion: 1.6.0

@@ -1,0 +1,13 @@
+// 1. Rename a column in the users table
+renameColumn(table="users", columnName="userName", newColumnName="username");
+
+// 2. Rename a column as part of a migration's up() and down() methods
+component extends="wheels.migrator.Migration" hint="Rename fullName to displayName in profiles" {
+    function up() {
+        renameColumn(table="profiles", columnName="fullName", newColumnName="displayName");
+    }
+
+    function down() {
+        renameColumn(table="profiles", columnName="displayName", newColumnName="fullName");
+    }
+}

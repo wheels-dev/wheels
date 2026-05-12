@@ -1,0 +1,10 @@
+// 1. Get the MIME type for a known file extension
+mimeType = mimeTypes("xls");
+// mimeType -> "application/vnd.ms-excel"
+
+// 2. Get the MIME type for a dynamic extension from user input, with a custom fallback
+mimeType = mimeTypes(extension=params.fileType, fallback="text/plain");
+
+// 3. Use the default fallback (application/octet-stream) for an unknown extension
+mimeType = mimeTypes("xyz");
+// mimeType -> "application/octet-stream"

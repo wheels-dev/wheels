@@ -1,0 +1,9 @@
+{
+	"name": "wheels-lazypkg",
+	"version": "1.0.0",
+	"description": "Test fixture: lazy-loaded package with no mixins",
+	"lazy": true,
+	"provides": {
+		"mixins": "none"
+	}
+}

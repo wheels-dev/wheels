@@ -1,0 +1,26 @@
+// 1. Use a custom layout for the entire controller, except for one action.
+// Declared inside the controller's config() function.
+usesLayout(template="myLayout", except="myAjax");
+
+// 2. Apply a custom layout only to specific actions; all other actions
+// use the default layout.cfm.
+usesLayout(template="myLayout", only="termsOfService,shippingPolicy");
+
+// 3. Serve a lightweight layout for AJAX requests while normal requests
+// still receive the full layout.
+usesLayout(template="myLayout", ajax="ajaxLayout");
+
+// 4. Delegate layout selection to a private function. The function receives
+// the current action name and should return the layout template name or
+// true to fall back to the default layout.cfm.
+usesLayout("chooseLayout");
+
+// Example chooseLayout() function in the same controller:
+// private function chooseLayout(action) {
+//   if (action == "print") return "printLayout";
+//   return true; // fall back to default layout.cfm
+// }
+
+// 5. Use a function-based layout but fall back to layout.cfm when the
+// function returns nothing (useDefault defaults to true).
+usesLayout(template="chooseLayout", useDefault=true);

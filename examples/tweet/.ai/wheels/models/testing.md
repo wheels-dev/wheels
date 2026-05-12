@@ -10,7 +10,7 @@ Comprehensive guide to testing Wheels models using TestBox 5 with modern BDD (Be
 /**
  * UserModelSpec - Test User model functionality using BDD
  */
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("User Model", () => {

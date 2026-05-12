@@ -1,0 +1,60 @@
+// 1. Get all users ordered by last name
+users = model("user").findAll(order="lastName ASC");
+
+// 2. Get only 5 users in a random order
+fiveRandomUsers = model("user").findAll(maxRows=5, order="random");
+
+// 3. Include a belongsTo association and filter with a WHERE clause
+articles = model("article").findAll(include="author", where="published=1", order="createdAt DESC");
+
+// 4. Include a hasMany association in the opposite direction
+bobsArticles = model("author").findAll(include="articles", where="firstName='Bob'");
+
+// 5. Use pagination (records 26-50) with a nested include (song belongsTo album, album belongsTo artist)
+songs = model("song").findAll(include="album(artist)", page=2, perPage=25);
+
+// 6. Return results as an array of model objects instead of a query
+activeUsers = model("user").findAll(where="active=1", order="lastName ASC", returnAs="objects");
+for (user in activeUsers) {
+	writeOutput(user.firstName & " " & user.lastName);
+}
+
+// 7. Return results as an array of structs
+userStructs = model("user").findAll(where="active=1", returnAs="structs");
+
+// 8. Use a dynamic finder to get all books released in a certain year
+// (same as model("book").findAll(where="releaseYear=#params.year#"))
+books = model("book").findAllByReleaseYear(params.year);
+
+// 9. Use a dynamic finder with multiple criteria
+// (same as model("book").findAll(where="releaseYear=#params.year# AND type='#params.type#'"))
+books = model("book").findAllByReleaseYearAndType("#params.year#,#params.type#");
+
+// 10. Use a scoped call via a hasMany association (calls findAll internally with a where clause)
+post = model("post").findByKey(params.postId);
+comments = post.comments();
+
+// 11. Use GROUP BY with a calculated property (generates HAVING instead of WHERE)
+// Order model has a calculated property: property(name="totalAmount", sql="SUM(amount)")
+ids = model("order").findAll(group="productId", where="totalAmount > 1000", select="productId");
+
+// 12. Include soft-deleted records
+allUsers = model("user").findAll(includeSoftDeletes=true, order="lastName ASC");
+
+// 13. Cache the query results for 10 minutes
+cachedUsers = model("user").findAll(where="active=1", cache=10);
+
+// 14. Return the generated SQL string instead of running the query
+sql = model("user").findAll(where="active=1", order="lastName ASC", returnAs="sql");
+// sql -> "SELECT ... FROM users WHERE active = 1 ORDER BY last_name ASC"
+
+// 15. Use index hints (MySQL and SQL Server only)
+indexes = {
+	author="idx_authors_name",
+	post="idx_posts_created"
+};
+posts = model("author").findAll(
+	where="firstName LIKE '#params.q#%' OR subject LIKE '#params.q#%'",
+	include="posts",
+	useIndex=indexes
+);

@@ -2,10 +2,10 @@ FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
-#Add Sqlite
-RUN apt update -y && apt install -y sqlite3 libsqlite3-dev
-RUN pwd
-RUN sqlite3 wheelstestdb.db
+# Install SQLite and create test database
+RUN apt-get update -y && apt-get install -y --no-install-recommends sqlite3 libsqlite3-dev \
+ && rm -rf /var/lib/apt/lists/* \
+ && sqlite3 wheelstestdb.db "SELECT 1;"
 
 ENV PORT 62023
 ENV APP_DIR                 "/wheels-test-suite"
@@ -14,6 +14,7 @@ ENV ENV_MODE                "remote"
 ENV BOX_SERVER_CFCONFIGFILE "/wheels-test-suite/CFConfig.json"
 ENV BOX_SERVER_PROFILE      "none"
 ENV BOX_INSTALL             TRUE
+ENV BOX_SERVER_APP_CFENGINE "adobe@2023.0.11+330706"
 
 # Set working directory
 WORKDIR ${APP_DIR}

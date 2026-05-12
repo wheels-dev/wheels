@@ -1,0 +1,9 @@
+// 1. Register a single method to run before an existing object is validated on update
+// Called inside the model's config() function
+beforeValidationOnUpdate("sanitizeFields");
+
+// 2. Register multiple methods as a comma-delimited list
+beforeValidationOnUpdate("sanitizeFields,enforceBusinessRules");
+
+// 3. Use the `method` argument alias for a single callback
+beforeValidationOnUpdate(method="normalizeEmail");

@@ -1,0 +1,17 @@
+// 1. Switch to a different tenant mid-request (minimal required argument)
+switchTenant(tenant = {dataSource = "tenant_db_acme"});
+
+// 2. Switch with a full tenant struct (id and per-tenant config override)
+switchTenant(
+    tenant = {
+        dataSource = "tenant_db_beta",
+        id         = "beta",
+        config     = {timeZone = "America/New_York"}
+    }
+);
+
+// 3. Force-switch even when the current tenant is locked by TenantResolver middleware
+switchTenant(
+    tenant = {dataSource = "tenant_db_admin", id = "admin"},
+    force  = true
+);

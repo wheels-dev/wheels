@@ -120,7 +120,4 @@ randomize(12345);
 - `precisionEvaluate()` has performance overhead
 
 ## Related Concepts
-- [Mathematical Operators](../../syntax/operators.md)
 - [Variables](../variables.md)
-- [Type Conversion](../../best-practices/type-handling.md)
-- [Precision Math](../../advanced/precision-calculations.md)

@@ -1,0 +1,22 @@
+<cfscript>
+
+// 1. Add a search route acting on the photos collection (GET /photos/search)
+mapper()
+    .resources(name="photos", nested=true)
+        .collection()
+            .get("search")
+        .end()
+    .end()
+.end();
+
+// 2. Add multiple collection routes (GET /articles/featured, POST /articles/bulk-delete)
+mapper()
+    .resources(name="articles", nested=true)
+        .collection()
+            .get("featured")
+            .post("bulkDelete")
+        .end()
+    .end()
+.end();
+
+</cfscript>

@@ -1,0 +1,13 @@
+// 1. Get the column name mapped to a model property
+col = model("User").columnForProperty("firstName");
+// col -> "first_name"
+
+// 2. Check the column for a property before building a raw SQL fragment
+col = model("Order").columnForProperty("placedAt");
+if (col != false) {
+    writeOutput("Column in the database: " & col);
+}
+
+// 3. Returns false when the property does not exist on the model
+col = model("User").columnForProperty("nonExistentProperty");
+// col -> false

@@ -1,0 +1,26 @@
+// 1. Register a single callback method to run after an object is saved (both create and update)
+// In models/User.cfc
+component extends="Model" {
+    function config() {
+        afterSave("sendWelcomeEmail");
+    }
+
+    private function sendWelcomeEmail() {
+        // called automatically each time a User is saved
+    }
+}
+
+// 2. Register multiple callback methods using a comma-delimited list
+component extends="Model" {
+    function config() {
+        afterSave("updateSearchIndex,notifyAdmins");
+    }
+}
+
+// 3. Register multiple callbacks by calling afterSave() more than once
+component extends="Model" {
+    function config() {
+        afterSave("updateSearchIndex");
+        afterSave("notifyAdmins");
+    }
+}

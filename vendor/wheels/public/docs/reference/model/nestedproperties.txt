@@ -1,0 +1,24 @@
+// 1. In `models/User.cfc`, allow `groupEntitlements` to be saved and deleted through the `user` object.
+function config() {
+	hasMany("groupEntitlements");
+	nestedProperties(association="groupEntitlements", allowDelete=true);
+}
+
+// 2. Allow nested `addresses` to be saved but not auto-saved with the parent; also reject blank `street` values.
+function config() {
+	hasMany("addresses");
+	nestedProperties(association="addresses", autoSave=false, rejectIfBlank="street");
+}
+
+// 3. Allow nested `lineItems` with a sort order driven by the `position` property, and enable deletion.
+function config() {
+	hasMany("lineItems");
+	nestedProperties(association="lineItems", allowDelete=true, sortProperty="position");
+}
+
+// 4. Enable nested properties for multiple associations at once.
+function config() {
+	hasOne("profile");
+	hasMany("phoneNumbers");
+	nestedProperties(associations="profile,phoneNumbers");
+}

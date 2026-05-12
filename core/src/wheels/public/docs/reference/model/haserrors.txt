@@ -1,4 +1,0 @@
-// Check if the post object has any errors set on it 
-if(post.hasErrors()){
-    // Send user to a form to correct the errors... 
-}

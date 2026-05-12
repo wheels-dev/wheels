@@ -72,7 +72,7 @@ component extends="./base" {
             var action = arguments.remove ? "down" : "stop";
             
             print.yellowLine("Stopping containers...");
-            var result = $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose #action#'");
+            var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose " & action & "'");
             
             if (result.exitCode == 0) {
                 print.greenLine("✓ Containers stopped successfully");
@@ -80,7 +80,7 @@ component extends="./base" {
                 if (arguments.remove) {
                     // Clean up volumes if removing
                     print.yellowLine("Cleaning up volumes...");
-                    $execBash("ssh #sshUser#@#server# 'cd /opt/#serviceName# && docker compose down -v'");
+                    $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " 'cd /opt/" & $shellEscape(serviceName) & " && docker compose down -v'");
                 }
             } else {
                 print.redLine("✗ Failed to stop containers");

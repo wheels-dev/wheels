@@ -1,1 +1,0 @@
-addIndex(table='members', columnNames='username', unique=true);

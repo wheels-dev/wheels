@@ -1,0 +1,18 @@
+// 1. Collect all validation errors from associated objects on a post
+post = model("Post").findOne(where="id=1", include="comments");
+errors = post.allAssociationErrors();
+// errors -> array of error structs from associated comments (and their associations, recursively)
+// Each struct contains keys: property, message, name
+
+// 2. Use allErrors() with includeAssociations=true instead (preferred shorthand)
+// allErrors() calls allAssociationErrors() internally when includeAssociations is true
+post = model("Post").findOne(where="id=1", include="comments");
+allErrors = post.allErrors(includeAssociations=true);
+// allErrors -> combined array of the post's own errors plus all associated errors
+
+// 3. Check if any associated model has errors before saving
+order = model("Order").findOne(where="id=1", include="lineItems");
+associationErrors = order.allAssociationErrors();
+if (arrayLen(associationErrors)) {
+    writeOutput("One or more line items have validation errors.");
+}

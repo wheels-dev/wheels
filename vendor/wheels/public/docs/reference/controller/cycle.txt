@@ -1,0 +1,41 @@
+// 1. Alternate CSS classes on table rows
+// Outputs "odd" on the first row, "even" on the second, "odd" on the third, etc.
+<table>
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Phone</th>
+		</tr>
+	</thead>
+	<tbody>
+		<cfoutput query="employees">
+			<tr class="#cycle("odd,even")#">
+				<td>#employees.name#</td>
+				<td>#employees.phone#</td>
+			</tr>
+		</cfoutput>
+	</tbody>
+</table>
+
+// 2. Use named cycles when running multiple cycles simultaneously
+// Cycle "row" and "highlight" advance independently
+<cfoutput query="employees">
+	<cfset rowClass = cycle(values="even,odd", name="row")>
+	<cfset hlClass = cycle(values="highlight,normal,normal", name="highlight")>
+	<tr class="#rowClass# #hlClass#">
+		<td>#employees.name#</td>
+	</tr>
+</cfoutput>
+
+// 3. Reset a cycle so it starts over from the first value
+<cfoutput query="departments" group="departmentId">
+	<div class="#cycle(values="even,odd", name="row")#">
+		<ul>
+			<cfoutput>
+				<cfset rank = cycle(values="president,vice-president,director,manager,specialist,intern", name="position")>
+				<li class="#rank#">#employees.name#</li>
+			</cfoutput>
+		</ul>
+	</div>
+	<cfset resetCycle("position")>
+</cfoutput>

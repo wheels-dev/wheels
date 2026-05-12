@@ -1,0 +1,66 @@
+---
+import markPng from '../assets/wheels-logo-mark.png';
+import lockupPng from '../assets/wheels-logo.png';
+import lockupWhitePng from '../assets/wheels-logo-white.png';
+
+interface Props {
+	variant?: 'mark' | 'lockup' | 'lockup-on-dark';
+	size?: 'sm' | 'md' | 'lg';
+	class?: string;
+}
+
+const { variant = 'mark', size = 'md', class: className = '' } = Astro.props;
+
+const markSizes = {
+	sm: { w: 20, h: 20 },
+	md: { w: 28, h: 28 },
+	lg: { w: 40, h: 40 },
+};
+
+const lockupHeights = {
+	sm: 20,
+	md: 28,
+	lg: 40,
+};
+
+const isLockup = variant === 'lockup' || variant === 'lockup-on-dark';
+const src =
+	variant === 'mark' ? markPng : variant === 'lockup-on-dark' ? lockupWhitePng : lockupPng;
+---
+
+{
+	variant === 'mark' && (
+		<img
+			src={src.src}
+			width={markSizes[size].w}
+			height={markSizes[size].h}
+			alt="Wheels"
+			class:list={['wd-logo', 'wd-logo--mark', className]}
+			loading="eager"
+			decoding="async"
+		/>
+	)
+}
+
+{
+	isLockup && (
+		<img
+			src={src.src}
+			height={lockupHeights[size]}
+			alt="wheels.dev"
+			class:list={['wd-logo', 'wd-logo--lockup', className]}
+			loading="eager"
+			decoding="async"
+		/>
+	)
+}
+
+<style>
+	.wd-logo {
+		display: inline-block;
+		flex-shrink: 0;
+	}
+	.wd-logo--lockup {
+		width: auto;
+	}
+</style>

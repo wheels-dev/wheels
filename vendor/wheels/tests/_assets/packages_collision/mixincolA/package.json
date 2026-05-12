@@ -1,0 +1,8 @@
+{
+	"name": "wheels-mixincolA",
+	"version": "1.0.0",
+	"description": "Test fixture: defines $sharedHelper on controller",
+	"provides": {
+		"mixins": "controller"
+	}
+}

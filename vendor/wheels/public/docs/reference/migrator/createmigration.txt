@@ -1,0 +1,16 @@
+// 1. Create a blank migration file (uses timestamp prefix by default)
+result = application.wheels.migrator.createMigration("CreateUsersTable");
+// result -> "The migration 20240815123045_CreateUsersTable.cfc file was created"
+
+// 2. Create a migration from a built-in template (e.g. create-table)
+result = application.wheels.migrator.createMigration(
+	migrationName="CreatePostsTable",
+	templateName="create-table"
+);
+
+// 3. Create a migration using a sequential numeric prefix instead of a timestamp
+result = application.wheels.migrator.createMigration(
+	migrationName="AddIndexToUsers",
+	migrationPrefix="numeric"
+);
+// result -> "The migration 001_AddIndexToUsers.cfc file was created"

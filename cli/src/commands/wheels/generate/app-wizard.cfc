@@ -156,11 +156,11 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
 
     var template = multiselect( 'Which Wheels Template shall we use? ' )
       .options( [
-        {value: 'wheels-base-template@^3.0.0', display: '3.0 - Wheels Base Template - Stable', selected: true},
+        {value: 'wheels-base-template@^4.0.0', display: '4.0 - Wheels Base Template - Stable', selected: true},
         {value: 'wheels-base-template@BE', display: 'Bleeding Edge - Wheels Base Template'},
-        {value: 'cfwheels-template-htmx-alpine-simple', display: 'Wheels Template - HTMX - Alpine.js - Simple.css'},
+        {value: 'wheels-template-htmx-alpine-simple', display: 'Wheels Template - HTMX - Alpine.js - Simple.css'},
         {value: 'wheels-starter-app', display: 'Wheels Starter App'},
-        {value: 'cfwheels-todomvc-htmx', display: 'Wheels - TodoMVC - HTMX - Demo App'},
+        {value: 'wheels-todomvc-htmx', display: 'Wheels - TodoMVC - HTMX - Demo App'},
         {value: 'custom', display: 'Enter a custom template endpoint'}
       ] )
       .required()

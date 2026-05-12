@@ -1,0 +1,23 @@
+// 1. Render the view template for a different action within the same controller.
+renderView(action="edit");
+
+// 2. Render the view template for a different action within a different controller.
+renderView(controller="blog", action="new");
+
+// 3. Render a specific template using an absolute path from the `views` folder.
+renderView(template="/blog/new");
+
+// 4. Render without a layout and cache the output for 60 minutes.
+renderView(layout=false, cache=60);
+
+// 5. Load a layout from a non-default folder within `views`.
+renderView(layout="/layouts/blog");
+
+// 6. Return the rendered output as a string instead of sending it to the client.
+myView = renderView(returnAs="string");
+
+// 7. Render with a specific HTTP status code (useful for error pages).
+renderView(action="notFound", status=404);
+
+// 8. Render XML output and suppress debug information even when `showDebugInformation` is globally enabled.
+renderView(template="/reports/summary", layout=false, hideDebugInformation=true);

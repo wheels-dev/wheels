@@ -1,0 +1,32 @@
+# Your Wheels app name. Used for container names and proxy service name.
+service: {{service_name}}
+
+# Docker image name. The registry prefix is added automatically below.
+image: {{image_name}}
+
+servers:
+  web:
+    - 192.168.0.1
+
+proxy:
+  ssl: true
+  host: app.example.com
+  app_port: 8080
+  healthcheck:
+    path: /up
+    interval: 1
+    timeout: 30
+
+registry:
+  username: {{registry_username}}
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+env:
+  clear:
+    DB_HOST: 192.168.0.2
+  secret:
+    - WHEELS_RELOAD_PASSWORD
+
+ssh:
+  user: deploy

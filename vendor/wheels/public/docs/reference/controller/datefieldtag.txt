@@ -1,0 +1,8 @@
+// 1. Basic date field with a name and label
+#dateFieldTag(name="startDate", label="Start Date")#
+
+// 2. Pre-filled date value with min/max constraints
+#dateFieldTag(name="eventDate", value="2024-06-15", min="2024-01-01", max="2024-12-31", label="Event Date")#
+
+// 3. Date field with extra HTML attributes passed through
+#dateFieldTag(name="dueDate", label="Due Date", class="form-control", id="due-date-input")#

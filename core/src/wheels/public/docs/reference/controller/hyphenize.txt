@@ -1,2 +1,0 @@
-<!---Outputs "my-blog-post" --->
-#hyphenize("myBlogPost")#

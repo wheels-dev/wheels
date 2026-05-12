@@ -1,0 +1,20 @@
+// 1. Include a single stylesheet from the `stylesheets` folder
+// Generates: <link rel="stylesheet" href="/stylesheets/app.css" ...>
+writeOutput(styleSheetLinkTag("app"));
+
+// 2. Include multiple stylesheets with a comma-delimited list
+// Generates two separate <link> tags for blog.css and comments.css
+writeOutput(styleSheetLinkTag("blog,comments"));
+
+// 3. Include a stylesheet for print media only
+writeOutput(styleSheetLinkTag(sources="print", media="print"));
+
+// 4. Include an external stylesheet via full URL
+writeOutput(styleSheetLinkTag("https://fonts.googleapis.com/css2?family=Roboto"));
+
+// 5. Push a stylesheet into the <head> from anywhere in the view
+// The tag is injected into the <head> section rather than rendered inline
+writeOutput(styleSheetLinkTag(sources="tabs", head=true));
+
+// 6. Use a pipe delimiter instead of the default comma
+writeOutput(styleSheetLinkTag(sources="reset|layout|theme", delim="|"));

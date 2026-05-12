@@ -55,20 +55,20 @@ component extends="./base" {
         
         // Build docker logs command
         var logCmd = "docker logs";
-        
+
         if (arguments.tail > 0 && !arguments.follow) {
-            logCmd &= " --tail #arguments.tail#";
+            logCmd &= " --tail " & int(arguments.tail);
         }
-        
+
         if (arguments.follow) {
             logCmd &= " -f";
         }
-        
+
         if (len(arguments.since)) {
-            logCmd &= " --since #arguments.since#";
+            logCmd &= " --since " & $shellEscape(arguments.since);
         }
-        
-        logCmd &= " #containerName# 2>&1";
+
+        logCmd &= " " & $shellEscape(containerName) & " 2>&1";
         
         // Show logs from each server
         for (var i = 1; i <= arrayLen(targetServers); i++) {
@@ -87,10 +87,10 @@ component extends="./base" {
                 // For follow mode, we need to execute interactively
                 runCommand(
                     name="ssh",
-                    arguments="#sshUser#@#server# '#logCmd#'"
+                    arguments=$shellEscape(sshUser) & "@" & $validateServerAddress(server) & " " & $shellEscape(logCmd)
                 );
             } else {
-                var result = $execBash("ssh #sshUser#@#server# '#logCmd#'");
+                var result = $execBash("ssh " & $shellEscape(sshUser) & "@" & $validateServerAddress(server) & " " & $shellEscape(logCmd));
                 
                 if (result.exitCode == 0) {
                     print.line(result.output);

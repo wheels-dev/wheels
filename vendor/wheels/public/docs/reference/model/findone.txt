@@ -1,0 +1,32 @@
+// 1. Get the most recent order as an object from the database
+order = model("Order").findOne(order="datePurchased DESC");
+
+// 2. Use a where clause to find the first user with a specific email address
+user = model("User").findOne(where="email='someone@example.com'");
+
+// 3. Use a dynamic finder to get the first person with the last name Smith.
+// Equivalent to: model("User").findOne(where="lastName='Smith'")
+person = model("User").findOneByLastName("Smith");
+
+// 4. Use a dynamic finder to match on two columns.
+// Equivalent to: model("User").findOne(where="email='someone@example.com' AND password='mypass'")
+user = model("User").findOneByEmailAndPassword("someone@example.com", "mypass");
+
+// 5. Return false when no matching record is found (the default returnAs="object" behavior)
+user = model("User").findOne(where="email='unknown@example.com'");
+if (!isObject(user)) {
+    writeOutput("No user found.");
+}
+
+// 6. Return as a query result set instead of an object
+userQuery = model("User").findOne(where="role='admin'", returnAs="query");
+
+// 7. Use a scoped call via a hasOne association from User to Profile.
+// The profile() method calls model("Profile").findOne(where="userId=#user.id#") internally.
+user = model("User").findByKey(params.userId);
+profile = user.profile();
+
+// 8. Use a scoped call via a hasMany association from Post to Comment.
+// The findOneComment() method calls model("Comment").findOne(where="postId=#post.id#") internally.
+post = model("Post").findByKey(params.postId);
+comment = post.findOneComment(where="approved=1");

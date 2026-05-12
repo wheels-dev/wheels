@@ -18,6 +18,207 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+# [4.0.0](https://github.com/wheels-dev/wheels/releases/tag/v4.0.0) => 2026-05-12
+
+> **Wheels 4.0** — the release that started as 3.1 and grew into a major version. Closes multiple framework-maturity gaps against Rails, Laravel, and Django. See [docs/releases/wheels-4.0-audit.md](docs/releases/wheels-4.0-audit.md) for the full audit trail (260+ merged PRs since 3.0.0). Contributors: @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta.
+
+### Added
+
+**Documentation**
+- Correct landing page license text from "MIT licensed" to "Apache 2.0 licensed"
+- Add Debug Panel guide covering each tab, configuration settings, and when the bar appears
+- Clarify BoxLang server management in cfml-engines guide; update vm-deployment tip to distinguish CommandBox server management from the `wheels` dev CLI
+
+**ORM & data layer**
+- Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `whereNotIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries (#1922)
+- Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation (#1921)
+- Query scopes with `scope()` for reusable, composable query fragments in models (#1920)
+- Batch processing with `findEach()` and `findInBatches()` for memory-efficient record iteration (#1919)
+- Bulk insert/upsert operations (`insertAll()` / `upsertAll()`) with per-adapter native UPSERT syntax across MySQL, PostgreSQL, SQL Server, SQLite, H2, CockroachDB, and Oracle (#2101)
+- Polymorphic associations via `belongsTo(polymorphic=true)` and `hasMany(as=...)` with type-discriminator JOINs (#2104)
+- Advisory locks (`withAdvisoryLock(name, callback)`) and pessimistic locking (`.forUpdate()` on QueryBuilder) for `SELECT ... FOR UPDATE` (#2103)
+- CockroachDB database adapter — seventh supported database, with `unique_rowid()` PK convention and `RETURNING` clause identity select (#1876, #1986, #1993, #1999)
+- `throwOnColumnNotFound` config setting for strict column validation in WHERE clauses (#1938)
+- SQL identifier quoting for reserved-word conflicts in table/column names (#1874)
+
+**Migrations**
+- Auto-migration generation from model/DB schema diff (`AutoMigrator.diff(modelName)`, `writeMigration()`) (#2102)
+- Auto-migration rename detection via explicit hints plus heuristic suggestions (normalized-token + Levenshtein) with new `wheels dbmigrate diff` CLI command and MCP integration (#2112)
+
+**Routing**
+- Router modernization: `group()` helper, typed constraints (`whereNumber`, `whereAlpha`, `whereUuid`, `whereSlug`, `whereIn`), API versioning via `.version(1)`, performance indexes (#1891, #1894)
+- Route model binding with `binding=true` on resource routes or `set(routeModelBinding=true)` globally to auto-resolve model instances from route key parameters (#1929)
+
+**Middleware pipeline (new core framework)**
+- Middleware pipeline: closure-based chain running at dispatch level before controller instantiation, route-scoped via `.scope(middleware=[...])` or global via `set(middleware=[...])` (#1924)
+- Rate limiting middleware with `wheels.middleware.RateLimiter` supporting fixed window, sliding window, and token bucket strategies with in-memory and database storage (#1931)
+- SecurityHeaders middleware emits Content-Security-Policy, HSTS, and Permissions-Policy headers (#2036)
+- `hsts` argument on `SecurityHeaders` middleware to suppress the `Strict-Transport-Security` header entirely, for apps behind TLS-terminating proxies that emit HSTS themselves (#2174)
+- Multi-tenant support with per-request datasource switching (#1951)
+
+**Views**
+- Composable pagination view helpers: `paginationInfo()`, `previousPageLink()`, `nextPageLink()`, `firstPageLink()`, `lastPageLink()`, `pageNumberLinks()`, and `paginationNav()` for building custom pagination UIs (#1930)
+- XSS helpers formalized: `h()`, `hAttr()`, `stripTags()`, `stripLinks()` (#2097)
+- Redesigned v4.0 congratulations page for scaffolded apps (#2098)
+- `vitePreloadTag()` view helper emits `<link rel="modulepreload">` for a Vite entrypoint and its transitive chunk imports, suitable for Turbo Drive hover-preload patterns
+- `viteScriptTag()` and `viteStyleTag()` now resolve transitive chunk imports from the Vite manifest: modulepreload links for JS chunks are emitted into `<head>`, and CSS from transitive chunks is included in the stylesheet tags (brings parity with Rails/Laravel Vite integrations)
+- `viteStrictManifest` setting (default `true`) — missing manifest entries now throw `Wheels.ViteAssetNotFound` in production. Set to `false` to restore 3.x silent behavior.
+
+**Background jobs & real-time**
+- Job worker daemon with CLI commands (`wheels jobs work/status/retry/purge/monitor`) for persistent background job processing with optimistic locking, timeout recovery, and live monitoring (#1934)
+- Configurable exponential backoff for jobs via `this.baseDelay` and `this.maxDelay` with formula `Min(baseDelay * 2^attempt, maxDelay)` (#1934)
+- Pub/sub channels for SSE: `subscribeToChannel()`, `publish()`, `poll()`, with DatabaseAdapter and in-memory implementations (#1940)
+
+**Dependency injection**
+- Expanded DI container with `asRequestScoped()` for per-request service instances, `service()` global helper, declarative `inject()` in controller config, `bind()` interface binding, auto-wiring of init() arguments, and `config/services.cfm` for service registration (#1933)
+
+**Testing infrastructure**
+- HTTP test client (`TestClient`) for integration testing with fluent assertions: `visit()`, `assertOk()`, `assertSee()`, `assertJson()`, `assertJsonPath()`, cookie tracking, session support (#2099)
+- Parallel test execution runner (`ParallelRunner`) partitioning bundles across `cfthread` workers (#2100)
+- Browser testing via Playwright Java with `BrowserTest` base class, fluent DSL (navigation, interaction, keyboard, waiting, scoping, cookies, auth, dialogs, viewport, script, screenshots, assertions), and `wheels browser:install` command (#2113, #2115, #2116, #2121)
+
+**Package system**
+- Package system (`PackageLoader`) with `packages/` → `vendor/` activation model, `package.json` manifests with `provides.mixins` targets, per-package error isolation (#1995)
+- Module system with dependency graph (requires/replaces/suggests topological sort) and lazy loading (#2017)
+- LuCLI module distribution via wheels-cli-lucli repo (#2018)
+- `/wheels/packages` developer page now shows a "Browse registry" section listing all packages available from `wheels-dev/wheels-packages` — package name, description, latest version, and a copy-to-clipboard `wheels packages install <name>` snippet per row. Rows matching an already-installed package show a `✓ Installed` badge. Dev/testing only; `$blockInProduction()` gate keeps it off production servers. Registry data comes from the CLI's `Registry.listAll()` with 24h app-scope cache (#2271, partial — wheels.dev/packages static-site work deferred)
+
+**Engine adapters & cross-engine**
+- Engine adapter modules encapsulating Lucee, Adobe CF, and BoxLang engine-specific behavior (#2016)
+- Interface-driven design contracts for framework extension points (#2014)
+
+**Migration & legacy**
+- Legacy compatibility adapter for 3.x → 4.0 migration soft-landing (#2015)
+
+**CLI & LuCLI**
+- `wheels new` now prints a non-blocking hint at the end of app scaffolding when a newer Wheels release is available on the user's channel (stable, bleeding-edge). Channel-aware (skips dev/rc), 24h-cached at `$LUCLI_HOME/.update-check.json`, 5s HTTP timeout, silent on any failure — never delays or breaks `wheels new`. (#2556)
+- `wheels doctor` now detects a stale installed CLI module at `~/.wheels/modules/wheels/` that shadows a source checkout and warns with a remediation command (symlink). Previously, contributors running `wheels` from a checkout could silently execute a pre-install Module.cfc, making merged fixes appear not to take effect. (#2223)
+- LuCLI Phase 2: zero-Docker local testing via `tools/test-local.sh` (#2063)
+- LuCLI Phase 2: service layer, generators, MCP annotations (#1941)
+- LuCLI Phase 3–4: scaffold, seed, in-process services (#2065)
+- LuCLI-native Lucee 7 + SQLite CI pipeline (#2032)
+- LuCLI tier 1 commands module + WheelsTest test suite (#2092, #2093)
+- Playwright CLI commands for browser testing (#2013, #2021)
+
+**Distribution (new in 4.0)**
+- **macOS** — Homebrew tap at [`wheels-dev/homebrew-wheels`](https://github.com/wheels-dev/homebrew-wheels) with separate formulae for stable (`wheels`) and bleeding-edge (`wheels-be`) channels. Daily auto-update workflow polls the upstream release feeds and opens PRs.
+- **Windows** — Scoop bucket at [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) with `wheels` / `wheels-be` manifests. Hourly auto-update via the community Excavator bot. Legacy Chocolatey `wheels` package on `community.chocolatey.org` (CommandBox-based v1.x) is no longer maintained — see [Windows install docs](web/sites/guides/src/content/docs/v4-0-0-snapshot/start-here/installing.mdx) for the migration. (#2545, #2552)
+- **Linux** — `.deb` and `.rpm` packages built by `nfpm` on every release and uploaded to the GitHub Release alongside the existing zip artifacts. The package installs `/usr/bin/wheels`, depends on OpenJDK 21, and on first run syncs the framework module into `~/.wheels/`. Native `apt`/`yum` repositories at `apt.wheels.dev` / `yum.wheels.dev` are planned for 4.0.x. (#2545)
+- **WinGet** — manifest drafts for `Wheels.Wheels` and `Wheels.WheelsBE` staged for post-GA submission to the `microsoft/winget-pkgs` community repo. (#2557)
+
+**Configuration & developer experience**
+- `env()` helper for cross-scope environment variable access (#1985)
+- Pre-request logging (#1895)
+- Debug panel redesign (W-001, W-002) (#2000, #2001)
+- Gap migration detection in `migrateTo()` — detects and runs previously-skipped migrations, not just the endpoint (#1928)
+- Calculated property SQL validation at model config time (#2067)
+- GROUP BY validation with dot-notation, matching ORDER BY parser (#2084)
+- Adopt the [Developer Certificate of Origin](https://developercertificate.org/) for contributions — `Signed-off-by:` trailer required on every commit via `git commit -s`; enforced by the [DCO GitHub App](https://github.com/apps/dco) on new PRs only (existing commits grandfathered); `CONTRIBUTING.md`, PR template, and `wheels-bot` rails updated (#2575)
+
+### Changed
+
+- Project-level docs and the `tools/test-local.sh` script now refer to the CLI as `wheels` rather than `lucli`. Wheels is built on the LuCLI runtime, but the rebranded `wheels` binary is the only thing end users install — `brew install wheels`, `wheels server run`, `~/.wheels/express`. CLAUDE.md adds an explicit "wheels IS the CLI" callout so future Claude sessions and new contributors don't go looking for a separate `lucli` install when `tools/test-local.sh` fails. References to LuCLI as the upstream runtime project (e.g. installation docs explaining the relationship, runtime-specific env vars like `LUCLI_HOME`) are intentionally retained.
+- **Breaking:** CORS middleware default changed from wildcard `*` to deny-all. Apps must explicitly configure `allowOrigins` or set an explicit wildcard. (#2039)
+- **Breaking:** `viteStrictManifest` defaults to `true` — a missing Vite manifest entry now throws `Wheels.ViteAssetNotFound` in production instead of silently falling back (3.x behavior). Rebuild Vite assets during the upgrade window; to retain 3.x silent behavior, `set(viteStrictManifest=false)`. (#2133)
+- **Breaking:** `allowEnvironmentSwitchViaUrl` defaults to `false` in production (#2076)
+- **Breaking:** Reload password must be non-empty for environment switching in production (#2082)
+- **Breaking:** HSTS header defaults on in production (#2081)
+- **Breaking:** CSRF cookie now sets `SameSite` attribute (#2035)
+- **Breaking:** RateLimiter `trustProxy` default changed from `true` to `false` (#2024)
+- **Breaking:** RateLimiter proxy strategy default changed to `last` (#2088)
+- **Breaking:** `wheels snippets` CLI command renamed to `wheels generate snippets` (#1852)
+- **Breaking:** Test base class namespace renamed: new tests extend `wheels.WheelsTest` (old `wheels.Test` preserved during 4.0 as a deprecation path) (#1889)
+- **Breaking:** Tests directory `tests/specs/functions/` renamed to `tests/specs/functional/` (#1872)
+- **Breaking:** `application.wirebox` renamed to `application.wheelsdi` (#1888)
+- CFWheels branding removed from active code and metadata (continuation of the 3.0 rebrand) (#2064)
+- Project version bumped to 4.0.0-SNAPSHOT (#2066)
+- Internal rim modernized: WireBox/TestBox replaced; `init()` decomposed (#1883)
+- Monorepo flattened to clone-and-run structure (#1885)
+- Architecture hardening: XSS helpers consolidated, error hooks added, interface verification (#2097)
+- CSRF cookie encryption key auto-generated when empty (apps should still set their own for stable cross-deploy cookies) (#2054)
+- CI engine testing restructured: 42 jobs reduced to 8 via engine-grouped testing (#1939)
+- `wheels mcp wheels` MCP surface curated — 7 CLI-only commands (`mcp`, `d`, `new`, `console`, `start`, `stop`, `browser`) hidden from MCP `tools/list` via the `mcpHiddenTools()` convention (requires LuCLI 0.3.4+). All remain reachable as CLI subcommands. Tool count drops from 23 to 16 for agent consumers.
+- LuCLI stdio MCP (`wheels mcp wheels`) is now the canonical AI-agent surface for Wheels. `wheels mcp setup` generates `.mcp.json` and `.opencode.json` pointing at the stdio transport. No port or running dev server required. Updated templates: `cli/src/templates/McpConfig.json`, `app/snippets/McpConfig.json`, `tools/build/base/.mcp.json`, `tools/build/base/.opencode.json`.
+- Package lazy-loading (`"lazy": true` in `package.json`) retained and documented in the [Packages](web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/packages.mdx) guide. Audit of all six first-party packages (`wheels-sentry`, `wheels-hotwire`, `wheels-basecoat`, `wheels-legacy-adapter`, `wheels-i18n`, `wheels-seo-suite`) found no candidates — all provide controller mixins, which require eager load to populate the mixin tables. The feature remains valid for third-party service-only packages. Added a defensive test that a package declaring `lazy: true` alongside mixins or middleware is still loaded eagerly (the loader's existing `canBeLazy` gate). (#2249)
+
+### Deprecated
+
+- Legacy `plugins/` folder — superseded by the new `packages/` → `vendor/` activation model. Plugins still load, with a deprecation warning. Scheduled for removal in v5.0. (#1995)
+- RocketUnit test style for new tests — BDD syntax (via WheelsTest) is required going forward. Existing RocketUnit specs continue to run. (#1925)
+- `wheels.Test` test base class — extend `wheels.WheelsTest` instead (#1889)
+- In-dev-server HTTP MCP endpoint at `/wheels/mcp` — superseded by the LuCLI stdio MCP server (`wheels mcp wheels`). Emits a deprecation warning to the `wheels_mcp` log on first request and advertises `deprecated: true` in the `serverInfo` handshake. Scheduled for removal in a future release. Migrate existing projects with `wheels mcp setup --force`.
+- Legacy CommandBox `wheels-cli` module (`wheels g app`, `wheels new` via the CommandBox wizard) — superseded by LuCLI's canonical `wheels new`. Emits a deprecation banner on every invocation. Scheduled for removal in v5.0. (#2227)
+
+### Removed
+
+- Legacy RocketUnit core test scaffolding (existing app specs still run; framework-level runner removed) (#1925)
+- Railo compatibility workaround from `$initializeMixins` — Railo is no longer a target (#1987)
+- `server.cfc` file (#1902)
+- Stale monorepo artifacts after repository flatten (#1988)
+- `cli/lucli/services/MCP.cfc` parallel schema registry — never wired into LuCLI's MCP discovery, drifted out of sync with `Module.cfc`. Rich parameter schemas will return via typed parameters directly on Module.cfc functions in a follow-up PR.
+- Undocumented per-file `checksums` field from `package.json` manifest and its verification code in `PackageLoader` — superseded by the registry-level tarball sha256 pinned at publish time. No migration required (no shipped package used it). (#2248)
+
+### Fixed
+
+- `scoop install wheels` / `scoop install wheels-be` on Windows no longer aborts with `Can't shim 'wheels.cmd': File doesn't exist.` Scoop's install order is `pre_install` → bin shim creation → `post_install`, but the bucket's manifest generator (`tools/distribution-drafts/scoop/build-manifests.py`) emitted the `wheels.cmd` launcher in `post_install` — so the shim step ran first, failed because the file wasn't there yet, and aborted before the launcher was ever written. Moved the launcher emit into `pre_install` (both `wheels` and `wheels-be` manifests are byte-identical apart from the renamed key). (#2603)
+- Model `$setProperty` now throws `Wheels.PropertyIsIncorrectType` when a struct or array value is mass-assigned to a property that isn't declared as a nested association, instead of silently overwriting `this.<property>` and producing a confusing `Can't cast Complex Object Type Struct to String` deep inside a user callback. The most common upstream cause is form data shaped by a curl POST whose body uses bracket-nested keys without an `=` separator (e.g. `--data-urlencode "user[email][badkey]"`); Lucee's form parser turns that into a nested-struct path so `params.user.email` arrives shaped like a struct. Legitimate nested-attribute assignments (`hasOne`/`hasMany`/`belongsTo` with `nestedProperties()` enabled) continue to work unchanged. Also corrects the chapter 6 tutorial's curl gotcha note: the failure mode is the missing `=` separator, not `@` encoding per se. (#2412)
+- `wheels test` preamble no longer prints `<base>_test_test` for apps that only declare `coreTestDataSourceName`. `$resolveAppTestDataSource` in `cli/lucli/Module.cfc` searched `config/settings.cfm` with the regex `dataSourceName\s*=\s*"([^"]*)"`, which case-insensitively matched the trailing substring inside `set(coreTestDataSourceName="testappdb_test")` and then re-appended `_test`. The matcher now uses `\bdataSourceName\b` and strips CFML comments before the lookup (matching the pattern already used by `info()`), and guards against re-appending `_test` if the resolved base already ends in `_test`. Extracted the app-runner's `?directory=` regex into a `TestDirectoryResolver` helper alongside `TestDbResolver` so the silent-fallback path (a bare `?directory=models` collapsing to `tests.specs`) is unit-testable instead of HTTP-only. (#2489)
+- Core test suite no longer crashes on Adobe ColdFusion 2023/2025 with `java.lang.ArrayStoreException: coldfusion.compiler.ASTcffunction`. `vendor/wheels/tests/specs/middleware/RateLimiterSpec.cfc` passed 12 inline `keyFunction = function(req) { ... }` literals as named arguments to `new wheels.middleware.RateLimiter(...)`; Adobe CF's bytecode generator (`ExprAssembler.invokeNew` → `generateSetVarCode`) rejects function-AST nodes in that array slot and the failure fires from `getComponentMetadata()`, eagerly crashing every CFC in the bundle directory and forcing every database matrix cell on `adobe2023`/`adobe2025` to HTTP 500. All 12 closures are now hoisted into local `var keyFn = ...` declarations above the constructor call, matching the existing workaround in `SessionStrategySpec.cfc`. No behavior change on Lucee/BoxLang. Trap documented in `.ai/wheels/cross-engine-compatibility.md` and `CLAUDE.md` "Known cross-engine gotchas" list. (#2568, #2599)
+- `LICENSE` and `NOTICE` are now bundled into the `wheels-core`, `wheels-cli`, and `wheels-starter-app` release artifacts so every distributed scaffold ships with Apache 2.0 §4(a) license text and §4(d) NOTICE attribution. Previously only the base-template artifact bundled them — derivatives published from the other three prepare scripts left downstream redistributors out of compliance.
+- `/wheels/guides` redirect page no longer throws "Unable to add text to HTML HEAD tag" on Adobe ColdFusion. The docs view injected its 3-second meta refresh via `cfhtmlhead` from inside `vendor/wheels/public/docs/guides.cfm`, but the wrapper view (`vendor/wheels/public/views/guides.cfm`) includes the layout header before the docs view runs — so by the time `cfhtmlhead` executes the response has already streamed past `</head>`. Lucee tolerates this; Adobe rejects it. Replaced the head-injection with a body-level JS redirect that reads its target from a `data-url` attribute (still encoded with `encodeForHTMLAttribute`, matching the visible anchor), so the redirect works identically on every engine. (#2569)
+- Tools → Packages page no longer 500s on Adobe ColdFusion. `$ensureDir` in `vendor/wheels/services/packages/ManifestCache.cfc` called `DirectoryCreate(path, true)`, but the `createPath` flag is a Lucee-only extension — Adobe CF rejects the second argument with `"The function takes 1 parameter"`, crashing the first request after a fresh install when `~/.wheels/cache/` does not yet exist. The recursive mkdir now routes through `java.io.File.mkdirs()`, which has stable JVM-level semantics on every supported engine. Mirrored into the CLI-side `cli/lucli/services/packages/ManifestCache.cfc` to keep the deliberately paired files in sync. (#2567)
+- `wheels validate` no longer passes models or controllers whose only `extends="Model"` / `extends="Controller"` declaration is inside a CFML comment. `validateModel()` / `validateController()` in `cli/lucli/services/Analysis.cfc` performed a substring search over the raw file content, so a line like `// component extends="Model" {` above a commentless `component { … }` satisfied the inheritance check incorrectly. The validators now strip line, block, and tag-style CFML comments before testing for the `extends=` token.
+- `wheels console` slash commands `/models`, `/routes`, `/version`, and `/datasource` no longer fail with `Cannot cast Object type [url] to a value of type [string]`. The `consoleExec` helper in `cli/lucli/Module.cfc` declared a parameter named `url`, which CFML's reserved URL scope shadowed at the call to `makeHttpPost(url, body)` — so the function received the URL scope struct in place of the request URL. Renamed the parameter to `requestUrl` to match `makeHttpPost`'s own signature.
+- Routes UI now classifies the framework's `/_browser/*` browser-test fixture routes as Internal instead of leaking them into the Application tab. The bucket predicate in `vendor/wheels/public/views/routes.cfm` previously matched only `controller == "wheels.public"` or `pattern == "/wheels/app/tests"`, so the fixture routes (which use controllers like `BrowserTestHome`) fell through to App and made the route list noisier in dev/test environments that opt into `loadBrowserTestFixtures`.
+- Tools → Packages listing page's "View Tests" link now passes the test directory through `urlFor`'s `params` argument instead of concatenating `&directory=...` onto the URL. The old form produced a path like `/wheels/core/tests&directory=vendor.foo.tests` (the `&` ended up inside the path segment), and the router responded "Could not find a route that matched this request." The fix mirrors the same pattern already used by the per-package detail page's "Run Package Tests" button. (#2428)
+- `wheels generate api-resource` now produces a controller with resolved identifiers instead of literal `#objectNamePlural#` / `#objectNameSingular#` placeholders. The framework snippet at `app/snippets/ApiControllerContent.txt` was still using the legacy hash-token form that the CLI's `Templates.processTemplate()` does not substitute, while the CLI-bundled copy already used the pipe-delimited `|ObjectNamePlural|` / `|ObjectNameSingular|` tokens it understands. Aligned the framework-level snippet with the CLI-bundled one. (#2468)
+- Framework dev pages (`/wheels/guides`, `/wheels/info`, `/wheels/migrator`, `/wheels/packages`, error screens) now render Semantic UI icons instead of empty bordered squares. The dev layouts inline `semantic.min.css` into a `<style>` block, so its relative URLs to `themes/default/assets/fonts/icons.woff2` resolved against the page URL and 404'd — every `<i class="...icon">` rendered as the fallback square. `_header.cfm` and `_header_simple.cfm` now read the woff2 once at application scope, base64-encode it, and emit a `@font-face` override after the inlined Semantic CSS. Initialization uses double-checked locking on `application.wheels.iconsFontDataUri` so concurrent first-requests can't read an intermediate empty value. (#2563)
+- Debug bar Tools → Packages page now lists packages available from the `wheels-dev/wheels-packages` registry in fresh apps generated with `wheels new`. The previous gate (`FileExists("/cli/lucli/services/packages/Registry.cfc")`) silently returned an empty list because user apps don't ship the CLI alongside the framework. The registry reader now lives at `vendor/wheels/services/packages/{Registry,HttpClient,ManifestCache}.cfc` and ships with every generated app. The registry list stays scoped to the standalone Tools → Packages page; the inline debug-bar Environment panel shows installed packages only, so the bar stays compact and doesn't trigger a registry walk on every dev-mode page load. (#2530)
+- `Registry.fetchManifest()` now validates that a manifest contains a non-empty `versions` array before returning, throwing `Wheels.Packages.RegistryMalformed` instead of letting a downstream `local.m.versions[ArrayLen(...)]` access crash with an unhandled `Expression` error. The per-package skip-on-malformed catch in `listAll()` now actually catches every malformed shape, so the Tools → Packages page degrades gracefully when the registry serves a partial manifest. Mirrored into the CLI's `cli/lucli/services/packages/Registry.cfc` to keep both copies in sync. (#2530)
+- Installed-package indicator on the Tools → Packages page now renders correctly. The badge previously used Semantic UI's icon-font `<i class="check icon">`, which the bundled `semantic.min.css` declares only with `.eot` and `.svg` font sources (no `.woff`/`.woff2`) and is referenced via relative URLs broken by the page's inlined-CSS approach — so the glyph never loaded in modern browsers. Replaced with an inline SVG checkmark, matching the pattern used by every other icon in the same view. (#2423)
+- Snapshot pre-releases on `develop` now publish the full artifact set (`wheels-core-*.zip`, `wheels-base-template-*.zip`, `wheels-cli-*.zip`, `wheels-starter-app-*.zip`) alongside `wheels-module-*`. Previously only the module tarball was attached, which broke Homebrew/Chocolatey distributions that depend on fetching `wheels-core-*.zip` as a companion artifact: users scaffolded a new app and hit "Could not locate the Wheels framework source" at chapter 1 of the tutorial. Snapshots now mirror the main-branch release contents exactly, flagged as pre-release.
+- `wheels doctor` now detects when the installed CLI module has no companion framework source (vendor/wheels/) on disk — catches broken package distributions before they surface as a cryptic scaffold error. Previously `doctor` would report missing project directories and recommend `wheels new`, but `wheels new` would then fail with "Could not locate the Wheels framework source." The new `checkFrameworkSourceBundled` check walks the same search paths as `Module.cfc`'s `resolveFrameworkSource()` and reports a CRITICAL issue when none resolve, replacing the misleading `wheels new` recommendation with guidance to reinstall or set `WHEELS_FRAMEWORK_PATH`.
+- `wheels new` framework-not-found error now links to the real guides page (`/v4-0-0-snapshot/start-here/installing/`) instead of a 404 (`/docs/getting-started`), and mentions Homebrew/Chocolatey packaging explicitly so users can tell the difference between "I'm in the wrong directory" and "my install is incomplete."
+- `PackageLoader` now enforces `wheelsVersion` constraints from `package.json`. Packages whose constraint is not satisfied by the running Wheels version are skipped with a warning and recorded in `failedPackages`, preventing silent API incompatibility when a package built for an older major version lands in `vendor/`. Dev builds (unstamped `@build.version@`) remain permissive so local development doesn't break. (#2231)
+- `wheels doctor` mixin-collision scan now honors per-method `mixin="..."` attributes (including `mixin="none"`), follows each package's in-package `extends` chain to pick up inherited methods, and strips block comments so function-like text inside docblocks no longer produces false-positive collisions. Runtime detection in `PackageLoader.$collectMixins` remains authoritative; this brings the pre-boot `wheels doctor` visibility pass closer to runtime semantics. (#2260)
+- `wheels routes`, `reload`, `test`, `console`, `migrate`, `seed`, `db status`, `db version`, and `generate admin` now exit non-zero when no Wheels dev server is running. Previously these commands printed a red diagnostic but returned `""`, producing exit 0 — MCP clients and shell automation couldn't distinguish "succeeded with no output" from "server down, nothing ran". A shared `$requireRunningServer()` helper now throws a typed `Wheels.ServerNotRunning` exception that LuCLI's `ExecutionExceptionHandler` maps to exit 1. (#2229)
+- Legacy CommandBox `wheels g app` now scaffolds a 4.0 app by default — the `wheels-base-template` default was pinned at `@^3.1.0`, so `box install wheels-cli && wheels g app myapp` produced a 3.x scaffold at 4.0 GA. Updated default (and the `WheelsBaseTemplate` shortcut + wizard default selection) to `@^4.0.0`, fixed the stale "Default is Bleeding Edge" docstring, and added a deprecation banner pointing users at LuCLI's `wheels new`. (#2227)
+- `changeColumn` on SQLite now works by implementing the SQLite-standard recreate-table pattern in `SQLiteMigrator`. Previously, SQLite migrations inherited MySQL's `ALTER TABLE ... CHANGE` syntax from `Abstract.cfc` and failed with `near "CHANGE": syntax error`. The migrator's `$execute` now accepts an array of statements so adapters can return multi-step DDL. v1 limitations: foreign-key constraints declared inline on `CREATE TABLE` and triggers are not preserved across the recreate. (#2207)
+- Framework-internal browser-test fixture controllers, views, and the `/_browser/*` routes no longer leak into application-level files. Moved from `app/controllers/BrowserTest*.cfc`, `app/views/browsertest*/`, and `config/routes.cfm` into `vendor/wheels/public/browser-fixtures/`, auto-mounted by `$lockedLoadRoutes` when environment is `testing` or `development` and the new opt-in setting `loadBrowserTestFixtures=true` is set. Apps upgrading from a 4.0 snapshot that had custom `/_browser/*` routes must opt in explicitly or re-declare them in `config/routes.cfm`. (#2135, #2138)
+- Stray `app/mailers/UserNotificationsMailer.cfc` demo removed from the framework repo root (byte-identical copies remain in the example apps under `examples/tweet/` and `examples/starter-app/`). (#2138)
+- View lookup after `renderText()` / `renderWith()` no longer breaks subsequent partial rendering (#1991)
+- Scaffolded apps from `wheels new` now boot correctly (#2096)
+- `wheels stats` crash on Lucee 7 — private `sprintf()` helper called `Left(result, 0)` when the format string started with a placeholder. Lucee 7 throws where Lucee 6 returned empty silently. Added a ternary guard per the project's cross-engine compatibility pattern.
+- CockroachDB primary key uses `unique_rowid()` instead of `SERIAL` (#1986)
+- CockroachDB SQL generation fixes and soft-fail removed from test matrix (#1999)
+- CockroachDB `RETURNING` clause identity select (#1993)
+- `$canonicalize` catches `IllegalArgumentException` for malformed percent-encoded sequences (#2006)
+- Base template build no longer fails on `vendor/.keep` gitignore negation (#1994)
+- Adobe Oracle coercion preserved after adapter module refactor (#2030, #2031)
+- Engine adapter startup + cross-engine compatibility fixes across Lucee/Adobe/BoxLang (#2028)
+- Enum scope WHERE clauses escape single quotes correctly (#2023)
+- Numerous CLI, docker, installer, and documentation fixes landed across ~25 PRs not itemized here; see `git log v3.0.0+33..HEAD --merges` for the full list.
+
+### Security
+
+This release includes 40+ security-hardening PRs. Key themes:
+
+- **SQL injection defenses** — QueryBuilder property + operator validation (#2025); ORDER BY clause hardening (#2026); `$quoteValue()` single-quote escaping (#2033); scope handler argument sanitization and blacklist expansion (#2043, #2045, #2061, #2070, #2090); geography property / WKT handling (#2044, #2055); enum scope WHERE clauses (#2056, #2070); `include` param in UPDATE queries (#2047); index hints via `$indexHint` (#2058).
+- **Path traversal** — partial template rendering (#2071); `guideImage` endpoint (#2037); MCP documentation reader (#2049, #2062); encoded-bypass attempts (#2089).
+- **Session, cookie, CSRF** — SameSite attribute on CSRF cookie (#2035); auto-generated CSRF encryption key when empty (#2054); session fixation prevention on login (#2034); open-redirect prevention in `redirectTo()` (#2038); CSRF key enforced in production (#2079).
+- **Console & reload endpoints** — `consoleeval` POST-only + robust IPv6 + Content-Type checks (#2059); rate limiting and constant-time comparison on reload (#2077); hash-based reload password comparison (#2022); hardened console REPL endpoint (#2046).
+- **CORS middleware** — wildcard → deny-all default (#2039); wildcard+credentials rejected (#2053); CORS + CSRF cookie defaults hardened (#2027).
+- **Rate limiter** — memory exhaustion and IP spoofing mitigations (#2041, #2048, #2080); fail-closed on lock timeout (#2069); proxy strategy default changed to `last` (#2088).
+- **SSE** — newline injection prevention in event fields and data (#2051).
+- **MCP endpoint** — auth gate + input validation (#2050); command injection blocklist replaced with structural allowlist (#2083); CSRNG session tokens (#2087); exception detail suppression (#2072); port validation (#2075); unnecessary CORS headers removed (#2074).
+- **XSS (pagination)** — HTML entity encoding bypass (#2057); `prependToPage` / `anchorDivider` / `appendToPage` sanitization (#2042, #2060).
+- **JWT** — algorithm claim validation to prevent algorithm confusion (#2079); constant-time signature verification (#2086).
+- **CLI shell argument validation** — deploy command sanitization (#2068, #2073); quote blocking and box fallback fix (#2073); command injection in `db shell` (#2040).
+- **Public GUI production gate** — `/wheels/*` routes (`info`, `routes`, `testbox`, `runner`, `consoleeval`, `migrator`, `build`, etc.) now hard-abort with HTTP 404 in `production` even when a developer has explicitly set `enablePublicComponent=true`. The dispatch-layer gate also returns 404 with a `Not Found` body instead of a silent blank HTTP 200, so the surface can no longer be fingerprinted. Only `index()` (the congratulations page) remains respect-the-toggle, so dev/testing ergonomics are unchanged. (#2233)
+- **Known security limitations** documented for operators (#2078).
+
+---
+
 
 # [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
 

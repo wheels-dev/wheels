@@ -1,5 +1,0 @@
-// Get the internally-stored MIME type for `xls`
-mimeType = mimeTypes("xls");
-
-// Get the internally-stored MIME type for a dynamic value. Fall back to a MIME type of `text/plain` if it's not found
-mimeType = mimeTypes(extension=params.type, fallback="text/plain");

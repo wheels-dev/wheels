@@ -1,0 +1,21 @@
+// 1. Reset the default cycle between grouped query sections
+<cfoutput query="posts" group="categoryId">
+	resetCycle();
+	<cfoutput>
+		rowClass = cycle(values="even,odd");
+		writeOutput(rowClass & ": " & posts.title);
+	</cfoutput>
+</cfoutput>
+
+// 2. Reset a named cycle so it starts over for each department group
+<cfoutput query="employees" group="departmentId">
+	resetCycle("position");
+	<cfoutput>
+		rank = cycle(values="manager,specialist,intern", name="position");
+		writeOutput(employees.lastName & " - " & rank);
+	</cfoutput>
+</cfoutput>
+
+// 3. Reset all cycles by name after rendering a section
+resetCycle("row");
+resetCycle("highlight");

@@ -1,0 +1,15 @@
+<cfscript>
+
+mapper()
+    .namespace("admin")
+        .resources("products")
+    .end() // Ends the `namespace` block.
+
+    .scope(package="public")
+        .resources(name="products", nested=true)
+          .resources("variations")
+        .end() // Ends the nested `resources` block.
+    .end() // Ends the `scope` block.
+.end(); // Ends the `mapper` block.
+
+</cfscript>

@@ -1,0 +1,17 @@
+// 1. Assert that a redirect was performed to a specific URL (in a test)
+processDelete();
+redirect = getRedirect();
+assert("structCount(redirect) gt 0");
+assert("redirect.url eq '/users'");
+
+// 2. Inspect the full redirect struct after an action runs
+submitLogin();
+redirect = getRedirect();
+// redirect.url        -> "/dashboard"
+// redirect.statusCode -> 302
+// redirect.addToken   -> false
+
+// 3. Confirm no redirect was performed (action rendered a view instead)
+showProfile();
+redirect = getRedirect();
+// redirect -> {}

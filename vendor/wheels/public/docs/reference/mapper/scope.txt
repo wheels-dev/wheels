@@ -1,0 +1,38 @@
+<cfscript>
+
+mapper()
+    // 1. Scope routes to a specific controller.
+    // All routes inside will use the `freeForAll` controller.
+    .scope(controller="freeForAll")
+        .get(name="bananas", action="bananas")
+        .root(action="index")
+    .end()
+
+    // 2. Scope routes to a package (subfolder) without affecting the URL.
+    // All routes' controllers inside will be inside the `public` package/subfolder.
+    .scope(package="public")
+        .resource(name="search", only="show,create")
+    .end()
+
+    // 3. Scope routes under a URL path prefix.
+    // All routes inside will be prepended with a URL path of `phones/`.
+    .scope(path="phones")
+        .get(name="newest", to="phones##newest")
+        .get(name="sortOfNew", to="phones##sortOfNew")
+    .end()
+
+    // 4. Scope routes with both a name prefix and URL path prefix.
+    // Generates named routes like `adminUsers` and `adminPosts`.
+    .scope(name="admin", path="admin")
+        .resources(name="users")
+        .resources(name="posts")
+    .end()
+
+    // 5. Scope routes with URL variable constraints applied to all children.
+    .scope(constraints={id="[0-9]+"})
+        .get(name="userProfile", to="users##profile")
+        .resources(name="orders")
+    .end()
+.end();
+
+</cfscript>

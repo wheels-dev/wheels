@@ -1,0 +1,361 @@
+name: Deploy static sites
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-deploy.yml'
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-deploy.yml'
+  repository_dispatch:
+    types: [registry-updated]
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.site }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: web-deploy-${{ matrix.site }}-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      deployments: write
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ${{ github.event_name == 'repository_dispatch' && fromJSON('["packages"]') || fromJSON('["landing", "blog", "guides", "api", "packages"]') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ${{ matrix.site }}
+        working-directory: web
+        run: pnpm --filter @wheels-dev/site-${{ matrix.site }} build
+
+      - name: Deploy to Cloudflare Pages
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Routed via env to keep untrusted branch names out of the command string.
+          DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
+          SITE: ${{ matrix.site }}
+        run: |
+          # Pass --commit-message explicitly. wrangler auto-derives from git
+          # when omitted, and Cloudflare's API rejects non-ASCII content in
+          # auto-merged GitHub commit bodies (em-dashes, arrows, etc.) with
+          # "Invalid commit message, it must be a valid UTF-8 string". Send
+          # a controlled ASCII string instead. See PR #2550 for the snapshot.yml
+          # variant of this fix and the originating failure (run 25641189988).
+          pnpm dlx wrangler@4.78.0 pages deploy "sites/${SITE}/dist" \
+            --project-name="wheels-${SITE}" \
+            --branch="${DEPLOY_BRANCH}" \
+            --commit-hash="${GITHUB_SHA}" \
+            --commit-message="deploy ${SITE} from ${DEPLOY_BRANCH} (run ${GITHUB_RUN_ID})"
+
+  detect-scope:
+    name: Detect change scope
+    runs-on: ubuntu-latest
+    outputs:
+      content_only: ${{ steps.scope.outputs.content_only }}
+      blog_content_changed: ${{ steps.scope.outputs.blog_content_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute change scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Disable -e (GitHub Actions sets it by default for bash steps).
+          # Plain `grep -v` with no matches exits 1, which is normal — but
+          # under `set -e` it would kill the script. For a content-only PR
+          # — the exact case we want to skip — every line matches the
+          # content patterns, the filter returns empty + exit 1, and the
+          # detector dies. Keep -u for typo protection, drop -e.
+          set +e
+          set -u
+          set -o pipefail
+          # Resolve the diff range. For PRs we compare base vs head; for
+          # pushes we compare the previous tip vs the new tip (falling back
+          # to HEAD~1 on first-push / force-push when `before` is zeros).
+          case "$EVENT_NAME" in
+            pull_request)
+              base="$PR_BASE_SHA"
+              head="$PR_HEAD_SHA"
+              ;;
+            push)
+              base="$BEFORE_SHA"
+              head="$HEAD_SHA"
+              if [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base" 2>/dev/null; then
+                base="${head}~1"
+              fi
+              ;;
+            *)
+              base=""
+              head=""
+              ;;
+          esac
+
+          # Safety default: any uncertainty → run the regression. The
+          # cost of running unnecessarily is one CI job; the cost of
+          # silently skipping is shipping a layout break.
+          if [ -z "$base" ] || [ -z "$head" ]; then
+            echo "Cannot resolve diff range for event $EVENT_NAME — running visual regression."
+            echo "content_only=false" >> "$GITHUB_OUTPUT"
+            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$base" "$head" 2>/dev/null)
+          if [ -z "$changed" ]; then
+            echo "Empty diff between $base and $head — running visual regression."
+            echo "content_only=false" >> "$GITHUB_OUTPUT"
+            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Changed files (vs $base):"
+          echo "$changed" | sed 's/^/  /'
+
+          # Content-only patterns. Visual regression skips when EVERY
+          # changed file matches one of these:
+          #   web/content/**            — blog posts + free-standing content
+          #   web/sites/*/src/content/  — Astro content collections (guides, api)
+          #   web/sites/*/public/       — static images/assets the sites serve
+          #   web/**/*.md, web/**/*.mdx — markdown anywhere under web/
+          # `|| true` guards against the empty-match exit-1 case even if a
+          # future change reintroduces `set -e`. Belt-and-suspenders with the
+          # `set +e` above.
+          non_content=$(echo "$changed" \
+            | grep -v '^$' \
+            | grep -vE '^(web/content/.+|web/sites/[^/]+/src/content/.+|web/sites/[^/]+/public/.+|web/.+\.mdx?)$' \
+            || true)
+
+          if [ -z "$non_content" ]; then
+            echo "All changes are content-only — visual regression will be skipped."
+            echo "content_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Non-content files changed — visual regression will run. Triggering files:"
+            echo "$non_content" | sed 's/^/  /'
+            echo "content_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$changed" | grep -qE '^web/content/blog/posts/'; then
+            echo "blog_content_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "blog_content_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  visual-regression:
+    name: Visual regression
+    needs: detect-scope
+    # Skip entirely on content-only changes (blog posts, guides/api
+    # markdown, static assets). The detect-scope job emits
+    # content_only=true when every changed file is markdown or sits under
+    # a content/asset path — that avoids the blog-baseline auto-refresh
+    # dance for routine publish flows.
+    #
+    # For mixed PRs (content + components/scripts), the regression still
+    # runs. If the blog index drifts because of the content change, the
+    # pre-refresh step below regenerates the baseline before comparison.
+    #
+    # Safety: when detect-scope itself fails (not success), fall through
+    # to running visual regression rather than silently skipping. The
+    # `always()` guard is required so this `if:` is evaluated even when
+    # the `needs:` dependency fails — without it, Actions auto-skips us.
+    #
+    # Push events (merges to develop) ALWAYS run the regression — even
+    # for content-only changes — because the post-merge auto-refresh
+    # of the blog baseline lives in this job. Skipping on push would
+    # break the auto-refresh loop and leave the baseline stale forever.
+    # The skip optimization is for the PR friction case only; pushes
+    # eat the few extra CI minutes so the maintenance contract holds.
+    #
+    # If this job fails on an intentional layout change, download the
+    # `visual-regression-diffs` artifact and copy each *.actual.png over
+    # the matching web/tests/visual-baselines/*.png, commit, and push.
+    if: |
+      always() &&
+      (needs.detect-scope.result != 'success' ||
+       github.event_name != 'pull_request' ||
+       needs.detect-scope.outputs.content_only != 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build all sites
+        working-directory: web
+        run: pnpm build
+
+      # The blog index page is content-driven — new articles appear on it
+      # automatically — so the blog baseline is *expected* to drift whenever
+      # any file under web/content/blog/posts/ changes. The detect-scope job
+      # surfaces that via blog_content_changed; on mixed commits (blog
+      # content alongside non-content changes) we pre-refresh the blog
+      # baseline here before the regression test runs.
+      - name: Pre-refresh blog baseline before regression test
+        if: needs.detect-scope.outputs.blog_content_changed == 'true'
+        working-directory: web
+        run: node scripts/visual-regression.mjs --update --site blog
+
+      - name: Run visual regression
+        id: regress
+        continue-on-error: true
+        working-directory: web
+        run: pnpm visual:test
+
+      # Commit the pre-refreshed baseline only when the regression test
+      # passed for all pages. If a non-blog page regressed, we don't want
+      # to commit an updated blog baseline that might mask a real regression
+      # elsewhere — investigators can see the failure with the un-committed
+      # refreshed blog.png in the diffs artifact and update baselines once
+      # the non-blog regression is fixed.
+      - name: Commit pre-refreshed blog baseline
+        if: |
+          needs.detect-scope.outputs.blog_content_changed == 'true' &&
+          steps.regress.outcome == 'success'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/tests/visual-baselines/blog.png
+          if git diff --cached --quiet; then
+            echo "Baseline did not actually change after pre-refresh — exiting clean."
+            exit 0
+          fi
+          # [skip ci] keeps this push from re-triggering the deploy
+          # workflow and creating a publish loop.
+          git commit -m "chore(docs): auto-refresh blog visual baseline after content change [skip ci]"
+
+          # Retry with fetch+rebase: develop can move while this ~3-min job
+          # is running (e.g., another PR merges right behind a blog content
+          # push). Without retry, a dropped push here leaves the baseline
+          # stale on develop and trips every subsequent non-blog PR until
+          # someone refreshes manually.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin develop
+            if ! git rebase origin/develop; then
+              # Rebase conflict is vanishingly unlikely (we only touch one PNG)
+              # and would mean a parallel run also refreshed the baseline.
+              # In that case our refresh is redundant — drop it.
+              # `|| true` so a failed --abort (e.g., already-clean rebase state)
+              # doesn't trip set -e and turn the exit-0 path into exit-1.
+              git rebase --abort || true
+              echo "Rebase conflict on attempt $attempt — abandoning auto-refresh (parallel refresh likely already landed)."
+              exit 0
+            fi
+            if git push origin HEAD:develop; then
+              echo "Pushed baseline refresh on attempt $attempt."
+              exit 0
+            fi
+            # Skip the backoff (and the misleading "will retry" message) on
+            # the last iteration — no retry follows it; the loop falls through
+            # to the exit-1 path below.
+            if [ "$attempt" -lt 5 ]; then
+              echo "Push rejected on attempt $attempt; will fetch + rebase + retry."
+              sleep $((RANDOM % 5 + 2))
+            else
+              echo "Push rejected on attempt $attempt (final attempt, no retry)."
+            fi
+          done
+          echo "Failed to push baseline refresh after 5 attempts — develop is unusually contended."
+          echo "The auto-refresh will be retried on the next push that touches web/content/blog/posts/."
+          exit 1
+
+      # Upload BEFORE the explicit-fail step. Without this ordering, the
+      # fail step exits 1 first and Actions skips subsequent steps (even
+      # those with matching `if:`), leaving the diagnostic artifact
+      # unreachable on the run that needs it most.
+      - name: Upload diffs on failure
+        if: steps.regress.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-diffs
+          path: |
+            web/tests/visual-diffs/*.png
+            web/tests/visual-baselines/*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail job on real regression
+        if: steps.regress.outcome == 'failure'
+        env:
+          BLOG_CONTENT_CHANGED: ${{ needs.detect-scope.outputs.blog_content_changed }}
+        run: |
+          echo "Visual regression failed."
+          if [ "$BLOG_CONTENT_CHANGED" = "true" ]; then
+            echo "Note: the blog baseline was pre-refreshed for this run, so any"
+            echo "[blog] failure here would be a mismatch separate from content drift."
+            echo "Failure is most likely on another page."
+          fi
+          echo "Download the visual-regression-diffs artifact and update baselines as needed."
+          exit 1
+
+# Note: the packages-index baseline auto-refresh that fires on
+# repository_dispatch: registry-updated lives in its own workflow file
+# at .github/workflows/refresh-packages-baseline.yml so it doesn't
+# appear as a "skipped" check on regular PRs.

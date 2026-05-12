@@ -177,6 +177,3 @@ obj = new MyClass()
 ## Related Concepts
 - [Properties](properties.md)
 - [Functions](functions.md)
-- [Inheritance](inheritance.md)
-- [Interfaces](interfaces.md)
-- [Static Methods](static-methods.md)

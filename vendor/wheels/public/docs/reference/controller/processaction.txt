@@ -1,0 +1,12 @@
+// 1. Process the current action (runs before and after filters plus the action itself).
+// Typically called automatically by the framework; used directly in unit tests.
+result = controller.processAction();
+// result -> true
+
+// 2. Process the action running only "before" filters (skip "after" filters).
+result = controller.processAction(includeFilters="before");
+// result -> true
+
+// 3. Process the action without running any filters.
+result = controller.processAction(includeFilters=false);
+// result -> true

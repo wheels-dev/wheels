@@ -1,0 +1,19 @@
+// 1. Resolve a registered service and call a method on it
+mailer = service("MailerService");
+mailer.send(to="user@example.com", subject="Welcome!");
+
+// 2. Resolve a payment gateway service and process a charge
+gateway = service("PaymentGateway");
+result = gateway.charge(amount=params.amount, token=params.stripeToken);
+
+// 3. Use a service in a model callback to send a notification
+component extends="Model" {
+    function config() {
+        afterCreate(method="notifyAdmin");
+    }
+
+    private function notifyAdmin() {
+        notifier = service("NotificationService");
+        notifier.notify(event="userCreated", userId=this.id);
+    }
+}

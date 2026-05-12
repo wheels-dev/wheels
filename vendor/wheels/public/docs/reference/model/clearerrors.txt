@@ -1,0 +1,11 @@
+// 1. Clear all errors on the object
+this.clearErrors();
+
+// 2. Clear all errors set on the `firstName` property
+this.clearErrors(property="firstName");
+
+// 3. Clear only errors that were set with a specific error name
+this.clearErrors(name="invalidFormat");
+
+// 4. Clear errors on a specific property that were also set with a specific name
+this.clearErrors(property="email", name="duplicateEmail");

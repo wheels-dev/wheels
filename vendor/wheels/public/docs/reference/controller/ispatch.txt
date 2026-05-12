@@ -1,0 +1,18 @@
+// 1. Only handle PATCH requests in an action
+if (!isPatch()) {
+    redirectTo(action = "index");
+}
+
+// 2. Respond differently depending on whether the request is a PATCH
+if (isPatch()) {
+    // Apply a partial update to the resource
+    user = model("User").findByKey(params.key);
+    user.update(params.user);
+} else {
+    // Not a PATCH request; redirect away
+    redirectTo(action = "index");
+}
+
+// 3. Store the result to use in a conditional
+requestIsPatch = isPatch();
+// requestIsPatch -> true for a PATCH request, false otherwise

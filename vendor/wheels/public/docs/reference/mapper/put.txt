@@ -1,0 +1,64 @@
+<cfscript>
+
+mapper()
+    // 1. Basic PUT route using "to" shorthand (controller##action)
+    // Route name:  ghostStory
+    // Example URL: /ghosts/666/stories/616
+    // Controller:  Stories
+    // Action:      update
+    .put(name="ghostStory", pattern="ghosts/[ghostKey]/stories/[key]", to="stories##update")
+
+    // 2. Explicit controller and action arguments
+    // Route name:  goblins
+    // Example URL: /goblins
+    // Controller:  Goblins
+    // Action:      update
+    .put(name="goblins", controller="goblins", action="update")
+
+    // 3. Minimal "to" — pattern derived from name
+    // Route name:  heartbeat
+    // Example URL: /heartbeat
+    // Controller:  Sessions
+    // Action:      update
+    .put(name="heartbeat", to="sessions##update")
+
+    // 4. Scoped to a package (subfolder) — package not added to URL
+    // Route name:  usersPreferences
+    // Example URL: /preferences
+    // Controller:  users.Preferences
+    // Action:      update
+    .put(name="preferences", to="preferences##update", package="users")
+
+    // 5. Package combined with an explicit pattern
+    // Route name:  orderShipment
+    // Example URL: /shipments/5432
+    // Controller:  orders.Shipments
+    // Action:      update
+    .put(
+        name="shipment",
+        pattern="shipments/[key]",
+        to="shipments##update",
+        package="orders"
+    )
+
+    // 6. Permanent redirect — useful when an endpoint has moved
+    // Example URL: /legacy-profile -> redirects to /profile
+    .put(name="legacyProfile", pattern="legacy-profile", redirect="/profile")
+
+    // 7. "on" argument within a nested resource
+    .resources(name="subscribers", nested=true)
+        // Route name:  launchSubscribers
+        // Example URL: /subscribers/launch
+        // Controller:  Subscribers
+        // Action:      launch
+        .put(name="launch", to="subscribers##launch", on="collection")
+
+        // Route name:  discontinueSubscriber
+        // Example URL: /subscribers/2251/discontinue
+        // Controller:  Subscribers
+        // Action:      discontinue
+        .put(name="discontinue", to="subscribers##discontinue", on="member")
+    .end()
+.end();
+
+</cfscript>

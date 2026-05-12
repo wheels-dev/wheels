@@ -50,10 +50,19 @@ Wheels requires **consistent parameter syntax** - either all positional or all n
 
 <!-- Missing 'value' parameter -->
 #submitTag("Save", class="btn")#  <!-- Use value="Save" instead -->
+```
 
-<!-- Non-existent helpers -->
-#emailField()#       <!-- Use textField(type="email") -->
-#passwordField()#    <!-- Use textField(type="password") -->
+### ✅ **HTML5 Helpers Are Available**
+Wheels includes dedicated HTML5 input helpers — use them directly:
+```cfm
+#emailField(objectName="user", property="email")#
+#numberField(objectName="product", property="qty", min="1", max="100")#
+#telField(objectName="user", property="phone")#
+#dateField(objectName="event", property="startDate")#
+#urlField(objectName="user", property="website")#
+#colorField(objectName="theme", property="color")#
+#rangeField(objectName="settings", property="volume", min="0", max="100")#
+#searchField(objectName="search", property="query")#
 ```
 
 ## Form Structure Best Practices

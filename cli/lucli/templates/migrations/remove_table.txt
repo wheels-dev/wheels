@@ -1,0 +1,34 @@
+component extends="wheels.migrator.Migration" hint="Migration: {{className}}" {
+
+	function up() {
+		transaction {
+			try {
+				dropTable(tableName="{{tableName}}");
+			} catch (any e) {
+				local.exception = e;
+			}
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				throw(object=local.exception);
+			}
+		}
+	}
+
+	function down() {
+		transaction {
+			try {
+				// Re-create the table manually if needed
+				// t = createTable(name="{{tableName}}", force="false");
+				// t.timestamps();
+				// t.create();
+			} catch (any e) {
+				local.exception = e;
+			}
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				throw(object=local.exception);
+			}
+		}
+	}
+
+}

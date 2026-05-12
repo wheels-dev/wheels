@@ -65,8 +65,8 @@ component extends="./base" {
         print.line("=".repeatString(50));
         
         // Check if lock exists
-        var checkResult = $execBash("ssh #arguments.user#@#arguments.server# 'test -d #arguments.lockDir# && echo EXISTS || echo FREE'");
-        
+        var checkResult = $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'test -d " & $shellEscape(arguments.lockDir) & " && echo EXISTS || echo FREE'");
+
         if (trim(checkResult.output) == "EXISTS" && !arguments.force) {
             // Lock exists, get info
             var lockInfo = getLockInfo(arguments.server, arguments.user, arguments.lockDir);
@@ -100,10 +100,10 @@ component extends="./base" {
         
         // Create lock directory atomically
         if (arguments.force) {
-            $execBash("ssh #arguments.user#@#arguments.server# 'rm -rf #arguments.lockDir#'");
+            $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'rm -rf " & $shellEscape(arguments.lockDir) & "'");
         }
-        
-        var createResult = $execBash("ssh #arguments.user#@#arguments.server# 'mkdir -p /opt/.kamal && mkdir #arguments.lockDir# && echo ''#replace(lockJson, "'", "'\''", "all")#'' > #arguments.lockDir#/info.json'");
+
+        var createResult = $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'mkdir -p /opt/.kamal && mkdir " & $shellEscape(arguments.lockDir) & " && echo " & $shellEscape(lockJson) & " > " & $shellEscape(arguments.lockDir) & "/info.json'");
         
         if (createResult.exitCode == 0) {
             print.greenLine("✓ Deployment lock acquired successfully");
@@ -126,8 +126,8 @@ component extends="./base" {
         print.line("=".repeatString(50));
         
         // Check if lock exists
-        var checkResult = $execBash("ssh #arguments.user#@#arguments.server# 'test -d #arguments.lockDir# && echo EXISTS || echo FREE'");
-        
+        var checkResult = $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'test -d " & $shellEscape(arguments.lockDir) & " && echo EXISTS || echo FREE'");
+
         if (trim(checkResult.output) != "EXISTS") {
             print.yellowLine("No deployment lock found");
             return;
@@ -137,7 +137,7 @@ component extends="./base" {
         var lockInfo = getLockInfo(arguments.server, arguments.user, arguments.lockDir);
         
         // Remove lock
-        var removeResult = $execBash("ssh #arguments.user#@#arguments.server# 'rm -rf #arguments.lockDir#'");
+        var removeResult = $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'rm -rf " & $shellEscape(arguments.lockDir) & "'");
         
         if (removeResult.exitCode == 0) {
             print.greenLine("✓ Deployment lock released successfully");
@@ -159,8 +159,8 @@ component extends="./base" {
         print.line("=".repeatString(50));
         
         // Check if lock exists
-        var checkResult = $execBash("ssh #arguments.user#@#arguments.server# 'test -d #arguments.lockDir# && echo EXISTS || echo FREE'");
-        
+        var checkResult = $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'test -d " & $shellEscape(arguments.lockDir) & " && echo EXISTS || echo FREE'");
+
         if (trim(checkResult.output) != "EXISTS") {
             print.greenLine("✓ No deployment lock - deployments can proceed");
             return;
@@ -206,7 +206,7 @@ component extends="./base" {
         required string user,
         required string lockDir
     ) {
-        var infoResult = $execBash("ssh #arguments.user#@#arguments.server# 'cat #arguments.lockDir#/info.json 2>/dev/null'");
+        var infoResult = $execBash("ssh " & $shellEscape(arguments.user) & "@" & $validateServerAddress(arguments.server) & " 'cat " & $shellEscape(arguments.lockDir) & "/info.json 2>/dev/null'");
         
         if (infoResult.exitCode == 0 && len(trim(infoResult.output))) {
             try {

@@ -1,2 +1,0 @@
-// Make sure that the user selects either "CFWheels" or "Rails" as their framework 
-validatesInclusionOf(property="frameworkOfChoice", list="cfwheels,rails", message="Please try again, and this time, select a decent framework!" );

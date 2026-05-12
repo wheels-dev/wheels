@@ -1,0 +1,20 @@
+// 1. Ensure no two users share the same username
+validatesUniquenessOf(property="username", message="Sorry, that username is already taken.");
+
+// 2. Scope uniqueness to an account — the same username is allowed in different accounts
+validatesUniquenessOf(property="username", scope="accountId");
+
+// 3. Validate multiple properties for uniqueness in one call
+validatesUniquenessOf(properties="email,username");
+
+// 4. Skip the check when the email field is blank (pair with validatesPresenceOf to avoid duplicate errors)
+validatesUniquenessOf(property="email", allowBlank=true);
+
+// 5. Only enforce uniqueness on create, not on update
+validatesUniquenessOf(property="slug", when="onCreate");
+
+// 6. Run the check only when a condition is true
+validatesUniquenessOf(property="referralCode", condition="this.isAffiliate()");
+
+// 7. Exclude soft-deleted records from the uniqueness check so a previously-deleted value can be reused
+validatesUniquenessOf(property="username", includeSoftDeletes=false);

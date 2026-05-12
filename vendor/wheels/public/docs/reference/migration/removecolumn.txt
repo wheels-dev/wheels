@@ -1,0 +1,11 @@
+// 1. Remove a column by specifying its name directly
+removeColumn(table="members", columnName="status");
+
+// 2. Remove a reference column using its reference name (removes the <referenceName>id column)
+removeColumn(table="posts", referenceName="author");
+// Removes the column named "authorid" from the posts table
+
+// 3. Typical use inside a migration's down() method to reverse an addColumn()
+function down() {
+    removeColumn(table="products", columnName="discountPrice");
+}

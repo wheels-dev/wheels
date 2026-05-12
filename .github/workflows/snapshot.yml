@@ -1,5 +1,3 @@
-# This workflow tests the CFWheels code using many permutations in the matrix.
-# If successful, then it creates the bleeding edge artifact and publishes it to ForgeBox
 name: Wheels Snapshots
 
 on:
@@ -7,50 +5,289 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: write
+  checks: write
+  pull-requests: write
+
 env:
   WHEELS_PRERELEASE: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  LUCLI_VERSION: "0.3.7"
 
 jobs:
-  tests:
-    uses: ./.github/workflows/tests.yml
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #############################################
+  # Fast Test: Lucee 7 + SQLite via LuCLI
+  #############################################
+  fast-test:
+    name: "Lucee 7 + SQLite (LuCLI)"
+    runs-on: ubuntu-latest
+    env:
+      WHEELS_CI: "true"
+      WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
+      WHEELS_BROWSER_CI_ENABLE: "true"
+    steps:
+      - uses: actions/checkout@v5
 
-  #  cfformat:
-  #    runs-on: ubuntu-latest
-  #    needs: tests
-  #    steps:
-  #      - name: Checkout Repository
-  #        uses: actions/checkout@v3
-  #
-  #      - uses: Ortus-Solutions/commandbox-action@v1.0.2
-  #        with:
-  #          cmd: run-script format
-  #
-  #      - name: Commit Format Changes
-  #        uses: stefanzweifel/git-auto-commit-action@v4
-  #        with:
-  #          commit_message: Apply CFFormat changes
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+          lucli --version
+
+      - name: Create test databases
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
+          sqlite3 wheelstestdb.db "SELECT 1;"
+          sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+
+      - name: Cache Playwright
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.wheels/browser/lib
+            ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('vendor/wheels/browser-manifest.json') }}
+          restore-keys: |
+            playwright-
+
+      - name: Install Playwright
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.wheels/browser/lib
+
+          # Download JARs from manifest
+          for row in $(jq -c '.classpath[]' vendor/wheels/browser-manifest.json); do
+            URL=$(echo "$row" | jq -r '.url')
+            FILE=$(echo "$row" | jq -r '.filename')
+            SHA=$(echo "$row" | jq -r '.sha256')
+
+            echo "Downloading ${FILE}..."
+            curl -sL "$URL" -o ~/.wheels/browser/lib/"$FILE"
+
+            ACTUAL=$(sha256sum ~/.wheels/browser/lib/"$FILE" | cut -d' ' -f1)
+            if [ "$ACTUAL" != "$SHA" ]; then
+              echo "::error::SHA-256 mismatch for ${FILE}: expected ${SHA}, got ${ACTUAL}"
+              exit 1
+            fi
+          done
+
+          # Build classpath and install Chromium + system deps
+          CP=$(ls ~/.wheels/browser/lib/*.jar | tr '\n' ':')
+          java -cp "$CP" com.microsoft.playwright.CLI install --with-deps chromium
+
+      - name: Download SQLite JDBC driver
+        run: |
+          curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
+            -o /tmp/sqlite-jdbc.jar
+
+      - name: Start Lucee server
+        run: |
+          cp tools/ci/lucee.ci.json lucee.json
+          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+          echo "Waiting for Lucee to start..."
+          for i in $(seq 1 120); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee is up (attempt ${i})"
+              break
+            fi
+            if ! kill -0 $(cat /tmp/lucli-server.pid) 2>/dev/null; then
+              echo "::error::LuCLI server process died"
+              cat /tmp/lucli-server.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Install SQLite JDBC into Lucee
+        run: |
+          LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
+          if [ -z "$LUCEE_LIB" ]; then
+            LUCEE_LIB=$(find ~/.lucli/express -maxdepth 2 -name "lib" -type d 2>/dev/null | head -1)
+          fi
+          if [ -n "$LUCEE_LIB" ]; then
+            cp /tmp/sqlite-jdbc.jar "$LUCEE_LIB/"
+            echo "SQLite JDBC installed to: $LUCEE_LIB"
+          else
+            echo "::error::Could not find Lucee lib directory"
+            exit 1
+          fi
+          kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          lucli server stop 2>/dev/null || true
+          for i in $(seq 1 15); do
+            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:60007/" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          fuser -k 60007/tcp 2>/dev/null || true
+          sleep 2
+          nohup lucli server run --port=60007 --force > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+          echo "Waiting for Lucee to restart..."
+          for i in $(seq 1 60); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee restarted with SQLite JDBC"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run tests
+        run: |
+          mkdir -p /tmp/test-results /tmp/junit-results
+          PORT=60007 \
+          RESULT_DIR=/tmp/test-results \
+          JUNIT_DIR=/tmp/junit-results \
+          bash tools/ci/run-tests.sh
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results-lucee7-sqlite
+          path: /tmp/test-results/
+          if-no-files-found: warn
+
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: junit-lucee7-sqlite
+          path: /tmp/junit-results/
+          if-no-files-found: warn
+
+      - name: Generate API docs JSON (snapshot)
+        run: |
+          mkdir -p docs/api
+          VERSION=$(jq -r '.version' wheels.json)
+          # Lowercase "-snapshot" matches the URL slug convention used by
+          # web/scripts/generate-api-docs.mjs (version.replace(/\./g, '-')).
+          SNAPSHOT_FILE="docs/api/v${VERSION}-snapshot.json"
+          curl -sf --max-time 60 \
+            "http://localhost:60007/wheels/api?format=json&type=core" \
+            -o "$SNAPSHOT_FILE"
+          if ! jq -e '.functions and .sections' "$SNAPSHOT_FILE" > /dev/null 2>&1; then
+            echo "::error::API docs JSON invalid or empty"
+            head -c 500 "$SNAPSHOT_FILE" || true
+            exit 1
+          fi
+          echo "Generated $SNAPSHOT_FILE ($(wc -c < "$SNAPSHOT_FILE") bytes)"
+
+      - name: Upload API docs snapshot
+        uses: actions/upload-artifact@v6
+        with:
+          name: api-docs-snapshot
+          path: docs/api/v*-snapshot.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Debug server logs
+        if: failure()
+        run: cat /tmp/lucli-server.log 2>/dev/null || true
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
+          lucli server stop 2>/dev/null || true
 
   #############################################
-  # Build Snapshot Release
+  # Build Snapshot Release (gates on fast-test)
   #############################################
   build:
-    needs: tests
+    needs: fast-test
     uses: ./.github/workflows/release.yml
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       FORGEBOX_API_TOKEN: ${{ secrets.FORGEBOX_API_TOKEN }}
       FORGEBOX_PASS: ${{ secrets.FORGEBOX_PASS }}
+      DOWNSTREAM_DISPATCH_TOKEN: ${{ secrets.DOWNSTREAM_DISPATCH_TOKEN }}
+      # Required: the snapshot-publish step in release.yml writes the GitHub
+      # Release to wheels-dev/wheels-snapshots, which needs a PAT with
+      # Contents:write on that repo. Stable (main) builds don't use this and
+      # rely on the default GITHUB_TOKEN.
+      WHEELS_SNAPSHOTS_TOKEN: ${{ secrets.WHEELS_SNAPSHOTS_TOKEN }}
 
+  #############################################
+  # Deploy API docs snapshot to Cloudflare Pages
+  #############################################
+  # Regenerates the v{version}-snapshot markdown from the JSON produced by
+  # fast-test, builds the Starlight api site, and deploys to the wheels-api
+  # Cloudflare Pages project. Runs on every develop push so the snapshot
+  # version on api.wheels.dev tracks the current framework state.
+  deploy-api-snapshot:
+    needs: fast-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: deploy-api-snapshot-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-#############################################
-# Sync Docs in Wheels.dev
-#############################################
+      - name: Download API docs snapshot artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: api-docs-snapshot
+          path: docs/api/
 
-  sync-docs:
-    needs: build
-    uses: ./.github/workflows/docs-sync.yml
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate snapshot markdown from JSON
+        run: |
+          VERSION=$(jq -r '.version' wheels.json)
+          node web/scripts/generate-api-docs.mjs "${VERSION}-snapshot"
+
+      - name: Build api site
+        working-directory: web
+        run: pnpm --filter @wheels-dev/site-api build
+
+      - name: Deploy to Cloudflare Pages
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+        run: |
+          # Pass --commit-message explicitly. Without it, wrangler auto-derives
+          # the commit message from git, and Cloudflare's API rejected this
+          # repo's auto-generated GitHub merge commit body in run 25641189988
+          # with "Invalid commit message, it must be a valid UTF-8 string"
+          # (despite the body being valid UTF-8 — CF appears to have a stricter
+          # rule than the error message implies). The fix is to send a short
+          # ASCII-only message derived from the version + run; that always works.
+          VERSION=$(jq -r '.version' ../wheels.json)
+          pnpm dlx wrangler@4.78.0 pages deploy "sites/api/dist" \
+            --project-name="wheels-api" \
+            --branch="${DEPLOY_BRANCH}" \
+            --commit-hash="${GITHUB_SHA}" \
+            --commit-message="snapshot deploy: ${VERSION}-snapshot (run ${GITHUB_RUN_ID})"

@@ -1,0 +1,39 @@
+# MySQL database profile for Wheels development
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml -f docker-compose.db-mysql.yml up
+#
+# Adds a MySQL 9 service and configures the "wheels-dev" datasource
+# to connect to it automatically.
+
+services:
+  app:
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - BOX_SERVER_CFCONFIGFILE=tools/docker/dev/cfconfig-mysql.json
+
+  mysql:
+    image: mysql:9
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: wheelstestdb
+      MYSQL_DATABASE: wheelstestdb
+      MYSQL_USER: wheelstestdb
+      MYSQL_PASSWORD: wheelstestdb
+    ports:
+      - "${WHEELS_MYSQL_PORT:-3307}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - wheels-dev
+
+volumes:
+  mysql_data:

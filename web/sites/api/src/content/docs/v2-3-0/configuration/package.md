@@ -1,0 +1,57 @@
+---
+title: package()
+description: "Scopes any the controllers for any routes configured within this block to a subfolder (package) without adding the package name to the URL."
+sidebar:
+  label: package()
+  order: 0
+---
+
+## Signature
+
+`package()` — returns `struct`
+
+**Available in:** `mapper`
+**Category:** Routing
+
+## Description
+
+Scopes any the controllers for any routes configured within this block to a subfolder (package) without adding the package name to the URL.
+
+
+
+## Parameters
+
+<div class="wd-params-table">
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `name` | `string` | yes | — | Name to prepend to child route names. |
+| `package` | `string` | no | `[runtime expression]` | Subfolder (package) to reference for controllers. This defaults to the value provided for `name`. |
+
+</div>
+
+## Examples
+
+<pre><code class='javascript'>&lt;cfscript&gt;
+
+mapper()
+    .package(&quot;public&quot;)
+        // Example URL: /products/1234
+        // Controller:  public.Products
+        .resources(&quot;products&quot;)
+    .end()
+
+    // Example URL: /users/4321
+    // Controller:  Users
+    .resources(name=&quot;users&quot;, nested=true)
+        // Calling `package` here is useful to scope nested routes for the `users`
+        // resource into a subfolder.
+        .package(&quot;users&quot;)
+            // Example URL: /users/4321/profile
+            // Controller:  users.Profiles
+            .resource(&quot;profile&quot;)
+        .end()
+    .end()
+.end();
+
+&lt;/cfscript&gt;</code></pre>

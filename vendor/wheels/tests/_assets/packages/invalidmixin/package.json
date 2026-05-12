@@ -1,0 +1,8 @@
+{
+	"name": "wheels-invalidmixin",
+	"version": "1.0.0",
+	"description": "Test fixture: declares unknown mixin target (typo)",
+	"provides": {
+		"mixins": "controler"
+	}
+}

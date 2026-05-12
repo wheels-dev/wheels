@@ -1,0 +1,15 @@
+// 1. Check whether a property exists on a new object after setting it
+employee = model("Employee").new();
+employee.firstName = "Jane";
+employee.hasProperty("firstName"); // -> true
+employee.hasProperty("salary");    // -> false (not set on this object)
+
+// 2. Use the equivalent dynamic method (has<PropertyName>)
+employee.hasFirstName(); // -> true
+employee.hasSalary();    // -> false
+
+// 3. Guard logic before accessing a property
+user = model("User").findOne(where="email='jane@example.com'");
+if (user.hasProperty("avatarUrl")) {
+    writeOutput(user.avatarUrl);
+}

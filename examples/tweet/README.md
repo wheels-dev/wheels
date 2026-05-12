@@ -12,7 +12,7 @@ As a ForgeBox package there is some interesting things going on here. Although t
 
 ```
 "Dependencies":{
-  "wheels-core":"^3.0.0"
+  "wheels-core":"^3.1.0"
 }
 ```
 

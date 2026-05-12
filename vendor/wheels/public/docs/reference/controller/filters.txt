@@ -1,0 +1,25 @@
+// 1. Run `restrictAccess` before every action in this controller (declared inside config()).
+filters("restrictAccess");
+
+// 2. Run two before-filters on every action except `home` and `login`.
+filters(through="isLoggedIn, checkIPAddress", except="home, login");
+
+// 3. Run `auditLog` after only the `create`, `update`, and `delete` actions.
+filters(through="auditLog", type="after", only="create, update, delete");
+
+// 4. Prepend a filter so it runs before any already-registered filters.
+filters(through="maintenanceCheck", placement="prepend");
+
+// Note: filter functions must be declared as `private` in the controller
+// to prevent them from being routed as public actions.
+// Example controller setup:
+// component extends="Controller" {
+//     function config() {
+//         filters("restrictAccess");
+//     }
+//     private function restrictAccess() {
+//         if (!isLoggedIn()) {
+//             redirectTo(route="login");
+//         }
+//     }
+// }

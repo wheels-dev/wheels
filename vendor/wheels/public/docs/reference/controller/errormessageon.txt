@@ -1,0 +1,12 @@
+// 1. Display the first error message (if any) on the email property
+#errorMessageOn(objectName="user", property="email")#
+// -> <span class="error-message">Email is not a valid email address.</span>
+// -> (empty string when no error exists on that property)
+
+// 2. Prepend and append custom text around the error message
+#errorMessageOn(objectName="user", property="username", prependText="Problem:", appendText="Please try again.")#
+// -> <span class="error-message">Problem: Username has already been taken. Please try again.</span>
+
+// 3. Wrap the message in a div with a custom CSS class instead of the default span
+#errorMessageOn(objectName="post", property="title", wrapperElement="div", class="field-error")#
+// -> <div class="field-error">Title can't be blank.</div>

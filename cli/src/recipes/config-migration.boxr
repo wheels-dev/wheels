@@ -1,6 +1,6 @@
 #!/usr/bin/env cfscript
 /**
- * CFWheels 3.0.0 Config Migration Recipe
+ * CFWheels 3.1.0 Config Migration Recipe
  * 
  * This recipe migrates your CFWheels application from the old /app/config
  * structure to the new /config structure at the root level.
@@ -9,7 +9,7 @@
  */
 
 // Display welcome message
-print.greenBoldLine("CFWheels 3.0.0 Config Migration Tool")
+print.greenBoldLine("CFWheels 3.1.0 Config Migration Tool")
     .line("====================================")
     .line()
     .yellowLine("This recipe will migrate your config directory from /app/config to /config")
@@ -168,7 +168,7 @@ if (arrayLen(foundReferences)) {
 
 // Step 5: Create migration documentation
 var migrationLog = [];
-arrayAppend(migrationLog, "CFWheels 3.0.0 Config Migration Log");
+arrayAppend(migrationLog, "CFWheels 3.1.0 Config Migration Log");
 arrayAppend(migrationLog, "===================================");
 arrayAppend(migrationLog, "Migration Date: #dateTimeFormat(now(), 'yyyy-mm-dd HH:nn:ss')#");
 arrayAppend(migrationLog, "");

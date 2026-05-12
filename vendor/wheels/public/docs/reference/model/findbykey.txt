@@ -1,0 +1,22 @@
+// 1. Get the author with the primary key value `99` as an object
+auth = model("author").findByKey(99);
+
+// 2. Get an author based on a form/URL value and handle the not-found case
+auth = model("author").findByKey(params.key);
+if (!isObject(auth)) {
+    flashInsert(message="Author #params.key# was not found");
+    redirectTo(back=true);
+}
+
+// 3. Fetch only selected columns for a record
+user = model("user").findByKey(key=params.id, select="id,firstName,email");
+
+// 4. Include a belongsTo association when fetching by key
+order = model("order").findByKey(key=params.orderId, include="customer");
+
+// 5. Cache the lookup for 10 minutes and include soft-deleted records
+product = model("product").findByKey(key=params.id, cache=10, includeSoftDeletes=true);
+
+// 6. Use a scoped call via a belongsTo association (calls `model("post").findByKey(comment.postId)` internally)
+comment = model("comment").findByKey(params.commentId);
+post = comment.post();

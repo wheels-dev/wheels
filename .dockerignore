@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# IDE / editor
+.project
+.settings
+.classpath
+.vscode
+.idea
+.claude
+
+# CommandBox artifacts (rebuilt in container)
+.CommandBox
+.engine
+
+# Build and temp
+target/
+temp/
+bin/
+test-output/
+
+# Node (testui has its own Docker build)
+node_modules/
+
+# Database files (H2/SQLite)
+*.db
+
+# CI/CD workflows
+.github/
+
+# Documentation
+*.md
+
+# Docker files (avoid recursive COPY)
+Dockerfile*
+docker-compose*
+.dockerignore

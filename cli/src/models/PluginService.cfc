@@ -7,7 +7,7 @@ component {
     
     
     /**
-     * Install a Wheels plugin (cfwheels-plugins type only)
+     * Install a Wheels plugin (wheels-plugins type only)
      * Plugins are automatically installed to /plugins folder
      */
     function install(
@@ -22,7 +22,7 @@ component {
                 directoryCreate(pluginsDir);
             }
 
-            // Check if it's a valid cfwheels-plugins package
+            // Check if it's a valid wheels-plugins package
             var pluginInfo = getPluginInfo(arguments.name);
             if (!pluginInfo.isValid) {
                 return {
@@ -31,11 +31,11 @@ component {
                 };
             }
 
-            // Verify it's a cfwheels-plugins type
-            if (pluginInfo.type != "cfwheels-plugins") {
+            // Verify it's a wheels-plugins type
+            if (pluginInfo.type != "wheels-plugins") {
                 return {
                     success: false,
-                    error: "Package '" & arguments.name & "' is not a cfwheels-plugins type. Only cfwheels-plugins can be installed."
+                    error: "Package '" & arguments.name & "' is not a wheels-plugins type. Only wheels-plugins can be installed."
                 };
             }
 
@@ -138,7 +138,7 @@ component {
     function list() {
         var plugins = [];
 
-        // Check for cfwheels-plugins in /plugins folder
+        // Check for wheels-plugins in /plugins folder
         var pluginsDir = fileSystemUtil.resolvePath("plugins");
         if (!directoryExists(pluginsDir)) {
             return plugins; // Return empty array if plugins folder doesn't exist
@@ -161,7 +161,7 @@ component {
 
     /**
      * Get plugin information from ForgeBox
-     * Validates that it's a cfwheels-plugins type
+     * Validates that it's a wheels-plugins type
      */
     private function getPluginInfo(pluginName) {
         try {
@@ -169,7 +169,7 @@ component {
             if (findNoCase("http", arguments.pluginName) || findNoCase("github.com", arguments.pluginName)) {
                 return {
                     isValid: false,
-                    error: "URL installations are not supported for cfwheels-plugins. Use package name from ForgeBox."
+                    error: "URL installations are not supported for wheels-plugins. Use package name from ForgeBox."
                 };
             }
 
@@ -177,8 +177,8 @@ component {
             try {
                 var forgeboxData = forgebox.getEntry(arguments.pluginName);
 
-                // Check if it's a cfwheels-plugins type
-                if (structKeyExists(forgeboxData, "typeslug") && forgeboxData.typeslug == "cfwheels-plugins") {
+                // Check if it's a wheels-plugins type
+                if (structKeyExists(forgeboxData, "typeslug") && forgeboxData.typeslug == "wheels-plugins") {
                     return {
                         isValid: true,
                         name: forgeboxData.title ?: arguments.pluginName,
@@ -190,7 +190,7 @@ component {
                 } else {
                     return {
                         isValid: false,
-                        error: "Package '#arguments.pluginName#' is not a cfwheels-plugins type"
+                        error: "Package '#arguments.pluginName#' is not a wheels-plugins type"
                     };
                 }
             } catch (any e) {
@@ -219,7 +219,7 @@ component {
             folderName: arguments.folderName,
             version: "unknown",
             description: "",
-            type: "cfwheels-plugins"
+            type: "wheels-plugins"
         };
 
         try {
@@ -263,7 +263,7 @@ component {
      */
     private function isWheelsPlugin(moduleName) {
         // Exclude the core framework and common non-plugin dependencies
-        if (listFindNoCase("wheels-core,wirebox,testbox,cfformat", arguments.moduleName)) {
+        if (listFindNoCase("wheels-core,testbox,cfformat", arguments.moduleName)) {
             return false;
         }
         

@@ -1,0 +1,23 @@
+// 1. Include the view's generated content inside a layout file
+// In `app/views/layout.cfm`, place this where the page body should appear
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My App</title>
+</head>
+<body>
+    #contentForLayout()#
+</body>
+</html>
+
+// 2. Combine with includeContent to render named sections alongside the body
+// In `app/views/layout.cfm`
+<html>
+<head>
+    #includeContent("head")#
+</head>
+<body>
+    #contentForLayout()#
+    #includeContent("footer")#
+</body>
+</html>

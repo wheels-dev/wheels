@@ -1,0 +1,11 @@
+{
+	"name": "wheels-cycleA",
+	"version": "1.0.0",
+	"description": "Test fixture: circular dependency with cycleB",
+	"requires": {
+		"wheels-cycleB": ">=1.0.0"
+	},
+	"provides": {
+		"mixins": "none"
+	}
+}

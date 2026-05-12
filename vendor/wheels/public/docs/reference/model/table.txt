@@ -1,0 +1,18 @@
+// 1. Map the `User` model to a non-standard table name.
+// In models/User.cfc
+function config() {
+	// Tell Wheels to use `tbl_USERS` instead of the default `users` table.
+	table("tbl_USERS");
+}
+
+// 2. Map a model to a table with a legacy prefix.
+// In models/Product.cfc
+function config() {
+	table("legacy_products");
+}
+
+// 3. Declare a model that has no backing database table at all.
+// In models/ApiResponse.cfc
+function config() {
+	table(false);
+}

@@ -1,0 +1,7 @@
+{
+	"name": "NeedyPlugin",
+	"version": "1.0.0",
+	"dependencies": {
+		"OldDep": ">=2.0.0 <3.0.0"
+	}
+}

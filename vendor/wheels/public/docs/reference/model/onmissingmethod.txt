@@ -1,0 +1,42 @@
+// Note: onMissingMethod() is not called directly. It is the CFML hook that
+// powers Wheels' dynamic model methods. The examples below show what you
+// call in your code — Wheels intercepts each one automatically.
+
+// 1. Dynamic finder: findOneBy<Property>
+// Finds the first user whose email matches the given value.
+user = model("User").findOneByEmail("jane@example.com");
+
+// 2. Dynamic finder: findAllBy<Property>
+// Finds all posts with the given status.
+posts = model("Post").findAllByStatus("published");
+
+// 3. Dynamic finder across multiple properties joined by "And"
+// Finds a single order matching both customerId and status.
+order = model("Order").findOneByCustomerIdAndStatus(42, "pending");
+
+// 4. Find or create by property
+// Returns an existing tag with the name "cfml", or creates one if none exists.
+tag = model("Tag").findOrCreateByName("cfml");
+
+// 5. Association helpers generated for hasMany (comments on a post)
+post = model("Post").findByKey(1);
+// Retrieve all associated comments
+comments = post.comments();
+// Count associated comments
+total = post.commentCount();
+// Create a new associated comment (foreign key set automatically)
+post.createComment(body="Great post!");
+
+// 6. Property change helpers
+user = model("User").findByKey(1);
+user.email = "new@example.com";
+// Check whether a specific property has changed since the record was loaded
+changed = user.emailHasChanged();
+// Get the original value before the change
+original = user.emailChangedFrom();
+
+// 7. Enum boolean helpers (requires enum() declaration in model config)
+// component Post extends="Model" { function config() { enum(property="status", values="draft,published,archived"); } }
+post = model("Post").findByKey(1);
+writeOutput(post.isPublished()); // true or false
+writeOutput(post.isDraft());     // true or false

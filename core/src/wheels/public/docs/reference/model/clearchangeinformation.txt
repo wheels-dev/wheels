@@ -1,7 +1,0 @@
-// Convert startTime to UTC (maybe done in an "after find" call back) but then tell CFWheels to clear the information about this change (but not the change itself) so that it won't attempt to save the new value to the database, report it as being changed when calling hasChanged() etc.
-
-this.startTime = DateConvert("Local2UTC", this.startTime);
-this.clearChangeInformation(property="startTime");
-
-// Clear information for all properties
-this.clearChangeInformation();

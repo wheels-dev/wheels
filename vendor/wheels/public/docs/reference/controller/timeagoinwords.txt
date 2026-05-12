@@ -1,0 +1,15 @@
+// 1. Show how long ago a date was (relative to now)
+aWhileAgo = DateAdd("d", -90, Now());
+// Returns something like "3 months"
+writeOutput(timeAgoInWords(aWhileAgo));
+
+// 2. Include seconds for a very recent timestamp
+justNow = DateAdd("s", -8, Now());
+// Returns "less than 10 seconds"
+writeOutput(timeAgoInWords(fromTime=justNow, includeSeconds=true));
+
+// 3. Compare against a specific reference point instead of now
+postDate = CreateDateTime(2024, 1, 15, 9, 0, 0);
+referenceDate = CreateDateTime(2024, 3, 20, 9, 0, 0);
+// Returns "about 2 months"
+writeOutput(timeAgoInWords(fromTime=postDate, toTime=referenceDate));

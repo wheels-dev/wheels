@@ -1,0 +1,13 @@
+// 1. Get the current response content (empty string if nothing has been rendered yet)
+content = response();
+
+// 2. Use in a controller test to verify rendered output
+// (Wheels populates the response after renderView, renderText, or renderPartial runs)
+renderText("Hello, world!");
+assert("response() eq 'Hello, world!'");
+
+// 3. Inspect and modify the response before it is sent to the client
+currentContent = response();
+if (FindNoCase("<!-- debug -->", currentContent)) {
+    setResponse(Replace(currentContent, "<!-- debug -->", "", "all"));
+}

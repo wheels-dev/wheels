@@ -1,0 +1,182 @@
+---
+title: Integration Tests
+description: Multi-model and multi-step workflow tests — exercising real persistence and routing through several requests.
+type: howto
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Integration tests cover the journeys a user actually takes — signup, login, creating content, interacting with another user's record. They span multiple controllers, touch multiple models, and use the same `TestClient` as controller tests, but they chain several requests on one session and assert on the database state at the end. This page walks the canonical patterns: multi-step workflows, cookie-jar semantics, cross-controller routes, and per-spec rollback.
+
+**You'll learn:**
+
+- What integration tests exercise that unit and controller tests don't
+- How the `TestClient` cookie jar carries session state across requests
+- How to assert on database state after a workflow, not just the last HTTP response
+- How to isolate destructive specs with a manual transaction rollback
+- When a flow genuinely needs a browser test instead
+
+<Aside type="note">
+  You should already know BDD basics and the `TestClient` API. See [Model Tests](/v4-0-0-snapshot/testing/model-tests/) and [Controller Tests](/v4-0-0-snapshot/testing/controller-tests/).
+</Aside>
+
+## The test-type spectrum
+
+Integration tests sit between single-controller tests and full browser tests. Pick the level that matches what you're actually trying to exercise — cheaper tests are faster and more stable, but they can't prove a flow end-to-end.
+
+| Level | What it exercises | Speed | When |
+|-------|-------------------|-------|------|
+| Model test | One model in isolation | Fast | validations, callbacks, custom methods |
+| Controller test | One action + dependencies | Fast | response shape, filters, params |
+| **Integration test** | **Multi-step, multi-model, multi-request** | **Medium** | **workflows, cross-controller feature flows** |
+| Functional test | Full request lifecycle end-to-end | Medium-Slow | feature slice, middleware effects |
+| Browser test | UI-driven, real browser | Slowest | JS behaviour, Turbo flows, visual regressions |
+
+A good suite leans heavy on model and controller tests, with a handful of integration tests covering the load-bearing flows (signup, checkout, permission boundaries) and browser tests reserved for JavaScript-dependent behaviour.
+
+## A multi-step workflow spec
+
+The canonical shape: one `it` per user journey, with a single `$testClient()` reused across every step. The cookie jar is what makes the flow work — the login in step two carries through to step three automatically.
+
+```cfm {test:compile} title="tests/specs/integration/ContentCreationSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("New-user content creation flow", () => {
+            it("supports signup through first comment", () => {
+                var client = $testClient();
+
+                // signup
+                client.post("/users", {"user[email]": "a@a.com", "user[password]": "secret"})
+                    .assertRedirect(to="/login");
+
+                // login — cookie jar captures the session
+                client.post("/login", {"session[email]": "a@a.com", "session[password]": "secret"})
+                    .assertRedirect();
+
+                // create a post
+                client.post("/posts", {"post[title]": "Hello", "post[body]": "World"})
+                    .assertRedirect();
+
+                // find the post in the database, then comment on it
+                var post = model("Post").findOne(where="title='Hello'");
+                client.post("/posts/##post.id##/comments", {"comment[author]": "Me", "comment[body]": "First"})
+                    .assertOk();
+
+                expect(post.commentCount()).toBe(1);
+            });
+        });
+    }
+}
+```
+
+Four things to notice:
+
+- **One client, four requests.** The `client` variable holds session state across the whole journey — logging in on request two means requests three and four are authenticated.
+- **Chained assertions.** Every `TestClient` method returns `this`, so `.post(...).assertRedirect()` reads naturally.
+- **Database lookup mid-flow.** After the create redirect, the spec pulls the new row out of the DB to get its primary key, then uses that key in the next URL. The response body isn't enough — the id lives in the `Location` header or the database.
+- **Final assertion on DB state.** `commentCount()` is the proof; a 200 on `POST /comments` only says the action didn't crash, not that the association saved.
+
+## Cookie jar semantics
+
+One `$testClient()` instance holds session state across every request in the spec. Multiple clients in one spec represent multiple users — useful when the behaviour under test is "user B can't touch user A's data".
+
+```cfm {test:compile} title="tests/specs/integration/OwnershipSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Ownership enforcement", () => {
+            it("prevents user B from editing user A's post", () => {
+                // populate.cfm sets up alice (id=1) with post id=1, bob (id=2)
+
+                var bobClient = $testClient();
+                bobClient.post("/login", {"session[email]": "bob@ex.com", "session[password]": "x"})
+                    .assertRedirect();
+                bobClient.get("/posts/1/edit")
+                    .assertRedirect(to="/posts");
+            });
+        });
+    }
+}
+```
+
+For an A-vs-B interaction test, build two clients and log each in separately — the pattern scales to any number of actors. A fresh `$testClient()` always starts with an empty cookie jar, so there's no bleed between users in the same spec.
+
+## Asserting on DB state
+
+After a workflow, the persistence side is the authoritative check. A 302 redirect only says the controller thought the save succeeded; a record in the database says it actually did.
+
+```cfm {test:compile} title="tests/specs/integration/PostPersistenceSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Post creation", () => {
+            it("persists a post after the create action", () => {
+                $testClient().post("/posts", {"post[title]": "T", "post[body]": "B"})
+                    .assertRedirect();
+
+                expect(model("Post").count()).toBe(1);
+                var post = model("Post").findOne(where="title='T'");
+                expect(post.body).toBe("B");
+            });
+        });
+    }
+}
+```
+
+The pattern: run the workflow, then reach into the model layer with `count()`, `findOne()`, or a scope to confirm the intended rows exist with the intended values. Silent failures — a callback that swallowed an exception, a filter that dropped a param, an association that didn't cascade — don't surface in the HTTP status. The DB assertion catches them.
+
+## Per-spec transaction isolation
+
+`transactionMode` defaults to `none`, so writes persist between specs. `populate.cfm` only runs once per test run, not between `it`s. For a destructive spec that shouldn't leak data into the next one, wrap the work in a manual transaction and roll back at the end.
+
+```cfm {test:compile} title="tests/specs/integration/RollbackSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Destructive spec", () => {
+            it("rolls back writes on completion", () => {
+                transaction {
+                    try {
+                        $testClient().post("/posts", {"post[title]": "Temp", "post[body]": "B"})
+                            .assertRedirect();
+                        expect(model("Post").count()).toBeGT(0);
+                    } finally {
+                        transaction action="rollback";
+                    }
+                }
+
+                expect(model("Post").count(where="title='Temp'")).toBe(0);
+            });
+        });
+    }
+}
+```
+
+The `finally` block is what makes this safe: even if an assertion fails midway, the rollback still runs and the next spec sees a clean table. Cross-link to [Fixtures & Test Data](/v4-0-0-snapshot/testing/fixtures-and-test-data/) for the full fixture-lifecycle pattern — when to use rollback, when to use populate data, when to seed per-spec.
+
+## Cross-controller workflows
+
+Integration tests often span the controllers a user journey actually crosses — `Users` (signup) → `Sessions` (login) → `Posts` (create) → `Comments` (add). Test the journey, not the individual controllers; let the controller-test page own single-action assertions. A good heuristic: if the spec's name reads like a verb phrase the user would say ("signs up, posts, and comments"), it's an integration test. If it reads like a dispatch detail ("redirects anonymous users from the edit page"), it's a controller test.
+
+The payoff: one integration test catches regressions across every controller it touches. When the login flow breaks because `SessionsController` started clearing a cookie too eagerly, the signup-through-comment spec turns red — even though it doesn't mention `SessionsController` anywhere.
+
+## Common patterns
+
+- **One spec = one user journey.** Multiple journeys go in separate `it` blocks inside the same `describe`.
+- **Reuse `$testClient()` throughout a spec.** Its cookie jar *is* the session state — building a fresh client drops the login.
+- **Build a fresh `$testClient()` per distinct user.** Two clients = two actors; don't try to share one and juggle cookies manually.
+- **`populate.cfm` handles common setup; the spec handles journey-specific data.** Users, roles, permissions — populate. The post Alice creates in this specific journey — the spec.
+- **Assert on DB state at the end, not just the HTTP response.** Silent failures in callbacks and filters don't surface in a 302.
+- **Extract the `Location` header when a flow needs to follow a redirect.** `TestClient` never auto-follows — `headers()["Location"]` gives you the target to hit next.
+
+## When to prefer a browser test instead
+
+Integration tests are faster than browser tests but can't exercise JavaScript. If the flow depends on `data-turbo-frame` swapping, client-side validation, a form that submits via fetch, or anything that renders after the initial HTML, write a browser test — the `TestClient` sees only the HTML the server first shipped, not whatever the browser turned it into. For pure server-rendered flows — a classic form POST followed by a redirect — integration tests cover the same ground an order of magnitude faster. Reach for the browser suite only when the behaviour genuinely lives in the browser.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Controller Tests" href="/v4-0-0-snapshot/testing/controller-tests/" description="Single-action response shape, redirects, filters, flash messages, and JSON responses." />
+  <LinkCard title="Model Tests" href="/v4-0-0-snapshot/testing/model-tests/" description="Validations, callbacks, custom methods, associations, and scopes — the bulk of a healthy suite." />
+  <LinkCard title="View & Form Tests" href="/v4-0-0-snapshot/testing/view-and-form-tests/" description="Rendering partials, form helper output, and error display." />
+  <LinkCard title="Models and the ORM" href="/v4-0-0-snapshot/basics/models-and-the-orm/" description="Finders, associations, and the persistence APIs your integration tests assert against." />
+</CardGrid>

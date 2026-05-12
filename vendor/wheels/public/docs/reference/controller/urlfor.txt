@@ -1,0 +1,14 @@
+// 1. Create the URL for the `logOut` action on the `account` controller, typically resulting in `/account/log-out`
+urlFor(controller="account", action="logOut")
+
+// 2. Create a URL with an anchor appended to it
+urlFor(action="comments", anchor="comment10")
+
+// 3. Create a URL based on a named route that expects `categorySlug` and `productSlug` params
+urlFor(route="product", categorySlug="accessories", productSlug="battery-charger")
+
+// 4. Generate an absolute URL (including protocol and host) to use in an email or external link
+urlFor(controller="account", action="confirm", key=user.key(), onlyPath=false, protocol="https")
+
+// 5. Append extra query string params not covered by the route pattern
+urlFor(controller="products", action="index", params="sort=price&dir=asc")

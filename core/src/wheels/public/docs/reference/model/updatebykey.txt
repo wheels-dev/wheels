@@ -1,5 +1,0 @@
-// Updates the object with `33` as the primary key value with values passed in through the URL/form
-result = model("post").updateByKey(33, params.post);
-
-// Updates the object with `33` as the primary key using named arguments
-result = model("post").updateByKey(key=33, title="New version of Wheels just released", published=1);

@@ -65,7 +65,7 @@ Result: Complete blog in 3 minutes!
 3. **wheels-view-generator** - Views with proper query handling
 4. **wheels-migration-generator** - Database-agnostic migrations
 5. **wheels-anti-pattern-detector** - Automatic code validation (ALWAYS ON)
-6. **wheels-test-generator** - TestBox BDD specs
+6. **wheels-test-generator** - WheelsTest BDD specs
 7. **wheels-debugging** - Error troubleshooting
 8. **wheels-refactoring** - Performance optimization
 9. **wheels-api-generator** - RESTful JSON APIs

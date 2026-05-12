@@ -1,0 +1,29 @@
+// 1. Map a `status` property to a comma-delimited list of allowed string values.
+//    Wheels auto-validates that `status` is one of the listed values,
+//    creates `isDraft()`, `isPublished()`, and `isArchived()` checker methods,
+//    and registers `draft()`, `published()`, and `archived()` query scopes.
+component extends="Model" {
+	function config() {
+		enum(property="status", values="draft,published,archived");
+	}
+}
+
+// 2. Map a `priority` property using a struct so that the stored database value
+//    differs from the human-readable name (0, 1, 2 are stored; low/medium/high are the names).
+//    Generated methods: `isLow()`, `isMedium()`, `isHigh()`.
+//    Generated scopes:  `model("Task").low()`, `model("Task").medium()`, `model("Task").high()`.
+component extends="Model" {
+	function config() {
+		enum(property="priority", values={low: 0, medium: 1, high: 2});
+	}
+}
+
+// 3. Using the generated checker methods and scopes at runtime.
+//    `isPublished()` returns true/false; `published()` scopes a finder to that status.
+post = model("Post").findByKey(key=42);
+if (post.isPublished()) {
+	writeOutput("This post is live.");
+}
+
+// Find all published posts using the auto-generated scope.
+publishedPosts = model("Post").published().findAll();

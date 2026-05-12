@@ -150,4 +150,3 @@ combined = arr1.merge(arr2);     // [1, 2, 3, 4, 5, 6]
 - [Array Creation](array-creation.md)
 - [Array Iteration](array-iteration.md)
 - [Closures](../../advanced/closures.md)
-- [Functional Programming](../../best-practices/functional-patterns.md)

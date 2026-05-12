@@ -1,0 +1,6 @@
+# Intentionally empty.
+#
+# Historical blog posts reference images at cfwheels.org/* URLs that now
+# 301-redirect to wheels.dev/. Image recovery from the Wayback Machine
+# is a follow-up after Phase 1 launch. Recovered images will be dropped
+# into this directory and the markdown references updated via a script.

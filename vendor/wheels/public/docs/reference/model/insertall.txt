@@ -1,0 +1,29 @@
+// 1. Insert multiple user records in a single batch
+newUsers = [
+    {firstName: "Alice", lastName: "Smith", email: "alice@example.com"},
+    {firstName: "Bob",   lastName: "Jones", email: "bob@example.com"},
+    {firstName: "Carol", lastName: "White", email: "carol@example.com"}
+];
+result = model("User").insertAll(records=newUsers);
+// result -> {insertedCount: 3}
+
+// 2. Insert records without automatic createdAt/updatedAt timestamps
+rows = [
+    {username: "imported_1", score: 9800},
+    {username: "imported_2", score: 7450}
+];
+result = model("HighScore").insertAll(records=rows, timestamps=false);
+// result -> {insertedCount: 2}
+
+// 3. Insert a large dataset wrapped in a single transaction, using selective cfqueryparam
+products = [];
+for (i = 1; i <= 2500; i++) {
+    arrayAppend(products, {name: "Product #i#", price: RandRange(1, 999), stock: RandRange(0, 500)});
+}
+// Batches automatically in groups of 1000; all batches share one transaction.
+result = model("Product").insertAll(
+    records      = products,
+    transaction  = "commit",
+    parameterize = "price,stock"
+);
+// result -> {insertedCount: 2500}

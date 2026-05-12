@@ -236,7 +236,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean factory = false
 	) {
-		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		var content = 'component extends="wheels.WheelsTest" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNameSingularC# Model", function() {' & chr(10) & chr(10);
 
@@ -347,7 +347,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean mock = false
 	) {
-		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		var content = 'component extends="wheels.WheelsTest" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function beforeAll() {' & chr(10);
 		content &= chr(9) & chr(9) & 'variables.baseUrl = "http://localhost:8080";' & chr(10);
 		content &= chr(9) & '}' & chr(10) & chr(10);
@@ -421,7 +421,7 @@ component aliases='wheels g test' extends="../base"  {
 	 * Generate view test
 	 */
 	private function generateViewTest(required struct obj, required string viewName) {
-		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		var content = 'component extends="wheels.WheelsTest" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function beforeAll() {' & chr(10);
 		content &= chr(9) & chr(9) & 'variables.baseUrl = "http://localhost:8080";' & chr(10);
 		content &= chr(9) & '}' & chr(10) & chr(10);
@@ -453,7 +453,7 @@ component aliases='wheels g test' extends="../base"  {
 	 * Generate unit test
 	 */
 	private function generateUnitTest(required struct obj, boolean mock = false) {
-		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		var content = 'component extends="wheels.WheelsTest" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNameSingularC# Unit Tests", function() {' & chr(10) & chr(10);
 
@@ -500,7 +500,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean factory = false
 	) {
-		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		var content = 'component extends="wheels.WheelsTest" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function beforeAll() {' & chr(10);
 		content &= chr(9) & chr(9) & 'variables.baseUrl = "http://localhost:8080";' & chr(10);
 		content &= chr(9) & '}' & chr(10) & chr(10);
@@ -558,7 +558,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean mock = false
 	) {
-		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		var content = 'component extends="wheels.WheelsTest" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function beforeAll() {' & chr(10);
 		content &= chr(9) & chr(9) & 'variables.apiUrl = "http://localhost:8080/api";' & chr(10);
 		content &= chr(9) & '}' & chr(10) & chr(10);

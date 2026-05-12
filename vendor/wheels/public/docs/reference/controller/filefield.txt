@@ -1,0 +1,14 @@
+// 1. Basic file upload field bound to an object and property
+#fileField(objectName="photo", property="imageFile")#
+
+// 2. Provide a custom label for the file field
+#fileField(label="Profile Photo", objectName="user", property="avatar")#
+
+// 3. Display file upload fields for a hasMany association using nested properties
+<fieldset>
+	<legend>Screenshots</legend>
+	<cfloop from="1" to="#ArrayLen(site.screenshots)#" index="i">
+		#fileField(label="File ##i#", objectName="site", association="screenshots", position=i, property="file")#
+		#textField(label="Caption ##i#", objectName="site", association="screenshots", position=i, property="caption")#
+	</cfloop>
+</fieldset>

@@ -1,0 +1,11 @@
+// 1. Capitalize each word in a plain sentence
+result = titleize("the quick brown fox");
+// result -> "The Quick Brown Fox"
+
+// 2. Capitalize a page title that is already mixed case
+result = titleize("CFWheels is a framework for ColdFusion");
+// result -> "CFWheels Is A Framework For ColdFusion"
+
+// 3. Use titleize to format a record name for display
+article = model("Article").findByKey(params.key);
+writeOutput(titleize(article.title));

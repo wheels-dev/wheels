@@ -1,0 +1,25 @@
+// 1. Get an object, change some properties, and inspect all changes before saving
+member = model("member").findByKey(params.memberId);
+member.firstName = params.newFirstName;
+member.email = params.newEmail;
+changes = member.allChanges();
+// changes -> {
+//   firstName: { changedFrom: "Jane", changedTo: "Janet" },
+//   email:     { changedFrom: "jane@example.com", changedTo: "janet@example.com" }
+// }
+
+// 2. Only call allChanges() when there are changes to process
+post = model("post").findByKey(params.id);
+post.title = params.title;
+post.body = params.body;
+if (post.hasChanged()) {
+    changes = post.allChanges();
+    for (prop in changes) {
+        writeOutput("'#prop#' changed from '#changes[prop].changedFrom#' to '#changes[prop].changedTo#'");
+    }
+}
+
+// 3. allChanges() returns an empty struct when nothing has changed
+user = model("user").findByKey(params.userId);
+changes = user.allChanges();
+// changes -> {} (empty struct — no unsaved changes)

@@ -1,0 +1,20 @@
+// 1. Delete the user who signed up most recently.
+result = model("User").deleteOne(order="signupDate DESC");
+
+// 2. Delete the oldest unpaid invoice for a given customer.
+result = model("Invoice").deleteOne(
+	where="customerId=#params.customerId# AND status='unpaid'",
+	order="createdAt ASC"
+);
+
+// 3. Permanently delete a soft-deletable record (bypass soft-delete behaviour).
+result = model("User").deleteOne(
+	where="status='banned'",
+	order="createdAt ASC",
+	softDelete=false
+);
+
+// 4. If you have a `hasOne` association set up from `User` to `Profile` you can do a scoped call.
+// The `deleteProfile` method will call `model("Profile").deleteOne(where="userId=#aUser.id#")` internally.
+aUser = model("User").findByKey(params.userId);
+aUser.deleteProfile();

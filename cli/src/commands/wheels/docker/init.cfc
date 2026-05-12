@@ -28,36 +28,90 @@ component extends="DockerCommand" {
         string db="mysql",
         string dbVersion="",
         string cfengine="lucee",
-        string cfVersion="6",
+        string cfVersion="",
         string port="",
         boolean force=false,
         boolean production=false,
         boolean nginx=false
     ) {
         requireWheelsApp(getCWD());
-        arguments = reconstructArgs(
-            argStruct=arguments,
-            allowedValues={
-                db: ["h2", "sqlite", "mysql", "postgres", "mssql", "oracle"],
-                cfengine: ["lucee", "adobe"]
-            }
-        );
+        // Allowed values
+        var allowedValues = {
+            db: ["h2", "sqlite", "mysql", "postgres", "mssql", "oracle"],
+            cfengine: ["lucee", "adobe"]
+        };
+
+        // Validate db and cfengine
+        arguments = reconstructArgs(argStruct=arguments, allowedValues=allowedValues);
+
+        // Define CF defaults and allowed versions
+        var cfDefaults = {
+            lucee: { default: "6", versions: ["6", "7"] },
+            adobe: { default: "2018", versions: ["2018", "2021", "2023", "2025"] } // default is 2018
+        };
+
+        if (len(arguments.cfengine) && !len(arguments.cfVersion)) {
+            arguments.cfVersion = cfDefaults[arguments.cfengine].default;
+        }
+
+        // Validate cfVersion
+        if (!arrayContains(cfDefaults[arguments.cfengine].versions, arguments.cfVersion)) {
+            detailOutput.error("Invalid cfVersion: #arguments.cfVersion# for cfengine: #arguments.cfengine#");
+            detailOutput.statusInfo("Valid cfVersions for #arguments.cfengine# are: " & ArrayToList(cfDefaults[arguments.cfengine].versions, ", "));
+            detailOutput.line();
+            return;
+        }
+        
         // Welcome message
         detailOutput.header("Wheels Docker Configuration");
 
+        // Docker name regex (lowercase, numbers, ., _, - allowed)
+        local.dockerNamePattern = "^[a-z0-9]+([._-][a-z0-9]+)*$";
+
         // Interactive prompts for Deployment Configuration
-        local.appName = ask("Application Name (default: #listLast(getCWD(), '\/')#): ");
+        local.appName = ask("Application Name (default: #lcase(listLast(getCWD(), '\/'))#): ");
         if (!len(trim(local.appName))) {
-            local.appName = listLast(getCWD(), '\/');
+            local.appName = lcase(listLast(getCWD(), '\/'));
+        }
+
+        // Validate appName
+        if (!reFind(local.dockerNamePattern, local.appName)) {
+            detailOutput.error("Invalid appName: #local.appName#");
+            detailOutput.statusInfo("appName must be lowercase and may contain only letters, numbers, dots (.), underscores (_), and hyphens (-).");
+            detailOutput.line();
+            return;
         }
         
         local.imageName = ask("Docker Image Name (default: #local.appName#): ");
         if (!len(trim(local.imageName))) {
             local.imageName = local.appName;
         }
+
+        // Validate imageName
+        if (!reFind(local.dockerNamePattern, local.imageName)) {
+            detailOutput.error("Invalid imageName: #local.imageName#");
+            detailOutput.statusInfo("imageName must be lowercase and may contain only letters, numbers, dots (.), underscores (_), and hyphens (-).");
+            detailOutput.line();
+            return;
+        }
+
+        local.imageTag = ask("Docker Image Tag (default: latest): ");
+        if (!len(trim(local.imageTag))) {
+            local.imageTag = "latest";
+        }
+
+        // Simple tag validation (Docker-safe)
+        local.tagPattern = "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$";
+
+        if (!reFind(local.tagPattern, local.imageTag)) {
+            detailOutput.error("Invalid imageTag: #local.imageTag#");
+            detailOutput.statusInfo("Tag may contain letters, numbers, dots (.), underscores (_), and hyphens (-).");
+            detailOutput.line();
+            return;
+        }
         
         detailOutput.subHeader("Production Server Configuration");
-        local.serverHost = ask("Server Host/IP (e.g. 192.168.1.10): ");
+        local.serverHost = ask("Server Host/IP (e.g. 192.168.1.10) (default: localhost): ");
         local.serverUser = "";
         
         if (len(trim(local.serverHost))) {
@@ -118,12 +172,12 @@ component extends="DockerCommand" {
         // Create Docker configuration files
         detailOutput.subHeader("Creating Docker Configuration Files");        
         createDockerfile(arguments.cfengine, arguments.cfVersion, local.appPort, arguments.db, arguments.production);
-        createDockerCompose(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion, local.appPort, arguments.production, arguments.nginx);
+        createDockerCompose(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion, local.appPort, arguments.production, arguments.nginx, local.appName, local.imageName, local.imageTag);
         createDockerIgnore(arguments.production);
         configureDatasource(arguments.db);
         
         // Create Deployment Config
-        createDeployConfig(local.appName, local.imageName, local.serverHost, local.serverUser);
+        createDeployConfig(local.appName, local.imageName, local.imageTag, local.serverHost, local.serverUser);
 
         // Create Nginx configuration if requested
         if (arguments["nginx"]) {
@@ -132,10 +186,11 @@ component extends="DockerCommand" {
 
         detailOutput.line();
         detailOutput.statusSuccess("Docker configuration created successfully!");
-        detailOutput.line();
         detailOutput.statusInfo("To start your Docker environment:");
-        detailOutput.output("docker-compose up -d", true);
-        detailOutput.line();
+        detailOutput.nextSteps([
+            "Run wheels docker build to build the Docker images",
+            "Run wheels docker deploy to start the containers"
+        ]);
     }
 
     private function createDockerfile(string cfengine, string cfVersion, numeric appPort, string db, boolean production=false) {
@@ -213,7 +268,18 @@ CMD ["box", "server", "start", "--console", "--force"]';
         detailOutput.create("Dockerfile");
     }
 
-    private function createDockerCompose(string db, string dbVersion, string cfengine, string cfVersion, numeric appPort, boolean production=false, boolean nginx=false) {
+    private function createDockerCompose(
+        string db, 
+        string dbVersion, 
+        string cfengine, 
+        string cfVersion, 
+        numeric appPort, 
+        boolean production=false, 
+        boolean nginx=false,
+        string appName,
+        string imageName,
+        string imageTag
+    ) {
         local.dbService = '';
         local.dbEnvironment = '';
 
@@ -343,9 +409,9 @@ CMD ["box", "server", "start", "--console", "--force"]';
             local.volumes = '
     volumes:
       - .:/app
-      - ../../../core/src/wheels:/app/vendor/wheels
-      - ../../../docs:/app/vendor/wheels/docs
-      - ../../../tests:/app/tests';
+      - ./vendor/wheels:/app/vendor/wheels
+      - ./docs:/app/vendor/wheels/docs
+      - ./tests:/app/tests';
         }
 
         // Build app depends_on based on database
@@ -357,10 +423,12 @@ CMD ["box", "server", "start", "--console", "--force"]';
         }
 
         // Build app service
-        local.composeContent = 'version: "3.8"
+        local.composeContent = '
 
 services:
   app:
+    container_name: #arguments.appName#
+    image: #arguments.imageName#:#arguments.imageTag#
     build: .#local.appPorts#
     environment:
       ENVIRONMENT: #local.envMode##local.dbEnvironment##local.volumes##local.restartPolicy##local.appDependsOn#';
@@ -722,13 +790,19 @@ http {
         }
     }
 
-    private function createDeployConfig(string appName, string imageName, string serverHost, string serverUser) {
+    private function createDeployConfig(
+        string appName, 
+        string imageName,
+        string imageTag, 
+        string serverHost, 
+        string serverUser
+    ) {
         if (!directoryExists(fileSystemUtil.resolvePath("config"))) {
             directoryCreate(fileSystemUtil.resolvePath("config"));
         }
         
         local.deployContent = "name: #arguments.appName#
-image: #arguments.imageName#
+image: #arguments.imageName#:#arguments.imageTag#
 servers:
 ";
         if (len(trim(arguments.serverHost))) {

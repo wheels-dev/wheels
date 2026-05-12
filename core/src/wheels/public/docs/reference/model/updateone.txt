@@ -1,6 +1,0 @@
-// Sets the `new` property to `1` on the most recently released product
-result = model("product").updateOne(order="releaseDate DESC", new=1);
-
-// If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `removeProfile` method below will call `model("profile").updateOne(where="userId=#aUser.id#", userId="")` internally.)
-aUser = model("user").findByKey(params.userId);
-aUser.removeProfile();

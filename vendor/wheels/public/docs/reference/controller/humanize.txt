@@ -1,0 +1,11 @@
+// 1. Humanize a camelCase string
+result = humanize("wheelsIsAFramework");
+// result -> "Wheels Is A Framework"
+
+// 2. Humanize a string and replace an abbreviation using the except argument
+result = humanize("wheelsIsACfmlFramework", "CFML");
+// result -> "Wheels Is A CFML Framework"
+
+// 3. Humanize a multi-word property name from a model attribute
+result = humanize("firstName");
+// result -> "First Name"

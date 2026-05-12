@@ -1,0 +1,22 @@
+// 1. Get all errors on a model object after a failed validation
+user = model("User").new(username="", password="");
+user.valid();
+errors = user.allErrors();
+// errors ->
+// [
+//   { message: "Username must not be blank.", name: "", property: "username" },
+//   { message: "Password must not be blank.", name: "", property: "password" }
+// ]
+
+// 2. Check for errors and iterate over them
+if (user.hasErrors()) {
+	for (error in user.allErrors()) {
+		writeOutput(error.property & ": " & error.message);
+	}
+}
+
+// 3. Include errors from associated models (e.g. a user with associated profile)
+user = model("User").findOne(where="id=1", include="profile");
+user.valid();
+allErrors = user.allErrors(includeAssociations=true);
+// allErrors contains errors from both user and its associated profile model

@@ -1,4 +1,0 @@
-<!--- View Code --->
-#startFormTag(action="create")#
-    <!--- your form controls --->
-#endFormTag()#

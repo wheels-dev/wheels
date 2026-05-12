@@ -1,0 +1,22 @@
+// 1. Validate that a credit card number is in the correct format
+validatesFormatOf(property="creditCard", type="creditcard");
+
+// 2. Validate an email address using a regular expression
+validatesFormatOf(property="email", type="email");
+
+// 3. Validate a US phone number with a custom regex and allow blank values
+validatesFormatOf(
+	property="phone",
+	regEx="^\d{3}-\d{3}-\d{4}$",
+	allowBlank=true,
+	message="[property] must be in the format 555-867-5309."
+);
+
+// 4. Validate that an email ends with `.se` only when a condition is met and it's not Sunday
+validatesFormatOf(
+	property="email",
+	regEx="^.*@.*\.se$",
+	condition="ipCheck()",
+	unless="DayOfWeek() eq 1",
+	message="Sorry, you must have a Swedish email address to use this website."
+);

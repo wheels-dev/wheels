@@ -1,0 +1,32 @@
+component extends="wheels.Mailer" {
+
+	/**
+	 * Send welcome email to a new user.
+	 */
+	public void function sendWelcome(required any user) {
+		mail(
+			to=arguments.user.email,
+			from="noreply@example.com",
+			subject="Welcome to the app!",
+			template="/app/views/mailers/user/welcome",
+			layout="/app/views/mailers/layout",
+			user=arguments.user
+		);
+	}
+
+	/**
+	 * Send password reset instructions.
+	 */
+	public void function sendPasswordReset(required any user, required string token) {
+		mail(
+			to=arguments.user.email,
+			from="noreply@example.com",
+			subject="Password Reset",
+			template="/app/views/mailers/user/password_reset",
+			layout="/app/views/mailers/layout",
+			user=arguments.user,
+			token=arguments.token
+		);
+	}
+
+}

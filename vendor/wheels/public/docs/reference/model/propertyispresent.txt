@@ -1,0 +1,13 @@
+// 1. Check if a non-blank property is present
+employee = model("Employee").new();
+employee.firstName = "Jane";
+writeOutput(employee.propertyIsPresent("firstName")); // true
+
+// 2. Returns false when the property is an empty string
+employee = model("Employee").new();
+employee.firstName = "";
+writeOutput(employee.propertyIsPresent("firstName")); // false
+
+// 3. Returns false when the property does not exist on the object
+employee = model("Employee").new();
+writeOutput(employee.propertyIsPresent("nonExistentField")); // false

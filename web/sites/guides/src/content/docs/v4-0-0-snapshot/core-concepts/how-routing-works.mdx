@@ -1,0 +1,82 @@
+---
+title: How Routing Works
+description: URL to action, the algorithm — how .resources() expands, why order matters, and how route model binding loads records before your action runs.
+type: concept
+sidebar:
+  order: 7
+---
+
+Routing is the stage between a URL arriving and a controller method running. The algorithm is small enough to keep in your head, the expansion rules are fixed, and the order of declarations is the order of matching — which makes routing failures easy to reason about once you know the shape.
+
+**You'll learn:**
+
+- The match algorithm the router uses on every request
+- What `.resources("posts")` actually generates
+- The order rules that decide which route wins
+- How route model binding loads records before the action runs
+- Why named routes are the right way to build URLs
+
+## The match algorithm
+
+The router walks `config/routes.cfm` top-to-bottom on every request. The first route whose HTTP method and URL pattern both match the request wins — and that's the match, even if a more specific route appears later. There is no scoring, no backtracking, no "best fit."
+
+Resource and namespaced declarations are not matched as a unit. They expand at boot time into plain routes that sit in the same ordered list as your hand-written `.get()` and `.post()` calls. A `.resources("posts")` is seven entries in the table, registered in a fixed order. The wildcard route catches anything that falls through and maps `/controller/action` conventionally — a legacy pattern kept for upgrade paths. Named routes are the preferred way to wire URLs.
+
+## What `.resources("posts")` expands to
+
+One call generates seven routes. The names in the right column are what you pass to `linkTo`, `redirectTo`, and `urlFor`.
+
+| HTTP method | Path | Controller#action | Named route |
+|-------------|------|-------------------|-------------|
+| GET | `/posts` | `posts#index` | `posts` |
+| GET | `/posts/new` | `posts#new` | `newPost` |
+| POST | `/posts` | `posts#create` | (same name `posts`) |
+| GET | `/posts/:key` | `posts#show` | `post` |
+| GET | `/posts/:key/edit` | `posts#edit` | `editPost` |
+| PATCH/PUT | `/posts/:key` | `posts#update` | (same name `post`) |
+| DELETE | `/posts/:key` | `posts#delete` | (same name `post`) |
+
+Two routes can share a named route because the helpers disambiguate by HTTP verb. `linkTo(route="post", key=post.id)` renders a GET link to `show`; `buttonTo(route="post", key=post.id, method="delete")` renders a DELETE button against the same name. You look up by name, the helper picks the verb.
+
+## Order rules
+
+Route order is almost always the cause when a URL matches the wrong action. Four rules cover every case:
+
+- Specific routes come before generic ones. A literal path beats a pattern with a placeholder.
+- `.resources(...)` declarations come before `.root(...)`, which comes before `.wildcard()`. The wildcard is always last.
+- A custom `.get(pattern="/posts/featured", to="posts##featured")` must come **before** `.resources("posts")`, or `/posts/featured` matches the `show` route with `params.key = "featured"` instead.
+- Order within a named-route group doesn't matter for URL generation. Named routes are a keyed lookup — the name is the key, not the position.
+
+```cfm title="illustrative — config/routes.cfm"
+mapper()
+    .get(pattern="/posts/featured", to="posts##featured")
+    .resources("posts")
+    .root(to="home##index", method="get")
+    .wildcard()
+.end();
+```
+
+## Route model binding
+
+With `.resources(name="posts", binding=true)` — or globally via `set(routeModelBinding=true)` in `config/settings.cfm` — the router loads `params.post` from the database before your action runs. The convention is controller `posts` → model `Post` → `params.post`; override with `binding="BlogPost"` when the controller name doesn't singularize cleanly to the model. The helper runs after route dispatch but before `beforeAction` filters, so filters and actions both see the resolved instance.
+
+Member actions (`show`, `edit`, `update`, `delete`) see a pre-populated `params.post` ready to use. If the record doesn't exist, the dispatcher raises `Wheels.RecordNotFound` and renders a 404 — the controller action never runs. Without `binding=true`, `params.post` is undefined and you're expected to call `findByKey(params.key)` yourself; in development mode the framework logs a warning at dispatch time when a binding-eligible action is missing its binding.
+
+## Named routes everywhere
+
+Named routes are the one place URLs for a resource are defined, and every helper reads from that same table:
+
+- `linkTo(route="post", key=post.id, text="View")`
+- `redirectTo(route="posts")`
+- `urlFor(route="newPost")`
+- `buttonTo(route="post", key=post.id, method="delete")`
+- `startFormTag(route="post", key=post.id, method="put")`
+
+Rename the resource once in `config/routes.cfm` and every caller updates. That is the whole reason to route by name rather than by hand-written URL string.
+
+## See also
+
+- [The Request Lifecycle](/v4-0-0-snapshot/core-concepts/request-lifecycle/) — routing is stage 2
+- [Middleware Pipeline](/v4-0-0-snapshot/core-concepts/middleware-pipeline/) — runs before the router
+- [Routing](/v4-0-0-snapshot/basics/routing/) — hands-on how-to
+- [Controllers and Actions](/v4-0-0-snapshot/basics/controllers-and-actions/) — where route params land

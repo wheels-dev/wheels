@@ -1,2 +1,0 @@
-<!--- Basic usage usually involves a `name` and `value` --->
-#hiddenFieldTag(name="userId", value=user.id)#

@@ -84,8 +84,8 @@ component aliases='wheels g property'  extends="../base"  {
     	detailOutput.invoke("dbmigrate");
 		command('wheels dbmigrate create column')
 			.params(
-				name=obj.objectNamePlural,
-				columnName=lcase(arguments.columnName),
+				name=lcase(arguments.columnName),
+				tableName=obj.objectNamePlural,
 				dataType=arguments.dataType,
 				default=arguments.default,
 				allowNull=arguments.allowNull,

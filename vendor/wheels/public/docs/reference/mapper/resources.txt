@@ -1,0 +1,37 @@
+<cfscript>
+
+mapper()
+    // 1. Basic CRUD resource — generates index, show, new, create, edit, update, delete routes
+    .resources("admins")
+
+    // 2. Point authors URL to controller at `app/controllers/Users.cfc`
+    .resources(name="authors", controller="users")
+
+    // 3. Limit routes to a specific set with the `only` argument
+    .resources(name="products", only="index,show,edit,update")
+
+    // 4. Exclude specific routes using the `except` argument
+    .resources(name="orders", except="delete")
+
+    // 5. Nested resources — child routes receive parent key in URL (e.g. /stories/1/heroes)
+    .resources(name="stories", nested=true)
+        .resources("heroes")
+        .resources("villains")
+    .end()
+
+    // 6. Override the URL path (e.g. /blog-posts/options instead of /blog-posts-options)
+    .resources(name="blogPostsOptions", path="blog-posts/options")
+
+    // 7. Shallow nesting — member routes (show, edit, update, delete) drop the parent prefix
+    .resources(name="posts", nested=true, shallow=true)
+        .resources("comments")
+    .end()
+
+    // 8. Constrain URL parameters to a specific pattern (e.g. numeric IDs only)
+    .resources(name="photos", constraints={key="[0-9]+"})
+
+    // 9. Override the singularized form when auto-detection is wrong
+    .resources(name="people", singular="person")
+.end();
+
+</cfscript>

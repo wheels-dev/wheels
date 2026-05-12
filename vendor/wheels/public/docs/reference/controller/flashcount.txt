@@ -1,0 +1,13 @@
+// 1. Check how many keys are currently in the Flash
+count = flashCount();
+// count -> 0 (Flash is empty), or a positive integer when keys exist
+
+// 2. Only render a Flash notice section when there is something to show
+if (flashCount()) {
+    writeOutput("You have " & flashCount() & " flash message(s).");
+}
+
+// 3. Use alongside flashIsEmpty() — flashCount() powers the isEmpty check
+flashInsert(notice="Saved successfully", warning="Check your email");
+count = flashCount();
+// count -> 2

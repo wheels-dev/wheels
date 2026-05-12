@@ -1,24 +1,24 @@
 {
-    "name":"CFWheels JS Confirm",
+    "name":"Wheels JS Confirm",
     "version":"1.0.5",
     "author":"Per Djurner",
-    "location":"perdjurner/cfwheels-js-confirm#v1.0.5",
+    "location":"perdjurner/wheels-js-confirm#v1.0.5",
     "directory":"/plugins/",
     "createPackageDirectory":true,
     "packageDirectory":"jsconfirm",
-    "homepage":"https://github.com/perdjurner/cfwheels-js-confirm",
+    "homepage":"https://github.com/perdjurner/wheels-js-confirm",
     "documentation":"",
     "repository":{
         "type":"",
         "URL":""
     },
     "bugs":"",
-    "slug":"cfwheels-js-confirm",
-    "shortDescription":"JS Confirm - CFWheels Plugin",
+    "slug":"wheels-js-confirm",
+    "shortDescription":"JS Confirm - Wheels Plugin",
     "description":"",
     "instructions":"",
     "changelog":"",
-    "type":"cfwheels-plugins",
+    "type":"wheels-plugins",
     "keywords":[
         
     ],

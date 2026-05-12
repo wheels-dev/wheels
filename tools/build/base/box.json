@@ -35,24 +35,19 @@
 			"wheels-plugins":"vendor/"
 		},
     "installPaths":{
-        "wheels-core":"vendor/wheels/",
-				"wirebox":"vendor/wirebox/",
-				"testbox":"vendor/testbox/"
+        "wheels-core":"vendor/wheels/"
     },
     "dependencies":{
-        "wheels-core":"@build.version@",
-				"wirebox":"^7",
-				"testbox":"^6"
+        "wheels-core":"@build.version@"
     },
     "private":false,
     "license":[
         {
             "type":"Apache License 2.0",
-            "URL":"https://github.com/wheels-dev/wheels/blob/master/LICENSE"
+            "URL":"https://github.com/wheels-dev/wheels/blob/main/LICENSE"
         }
     ],
     "scripts":{
-        "postPublish":"!git push --follow-tags",
         "postInstall":"pathExists .env || cp env.example .env && mv env.example .env.example",
         "format":"cfformat run config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc --overwrite",
         "format:check":"cfformat check config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc",

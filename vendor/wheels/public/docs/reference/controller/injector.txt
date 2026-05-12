@@ -1,0 +1,18 @@
+// 1. Register a singleton service in `config/services.cfm` (one instance per app lifetime)
+di = injector();
+di.map("emailService").to("app.lib.EmailService").asSingleton();
+
+// 2. Bind an interface name to a concrete implementation
+di = injector();
+di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+
+// 3. Register a request-scoped service (one instance per HTTP request)
+di = injector();
+di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+
+// 4. Inspect or resolve at runtime
+di = injector();
+if (di.containsInstance("emailService")) {
+    mailer = di.getInstance("emailService");
+    mailer.send(to="user@example.com", subject="Welcome");
+}

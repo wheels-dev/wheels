@@ -1,0 +1,110 @@
+# Deploy subsystem CI gate
+#
+# Runs the CLI test suite plus the deploy-specific harness scripts on any
+# PR/push that touches the wheels-deploy subsystem (cli/lucli/services/deploy/**,
+# cli/lucli/lib/deploy/**, fixtures, helpers, or the tooling itself).
+#
+# This is narrower than the broader `pr.yml` fast-test workflow, which runs
+# the core framework test suite on every PR against `develop`. Keeping this
+# one path-scoped means framework-only edits don't re-run the (slower) deploy
+# matrix, and deploy-subsystem edits pick up an extra gate.
+#
+# Prerequisites (already present in this repo's CI):
+#   - LuCLI install recipe mirrors .github/workflows/pr.yml (cybersonic/LuCLI release).
+#   - Java 21 via actions/setup-java@v5.
+#
+# Gating model:
+#   1. cli-tests              - runs `tools/test-cli-local.sh`, must be 365+/0/0.
+#   2. deploy-config-diff     - informational (`continue-on-error: true`).
+#      The script expects Ruby Kamal on PATH *and* a routable `wheels deploy`.
+#      Neither is wired in CI yet, so this step's exit 1 is expected and
+#      non-gating until the `wheels` binary routes to this worktree's Module.cfc.
+#   3. deploy-verb-smoke      - calls `tools/deploy-verb-smoke.sh`, which already
+#      exits 0 with a warning when `wheels deploy` is unreachable. So this step
+#      is a no-op today, and becomes a real gate automatically the moment the
+#      LuCLI/Module.cfc routing lands.
+#
+# See `docs/superpowers/plans/2026-04-21-phase1-retrospective.md` for the
+# full deploy-gap write-up.
+
+name: Deploy Subsystem CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'cli/lucli/services/deploy/**'
+      - 'cli/lucli/lib/deploy/**'
+      - 'cli/lucli/templates/deploy/**'
+      - 'cli/lucli/tests/_fixtures/deploy/**'
+      - 'cli/lucli/tests/specs/deploy/**'
+      - 'cli/lucli/tests/_helpers/DeployShellHelper.cfc'
+      - 'cli/lucli/Module.cfc'
+      - 'tools/deploy-*.sh'
+      - 'tools/deploy-dry-run-normalize.py'
+      - 'tools/test-cli-local.sh'
+      - '.github/workflows/deploy-ci.yml'
+  pull_request:
+    paths:
+      - 'cli/lucli/services/deploy/**'
+      - 'cli/lucli/lib/deploy/**'
+      - 'cli/lucli/templates/deploy/**'
+      - 'cli/lucli/tests/_fixtures/deploy/**'
+      - 'cli/lucli/tests/specs/deploy/**'
+      - 'cli/lucli/tests/_helpers/DeployShellHelper.cfc'
+      - 'cli/lucli/Module.cfc'
+      - 'tools/deploy-*.sh'
+      - 'tools/deploy-dry-run-normalize.py'
+      - 'tools/test-cli-local.sh'
+      - '.github/workflows/deploy-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-gate:
+    name: "Deploy CLI tests + verb smoke"
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      LUCLI_VERSION: "0.3.7"
+      WHEELS_CI: "true"
+      PORT: "8080"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+          lucli --version
+
+      - name: Create test databases
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
+          sqlite3 wheelstestdb.db "SELECT 1;"
+          sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+
+      - name: Run CLI test suite
+        run: bash tools/test-cli-local.sh
+
+      - name: Run deploy-config-diff (informational)
+        continue-on-error: true
+        run: |
+          bash tools/deploy-config-diff.sh \
+            || echo "deploy-config-diff: informational, non-gating (expected until 'wheels deploy' routes in CI)"
+
+      - name: Run deploy-verb-smoke (gates when wheels deploy reachable)
+        run: bash tools/deploy-verb-smoke.sh
+
+      - name: Debug server logs
+        if: failure()
+        run: |
+          cat /tmp/wheels-cli-test-server.log 2>/dev/null || true

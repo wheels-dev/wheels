@@ -1,2 +1,0 @@
-<!--- Provide an `objectName` and `property` --->
-#hiddenField(objectName="user", property="id")#

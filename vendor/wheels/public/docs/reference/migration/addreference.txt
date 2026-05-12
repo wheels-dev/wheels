@@ -1,0 +1,17 @@
+// 1. Add a foreign key from comments.postId to posts.id using a reference name
+// Equivalent to: addForeignKey(table="comments", referenceTable="posts", column="postId", referenceColumn="id")
+addReference(table="comments", referenceName="post");
+
+// 2. Add a foreign key from order_items.orderId to orders.id
+addReference(table="order_items", referenceName="order");
+
+// 3. Use addReference in a migration's up() and undo it with dropReference() in down()
+// In your migration CFC:
+//
+// public void function up() {
+//     addReference(table="comments", referenceName="post");
+// }
+//
+// public void function down() {
+//     dropReference(table="comments", referenceName="post");
+// }

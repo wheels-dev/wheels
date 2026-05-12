@@ -1,8 +1,0 @@
-// Get an object, set a value and then see if the property exists
-employee = model("employee").new();
-employee.firstName = "dude";
-employee.hasProperty("firstName"); // returns true
-
-// This is also a dynamic method that you could do
-employee.hasFirstName();
-

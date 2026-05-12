@@ -1,0 +1,8 @@
+{
+	"name": "wheels-nomixin",
+	"version": "1.0.0",
+	"description": "Test fixture: valid package with no mixin targets",
+	"provides": {
+		"mixins": "none"
+	}
+}

@@ -1,0 +1,17 @@
+// 1. Verify that the `handleForm` action is always a POST request.
+verifies(only="handleForm", post=true);
+
+// 2. Verify that the `edit` action is a GET request, that `userId` exists in `params`, and that it is an integer.
+verifies(only="edit", get=true, params="userId", paramsTypes="integer");
+
+// 3. Same as above, but invoke a custom handler function on failure instead of aborting.
+verifies(only="edit", get=true, params="userId", paramsTypes="integer", handler="accessDenied");
+
+// 4. Same verification, but redirect to the `index` action with a flash error message on failure.
+verifies(only="edit", get=true, params="userId", paramsTypes="integer", action="index", error="Invalid userId");
+
+// 5. Verify that a session variable named `userId` exists for all actions except `login` and `register`.
+verifies(except="login,register", session="userId");
+
+// 6. Verify that the `subscribe` action is an AJAX POST request and that `email` exists in `params` as a valid email address.
+verifies(only="subscribe", ajax=true, post=true, params="email", paramsTypes="email");

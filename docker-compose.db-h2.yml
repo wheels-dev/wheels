@@ -1,0 +1,18 @@
+# H2 (embedded) database profile for Wheels development
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml -f docker-compose.db-h2.yml up
+#
+# Configures the "wheels-dev" datasource to use an embedded H2 database.
+# No external service is needed — H2 runs inside the CFML engine process.
+# Data is stored in a named volume so it persists across restarts.
+
+services:
+  app:
+    environment:
+      - BOX_SERVER_CFCONFIGFILE=tools/docker/dev/cfconfig-h2.json
+    volumes:
+      - h2_data:/app/db
+
+volumes:
+  h2_data:

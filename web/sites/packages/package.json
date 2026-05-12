@@ -1,0 +1,31 @@
+{
+	"name": "@wheels-dev/site-packages",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"license": "Apache-2.0",
+	"scripts": {
+		"dev": "astro dev --port 4325",
+		"build": "astro build",
+		"preview": "astro preview",
+		"check": "astro check",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@astrojs/sitemap": "^3.7.2",
+		"@shikijs/rehype": "^3.3.0",
+		"@wheels-dev/ui": "workspace:*",
+		"astro": "^6.3.1",
+		"rehype-sanitize": "^6.0.0",
+		"rehype-stringify": "^10.0.1",
+		"remark-gfm": "^4.0.1",
+		"remark-parse": "^11.0.0",
+		"remark-rehype": "^11.1.2",
+		"unified": "^11.0.5"
+	},
+	"devDependencies": {
+		"@astrojs/check": "^0.9.4",
+		"typescript": "^5.7.2",
+		"vitest": "^2.1.9"
+	}
+}

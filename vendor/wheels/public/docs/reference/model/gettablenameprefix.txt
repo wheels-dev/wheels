@@ -1,0 +1,13 @@
+// 1. Use the table name prefix when running a custom query inside a model method
+function getDisabledUsers() {
+	local.q = queryExecute(
+		"SELECT * FROM #this.getTableNamePrefix()#users WHERE disabled = 1",
+		[],
+		{datasource: get("dataSourceName")}
+	);
+	return local.q;
+}
+
+// 2. Log the configured prefix to verify model setup
+prefix = model("User").getTableNamePrefix();
+// prefix -> "app_" (or "" if none is set)

@@ -1,0 +1,113 @@
+// 1. Basic usage: paginate a custom query inside a model method, letting the CFML engine handle pagination
+// In app/models/User.cfc
+function searchByName(required string name, numeric page = 1, numeric perPage = 25) {
+	local.allMatches = QueryExecute(
+		"SELECT * FROM users WHERE firstName LIKE :name ORDER BY lastName",
+		{ name = { value = "%" & arguments.name & "%", cfsqltype = "cf_sql_varchar" } },
+		{ datasource = get("dataSourceName") }
+	);
+	setPagination(
+		totalRecords = local.allMatches.recordCount,
+		currentPage  = arguments.page,
+		perPage      = arguments.perPage,
+		handle       = "userSearch"
+	);
+	return local.allMatches;
+}
+
+// In app/controllers/Users.cfc
+function search() {
+	param name="params.page"    default="1";
+	param name="params.perPage" default="25";
+	searchResults = model("User").searchByName(
+		name    = params.q,
+		page    = params.page,
+		perPage = params.perPage
+	);
+	paginationData = pagination("userSearch");
+}
+
+<!--- In app/views/users/search.cfm --->
+<!--- Use startRow / endRow to page through the full query result --->
+<ul>
+	<cfloop query="searchResults"
+	        startRow="#paginationData.startRow#"
+	        endRow="#paginationData.endRow#">
+		<li>#searchResults.firstName# #searchResults.lastName#</li>
+	</cfloop>
+</ul>
+#paginationLinks(handle="userSearch")#
+
+// 2. Database-level pagination: run a COUNT query and a page-slice query separately
+// In app/models/Article.cfc
+function pagedResults(numeric page = 1, numeric perPage = 10) {
+	local.countQuery = QueryExecute(
+		"SELECT COUNT(*) AS total FROM articles WHERE publishedAt IS NOT NULL",
+		[],
+		{ datasource = get("dataSourceName") }
+	);
+	local.pageQuery = QueryExecute(
+		"SELECT * FROM articles WHERE publishedAt IS NOT NULL ORDER BY publishedAt DESC LIMIT :perPage OFFSET :offset",
+		{
+			perPage = { value = arguments.perPage, cfsqltype = "cf_sql_integer" },
+			offset  = { value = (arguments.page - 1) * arguments.perPage, cfsqltype = "cf_sql_integer" }
+		},
+		{ datasource = get("dataSourceName") }
+	);
+	// Use the COUNT result so paginationLinks reflects the total, not just this page
+	setPagination(
+		totalRecords = local.countQuery.total,
+		currentPage  = arguments.page,
+		perPage      = arguments.perPage,
+		handle       = "articles"
+	);
+	return local.pageQuery;
+}
+
+// In app/controllers/Articles.cfc
+function index() {
+	param name="params.page"    default="1";
+	param name="params.perPage" default="10";
+	articles = model("Article").pagedResults(
+		page    = params.page,
+		perPage = params.perPage
+	);
+}
+
+<!--- In app/views/articles/index.cfm --->
+<ul>
+	<cfloop query="articles">
+		<li>#articles.title#</li>
+	</cfloop>
+</ul>
+#paginationLinks(handle="articles")#
+
+// 3. Use the default handle name so paginationLinks() needs no handle argument
+// In app/models/Product.cfc
+function featured(numeric page = 1) {
+	local.q = QueryExecute(
+		"SELECT * FROM products WHERE featured = 1 ORDER BY name",
+		[],
+		{ datasource = get("dataSourceName") }
+	);
+	// Omitting handle defaults it to "query", matching paginationLinks() default
+	setPagination(totalRecords = local.q.recordCount, currentPage = arguments.page);
+	return local.q;
+}
+
+// In app/controllers/Products.cfc
+function index() {
+	param name="params.page" default="1";
+	products     = model("Product").featured(page = params.page);
+	pagingData   = pagination(); // uses default handle "query"
+}
+
+<!--- In app/views/products/index.cfm --->
+<ul>
+	<cfloop query="products"
+	        startRow="#pagingData.startRow#"
+	        endRow="#pagingData.endRow#">
+		<li>#products.name#</li>
+	</cfloop>
+</ul>
+#paginationLinks()#

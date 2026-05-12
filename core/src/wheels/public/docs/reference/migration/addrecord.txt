@@ -1,8 +1,0 @@
-addRecord(table='people',
-		id = 1,
-		title = "Mr",
-		firstname = "Bruce",
-		lastname = "Wayne", 
-		email = "bruce@wayneenterprises.com",
-		tel = "555-67869099", 
-);

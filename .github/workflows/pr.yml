@@ -1,16 +1,199 @@
 name: Wheels Pull Requests
 
 on:
-#  push:
-#    branches-ignore:
-#      - "main"
-#      - "develop"
   pull_request:
     branches:
       - develop
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
-  tests:
-    uses: ./.github/workflows/tests.yml
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  commitlint:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - run: npm ci
+      - name: Validate commits
+        run: npx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+  fast-test:
+    name: "Lucee 7 + SQLite (LuCLI)"
+    runs-on: ubuntu-latest
+    env:
+      LUCLI_VERSION: "0.3.7"
+      WHEELS_CI: "true"
+      WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
+      WHEELS_BROWSER_CI_ENABLE: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+          lucli --version
+
+      - name: Create test databases
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
+          sqlite3 wheelstestdb.db "SELECT 1;"
+          sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+
+      - name: Cache Playwright
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.wheels/browser/lib
+            ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('vendor/wheels/browser-manifest.json') }}
+          restore-keys: |
+            playwright-
+
+      - name: Install Playwright
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.wheels/browser/lib
+
+          # Download JARs from manifest
+          for row in $(jq -c '.classpath[]' vendor/wheels/browser-manifest.json); do
+            URL=$(echo "$row" | jq -r '.url')
+            FILE=$(echo "$row" | jq -r '.filename')
+            SHA=$(echo "$row" | jq -r '.sha256')
+
+            echo "Downloading ${FILE}..."
+            curl -sL "$URL" -o ~/.wheels/browser/lib/"$FILE"
+
+            ACTUAL=$(sha256sum ~/.wheels/browser/lib/"$FILE" | cut -d' ' -f1)
+            if [ "$ACTUAL" != "$SHA" ]; then
+              echo "::error::SHA-256 mismatch for ${FILE}: expected ${SHA}, got ${ACTUAL}"
+              exit 1
+            fi
+          done
+
+          # Build classpath and install Chromium + system deps
+          CP=$(ls ~/.wheels/browser/lib/*.jar | tr '\n' ':')
+          java -cp "$CP" com.microsoft.playwright.CLI install --with-deps chromium
+
+      - name: Download SQLite JDBC driver
+        run: |
+          curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
+            -o /tmp/sqlite-jdbc.jar
+
+      - name: Start Lucee server
+        run: |
+          cp tools/ci/lucee.ci.json lucee.json
+
+          # Start server (downloads Lucee Express on first run)
+          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+
+          echo "Waiting for Lucee to start..."
+          for i in $(seq 1 120); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee is up (attempt ${i})"
+              break
+            fi
+            if ! kill -0 $(cat /tmp/lucli-server.pid) 2>/dev/null; then
+              echo "::error::LuCLI server process died"
+              cat /tmp/lucli-server.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Install SQLite JDBC into Lucee
+        run: |
+          # Find where LuCLI placed the Lucee Express lib directory
+          LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
+          if [ -z "$LUCEE_LIB" ]; then
+            LUCEE_LIB=$(find ~/.lucli/express -maxdepth 2 -name "lib" -type d 2>/dev/null | head -1)
+          fi
+          if [ -n "$LUCEE_LIB" ]; then
+            cp /tmp/sqlite-jdbc.jar "$LUCEE_LIB/"
+            echo "SQLite JDBC installed to: $LUCEE_LIB"
+          else
+            echo "::error::Could not find Lucee lib directory"
+            find ~/.lucli/express -type d | head -20
+            exit 1
+          fi
+
+          # Stop server fully and restart to pick up the new JDBC driver
+          kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          lucli server stop 2>/dev/null || true
+          # Wait for port to be freed
+          for i in $(seq 1 15); do
+            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:60007/" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          # Also kill any lingering java processes on the port
+          fuser -k 60007/tcp 2>/dev/null || true
+          sleep 2
+
+          nohup lucli server run --port=60007 --force > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+
+          echo "Waiting for Lucee to restart..."
+          for i in $(seq 1 60); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee restarted with SQLite JDBC"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run tests
+        run: |
+          mkdir -p /tmp/test-results /tmp/junit-results
+          PORT=60007 \
+          RESULT_DIR=/tmp/test-results \
+          JUNIT_DIR=/tmp/junit-results \
+          bash tools/ci/run-tests.sh
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results-lucee7-sqlite
+          path: /tmp/test-results/
+          if-no-files-found: warn
+
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: junit-lucee7-sqlite
+          path: /tmp/junit-results/
+          if-no-files-found: warn
+
+      - name: Debug server logs
+        if: failure()
+        run: cat /tmp/lucli-server.log 2>/dev/null || true
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
+          lucli server stop 2>/dev/null || true

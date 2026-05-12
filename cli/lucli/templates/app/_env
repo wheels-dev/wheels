@@ -1,0 +1,6 @@
+# Environment configuration for {{appName}}
+# Never commit this file to version control.
+
+WHEELS_ENV=development
+WHEELS_DATASOURCE={{datasourceName}}
+RELOAD_PASSWORD={{reloadPassword}}

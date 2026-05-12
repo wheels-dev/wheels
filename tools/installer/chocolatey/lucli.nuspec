@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>lucli</id>
+    <version>0.2.23</version>
+    <title>LuCLI - Lucee CLI</title>
+    <authors>Mark Drew</authors>
+    <owners>wheels-dev</owners>
+    <projectUrl>https://github.com/cybersonic/LuCLI</projectUrl>
+    <licenseUrl>https://github.com/cybersonic/LuCLI/blob/main/LICENSE</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/wheels-dev/wheels/develop/web/packages/ui/src/assets/wheels-logo-mark.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>LuCLI is a fast, native Lucee CLI for running CFML from the command line. It powers the Wheels framework CLI (`wheels` command) for code generation, migrations, testing, and MCP-based AI editor integration.
+
+Install the Wheels module after installing LuCLI:
+  lucli modules install wheels
+
+Key features:
+- Sub-second startup (vs 3-5s for CommandBox)
+- ~40 MB install size (vs ~200 MB)
+- Built-in MCP support for AI editors (Claude Code, Cursor, VS Code)
+- Lucee module system for extensibility
+- Drop-in replacement for CommandBox Wheels CLI</description>
+    <summary>Fast Lucee-native CLI for CFML development and the Wheels framework</summary>
+    <releaseNotes>https://github.com/cybersonic/LuCLI/releases</releaseNotes>
+    <tags>lucli lucee cfml wheels cli development framework mvc</tags>
+    <packageSourceUrl>https://github.com/wheels-dev/wheels/tree/develop/tools/installer/chocolatey</packageSourceUrl>
+    <docsUrl>https://wheels.dev/command-line-tools/cli-overview</docsUrl>
+    <bugTrackerUrl>https://github.com/cybersonic/LuCLI/issues</bugTrackerUrl>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

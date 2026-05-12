@@ -89,8 +89,8 @@ component aliases="wheels plugin init" extends="../base" {
                 "version": arguments.version,
                 "author": arguments.author,
                 "slug": pluginName,
-                "type": "cfwheels-plugins",
-                "keywords": "cfwheels,wheels,plugin",
+                "type": "wheels-plugins",
+                "keywords": "wheels,plugin",
                 "homepage": "",
                 "shortDescription": arguments.description,
                 "private": false,
@@ -221,7 +221,7 @@ node_modules/
             fileWrite(pluginDir & "/.gitignore", gitignore);
 
             // Create test file
-            var testFile = 'component extends="wheels.Testbox" {
+            var testFile = 'component extends="wheels.WheelsTest" {
 
     function run() {
         describe("#pluginName# Tests", function() {

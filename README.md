@@ -13,11 +13,15 @@ One of our biggest goals is for you to be able to get up and running with Wheels
 
 ### Quick Start
 
-Create a new Wheels application using the CLI:
+Install the Wheels CLI (Homebrew on macOS and Linux):
 
 ```bash
+brew tap wheels-dev/wheels
+brew install wheels
 wheels new myapp
 ```
+
+The CLI is powered by [LuCLI](https://github.com/cybersonic/LuCLI) — it ships with Lucee and depends only on Java 21, so no CommandBox install is required.
 
 ### Learning Wheels
 
@@ -57,9 +61,7 @@ your-app/
 ├── public/
 ├── tests/
 ├── vendor/
-│   ├── wheels/
-│   ├── wirebox/
-│   └── testbox/
+│   └── wheels/
 └── ...
 ```
 
@@ -69,8 +71,8 @@ This repository contains the complete Wheels ecosystem in a monorepo structure. 
 
 ```
 wheels-monorepo/
-├── cli/                    # Wheels CLI (CommandBox module)
-│   └── src/                # Published as 'wheels-cli'
+├── cli/                    # Wheels CLI (LuCLI-powered)
+│   └── lucli/              # LuCLI module entry point
 ├── core/                   # Framework Core
 │   └── src/wheels/         # Published as 'wheels-core'
 ├── templates/              # Application Templates
@@ -84,13 +86,13 @@ wheels-monorepo/
 ```
 
 **Key Components:**
-- **CLI** (`wheels-cli`): Development tools and generators (CommandBox module)
+- **CLI** (`wheels`): Development tools and generators, distributed via Homebrew and Chocolatey formulas that bundle [LuCLI](https://github.com/cybersonic/LuCLI)
 - **Core** (`wheels-core`): Framework runtime installed in `/vendor/wheels`
-- **Base Template** (`wheels-base-template`): Starting structure downloaded by CLI for new applications
+- **Base Template** (`wheels-base-template`): Starting structure used by the CLI for new applications
 - **Documentation**: Comprehensive guides published to wheels.dev/guides
-- **Build System**: Automated packaging and ForgeBox distribution
+- **Build System**: Automated packaging and release distribution
 
-**Package Flow**: CLI downloads base template from ForgeBox during `wheels new myapp`, which includes dependency on core framework. Documentation is automatically published to wheels.dev/guides. All components are versioned together and distributed as separate ForgeBox packages that work seamlessly together.
+**Package Flow**: the CLI stages the base template when you run `wheels new myapp`, which pulls in the core framework as a dependency. Documentation is automatically published to wheels.dev/guides. All components are versioned together and released through Homebrew, Chocolatey, and GitHub releases.
 
 **For detailed monorepo documentation**, see [MONOREPO.md](MONOREPO.md) which includes:
 - Complete directory structure breakdown
@@ -133,7 +135,7 @@ Please check out our [Contributing Guide][3] for detailed guidelines on how to g
  4. In the gray debug area at the bottom of the page, click the `Run Tests` link next to the version number
     on the `Framework` line.
     
-For multi-engine testing, use our [Docker setup](https://wheels.dev/3.0.0/guides/working-with-wheels/testing-your-application#running-tests-with-docker)
+For multi-engine testing, use our [Docker setup](https://wheels.dev/3.1.0/guides/working-with-wheels/testing-your-application#running-tests-with-docker)
 
 ### Reporting Issues
 
@@ -170,10 +172,12 @@ Wheels supports the following CFML engines:
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).
+
 ---
-**Wheels 3.0** - Now stable! Faster, more organized, and just plain fun to use.
+
+**Wheels 3.0** - Faster, more organized, and just plain fun to use!
 
 [1]: https://wheels.dev/
-[2]: https://wheels.dev/3.0.0/guides/introduction/readme/beginner-tutorial-hello-world
+[2]: https://wheels.dev/3.1.0/guides/introduction/readme/beginner-tutorial-hello-world
 [3]: ./CONTRIBUTING.md
 [4]: https://github.com/wheels-dev/wheels/issues

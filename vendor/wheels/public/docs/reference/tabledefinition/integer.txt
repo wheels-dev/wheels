@@ -1,0 +1,18 @@
+// 1. Add a single integer column to a new table
+t = createTable(name='products');
+	t.string(columnNames='name', limit=255, allowNull=false);
+	t.integer(columnNames='quantity');
+	t.timestamps();
+t.create();
+
+// 2. Add multiple integer columns at once with a default value
+t = createTable(name='scores');
+	t.integer(columnNames='wins,losses,draws', default=0, allowNull=false);
+	t.string(columnNames='playerName', limit=100, allowNull=false);
+	t.timestamps();
+t.create();
+
+// 3. Add an integer column with a limit when altering an existing table
+t = changeTable(name='orders');
+	t.integer(columnNames='itemCount', default=0, allowNull=false, limit=4);
+t.change();

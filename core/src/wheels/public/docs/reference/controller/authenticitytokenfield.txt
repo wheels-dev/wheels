@@ -1,8 +1,0 @@
-<!--- Needed here because we're not using `startFormTag`. --->
-<form action="#urlFor(route='posts')#" method="post">
-  #authenticityTokenField()#
-</form>
-  
-<!--- Not needed here because we're not POSTing the form. --->
-<form action="#urlFor(route='invoices')#" method="get">
-</form>

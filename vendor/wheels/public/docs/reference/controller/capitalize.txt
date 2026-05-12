@@ -1,0 +1,11 @@
+// 1. Capitalize the first character of a sentence
+result = capitalize("wheels is a framework");
+// result -> "Wheels is a framework"
+
+// 2. Capitalize a lowercase word
+result = capitalize("hello");
+// result -> "Hello"
+
+// 3. Returns an already-capitalized string unchanged
+result = capitalize("CFWheels");
+// result -> "CFWheels"

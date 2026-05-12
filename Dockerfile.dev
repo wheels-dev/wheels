@@ -1,0 +1,42 @@
+# Wheels Development Dockerfile
+# Optimized for local development with hot-reload via volume mounts.
+# Usage: docker compose -f docker-compose.dev.yml up
+#
+# The host project directory is mounted at /app, so code changes
+# are reflected immediately without rebuilding the image.
+
+FROM ortussolutions/commandbox:latest
+
+LABEL maintainer="Wheels Core Team"
+
+# Development server configuration
+ENV PORT=8080
+ENV APP_DIR="/app"
+ENV BOX_SERVER_PROFILE="development"
+ENV BOX_SERVER_APP_CFENGINE="lucee@6"
+ENV BOX_INSTALL=true
+ENV WHEELS_ENV="development"
+
+# CFConfig: development-friendly defaults
+ENV cfconfig_adminPassword="commandbox"
+
+WORKDIR ${APP_DIR}
+
+# Install CommandBox modules used in development
+RUN box install commandbox-dotenv,commandbox-cfconfig --system
+
+# Copy only dependency manifests first for layer caching.
+# On `docker compose up`, the full project is volume-mounted over /app,
+# so these copies are only used during the initial image build to
+# pre-install dependencies and warm up the server.
+COPY box.json ${APP_DIR}/box.json
+COPY server.json ${APP_DIR}/server.json
+
+# Install project dependencies (cached unless box.json changes)
+RUN box install
+
+# Expose the dev server port
+EXPOSE ${PORT}
+
+# Start CommandBox server in foreground (keeps container alive)
+CMD ["box", "server", "start", "--console"]

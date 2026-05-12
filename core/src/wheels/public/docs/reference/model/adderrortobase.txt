@@ -1,2 +1,0 @@
-// Add an error on the object that's not specific to a single property.
-this.addErrorToBase(message="Your email address must be the same as your domain name.");

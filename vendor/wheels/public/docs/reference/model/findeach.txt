@@ -1,0 +1,29 @@
+// 1. Send a newsletter email to every subscriber one at a time
+model("Subscriber").findEach(callback = function(subscriber) {
+    sendEmail(
+        to = subscriber.email,
+        subject = "Monthly Newsletter",
+        template = "/emails/newsletter",
+        subscriber = subscriber
+    );
+});
+
+// 2. Process users as structs and write a report entry for each one
+model("User").findEach(
+    where = "active = 1",
+    order = "lastName ASC",
+    returnAs = "struct",
+    callback = function(user) {
+        writeLog("Processing user: #user.firstName# #user.lastName#");
+    }
+);
+
+// 3. Archive old orders in smaller batches to reduce memory pressure
+model("Order").findEach(
+    where = "createdAt < '#DateFormat(DateAdd('yyyy', -2, Now()), 'yyyy-mm-dd')#'",
+    batchSize = 250,
+    callback = function(order) {
+        order.archived = true;
+        order.save();
+    }
+);

@@ -1,0 +1,21 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a single route variable to numeric digits only
+    //    The [id] segment will only match values like "1", "42", "1000"
+    .get(name="article", pattern="articles/[id]", to="articles##show")
+    .whereNumber("id")
+
+    // 2. Constrain multiple variables at once using a comma-delimited list
+    //    Both [year] and [month] must contain only digit characters
+    .get(name="archiveMonth", pattern="archive/[year]/[month]", to="posts##archive")
+    .whereNumber("year,month")
+
+    // 3. Chain with other constraint helpers for mixed-type route variables
+    //    [category] must be alphabetic; [id] must be numeric
+    .get(name="categoryItem", pattern="[category]/[id]", to="items##show")
+    .whereAlpha("category")
+    .whereNumber("id")
+.end();
+
+</cfscript>

@@ -1,2 +1,0 @@
-// Get current database version
-currentVersion = application.wheels.migrator.getCurrentMigrationVersion();

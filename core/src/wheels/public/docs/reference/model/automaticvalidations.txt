@@ -1,4 +1,0 @@
-// Disable automatic validations (for example when automatic validations are enabled globally, but we want to disable just for this model).
-config() {
-	automaticValidations(false);
-}

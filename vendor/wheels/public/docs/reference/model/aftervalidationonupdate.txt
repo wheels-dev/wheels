@@ -1,0 +1,26 @@
+// 1. Call a single method after an existing object is validated on update
+// In models/User.cfc:
+component extends="Model" {
+    function config() {
+        afterValidationOnUpdate("stampUpdatedBy");
+    }
+
+    private function stampUpdatedBy() {
+        this.updatedBy = request.currentUserId;
+    }
+}
+
+// 2. Register multiple methods to run after an existing object is validated on update
+component extends="Model" {
+    function config() {
+        afterValidationOnUpdate("normalizeSlug,logValidation");
+    }
+
+    private function normalizeSlug() {
+        this.slug = LCase(Replace(this.title, " ", "-", "all"));
+    }
+
+    private function logValidation() {
+        // custom logging logic here
+    }
+}

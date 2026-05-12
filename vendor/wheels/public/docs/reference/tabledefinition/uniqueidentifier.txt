@@ -1,0 +1,17 @@
+// 1. Add a single UUID column with the default newid() value
+t = createTable(name='sessions');
+	t.uniqueidentifier(columnNames='token');
+	t.timestamps();
+t.create();
+
+// 2. Add a UUID column that allows NULL values
+t = createTable(name='invitations');
+	t.string(columnNames='email', limit=255, allowNull=false);
+	t.uniqueidentifier(columnNames='inviteToken', allowNull=true);
+	t.timestamps();
+t.create();
+
+// 3. Alter an existing table to add multiple UUID columns at once
+t = changeTable(name='documents');
+	t.uniqueidentifier(columnNames='publicId,shareToken', allowNull=false);
+t.change();

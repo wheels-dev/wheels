@@ -1,0 +1,12 @@
+// 1. Basic usage with a simple list of options
+#selectTag(name="color", options="Red,Green,Blue")#
+
+// 2. Use a query as the options source, specifying which columns map to value and display text
+cities = model("City").findAll(order="name");
+#selectTag(name="cityId", options=cities, valueField="id", textField="name")#
+
+// 3. Pre-select a value and include a blank "please choose" option
+#selectTag(name="cityId", options=cities, valueField="id", textField="name", selected=params.cityId, includeBlank="- Select a City -")#
+
+// 4. Allow multiple selections
+#selectTag(name="tagIds", options=model("Tag").findAll(order="name"), valueField="id", textField="name", multiple=true)#

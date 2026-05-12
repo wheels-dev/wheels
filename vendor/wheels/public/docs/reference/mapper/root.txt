@@ -1,0 +1,25 @@
+<cfscript>
+
+// 1. Map the application's web root (home page) to a specific controller action
+mapper()
+    // Map "/" to the `index` action of the `home` controller
+    .root(to="home##index")
+.end();
+
+// 2. Map the root of a namespace scope using separate controller and action arguments
+mapper()
+    .namespace("admin")
+        // Map "/admin/" to the `dashboard` action of the `admin` controller
+        .root(controller="admin", action="dashboard")
+    .end()
+.end();
+
+// 3. Map the root with format matching enabled so ".json" etc. are captured
+mapper()
+    .namespace("api")
+        // Map "/api/" and "/api/.json" (etc.) to the `apis` controller's `index` action
+        .root(to="apis##index", mapFormat=true)
+    .end()
+.end();
+
+</cfscript>

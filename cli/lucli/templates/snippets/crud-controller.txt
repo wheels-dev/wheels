@@ -1,0 +1,62 @@
+component extends="Controller" {
+
+	function config() {
+		// Inherit CSRF protection (and any other defaults) from
+		// app/controllers/Controller.cfc. Skipping super.config() silently
+		// disables protectsFromForgery() for this controller.
+		super.config();
+		verifies(params="key", paramsTypes="integer", only="show,edit,update,delete");
+		filters(through="findRecord", only="show,edit,update,delete");
+	}
+
+	function index() {
+		var page = val(params.page) > 0 ? val(params.page) : 1;
+		records = model("Item").findAll(page=page, perPage=25, order="createdAt DESC");
+	}
+
+	function show() {
+	}
+
+	function new() {
+		record = model("Item").new();
+	}
+
+	function create() {
+		record = model("Item").new(params.item);
+		if (record.save()) {
+			flashInsert(success="Item was created successfully.");
+			redirectTo(action="index");
+		} else {
+			flashInsert(error="There was a problem creating the item.");
+			renderView(action="new");
+		}
+	}
+
+	function edit() {
+	}
+
+	function update() {
+		if (record.update(properties=params.item)) {
+			flashInsert(success="Item was updated successfully.");
+			redirectTo(action="index");
+		} else {
+			flashInsert(error="There was a problem updating the item.");
+			renderView(action="edit");
+		}
+	}
+
+	function delete() {
+		record.delete();
+		flashInsert(success="Item was deleted successfully.");
+		redirectTo(action="index");
+	}
+
+	private function findRecord() {
+		record = model("Item").findByKey(params.key);
+		if (!IsObject(record)) {
+			flashInsert(error="Item not found.");
+			redirectTo(action="index");
+		}
+	}
+
+}

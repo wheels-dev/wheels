@@ -1,0 +1,14 @@
+// 1. Check whether the Flash is empty before rendering a notice area
+if (!flashIsEmpty()) {
+    writeOutput(flash("notice"));
+}
+
+// 2. Insert a message and confirm the Flash is no longer empty
+flashInsert(notice="Record saved successfully.");
+empty = flashIsEmpty();
+// empty -> false
+
+// 3. After clearing the Flash, confirm it is empty again
+flashClear();
+empty = flashIsEmpty();
+// empty -> true

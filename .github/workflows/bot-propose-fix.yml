@@ -1,0 +1,131 @@
+name: Wheels Bot — Propose Fix
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue-number:
+        description: 'Issue number to propose a fix for'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-bot-propose-fix-${{ github.event.issue.number || inputs.issue-number }}
+  cancel-in-progress: false
+
+jobs:
+  propose-fix:
+    name: Propose fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing
+    # `wheels-bot:triage-confidence:high` (bug path) or
+    # `wheels-bot:research-confidence:high` (framework-design path).
+    # workflow_dispatch is preserved for manual reruns.
+    # The bot-identity check is load-bearing: prevents humans from
+    # triggering propose-fix by quoting a marker in a comment reply.
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && (
+        github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'issue_comment'
+            && github.event.comment.user.login == 'wheels-bot[bot]'
+            && (contains(github.event.comment.body, 'wheels-bot:triage-confidence:high')
+                || contains(github.event.comment.body, 'wheels-bot:research-confidence:high')))
+      )
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue-number }}
+      WHEELS_CI: "true"
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: issue
+          target-number: ${{ env.ISSUE_NUMBER }}
+          marker-pattern: 'wheels-bot:fix:${{ env.ISSUE_NUMBER }}|wheels-bot:fix-held:${{ env.ISSUE_NUMBER }}'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Compute branch slug
+        if: steps.gate.outputs.skip == 'false'
+        id: branch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          title=$(gh issue view "$ISSUE_NUMBER" --json title --jq '.title')
+          slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' \
+            | cut -c1-50 \
+            | sed -E 's/-+$//')
+          [[ -z "$slug" ]] && slug="issue"
+          name="fix/bot-${ISSUE_NUMBER}-${slug}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git + create branch
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          git config user.name "wheels-bot[bot]"
+          git config user.email "wheels-bot[bot]@users.noreply.github.com"
+          git checkout -b "${{ steps.branch.outputs.name }}"
+
+      - name: Set up Wheels test environment
+        if: steps.gate.outputs.skip == 'false'
+        uses: ./.github/actions/setup-wheels-test-env
+        with:
+          port: '60007'
+          install-playwright: 'false'
+
+      - name: Run Propose Fix
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          # When un-gated at Phase 4a/4b, this workflow fires from wheels-bot[bot]
+          # comments containing high-confidence triage or research markers. Allow
+          # that bot identity (and github-actions[bot] for consistency).
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /propose-fix ${{ env.ISSUE_NUMBER }}
+          claude_args: |
+            --model claude-opus-4-7
+            --max-turns 1000
+            --allowedTools "Bash(gh:*),Bash(git:*),Bash(bash tools/test-local.sh*),Bash(curl:*),Read,Edit,Write,Grep,Glob"
+
+      - name: Push branch
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if git diff --quiet origin/develop -- && git diff --cached --quiet; then
+            echo "No changes produced — nothing to push."
+            exit 0
+          fi
+          git push -u origin "${{ steps.branch.outputs.name }}"
+
+      - name: Stop Lucee server
+        if: always()
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
+          lucli server stop 2>/dev/null || true

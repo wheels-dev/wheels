@@ -1,0 +1,26 @@
+// 1. Call a single method after a new object is validated on create
+component extends="Model" {
+	function config() {
+		afterValidationOnCreate("assignDefaults");
+	}
+
+	private function assignDefaults() {
+		if (!Len(this.role)) {
+			this.role = "member";
+		}
+	}
+}
+
+// 2. Call multiple methods after validation on create (comma-delimited list)
+component extends="Model" {
+	function config() {
+		afterValidationOnCreate("sanitizeFields,logNewRecord");
+	}
+}
+
+// 3. Use the singular `method` alias for clarity
+component extends="Model" {
+	function config() {
+		afterValidationOnCreate(method="trimWhitespace");
+	}
+}

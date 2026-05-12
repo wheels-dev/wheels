@@ -1,0 +1,37 @@
+// 1. Basic select field bound to a model object property
+// Controller
+authors = model("Author").findAll(order="lastName");
+// View
+#select(objectName="book", property="authorId", options=authors)#
+
+// 2. Override which query columns to use for option values and display text
+// Controller
+authors = model("Author").findAll(order="lastName");
+// View
+#select(objectName="book", property="authorId", options=authors, valueField="id", textField="fullName")#
+
+// 3. Include a blank/placeholder option at the top of the list
+#select(objectName="order", property="statusId", options=statuses, includeBlank="-- Select a Status --")#
+
+// 4. Populate options from a simple list or array instead of a query
+#select(objectName="profile", property="country", options="Canada,Mexico,United States")#
+
+// 5. Allow multiple selections (multi-select box)
+#select(objectName="post", property="tagIds", options=tags, multiple=true, label="Tags")#
+
+// 6. Nested form — select within a hasMany association loop
+// Controller
+shipment = model("Shipment").findByKey(params.key, include="orders");
+statuses = model("Status").findAll(order="name");
+// View
+<cfloop from="1" to="#ArrayLen(shipment.orders)#" index="i">
+    #select(
+        label        = "Order ##shipment.orders[i].orderNumber##",
+        objectName   = "shipment",
+        association  = "orders",
+        position     = i,
+        property     = "statusId",
+        options      = statuses,
+        includeBlank = true
+    )#
+</cfloop>

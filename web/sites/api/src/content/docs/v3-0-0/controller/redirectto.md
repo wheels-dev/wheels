@@ -1,0 +1,71 @@
+---
+title: redirectTo()
+description: "Used to redirect the browser to another page, action, controller, route, or back to the referring page. Internally, it uses Wheels’ URLFor() function to constru"
+sidebar:
+  label: redirectTo()
+  order: 0
+---
+
+## Signature
+
+`redirectTo()` — returns `void`
+
+**Available in:** `controller`
+**Category:** Miscellaneous Functions
+
+## Description
+
+Used to redirect the browser to another page, action, controller, route, or back to the referring page. Internally, it uses Wheels’ URLFor() function to construct the URL and the &lt;cflocation&gt; tag (or equivalent in your CFML engine) to perform the actual redirect. You can redirect to internal routes or controllers, pass keys and query parameters, include anchors, override protocol, host, or port, and even delay the redirect until after your action code executes. This function ensures URLs are safely encoded and properly formatted for the redirect.
+
+
+
+## Parameters
+
+<div class="wd-params-table">
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `back` | `boolean` | no | `false` | Set to `true` to redirect back to the referring page. |
+| `addToken` | `boolean` | no | `false` | See documentation for your CFML engine's implementation of `cflocation`. |
+| `statusCode` | `numeric` | no | `302` | See documentation for your CFML engine's implementation of `cflocation`. |
+| `route` | `string` | no | — | Name of a route that you have configured in `config/routes.cfm`. |
+| `method` | `string` | no | — |  |
+| `controller` | `string` | no | — | Name of the controller to include in the URL. |
+| `action` | `string` | no | — | Name of the action to include in the URL. |
+| `key` | `any` | no | — | Key(s) to include in the URL. |
+| `params` | `string` | no | — | Any additional parameters to be set in the query string (example: `wheels=cool&x=y`). Please note that Wheels uses the `&` and `=` characters to split the parameters and encode them properly for you. However, if you need to pass in `&` or `=` as part of the value, then you need to encode them (and only them), example: `a=cats%26dogs%3Dtrouble!&b=1`. |
+| `anchor` | `string` | no | — | Sets an anchor name to be appended to the path. |
+| `onlyPath` | `boolean` | no | `true` | If `true`, returns only the relative URL (no protocol, host name or port). |
+| `host` | `string` | no | — | Set this to override the current host. |
+| `protocol` | `string` | no | — | Set this to override the current protocol. |
+| `port` | `numeric` | no | `0` | Set this to override the current port number. |
+| `url` | `string` | no | — | Redirect to an external URL. |
+| `delay` | `boolean` | no | `false` | Set to `true` to delay the redirection until after the rest of your action code has executed. |
+| `encode` | `boolean` | no | `true` | Encode URL parameters using `EncodeForURL()`. Please note that this does not make the string safe for placement in HTML attributes, for that you need to wrap the result in `EncodeForHtmlAttribute()` or use `linkTo()`, `startFormTag()` etc instead. |
+
+</div>
+
+## Examples
+
+<pre><code class='javascript'>1. Redirect to an action after saving
+if (user.save()) {
+    redirectTo(action=&quot;saveSuccessful&quot;);
+}
+
+2. Redirect to a secure checkout page with parameters
+redirectTo(
+    controller=&quot;checkout&quot;,
+    action=&quot;start&quot;,
+    params=&quot;type=express&quot;,
+    protocol=&quot;https&quot;
+);
+
+3. Redirect to a named route and pass a route parameter
+redirectTo(route=&quot;profile&quot;, screenName=&quot;Joe&quot;);
+
+4. Redirect back to the referring page
+redirectTo(back=true);
+
+5. Redirect to an external URL
+redirectTo(url=&quot;https://example.com/welcome&quot;);
+</code></pre>

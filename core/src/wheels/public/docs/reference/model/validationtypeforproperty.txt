@@ -1,5 +1,0 @@
-// first name is a varchar(50) column
-employee = model("employee").new();
-
-<!--- would output "string"--->
-#employee.validationTypeForProperty("firstName")#

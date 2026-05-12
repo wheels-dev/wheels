@@ -1,0 +1,20 @@
+// 1. Use isClass() to branch between class-level and instance-level behavior
+// In a model method, detect whether the method is being called on the class
+// (e.g. model("User").isAdmin(42)) or on an instance (e.g. user.isAdmin()).
+function isAdmin(numeric id) {
+	if (isClass()) {
+		// Called on the class — look up the record by the provided id
+		return this.findByKey(arguments.id).admin;
+	} else {
+		// Called on an instance — the property is already available
+		return this.admin;
+	}
+}
+
+// 2. Guard a class-only operation
+function resetAllPasswords() {
+	if (!isClass()) {
+		Throw(type="App.Error", message="resetAllPasswords must be called on the class, not an instance.");
+	}
+	this.updateAll(password="changeme");
+}

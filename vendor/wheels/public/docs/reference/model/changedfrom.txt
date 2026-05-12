@@ -1,0 +1,20 @@
+// 1. Get the previous value of a changed property
+user = model("User").findByKey(params.userId);
+user.email = params.newEmail;
+
+// Returns the original email address before it was changed
+oldEmail = user.changedFrom("email");
+// oldEmail -> "original@example.com"
+
+// 2. Use the dynamic shorthand method (equivalent to the above)
+oldEmail = user.emailChangedFrom();
+
+// 3. Check if a property changed before accessing the previous value
+user = model("User").findByKey(params.userId);
+user.firstName = params.firstName;
+
+if (user.hasChanged("firstName")) {
+	oldName = user.changedFrom("firstName");
+	// oldName -> "Jane"
+}
+// Returns empty string if property has not changed or no previous value exists

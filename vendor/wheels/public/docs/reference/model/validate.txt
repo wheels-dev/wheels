@@ -1,0 +1,33 @@
+// 1. Register a custom validation method to run on every save
+function config() {
+	// `checkPhoneNumber` will be called whenever an object is created or updated.
+	validate("checkPhoneNumber");
+}
+
+function checkPhoneNumber() {
+	// Make sure the area code is `614`.
+	return Left(this.phoneNumber, 3) == "614";
+}
+
+// 2. Register multiple custom validation methods at once
+function config() {
+	validate(methods="checkPhoneNumber,checkEmailDomain");
+}
+
+// 3. Limit validation to create or update only
+function config() {
+	// Only run `checkTrialExpiry` when updating an existing record.
+	validate(methods="checkTrialExpiry", when="onUpdate");
+}
+
+// 4. Run a custom validation only when a condition is met
+function config() {
+	// `checkBillingAddress` is skipped when the order is free.
+	validate(methods="checkBillingAddress", condition="this.totalAmount gt 0");
+}
+
+// 5. Skip a custom validation when an `unless` expression is true
+function config() {
+	// `checkCreditCard` is skipped for admin users.
+	validate(methods="checkCreditCard", unless="this.isAdmin");
+}

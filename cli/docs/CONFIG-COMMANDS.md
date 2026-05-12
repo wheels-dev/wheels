@@ -145,9 +145,9 @@ wheels secret --type=uuid         # UUID format
 ## Integration with Existing Tools
 
 These commands integrate with:
-- **commandbox-dotenv**: For .env file management
+- **`.env` loader**: Wheels reads `.env` files at application start; the CLI respects the same convention
 - **Wheels configuration system**: Reads from config/environment/*.cfm files
-- **CommandBox server management**: Uses server.json for server configuration
+- **Server configuration**: Uses server.json for LuCLI server settings
 
 ## Examples
 

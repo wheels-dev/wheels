@@ -1,6 +1,0 @@
-// Controller code.
-aWhileAgo = DateAdd("d", -90, Now());
-
-// View code.
-<!--- Will output: 3 months --->
-#timeAgoInWords(aWhileAgo)#

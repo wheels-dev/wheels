@@ -41,7 +41,7 @@ wheels dbmigrate latest
 ## Documentation
 
 Full documentation is available at:
-https://wheels.dev/3.0.0/guides/command-line-tools/commands/README
+https://wheels.dev/3.1.0/guides/command-line-tools/commands/README
 
 ## Requirements
 

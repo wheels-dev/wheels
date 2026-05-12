@@ -1,0 +1,18 @@
+// 1. Drop the foreign key from comments.postId back to posts.id
+// Removes the constraint named FK_comments_posts
+dropReference(table="comments", referenceName="post");
+
+// 2. Drop a foreign key from order_items back to orders
+// Removes the constraint named FK_order_items_orders
+dropReference(table="order_items", referenceName="order");
+
+// 3. Use dropReference in the down() of a migration that added a reference in up()
+// In your migration CFC:
+//
+// public void function up() {
+//     addReference(table="comments", referenceName="post");
+// }
+//
+// public void function down() {
+//     dropReference(table="comments", referenceName="post");
+// }

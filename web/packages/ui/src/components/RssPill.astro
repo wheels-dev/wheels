@@ -1,0 +1,64 @@
+---
+interface Props {
+	href?: string;
+	label?: string;
+	class?: string;
+}
+
+const { href = '/rss.xml', label = 'RSS', class: className = '' } = Astro.props;
+---
+
+<a href={href} class:list={['wd-rss-pill', className]} aria-label={`${label} feed`}>
+	<svg
+		class="wd-rss-pill__icon"
+		width="14"
+		height="14"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
+	>
+		<path d="M4 11a9 9 0 0 1 9 9"></path>
+		<path d="M4 4a16 16 0 0 1 16 16"></path>
+		<circle cx="5" cy="19" r="1"></circle>
+	</svg>
+	<span>{label}</span>
+</a>
+
+<style>
+	.wd-rss-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-2) var(--space-4);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-pill);
+		background: transparent;
+		color: var(--color-fg-muted);
+		font-family: var(--font-sans);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		text-decoration: none;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		transition:
+			border-color 0.15s,
+			color 0.15s,
+			background 0.15s;
+	}
+
+	.wd-rss-pill:hover {
+		border-color: var(--color-brand);
+		color: var(--color-brand);
+		background: var(--color-brand-soft);
+		text-decoration: none;
+	}
+
+	.wd-rss-pill__icon {
+		color: var(--color-brand);
+		flex-shrink: 0;
+	}
+</style>

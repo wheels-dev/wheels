@@ -1,0 +1,15 @@
+// 1. Get the primary key value of a found object
+employee = model("Employee").findByKey(params.key);
+writeOutput(employee.key());
+// -> 42
+
+// 2. Use key() when you don't know the primary key column name (dynamic programming)
+obj = model(params.modelName).findByKey(params.id);
+if (IsObject(obj)) {
+	writeOutput("Found record with key: " & obj.key());
+}
+
+// 3. Composite primary key — key() returns a comma-delimited list of both values
+orderItem = model("OrderItem").findByKey(key="1,5");
+writeOutput(orderItem.key());
+// -> 1,5 (orderId and productId combined)

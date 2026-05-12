@@ -1,0 +1,13 @@
+// 1. Update properties from a form post struct
+user = model("User").findByKey(1);
+user.setProperties(params.user);
+
+// 2. Pass a struct literal directly to set multiple properties at once
+user = model("User").findByKey(1);
+user.setProperties({firstName: "Jane", lastName: "Doe", email: "jane@example.com"});
+user.save();
+
+// 3. Use named arguments instead of a struct (named args are merged with the properties struct)
+user = model("User").findByKey(1);
+user.setProperties(firstName="John", lastName="Smith");
+user.save();

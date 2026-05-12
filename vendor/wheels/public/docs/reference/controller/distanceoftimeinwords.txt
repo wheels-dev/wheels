@@ -1,0 +1,25 @@
+// 1. Compare two dates about a month apart
+rightNow = Now();
+aWhileAgo = DateAdd("d", -30, rightNow);
+writeOutput(distanceOfTimeInWords(aWhileAgo, rightNow));
+// -> "about 1 month"
+
+// 2. Show a short gap with seconds included
+justNow = Now();
+fiveSecondsAgo = DateAdd("s", -5, justNow);
+writeOutput(distanceOfTimeInWords(fiveSecondsAgo, justNow, includeSeconds=true));
+// -> "less than 5 seconds"
+
+// 3. Show various time ranges
+now = Now();
+writeOutput(distanceOfTimeInWords(DateAdd("n", -2, now), now));
+// -> "2 minutes"
+
+writeOutput(distanceOfTimeInWords(DateAdd("h", -3, now), now));
+// -> "about 3 hours"
+
+writeOutput(distanceOfTimeInWords(DateAdd("d", -5, now), now));
+// -> "5 days"
+
+writeOutput(distanceOfTimeInWords(DateAdd("yyyy", -2, now), now));
+// -> "over 2 years"

@@ -1,0 +1,15 @@
+// 1. Get all properties of a model object as a struct
+user = model("User").findByKey(1);
+props = user.properties();
+// props -> {id: 1, firstName: "Jane", lastName: "Doe", email: "jane@example.com", createdAt: ...}
+
+// 2. Exclude nested (included) association properties from the result
+// Useful when you only want the object's own scalar properties
+post = model("Post").findOne(include="comments");
+ownProps = post.properties(returnIncluded=false);
+// ownProps -> {id: 42, title: "Hello World", body: "...", createdAt: ...}
+// (nested `comments` array is omitted)
+
+// 3. Use properties() to pass a model's data as a plain struct (e.g. to a service layer)
+user = model("User").findByKey(session.userId);
+userService.syncUser(user.properties());

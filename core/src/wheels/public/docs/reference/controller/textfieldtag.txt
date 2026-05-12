@@ -1,2 +1,0 @@
-<!--- Basic usage usually involves a `label`, `name`, and `value` --->
-#textFieldTag(label="Search", name="q", value=params.q)#

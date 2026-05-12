@@ -1,0 +1,15 @@
+// 1. Ignore a single column in the model's config() method
+// In app/models/User.cfc
+component extends="Model" {
+	function config() {
+		ignoredColumns(columns=["legacyField"]);
+	}
+}
+
+// 2. Ignore multiple columns so they are excluded from Wheels ORM property mapping
+// In app/models/Product.cfc
+component extends="Model" {
+	function config() {
+		ignoredColumns(columns=["internalCode", "deprecatedFlag", "tempCache"]);
+	}
+}

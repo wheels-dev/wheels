@@ -1,0 +1,30 @@
+---
+title: "wheels deploy accessory stop"
+description: docker stop the named accessory container.
+type: reference
+sidebar:
+  label: "stop"
+  order: 4
+---
+
+`docker stop <service>-<name>`. Container remains on disk — use [`accessory remove`](/v4-0-0-snapshot/command-line-tools/commands/deploy/accessory/remove/) to delete.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy accessory stop --name=<name|all> [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Example
+
+```bash title="illustrative"
+wheels deploy accessory stop --name=db
+```

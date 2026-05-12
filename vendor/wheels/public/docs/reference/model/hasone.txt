@@ -1,0 +1,11 @@
+// 1. Specify that instances of this model have one profile. (The associated model's table, not the current one, should have the foreign key column.)
+hasOne("profile");
+
+// 2. Same as above but setting `joinType` to `inner`, meaning this model should always have a matching record in the `profiles` table.
+hasOne(name="profile", joinType="inner");
+
+// 3. Automatically delete the associated `profile` record whenever this object is deleted.
+hasOne(name="profile", dependent="delete");
+
+// 4. Declare a polymorphic `hasOne` association so that multiple models can each have one image via a shared interface.
+hasOne(name="image", as="imageable");

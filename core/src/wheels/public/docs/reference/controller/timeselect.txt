@@ -1,8 +1,0 @@
-<!---View code --->
-#timeSelect(objectName="business", property="openUntil")#
-
-<!---Show fields for hour and minute --->
-#timeSelect(objectName="business", property="openUntil", order="hour,minute")#
-
-<!---Only show 15-minute intervals --->
-#timeSelect(objectName="appointment", property="dateTimeStart", minuteStep=15)#

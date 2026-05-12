@@ -1,0 +1,17 @@
+<cfscript>
+
+mapper()
+    // 1. Constrain a route variable to a custom regex pattern (year: 4-digit number)
+    .get(name="archiveYear", pattern="archive/[year]", to="posts##archiveByYear")
+    .whereMatch(variableName="year", pattern="\d{4}")
+
+    // 2. Constrain a slug variable to lowercase letters and hyphens only
+    .get(name="articleShow", pattern="articles/[slug]", to="articles##show")
+    .whereMatch(variableName="slug", pattern="[a-z][a-z0-9-]+")
+
+    // 3. Chained with resources — constrain the key to a specific format (e.g. SKU like AB-12345)
+    .resources("products")
+    .whereMatch(variableName="key", pattern="[A-Z]{2}-\d{5}")
+.end();
+
+</cfscript>

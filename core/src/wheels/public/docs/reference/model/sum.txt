@@ -1,8 +1,0 @@
-// Get the sum of all salaries
-allSalaries = model("employee").sum("salary");
-
-// Get the sum of all salaries for employees in a given country
-allAustralianSalaries = model("employee").sum(property="salary", include="country", where="countryname='Australia'");
-
-// Make sure a numeric value is always returned, even if there are no records analyzed by the query
-salarySum = model("employee").sum(property="salary", where="salary BETWEEN #params.min# AND #params.max#", ifNull=0);

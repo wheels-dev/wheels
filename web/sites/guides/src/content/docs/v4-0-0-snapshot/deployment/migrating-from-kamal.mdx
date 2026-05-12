@@ -1,0 +1,155 @@
+---
+title: Migrating from Kamal
+description: For teams coming from Ruby Kamal — what wheels deploy inherits verbatim, the one deliberate schema divergence, and a concrete switch-over checklist.
+type: howto
+sidebar:
+  order: 12
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is for teams already running Ruby Kamal who want to replace `kamal` with `wheels deploy`. The short version: your `config/deploy.yml`, `.kamal/secrets`, and `.kamal/hooks/*` work unchanged with one exception — ERB inside `deploy.yml`. Keep reading for the full story.
+
+**You'll learn:**
+
+- What `wheels deploy` keeps byte-compatible with Ruby Kamal
+- The one deliberate schema divergence — ERB removed; Kamal's `${VAR}` interpolation kept unchanged
+- The coexistence guarantee — running both tools against the same host during evaluation
+- A concrete switch-over checklist
+
+<Aside type="caution" title="ERB is not supported">
+`deploy.yml` in Ruby Kamal supports embedded ERB. `wheels deploy` does not. This is the only schema-level incompatibility. If you use ERB anywhere in your deploy config, you will need to convert it to `${VAR}` env-var interpolation (which Kamal already supports too) or move the logic into `.kamal/secrets`. See [The one divergence](#the-one-divergence) below.
+</Aside>
+
+## What's byte-compatible
+
+The on-server state managed by `wheels deploy` and Ruby Kamal is identical by design. Everything in this list matches the Kamal 2.4.0 contract exactly.
+
+| Concern | Value |
+|---------|-------|
+| Container name | `<service>-<role>-<version>` (e.g. `myapp-web-abc1234`) |
+| Container labels | `service=`, `role=`, `destination=`, `version=` |
+| Docker network | `kamal` |
+| Proxy image | `basecamp/kamal-proxy:v0.8.6` |
+| Proxy config dir | `/home/<user>/.config/kamal-proxy/` |
+| Lock file path | `/tmp/kamal_deploy_lock_<service>` |
+| Audit log | `/tmp/kamal-audit.log` |
+| Hook directory | `.kamal/hooks/` |
+| Hook env prefix | `KAMAL_*` (not `WHEELS_*`) |
+| Secret file | `.kamal/secrets`, `.kamal/secrets.<destination>` |
+
+Why keep the `KAMAL_*` prefix? Because every hook anyone has ever written for Ruby Kamal uses it. Renaming would break every user's existing scripts for zero benefit.
+
+Why keep the `.kamal/` directory name? Because you can sit on both tools during evaluation — `kamal deploy` and `wheels deploy` read the same secrets and the same hooks. Switch back and forth freely; nothing on the server changes.
+
+## The one divergence
+
+Ruby Kamal allows ERB inside `deploy.yml`:
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+# Ruby Kamal — NOT SUPPORTED in wheels deploy
+service: <%= ENV["APP_NAME"] %>
+image: <%= ENV["REGISTRY"] %>/<%= ENV["APP_NAME"] %>
+```
+
+ERB is a Ruby template language — it calls into Ruby code at render time. We can't render ERB from a CFML CLI without embedding a Ruby runtime, which defeats the purpose of the port.
+
+What `wheels deploy` keeps unchanged is Kamal's other built-in interpolation syntax — `${UPPER_SNAKE}` env-var tokens — so most ERB-using configs convert mechanically by dropping the `<%= ENV["..."] %>` wrapper and using a bare `${VAR}` reference:
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
+```
+
+`${VAR}` references resolve in this order:
+
+1. CLI `--env` overrides (test/CI shims).
+2. `.kamal/secrets` (and the destination overlay `.kamal/secrets.<destination>` when `--destination` is set).
+3. `System.getenv(VAR)` on the machine running `wheels deploy`.
+4. Empty string (Kamal's behavior for unset vars).
+
+Only uppercase-and-underscore tokens are expanded — `${APP_NAME}` matches; lowercase `${service}` is left alone (this prevents accidental capture of shell-style placeholders elsewhere in the config). This is the same rule Kamal applies.
+
+If your existing config uses ERB logic — `<%= "blue" if ENV["ROLE"] == "staging" %>` — move that logic into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay), or into a shell wrapper that exports the resolved value, then reference the result with `${ROLE}`.
+
+### Common ERB → `${VAR}` conversions
+
+| Ruby Kamal ERB | `wheels deploy` |
+|----------------|-----------------|
+| `<%= ENV["FOO"] %>` | `${FOO}` |
+| `<%= ENV.fetch("FOO", "bar") %>` | `${FOO}` — set `FOO=bar` in `.kamal/secrets` for the default |
+| `<%= `git rev-parse --short HEAD`.chomp %>` | pass `--version=$(git rev-parse --short HEAD)` on the CLI, or set `VERSION` in `.kamal/secrets` and use `${VERSION}` |
+| `<%= ENV["STAGE"] == "prod" ? 1 : 0 %>` | set the resolved value in `.kamal/secrets.production` or `.kamal/secrets.staging` — destination overlays replace in-file logic |
+
+## What changes in the CLI
+
+The verb surface mirrors Kamal's. Most invocations are identical save the leading verb:
+
+| Ruby Kamal | `wheels deploy` |
+|------------|-----------------|
+| `kamal setup` | `wheels deploy setup` |
+| `kamal deploy` | `wheels deploy` |
+| `kamal redeploy` | `wheels deploy redeploy` |
+| `kamal rollback VERSION` | `wheels deploy rollback --version=VERSION` |
+| `kamal config` | `wheels deploy config` |
+| `kamal app logs --follow` | `wheels deploy app logs --follow` |
+| `kamal proxy boot` | `wheels deploy proxy boot` |
+| `kamal accessory boot db` | `wheels deploy accessory boot db` |
+| `kamal secrets fetch --from op://...` | `wheels deploy secrets fetch --adapter=op --from=op://...` |
+| `kamal version` | `wheels deploy version` |
+
+Two CLI-level differences worth flagging:
+
+- **Flag style.** `wheels deploy` uses `--flag=value` everywhere. Positional args for a few verbs (`accessory boot <name>`, `rollback <version>` in Kamal) become named flags (`accessory boot --name=<name>`, `rollback --version=<version>`) for consistency across the CFML arg parser.
+- **`--dry-run` is everywhere.** Every `wheels deploy` verb accepts `--dry-run` and prints the commands it would have run, prefixed by host. This is wider coverage than Kamal's `KAMAL_DEBUG=1` logs.
+
+## The coexistence guarantee
+
+Because on-server state is byte-identical, you can run both tools against the same host during a transition:
+
+- Deploy with `kamal deploy` on Tuesday, `wheels deploy` on Wednesday, `kamal deploy` on Thursday. Nothing on the server notices.
+- Run `kamal config` and `wheels deploy config` side-by-side to compare resolved output. The wheels output is a subset of the Kamal output — it names fewer keys, but every key it names matches.
+- Locks, audit logs, and the `kamal-proxy` container are single-owner on the server; whichever tool holds the lock has it until release.
+
+This exists for evaluation, not long-term mixed use. Pick a tool per repo and stick with it.
+
+## Switch-over checklist
+
+Before removing `kamal` from your ecosystem:
+
+1. **Scan `deploy.yml` for ERB.** `grep -n '<%' config/deploy.yml`. Every match needs conversion.
+2. **Review `.kamal/secrets` for shell compatibility.** `wheels deploy` evaluates the file through `bash`; if you relied on `sh`-only behavior, nothing changes, but confirm.
+3. **Install the Wheels CLI on every control machine that runs deploys.** See [installing the CLI](/v4-0-0-snapshot/command-line-tools/installation/).
+4. **Run `wheels deploy config` and diff against `kamal config`.** Every field wheels emits should match kamal's. The reverse isn't true — wheels emits a subset during Phase 1.
+5. **Run `wheels deploy --dry-run`.** Every command it would run, printed with host prefixes. Confirm it matches what you expect.
+6. **Deploy a non-critical environment first.** Staging before production. Verify logs, health checks, rollback.
+7. **Update CI.** Replace any `bundle exec kamal ...` or `gem install kamal` lines with your Wheels CLI install command plus `wheels deploy ...`.
+8. **Remove `Gemfile` / `Gemfile.lock` Kamal entries.** Only after at least one successful production deploy with `wheels deploy`.
+
+## What's explicitly not supported
+
+These Ruby Kamal features have no `wheels deploy` equivalent and won't get one:
+
+- **Kamal plugins** (`Kamal::Commands` extension points in Ruby). The plugin API is Ruby-specific. Shell-script `.kamal/hooks/` are supported — that's the language-agnostic extension story.
+- **Arbitrary ERB in `deploy.yml`.** Covered above.
+- **Windows servers.** Kamal doesn't support them, and `wheels deploy` inherits that.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="deploy.yml Reference"
+    href="/v4-0-0-snapshot/deployment/config-reference/"
+    description="Every key in the schema, with the ${VAR} interpolation rules."
+  />
+  <LinkCard
+    title="Your First Deploy"
+    href="/v4-0-0-snapshot/deployment/first-deploy/"
+    description="The walkthrough to confirm wheels deploy works on your stack."
+  />
+  <LinkCard
+    title="Hooks"
+    href="/v4-0-0-snapshot/deployment/hooks/"
+    description="Your Ruby Kamal hooks port over unchanged — KAMAL_ env is preserved."
+  />
+</CardGrid>

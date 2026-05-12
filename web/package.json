@@ -1,0 +1,42 @@
+{
+	"name": "@wheels-dev/web",
+	"version": "0.0.0",
+	"private": true,
+	"description": "wheels.dev static sites monorepo",
+	"license": "Apache-2.0",
+	"packageManager": "pnpm@10.23.0",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"scripts": {
+		"build": "pnpm -r --filter './sites/*' build",
+		"dev:landing": "pnpm --filter @wheels-dev/site-landing dev",
+		"dev:blog": "pnpm --filter @wheels-dev/site-blog dev",
+		"dev:guides": "pnpm --filter @wheels-dev/site-guides dev",
+		"dev:api": "pnpm --filter @wheels-dev/site-api dev",
+		"dev:packages": "pnpm --filter @wheels-dev/site-packages dev",
+		"format": "prettier --write \"**/*.{astro,ts,tsx,md,json,css}\"",
+		"format:check": "prettier --check \"**/*.{astro,ts,tsx,md,json,css}\"",
+		"test": "pnpm -r --filter './sites/*' test",
+		"visual:test": "node scripts/visual-regression.mjs",
+		"visual:baseline": "node scripts/visual-regression.mjs --update"
+	},
+	"devDependencies": {
+		"pixelmatch": "^7.1.0",
+		"playwright": "^1.59.1",
+		"pngjs": "^7.0.0",
+		"prettier": "^3.4.2",
+		"prettier-plugin-astro": "^0.14.1",
+		"typescript": "^5.7.2",
+		"vitest": "^2.1.9"
+	},
+	"pnpm": {
+		"overrides": {
+			"fast-uri": "^3.1.2",
+			"fast-xml-builder": "^1.1.7",
+			"esbuild": "^0.27.3",
+			"yaml": "^2.8.3",
+			"astro": "^6.3.1"
+		}
+	}
+}

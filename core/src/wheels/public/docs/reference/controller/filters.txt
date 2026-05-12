@@ -1,5 +1,0 @@
-// Always execute `restrictAccess` before all actions in this controller.
-filters("restrictAccess");
-
-// Always execute `isLoggedIn` and `checkIPAddress` (in that order) before all actions in this controller, except the `home` and `login` actions.
-filters(through="isLoggedIn, checkIPAddress", except="home, login");

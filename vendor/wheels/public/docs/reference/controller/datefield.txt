@@ -1,0 +1,10 @@
+// 1. Basic date field bound to a model object property
+#dateField(objectName="event", property="startDate")#
+
+// 2. Date field with a custom label, min/max constraints, and a CSS class
+#dateField(objectName="event", property="startDate", label="Start Date", min="2024-01-01", max="2024-12-31", class="date-picker")#
+
+// 3. Date fields for nested properties on a hasMany association (e.g., schedule items)
+<cfloop from="1" to="#ArrayLen(project.milestones)#" index="i">
+	#dateField(objectName="project", association="milestones", position="#i#", property="dueDate", label="Due Date ##i#")#
+</cfloop>

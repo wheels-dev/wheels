@@ -1,0 +1,34 @@
+From: Peter Amiri <petera@pai.com>
+Date: Sat, 18 Apr 2026 00:00:00 +0000
+Subject: [PATCH] fix(cfml): return exit 1 when expression execution fails
+
+`lucli cfml '<expr>'` currently swallows CFML execution errors: the catch
+block logs to stderr but falls through to `return result`, where `result`
+is still `null`. picocli maps a null Object return to exit code 0, so every
+failure reports success to callers (shells, CI, doctest harnesses).
+
+Add `return 1;` in the catch so the command exits with a non-zero code on
+any execution failure. The finally block still runs (Timer.stop), and the
+null execution-result path is skipped because there's nothing meaningful
+to expose programmatically on failure anyway.
+
+---
+ .../java/org/lucee/lucli/cli/commands/CfmlCommand.java         | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/main/java/org/lucee/lucli/cli/commands/CfmlCommand.java b/src/main/java/org/lucee/lucli/cli/commands/CfmlCommand.java
+--- a/src/main/java/org/lucee/lucli/cli/commands/CfmlCommand.java
++++ b/src/main/java/org/lucee/lucli/cli/commands/CfmlCommand.java
+@@ -65,10 +65,11 @@ public class CfmlCommand implements Callable<Object> {
+             // We can capture output here if needed
+             result = LuceeScriptEngine.getInstance().eval(cfmlCode);
+
+         }
+         catch (Exception e) {
+             System.err.println("Error in cfml command: " + e.getMessage());
+             LuCLI.debugStack(e);
++            return 1;
+         }
+         finally {
+             Timer.stop("CFML Command Execution");
+         }

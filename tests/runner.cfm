@@ -96,9 +96,9 @@
     
     // Initialize TestBox with options
     if (len(url.bundles)) {
-        testBox = new testbox.system.TestBox(bundles=url.bundles);
+        testBox = new wheels.wheelstest.system.TestBox(bundles=url.bundles);
     } else {
-        testBox = new testbox.system.TestBox(
+        testBox = new wheels.wheelstest.system.TestBox(
             directory=testBoxOptions.directory.mapping,
             recurse=testBoxOptions.directory.recurse
         );
@@ -113,14 +113,21 @@
         if (len(url.reporter)) {
             testBoxOptions.reporter = url.reporter;
         } else {
-            testBoxOptions.reporter = "testbox.system.reports.JSONReporter";
+            testBoxOptions.reporter = "wheels.wheelstest.system.reports.JSONReporter";
         }
         
         result = testBox.run(argumentCollection = testBoxOptions);
+        DeJsonResult = DeserializeJSON(result);
+
+        if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
+            cfheader(statuscode=417);
+        } else {
+            cfheader(statuscode=200);
+        }
     }
     else if(url.format eq "json"){
         // Set JSON reporter
-        testBoxOptions.reporter = "testbox.system.reports.JSONReporter";
+        testBoxOptions.reporter = "wheels.wheelstest.system.reports.JSONReporter";
         
         result = testBox.run(argumentCollection = testBoxOptions);
         
@@ -234,7 +241,7 @@
     }
     else if (url.format eq "txt") {
         // Set Text reporter
-        testBoxOptions.reporter = "testbox.system.reports.TextReporter";
+        testBoxOptions.reporter = "wheels.wheelstest.system.reports.TextReporter";
         
         result = testBox.run(argumentCollection = testBoxOptions);
         
@@ -243,7 +250,7 @@
     }
     else if(url.format eq "junit"){
         // Set JUnit reporter
-        testBoxOptions.reporter = "testbox.system.reports.ANTJUnitReporter";
+        testBoxOptions.reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter";
         
         result = testBox.run(argumentCollection = testBoxOptions);
         
@@ -256,6 +263,6 @@
     if(!structKeyExists(url, "format") || url.format eq "html"){
         // Use our html template
         type = "App";
-        include "/wheels/tests_testbox/html.cfm";
+        include "/wheels/tests/html.cfm";
     }
 </cfscript>

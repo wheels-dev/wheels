@@ -1,0 +1,15 @@
+// 1. Assert that exactly one file was sent during the action (in a test)
+processDownload();
+files = getFiles();
+assert("arrayLen(files) eq 1");
+assert("files[1].name eq 'report.pdf'");
+
+// 2. Inspect all files sent during a request
+files = getFiles();
+for (file in files) {
+	writeOutput(file.name & " — " & file.type);
+}
+
+// 3. Return an empty array when no files were sent
+files = getFiles();
+// files -> []

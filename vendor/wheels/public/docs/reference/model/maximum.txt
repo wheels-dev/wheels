@@ -1,0 +1,11 @@
+// 1. Get the highest salary across all employees
+highestSalary = model("employee").maximum("salary");
+
+// 2. Get the highest salary for employees in a specific department
+highestSalary = model("employee").maximum(property="salary", where="departmentId=#params.key#");
+
+// 3. Return 0 instead of a blank string when no matching records are found
+highestSalary = model("employee").maximum(property="salary", where="salary > #params.minSalary#", ifNull=0);
+
+// 4. Get the highest salary per department (returns a query with departmentId and the maximum value)
+salaryByDept = model("employee").maximum(property="salary", group="departmentId");

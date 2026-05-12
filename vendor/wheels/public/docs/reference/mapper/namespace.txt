@@ -1,0 +1,31 @@
+<cfscript>
+
+mapper()
+    .namespace("api")
+        .namespace("v2")
+            // Route name:  apiV2Products
+            // Example URL: /api/v2/products/1234
+            // Controller:  api.v2.Products
+            .resources("products")
+        .end()
+
+        .namespace("v1")
+            // Route name:  apiV1Users
+            // Example URL: /api/v1/users
+            // Controller:  api.v1.Users
+            .get(name="users", to="users##index")
+        .end()
+    .end()
+
+    // Custom package and path: name="foo", package="foos", path="foose"
+    // The `path` argument overrides the default URL prefix (which would be "foo").
+    // The `package` argument overrides the default controller subfolder (which would be "foo").
+    .namespace(name="foo", package="foos", path="foose")
+        // Route name:  fooBars
+        // Example URL: /foose/bars
+        // Controller:  foos.Bars
+        .post(name="bars", to="bars##create")
+    .end()
+.end();
+
+</cfscript>

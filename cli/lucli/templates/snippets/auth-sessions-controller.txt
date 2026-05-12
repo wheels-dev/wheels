@@ -1,0 +1,41 @@
+component extends="Controller" {
+
+	function config() {
+		// Inherit CSRF protection (and other defaults) from
+		// app/controllers/Controller.cfc. Login forms in particular need
+		// CSRF or they're trivially target-able.
+		super.config();
+		verifies(only="create", params="username,password");
+	}
+
+	/**
+	 * Login form
+	 */
+	function new() {
+	}
+
+	/**
+	 * Process login
+	 */
+	function create() {
+		var user = model("User").findOne(where="username='#params.username#'");
+		if (IsObject(user) && user.authenticate(params.password)) {
+			session.currentUserId = user.key();
+			flashInsert(success="Logged in successfully.");
+			redirectTo(route="root");
+		} else {
+			flashInsert(error="Invalid username or password.");
+			renderView(action="new");
+		}
+	}
+
+	/**
+	 * Logout
+	 */
+	function delete() {
+		structDelete(session, "currentUserId");
+		flashInsert(success="You have been logged out.");
+		redirectTo(route="root");
+	}
+
+}

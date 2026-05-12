@@ -1,0 +1,14 @@
+// 1. Close a form opened with startFormTag
+#startFormTag(action="create")#
+    <!--- your form controls --->
+#endFormTag()#
+
+// 2. Append a note after the closing form tag
+#startFormTag(action="update", method="post")#
+    <!--- your form controls --->
+#endFormTag(append="<p>All fields are required.</p>")#
+
+// 3. Wrap the closing tag with surrounding markup using prepend and append
+#startFormTag(route="userSearch")#
+    <!--- your form controls --->
+#endFormTag(prepend="</div>", append="</section>")#

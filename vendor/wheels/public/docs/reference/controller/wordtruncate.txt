@@ -1,0 +1,11 @@
+// 1. Truncate text to the first 4 words (default truncate string "...")
+result = wordTruncate(text="CFWheels is a framework for ColdFusion", length=4);
+// result -> "CFWheels is a framework..."
+
+// 2. Truncate with a custom truncate string
+result = wordTruncate(text="The quick brown fox jumps over the lazy dog", length=5, truncateString=" [read more]");
+// result -> "The quick brown fox jumps [read more]"
+
+// 3. Text with fewer words than the limit is returned unchanged
+result = wordTruncate(text="Short text", length=10);
+// result -> "Short text"

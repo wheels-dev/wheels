@@ -1,0 +1,11 @@
+// 1. Add an error to the `email` property.
+this.addError(property="email", message="Sorry, you are not allowed to use that email. Try again, please.");
+
+// 2. Add a named error so you can distinguish it from other errors on the same property.
+this.addError(property="email", message="That email address is already taken.", name="emailTaken");
+
+// 3. Check for the named error after adding it.
+this.addError(property="username", message="Username is reserved.", name="reservedUsername");
+if (this.hasErrors(property="username", name="reservedUsername")) {
+	writeOutput("A reserved-username error is present.");
+}

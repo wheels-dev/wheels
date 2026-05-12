@@ -1,4 +1,0 @@
-// In `models/Subscription.cfc`, define the primary key as composite of the columns `customerId` and `publicationId`.
-function config(){
-	setPrimaryKeys("customerId,publicationId");
-}
