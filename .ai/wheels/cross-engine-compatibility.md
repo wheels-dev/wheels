@@ -125,6 +125,22 @@ createDynamicProxy(consumer, ["java.util.function.Consumer"]);
 
 **Reference example**: [`vendor/wheels/wheelstest/DialogConsumer.cfc`](../../vendor/wheels/wheelstest/DialogConsumer.cfc) shows the CFC-based pattern used by `BrowserClient` to proxy Playwright's `Consumer<Dialog>`. The probe in `$requireDialogSupport` mirrors the real call shape so engine compatibility is verified on the same code path.
 
+### `DirectoryCreate()` Second Argument Is Lucee-Only
+
+Lucee accepts `DirectoryCreate(path, createPath, mode)` and recurses parent directories when `createPath=true`. Adobe CF's signature varies by version and at least some Adobe builds reject any second argument with `"The function takes 1 parameter"` (issue #2567).
+
+```cfm
+// WRONG — crashes on Adobe CF
+DirectoryCreate(path, true);
+
+// RIGHT — engine-agnostic recursive mkdir via Java NIO
+if (!DirectoryExists(path)) {
+    CreateObject("java", "java.io.File").init(path).mkdirs();
+}
+```
+
+**Why**: `java.io.File.mkdirs()` is part of the JDK on every CFML engine and recurses parents the same way on Lucee, Adobe CF, and BoxLang. Reach for it whenever a path's parents may be missing — relying on the BIF's `createPath` extension is a portability trap.
+
 ### Private View Helpers Not Integrated
 
 `$integrateComponents()` only copies `public` methods into controllers. Private helper functions in view CFCs are never available.

@@ -65,6 +65,28 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(Len(info.indexFetchedAt)).toBeGT(0);
 				DirectoryDelete(root, true);
 			});
+
+			// Regression for #2567: $ensureDir used DirectoryCreate(path, true).
+			// The createPath flag is Lucee-only — Adobe CF rejects the second
+			// argument and crashes the Tools → Packages page. The fix routes
+			// through java.io.File.mkdirs() so multi-level parent creation works
+			// on every engine.
+			it("creates deeply nested cache directories whose parents do not yet exist", () => {
+				var unique = "wheels-cli-cache-2567-" & CreateUUID();
+				var nestedRoot = GetTempDirectory() & unique & "/level-a/level-b/level-c/";
+				try {
+					var cache = new cli.lucli.services.packages.ManifestCache(root = nestedRoot);
+					cache.writeIndex(["wheels-sentry"]);
+					expect(DirectoryExists(nestedRoot)).toBeTrue("expected $ensureDir to create the nested cache root");
+					expect(cache.hasFreshIndex()).toBeTrue();
+					expect(cache.readIndex()).toBe(["wheels-sentry"]);
+				} finally {
+					var sweep = GetTempDirectory() & unique;
+					if (DirectoryExists(sweep)) {
+						DirectoryDelete(sweep, true);
+					}
+				}
+			});
 		});
 	}
 }

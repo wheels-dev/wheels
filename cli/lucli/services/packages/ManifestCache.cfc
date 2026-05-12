@@ -113,9 +113,14 @@ component {
 	}
 
 	private void function $ensureDir(required string path) {
-		if (!DirectoryExists(arguments.path)) {
-			DirectoryCreate(arguments.path, true);
+		if (DirectoryExists(arguments.path)) {
+			return;
 		}
+		// Adobe CF's DirectoryCreate accepts only a single argument — passing
+		// the Lucee-only createPath flag crashes the Tools → Packages page on
+		// fresh ACF installs (#2567). Java's File.mkdirs() recurses parents
+		// uniformly on every engine.
+		CreateObject("java", "java.io.File").init(arguments.path).mkdirs();
 	}
 
 	private string function $defaultRoot() {
