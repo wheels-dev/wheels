@@ -3,8 +3,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 		describe("BrowserTest artifact directory creation", () => {
 
-			// Regression for #2614 — Adobe CF rejects directoryCreate(path, true);
-			// $ensureArtifactDir routes through java.io.File.mkdirs() instead.
+			// Regression for #2614: Adobe CF rejects directoryCreate(path, true); routes through File.mkdirs() instead.
 			it("creates deeply nested artifact directories whose parents do not yet exist (regression ##2614)", () => {
 				var nestedRoot = GetTempDirectory() & "wheels-browser-2614-" & CreateUUID() & "/level-a/level-b/level-c";
 				try {
