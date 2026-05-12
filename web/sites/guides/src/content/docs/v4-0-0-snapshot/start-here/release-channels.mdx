@@ -106,8 +106,12 @@ sudo apt install "./wheels_${WHEELS_FILENAME_VER}_amd64.deb"
 ```
 
 ```bash title="Fedora / RHEL (bleeding-edge)"
+# The bleeding-edge channel publishes only pre-releases, so use /releases (not /releases/latest).
 WHEELS_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+# Tag uses a SemVer hyphen (4.0.0-snapshot.N). The on-disk asset name uses a dot
+# in the same slot because GitHub Releases rewrites the package's internal
+# ~snapshot.N form to . at upload time. So translate hyphen → dot for the URL.
 WHEELS_FILENAME_VER="${WHEELS_TAG//-/.}"
 sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels-${WHEELS_FILENAME_VER}.x86_64.rpm"
 ```

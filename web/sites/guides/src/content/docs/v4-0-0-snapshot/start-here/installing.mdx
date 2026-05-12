@@ -261,7 +261,7 @@ WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/relea
 sudo dnf upgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
 ```
 
-For the bleeding-edge channel, run the install snippet from the [bleeding-edge Aside](#install-the-cli) — it points at `wheels-dev/wheels-snapshots` and `apt`/`dnf` will treat each new snapshot as an upgrade.
+For the bleeding-edge channel, re-run the bleeding-edge install snippet from the Linux tab above — it points at `wheels-dev/wheels-snapshots`, and `apt`/`dnf` will treat each new snapshot as an upgrade.
 
 The first `wheels` invocation after upgrade syncs the new framework module into `~/.wheels/modules/wheels/` automatically.
 
