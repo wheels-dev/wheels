@@ -157,23 +157,51 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
 
 <TabItem label="Linux" icon="linux">
 
+Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repository at `apt.wheels.dev` / `yum.wheels.dev` is on the v4.0.x roadmap — until then, install the package directly from a GitHub Release. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
+
+<Aside type="caution" title="Trust model during Phase 1">
+During Phase 1 (before `apt.wheels.dev` / `yum.wheels.dev` are live), download integrity relies on GitHub's HTTPS transport — the `.deb`/`.rpm` artifacts ship without detached GPG signatures, so there's nothing for `apt-key` / `rpm --checksig` to verify against. Phase 2 adds GPG-signed apt/yum repositories. For now, `wheels-dev/wheels/releases` is the trust root.
+</Aside>
+
 <Steps>
 
-1. Install via the official installer script:
+1. Download and install the latest Wheels release:
 
-   ```bash title="your shell"
-   curl -fsSL https://get.wheels.dev/install.sh | bash
+   ```bash title="Debian / Ubuntu — stable"
+   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+   curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+   sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
    ```
 
-   The script downloads the latest release into `~/.wheels/bin/` and adds it to your `PATH`.
-
-2. Reload your shell or source the updated profile:
-
-   ```bash title="your shell"
-   exec "$SHELL"
+   ```bash title="Fedora / RHEL — stable"
+   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+   sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
    ```
 
-3. Verify:
+   <Aside type="note" title="Want bleeding-edge?">
+   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Because every release there is a GitHub *pre-release*, `api.github.com/.../releases/latest` returns nothing — use `/releases` and pick the first entry. Snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`); the on-disk asset filename uses a dot in the same slot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. Self-contained snippets:
+
+   ```bash title="Debian / Ubuntu — bleeding-edge"
+   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+   curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   ```
+
+   ```bash title="Fedora / RHEL — bleeding-edge"
+   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+   sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+   ```
+
+   The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-0-snapshot/start-here/release-channels/).
+   </Aside>
+
+2. Verify:
 
    ```bash title="your shell"
    wheels --version
@@ -218,11 +246,24 @@ scoop update wheels-be
 
 <TabItem label="Linux" icon="linux">
 
-Re-run the installer script — it detects existing installs and upgrades in place:
+Re-run the install command for your distro — `apt`/`dnf` upgrades the package in place when it sees a newer version:
 
-```bash title="your shell"
-curl -fsSL https://get.wheels.dev/install.sh | bash
+```bash title="Debian / Ubuntu"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
 ```
+
+```bash title="Fedora / RHEL"
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+sudo dnf upgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+```
+
+For the bleeding-edge channel, run the install snippet from the [bleeding-edge Aside](#install-the-cli) — it points at `wheels-dev/wheels-snapshots` and `apt`/`dnf` will treat each new snapshot as an upgrade.
+
+The first `wheels` invocation after upgrade syncs the new framework module into `~/.wheels/modules/wheels/` automatically.
 
 </TabItem>
 
@@ -232,7 +273,7 @@ curl -fsSL https://get.wheels.dev/install.sh | bash
 
 **`wheels: command not found`**
 
-Your shell's `PATH` doesn't include the CLI. Restart your shell, or on Linux source `~/.wheels/env` manually. On macOS, confirm Homebrew's bin path is in `PATH`: `echo $PATH | tr ':' '\n' | grep brew`.
+Your shell's `PATH` doesn't include the CLI. Restart your shell first — most installs only put the binary on `PATH` for new shell sessions. On macOS, confirm Homebrew's bin path is in `PATH`: `echo $PATH | tr ':' '\n' | grep brew`. On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be on every user's default `PATH`; if it's not, check `dpkg -L wheels` (Debian) or `rpm -ql wheels` (RHEL) to confirm the package installed and the binary is where expected.
 
 **`Error: unable to find Java runtime`**
 
