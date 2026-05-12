@@ -16,7 +16,7 @@ There is no ForgeBox and no CommandBox. The registry manifest is authoritative, 
 wheels packages list [--tag=<tag>]
 wheels packages search <query>
 wheels packages show <name>
-wheels packages install <name>[@<version>] [--force]
+wheels packages add <name>[@<version>] [--force]
 wheels packages update <name> --yes
 wheels packages update --all --yes
 wheels packages remove <name>
@@ -31,7 +31,7 @@ wheels packages registry info
 | [`list`](./list) | Show every package in the registry, optionally filtered by `--tag`. |
 | [`search`](./search) | Substring match against name, description, and tags. |
 | [`show`](./show) | Detail page for a package: versions, homepage, license, install state. |
-| [`install`](./install) | Download, verify, extract into `vendor/<name>/`. |
+| [`add`](./install) | Download, verify, extract into `vendor/<name>/`. |
 | [`update`](./update) | Re-install the latest compatible version. Explicit: requires `--yes`. |
 | [`remove`](./remove) | Delete `vendor/<name>/`. Refuses dirs without a `package.json`. |
 | [`registry refresh`](./registry-refresh) | Bust the 24h cache. |
@@ -58,4 +58,4 @@ See the registry's [CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packag
 2. Tag a release on your repo (e.g. `v1.0.0`).
 3. Open a PR to `wheels-packages` adding `packages/<your-name>/manifest.json` with the version entry (leave `tarball` and `sha256` blank — CI fills them).
 4. After merge, the `mirror-tarball` workflow packages your tag, uploads it as a registry release asset, computes the sha256, and commits it back.
-5. Users can now `wheels packages install <your-name>`.
+5. Users can now `wheels packages add <your-name>`.

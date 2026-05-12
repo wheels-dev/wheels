@@ -242,10 +242,10 @@ The `plugins/` directory still works. It emits a warning at load. Plan a migrati
    }
    ```
 
-4. Install into `vendor/`, then reload. Wheels 4.1 will ship `wheels packages install`; until then, clone (or symlink a local checkout) into `vendor/`:
+4. Install into `vendor/`, then reload:
 
    ```bash title="your shell"
-   gh repo clone yourorg/wheels-auditlog vendor/wheels-auditlog
+   wheels packages add wheels-auditlog
    wheels reload
    ```
 
@@ -292,10 +292,10 @@ The `/_browser/home`, `/_browser/login`, `/_browser/dashboard`, `/_browser/login
 
 **CHANGELOG:** `Legacy compatibility adapter for 3.x → 4.0 migration soft-landing` (#2015), now distributed as the standalone [`wheels-dev/wheels-legacy-adapter`](https://github.com/wheels-dev/wheels-legacy-adapter) package.
 
-When you can't fix all eleven breaking items in one sprint, install the adapter, ship the upgrade, and modernize incrementally. Wheels 4.1 will support `wheels packages install wheels-legacy-adapter`; until then, the interim install is:
+When you can't fix all eleven breaking items in one sprint, install the adapter, ship the upgrade, and modernize incrementally:
 
 ```bash title="your shell"
-gh repo clone wheels-dev/wheels-legacy-adapter vendor/wheels-legacy-adapter
+wheels packages add wheels-legacy-adapter
 wheels reload
 ```
 

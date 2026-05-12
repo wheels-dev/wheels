@@ -283,8 +283,8 @@ gh repo clone wheels-dev/wheels-hotwire vendor/wheels-hotwire
 wheels reload
 ```
 
-<Aside type="caution">
-  Wheels 4.1 will ship `wheels packages install wheels-hotwire` which resolves names against the registry. Until then, the `gh repo clone` above is the interim install path. Part 4 wires Hotwire into the blog for real.
+<Aside type="tip">
+  Use `wheels packages add wheels-hotwire` to install from the registry. The `gh repo clone` above is the manual fallback if the registry is unavailable. Part 4 wires Hotwire into the blog for real.
 </Aside>
 
 Once Hotwire is active, clicking any internal link becomes a Turbo Drive visit — the page body swaps in without a full reload, and the browser history is preserved. The magic is invisible: no `<turbo-frame>` markup is required for the baseline experience.
