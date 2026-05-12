@@ -1105,20 +1105,16 @@ Provide migration code following Wheels conventions."
 			local.appRoot = getDirectoryFromPath(local.publicDirClean) & "/";
 			local.fullTargetDir = local.appRoot & local.targetDir;
 
-			// Debug logging removed - path resolution working correctly
-
 			// Clean up path separators
 			local.fullTargetDir = replace(local.fullTargetDir, "\\", "/", "all");
 			local.fullTargetDir = replace(local.fullTargetDir, "//", "/", "all");
 
 			if (!directoryExists(local.fullTargetDir)) {
-				// Adobe CF's DirectoryCreate rejects the Lucee-only createPath
-				// flag with "Parameter validation error for the DIRECTORYCREATE
-				// function. The function takes 1 parameter." (#2614). Route
-				// through java.io.File.mkdirs() so the recursive-create path
-				// works on every engine. Same pattern as ManifestCache (#2567)
-				// and BrowserTest.$ensureArtifactDir.
-				createObject("java", "java.io.File").init(local.fullTargetDir).mkdirs();
+				// Adobe CF rejects directoryCreate(path, true) — see #2614. Use mkdirs() instead.
+				local.created = createObject("java", "java.io.File").init(local.fullTargetDir).mkdirs();
+				if (!local.created && !directoryExists(local.fullTargetDir)) {
+					throw(type="Wheels.Mcp.TestDir", message="Could not create test directory '#local.fullTargetDir#'.");
+				}
 			}
 
 			// Generate test file content
