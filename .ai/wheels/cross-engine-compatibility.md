@@ -64,6 +64,29 @@ var fn = obj["dynamicMethod"];
 var result = fn();
 ```
 
+### Inline Closure as Constructor Named Argument (Adobe CF)
+
+Passing a function literal directly as a named argument to a `new Component(...)` call crashes Adobe CF's bytecode generator with `java.lang.ArrayStoreException: coldfusion.compiler.ASTcffunction`. The compile error fires from `getComponentMetadata()` and crashes the **entire** TestBox bundle for the engine — not just the one spec — because Adobe CF eagerly compiles every CFC in the bundle directory before any test runs.
+
+```cfm
+// WRONG — crashes Adobe CF at compile time
+var mw = new wheels.middleware.RateLimiter(
+    maxRequests = 5,
+    keyFunction = function(req) { return "client-1"; }
+);
+
+// RIGHT — hoist the closure into a local var first
+var keyFn = function(req) { return "client-1"; };
+var mw = new wheels.middleware.RateLimiter(
+    maxRequests = 5,
+    keyFunction = keyFn
+);
+```
+
+**Why**: Adobe CF's `ExprAssembler.invokeNew` (called via `generateSetVarCode` → `assignStatement`) tries to store the function AST node into a typed array that doesn't accept `ASTcffunction` entries. The bug only manifests when the function literal appears in the argument list of `new` (not bare function calls).
+
+**Reference examples**: `vendor/wheels/tests/specs/middleware/RateLimiterSpec.cfc` (12 sites) and the original `SessionStrategySpec.cfc` workaround. Lucee and BoxLang compile both forms identically — there is no behavior change from hoisting, only better cross-engine portability.
+
 ### Array By-Value in Struct Literals (Adobe CF)
 
 Adobe CF copies arrays by value when they appear in struct literal syntax. Closures that append to the copy won't affect the original.

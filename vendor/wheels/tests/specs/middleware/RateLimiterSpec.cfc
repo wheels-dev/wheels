@@ -488,11 +488,14 @@ component extends="wheels.WheelsTest" {
 			it("hashes long keys from custom keyFunction", function() {
 				var longKey = RepeatString("X", 300);
 
+				// Adobe CF: hoist the function literal out of `new` to dodge
+				// ASTcffunction ArrayStoreException at compile time.
+				var keyFn = function(req) { return longKey; };
 				var limiter = new wheels.middleware.RateLimiter(
 					maxRequests = 1,
 					windowSeconds = 60,
 					maxKeyLength = 128,
-					keyFunction = function(req) { return longKey; }
+					keyFunction = keyFn
 				);
 
 				var nextFn = function(req) { return "ok"; };
@@ -663,8 +666,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("accepts a custom keyFunction", function() {
+				var keyFn = function(request) { return "custom-key"; };
 				var mw = new wheels.middleware.RateLimiter(
-					keyFunction = function(request) { return "custom-key"; }
+					keyFunction = keyFn
 				);
 				expect(mw).toBeInstanceOf("wheels.middleware.RateLimiter");
 			});
@@ -674,11 +678,12 @@ component extends="wheels.WheelsTest" {
 		describe("RateLimiter handle() - Fixed Window via Pipeline", function() {
 
 			it("allows requests under the limit", function() {
+				var keyFn = function(req) { return "fw-client-1"; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 5,
 					windowSeconds = 60,
 					strategy = "fixedWindow",
-					keyFunction = function(req) { return "fw-client-1"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var shared = {callCount: 0};
@@ -695,11 +700,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("blocks requests exceeding the limit", function() {
+				var keyFn = function(req) { return "fw-client-2"; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 3,
 					windowSeconds = 60,
 					strategy = "fixedWindow",
-					keyFunction = function(req) { return "fw-client-2"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var shared = {callCount: 0};
@@ -718,11 +724,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns 429 response text when rate limited", function() {
+				var keyFn = function(req) { return "fw-client-429"; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 1,
 					windowSeconds = 60,
 					strategy = "fixedWindow",
-					keyFunction = function(req) { return "fw-client-429"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var handler = function(required struct request) { return "ok"; };
@@ -735,11 +742,12 @@ component extends="wheels.WheelsTest" {
 
 			it("tracks different clients independently", function() {
 				var clientKey = {value: "fw-clientA"};
+				var keyFn = function(req) { return clientKey.value; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 2,
 					windowSeconds = 60,
 					strategy = "fixedWindow",
-					keyFunction = function(req) { return clientKey.value; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var handler = function(required struct request) { return "ok"; };
@@ -760,11 +768,12 @@ component extends="wheels.WheelsTest" {
 		describe("RateLimiter handle() - Sliding Window via Pipeline", function() {
 
 			it("allows requests under the limit", function() {
+				var keyFn = function(req) { return "sw-client-1"; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 5,
 					windowSeconds = 60,
 					strategy = "slidingWindow",
-					keyFunction = function(req) { return "sw-client-1"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var shared = {callCount: 0};
@@ -781,11 +790,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("blocks requests exceeding the limit", function() {
+				var keyFn = function(req) { return "sw-client-2"; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 3,
 					windowSeconds = 60,
 					strategy = "slidingWindow",
-					keyFunction = function(req) { return "sw-client-2"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var shared = {callCount: 0};
@@ -808,11 +818,12 @@ component extends="wheels.WheelsTest" {
 		describe("RateLimiter handle() - Token Bucket via Pipeline", function() {
 
 			it("allows requests up to bucket capacity", function() {
+				var keyFn = function(req) { return "tb-client-1"; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 5,
 					windowSeconds = 60,
 					strategy = "tokenBucket",
-					keyFunction = function(req) { return "tb-client-1"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var shared = {callCount: 0};
@@ -829,11 +840,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("blocks when bucket is empty", function() {
+				var keyFn = function(req) { return "tb-client-2"; };
 				var mw = new wheels.middleware.RateLimiter(
 					maxRequests = 2,
 					windowSeconds = 60,
 					strategy = "tokenBucket",
-					keyFunction = function(req) { return "tb-client-2"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var shared = {callCount: 0};
@@ -856,9 +868,10 @@ component extends="wheels.WheelsTest" {
 
 			it("works in a middleware pipeline with other middleware", function() {
 				var requestId = new wheels.middleware.RequestId();
+				var keyFn = function(req) { return "pipeline-client"; };
 				var limiter = new wheels.middleware.RateLimiter(
 					maxRequests = 10,
-					keyFunction = function(req) { return "pipeline-client"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [requestId, limiter]);
 				var handler = function(required struct request) { return "ok"; };
@@ -870,9 +883,10 @@ component extends="wheels.WheelsTest" {
 
 			it("short-circuits pipeline when rate limited", function() {
 				var shared = {coreReached: false};
+				var keyFn = function(req) { return "shortcircuit-client"; };
 				var limiter = new wheels.middleware.RateLimiter(
 					maxRequests = 1,
-					keyFunction = function(req) { return "shortcircuit-client"; }
+					keyFunction = keyFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [limiter]);
 				var handler = function(required struct request) {
