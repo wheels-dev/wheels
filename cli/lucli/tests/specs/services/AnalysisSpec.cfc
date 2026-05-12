@@ -112,7 +112,125 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(issueMessages).toInclude("Model");
 				});
 
-				it("does not flag the framework's parent Model.cfc / Controller.cfc", () => {
+				it("flags model where extends is only present in a line comment", () => {
+				// Reproduces #2491 follow-up: the validator must not treat a
+				// commented-out `extends="Model"` as satisfying inheritance.
+				var modelDir = tempRoot & "/app/models";
+				directoryCreate(modelDir, true, true);
+				fileWrite(
+					modelDir & "/CommentedExtendsLine.cfc",
+					'// component extends="Model" {' & chr(10) &
+					'component {' & chr(10) &
+					'    function config() {}' & chr(10) &
+					'}'
+				);
+
+				var results = analysis.validate();
+				var issueMessages = "";
+				for (var issue in results.issues) {
+					if (findNoCase("CommentedExtendsLine.cfc", issue.file)) {
+						issueMessages &= issue.message & " ";
+					}
+				}
+				expect(issueMessages).toInclude("does not extend Model");
+
+				fileDelete(modelDir & "/CommentedExtendsLine.cfc");
+			});
+
+			it("flags model where extends is only present in a block comment", () => {
+				var modelDir = tempRoot & "/app/models";
+				directoryCreate(modelDir, true, true);
+				fileWrite(
+					modelDir & "/CommentedExtendsBlock.cfc",
+					'/* example: component extends="Model" {} */' & chr(10) &
+					'component {' & chr(10) &
+					'    function config() {}' & chr(10) &
+					'}'
+				);
+
+				var results = analysis.validate();
+				var issueMessages = "";
+				for (var issue in results.issues) {
+					if (findNoCase("CommentedExtendsBlock.cfc", issue.file)) {
+						issueMessages &= issue.message & " ";
+					}
+				}
+				expect(issueMessages).toInclude("does not extend Model");
+
+				fileDelete(modelDir & "/CommentedExtendsBlock.cfc");
+			});
+
+			it("flags model where extends is only present in a tag-style CFML comment", () => {
+				var modelDir = tempRoot & "/app/models";
+				directoryCreate(modelDir, true, true);
+				fileWrite(
+					modelDir & "/CommentedExtendsTag.cfc",
+					'<!--- example: component extends="Model" {} --->' & chr(10) &
+					'component {' & chr(10) &
+					'    function config() {}' & chr(10) &
+					'}'
+				);
+
+				var results = analysis.validate();
+				var issueMessages = "";
+				for (var issue in results.issues) {
+					if (findNoCase("CommentedExtendsTag.cfc", issue.file)) {
+						issueMessages &= issue.message & " ";
+					}
+				}
+				expect(issueMessages).toInclude("does not extend Model");
+
+				fileDelete(modelDir & "/CommentedExtendsTag.cfc");
+			});
+
+			it("still passes when extends is present alongside a commented-out copy", () => {
+				var modelDir = tempRoot & "/app/models";
+				directoryCreate(modelDir, true, true);
+				fileWrite(
+					modelDir & "/CommentedAndReal.cfc",
+					'// component extends="Model" {' & chr(10) &
+					'component extends="Model" {' & chr(10) &
+					'    function config() {}' & chr(10) &
+					'}'
+				);
+
+				var results = analysis.validate();
+				var foundBadIssue = false;
+				for (var issue in results.issues) {
+					if (findNoCase("CommentedAndReal.cfc", issue.file)
+							&& findNoCase("does not extend Model", issue.message)) {
+						foundBadIssue = true;
+					}
+				}
+				expect(foundBadIssue).toBeFalse();
+
+				fileDelete(modelDir & "/CommentedAndReal.cfc");
+			});
+
+			it("flags controller where extends is only present in a comment", () => {
+				var ctrlDir = tempRoot & "/app/controllers";
+				directoryCreate(ctrlDir, true, true);
+				fileWrite(
+					ctrlDir & "/CommentedCtrl.cfc",
+					'// component extends="Controller" {' & chr(10) &
+					'component {' & chr(10) &
+					'    function config() {}' & chr(10) &
+					'}'
+				);
+
+				var results = analysis.validate();
+				var issueMessages = "";
+				for (var issue in results.issues) {
+					if (findNoCase("CommentedCtrl.cfc", issue.file)) {
+						issueMessages &= issue.message & " ";
+					}
+				}
+				expect(issueMessages).toInclude("does not extend Controller");
+
+				fileDelete(ctrlDir & "/CommentedCtrl.cfc");
+			});
+
+			it("does not flag the framework's parent Model.cfc / Controller.cfc", () => {
 					// The base parent files extend "wheels.Model" / "wheels.Controller"
 					// rather than "Model" / "Controller", since they ARE the parent.
 					// The validator must skip them.
