@@ -44,9 +44,30 @@ docs = {
 <cfif request.wheels.params.format EQ "json">
     <cfcontent type="application/json" reset="true"><cfoutput>#SerializeJSON(docs)#</cfoutput>
 <cfelse>
-    <cfhtmlhead text="<meta http-equiv=""refresh"" content=""3;url=#encodeForHTMLAttribute(docs.url)#"">">
     <cfoutput>
         <!--- cfformat-ignore-start --->
+        <!---
+            Body-level redirect. The wrapper view (../views/guides.cfm)
+            includes ../layout/_header.cfm before this template, so by the
+            time we reach this point the response has already streamed
+            past </head>. Lucee tolerates a late <cfhtmlhead> but Adobe
+            ColdFusion throws "Unable to add text to HTML HEAD tag." See
+            issue ##2569. We read the redirect target from a hidden data
+            attribute and trigger the navigation in JavaScript — the URL
+            still flows through encodeForHTMLAttribute, the same encoder
+            used for the visible anchor a few lines below.
+         --->
+        <div id="wheels-guides-redirect" data-url="#encodeForHTMLAttribute(docs.url)#" hidden></div>
+        <script>
+            (function() {
+                var el = document.getElementById('wheels-guides-redirect');
+                if (el) {
+                    setTimeout(function() {
+                        window.location.href = el.getAttribute('data-url');
+                    }, 3000);
+                }
+            })();
+        </script>
         <div class="sixteen wide column">
             <div class="ui raised segment">
                 <h1>Wheels Guides have moved</h1>
