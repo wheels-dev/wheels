@@ -1,18 +1,22 @@
 ---
-title: "wheels packages install"
+title: "wheels packages add"
 description: Download, verify sha256, extract into vendor/<name>/. Refuses to overwrite without --force.
 type: reference
 sidebar:
-  label: "install"
+  label: "add"
   order: 4
 ---
 
-Installs a package into `vendor/<name>/` from the registry. On the next `wheels reload`, `PackageLoader` auto-discovers the new `vendor/<name>/package.json` and activates the package.
+Adds a package into `vendor/<name>/` from the registry. On the next `wheels reload`, `PackageLoader` auto-discovers the new `vendor/<name>/package.json` and activates the package.
+
+:::note[Why `add`, not `install`?]
+LuCLI's built-in extension installer intercepts the literal subcommand `install` across every module. Typing `wheels packages install <name>` runs LuCLI's own dependency resolver — it prints `No git or extension dependencies to install` and exits without touching `vendor/`. Use `add` instead. (The same rename happened to `wheels browser setup`, which was previously `wheels browser install`.)
+:::
 
 ## Synopsis
 
 ```sh title="synopsis"
-wheels packages install <name>[@<version>] [--force]
+wheels packages add <name>[@<version>] [--force]
 ```
 
 ## Flags
@@ -45,11 +49,11 @@ The same `SemVer` matcher that `PackageLoader` uses at runtime.
 ## Example
 
 ```sh title="illustrative — terminal session"
-$ wheels packages install wheels-sentry
+$ wheels packages add wheels-sentry
 Installed wheels-sentry@1.0.0 → /Users/me/app/vendor/wheels-sentry
 Run `wheels reload` to activate it.
 
-$ wheels packages install wheels-sentry@1.0.0 --force
+$ wheels packages add wheels-sentry@1.0.0 --force
 Installed wheels-sentry@1.0.0 → /Users/me/app/vendor/wheels-sentry
 Run `wheels reload` to activate it.
 ```
