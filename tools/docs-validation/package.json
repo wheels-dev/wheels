@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Agent-driven validation of Wheels API docs and guides",
+  "license": "Apache-2.0",
   "scripts": {
     "validate": "node orchestrate.mjs",
     "status": "node orchestrate.mjs --status"

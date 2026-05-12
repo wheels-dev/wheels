@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Wheels CFML MVC Framework — dev tooling only",
+  "license": "Apache-2.0",
   "scripts": {
     "prepare": "husky",
     "issue-resolver:setup": "tsx tools/issue-resolver/setup.ts",
