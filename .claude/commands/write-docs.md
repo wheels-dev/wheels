@@ -124,11 +124,13 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 
    ```bash
    git add <files>
-   git commit -m "<message>"
+   git commit -s -m "<message>"
    ```
 
-   The caller workflow handles the actual `git push` — just commit
-   cleanly. Do **not** use `--amend` or `--force`.
+   The `-s` flag is required — every commit must carry a `Signed-off-by:`
+   trailer matching the configured git author (DCO enforcement; see
+   `_shared-rails.md`). The caller workflow handles the actual `git push`
+   — just commit cleanly. Do **not** use `--amend` or `--force`.
 
 8. **Open the draft PR.** Use `gh pr create --draft --base develop`. The
    PR body must:

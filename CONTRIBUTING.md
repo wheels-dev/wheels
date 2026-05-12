@@ -10,6 +10,7 @@ These guidelines are here to make the contribution process clear, smooth, and re
 ## Quick Links
 
 * [Code of Conduct](#code-of-conduct)
+* [Developer Certificate of Origin (DCO)](#developer-certificate-of-origin-dco)
 * [Getting Started](#getting-started)
   * [Development Environment Setup](#development-environment-setup)
   * [Issues](#issues)
@@ -25,6 +26,63 @@ These guidelines are here to make the contribution process clear, smooth, and re
 ## Code of Conduct
 
 We value an open, welcoming, and respectful community. By participating in Wheels projects, you agree to follow our [Code of Conduct](https://github.com/wheels-dev/wheels/blob/develop/CODE_OF_CONDUCT.md). This applies to all community spaces, including GitHub, forums, and events.
+
+---
+
+## Developer Certificate of Origin (DCO)
+
+Wheels uses the [Developer Certificate of Origin](https://developercertificate.org/) (DCO) for all contributions. The DCO is a lightweight, per-commit attestation that you have the right to submit the work you're contributing. It's a simpler alternative to a Contributor License Agreement (CLA) and is the same model used by the Linux kernel, Docker, and GitLab.
+
+By signing off on a commit, you certify that:
+
+> 1. The contribution was created in whole or in part by you and you have the right to submit it under the open source license indicated in the file; or
+> 2. The contribution is based upon previous work that is covered by an appropriate open source license and you have the right under that license to submit that work with modifications; or
+> 3. The contribution was provided directly to you by some other person who certified (1), (2), or (3); and you have not modified it.
+> 4. You understand and agree that this project and the contribution are public and that a record of the contribution (including all personal information you submit with it) is maintained indefinitely.
+
+Read the [full DCO text](https://developercertificate.org/) for the authoritative wording.
+
+### How to sign off
+
+Add a `Signed-off-by:` trailer to every commit. The easiest way is `git commit -s`, which appends the trailer automatically using your configured `user.name` and `user.email`:
+
+```bash
+git commit -s -m "fix(model): handle null in validatesPresenceOf"
+```
+
+The resulting commit message looks like this:
+
+```
+fix(model): handle null in validatesPresenceOf
+
+Signed-off-by: Jane Contributor <jane@example.com>
+```
+
+The name and email **must match** the identity you use on GitHub. Anonymous or pseudonymous sign-offs are not accepted.
+
+### Forgot to sign off?
+
+If you've already pushed a branch without sign-offs, you can amend the last commit:
+
+```bash
+git commit --amend -s --no-edit
+git push --force-with-lease
+```
+
+For multiple unsigned commits, rebase and add sign-off to each:
+
+```bash
+git rebase --signoff develop
+git push --force-with-lease
+```
+
+### Enforcement
+
+The [DCO GitHub App](https://github.com/apps/dco) runs as a required status check on every PR. It verifies that every commit in the PR carries a valid `Signed-off-by:` trailer and blocks merge if any are missing. The app comments on the PR with a fixup suggestion when it finds an unsigned commit.
+
+### Grandfathering
+
+The DCO is enforced on **new PRs only**. Commits authored before DCO adoption are grandfathered and do not need to be retroactively signed.
 
 ---
 
@@ -66,7 +124,7 @@ In general, we follow the ["fork-and-pull" Git workflow](https://github.com/susa
 2. Clone the project to your machine
 3. Run `bash tools/scripts/setup.sh` to set up your dev environment
 4. Create a branch locally with a succinct but descriptive name
-5. Commit changes to the branch
+5. Commit changes to the branch with `git commit -s` to add the required [DCO sign-off](#developer-certificate-of-origin-dco)
 6. Following the formatting and testing guidelines
 7. Push changes to your fork
 8. Open a PR in the [wheels-dev/wheels](https://github.com/wheels-dev/wheels) repository and follow the PR template so that we can efficiently review the changes.
@@ -137,8 +195,9 @@ If you're making a **breaking change** or working on **core functionality**, it'
 3. Create a descriptive branch name
 4. Make your changes
 5. Run tests and check formatting
-6. Push to your fork
-7. Open a PR to `wheels-dev/wheels` and follow the PR template
+6. Commit with `git commit -s` to add the required [DCO sign-off](#developer-certificate-of-origin-dco)
+7. Push to your fork
+8. Open a PR to `wheels-dev/wheels` and follow the PR template
 
 **Review Process:**
 

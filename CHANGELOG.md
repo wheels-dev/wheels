@@ -107,6 +107,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Gap migration detection in `migrateTo()` — detects and runs previously-skipped migrations, not just the endpoint (#1928)
 - Calculated property SQL validation at model config time (#2067)
 - GROUP BY validation with dot-notation, matching ORDER BY parser (#2084)
+- Adopt the [Developer Certificate of Origin](https://developercertificate.org/) for contributions — `Signed-off-by:` trailer required on every commit via `git commit -s`; enforced by the [DCO GitHub App](https://github.com/apps/dco) on new PRs only (existing commits grandfathered); `CONTRIBUTING.md`, PR template, and `wheels-bot` rails updated (#2575)
 
 ### Changed
 
