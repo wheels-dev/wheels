@@ -1,5 +1,5 @@
 ---
-title: Wheels 4.0: Closing the Maturity Gap
+title: 'Wheels 4.0: Closing the Maturity Gap'
 slug: wheels-4-closing-the-maturity-gap
 publishedAt: '2026-05-12T14:00:00.000Z'
 updatedAt: '2026-05-07T02:00:09.000Z'
