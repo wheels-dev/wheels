@@ -124,11 +124,9 @@ brew uninstall wheels-be
 brew install wheels
 ```
 
-```bash title="Linux — stable → bleeding-edge"
-# Use the bleeding-edge install snippet from "Installing each channel" above
-# (the wheels-dev/wheels-snapshots URLs). apt/dnf sees a newer version
-# (e.g. 4.0.1~snapshot.500 sorts above the most recent stable 4.0.0) and
-# upgrades in place — no uninstall step needed.
+```bash title="Linux — stable → bleeding-edge (Debian / Ubuntu)"
+# apt sees a newer version (e.g. 4.0.1~snapshot.500 sorts above the most
+# recent stable 4.0.0) and upgrades in place — no uninstall step needed.
 SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
 SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
@@ -136,18 +134,37 @@ curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v$
 sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
 ```
 
-```bash title="Linux — bleeding-edge → stable"
-# apt treats this as a downgrade (4.0.0 sorts below 4.0.1~snapshot.500) so add
-# --allow-downgrades. dnf handles downgrades transparently with `dnf downgrade`.
+```bash title="Linux — stable → bleeding-edge (Fedora / RHEL)"
+SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
+sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+```
+
+```bash title="Linux — bleeding-edge → stable (Debian / Ubuntu)"
+# apt treats this as a downgrade (4.0.0 sorts below 4.0.1~snapshot.500), so add
+# --allow-downgrades.
 WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
 curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
 sudo apt install --allow-downgrades "./wheels_${WHEELS_VERSION}_amd64.deb"
 ```
 
+```bash title="Linux — bleeding-edge → stable (Fedora / RHEL)"
+# Use `dnf downgrade` — dnf handles the older-version transition transparently.
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+sudo dnf downgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+```
+
 ```powershell title="Windows (Scoop) — stable → bleeding-edge"
 scoop uninstall wheels
 scoop install wheels-be
+```
+
+```powershell title="Windows (Scoop) — bleeding-edge → stable"
+scoop uninstall wheels-be
+scoop install wheels
 ```
 
 ### What happens to your apps when you switch

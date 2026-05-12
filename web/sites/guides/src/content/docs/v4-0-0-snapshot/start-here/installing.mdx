@@ -159,6 +159,10 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
 
 Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repository at `apt.wheels.dev` / `yum.wheels.dev` is on the v4.0.x roadmap — until then, install the package directly from a GitHub Release. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
 
+<Aside type="caution" title="Trust model during Phase 1">
+During Phase 1 (before `apt.wheels.dev` / `yum.wheels.dev` are live), download integrity relies on GitHub's HTTPS transport — the `.deb`/`.rpm` artifacts ship without detached GPG signatures, so there's nothing for `apt-key` / `rpm --checksig` to verify against. Phase 2 adds GPG-signed apt/yum repositories. For now, `wheels-dev/wheels/releases` is the trust root.
+</Aside>
+
 <Steps>
 
 1. Download and install the latest Wheels release:

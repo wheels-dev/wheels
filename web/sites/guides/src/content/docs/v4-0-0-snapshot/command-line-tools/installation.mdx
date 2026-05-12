@@ -93,6 +93,10 @@ The version metadata *inside* the `.deb`/`.rpm` preserves the canonical `~snapsh
 The download-and-install flow above is the v4.0 GA story. Native `apt`/`yum` repositories at `apt.wheels.dev` and `yum.wheels.dev` are on the v4.0.x roadmap — once they're live, you'll be able to add a sources list once and `sudo apt install wheels` / `sudo dnf install wheels` will pull new versions automatically via `apt update`. The package format on disk doesn't change.
 </Aside>
 
+<Aside type="caution" title="Trust model during Phase 1">
+Until the native repos are live, download integrity relies on GitHub's HTTPS transport — the `.deb`/`.rpm` artifacts ship without detached GPG signatures, so neither `apt-key` nor `rpm --checksig` has anything to verify against. Phase 2 introduces a GPG-signed apt/yum repository (the signing key will live in 1Password and be published at `apt.wheels.dev/wheels.gpg`), which will add cryptographic provenance on top of TLS. For now, treat `wheels-dev/wheels/releases` as the trust root.
+</Aside>
+
 ## Windows (Scoop)
 
 Wheels ships on Windows through [Scoop](https://scoop.sh) — a portable, sandboxed package manager that fits the project's release cadence (hourly autoupdate for both stable and bleeding-edge channels). The legacy Chocolatey path is no longer supported; the old v1.x `wheels` package at `community.chocolatey.org/packages/wheels` is the CommandBox-based release and won't drive a v4 tutorial.
