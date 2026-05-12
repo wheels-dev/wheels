@@ -1,0 +1,53 @@
+---
+title: Controller
+description: "48 Controller functions in Wheels 4.0.0."
+---
+
+- [`authenticityToken()`](/v4-0-0/controller/authenticitytoken/) — Returns the raw CSRF authenticity token
+- [`caches()`](/v4-0-0/controller/caches/) — Tells Wheels to cache one or more actions.
+- [`clearCachableActions()`](/v4-0-0/controller/clearcachableactions/) — Clears cached action metadata for current controller.
+- [`filterChain()`](/v4-0-0/controller/filterchain/) — Returns an array of all the filters set on current controller in the order in which they will be executed.
+- [`filters()`](/v4-0-0/controller/filters/) — Tells Wheels to run a function before an action is run or after an action has been run.
+- [`flash()`](/v4-0-0/controller/flash/) — Returns the value of a specific key in the Flash (or the entire Flash as a struct if no key is passed in).
+- [`flashClear()`](/v4-0-0/controller/flashclear/) — Deletes everything from the Flash.
+- [`flashCount()`](/v4-0-0/controller/flashcount/) — Returns how many keys exist in the Flash.
+- [`flashDelete()`](/v4-0-0/controller/flashdelete/) — Deletes a specific key from the Flash.
+- [`flashInsert()`](/v4-0-0/controller/flashinsert/) — Inserts a new key / value into the Flash.
+- [`flashIsEmpty()`](/v4-0-0/controller/flashisempty/) — Returns whether or not the Flash is empty.
+- [`flashKeep()`](/v4-0-0/controller/flashkeep/) — Make the entire Flash or specific key in it stick around for one more request.
+- [`flashKeyExists()`](/v4-0-0/controller/flashkeyexists/) — Checks if a specific key exists in the Flash.
+- [`getEmails()`](/v4-0-0/controller/getemails/) — Primarily used for testing to get information about emails sent during the request.
+- [`getFiles()`](/v4-0-0/controller/getfiles/) — Primarily used for testing to get information about files sent during the request.
+- [`getRedirect()`](/v4-0-0/controller/getredirect/) — Primarily used for testing to establish whether the current request has performed a redirect.
+- [`isAjax()`](/v4-0-0/controller/isajax/) — Returns whether the page was called from JavaScript or not.
+- [`isDelete()`](/v4-0-0/controller/isdelete/) — Returns whether the request was a <code>DELETE</code> request or not.
+- [`isGet()`](/v4-0-0/controller/isget/) — Returns whether the request was a normal <code>GET</code> request or not.
+- [`isHead()`](/v4-0-0/controller/ishead/) — Returns whether the request was a <code>HEAD</code> request or not.
+- [`isOptions()`](/v4-0-0/controller/isoptions/) — Returns whether the request was an <code>OPTIONS</code> request or not.
+- [`isPatch()`](/v4-0-0/controller/ispatch/) — Returns whether the request was a <code>PATCH</code> request or not.
+- [`isPost()`](/v4-0-0/controller/ispost/) — Returns whether the request came from a form <code>POST</code> submission or not.
+- [`isPut()`](/v4-0-0/controller/isput/) — Returns whether the request was a <code>PUT</code> request or not.
+- [`isSecure()`](/v4-0-0/controller/issecure/) — Returns whether Wheels is communicating over a secure port.
+- [`onlyProvides()`](/v4-0-0/controller/onlyprovides/) — Use this in an individual controller action to define which formats the action will respond with.
+- [`pagination()`](/v4-0-0/controller/pagination/) — Returns a struct with information about the specified paginated query.
+- [`processAction()`](/v4-0-0/controller/processaction/) — Process the specified action of the controller.
+- [`processRequest()`](/v4-0-0/controller/processrequest/) — Creates a controller and calls an action on it.
+- [`protectsFromForgery()`](/v4-0-0/controller/protectsfromforgery/) — Tells Wheels to protect <code>POST</code>ed requests from CSRF vulnerabilities.
+- [`provides()`](/v4-0-0/controller/provides/) — Defines formats that the controller will respond with upon request.
+- [`redirectTo()`](/v4-0-0/controller/redirectto/) — Redirects the browser to the supplied controller/action/key, route or back to the referring page.
+- [`renderNothing()`](/v4-0-0/controller/rendernothing/) — Instructs the controller to render an empty string when it's finished processing the action.
+- [`renderPartial()`](/v4-0-0/controller/renderpartial/) — Instructs the controller to render a partial when it's finished processing the action.
+- [`renderText()`](/v4-0-0/controller/rendertext/) — Instructs the controller to render specified text when it's finished processing the action.
+- [`renderView()`](/v4-0-0/controller/renderview/) — Instructs the controller which view template and layout to render when it's finished processing the action.
+- [`renderWith()`](/v4-0-0/controller/renderwith/) — Instructs the controller to render the data passed in to the format that is requested.
+- [`response()`](/v4-0-0/controller/response/) — Returns content that Wheels will send to the client in response to the request.
+- [`sendEmail()`](/v4-0-0/controller/sendemail/) — Sends an email using a template and an optional layout to wrap it in.
+- [`sendFile()`](/v4-0-0/controller/sendfile/) — Sends a file to the user (from the <code>files</code> folder or a path relative to it by default).
+- [`setFilterChain()`](/v4-0-0/controller/setfilterchain/) — Use this function if you need a more low level way of setting the entire filter chain for a controller.
+- [`setFlashStorage()`](/v4-0-0/controller/setflashstorage/) — Dynamically sets flashStorage during request lifecycle.
+- [`setPagination()`](/v4-0-0/controller/setpagination/) — Allows you to set a pagination handle for a custom query so you can perform pagination on it in your view with <code>pag
+- [`setResponse()`](/v4-0-0/controller/setresponse/) — Sets content that Wheels will send to the client in response to the request.
+- [`setVerificationChain()`](/v4-0-0/controller/setverificationchain/) — Use this function if you need a more low level way of setting the entire verification chain for a controller.
+- [`usesLayout()`](/v4-0-0/controller/useslayout/) — Used within a controller's <code>config()</code> function to specify controller- or action-specific layouts.
+- [`verificationChain()`](/v4-0-0/controller/verificationchain/) — Returns an array of all the verifications set on this controller in the order in which they will be executed.
+- [`verifies()`](/v4-0-0/controller/verifies/) — Instructs Wheels to verify that some specific criteria are met before running an action.
