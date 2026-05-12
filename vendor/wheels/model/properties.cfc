@@ -577,11 +577,17 @@ component {
 				value = arguments.value,
 				association = arguments.associations[arguments.property]
 			);
-		} else if (IsStruct(arguments.value) || IsArray(arguments.value)) {
-			// Defensive: a struct / array reached the assignment boundary
-			// without matching any nested-attribute association branch above.
-			// Without this guard, the value silently overwrites this.<property>
-			// and surfaces much later as a confusing cast error inside a user
+		} else if (
+			(IsStruct(arguments.value) || IsArray(arguments.value))
+			&& StructKeyExists(variables.wheels.class, "properties")
+			&& StructKeyExists(variables.wheels.class.properties, arguments.property)
+		) {
+			// Defensive: a struct / array reached the assignment boundary for a
+			// property we KNOW is a scalar database column (introspected into
+			// variables.wheels.class.properties at class init). The value
+			// didn't match any nested-attribute association branch above, so
+			// without this guard it would silently overwrite this.<property>
+			// and surface much later as a confusing cast error inside a user
 			// callback — e.g. `LCase(this.email)` blowing up with
 			// "Can't cast Complex Object Type Struct to String" while pointing
 			// at the user's beforeValidation line instead of at the bad input
@@ -593,10 +599,17 @@ component {
 			// parser interprets as a nested-struct path. `params.user.email`
 			// then arrives as a struct (`{"test@example.com": ""}`) instead
 			// of a string.
+			//
+			// The check is intentionally scoped to real DB columns so that
+			// legitimate complex-value paths (a loaded `hasMany` array of
+			// model instances, framework-internal control params like
+			// `useIndex` leaking through `$setProperties`, etc.) keep
+			// working — they reach this branch with a property name that
+			// isn't in class.properties.
 			Throw(
 				type = "Wheels.PropertyIsIncorrectType",
-				message = "Cannot assign a #(IsArray(arguments.value) ? 'array' : 'struct')# value to property `#arguments.property#` on the `#variables.wheels.class.modelName#` model.",
-				extendedInfo = "Property `#arguments.property#` is not configured as a nested association, but `setProperties()` was called with a #(IsArray(arguments.value) ? 'array' : 'struct')# value for it. This usually means upstream form data arrived in an unexpected shape — most commonly a curl POST body using bracket-nested keys without an `=` separator (e.g. `user[email][nested@key]`), which Lucee's form parser turns into a nested-struct path so `params.user.email` ends up shaped like a struct instead of a string. If you actually want to accept structured data here, declare the association with `hasOne`, `hasMany`, or `belongsTo` and enable mass-assignment by calling `nestedProperties()`."
+				message = "Cannot assign a #(IsArray(arguments.value) ? 'array' : 'struct')# value to scalar column `#arguments.property#` on the `#variables.wheels.class.modelName#` model.",
+				extendedInfo = "Property `#arguments.property#` is a scalar database column, but `setProperties()` was called with a #(IsArray(arguments.value) ? 'array' : 'struct')# value for it. This usually means upstream form data arrived in an unexpected shape — most commonly a curl POST body using bracket-nested keys without an `=` separator (e.g. `user[email][nested@key]`), which Lucee's form parser turns into a nested-struct path so `params.user.email` ends up shaped like a struct instead of a string. If you actually want to accept structured data here, the property must be declared as an association with `hasOne`, `hasMany`, or `belongsTo` and have mass-assignment enabled via `nestedProperties()`."
 			);
 		} else {
 			this[arguments.property] = arguments.value;
