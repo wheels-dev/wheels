@@ -1189,10 +1189,10 @@ component extends="modules.BaseModule" {
 	/**
 	 * Execute a single expression and display the result
 	 */
-	private void function consoleExec(required string url, required string expression, string password = "") {
+	private void function consoleExec(required string requestUrl, required string expression, string password = "") {
 		try {
 			var body = serializeJSON({expression: expression, password: password});
-			var httpResult = makeHttpPost(url, body);
+			var httpResult = makeHttpPost(requestUrl, body);
 
 			if (!isJSON(httpResult)) {
 				out("Server returned non-JSON response.", "red");
