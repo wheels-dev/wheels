@@ -582,30 +582,7 @@ component {
 			&& StructKeyExists(variables.wheels.class, "properties")
 			&& StructKeyExists(variables.wheels.class.properties, arguments.property)
 		) {
-			// Defensive: a struct / array reached the assignment boundary for a
-			// property we KNOW is a scalar database column (introspected into
-			// variables.wheels.class.properties at class init). The value
-			// didn't match any nested-attribute association branch above, so
-			// without this guard it would silently overwrite this.<property>
-			// and surface much later as a confusing cast error inside a user
-			// callback — e.g. `LCase(this.email)` blowing up with
-			// "Can't cast Complex Object Type Struct to String" while pointing
-			// at the user's beforeValidation line instead of at the bad input
-			// shape. See issue #2412 for the originating fresh-VM report.
-			//
-			// The most common upstream cause is form data shaped by curl
-			// mistakes such as `--data-urlencode "user[email][test@example.com]"`
-			// (bracket-nested key with no `=` separator), which Lucee's form
-			// parser interprets as a nested-struct path. `params.user.email`
-			// then arrives as a struct (`{"test@example.com": ""}`) instead
-			// of a string.
-			//
-			// The check is intentionally scoped to real DB columns so that
-			// legitimate complex-value paths (a loaded `hasMany` array of
-			// model instances, framework-internal control params like
-			// `useIndex` leaking through `$setProperties`, etc.) keep
-			// working — they reach this branch with a property name that
-			// isn't in class.properties.
+			// Scoped to real DB columns so loaded hasMany arrays and control-param leakage still pass through. See #2412.
 			Throw(
 				type = "Wheels.PropertyIsIncorrectType",
 				message = "Cannot assign a #(IsArray(arguments.value) ? 'array' : 'struct')# value to scalar column `#arguments.property#` on the `#variables.wheels.class.modelName#` model.",

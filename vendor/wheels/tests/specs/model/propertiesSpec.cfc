@@ -442,6 +442,18 @@ component extends="wheels.WheelsTest" {
 				expect(_author.firstName).toBe("Eve")
 				expect(_author.lastName).toBe("Tester")
 			})
+
+			it("still accepts empty arrays for hasMany properties with nestedProperties enabled (regression for #2601 review)", () => {
+				_gallery = g.model("gallery").new({title = "Empty Photos Gallery", photos = []})
+				expect(_gallery.title).toBe("Empty Photos Gallery")
+			})
+
+			it("still accepts arrays of model objects for hasMany properties with nestedProperties enabled (regression for #2601 review)", () => {
+				var _p1 = g.model("photo").new({filename = "p1.jpg", DESCRIPTION1 = "first"})
+				var _p2 = g.model("photo").new({filename = "p2.jpg", DESCRIPTION1 = "second"})
+				_gallery = g.model("gallery").new({title = "Object Photos Gallery", photos = [_p1, _p2]})
+				expect(_gallery.title).toBe("Object Photos Gallery")
+			})
 		})
 
 		describe("Tests that propertyIsBlank", () => {
