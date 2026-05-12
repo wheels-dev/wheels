@@ -47,10 +47,10 @@ def info(msg: str) -> None:
 
 
 def extract_cmd_lines(manifest: dict) -> list[str]:
-    """Pull the literal CMD lines back out of the post_install array."""
+    """Pull the literal CMD lines back out of the pre_install array."""
     cmd_lines: list[str] = []
     pattern = re.compile(r"^\$lines\.Add\('(.*)'\)$")
-    for stmt in manifest.get("post_install", []):
+    for stmt in manifest.get("pre_install", []):
         m = pattern.match(stmt)
         if m:
             # PowerShell single-quote escape: '' -> '
@@ -107,7 +107,7 @@ def check_url_reachable(url: str, name: str) -> None:
 def check_wrapper(name: str, m: dict) -> None:
     cmd_lines = extract_cmd_lines(m)
     if not cmd_lines:
-        fail(f"{name}: post_install emits no CMD wrapper lines")
+        fail(f"{name}: pre_install emits no CMD wrapper lines")
         return
 
     joined = "\n".join(cmd_lines)

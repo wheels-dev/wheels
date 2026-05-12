@@ -44,7 +44,7 @@
             "wheels"
         ]
     ],
-    "post_install": [
+    "pre_install": [
         "$lines = New-Object System.Collections.Generic.List[string]",
         "$lines.Add('@echo off')",
         "$lines.Add('setlocal enabledelayedexpansion')",

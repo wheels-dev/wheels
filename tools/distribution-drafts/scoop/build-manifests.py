@@ -134,8 +134,14 @@ def ps_quote_for_addcontent(line: str) -> str:
     return "$lines.Add('" + line.replace("'", "''") + "')"
 
 
-def build_post_install(channel: str) -> list[str]:
-    """Generate the post_install PowerShell array for the given channel."""
+def build_pre_install(channel: str) -> list[str]:
+    """Generate the pre_install PowerShell array for the given channel.
+
+    Emitted as `pre_install` rather than `post_install` because Scoop creates the
+    `bin` shim after pre_install but before post_install. The wheels.cmd launcher
+    must exist at shim-creation time, otherwise the install aborts with
+    `Can't shim 'wheels.cmd': File doesn't exist.` and no further hooks run.
+    """
     lines = cmd_wrapper(channel)
     return [
         # Use the .NET List to avoid PowerShell's slow array-realloc pattern
@@ -183,7 +189,7 @@ def manifest_be() -> dict:
             }
         },
         "bin": [["wheels.cmd", "wheels"]],
-        "post_install": build_post_install("bleeding-edge"),
+        "pre_install": build_pre_install("bleeding-edge"),
         "checkver": {
             "url": "https://api.github.com/repos/wheels-dev/wheels-snapshots/releases?per_page=1",
             "jsonpath": "$[0].tag_name",
@@ -250,7 +256,7 @@ def manifest_stable() -> dict:
             }
         },
         "bin": [["wheels.cmd", "wheels"]],
-        "post_install": build_post_install("stable"),
+        "pre_install": build_pre_install("stable"),
         "checkver": {"github": "https://github.com/wheels-dev/wheels"},
         "autoupdate": {
             "architecture": {

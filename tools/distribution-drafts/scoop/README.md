@@ -23,8 +23,12 @@ Each install lands four payloads under Scoop's per-version app dir (`$dir`):
 | `lucli-0.3.7.bat` | cybersonic/LuCLI release | `$dir\` |
 | `sqlite-jdbc-3.49.1.0.jar` | Maven Central | `$dir\` |
 
-The `post_install` PowerShell block emits a generated `$dir\wheels.cmd` wrapper.
-That wrapper is what Scoop's `bin` directive shims onto PATH as `wheels`.
+The `pre_install` PowerShell block emits a generated `$dir\wheels.cmd` wrapper.
+That wrapper is what Scoop's `bin` directive shims onto PATH as `wheels`. We use
+`pre_install` (not `post_install`) because Scoop's install order is
+`pre_install` → `bin` shim creation → `post_install` — writing `wheels.cmd` in
+`post_install` would fail the shim step with `Can't shim 'wheels.cmd': File
+doesn't exist.` and abort the install before the wrapper is ever created.
 
 The wrapper, on every invocation:
 
@@ -110,7 +114,7 @@ statements. To pull out the literal CMD content and review it:
 python3 -c '
 import json, re
 m = json.load(open("tools/distribution-drafts/scoop/wheels-be.json"))
-for stmt in m["post_install"]:
+for stmt in m["pre_install"]:
     mm = re.match(r"\$lines\.Add\(\x27(.*)\x27\)", stmt)
     if mm:
         print(mm.group(1).replace("\x27\x27", "\x27"))'
