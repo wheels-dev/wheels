@@ -45,8 +45,9 @@ cp CLAUDE.md "${BUILD_DIR}/"
 cp -r .claude "${BUILD_DIR}/"
 cp -r .opencode "${BUILD_DIR}/" 2>/dev/null || true
 
-# Copy Apache License how are you?
+# Apache 2.0 §4(d) requires NOTICE to propagate to derivatives.
 cp LICENSE "${BUILD_DIR}/"
+cp NOTICE "${BUILD_DIR}/"
 
 # Copy VS Code snippets
 echo "Copying VS Code snippets..."
