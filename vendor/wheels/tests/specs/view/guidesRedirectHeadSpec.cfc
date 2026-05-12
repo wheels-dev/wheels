@@ -24,12 +24,15 @@ component extends="wheels.WheelsTest" {
 				// the CFML/Java regex dot does not match line terminators
 				// by default; [\s\S] is the portable any-character idiom.
 				source = reReplace(source, "<!---[\s\S]*?--->", "", "all");
-				// Build the cfhtmlhead pattern with Chr(60) so this spec
-				// does not contain a literal CFML opening tag in a string.
-				// Lucee's tag scanner inspects CFC files for unclosed
-				// tags before compiling and crashes the bundle on a
-				// literal cfhtmlhead in source text. See CLAUDE.md
-				// "Lucee Tag Scanner".
+				// Build the cfhtmlhead pattern with Chr(60) so the spec
+				// source never carries a literal opening angle-bracket
+				// CFML tag in a string. The same defensive convention is
+				// already used by MigratorViewIconsSpec.cfc, which builds
+				// its <svg / <i icon regexes the same way. The framework
+				// test runner compiles every CFC under tests.specs.* on
+				// load, so a malformed CFC takes the whole suite down
+				// for the engine — keeping these patterns in Chr(60)
+				// form sidesteps that whole class of failure.
 				var pattern = Chr(60) & "cfhtmlhead\b";
 				var hits = reMatchNoCase(pattern, source);
 				expect(ArrayLen(hits)).toBe(
