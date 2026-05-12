@@ -5053,14 +5053,23 @@ component extends="modules.BaseModule" {
 	 * Detection order matches `detectReloadPassword`: .env first, then
 	 * `config/settings.cfm`. Returns "(unknown)" if neither yields a name —
 	 * a label, not a fatal error, so the run still proceeds.
+	 *
+	 * Regex care (also #2489): use \b word-boundaries so `coreTestDataSourceName`
+	 * is not picked up as if it were `dataSourceName` (the original reporter
+	 * saw `testappdb_test_test` because the previous regex matched the
+	 * trailing substring and then doubled the suffix). Strip CFML comments
+	 * first so commented-out `set(...)` calls don't poison the lookup —
+	 * matches the pattern already used by `info()`.
 	 */
-	private string function $resolveAppTestDataSource(boolean useTestDB = true) {
+	public string function $resolveAppTestDataSource(boolean useTestDB = true) {
 		var base = "";
 
 		var envFile = variables.projectRoot & "/.env";
 		if (fileExists(envFile)) {
 			var envContent = fileRead(envFile);
-			var match = reFindNoCase("DATASOURCE_NAME\s*=\s*(.+)", envContent, 1, true);
+			// Anchor to start-of-line so an unrelated key whose name happens
+			// to end in DATASOURCE_NAME can't match by accident.
+			var match = reFindNoCase("(?:^|\n)\s*DATASOURCE_NAME\s*=\s*([^\r\n]+)", envContent, 1, true);
 			if (arrayLen(match.match) > 1 && len(trim(match.match[2]))) {
 				base = trim(match.match[2]);
 			}
@@ -5069,8 +5078,8 @@ component extends="modules.BaseModule" {
 		if (!len(base)) {
 			var settingsFile = variables.projectRoot & "/config/settings.cfm";
 			if (fileExists(settingsFile)) {
-				var settingsContent = fileRead(settingsFile);
-				var settingsMatch = reFindNoCase('dataSourceName\s*=\s*"([^"]*)"', settingsContent, 1, true);
+				var settingsContent = stripCfmlComments(fileRead(settingsFile));
+				var settingsMatch = reFindNoCase('\bdataSourceName\b\s*=\s*"([^"]*)"', settingsContent, 1, true);
 				if (arrayLen(settingsMatch.match) > 1 && len(trim(settingsMatch.match[2]))) {
 					base = trim(settingsMatch.match[2]);
 				}
@@ -5081,7 +5090,14 @@ component extends="modules.BaseModule" {
 			return "(unknown)";
 		}
 
-		return arguments.useTestDB ? base & "_test" : base;
+		if (!arguments.useTestDB) {
+			return base;
+		}
+		// Defensive: never double the suffix. If a user has named their
+		// app datasource `myapp_test`, surfacing `myapp_test_test` in the
+		// preamble is more confusing than helpful — the runner's own
+		// fallback would print the same `myapp_test` we'd return here.
+		return reFindNoCase("_test$", base) ? base : base & "_test";
 	}
 
 	/**
