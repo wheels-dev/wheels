@@ -4115,14 +4115,21 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		// Template variable context — all config values flow through here
+		// Template variable context — all config values flow through here.
+		// `datasourcesBlock` is the JSON fragment substituted into lucee.json
+		// at the `"datasources": {{datasourcesBlock}}` site: the SQLite pair
+		// by default, or an empty `{}` when `--no-sqlite` was passed. Without
+		// this gate the rendered lucee.json pointed Lucee at jdbc:sqlite
+		// paths even with `--no-sqlite`, and the engine auto-created empty
+		// db/*.sqlite files on first connection (GH ##2621).
 		var context = {
 			"appName": appName,
 			"datasourceName": opts.datasource,
 			"reloadPassword": opts.reloadPassword,
 			"port": opts.port,
 			"shutdownPort": opts.port + 1,
-			"openBrowser": opts.openBrowser ? "true" : "false"
+			"openBrowser": opts.openBrowser ? "true" : "false",
+			"datasourcesBlock": opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(opts.datasource)
 		};
 
 		// Copy template directory tree to target, processing placeholders.
@@ -4307,6 +4314,42 @@ component extends="modules.BaseModule" {
 				out("  config  #appName#/config/app.cfm (SQLite datasource)", "green");
 			}
 		}
+	}
+
+	/**
+	 * Build the JSON object substituted into `lucee.json`'s
+	 * `"datasources": {{datasourcesBlock}}` site for the default (SQLite-on)
+	 * path. Lives next to configureSQLiteDatabase() because both encode the
+	 * same dev/test datasource pair — the lucee.json variant for the engine
+	 * to bind on boot, the config/app.cfm variant for runtime overrides.
+	 * `--no-sqlite` substitutes the literal `"{}"` instead, suppressing the
+	 * pair so Lucee never auto-creates db/*.sqlite files (GH #2621).
+	 */
+	private string function buildSQLiteDatasourcesBlock(required string datasourceName) {
+		var nl = chr(10);
+		var pad = "      ";
+		var inner = "        ";
+		var block = "{" & nl;
+		block &= pad & '"#datasourceName#": {' & nl;
+		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
+		block &= inner & '"database": "#datasourceName#",' & nl;
+		block &= inner & '"dbdriver": "Other",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/development.sqlite",' & nl;
+		block &= inner & '"host": "",' & nl;
+		block &= inner & '"password": "",' & nl;
+		block &= inner & '"username": ""' & nl;
+		block &= pad & "},"  & nl;
+		block &= pad & '"#datasourceName#_test": {' & nl;
+		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
+		block &= inner & '"database": "#datasourceName#_test",' & nl;
+		block &= inner & '"dbdriver": "Other",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/test.sqlite",' & nl;
+		block &= inner & '"host": "",' & nl;
+		block &= inner & '"password": "",' & nl;
+		block &= inner & '"username": ""' & nl;
+		block &= pad & "}" & nl;
+		block &= "    }";
+		return block;
 	}
 
 	/**
