@@ -163,8 +163,8 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("strips wheels prefix using Adobe-safe 3-arg mid()", () => {
-					// Regression guard for issue #2613: Adobe CF requires mid(string, start, count).
-					// The 2-arg form crashes Adobe with "Parameter validation error for the MID function".
+					// Adobe CF requires mid(string, start, count); the 2-arg form causes a compile-time
+					// "Parameter validation error for the MID function" that crashes the entire test bundle.
 					var command = "wheels generate model User";
 					var stripped = trim(mid(command, 7, len(command)));
 					expect(stripped).toBe("generate model User");

@@ -1281,7 +1281,7 @@ Provide migration code following Wheels conventions."
 		}
 
 		// Strip "wheels " prefix once — used by both primary and fallback paths.
-		// 3-arg mid() is required for Adobe CF compatibility (issue #2613); Lucee/BoxLang accept 2 args.
+		// 3-arg mid() is required for Adobe CF compatibility; Lucee/BoxLang accept 2 args.
 		local.strippedArgs = trim(mid(arguments.command, 7, len(arguments.command)));
 
 		if (!len(local.strippedArgs)) {
