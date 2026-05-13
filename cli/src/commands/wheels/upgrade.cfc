@@ -3,7 +3,7 @@
  *
  * This command is deprecated and does not know about Wheels 4.0+. It is kept
  * around so that a 3.x user invoking it gets a clear pointer to the new CLI
- * instead of a silent "already on the latest version" message (issue #2634).
+ * instead of a silent "already on the latest version" message.
  * Scheduled for removal in v5.0 alongside the rest of the CommandBox-based
  * `wheels-cli` module.
  *
@@ -30,11 +30,11 @@ component extends="base" {
 		boolean force = false,
 		boolean backup = true
 	) {
-		// Deprecation short-circuit (issue #2634): the legacy `box wheels upgrade`
-		// command's getAvailableVersions() returns a hardcoded list maxing at
-		// "3.1.0", so users on 3.x were told they were on the latest version
-		// even though 4.x had shipped. Point them at the new CLI and exit
-		// before any of the stale machinery runs.
+		// Deprecation short-circuit: the legacy `box wheels upgrade` command's
+		// getAvailableVersions() returns a hardcoded list maxing at "3.1.0",
+		// so users on 3.x were told they were on the latest version even
+		// though 4.x had shipped. Point them at the new CLI and exit before
+		// any of the stale machinery runs.
 		print.line();
 		print.yellowLine("⚠  The `box wheels upgrade` command is deprecated and does not know about Wheels 4.0+.");
 		print.line();

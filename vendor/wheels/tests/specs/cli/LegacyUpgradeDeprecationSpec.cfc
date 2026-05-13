@@ -17,19 +17,28 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		// Shared context for nested it() closures. Adobe CF closures cannot
+		// reliably access plain `var` locals declared in the outer describe()
+		// body — see CLAUDE.md "Closure gotcha" — so we hang state off a
+		// struct that closes over by reference.
+		// expandPath("/wheels") resolves to vendor/wheels; the repo root is
+		// two levels above.
+		var ctx = {
+			repoRoot: expandPath("/wheels/../.."),
+			upgradePath: expandPath("/wheels/../..") & "/cli/src/commands/wheels/upgrade.cfc"
+		};
+
 		describe("cli/src/commands/wheels/upgrade.cfc", () => {
 
-			// expandPath("/wheels") resolves to vendor/wheels; the repo root is
-			// two levels above.
-			var repoRoot = expandPath("/wheels/../..");
-			var upgradePath = repoRoot & "/cli/src/commands/wheels/upgrade.cfc";
-
 			it("the legacy upgrade command source file exists", () => {
-				expect(fileExists(upgradePath)).toBeTrue("Missing file: " & upgradePath);
+				expect(fileExists(ctx.upgradePath)).toBeTrue("Missing file: " & ctx.upgradePath);
 			});
 
 			it("declares itself deprecated and points users at the new Wheels CLI", () => {
-				var content = fileRead(upgradePath);
+				if (!fileExists(ctx.upgradePath)) {
+					fail("Missing file: " & ctx.upgradePath);
+				}
+				var content = fileRead(ctx.upgradePath);
 
 				expect(reFindNoCase("box\s+wheels\s+upgrade.{0,40}deprecated", content) > 0).toBeTrue(
 					"upgrade.cfc should declare that the `box wheels upgrade` command is deprecated "
@@ -42,7 +51,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("short-circuits before the stale ForgeBox / hardcoded version lookup", () => {
-				var content = fileRead(upgradePath);
+				if (!fileExists(ctx.upgradePath)) {
+					fail("Missing file: " & ctx.upgradePath);
+				}
+				var content = fileRead(ctx.upgradePath);
 
 				// The short-circuit must come before getAvailableVersions() is
 				// called, otherwise a 3.x user still lands in the stale
@@ -69,7 +81,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("updates the post-upgrade recommendations URL to the canonical v4.0 guide", () => {
-				var content = fileRead(upgradePath);
+				if (!fileExists(ctx.upgradePath)) {
+					fail("Missing file: " & ctx.upgradePath);
+				}
+				var content = fileRead(ctx.upgradePath);
 
 				expect(content contains "guides.wheels.dev/v4-0-0").toBeTrue(
 					"upgrade.cfc should reference the canonical v4.0 upgrade guide "
