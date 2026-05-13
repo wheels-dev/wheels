@@ -3652,6 +3652,92 @@ component extends="modules.BaseModule" {
 				extensions: "cfc,cfm",
 				fix: "Use service() or inject() from the DI container instead"
 			});
+			// CORS default flip — wildcard "*" → deny-all (#2039). A bare
+			// `new wheels.middleware.Cors()` accepts no requests in 4.0.
+			arrayAppend(checks, {
+				description: "CORS middleware without allowOrigins (deny-all default in 4.0)",
+				pattern: "new\s+wheels\.middleware\.Cors\s*\(\s*\)",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: 'Pass allowOrigins explicitly: new wheels.middleware.Cors(allowOrigins="https://myapp.com")'
+			});
+			// RateLimiter hardened defaults (#2024 trustProxy=false, #2088
+			// proxyStrategy="last"). Advisory only: the scan flags every
+			// RateLimiter invocation regardless of current config, because
+			// multi-line argument parsing is out of scope. Users whose
+			// config already sets both flags should treat the hit as a
+			// reminder to re-verify, not a false positive.
+			arrayAppend(checks, {
+				description: "RateLimiter middleware — defaults changed in 4.0 (advisory: review config)",
+				pattern: "new\s+wheels\.middleware\.RateLimiter",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: 'Advisory check — fires on every RateLimiter usage regardless of current config. 4.0 defaults: trustProxy=false, proxyStrategy="last". If your app sits behind a proxy or load balancer, confirm both flags are set explicitly.'
+			});
+			// allowEnvironmentSwitchViaUrl defaults to false in production
+			// (#2076). Explicit `true` is now a security concern.
+			arrayAppend(checks, {
+				description: "allowEnvironmentSwitchViaUrl=true (default flipped to false in production)",
+				pattern: "allowEnvironmentSwitchViaUrl\s*=\s*true",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: "Re-enable only for controlled staging environments. The 4.0 default rejects ?environment=... in production."
+			});
+			// CSRF key auto-generates when empty (#2054) but cookies rotate
+			// on every deploy when that happens. Warn if config/ never sets
+			// csrfEncryptionKey.
+			arrayAppend(checks, {
+				description: "Missing csrfEncryptionKey (CSRF cookies rotate on every deploy)",
+				pattern: "csrfEncryptionKey",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				absent: true,
+				fix: 'Set a stable key: set(csrfEncryptionKey = env("WHEELS_CSRF_KEY")).'
+			});
+			// `wheels snippets` → `wheels generate snippets` rename (#1852).
+			// Scan build / CI scripts; the CLI command is invoked from
+			// outside the app's own .cfm/.cfc files.
+			arrayAppend(checks, {
+				description: "Legacy 'wheels snippets' invocation (renamed to 'wheels generate snippets')",
+				pattern: "\bwheels\s+snippets\b",
+				checkType: "grep",
+				scanTargets: [
+					{path: "Makefile"},
+					{path: "package.json"},
+					{path: ".github/workflows", extensions: "yml,yaml", recurse: true},
+					{path: ".", extensions: "sh", recurse: false}
+				],
+				fix: "Rename to 'wheels generate snippets' in scripts, CI jobs, and IDE integrations."
+			});
+			// tests/specs/functions/ → tests/specs/functional/ rename (#1872).
+			// `pattern` is intentionally empty — `checkType: "directory"` signals on
+			// path existence and never reaches the grep loop. Do NOT replace this
+			// with a benign regex: `reFindNoCase("", anyString)` matches every line,
+			// so a future refactor that unifies the directory and grep branches
+			// would silently false-positive on every scanned file otherwise.
+			arrayAppend(checks, {
+				description: "Legacy tests/specs/functions/ directory (renamed to functional/)",
+				pattern: "",
+				checkType: "directory",
+				path: "tests/specs/functions",
+				fix: "Rename to tests/specs/functional/. No code changes required."
+			});
+			// Vite manifest strictness — viteStrictManifest defaults to true
+			// in 4.0 (#2133). Missing manifest entries now throw in
+			// production; flag any view that references the helpers so the
+			// user knows the default has flipped.
+			arrayAppend(checks, {
+				description: "Vite asset helpers (viteStrictManifest defaults to true in 4.0)",
+				pattern: "viteScriptTag|viteStyleTag|vitePreloadTag",
+				checkType: "grep",
+				scanDir: "app/views",
+				extensions: "cfm,cfc",
+				fix: "Missing manifest entries throw Wheels.ViteAssetNotFound in production. Rebuild assets during deploy (npm run build) or set(viteStrictManifest=false) to restore 3.x silent fallback."
+			});
 		}
 
 		// Run checks
@@ -3672,29 +3758,79 @@ component extends="modules.BaseModule" {
 					arrayAppend(passed, check.description);
 				}
 			} else if (check.checkType == "grep") {
-				var scanPath = variables.projectRoot & "/" & check.scanDir;
-				if (!directoryExists(scanPath)) {
-					arrayAppend(passed, check.description);
-					continue;
+				// Build the file set to scan. Checks may use `scanDir` +
+				// `extensions` (recursive scan of one directory) and/or
+				// `scanTargets` (mixed list of file paths and directory
+				// roots — needed by the `wheels snippets` rename check that
+				// has to look at Makefile, package.json, .github/workflows/,
+				// and top-level *.sh files in one shot).
+				var filesToScan = [];
+
+				if (structKeyExists(check, "scanDir") && len(check.scanDir)) {
+					var scanPath = variables.projectRoot & "/" & check.scanDir;
+					if (directoryExists(scanPath)) {
+						for (var ext in listToArray(check.extensions)) {
+							var dirFiles = directoryList(scanPath, true, "path", "*." & ext);
+							for (var f in dirFiles) arrayAppend(filesToScan, f);
+						}
+					}
 				}
-				var matches = [];
-				for (var ext in listToArray(check.extensions)) {
-					var files = directoryList(scanPath, true, "path", "*." & ext);
-					for (var filePath in files) {
-						var content = fileRead(filePath);
-						var lines = listToArray(content, chr(10), true);
-						for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
-							if (reFindNoCase(check.pattern, lines[lineNum])) {
-								var relPath = replace(filePath, variables.projectRoot & "/", "");
-								arrayAppend(matches, "#relPath#:#lineNum#");
+
+				if (structKeyExists(check, "scanTargets") && isArray(check.scanTargets)) {
+					for (var target in check.scanTargets) {
+						var targetPath = variables.projectRoot & "/" & target.path;
+						if (fileExists(targetPath)) {
+							arrayAppend(filesToScan, targetPath);
+						} else if (directoryExists(targetPath)) {
+							var recurse = structKeyExists(target, "recurse") ? target.recurse : true;
+							// Avoid Elvis `?:` on `check.extensions` — Adobe CF
+							// throws when the key is absent. The `wheels snippets`
+							// check has no top-level `extensions`, so this branch
+							// is reached on every Adobe CF run when a target is a
+							// directory without its own `extensions` key.
+							var exts = structKeyExists(target, "extensions") ? target.extensions
+								: (structKeyExists(check, "extensions") ? check.extensions : "");
+							for (var ext in listToArray(exts)) {
+								var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
+								for (var f in dirFiles2) arrayAppend(filesToScan, f);
 							}
 						}
 					}
 				}
-				if (arrayLen(matches)) {
-					arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
+
+				var matches = [];
+				for (var filePath in filesToScan) {
+					var content = fileRead(filePath);
+					var lines = listToArray(content, chr(10), true);
+					for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+						if (reFindNoCase(check.pattern, lines[lineNum])) {
+							var relPath = replace(filePath, variables.projectRoot & "/", "");
+							arrayAppend(matches, "#relPath#:#lineNum#");
+						}
+					}
+				}
+
+				// `absent: true` inverts the check — warn when the pattern
+				// is NOT found anywhere in the scanned set. Used for "you
+				// should be setting csrfEncryptionKey somewhere" style
+				// checks. If nothing was scannable (e.g. config/ missing),
+				// treat as pass to avoid noisy false positives.
+				var isAbsent = structKeyExists(check, "absent") && check.absent;
+				if (isAbsent) {
+					if (!arrayLen(filesToScan) || arrayLen(matches)) {
+						arrayAppend(passed, check.description);
+					} else {
+						var hint = structKeyExists(check, "scanDir") && len(check.scanDir)
+							? check.scanDir & "/ (no occurrences found)"
+							: "(no occurrences found)";
+						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [hint]});
+					}
 				} else {
-					arrayAppend(passed, check.description);
+					if (arrayLen(matches)) {
+						arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
+					} else {
+						arrayAppend(passed, check.description);
+					}
 				}
 			}
 		}
