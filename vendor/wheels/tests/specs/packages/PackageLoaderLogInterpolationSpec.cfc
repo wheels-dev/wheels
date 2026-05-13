@@ -1,15 +1,4 @@
-/**
- * GH#2630: the "Loading plugin..." / "Loading package..." INFO lines in
- * wheels_security.log emitted literal placeholder tokens
- * (`#arguments.dirName#`, `#local.pluginKey#`, etc.) instead of the resolved
- * values, because the `WriteLog(text="...")` strings escaped each `#` as
- * `##` — CFML's escape sequence for a literal `#`.
- *
- * This spec inspects the call sites in `vendor/wheels/PackageLoader.cfc` and
- * `vendor/wheels/Plugins.cfc` and asserts the malformed `##var##` patterns
- * are gone, so a future regression that re-introduces them fails fast
- * without anyone having to grep the log file.
- */
+// GH##2630: guard the PackageLoader / Plugins load-trace WriteLog calls against re-escaping #var# as ##var##.
 component extends="wheels.WheelsTest" {
 
 	function run() {
@@ -34,6 +23,19 @@ component extends="wheels.WheelsTest" {
 					"PackageLoader.cfc must not emit escaped pounds around "
 					& "arguments.pkgDir in WriteLog text — see issue ##2630."
 				);
+
+				// Positive assertions: lock the single-pound form in place so a
+				// future refactor that silently removes the log line fails the
+				// test instead of staying green.
+				expect(FindNoCase("'##arguments.dirName##'", source) GT 0).toBeTrue(
+					"PackageLoader.cfc must retain single-pound interpolation "
+					& "around arguments.dirName in WriteLog text — see issue ##2630."
+				);
+
+				expect(FindNoCase("from ##arguments.pkgDir##", source) GT 0).toBeTrue(
+					"PackageLoader.cfc must retain single-pound interpolation "
+					& "around arguments.pkgDir in WriteLog text — see issue ##2630."
+				);
 			});
 
 			it("does not escape pounds in the Plugins load-trace message", () => {
@@ -51,6 +53,17 @@ component extends="wheels.WheelsTest" {
 					"Plugins.cfc must not emit escaped pounds around "
 					& "local.pluginValue.folderPath in WriteLog text — see "
 					& "issue ##2630."
+				);
+
+				// Positive assertions: see PackageLoader block above for rationale.
+				expect(FindNoCase("'##local.pluginKey##'", source) GT 0).toBeTrue(
+					"Plugins.cfc must retain single-pound interpolation around "
+					& "local.pluginKey in WriteLog text — see issue ##2630."
+				);
+
+				expect(FindNoCase("from ##local.pluginValue.folderPath##", source) GT 0).toBeTrue(
+					"Plugins.cfc must retain single-pound interpolation around "
+					& "local.pluginValue.folderPath in WriteLog text — see issue ##2630."
 				);
 			});
 
