@@ -23,19 +23,23 @@ component extends="wheels.WheelsTest" {
 
 			// expandPath("/wheels") resolves to vendor/wheels via the
 			// configured Lucee mapping; the repo root is two levels above.
-			var repoRoot = expandPath("/wheels/../..");
-			var templatePath = repoRoot & "/cli/lucli/templates/app/rewrite.config";
+			// Outer-describe `var` declarations aren't reliably captured by
+			// inner closures on Adobe CF (CLAUDE.md "Closure gotcha"); share
+			// them through a struct instead.
+			var ctx = {};
+			ctx.repoRoot = expandPath("/wheels/../..");
+			ctx.templatePath = ctx.repoRoot & "/cli/lucli/templates/app/rewrite.config";
 
 			it("writes the project-level rewrite.config when the project doesn't have one", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
-				directoryCreate(projectRoot, true);
+				directoryCreate(projectRoot);
 				try {
 					expect(fileExists(projectRoot & "/rewrite.config")).toBeFalse(
 						"Precondition: project should start without a rewrite.config"
 					);
 
-					var result = installer.install(projectRoot=projectRoot, sourceTemplate=templatePath);
+					var result = installer.install(projectRoot=projectRoot, sourceTemplate=ctx.templatePath);
 
 					expect(result.installed).toBeTrue(
 						"install() should report installed=true when it creates the file"
@@ -51,11 +55,11 @@ component extends="wheels.WheelsTest" {
 			it("is a no-op when the project already ships its own rewrite.config (idempotent)", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
-				directoryCreate(projectRoot, true);
+				directoryCreate(projectRoot);
 				try {
 					fileWrite(projectRoot & "/rewrite.config", "## user-customized rules");
 
-					var result = installer.install(projectRoot=projectRoot, sourceTemplate=templatePath);
+					var result = installer.install(projectRoot=projectRoot, sourceTemplate=ctx.templatePath);
 
 					expect(result.installed).toBeFalse(
 						"install() should not overwrite a user-authored rewrite.config"
@@ -73,9 +77,9 @@ component extends="wheels.WheelsTest" {
 			it("emits a rewrite.config that passes 3.x-convention static-asset dirs through to the default servlet", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
-				directoryCreate(projectRoot, true);
+				directoryCreate(projectRoot);
 				try {
-					installer.install(projectRoot=projectRoot, sourceTemplate=templatePath);
+					installer.install(projectRoot=projectRoot, sourceTemplate=ctx.templatePath);
 					var content = fileRead(projectRoot & "/rewrite.config");
 
 					// 3.x apps commonly use these directory names — each must
@@ -108,9 +112,9 @@ component extends="wheels.WheelsTest" {
 				// rules with the [L] flag.
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
-				directoryCreate(projectRoot, true);
+				directoryCreate(projectRoot);
 				try {
-					installer.install(projectRoot=projectRoot, sourceTemplate=templatePath);
+					installer.install(projectRoot=projectRoot, sourceTemplate=ctx.templatePath);
 					var content = fileRead(projectRoot & "/rewrite.config");
 
 					// Strip comment lines (Tomcat RewriteValve uses '#' for
@@ -138,7 +142,7 @@ component extends="wheels.WheelsTest" {
 			it("returns installed=false with a reason when the source template can't be read", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
 				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
-				directoryCreate(projectRoot, true);
+				directoryCreate(projectRoot);
 				try {
 					var missing = getTempDirectory() & "wheels-no-such-template-#createUUID()#.config";
 
