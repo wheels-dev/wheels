@@ -134,7 +134,7 @@ myblog/
   lucee.json
 ```
 
-The `.env` file is created from the template's `_env` stub and carries environment-specific values; it is gitignored by the generated `.gitignore`. `lucee.json` pins the server port and shutdown port to the flags you passed. `config/app.cfm` carries the datasource configuration — SQLite by default, H2 under `--setup-h2`, or no datasource block under `--no-sqlite`.
+The `.env` file is created from the template's `_env` stub and carries environment-specific values; it is gitignored by the generated `.gitignore`. `lucee.json` pins the server port, shutdown port, and Lucee-level JDBC datasource entries. `config/app.cfm` carries the runtime datasource configuration. Both files honor `--no-sqlite`: the flag emits an empty `datasources` object in `lucee.json` so Lucee never auto-creates `db/development.sqlite` and `db/test.sqlite` on first connection, and omits the datasource block from `config/app.cfm`.
 
 ## Common workflows
 
