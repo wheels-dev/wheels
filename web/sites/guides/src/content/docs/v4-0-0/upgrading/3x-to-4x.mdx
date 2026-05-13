@@ -267,6 +267,17 @@ See [Packages](/v4-0-0/digging-deeper/packages/) for manifest fields, per-method
 
 **CHANGELOG:** `Deprecated: In-dev-server HTTP MCP endpoint at /wheels/mcp — superseded by the LuCLI stdio MCP server (wheels mcp wheels).` Migrate with `wheels mcp setup --force`.
 
+### Legacy CommandBox `wheels-cli` module
+
+**CHANGELOG:** `Deprecated: Legacy CommandBox wheels-cli module` — superseded by the new `wheels` CLI. Scheduled for removal in v5.0. (#2227, #2634)
+
+The CommandBox-based `wheels-cli` module (invoked as `box wheels upgrade`, `box wheels generate`, etc.) is deprecated and does not know about Wheels 4.0+. Running `box wheels upgrade` now prints a deprecation banner and exits immediately instead of silently reporting "You are already on the latest version." Use the new Wheels CLI for upgrade checks:
+
+```bash title="your shell"
+brew install wheels-dev/wheels/wheels
+wheels upgrade check
+```
+
 ### Browser-test fixture routes (`/_browser/*`) moved into the framework
 
 **CHANGELOG:** `Fixed: Framework-internal browser-test fixture controllers, views, and /_browser/* routes no longer leak into application-level files.` (#2135, #2138)
