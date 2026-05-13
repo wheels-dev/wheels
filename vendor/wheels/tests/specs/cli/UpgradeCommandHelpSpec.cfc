@@ -92,26 +92,39 @@ component extends="wheels.WheelsTest" {
 			it("upgrade() docblock hint matches the scanner-only reality", () => {
 				var source = fileRead(modulePath);
 
-				// Find the upgrade()'s docblock hint and assert it doesn't
-				// promise an upgrade action.
-				var hintMatch = reFindNoCase(
-					"hint:\s*[^\r\n]*(?=\s*\*/\s*public\s+string\s+function\s+upgrade)",
-					source,
-					1,
-					true
+				// Anchor on the function declaration first, then walk
+				// backward to its preceding `hint:` line. A bare
+				// findNoCase("hint:", source) would grab the file's first
+				// hint, not upgrade()'s; a lookahead through the closing
+				// `*/` can't span the docblock body since `\s*` won't skip
+				// the leading `*` on each comment line.
+				var fnPos = findNoCase("public string function upgrade(", source);
+				expect(fnPos > 0).toBeTrue(
+					"Could not locate `public string function upgrade(` in Module.cfc."
 				);
 
-				expect(arrayLen(hintMatch.match) > 0).toBeTrue(
-					"Could not locate the `hint:` docblock above `public string function upgrade()`."
-				);
+				if (fnPos > 0) {
+					var hintStart = 0;
+					var nextHint = findNoCase("hint:", source);
+					while (nextHint > 0 && nextHint < fnPos) {
+						hintStart = nextHint;
+						nextHint = findNoCase("hint:", source, nextHint + 1);
+					}
 
-				if (arrayLen(hintMatch.match) > 0) {
-					var hintLine = hintMatch.match[1];
-
-					expect(reFindNoCase("\bupgrade\s+the\s+wheels\s+framework\b", hintLine) > 0).toBeFalse(
-						"upgrade() hint still promises to `upgrade the Wheels framework`. "
-						& "It's a scanner — phrase the hint as `Scan ...` or `Check ...`."
+					expect(hintStart > 0).toBeTrue(
+						"Could not locate the `hint:` docblock above `public string function upgrade()`."
 					);
+
+					if (hintStart > 0) {
+						var hintEnd = find(chr(10), source, hintStart);
+						var hintLen = (hintEnd > hintStart) ? (hintEnd - hintStart) : (len(source) - hintStart + 1);
+						var hintLine = mid(source, hintStart, hintLen);
+
+						expect(reFindNoCase("\bupgrade\s+the\s+wheels\s+framework\b", hintLine) > 0).toBeFalse(
+							"upgrade() hint still promises to `upgrade the Wheels framework`. "
+							& "It's a scanner — phrase the hint as `Scan ...` or `Check ...`."
+						);
+					}
 				}
 			});
 
