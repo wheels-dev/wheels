@@ -64,6 +64,26 @@ var fn = obj["dynamicMethod"];
 var result = fn();
 ```
 
+### Method Reference Extraction Loses Receiver (BoxLang)
+
+BoxLang implements method dispatch with JavaScript-style semantics: pulling a method off an object into a local variable produces a bare function reference with no bound receiver. Calling that local then runs the function in an empty context, and any in-component call inside (helpers prefixed with `$`, `this.x()`, etc.) fails to resolve. The lookup-and-call **must** stay in a single expression for BoxLang to bind the receiver.
+
+```cfm
+// WRONG — drops the receiver on BoxLang, so $helper() throws
+//          "Function [$helper] not found" when publicMethod runs
+local.method = arguments.object[arguments.methodName];
+local.method();
+
+// RIGHT — single-expression bracket-call binds the receiver
+arguments.object[arguments.methodName]();
+```
+
+**Why**: BoxLang treats `obj["method"]` as a property access that returns a callable, not a bound method. Only an immediate invocation `obj["method"]()` lets BoxLang's call dispatcher know which object is the receiver. Lucee and Adobe CF preserve the receiver across both forms, so this trap only fires on BoxLang.
+
+**On `invoke()`**: The `invoke()` BIF is the Lucee/Adobe path via `Base.cfc` and preserves the receiver on those engines. Whether it preserves the receiver on BoxLang has **not** been verified — the `invokeMethod` override in `BoxLangAdapter.cfc` exists precisely because earlier BoxLang versions had `invoke()` parity gaps. Until a BoxLang run confirms the BIF binds the receiver, prefer the single-expression bracket-call on BoxLang. If a future audit confirms parity, the override can be deleted entirely.
+
+**Reference example**: `vendor/wheels/engineAdapters/BoxLang/BoxLangAdapter.cfc::invokeMethod`. The original two-statement form silently worked until #2241 added `$blockInProduction()` calls inside every `Public.cfc` handler — at which point every internal Wheels route (`/wheels/info`, `/wheels/routes`, ...) started 500-ing on BoxLang. Regression test: `vendor/wheels/tests/specs/dispatch/InvokeMethodSpec.cfc` (issue #2646).
+
 ### Inline Closure as Constructor Named Argument (Adobe CF)
 
 Passing a function literal directly as a named argument to a `new Component(...)` call crashes Adobe CF's bytecode generator with `java.lang.ArrayStoreException: coldfusion.compiler.ASTcffunction`. The compile error fires from `getComponentMetadata()` and crashes the **entire** TestBox bundle for the engine — not just the one spec — because Adobe CF eagerly compiles every CFC in the bundle directory before any test runs.
