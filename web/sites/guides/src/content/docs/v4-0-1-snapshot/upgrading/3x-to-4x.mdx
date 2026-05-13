@@ -345,6 +345,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 - **Plugin warning at startup.** Port to a package (see above) or accept the warning until you do.
 - **JWT tokens reject as invalid after upgrade.** Algorithm validation is on. Confirm your issuer sets `alg` to a supported value and the signature verification path uses constant-time comparison. See #2079, #2086.
 - **`Wheels.ViteAssetNotFound` thrown on first request after deploy.** The deploy shipped code referencing a Vite entrypoint that isn't in the manifest. Rebuild Vite assets (`npm run build`) before deploy, or temporarily `set(viteStrictManifest=false)` to restore 3.x silent fallback. See #2133.
+- **Static assets under `/miscellaneous/`, `/javascripts/`, `/stylesheets/`, or `/files/` return 404 after upgrade.** LuCLI's bundled-default `rewrite.config` uses a narrow allow-list (`images|css|js|fonts|assets|static`) that excludes 3.x-conventional directory names. `wheels start` now auto-provisions a project-level `rewrite.config` that covers these dirs on the first boot. If you upgraded before this fix, run `wheels start` once against your upgraded project — the file is dropped automatically and existing user-authored `rewrite.config` files are left untouched. See #2626.
 
 ## Related guides
 
