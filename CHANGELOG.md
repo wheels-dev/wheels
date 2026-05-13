@@ -26,6 +26,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Use the Adobe-safe 3-argument `mid()` form when stripping the `wheels` prefix in the MCP command executor and its security spec; the prior 2-arg call crashed the entire `security/` test bundle on Adobe ColdFusion (#2613)
 - Replace Lucee-only `directoryCreate(path, true)` calls in `BrowserTest.$captureFailureArtifacts` and `McpServer` test-file generation with `java.io.File.mkdirs()` so artifact directory creation no longer trips Adobe ColdFusion's `DIRECTORYCREATE` single-argument validator (#2614)
 - Generated `Application.cfc` (and the in-repo `public/`, `examples/tweet/`, `examples/starter-app/` copies) now assigns the injector directly to `application.wheelsdi` in `onApplicationStart()` and `onError()` instead of an orphan local `injector` variable, matching the documented 4.0 DI container name and the way every other reference in the file reads (#2622)
+- Legacy CommandBox `box wheels upgrade` command (`cli/src/commands/wheels/upgrade.cfc`) now prints a deprecation banner pointing at the new Wheels CLI (`brew install wheels-dev/wheels/wheels` → `wheels upgrade check`) and short-circuits before its stale hardcoded version list that maxed at 3.1.0; the post-upgrade-recommendations URL is updated to the canonical v4.0 guide. The CommandBox `wheels-cli` module remains scheduled for removal in v5.0 (#2634)
 
 ----
 

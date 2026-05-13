@@ -1,22 +1,28 @@
 /**
- * Interactive Wheels framework upgrade wizard
+ * DEPRECATED — legacy CommandBox `box wheels upgrade` command.
  *
- * This command helps you upgrade your Wheels application to a newer version
- * by analyzing your current setup and guiding you through the upgrade process.
+ * This command is deprecated and does not know about Wheels 4.0+. It is kept
+ * around so that a 3.x user invoking it gets a clear pointer to the new CLI
+ * instead of a silent "already on the latest version" message (issue #2634).
+ * Scheduled for removal in v5.0 alongside the rest of the CommandBox-based
+ * `wheels-cli` module.
+ *
+ * To upgrade a Wheels app to 4.0 or later, install the new Wheels CLI and use
+ * its `upgrade` subcommand:
  *
  * {code:bash}
- * wheels upgrade
- * wheels upgrade to=3.1.0
- * wheels upgrade check=true
+ * brew install wheels-dev/wheels/wheels
+ * wheels upgrade check
+ * brew upgrade wheels
  * {code}
  **/
 component extends="base" {
 
 	/**
-	 * @to Target version to upgrade to
-	 * @check Check if upgrade is available without performing it
-	 * @force Skip confirmation prompts
-	 * @backup Create backup before upgrading (default: true)
+	 * @to Target version to upgrade to (ignored — see deprecation banner)
+	 * @check Check if upgrade is available without performing it (ignored — see deprecation banner)
+	 * @force Skip confirmation prompts (ignored — see deprecation banner)
+	 * @backup Create backup before upgrading (ignored — see deprecation banner)
 	 **/
 	function run(
 		string to = "",
@@ -24,6 +30,29 @@ component extends="base" {
 		boolean force = false,
 		boolean backup = true
 	) {
+		// Deprecation short-circuit (issue #2634): the legacy `box wheels upgrade`
+		// command's getAvailableVersions() returns a hardcoded list maxing at
+		// "3.1.0", so users on 3.x were told they were on the latest version
+		// even though 4.x had shipped. Point them at the new CLI and exit
+		// before any of the stale machinery runs.
+		print.line();
+		print.yellowLine("⚠  The `box wheels upgrade` command is deprecated and does not know about Wheels 4.0+.");
+		print.line();
+		print.line("    Install the new Wheels CLI:");
+		print.line("        brew install wheels-dev/wheels/wheels");
+		print.line();
+		print.line("    Then check for available upgrades:");
+		print.line("        wheels upgrade check");
+		print.line();
+		print.line("    And upgrade the CLI itself:");
+		print.line("        brew upgrade wheels");
+		print.line();
+		print.line("    Upgrade guide: https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/");
+		print.line();
+		print.yellowLine("This legacy command is scheduled for removal in Wheels 5.0.");
+		print.line();
+		return;
+
 		// Ensure we're in a Wheels app directory
 		if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
 			error("This command must be run from the root of a Wheels application.");
@@ -320,7 +349,7 @@ component extends="base" {
 	private array function getPostUpgradeRecommendations(required string version) {
 		local.recommendations = [
 			"Run your test suite to ensure everything works",
-			"Check the upgrade guide at https://wheels.dev/guides/introduction/upgrading",
+			"Check the upgrade guide at https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/",
 			"Review deprecated features that may be removed in future versions",
 			"Update your plugins to compatible versions"
 		];
