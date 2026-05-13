@@ -36,7 +36,7 @@ component extends="wheels.WheelsTest" {
 			it("places the inline tab initializer immediately after the tab menu so a downstream rendering failure cannot strip it (regression for ##2651)", () => {
 				var src = fileRead(expandPath("/wheels/tests/html.cfm"));
 				var menuPos = findNoCase("tabular menu stackable", src);
-				var tabCallPos = findNoCase(".tab()", src);
+				var tabCallPos = findNoCase("jQuery('.menu .item').tab()", src);
 				expect(menuPos GT 0).toBeTrue("Tab menu markup should still be present in html.cfm.");
 				expect(tabCallPos GT 0).toBeTrue("Inline tab initializer should be present in html.cfm.");
 				expect(tabCallPos GT menuPos).toBeTrue(
