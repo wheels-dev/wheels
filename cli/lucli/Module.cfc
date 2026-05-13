@@ -3674,6 +3674,11 @@ component extends="modules.BaseModule" {
 				fix: "Rename to 'wheels generate snippets' in scripts, CI jobs, and IDE integrations."
 			});
 			// tests/specs/functions/ → tests/specs/functional/ rename (#1872).
+			// `pattern` is intentionally empty — `checkType: "directory"` signals on
+			// path existence and never reaches the grep loop. Do NOT replace this
+			// with a benign regex: `reFindNoCase("", anyString)` matches every line,
+			// so a future refactor that unifies the directory and grep branches
+			// would silently false-positive on every scanned file otherwise.
 			arrayAppend(checks, {
 				description: "Legacy tests/specs/functions/ directory (renamed to functional/)",
 				pattern: "",
