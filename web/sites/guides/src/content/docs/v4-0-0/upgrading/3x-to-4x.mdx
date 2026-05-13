@@ -75,7 +75,7 @@ set(accessControlAllowCredentials = false);
 set(accessControlAllowMethodsByRoute = false);
 ```
 
-All six `accessControlAllow*` settings are initialized in the 4.0 security defaults and read on every request. The only thing that changed is the middleware's default — not the global setting.
+All six CORS settings (`allowCorsRequests` and the five `accessControlAllow*` settings) are initialized in the 4.0 security defaults and read on every request. The only thing that changed is the middleware's default — not the global setting.
 
 **How the two paths differ**
 
