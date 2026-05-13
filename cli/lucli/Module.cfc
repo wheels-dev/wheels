@@ -636,6 +636,14 @@ component extends="modules.BaseModule" {
 		// very LuCLI invocation.
 		$ensureWheelsBundles();
 
+		// Drop a working rewrite.config at the project root if the project
+		// doesn't already ship one. LuCLI's bundled default uses a narrow
+		// allow-list and negated RewriteCond chains that 404 static assets
+		// for 3.x-conventional dirs (/miscellaneous/, /javascripts/, etc.);
+		// providing a project override sidesteps it. New apps get this file
+		// via `wheels new`; this catches 3.x → 4.0 upgrade paths. See GH #2626.
+		$ensureProjectRewriteConfig();
+
 		// Delegate to LuCLI's server start command. Forward only args we
 		// haven't consumed ourselves (--force is wheels-side, not LuCLI-side).
 		var cmdArgs = ["start"];
@@ -4654,6 +4662,35 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			// Stay out of the way — let LuCLI's server start surface the real
 			// error if the bundle was actually needed and we couldn't stage.
+		}
+	}
+
+	/**
+	 * Drop the working rewrite.config template into the project root if the
+	 * project doesn't already ship one. Delegates to RewriteConfigInstaller
+	 * so the behavior can be unit-tested in isolation.
+	 *
+	 * Background: LuCLI's bundled-default rewrite.config 404s static assets
+	 * for 3.x-conventional directory names like `/miscellaneous/`,
+	 * `/javascripts/`, `/stylesheets/`, `/files/`. `wheels new` already
+	 * drops the working template; this closes the 3.x → 4.0 upgrade-path
+	 * gap. See GH #2626.
+	 *
+	 * Idempotent and best-effort: a project rewrite.config already in place
+	 * is left untouched, and any IO failure is swallowed silently so a
+	 * permissions hiccup doesn't block `wheels start`.
+	 */
+	private void function $ensureProjectRewriteConfig() {
+		try {
+			var installer = new services.RewriteConfigInstaller();
+			var template = variables.moduleRoot & "templates/app/rewrite.config";
+			installer.install(
+				projectRoot = variables.projectRoot,
+				sourceTemplate = template
+			);
+		} catch (any e) {
+			// Don't block `wheels start` on a rewrite.config provisioning
+			// hiccup — the user can always drop their own override later.
 		}
 	}
 
