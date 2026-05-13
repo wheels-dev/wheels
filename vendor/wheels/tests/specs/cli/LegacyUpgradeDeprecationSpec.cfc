@@ -6,8 +6,8 @@
  * release. The post-upgrade-recommendations URL pointed at the pre-4.0
  * upgrade page, and the breaking-changes map had no 3.x -> 4.x entries.
  *
- * Issue #2634: the CommandBox `wheels-cli` module is already deprecated for
- * v5.0 removal per the 4.0 CHANGELOG. The fix is to print a deprecation
+ * The CommandBox `wheels-cli` module is already deprecated for v5.0 removal
+ * per the 4.0 CHANGELOG. The fix is to print a deprecation
  * banner directing users to the new `wheels` CLI and short-circuit before the
  * stale ForgeBox lookup. The fix MUST also update the post-upgrade URL to
  * the canonical v4.0 guide so any user still reaching it lands somewhere
@@ -73,7 +73,10 @@ component extends="wheels.WheelsTest" {
 				expect(firstReturnInRun > 0).toBeTrue(
 					"upgrade.cfc run() should contain a short-circuit `return;` after printing the deprecation banner."
 				);
-				expect(firstAvailableCall > 0).toBeTrue("getAvailableVersions() call not found in run()");
+				expect(firstAvailableCall > 0).toBeTrue(
+					"getAvailableVersions() call not found in upgrade.cfc run() — "
+					& "if the dead-code block was intentionally removed, delete this spec too."
+				);
 				expect(firstReturnInRun < firstAvailableCall).toBeTrue(
 					"upgrade.cfc must short-circuit (return) BEFORE calling getAvailableVersions() — "
 					& "otherwise 3.x users still hit the stale hardcoded list that maxes at 3.1.0."
