@@ -57,8 +57,7 @@ component extends="wheels.WheelsTest" {
 
 				var publicCfc = createObject("component", "wheels.Public").$init();
 				var adapter = application.wheels.engineAdapter;
-				var threwReceiverLoss = false;
-				var caughtMessage = "";
+				var receiverLossMessage = "";
 
 				try {
 					adapter.invokeMethod(publicCfc, "index");
@@ -66,14 +65,17 @@ component extends="wheels.WheelsTest" {
 					// index() doesn't call $blockInProduction so this should
 					// never throw a "Function [$...] not found" error. Any
 					// other error (e.g. missing view path or template) is
-					// unrelated — match only the receiver-loss signature.
+					// unrelated — match only the receiver-loss signature so
+					// the captured message surfaces directly in the failure.
 					if (REFindNoCase("Function \[\$[a-zA-Z]", e.message)) {
-						threwReceiverLoss = true;
-						caughtMessage = e.message;
+						receiverLossMessage = e.message;
 					}
 				}
 
-				expect(threwReceiverLoss).toBeFalse();
+				expect(receiverLossMessage).toBe(
+					"",
+					"Receiver-loss error thrown from Public.cfc::index: " & receiverLossMessage
+				);
 			});
 
 		});

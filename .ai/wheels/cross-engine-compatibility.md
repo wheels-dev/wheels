@@ -76,12 +76,11 @@ local.method();
 
 // RIGHT — single-expression bracket-call binds the receiver
 arguments.object[arguments.methodName]();
-
-// ALSO RIGHT — the invoke() BIF (used by Lucee/Adobe via Base.cfc)
-invoke(arguments.object, arguments.methodName);
 ```
 
 **Why**: BoxLang treats `obj["method"]` as a property access that returns a callable, not a bound method. Only an immediate invocation `obj["method"]()` lets BoxLang's call dispatcher know which object is the receiver. Lucee and Adobe CF preserve the receiver across both forms, so this trap only fires on BoxLang.
+
+**On `invoke()`**: The `invoke()` BIF is the Lucee/Adobe path via `Base.cfc` and preserves the receiver on those engines. Whether it preserves the receiver on BoxLang has **not** been verified — the `invokeMethod` override in `BoxLangAdapter.cfc` exists precisely because earlier BoxLang versions had `invoke()` parity gaps. Until a BoxLang run confirms the BIF binds the receiver, prefer the single-expression bracket-call on BoxLang. If a future audit confirms parity, the override can be deleted entirely.
 
 **Reference example**: `vendor/wheels/engineAdapters/BoxLang/BoxLangAdapter.cfc::invokeMethod`. The original two-statement form silently worked until #2241 added `$blockInProduction()` calls inside every `Public.cfc` handler — at which point every internal Wheels route (`/wheels/info`, `/wheels/routes`, ...) started 500-ing on BoxLang. Regression test: `vendor/wheels/tests/specs/dispatch/InvokeMethodSpec.cfc` (issue #2646).
 
