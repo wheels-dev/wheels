@@ -20,13 +20,25 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+### Changed
+
+- Reconcile upgrade docs: blog skeleton now lists all eleven canonical breaking changes (matching the canonical upgrade guide), fixes the `wheels.Test` → `wheels.WheelsTest` test-base-class rename description (previously mislabeled as a "testbox namespace" move), and adds the previously-missing `application.wirebox` → `application.wheelsdi` and Vite manifest strictness entries; stats table "Breaking defaults hardened | 7" corrected to "Breaking changes | 11" with four detail-row delta labels updated from Changed/Renamed/New to Breaking (#2632)
+
 ### Fixed
 
 - Stop the generated app's `_gitignore` and `app/plugins/README.md` from advertising the broken `wheels packages install` / `wheels install` verbs; point users at the canonical `wheels packages add` verb (#2610)
 - Use the Adobe-safe 3-argument `mid()` form when stripping the `wheels` prefix in the MCP command executor and its security spec; the prior 2-arg call crashed the entire `security/` test bundle on Adobe ColdFusion (#2613)
 - Replace Lucee-only `directoryCreate(path, true)` calls in `BrowserTest.$captureFailureArtifacts` and `McpServer` test-file generation with `java.io.File.mkdirs()` so artifact directory creation no longer trips Adobe ColdFusion's `DIRECTORYCREATE` single-argument validator (#2614)
 - Generated `Application.cfc` (and the in-repo `public/`, `examples/tweet/`, `examples/starter-app/` copies) now assigns the injector directly to `application.wheelsdi` in `onApplicationStart()` and `onError()` instead of an orphan local `injector` variable, matching the documented 4.0 DI container name and the way every other reference in the file reads (#2622)
+- Interpolate plugin and package names in the "Loading plugin..." / "Loading package..." `wheels_security.log` INFO lines so operators can read which plugin/package was being loaded; the call sites were double-escaping the pound signs (`##var##`) and emitting literal `#var#` placeholders instead of resolved values (#2630)
+- Update the scaffolded `config/routes.cfm` doc-URL comment in `cli/src/templates/ConfigRoutes.txt` and `cli/lucli/templates/app/app/snippets/ConfigRoutes.txt` from the dead `https://guides.wheels.dev/docs/routing` path to the canonical `https://guides.wheels.dev/v4-0-0-snapshot/handling-requests-with-controllers/routing` URL, so freshly scaffolded apps no longer ship a broken link (#2635)
+- `wheels new --no-sqlite` now suppresses the SQLite datasource pair in the scaffolded `lucee.json` so Lucee no longer auto-creates `db/development.sqlite` / `db/test.sqlite` on first connection (#2621)
 - `wheels start` now drops the working `rewrite.config` template at the project root when one is missing, so 3.x → 4.0 upgrades stop 404-ing static assets that live under non-default dirs like `/miscellaneous/`, `/javascripts/`, `/stylesheets/`, `/files/`. LuCLI's bundled default uses a narrow allow-list plus negated `RewriteCond` chains that Tomcat's RewriteValve doesn't honour; the project override sidesteps it. Existing project rewrite.config files are left untouched (#2626)
+
+### Documentation
+
+- Upgrade guide item 10 (`application.wirebox` → `application.wheelsdi`) now includes a callout that `wheels-legacy-adapter` does not shim this rename; apps must update direct `application.wirebox` access and `new wirebox.system.ioc.Injector(...)` bootstrap code regardless of adapter installation (#2627)
+- Legacy Compatibility Adapter section now lists what the adapter covers versus what requires manual remediation, and adds a boot-failure entry to Common Issues for the removed `wirebox` package path (#2627)
 
 ----
 
