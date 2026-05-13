@@ -26,6 +26,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Fixed
 
+- Core test runner result page (`/wheels/core/tests`) now initializes the Semantic UI "Failures / Errors / Passed" tabs inline, immediately after the menu markup, instead of relying solely on `_footer.cfm`. On the full-suite path the footer-bundled tab activator did not always reach the browser, leaving every tab but the default-active one un-clickable
 - Stop the generated app's `_gitignore` and `app/plugins/README.md` from advertising the broken `wheels packages install` / `wheels install` verbs; point users at the canonical `wheels packages add` verb (#2610)
 - Use the Adobe-safe 3-argument `mid()` form when stripping the `wheels` prefix in the MCP command executor and its security spec; the prior 2-arg call crashed the entire `security/` test bundle on Adobe ColdFusion (#2613)
 - Replace Lucee-only `directoryCreate(path, true)` calls in `BrowserTest.$captureFailureArtifacts` and `McpServer` test-file generation with `java.io.File.mkdirs()` so artifact directory creation no longer trips Adobe ColdFusion's `DIRECTORYCREATE` single-argument validator (#2614)
