@@ -2,7 +2,7 @@
 title: Upgrading from Wheels 3.x
 slug: upgrading-from-wheels-3x
 publishedAt: '2026-05-13T14:00:00.000Z'
-updatedAt: '2026-05-13T15:07:50.000Z'
+updatedAt: '2026-05-13T15:21:48.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
@@ -60,16 +60,16 @@ Detect it by searching your `Makefile`, `package.json` scripts, CI pipelines, an
 
 Wheels 4.0 on Lucee 7 tightened function scope: `redirectTo()` is a controller method, not a globally-resolvable function. Calls from request-lifecycle event handlers (`app/events/onrequeststart.cfm`, `onapplicationstart.cfm`) throw `No matching function [REDIRECTTO] found` at runtime.
 
-The pattern that surfaces this in real apps: an AppSerial mismatch in `onrequeststart.cfm` redirecting to `/account/logOut` to force re-login after a deploy. That branch only fires on the mismatch path, so neither the test suite nor normal traffic hit it — the first AppSerial bump after the upgrade catches it instead, surfaced by your error tracker within seconds.
+This bites any app with logic in `onrequeststart.cfm` that detects a condition requiring the request to be interrupted and the user sent to the login form — a stale session, a re-auth requirement after a server-side state change, a forced logout when an app-version flag flips, a maintenance-mode redirect. The natural pattern in 3.x was a `redirectTo()` call inside that handler. On 4.0 the call no longer resolves from event scope. The branch typically only fires under specific conditions, so neither the test suite nor normal traffic exercises it — the regression surfaces in production the first time the branch hits.
 
 Detect with `grep -rn "redirectTo(" app/events/ Application.cfc`. Fix by replacing with plain `cflocation` (function-call form, portable across engines):
 
 ```cfm
 // before
-redirectTo(controller="account", action="logOut");
+redirectTo(controller="sessions", action="new");
 
 // after
-cflocation(url="/account/logOut", addToken=false);
+cflocation(url="/login", addToken=false);
 ```
 
 ### 3. `testbox` → `wheelstest` namespace rename
