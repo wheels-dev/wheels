@@ -61,6 +61,47 @@ set(middleware = [
 
 Related hardening: wildcard-plus-credentials combinations are now rejected (#2053).
 
+#### CORS — two paths in 4.0
+
+The change above only affects apps that configured CORS via `new wheels.middleware.Cors()`. If your app used the **global setting** instead, none of that applies — the setting is still honored in 4.0, and no migration is required.
+
+```cfm {test:compile} title="config/settings.cfm"
+// 3.x global setting — still honored in 4.0, no changes needed
+set(allowCorsRequests = true);
+set(accessControlAllowOrigin = "https://myapp.com");
+set(accessControlAllowMethods = "GET, POST, PUT, DELETE, OPTIONS");
+set(accessControlAllowHeaders = "Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With");
+set(accessControlAllowCredentials = false);
+set(accessControlAllowMethodsByRoute = false);
+```
+
+All six `accessControlAllow*` settings are initialized in the 4.0 security defaults and read on every request. The only thing that changed is the middleware's default — not the global setting.
+
+**How the two paths differ**
+
+| | Global setting (`set(allowCorsRequests=true)`) | `wheels.middleware.Cors` |
+|---|---|---|
+| Where it runs | `onRequestStart` event — before dispatch | Middleware pipeline — during dispatch |
+| OPTIONS preflight | Handles via `abort` in `onRequestStart` | Returns empty 200 and short-circuits dispatch |
+| Per-route scoping | No | Yes |
+| `Access-Control-Max-Age` | No | Yes |
+| Available since | Wheels 2.x | Wheels 3.0 |
+
+**Precedence when both are active**
+
+The two paths can coexist, but they produce split behavior:
+
+- **OPTIONS requests**: the global setting fires first in `onRequestStart` and calls `abort` — the middleware never runs. CORS headers come from the global setting's configuration.
+- **All other requests**: both paths run. The middleware fires after `onRequestStart`, so its `cfheader` calls overwrite what the global setting emitted. The middleware wins.
+
+Unless you intentionally want this asymmetry, running both simultaneously is not recommended. Pick one.
+
+**Recommendation**
+
+- Apps using the global setting: leave it. It works in 4.0 without changes.
+- Apps using the middleware: add `allowOrigins` explicitly (see the breaking change above).
+- New CORS configuration: prefer the middleware — it supports per-route scoping and has a secure deny-all default.
+
 ### 2. HSTS defaults on in production
 
 **CHANGELOG:** `Breaking: HSTS header defaults on in production` (#2081).
