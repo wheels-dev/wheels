@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+### Changed
+
+- Reconcile upgrade docs: blog skeleton now lists all eleven canonical breaking changes (matching the canonical upgrade guide), fixes the `wheels.Test` → `wheels.WheelsTest` test-base-class rename description (previously mislabeled as a "testbox namespace" move), and adds the previously-missing `application.wirebox` → `application.wheelsdi` and Vite manifest strictness entries; stats table "Breaking defaults hardened | 7" corrected to "Breaking changes | 11" with four detail-row delta labels updated from Changed/Renamed/New to Breaking (#2632)
+
 ### Fixed
 
 - Stop the generated app's `_gitignore` and `app/plugins/README.md` from advertising the broken `wheels packages install` / `wheels install` verbs; point users at the canonical `wheels packages add` verb (#2610)
