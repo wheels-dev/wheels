@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+### Documentation
+
+- Document that `reloadPassword` must be wired through `config/settings.cfm` via `set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""))` — a value in `.env` alone does not populate `application.wheels.reloadPassword` and the fail-closed boot warning will fire regardless (#2631)
+
 ### Fixed
 
 - Stop the generated app's `_gitignore` and `app/plugins/README.md` from advertising the broken `wheels packages install` / `wheels install` verbs; point users at the canonical `wheels packages add` verb (#2610)
