@@ -2,7 +2,7 @@
 title: Upgrading from Wheels 3.x
 slug: upgrading-from-wheels-3x
 publishedAt: '2026-05-13T14:00:00.000Z'
-updatedAt: '2026-05-13T14:56:19.000Z'
+updatedAt: '2026-05-13T15:07:50.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
@@ -17,7 +17,7 @@ excerpt: >-
 coverImage: null
 ---
 
-If you run a 3.x Wheels app in production, 4.0 is the first release in years with hard breaks. The [canonical upgrade guide](https://guides.wheels.dev/v4-0-0-snapshot/upgrading/3x-to-4x/) catalogs eleven; this post walks the seven that bite a real 3.x codebase first, plus a "things that bite at boot" section the canonical list does not cover. Pretending the breaks are not real does not help anyone.
+If you run a 3.x Wheels app in production, 4.0 is the first release in years with hard breaks. The [canonical upgrade guide](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) catalogs eleven; this post walks the seven that bite a real 3.x codebase first, plus a "things that bite at boot" section the canonical list does not cover. Pretending the breaks are not real does not help anyone.
 
 The good news: the breakers are concentrated. Most are renames or scope changes that `grep` will find for you in an afternoon. Two are security defaults that used to be permissive and are now strict, which is the direction you wanted them to go anyway. And for the team that inherited a 3.x monolith with spotty test coverage and no appetite for a sprint-long migration, there is the Legacy Compatibility Adapter — one flag that re-enables most of the old surface area while you migrate on your own schedule.
 
@@ -36,7 +36,7 @@ Pick one, then stick with it.
 set(legacyCompatibilityAdapter=true);
 ```
 
-Either way, start by reading the [full upgrade guide](https://guides.wheels.dev/v4-0-0-snapshot/upgrading/3x-to-4x/) and skimming the seven breakers below. Knowing what is in the blast radius is half the battle.
+Either way, start by reading the [full upgrade guide](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) and skimming the seven breakers below. Knowing what is in the blast radius is half the battle.
 
 ## The seven breaking changes
 
@@ -155,10 +155,10 @@ Not breaking, but worth scheduling after the upgrade lands.
 - Legacy `plugins/` folder ([#1995](https://github.com/wheels-dev/wheels/pull/1995), [#2252](https://github.com/wheels-dev/wheels/pull/2252)) still loads in 4.x with a deprecation warning — scheduled for removal in v5.0. Migrate to the `packages/` → `vendor/` activation model before upgrading to 5.x.
 - Monolithic `paginationLinks()` ([#1930](https://github.com/wheels-dev/wheels/pull/1930)) still works; new code should use `paginationNav()` plus the individual helpers.
 - `wheels.Test` base class still works for existing specs; new tests extend `wheels.WheelsTest`.
-- Adopt the [middleware pipeline](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/middleware-pipeline/) ([#1924](https://github.com/wheels-dev/wheels/pull/1924)) for cross-cutting concerns you currently do in `beforeFilter`.
-- Turn on [route model binding](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/how-routing-works/) ([#1929](https://github.com/wheels-dev/wheels/pull/1929)) — it kills the first three lines of most show/edit/update actions.
-- Use the [chainable query builder](https://guides.wheels.dev/v4-0-0-snapshot/basics/query-builder-and-scopes/) ([#1922](https://github.com/wheels-dev/wheels/pull/1922)) instead of raw `where` strings for anything user-supplied.
-- Replace Redis-backed job queues with the [built-in daemon](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/background-jobs/) ([#1934](https://github.com/wheels-dev/wheels/pull/1934)) if the dependency is more than you need.
+- Adopt the [middleware pipeline](https://guides.wheels.dev/v4-0-0/core-concepts/middleware-pipeline/) ([#1924](https://github.com/wheels-dev/wheels/pull/1924)) for cross-cutting concerns you currently do in `beforeFilter`.
+- Turn on [route model binding](https://guides.wheels.dev/v4-0-0/core-concepts/how-routing-works/) ([#1929](https://github.com/wheels-dev/wheels/pull/1929)) — it kills the first three lines of most show/edit/update actions.
+- Use the [chainable query builder](https://guides.wheels.dev/v4-0-0/basics/query-builder-and-scopes/) ([#1922](https://github.com/wheels-dev/wheels/pull/1922)) instead of raw `where` strings for anything user-supplied.
+- Replace Redis-backed job queues with the [built-in daemon](https://guides.wheels.dev/v4-0-0/digging-deeper/background-jobs/) ([#1934](https://github.com/wheels-dev/wheels/pull/1934)) if the dependency is more than you need.
 
 ## Testing and deploying
 
@@ -189,9 +189,9 @@ For context as you plan timeline: 4.0 is roughly 260 pull requests over fifteen 
 
 ## Where to go next
 
-- [Upgrading to 4.0](https://guides.wheels.dev/v4-0-0-snapshot/upgrading/3x-to-4x/) — the authoritative guide with every breaker, every default flip, and every adapter flag documented in one place.
-- [Middleware](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/middleware-pipeline/), [route model binding](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/how-routing-works/), [query builder](https://guides.wheels.dev/v4-0-0-snapshot/basics/query-builder-and-scopes/) — the three adoptions that pay off fastest.
-- [Packages](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/packages/) — the replacement for the legacy `plugins/` folder.
+- [Upgrading to 4.0](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) — the authoritative guide with every breaker, every default flip, and every adapter flag documented in one place.
+- [Middleware](https://guides.wheels.dev/v4-0-0/core-concepts/middleware-pipeline/), [route model binding](https://guides.wheels.dev/v4-0-0/core-concepts/how-routing-works/), [query builder](https://guides.wheels.dev/v4-0-0/basics/query-builder-and-scopes/) — the three adoptions that pay off fastest.
+- [Packages](https://guides.wheels.dev/v4-0-0/digging-deeper/packages/) — the replacement for the legacy `plugins/` folder.
 - [Wheels vs other frameworks](https://github.com/wheels-dev/wheels/blob/develop/docs/wheels-vs-frameworks.md) — context for what 4.0 now offers compared to Rails, Laravel, and the rest.
 
 Most upgrades take an afternoon, not a sprint. If yours takes longer, open an issue on [wheels-dev/wheels](https://github.com/wheels-dev/wheels/issues) with the `upgrade` label — 4.0 is the first release in a long time with real breaks, and the team wants to hear where the map does not match the terrain.
