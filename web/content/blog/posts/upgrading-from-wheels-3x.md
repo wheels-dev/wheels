@@ -43,7 +43,7 @@ Either way, start by reading the [full upgrade guide](https://guides.wheels.dev/
 | # | Change | PR | Detection |
 |---|---|---|---|
 | 1 | `wheels snippets` renamed to `wheels generate snippets` | [#1852](https://github.com/wheels-dev/wheels/pull/1852) | Scripts calling bare `wheels snippets` |
-| 2 | `redirectTo()` is now controller-scoped; unresolvable from request-lifecycle events | Wheels 4.0 / Lucee 7 scope | `grep -rn "redirectTo(" app/events/ public/Application.cfc` |
+| 2 | `redirectTo()` is now controller-scoped; unresolvable from request-lifecycle events | Wheels 4.0 / Lucee 7 scope | `grep -rn "redirectTo(" app/events/ Application.cfc` |
 | 3 | `testbox` → `wheelstest` namespace | [#1889](https://github.com/wheels-dev/wheels/pull/1889) | Test imports and extends clauses |
 | 4 | `tests/specs/functions/` → `tests/specs/functional/` | [#1872](https://github.com/wheels-dev/wheels/pull/1872) | Directory name in your test tree |
 | 5 | Legacy RocketUnit removed from core | [#1925](https://github.com/wheels-dev/wheels/pull/1925) | New test runs still work; core shim gone |
@@ -62,14 +62,14 @@ Wheels 4.0 on Lucee 7 tightened function scope: `redirectTo()` is a controller m
 
 The pattern that surfaces this in real apps: an AppSerial mismatch in `onrequeststart.cfm` redirecting to `/account/logOut` to force re-login after a deploy. That branch only fires on the mismatch path, so neither the test suite nor normal traffic hit it — the first AppSerial bump after the upgrade catches it instead, surfaced by your error tracker within seconds.
 
-Detect with `grep -rn "redirectTo(" app/events/ public/Application.cfc`. Fix by replacing with plain `cflocation` (tag-in-script form):
+Detect with `grep -rn "redirectTo(" app/events/ Application.cfc`. Fix by replacing with plain `cflocation` (function-call form, portable across engines):
 
 ```cfm
 // before
 redirectTo(controller="account", action="logOut");
 
 // after
-location url="/account/logOut" addToken=false;
+cflocation(url="/account/logOut", addToken=false);
 ```
 
 ### 3. `testbox` → `wheelstest` namespace rename
