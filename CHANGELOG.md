@@ -38,6 +38,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 - Upgrade guide item 10 (`application.wirebox` → `application.wheelsdi`) now includes a callout that `wheels-legacy-adapter` does not shim this rename; apps must update direct `application.wirebox` access and `new wirebox.system.ioc.Injector(...)` bootstrap code regardless of adapter installation (#2627)
 - Legacy Compatibility Adapter section now lists what the adapter covers versus what requires manual remediation, and adds a boot-failure entry to Common Issues for the removed `wirebox` package path (#2627)
+- Document that `reloadPassword` must be wired through `config/settings.cfm` via `set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""))` — a value in `.env` alone is not wired into framework settings automatically, and the fail-closed boot warning will fire regardless (#2631)
 
 ----
 
