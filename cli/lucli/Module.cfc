@@ -221,7 +221,7 @@ component extends="modules.BaseModule" {
 		help &= "  notes               Find TODO / FIXME / HACK / OPTIMIZE comments" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Install, update, search Wheels packages" & nl;
-		help &= "  upgrade             Upgrade the Wheels framework version in your project" & nl;
+		help &= "  upgrade             Scan for breaking changes before upgrading Wheels (read-only)" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
@@ -2352,17 +2352,57 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Check for breaking changes before upgrading Wheels
+	 * hint: Scan your app for breaking changes before upgrading Wheels (read-only)
+	 *
+	 * This command does NOT perform the upgrade. It only scans the current app
+	 * for code paths that will break against a target framework version. The
+	 * actual framework swap is performed by your package manager
+	 * (`brew upgrade wheels`, `scoop update wheels`, or the equivalent).
+	 *
+	 * Despite occasional appearances in older help output, `--dry-run` is not
+	 * supported — the command is already read-only by design.
+	 *
+	 * Examples:
+	 *   wheels upgrade check                 - scan against the latest stable release
+	 *   wheels upgrade check --to=4.0.0      - scan against a specific target version
 	 */
 	public string function upgrade() {
 		var args = getArgs(arguments);
 
 		if (!arrayLen(args) || lCase(args[1]) != "check") {
-			out("Usage: wheels upgrade check [--to=<version>]", "yellow");
-			out("");
-			out("Scans your app for breaking changes between versions.");
-			out("Does not perform the upgrade — use 'brew upgrade wheels' for that.");
-			return "";
+			var nl = chr(10);
+			var help = "Usage: wheels upgrade check [--to=<version>]" & nl
+				& nl
+				& "Scans your app for breaking changes between Wheels versions." & nl
+				& "This command is read-only — it does not modify vendor/wheels/." & nl
+				& nl
+				& "Options:" & nl
+				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
+				& nl
+				& "Unsupported flags:" & nl
+				& "  --dry-run is not supported — the command is already read-only," & nl
+				& "                              so there is no dry-run mode to opt into." & nl
+				& nl
+				& "To actually install a new Wheels version, run:" & nl
+				& "  brew upgrade wheels       (macOS / Homebrew)" & nl
+				& "  scoop update wheels       (Windows / Scoop)" & nl;
+
+			// Detect the two common misfires from the legacy help text and
+			// nudge the user toward the right invocation explicitly.
+			var sawDryRun = false;
+			var sawTo = false;
+			for (var a in args) {
+				if (a == "--dry-run") sawDryRun = true;
+				else if (reFindNoCase("^--to(=|$)", a)) sawTo = true;
+			}
+			if (sawDryRun || sawTo) {
+				help &= nl & "Did you mean: wheels upgrade check"
+					& (sawTo ? " --to=<version>" : "")
+					& " ?" & nl;
+			}
+
+			out(help, "yellow");
+			return help;
 		}
 
 		var targetVersion = "";
