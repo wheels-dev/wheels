@@ -2,7 +2,7 @@
 title: Upgrading from Wheels 3.x
 slug: upgrading-from-wheels-3x
 publishedAt: '2026-05-13T14:00:00.000Z'
-updatedAt: '2026-05-13T02:19:38.000Z'
+updatedAt: '2026-05-13T15:21:48.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
@@ -17,9 +17,9 @@ excerpt: >-
 coverImage: null
 ---
 
-If you run a 3.x Wheels app in production, 4.0 is the first release in years with hard breaks. Not many — seven — but they are real, and pretending otherwise does not help anyone.
+If you run a 3.x Wheels app in production, 4.0 is the first release in years with hard breaks. The [canonical upgrade guide](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) catalogs eleven; this post walks the seven that bite a real 3.x codebase first, plus a "things that bite at boot" section the canonical list does not cover. Pretending the breaks are not real does not help anyone.
 
-The good news: the breakers are concentrated. Five are renames or default flips that `grep` will find for you in an afternoon. Two are security defaults that used to be permissive and are now strict, which is the direction you wanted them to go anyway. And for the team that inherited a 3.x monolith with spotty test coverage and no appetite for a sprint-long migration, there is the Legacy Compatibility Adapter — one flag that re-enables most of the old surface area while you migrate on your own schedule.
+The good news: the breakers are concentrated. Most are renames or scope changes that `grep` will find for you in an afternoon. Two are security defaults that used to be permissive and are now strict, which is the direction you wanted them to go anyway. And for the team that inherited a 3.x monolith with spotty test coverage and no appetite for a sprint-long migration, there is the Legacy Compatibility Adapter — one flag that re-enables most of the old surface area while you migrate on your own schedule.
 
 This post is the map: what changed, how to detect each break, how to fix it, and where the adapter fits.
 
@@ -36,14 +36,14 @@ Pick one, then stick with it.
 set(legacyCompatibilityAdapter=true);
 ```
 
-Either way, start by reading the [full upgrade guide](https://guides.wheels.dev/v4-0-0-snapshot/upgrading/3x-to-4x/) and skimming the seven breakers below. Knowing what is in the blast radius is half the battle.
+Either way, start by reading the [full upgrade guide](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) and skimming the seven breakers below. Knowing what is in the blast radius is half the battle.
 
 ## The seven breaking changes
 
 | # | Change | PR | Detection |
 |---|---|---|---|
 | 1 | `wheels snippets` renamed to `wheels generate snippets` | [#1852](https://github.com/wheels-dev/wheels/pull/1852) | Scripts calling bare `wheels snippets` |
-| 2 | `cfwheels` → `wheels` namespace in active code | [#2064](https://github.com/wheels-dev/wheels/pull/2064) | `grep -r cfwheels app/` |
+| 2 | `redirectTo()` is now controller-scoped; unresolvable from request-lifecycle events | Wheels 4.0 / Lucee 7 scope | `grep -rn "redirectTo(" app/events/ Application.cfc` |
 | 3 | `testbox` → `wheelstest` namespace | [#1889](https://github.com/wheels-dev/wheels/pull/1889) | Test imports and extends clauses |
 | 4 | `tests/specs/functions/` → `tests/specs/functional/` | [#1872](https://github.com/wheels-dev/wheels/pull/1872) | Directory name in your test tree |
 | 5 | Legacy RocketUnit removed from core | [#1925](https://github.com/wheels-dev/wheels/pull/1925) | New test runs still work; core shim gone |
@@ -56,11 +56,21 @@ The top-level `wheels snippets` command moved under the generator group and is n
 
 Detect it by searching your `Makefile`, `package.json` scripts, CI pipelines, and `.sh` files for `wheels snippets`. A build that ran yesterday fails with "unknown command" as the only signal. Fix by renaming the call site. The adapter re-registers the old alias if you need it.
 
-### 2. CFWheels → Wheels rebrand in active code
+### 2. `redirectTo()` is now strictly controller-scoped
 
-The project is named Wheels. It has been since 3.0, but 3.x kept `cfwheels`-prefixed identifiers in active namespaces for compatibility. 4.0 completes the rename in the code paths that actually run — module names, event prefixes, CLI namespace.
+Wheels 4.0 on Lucee 7 tightened function scope: `redirectTo()` is a controller method, not a globally-resolvable function. Calls from request-lifecycle event handlers (`app/events/onrequeststart.cfm`, `onapplicationstart.cfm`) throw `No matching function [REDIRECTTO] found` at runtime.
 
-Detect with `grep -ri cfwheels app/ config/`. Most references are cosmetic (log lines, comments), but any event listener or module reference using the old name will fail to resolve. Rename to `wheels`.
+This bites any app with logic in `onrequeststart.cfm` that detects a condition requiring the request to be interrupted and the user sent to the login form — a stale session, a re-auth requirement after a server-side state change, a forced logout when an app-version flag flips, a maintenance-mode redirect. The natural pattern in 3.x was a `redirectTo()` call inside that handler. On 4.0 the call no longer resolves from event scope. The branch typically only fires under specific conditions, so neither the test suite nor normal traffic exercises it — the regression surfaces in production the first time the branch hits.
+
+Detect with `grep -rn "redirectTo(" app/events/ Application.cfc`. Fix by replacing with plain `cflocation` (function-call form, portable across engines):
+
+```cfm
+// before
+redirectTo(controller="sessions", action="new");
+
+// after
+cflocation(url="/login", addToken=false);
+```
 
 ### 3. `testbox` → `wheelstest` namespace rename
 
@@ -105,6 +115,8 @@ Use it when: you inherited an app with ambiguous test coverage, you need 4.0 in 
 
 Do not use it for: new apps, small apps, or apps where you are already touching the breakers to add a feature. The adapter exists to buy time, not to avoid work that is cheaper to do now.
 
+What the adapter does **not** cover: it cannot shim `application.wirebox` access or the `wirebox.system.ioc.Injector` class path. Apps that bootstrap WireBox directly in `Application.cfc` (the canonical 2.x pattern still common in older codebases) must rewrite that file before first boot, adapter or no adapter. The canonical breaker for this rename is `application.wirebox` → `application.wheelsdi`. If `grep -rn "application.wirebox\|new wirebox.system" app/ public/` finds anything, plan the bootstrap rewrite up front.
+
 ## Security-hardening defaults to audit
 
 These are not on the canonical breaker list, but they change visible behavior. 4.0 shipped with more than forty security-hardening PRs; these three are the most likely to surface when you turn the app on in production.
@@ -115,6 +127,27 @@ These are not on the canonical breaker list, but they change visible behavior. 4
 
 **CSRF SameSite cookie default ([#2035](https://github.com/wheels-dev/wheels/pull/2035)).** The CSRF token cookie now sets `SameSite=Lax`. Cross-site form submissions that worked in 3.x will start failing; usually the fix is that they should have been same-origin all along.
 
+## Things that bite at boot (from the field)
+
+These are not on the canonical breaker list, but they are what eats your evening when you cut a real 3.x app over to 4.0. None of them show up in `wheels upgrade check`. All of them are recoverable in minutes once you know what to look for — but they will page someone at 2 AM if you don't.
+
+> **Heads up — most of this section is already being addressed in the forthcoming v4.0.1.** Between this post landing and now, the framework team has merged fixes that improve the CLI's default `rewrite.config` for 3.x apps, expand `wheels upgrade check` to scan more breakers, and clarify the canonical guide on `reloadPassword` wiring and the adapter's WireBox limits. A follow-up post will walk those changes when v4.0.1 ships and point back here. Until then, the workarounds below are what you need on 4.0.0.
+
+**The default `rewrite.config` 404s static assets in non-standard directories.** Lucee 7's bundled RewriteValve runs `rewrite.config` (mod_rewrite syntax), not the old `urlrewrite.xml` (Tuckey format) — the boot log warns about this but does not say how the default rules fail. The defaults only allow `images|css|js|fonts|assets|static` as static-asset directories. If your 3.x app keeps assets under `/miscellaneous/`, `/javascripts/`, `/stylesheets/`, `/files/`, or anywhere else, the catch-all rewrite routes them to `/index.cfm/...` and Wheels 404s every CSS and JS file. The site renders unstyled — login works but looks broken. Fix: drop a `rewrite.config` at your project root with explicit `[L]`-flagged pass-through rules for your asset directories before promoting the upgrade past staging.
+
+**`reloadPassword=...` in `.env` alone does not satisfy the framework's empty-check.** The fail-closed check reads `application.wheels.reloadPassword`, which is populated from `set(reloadPassword="...")` in `config/settings.cfm` — not from `.env` directly. Wire it through the `env()` helper so the value flows from `.env` into the framework setting:
+
+```cfm
+// config/settings.cfm
+set(reloadPassword = env("WHEELS_RELOAD_PASSWORD"));
+```
+
+Without this, boot logs a warning, `?reload=true` is silently disabled in production, and you find out by `tail`-ing the security log days later.
+
+**Classpath jars need a new home if you came from CommandBox.** CommandBox's `server.json` loaded application jars via `libDirs="public/miscellaneous/libs/server"`. The wheels CLI systemd unit has no equivalent. Symlink each `.jar` from your app's libs directory into Lucee Express's `lib/ext/` (the same drop-in path the wheels wrapper uses for `sqlite-jdbc`). Skip this and the first request that touches a custom JDBC driver — Universe, an older MSSQL build, anything bundled — throws `java.lang.ClassException: cannot load class …` the moment external traffic hits the upgraded host. Codify the symlink as a task in your provisioning role; do not leave it as a tribal-knowledge hotfix.
+
+**Lucee 6.x → 7 makes cross-version DB sessions into stuck cookies.** If your 3.x app stored sessions in a SQL store (Lucee's `sessionStorage="..."` pointing at CockroachDB / Postgres / MSSQL), every blob is serialized in Lucee 6 format. Lucee 7 throws `InvalidClassException` during session-load — **before** `onrequeststart.cfm` runs, so the AppSerial kill-switch can't fire. The user's cookie is stuck pointing at a blob that will never deserialize, and if your load balancer uses IP persistence, even a different browser tab on the same network won't recover (the cookie stays sticky to the same VM). One-time fix: truncate the session-storage table after cutover. Every active user gets a fresh Lucee 7 session on their next request. Plan this into the cutover playbook rather than discovering it from the first user-reported "I can't log in" the morning after.
+
 ## Deprecations and recommended migrations
 
 Not breaking, but worth scheduling after the upgrade lands.
@@ -122,10 +155,10 @@ Not breaking, but worth scheduling after the upgrade lands.
 - Legacy `plugins/` folder ([#1995](https://github.com/wheels-dev/wheels/pull/1995), [#2252](https://github.com/wheels-dev/wheels/pull/2252)) still loads in 4.x with a deprecation warning — scheduled for removal in v5.0. Migrate to the `packages/` → `vendor/` activation model before upgrading to 5.x.
 - Monolithic `paginationLinks()` ([#1930](https://github.com/wheels-dev/wheels/pull/1930)) still works; new code should use `paginationNav()` plus the individual helpers.
 - `wheels.Test` base class still works for existing specs; new tests extend `wheels.WheelsTest`.
-- Adopt the [middleware pipeline](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/middleware-pipeline/) ([#1924](https://github.com/wheels-dev/wheels/pull/1924)) for cross-cutting concerns you currently do in `beforeFilter`.
-- Turn on [route model binding](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/how-routing-works/) ([#1929](https://github.com/wheels-dev/wheels/pull/1929)) — it kills the first three lines of most show/edit/update actions.
-- Use the [chainable query builder](https://guides.wheels.dev/v4-0-0-snapshot/basics/query-builder-and-scopes/) ([#1922](https://github.com/wheels-dev/wheels/pull/1922)) instead of raw `where` strings for anything user-supplied.
-- Replace Redis-backed job queues with the [built-in daemon](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/background-jobs/) ([#1934](https://github.com/wheels-dev/wheels/pull/1934)) if the dependency is more than you need.
+- Adopt the [middleware pipeline](https://guides.wheels.dev/v4-0-0/core-concepts/middleware-pipeline/) ([#1924](https://github.com/wheels-dev/wheels/pull/1924)) for cross-cutting concerns you currently do in `beforeFilter`.
+- Turn on [route model binding](https://guides.wheels.dev/v4-0-0/core-concepts/how-routing-works/) ([#1929](https://github.com/wheels-dev/wheels/pull/1929)) — it kills the first three lines of most show/edit/update actions.
+- Use the [chainable query builder](https://guides.wheels.dev/v4-0-0/basics/query-builder-and-scopes/) ([#1922](https://github.com/wheels-dev/wheels/pull/1922)) instead of raw `where` strings for anything user-supplied.
+- Replace Redis-backed job queues with the [built-in daemon](https://guides.wheels.dev/v4-0-0/digging-deeper/background-jobs/) ([#1934](https://github.com/wheels-dev/wheels/pull/1934)) if the dependency is more than you need.
 
 ## Testing and deploying
 
@@ -152,13 +185,13 @@ One extends change, one BDD block, one `expect` instead of `assert`. The old Roc
 
 ## The shape of the release
 
-For context as you plan timeline: 4.0 is roughly 260 pull requests over fifteen weeks, with more than forty dedicated to security hardening. Contributors include @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta, and Dependabot. Seven of those PRs are the breakers above; the rest is additive.
+For context as you plan timeline: 4.0 is roughly 260 pull requests over fifteen weeks, with more than forty dedicated to security hardening. Contributors include @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta, and Dependabot. Six of the PRs above are the breakers (plus one Lucee 7 scope change); the rest is additive.
 
 ## Where to go next
 
-- [Upgrading to 4.0](https://guides.wheels.dev/v4-0-0-snapshot/upgrading/3x-to-4x/) — the authoritative guide with every breaker, every default flip, and every adapter flag documented in one place.
-- [Middleware](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/middleware-pipeline/), [route model binding](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/how-routing-works/), [query builder](https://guides.wheels.dev/v4-0-0-snapshot/basics/query-builder-and-scopes/) — the three adoptions that pay off fastest.
-- [Packages](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/packages/) — the replacement for the legacy `plugins/` folder.
+- [Upgrading to 4.0](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) — the authoritative guide with every breaker, every default flip, and every adapter flag documented in one place.
+- [Middleware](https://guides.wheels.dev/v4-0-0/core-concepts/middleware-pipeline/), [route model binding](https://guides.wheels.dev/v4-0-0/core-concepts/how-routing-works/), [query builder](https://guides.wheels.dev/v4-0-0/basics/query-builder-and-scopes/) — the three adoptions that pay off fastest.
+- [Packages](https://guides.wheels.dev/v4-0-0/digging-deeper/packages/) — the replacement for the legacy `plugins/` folder.
 - [Wheels vs other frameworks](https://github.com/wheels-dev/wheels/blob/develop/docs/wheels-vs-frameworks.md) — context for what 4.0 now offers compared to Rails, Laravel, and the rest.
 
 Most upgrades take an afternoon, not a sprint. If yours takes longer, open an issue on [wheels-dev/wheels](https://github.com/wheels-dev/wheels/issues) with the `upgrade` label — 4.0 is the first release in a long time with real breaks, and the team wants to hear where the map does not match the terrain.
