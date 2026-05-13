@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>apt.wheels.dev — Wheels Debian/Ubuntu repository</title>
+  <meta name="description" content="Native apt repository for the Wheels CFML framework CLI. Add the source once, then `apt update && apt upgrade wheels`.">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #0f172a;
+      --bg: #fff;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --code-bg: #f1f5f9;
+      --border: #e2e8f0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #f1f5f9;
+        --bg: #0f172a;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --code-bg: #1e293b;
+        --border: #334155;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    main { max-width: 720px; margin: 4rem auto; padding: 0 1.5rem; }
+    h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+    h2 { font-size: 1.25rem; margin: 2.5rem 0 0.75rem; }
+    p, li { margin: 0.5rem 0; }
+    a { color: var(--accent); }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    code:not(pre code) {
+      background: var(--code-bg);
+      padding: 2px 5px;
+      border-radius: 3px;
+      font: 90% ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>apt.wheels.dev</h1>
+  <p>Native Debian/Ubuntu repository for the <a href="https://wheels.dev">Wheels</a> CFML framework CLI.</p>
+
+  <h2>Stable channel</h2>
+  <pre><code>curl -fsSL https://apt.wheels.dev/wheels.gpg \
+  | sudo tee /usr/share/keyrings/wheels.gpg &gt;/dev/null
+echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
+  | sudo tee /etc/apt/sources.list.d/wheels.list
+sudo apt update &amp;&amp; sudo apt install wheels</code></pre>
+
+  <h2>Bleeding-edge channel</h2>
+  <p>Published on every merge to <code>develop</code>. The package is named <code>wheels-be</code> so it can coexist with the stable <code>wheels</code> install on the same host.</p>
+  <pre><code>curl -fsSL https://apt.wheels.dev/wheels.gpg \
+  | sudo tee /usr/share/keyrings/wheels.gpg &gt;/dev/null
+echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
+  | sudo tee /etc/apt/sources.list.d/wheels-be.list
+sudo apt update &amp;&amp; sudo apt install wheels-be</code></pre>
+
+  <h2>Upgrading</h2>
+  <pre><code>sudo apt update &amp;&amp; sudo apt upgrade wheels        # or wheels-be</code></pre>
+
+  <h2>Signing key</h2>
+  <p>The repository is signed with the Wheels project key. The public half is published at <a href="/wheels.gpg"><code>/wheels.gpg</code></a>. The fingerprint is committed to the <a href="https://github.com/wheels-dev/apt-wheels-dev">source repo</a> in <code>FINGERPRINT</code> for offline verification.</p>
+
+  <h2>Other platforms</h2>
+  <ul>
+    <li>macOS: <code>brew install wheels</code> — <a href="https://github.com/wheels-dev/homebrew-wheels">wheels-dev/homebrew-wheels</a></li>
+    <li>Windows: <code>scoop install wheels</code> — <a href="https://github.com/wheels-dev/scoop-wheels">wheels-dev/scoop-wheels</a></li>
+    <li>Fedora/RHEL: <code>dnf install wheels</code> — <a href="https://yum.wheels.dev">yum.wheels.dev</a></li>
+  </ul>
+
+  <footer>
+    <p>Hosted on Cloudflare Pages. Repository contents at <a href="https://github.com/wheels-dev/apt-wheels-dev">wheels-dev/apt-wheels-dev</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
