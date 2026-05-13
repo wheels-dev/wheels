@@ -65,10 +65,9 @@ component extends="wheels.WheelsTest" {
 				} catch (any e) {
 					// index() doesn't call $blockInProduction so this should
 					// never throw a "Function [$...] not found" error. Any
-					// other error (e.g. missing view path) is unrelated.
-					if (FindNoCase("$blockInProduction", e.message)
-						|| FindNoCase("$privateHelper", e.message)
-						|| FindNoCase("not found", e.message)) {
+					// other error (e.g. missing view path or template) is
+					// unrelated — match only the receiver-loss signature.
+					if (REFindNoCase("Function \[\$[a-zA-Z]", e.message)) {
 						threwReceiverLoss = true;
 						caughtMessage = e.message;
 					}
