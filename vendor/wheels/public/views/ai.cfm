@@ -306,10 +306,17 @@ function getGuidesSummary() {
 	local.base = "https://guides.wheels.dev";
 
 	// Discover the latest sidebar in the monorepo sidebars dir (snapshot
-	// or GA — whichever sorts highest). See vendor/wheels/public/docs/
-	// guides.cfm for the rationale; the same logic lives there. Hardcoding
-	// a single version slug broke this endpoint the moment v4.0.0 went GA
-	// and the snapshot file was renamed (issue ##2647).
+	// or GA — whichever sorts highest). Sidebar basenames like
+	// "v4-0-1-snapshot.json" / "v4-0-0.json" sort sensibly in descending
+	// lexicographic order because the version segment (e.g. "4-0-1")
+	// dominates — the snapshot is always named at the NEXT minor version
+	// while GA files carry the released version. Note: at an identical
+	// version prefix, "-snapshot" sorts LOWER than ".json" (ASCII "." >
+	// "-"), so if "v4-0-1.json" and "v4-0-1-snapshot.json" ever coexist
+	// the GA wins; in practice only one exists at a time. See
+	// vendor/wheels/public/docs/guides.cfm — the same logic lives there.
+	// Hardcoding a single version slug broke this endpoint the moment
+	// v4.0.0 went GA and the snapshot file was renamed (issue ##2647).
 	local.sidebarDir = expandPath("/wheels/../../web/sites/guides/src/sidebars");
 	local.sidebarPath = "";
 	if (directoryExists(local.sidebarDir)) {

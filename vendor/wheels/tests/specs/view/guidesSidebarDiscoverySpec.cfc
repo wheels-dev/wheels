@@ -43,10 +43,15 @@ component extends="wheels.WheelsTest" {
 
 				// Mirror the discovery logic that guides.cfm / ai.cfm use:
 				// glob *.json under sidebars/ and sort basenames in
-				// descending lexicographic order. The highest-named entry is
-				// the latest snapshot (a "-snapshot" suffix sorts after the
-				// matching GA, which is what we want — the dev snapshot wins
-				// over a GA at the same version). The file must exist.
+				// descending lexicographic order. The highest-named entry
+				// is the latest snapshot because the version segment (e.g.
+				// "4-0-1") dominates — the snapshot is always named at the
+				// NEXT minor version while GA files carry the released
+				// version. Note: at an identical version prefix,
+				// "-snapshot" sorts LOWER than ".json" (ASCII "." > "-"),
+				// so if "v4-0-1.json" and "v4-0-1-snapshot.json" ever
+				// coexist the GA wins; in practice only one exists at a
+				// time. The file must exist.
 				var candidates = DirectoryList(sidebarsDir, false, "name", "*.json");
 				expect(ArrayLen(candidates)).toBeGT(
 					0,

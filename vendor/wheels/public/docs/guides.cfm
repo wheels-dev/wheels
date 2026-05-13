@@ -12,10 +12,14 @@ param name="request.wheels.params.format" default="html";
 // hardcoded "v4-0-0-snapshot", which broke the in-app sidebar the moment
 // v4.0.0 went GA and the snapshot file was renamed (issue ##2647). Sidebar
 // basenames like "v4-0-1-snapshot.json" / "v4-0-0.json" sort sensibly in
-// descending lexicographic order — a "-snapshot" suffix sorts after the
-// matching GA, which is what we want (the dev snapshot wins at the same
-// version). Falls back to "v4-0-0" when the monorepo tree isn't present
-// so the external redirect still lands somewhere valid in installed apps.
+// descending lexicographic order because the version segment (e.g.
+// "4-0-1") dominates — the snapshot is always named at the NEXT minor
+// version while GA files carry the released version. Note: at an
+// identical version prefix, "-snapshot" sorts LOWER than ".json" (ASCII
+// "." > "-"), so if "v4-0-1.json" and "v4-0-1-snapshot.json" ever
+// coexist the GA wins; in practice only one exists at a time. Falls
+// back to "v4-0-0" when the monorepo tree isn't present so the external
+// redirect still lands somewhere valid in installed apps.
 local.sidebarDir = ExpandPath("/wheels/../../web/sites/guides/src/sidebars");
 local.activeSlug = "v4-0-0";
 local.sidebarPath = "";
