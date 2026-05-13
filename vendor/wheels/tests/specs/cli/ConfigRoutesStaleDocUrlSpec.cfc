@@ -28,7 +28,8 @@ component extends="wheels.WheelsTest" {
 			var repoRoot = expandPath("/wheels/../..");
 			var targets = [
 				"cli/src/templates/ConfigRoutes.txt",
-				"cli/lucli/templates/app/app/snippets/ConfigRoutes.txt"
+				"cli/lucli/templates/app/app/snippets/ConfigRoutes.txt",
+				"cli/lucli/templates/app/config/routes.cfm"
 			];
 			var canonical = "https://guides.wheels.dev/v4-0-0-snapshot/handling-requests-with-controllers/routing";
 
