@@ -4251,14 +4251,15 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		// Template variable context — all config values flow through here
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
 		var context = {
 			"appName": appName,
 			"datasourceName": opts.datasource,
 			"reloadPassword": opts.reloadPassword,
 			"port": opts.port,
 			"shutdownPort": opts.port + 1,
-			"openBrowser": opts.openBrowser ? "true" : "false"
+			"openBrowser": opts.openBrowser ? "true" : "false",
+			"datasourcesBlock": opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(opts.datasource)
 		};
 
 		// Copy template directory tree to target, processing placeholders.
@@ -4443,6 +4444,33 @@ component extends="modules.BaseModule" {
 				out("  config  #appName#/config/app.cfm (SQLite datasource)", "green");
 			}
 		}
+	}
+
+	private string function buildSQLiteDatasourcesBlock(required string datasourceName) {
+		var nl = chr(10);
+		var pad = "      ";
+		var inner = "        ";
+		var block = "{" & nl;
+		block &= pad & '"#datasourceName#": {' & nl;
+		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
+		block &= inner & '"database": "#datasourceName#",' & nl;
+		block &= inner & '"dbdriver": "Other",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/development.sqlite",' & nl;
+		block &= inner & '"host": "",' & nl;
+		block &= inner & '"password": "",' & nl;
+		block &= inner & '"username": ""' & nl;
+		block &= pad & "}," & nl;
+		block &= pad & '"#datasourceName#_test": {' & nl;
+		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
+		block &= inner & '"database": "#datasourceName#_test",' & nl;
+		block &= inner & '"dbdriver": "Other",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/test.sqlite",' & nl;
+		block &= inner & '"host": "",' & nl;
+		block &= inner & '"password": "",' & nl;
+		block &= inner & '"username": ""' & nl;
+		block &= pad & "}" & nl;
+		block &= "    }";
+		return block;
 	}
 
 	/**

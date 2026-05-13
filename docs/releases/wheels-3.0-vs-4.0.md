@@ -16,7 +16,7 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 |---|---|
 | New capabilities added | ~40 |
 | Capabilities formalized (tests + docs, made official) | ~11 |
-| Breaking defaults hardened | 7 |
+| Breaking changes | 11 |
 | Security-hardening passes | 40+ PRs grouped by theme |
 | Legacy surfaces removed | 4 |
 
@@ -96,13 +96,13 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | Partial path traversal | ~~`includePartial("../…")` unblocked~~ | Validated | **Hardened** ([#2071](https://github.com/wheels-dev/wheels/pull/2071)) |
 | Pagination XSS via prependToPage / anchorDivider / appendToPage | ~~bypassable~~ | Sanitized; HTML-entity-encoding bypass closed | **Hardened** ([#2042](https://github.com/wheels-dev/wheels/pull/2042), [#2057](https://github.com/wheels-dev/wheels/pull/2057), [#2060](https://github.com/wheels-dev/wheels/pull/2060)) |
 | Scaffolded-app landing page | ~~CFWheels-era splash~~ | Redesigned 4.0 congratulations page | **Refreshed** ([#2098](https://github.com/wheels-dev/wheels/pull/2098)) |
-| Vite asset pipeline | ~~basic entry-point resolution~~ | Transitive `modulepreload` + CSS resolution for multi-entry Vite builds | **New** ([#2133](https://github.com/wheels-dev/wheels/pull/2133)) |
+| Vite asset pipeline | ~~basic entry-point resolution~~ | Transitive `modulepreload` + CSS resolution for multi-entry Vite builds; strict manifest mode default-on in production | **Breaking** ([#2133](https://github.com/wheels-dev/wheels/pull/2133)) |
 
 ## 7. Dependency Injection
 
 | Capability | 3.0 | 4.0 | Delta |
 |---|---|---|---|
-| DI framework | WireBox (Ortus) | In-house `wheelsdi` with same surface, lighter core | **Changed** ([#1883](https://github.com/wheels-dev/wheels/pull/1883), [#1888](https://github.com/wheels-dev/wheels/pull/1888)) |
+| DI framework | WireBox (Ortus) | In-house `wheelsdi` with same surface, lighter core | **Breaking** ([#1883](https://github.com/wheels-dev/wheels/pull/1883), [#1888](https://github.com/wheels-dev/wheels/pull/1888)) |
 | Request-scoped services | ~~absent~~ | `.asRequestScoped()` for per-request instances | **New** ([#1933](https://github.com/wheels-dev/wheels/pull/1933)) |
 | `service()` global helper | ~~absent~~ | Global resolution anywhere | **New** ([#1933](https://github.com/wheels-dev/wheels/pull/1933)) |
 | Declarative controller injection | ~~manual~~ | `inject()` in controller `config()` | **New** ([#1933](https://github.com/wheels-dev/wheels/pull/1933)) |
@@ -126,9 +126,9 @@ A category-by-category comparison showing how Wheels 4.0 closed framework-maturi
 | HTTP integration test client | ~~absent~~ | `TestClient.visit()` with `.assertOk()`, `.assertSee()`, `.assertJson()`, `.assertJsonPath()`, cookie tracking, session support | **New** ([#2099](https://github.com/wheels-dev/wheels/pull/2099)) |
 | Parallel test runner | ~~serial~~ | `ParallelRunner` with `cfthread` workers; round-robin bundle partition | **New** ([#2100](https://github.com/wheels-dev/wheels/pull/2100)) |
 | Browser testing | ~~absent~~ | `BrowserTest` base class + ~60-method fluent DSL wrapping Playwright Java; `wheels browser setup` | **New** ([#2113](https://github.com/wheels-dev/wheels/pull/2113), [#2115](https://github.com/wheels-dev/wheels/pull/2115), [#2116](https://github.com/wheels-dev/wheels/pull/2116), [#2121](https://github.com/wheels-dev/wheels/pull/2121)) |
-| Test base class namespace | `wheels.Test` (RocketUnit-era) | `wheels.WheelsTest` (BDD style); old retained during 4.0 | **Changed** ([#1889](https://github.com/wheels-dev/wheels/pull/1889)) |
+| Test base class namespace | `wheels.Test` (RocketUnit-era) | `wheels.WheelsTest` (BDD style); old retained during 4.0 | **Breaking** ([#1889](https://github.com/wheels-dev/wheels/pull/1889)) |
 | Primary test style | RocketUnit + TestBox co-existed | WheelsTest (BDD) only for new tests | **Deprecated** ([#1925](https://github.com/wheels-dev/wheels/pull/1925)) |
-| Tests directory layout | `tests/specs/functions/` | `tests/specs/functional/` | **Renamed** ([#1872](https://github.com/wheels-dev/wheels/pull/1872)) |
+| Tests directory layout | `tests/specs/functions/` | `tests/specs/functional/` | **Breaking** ([#1872](https://github.com/wheels-dev/wheels/pull/1872)) |
 
 ## 10. CLI & LuCLI
 
