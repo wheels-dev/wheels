@@ -33,6 +33,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Interpolate plugin and package names in the "Loading plugin..." / "Loading package..." `wheels_security.log` INFO lines so operators can read which plugin/package was being loaded; the call sites were double-escaping the pound signs (`##var##`) and emitting literal `#var#` placeholders instead of resolved values (#2630)
 - Update the scaffolded `config/routes.cfm` doc-URL comment in `cli/src/templates/ConfigRoutes.txt` and `cli/lucli/templates/app/app/snippets/ConfigRoutes.txt` from the dead `https://guides.wheels.dev/docs/routing` path to the canonical `https://guides.wheels.dev/v4-0-0-snapshot/handling-requests-with-controllers/routing` URL, so freshly scaffolded apps no longer ship a broken link (#2635)
 - `wheels new --no-sqlite` now suppresses the SQLite datasource pair in the scaffolded `lucee.json` so Lucee no longer auto-creates `db/development.sqlite` / `db/test.sqlite` on first connection (#2621)
+- Extend `wheels upgrade check` for 3.x → 4.x to scan seven additional documented breakers (CORS deny-all default, RateLimiter hardened defaults, `allowEnvironmentSwitchViaUrl`, missing `csrfEncryptionKey`, legacy `wheels snippets` invocations in build/CI scripts, `tests/specs/functions/` rename, `viteStrictManifest` default flip); previously the tool only flagged the legacy plugin directory, `wheels.Test` base class, and `application.wirebox` references — silence on the rest read as a green light (#2628)
 
 ### Documentation
 
