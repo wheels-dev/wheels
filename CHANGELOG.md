@@ -26,6 +26,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Use the Adobe-safe 3-argument `mid()` form when stripping the `wheels` prefix in the MCP command executor and its security spec; the prior 2-arg call crashed the entire `security/` test bundle on Adobe ColdFusion (#2613)
 - Replace Lucee-only `directoryCreate(path, true)` calls in `BrowserTest.$captureFailureArtifacts` and `McpServer` test-file generation with `java.io.File.mkdirs()` so artifact directory creation no longer trips Adobe ColdFusion's `DIRECTORYCREATE` single-argument validator (#2614)
 - Generated `Application.cfc` (and the in-repo `public/`, `examples/tweet/`, `examples/starter-app/` copies) now assigns the injector directly to `application.wheelsdi` in `onApplicationStart()` and `onError()` instead of an orphan local `injector` variable, matching the documented 4.0 DI container name and the way every other reference in the file reads (#2622)
+- Interpolate plugin and package names in the "Loading plugin..." / "Loading package..." `wheels_security.log` INFO lines so operators can read which plugin/package was being loaded; the call sites were double-escaping the pound signs (`##var##`) and emitting literal `#var#` placeholders instead of resolved values (#2630)
 
 ----
 

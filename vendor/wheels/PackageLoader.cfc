@@ -366,7 +366,7 @@ component output="false" {
 
 		try {
 			WriteLog(
-				text = "[Wheels] Loading package '##arguments.dirName##' from ##arguments.pkgDir##",
+				text = "[Wheels] Loading package '#arguments.dirName#' from #arguments.pkgDir#",
 				type = "information",
 				file = "wheels_security"
 			);
