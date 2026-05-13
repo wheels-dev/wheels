@@ -26,11 +26,8 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Fixed
 
-<<<<<<< fix/bot-2651-core-test-runner-tabs-not-switchable-when-running
 - Core test runner result page (`/wheels/core/tests`) now initializes the Semantic UI "Failures / Errors / Passed" tabs inline, immediately after the menu markup, instead of relying solely on `_footer.cfm`. On the full-suite path the footer-bundled tab activator did not always reach the browser, leaving every tab but the default-active one un-clickable
-=======
 - Internal Wheels routes (`/wheels/info`, `/wheels/routes`, `/wheels/packages`, `/wheels/guides`, `/wheels/tests`, ...) no longer 500 on BoxLang with `Function [$blockInProduction] not found`. The BoxLang engine adapter's `invokeMethod` was splitting the dispatch into `local.method = obj[name]; local.method()`, which stripped the component receiver under BoxLang's JS-style dispatch — so every `Public.cfc` handler's first call to `$blockInProduction()` (added in #2241) failed to resolve. The dispatch is now a single-expression bracket-call that preserves the receiver. Lucee and Adobe were never affected (they take `Base.cfc::invoke()`). Regression test at `vendor/wheels/tests/specs/dispatch/InvokeMethodSpec.cfc` (#2646)
->>>>>>> develop
 - Stop the generated app's `_gitignore` and `app/plugins/README.md` from advertising the broken `wheels packages install` / `wheels install` verbs; point users at the canonical `wheels packages add` verb (#2610)
 - Use the Adobe-safe 3-argument `mid()` form when stripping the `wheels` prefix in the MCP command executor and its security spec; the prior 2-arg call crashed the entire `security/` test bundle on Adobe ColdFusion (#2613)
 - Replace Lucee-only `directoryCreate(path, true)` calls in `BrowserTest.$captureFailureArtifacts` and `McpServer` test-file generation with `java.io.File.mkdirs()` so artifact directory creation no longer trips Adobe ColdFusion's `DIRECTORYCREATE` single-argument validator (#2614)

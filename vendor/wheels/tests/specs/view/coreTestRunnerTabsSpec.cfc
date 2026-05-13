@@ -24,11 +24,12 @@ component extends="wheels.WheelsTest" {
 
 			it("initializes Semantic UI tabs inline so tab switching works even if _footer.cfm is truncated (regression for ##2651)", () => {
 				var src = fileRead(expandPath("/wheels/tests/html.cfm"));
-				expect(findNoCase(".menu .item", src) GT 0).toBeTrue(
-					"html.cfm must call .tab() on '.menu .item' inline (not via _footer.cfm). See issue ##2651."
-				);
-				expect(findNoCase(".tab()", src) GT 0).toBeTrue(
-					"html.cfm must invoke .tab() inline so tabs are interactive even when the footer JS is missing. See issue ##2651."
+				// Match the exact JS call as it appears in the <script> block.
+				// This string does NOT appear in any CFML comment, so passing this
+				// assertion proves the executable script block is present — not
+				// just narrative comment text describing the fix.
+				expect(findNoCase("jQuery('.menu .item').tab()", src) GT 0).toBeTrue(
+					"html.cfm must invoke jQuery('.menu .item').tab() in an inline script block (not via _footer.cfm). See issue ##2651."
 				);
 			});
 
