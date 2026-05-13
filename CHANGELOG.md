@@ -34,6 +34,11 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Update the scaffolded `config/routes.cfm` doc-URL comment in `cli/src/templates/ConfigRoutes.txt` and `cli/lucli/templates/app/app/snippets/ConfigRoutes.txt` from the dead `https://guides.wheels.dev/docs/routing` path to the canonical `https://guides.wheels.dev/v4-0-0-snapshot/handling-requests-with-controllers/routing` URL, so freshly scaffolded apps no longer ship a broken link (#2635)
 - `wheels new --no-sqlite` now suppresses the SQLite datasource pair in the scaffolded `lucee.json` so Lucee no longer auto-creates `db/development.sqlite` / `db/test.sqlite` on first connection (#2621)
 
+### Documentation
+
+- Upgrade guide item 10 (`application.wirebox` → `application.wheelsdi`) now includes a callout that `wheels-legacy-adapter` does not shim this rename; apps must update direct `application.wirebox` access and `new wirebox.system.ioc.Injector(...)` bootstrap code regardless of adapter installation (#2627)
+- Legacy Compatibility Adapter section now lists what the adapter covers versus what requires manual remediation, and adds a boot-failure entry to Common Issues for the removed `wirebox` package path (#2627)
+
 ----
 
 # [4.0.0](https://github.com/wheels-dev/wheels/releases/tag/v4.0.0) => 2026-05-12

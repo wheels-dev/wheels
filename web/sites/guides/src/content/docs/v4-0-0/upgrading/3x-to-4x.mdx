@@ -169,6 +169,13 @@ var svc = service("emailService");
 
 `service()` is the new global helper (#1933); prefer it over reaching into the container.
 
+<Aside type="caution">
+  **The legacy adapter does not cover this item.** Installing `wheels-legacy-adapter` does not create an `application.wirebox` alias and does not restore the `wirebox.system.ioc.Injector` package path. Both require manual remediation regardless of whether the adapter is installed:
+
+  - Replace all `application.wirebox.getInstance("...")` calls with `application.wheelsdi.getInstance("...")` or the `service()` helper.
+  - Replace any `Application.cfc` bootstrap that calls `new wirebox.system.ioc.Injector(...)`. The WireBox package no longer ships in `vendor/wheels/`. The 4.0 equivalent is `new wheels.Injector()`.
+</Aside>
+
 ### 11. Vite manifest strictness — missing entries throw in production
 
 **CHANGELOG:** `Breaking: viteStrictManifest defaults to true` (#2133).
@@ -301,6 +308,21 @@ wheels reload
 
 The adapter logs every deprecated call so you can track what's still 3.x-shaped in production.
 
+The adapter covers these 3.x patterns; everything else still requires manual remediation:
+
+| Covered by the adapter | Requires manual remediation regardless |
+|---|---|
+| `renderPage()` → `renderView()` shim | Items 1–9 and 11 (all other breaking changes) |
+| `renderPageToString()` shim | `application.wirebox` → `application.wheelsdi` (item 10) |
+| `$legacySendEmail()` argument remap | `new wirebox.system.ioc.Injector(...)` bootstrap code |
+| `$legacyAppScopeGet(key)` opt-in helper | |
+| Migration scanner | |
+| Deprecation call logger | |
+
+<Aside type="caution">
+  The adapter does **not** shim the `application.wirebox` rename (item 10). Apps whose `Application.cfc` calls `new wirebox.system.ioc.Injector(...)` or reads from `application.wirebox` must update those references manually — the adapter cannot defer or soften this item.
+</Aside>
+
 ## Recommended, not required
 
 These are additive in 4.0 and worth adopting during the upgrade window:
@@ -345,6 +367,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 - **Plugin warning at startup.** Port to a package (see above) or accept the warning until you do.
 - **JWT tokens reject as invalid after upgrade.** Algorithm validation is on. Confirm your issuer sets `alg` to a supported value and the signature verification path uses constant-time comparison. See #2079, #2086.
 - **`Wheels.ViteAssetNotFound` thrown on first request after deploy.** The deploy shipped code referencing a Vite entrypoint that isn't in the manifest. Rebuild Vite assets (`npm run build`) before deploy, or temporarily `set(viteStrictManifest=false)` to restore 3.x silent fallback. See #2133.
+- **Boot fails with a "wirebox" package-not-found error.** The `wirebox` package was removed from `vendor/wheels/` (#1883). Installing the legacy adapter does not restore it. Replace `new wirebox.system.ioc.Injector(...)` in `Application.cfc` with `new wheels.Injector()`, and replace any `application.wirebox` references with `application.wheelsdi`. See [item 10](#10-applicationwirebox-renamed-to-applicationwheelsdi).
 
 ## Related guides
 
