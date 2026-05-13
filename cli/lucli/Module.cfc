@@ -3623,16 +3623,18 @@ component extends="modules.BaseModule" {
 				fix: 'Pass allowOrigins explicitly: new wheels.middleware.Cors(allowOrigins="https://myapp.com")'
 			});
 			// RateLimiter hardened defaults (#2024 trustProxy=false, #2088
-			// proxyStrategy="last"). A best-effort scan: flag every
-			// RateLimiter invocation and ask the user to verify both flags
-			// are set. Multi-line config parsing is out of scope here.
+			// proxyStrategy="last"). Advisory only: the scan flags every
+			// RateLimiter invocation regardless of current config, because
+			// multi-line argument parsing is out of scope. Users whose
+			// config already sets both flags should treat the hit as a
+			// reminder to re-verify, not a false positive.
 			arrayAppend(checks, {
-				description: "RateLimiter middleware — verify trustProxy and proxyStrategy",
+				description: "RateLimiter middleware — defaults changed in 4.0 (advisory: review config)",
 				pattern: "new\s+wheels\.middleware\.RateLimiter",
 				checkType: "grep",
 				scanDir: "config",
 				extensions: "cfm,cfc",
-				fix: 'Defaults changed in 4.0 (trustProxy=false, proxyStrategy="last"). If your app sits behind a proxy or load balancer, set both flags explicitly.'
+				fix: 'Advisory check — fires on every RateLimiter usage regardless of current config. 4.0 defaults: trustProxy=false, proxyStrategy="last". If your app sits behind a proxy or load balancer, confirm both flags are set explicitly.'
 			});
 			// allowEnvironmentSwitchViaUrl defaults to false in production
 			// (#2076). Explicit `true` is now a security concern.
@@ -3736,7 +3738,13 @@ component extends="modules.BaseModule" {
 							arrayAppend(filesToScan, targetPath);
 						} else if (directoryExists(targetPath)) {
 							var recurse = structKeyExists(target, "recurse") ? target.recurse : true;
-							var exts = structKeyExists(target, "extensions") ? target.extensions : (check.extensions ?: "");
+							// Avoid Elvis `?:` on `check.extensions` — Adobe CF
+							// throws when the key is absent. The `wheels snippets`
+							// check has no top-level `extensions`, so this branch
+							// is reached on every Adobe CF run when a target is a
+							// directory without its own `extensions` key.
+							var exts = structKeyExists(target, "extensions") ? target.extensions
+								: (structKeyExists(check, "extensions") ? check.extensions : "");
 							for (var ext in listToArray(exts)) {
 								var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
 								for (var f in dirFiles2) arrayAppend(filesToScan, f);

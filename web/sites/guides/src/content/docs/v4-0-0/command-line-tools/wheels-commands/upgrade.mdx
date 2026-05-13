@@ -110,7 +110,7 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 - Existence of `tests/specs/functions/` — renamed to `tests/specs/functional/` (#1872).
 - `viteScriptTag`, `viteStyleTag`, or `vitePreloadTag` in `app/views/` — `viteStrictManifest` now defaults to `true` in production, throwing on missing manifest entries (#2133).
 
-Each grep scans `.cfc` and `.cfm` files (as appropriate for the check) recursively and reports `path:lineNumber` for every hit. Directory checks report only the top-level path when the directory exists and is non-empty.
+Each grep scan covers the file types relevant to that check (`.cfc` and `.cfm` for config and view checks; `Makefile`, `package.json`, `.yml`, `.yaml`, and `.sh` for the `wheels snippets` check) and reports `path:lineNumber` for every hit. Directory checks report only the top-level path when the directory exists and is non-empty.
 
 <Aside type="note" title="Not an exhaustive migration list">
 The scanner catches the patterns that are most commonly missed during a major upgrade — it is not a full migration checklist. Read the release notes for the target version alongside the scan output.
