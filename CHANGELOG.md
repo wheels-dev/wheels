@@ -23,6 +23,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ### Changed
 
 - Reconcile upgrade docs: blog skeleton now lists all eleven canonical breaking changes (matching the canonical upgrade guide), fixes the `wheels.Test` → `wheels.WheelsTest` test-base-class rename description (previously mislabeled as a "testbox namespace" move), and adds the previously-missing `application.wirebox` → `application.wheelsdi` and Vite manifest strictness entries; stats table "Breaking defaults hardened | 7" corrected to "Breaking changes | 11" with four detail-row delta labels updated from Changed/Renamed/New to Breaking (#2632)
+- Compat-matrix CF-engine readiness probe now tracks the last observed HTTP status, surfaces partial progress every 10 attempts, and on timeout distinguishes "engine never bound" (HTTP 000) from "engine bound but returning 5xx" (e.g. issue #2646's `$blockInProduction` symptom) — printing the response body and a stack-frame-stripped log slice when the latter occurs. Previously a 5-minute timeout dumped `tail -50` of raw container logs, dominated by ~30 lines of undertow/runwar stack frames, hiding the actual root cause
 
 ### Fixed
 
