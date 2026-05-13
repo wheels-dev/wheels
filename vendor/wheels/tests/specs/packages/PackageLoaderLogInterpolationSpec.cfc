@@ -7,10 +7,7 @@ component extends="wheels.WheelsTest" {
 			it("does not escape pounds in the PackageLoader load-trace message", () => {
 				var source = FileRead(ExpandPath("/wheels/PackageLoader.cfc"));
 
-				// "####" in a CFML string literal evaluates to the two-char
-				// sequence "##", so this search looks for the literal four
-				// characters "####" in the source. That four-char sequence is
-				// CFML's escape for "##" in a runtime string — the bug.
+				// "####" in a CFML string literal evaluates to "##" at runtime — the bug form.
 				expect(FindNoCase("####arguments.dirName####", source) GT 0).toBeFalse(
 					"PackageLoader.cfc must not emit escaped pounds around "
 					& "arguments.dirName in WriteLog text — CFML reads each "
@@ -24,9 +21,7 @@ component extends="wheels.WheelsTest" {
 					& "arguments.pkgDir in WriteLog text — see issue ##2630."
 				);
 
-				// Positive assertions: lock the single-pound form in place so a
-				// future refactor that silently removes the log line fails the
-				// test instead of staying green.
+				// Positive guard: fails if the WriteLog line is silently removed.
 				expect(FindNoCase("'##arguments.dirName##'", source) GT 0).toBeTrue(
 					"PackageLoader.cfc must retain single-pound interpolation "
 					& "around arguments.dirName in WriteLog text — see issue ##2630."
