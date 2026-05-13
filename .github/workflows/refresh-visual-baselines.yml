@@ -1,0 +1,205 @@
+name: Refresh visual baselines
+
+# Manually-triggered baseline refresh for web/tests/visual-baselines/*.png.
+#
+# Use this when an intentional content change (new blog post, new guide
+# page, a planned layout tweak, etc.) makes the `visual-regression` check
+# fail and you just want to accept the new rendering as the new baseline.
+#
+# Typical flow:
+#   1. PR fails `visual-regression`.
+#   2. Confirm the diff in the `visual-regression-diffs` artifact is the
+#      change you intended (don't refresh blindly — that's how real
+#      regressions sneak through).
+#   3. Actions → "Refresh visual baselines" → Run workflow.
+#      - "Use workflow from": select the PR's source branch.
+#      - "Which baseline(s) to refresh": pick the affected site, or "all".
+#   4. The workflow rebuilds the sites, screenshots the canary page(s),
+#      writes the new PNG(s) into web/tests/visual-baselines/, and pushes
+#      the commit back to the same branch.
+#   5. That push retriggers the PR's CI; `visual-regression` should now pass.
+#      (You can also click "Re-run failed jobs" on the original PR run if
+#      you'd rather not wait for a full CI re-run.)
+#
+# Why this exists alongside refresh-packages-baseline.yml:
+#   - refresh-packages-baseline.yml fires automatically when the
+#     wheels-packages registry merges a manifest change and opens a chore
+#     PR against develop. It's a registry-driven flow, scoped to
+#     packages-index.png.
+#   - This workflow is a manual escape hatch for the human cases: blog
+#     content drift, intentional layout changes, anything that should
+#     overwrite a baseline directly on the branch where the regression is
+#     currently failing.
+#
+# Security note: every `run:` block routes user-controllable values
+# (inputs.sites, github.ref_name) through `env:` rather than interpolating
+# them directly into shell commands. This blocks the classic Actions
+# workflow-injection pattern; see
+# https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sites:
+        description: 'Which baseline(s) to refresh'
+        type: choice
+        options:
+          - all
+          - landing
+          - blog
+          - guides
+          - api
+          - packages-index
+          - packages-wheels-sentry
+        default: all
+
+jobs:
+  refresh:
+    name: Refresh ${{ inputs.sites }} baseline(s) on ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    # Serialize per-branch so two simultaneous refreshes can't both build,
+    # commit, and race on `git push` (the second would be rejected as
+    # non-fast-forward). Matches the pattern web-deploy.yml uses for the
+    # visual-regression job.
+    concurrency:
+      group: refresh-visual-baselines-${{ github.ref }}
+      cancel-in-progress: true
+    # Worst-case real path: install + Chromium download + full site build +
+    # six screenshots is well under 10 minutes. 30 is a generous ceiling
+    # that cuts off runaway billable minutes if pnpm or Playwright hangs.
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v6
+        with:
+          # No explicit ref — workflow_dispatch already checks out the branch
+          # the user picked in the "Run workflow" UI (github.ref_name).
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.23.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Build every site even when only one baseline is being refreshed.
+      # The visual-regression script enforces that every target site has a
+      # dist/ directory; for "all" we need them all, and for a single-site
+      # refresh the marginal build cost is small enough that the simpler
+      # workflow wins over a per-site pnpm --filter mapping.
+      - name: Build all sites
+        working-directory: web
+        run: pnpm build
+
+      - name: Refresh baseline(s)
+        working-directory: web
+        env:
+          SITES: ${{ inputs.sites }}
+        run: |
+          set -euo pipefail
+          if [ "$SITES" = "all" ]; then
+            node scripts/visual-regression.mjs --update
+          else
+            node scripts/visual-regression.mjs --update --site "$SITES"
+          fi
+
+      - name: Detect baseline changes
+        id: changes
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- web/tests/visual-baselines/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No baseline drift — the rebuilt PNG(s) match what's already committed."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changed baselines:"
+            git diff --name-only -- web/tests/visual-baselines/
+          fi
+
+      - name: Commit and push refreshed baselines
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          SITES: ${{ inputs.sites }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/tests/visual-baselines/
+
+          # Build the commit message in a temp file so the heredoc body stays
+          # readable inside the YAML and the SITES value is never spliced into
+          # a shell-expanded string. SITES is constrained to the choice list
+          # above, but writing through a file keeps that contract obvious.
+          commit_msg_file="$(mktemp)"
+          {
+            printf '%s\n\n' "chore(web): refresh visual baseline(s) ($SITES)"
+            printf '%s\n' "Manually triggered baseline refresh via"
+            printf '%s\n\n' ".github/workflows/refresh-visual-baselines.yml on branch $BRANCH."
+            printf '%s\n' "Run when an intentional content/layout change makes the visual-regression"
+            printf '%s\n' "check fail. The new PNG(s) under web/tests/visual-baselines/ are now the"
+            printf '%s\n' "expected rendering; re-run the failing visual-regression job to flip the"
+            printf '%s\n' "check green."
+          } > "$commit_msg_file"
+
+          git commit -F "$commit_msg_file"
+          rm -f "$commit_msg_file"
+          git push origin "HEAD:$BRANCH"
+
+      - name: Write step summary
+        if: always()
+        env:
+          SITES: ${{ inputs.sites }}
+          CHANGED: ${{ steps.changes.outputs.changed }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          {
+            echo "## Refresh visual baselines"
+            echo
+            echo "- **Target branch:** \`$BRANCH\`"
+            echo "- **Sites requested:** \`$SITES\`"
+            if [ "$CHANGED" = "true" ]; then
+              echo "- **Result:** Baseline(s) committed and pushed."
+              echo
+              echo "### Next step"
+              echo
+              echo "The push to \`$BRANCH\` will retrigger CI automatically — the"
+              echo "\`visual-regression\` check on the next run should pass. If you'd rather"
+              echo "not wait for a full CI cycle, open the failing run on the PR and click"
+              echo "**Re-run failed jobs**."
+            elif [ "$CHANGED" = "false" ]; then
+              echo "- **Result:** No baseline drift detected — nothing to commit."
+              echo
+              echo "If \`visual-regression\` is still failing on your PR, the failure is a"
+              echo "real regression (not a stale baseline). Download the"
+              echo "\`visual-regression-diffs\` artifact from the failing run and inspect"
+              echo "the \`.diff.png\` images."
+            else
+              echo "- **Result:** Job exited before the change-detection step. See logs."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
