@@ -85,6 +85,22 @@ JWT verification now validates the `alg` claim and uses constant-time signature 
 
 In 3.x, `?environment=production` on a URL could switch the running environment. In 4.0, that is off by default in production and the reload password must be non-empty. Re-enable only for controlled staging environments.
 
+The reload password is populated only by `set(reloadPassword = ...)` in `config/settings.cfm`. A value in `.env` alone is not wired into framework settings automatically — you must call `set()` explicitly:
+
+```cfm {test:compile} title="config/settings.cfm"
+// env() reads from .env (or OS environment); the empty-string fallback
+// preserves the fail-closed behavior when the variable is absent.
+set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""));
+```
+
+Without this line, every boot will log the following warning even if `reloadPassword` is present in `.env`:
+
+```
+WARN  Wheels: reloadPassword is empty — URL-based environment switching and application reload are disabled until a password is set in config/settings.cfm
+```
+
+The `env()` helper is the canonical pattern for flowing `.env` values into framework settings. Use the same approach for `csrfEncryptionKey` and other security settings.
+
 ### 5. RateLimiter defaults hardened
 
 **CHANGELOG:** `Breaking: RateLimiter trustProxy default changed from true to false` (#2024); `Breaking: RateLimiter proxy strategy default changed to last` (#2088).
@@ -168,6 +184,13 @@ var svc = service("emailService");
 ```
 
 `service()` is the new global helper (#1933); prefer it over reaching into the container.
+
+<Aside type="caution">
+  **The legacy adapter does not cover this item.** Installing `wheels-legacy-adapter` does not create an `application.wirebox` alias and does not restore the `wirebox.system.ioc.Injector` package path. Both require manual remediation regardless of whether the adapter is installed:
+
+  - Replace all `application.wirebox.getInstance("...")` calls with `application.wheelsdi.getInstance("...")` or the `service()` helper.
+  - Replace any `Application.cfc` bootstrap that calls `new wirebox.system.ioc.Injector(...)`. The WireBox package no longer ships in `vendor/wheels/`. The 4.0 equivalent is `new wheels.Injector()`.
+</Aside>
 
 ### 11. Vite manifest strictness — missing entries throw in production
 
@@ -313,6 +336,21 @@ wheels reload
 
 The adapter logs every deprecated call so you can track what's still 3.x-shaped in production.
 
+The adapter covers these 3.x patterns; everything else still requires manual remediation:
+
+| Covered by the adapter | Requires manual remediation regardless |
+|---|---|
+| `renderPage()` → `renderView()` shim | Items 1–9 and 11 (all other breaking changes) |
+| `renderPageToString()` shim | `application.wirebox` → `application.wheelsdi` (item 10) |
+| `$legacySendEmail()` argument remap | `new wirebox.system.ioc.Injector(...)` bootstrap code |
+| `$legacyAppScopeGet(key)` opt-in helper | |
+| Migration scanner | |
+| Deprecation call logger | |
+
+<Aside type="caution">
+  The adapter does **not** shim the `application.wirebox` rename (item 10). Apps whose `Application.cfc` calls `new wirebox.system.ioc.Injector(...)` or reads from `application.wirebox` must update those references manually — the adapter cannot defer or soften this item.
+</Aside>
+
 ## Recommended, not required
 
 These are additive in 4.0 and worth adopting during the upgrade window:
@@ -357,6 +395,8 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 - **Plugin warning at startup.** Port to a package (see above) or accept the warning until you do.
 - **JWT tokens reject as invalid after upgrade.** Algorithm validation is on. Confirm your issuer sets `alg` to a supported value and the signature verification path uses constant-time comparison. See #2079, #2086.
 - **`Wheels.ViteAssetNotFound` thrown on first request after deploy.** The deploy shipped code referencing a Vite entrypoint that isn't in the manifest. Rebuild Vite assets (`npm run build`) before deploy, or temporarily `set(viteStrictManifest=false)` to restore 3.x silent fallback. See #2133.
+- **Boot fails with a "wirebox" package-not-found error.** The `wirebox` package was removed from `vendor/wheels/` (#1883). Installing the legacy adapter does not restore it. Replace `new wirebox.system.ioc.Injector(...)` in `Application.cfc` with `new wheels.Injector()`, and replace any `application.wirebox` references with `application.wheelsdi`. See [item 10](#10-applicationwirebox-renamed-to-applicationwheelsdi).
+- **"reloadPassword is empty" boot warning despite having `reloadPassword` in `.env`.** The reload password is populated only by `set(reloadPassword = ...)` in `config/settings.cfm` — a `.env` value does not flow through automatically. Add `set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""));` to `config/settings.cfm`. See #2631.
 
 ## Related guides
 
