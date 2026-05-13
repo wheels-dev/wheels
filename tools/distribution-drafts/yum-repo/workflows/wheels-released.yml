@@ -1,0 +1,171 @@
+# Receiver workflow for `wheels-dev/yum-wheels-dev`.
+#
+# Listens for `repository_dispatch` from `wheels-dev/wheels`'s release workflow,
+# downloads the new `.rpm` asset from the upstream GitHub Release, slots it
+# into `<channel>/packages/`, regenerates the repodata via `createrepo_c`,
+# signs `repomd.xml` with GPG (detached → repomd.xml.asc), and commits the
+# whole tree back to this repo. Cloudflare Pages auto-deploys on push.
+#
+# Trigger payload contract (sender: wheels-dev/wheels release.yml):
+#   event_type:    "wheels-released"
+#   client_payload:
+#     version: "<x.y.z>" or "<x.y.z>-snapshot.<n>"   # full SemVer, no leading v
+#     channel: "stable" | "bleeding-edge"             # routes into the pool
+#
+# Manual dispatch is also supported via `workflow_dispatch`.
+
+name: Publish to yum.wheels.dev
+
+on:
+  repository_dispatch:
+    types: [wheels-released]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Wheels version (e.g. 4.0.1 or 4.0.1-snapshot.1700)'
+        required: true
+        type: string
+      channel:
+        description: 'Release channel'
+        required: true
+        default: stable
+        type: choice
+        options:
+          - stable
+          - bleeding-edge
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-yum
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ github.event.client_payload.version || inputs.version }} (${{ github.event.client_payload.channel || inputs.channel }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve inputs
+        id: inputs
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            CHANNEL="${{ github.event.client_payload.channel }}"
+          else
+            VERSION="${{ inputs.version }}"
+            CHANNEL="${{ inputs.channel }}"
+          fi
+          if [ -z "$VERSION" ] || [ -z "$CHANNEL" ]; then
+            echo "::error::Both version and channel are required."
+            exit 1
+          fi
+          case "$CHANNEL" in
+            stable|bleeding-edge) ;;
+            *) echo "::error::Unsupported channel: $CHANNEL"; exit 1 ;;
+          esac
+          case "$CHANNEL" in
+            stable)        PKG="wheels" ;;
+            bleeding-edge) PKG="wheels-be" ;;
+          esac
+          case "$CHANNEL" in
+            stable)        UPSTREAM_REPO="wheels-dev/wheels" ;;
+            bleeding-edge) UPSTREAM_REPO="wheels-dev/wheels-snapshots" ;;
+          esac
+          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL"           >> "$GITHUB_OUTPUT"
+          echo "pkg=$PKG"                   >> "$GITHUB_OUTPUT"
+          echo "upstream_repo=$UPSTREAM_REPO" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout bucket repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install createrepo_c + gpg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends createrepo-c gnupg
+          createrepo_c --version
+          gpg --version | head -1
+
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.WHEELS_REPO_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.WHEELS_REPO_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GPG_PRIVATE_KEY:-}" ]; then
+            echo "::error::WHEELS_REPO_GPG_PRIVATE_KEY is unset; cannot sign repomd.xml."
+            exit 1
+          fi
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
+          KEY_ID=$(gpg --list-secret-keys --keyid-format=long --with-colons \
+            | awk -F: '/^sec:/ { print $5; exit }')
+          echo "Imported signing key: $KEY_ID"
+          echo "$KEY_ID:6:" | gpg --batch --yes --import-ownertrust
+          echo "GPG_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
+
+      - name: Download .rpm from upstream Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.inputs.outputs.version }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+          PKG: ${{ steps.inputs.outputs.pkg }}
+          UPSTREAM_REPO: ${{ steps.inputs.outputs.upstream_repo }}
+        run: |
+          set -euo pipefail
+          mkdir -p incoming
+          URL_VERSION="${VERSION/-snapshot./.snapshot.}"
+          ASSET="${PKG}-${URL_VERSION}.x86_64.rpm"
+          TAG="v${VERSION}"
+          echo "Fetching ${ASSET} from ${UPSTREAM_REPO}@${TAG}"
+          gh release download "$TAG" \
+            --repo "$UPSTREAM_REPO" \
+            --pattern "$ASSET" \
+            --dir incoming/
+          ls -l incoming/
+
+      - name: Slot .rpm into packages/
+        env:
+          VERSION: ${{ steps.inputs.outputs.version }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+          PKG: ${{ steps.inputs.outputs.pkg }}
+        run: |
+          set -euo pipefail
+          PKG_DIR="${CHANNEL}/packages"
+          mkdir -p "$PKG_DIR"
+          URL_VERSION="${VERSION/-snapshot./.snapshot.}"
+          # Rename to the canonical `~`-form for pool storage.
+          mv "incoming/${PKG}-${URL_VERSION}.x86_64.rpm" \
+             "${PKG_DIR}/${PKG}-${VERSION}.x86_64.rpm"
+          echo "Placed: ${PKG_DIR}/${PKG}-${VERSION}.x86_64.rpm"
+
+      - name: Regenerate yum metadata + sign
+        env:
+          GPG_PASSPHRASE: ${{ secrets.WHEELS_REPO_GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ env.GPG_KEY_ID }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/regenerate-yum-metadata.sh
+          ./scripts/regenerate-yum-metadata.sh
+
+      - name: Commit + push
+        env:
+          VERSION: ${{ steps.inputs.outputs.version }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+          PKG: ${{ steps.inputs.outputs.pkg }}
+        run: |
+          set -euo pipefail
+          git config user.name  "wheels-release-bot"
+          git config user.email "hello@wheels.dev"
+          git add stable/ bleeding-edge/
+          if git diff --cached --quiet; then
+            echo "No changes — dispatch must have been a no-op."
+            exit 0
+          fi
+          git commit -m "publish: ${PKG} ${VERSION} (${CHANNEL})"
+          git push origin HEAD:main
