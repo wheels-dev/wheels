@@ -7,7 +7,28 @@
 param name="request.wheels.params.path" default="";
 param name="request.wheels.params.format" default="html";
 
-local.externalBase = "https://guides.wheels.dev/v4-0-0-snapshot/";
+// Resolve the active guides version from the monorepo sidebars directory
+// (snapshot or GA — whichever sorts highest). The previous implementation
+// hardcoded "v4-0-0-snapshot", which broke the in-app sidebar the moment
+// v4.0.0 went GA and the snapshot file was renamed (issue ##2647). Sidebar
+// basenames like "v4-0-1-snapshot.json" / "v4-0-0.json" sort sensibly in
+// descending lexicographic order — a "-snapshot" suffix sorts after the
+// matching GA, which is what we want (the dev snapshot wins at the same
+// version). Falls back to "v4-0-0" when the monorepo tree isn't present
+// so the external redirect still lands somewhere valid in installed apps.
+local.sidebarDir = ExpandPath("/wheels/../../web/sites/guides/src/sidebars");
+local.activeSlug = "v4-0-0";
+local.sidebarPath = "";
+if (DirectoryExists(local.sidebarDir)) {
+    local.candidates = DirectoryList(local.sidebarDir, false, "name", "*.json");
+    if (ArrayLen(local.candidates)) {
+        ArraySort(local.candidates, "textnocase", "desc");
+        local.activeSlug = ReReplace(local.candidates[1], "\.json$", "");
+        local.sidebarPath = local.sidebarDir & "/" & local.candidates[1];
+    }
+}
+
+local.externalBase = "https://guides.wheels.dev/" & local.activeSlug & "/";
 local.deepLink = local.externalBase;
 if (Len(request.wheels.params.path)) {
     local.cleanPath = ReReplace(request.wheels.params.path, "\.md$", "");
@@ -22,8 +43,7 @@ if (Len(request.wheels.params.path)) {
 // have it. Best-effort — callers that need a structured index can hit
 // guides.wheels.dev directly.
 local.sections = [];
-local.sidebarPath = ExpandPath("/wheels/../../web/sites/guides/src/sidebars/v4-0-0-snapshot.json");
-if (FileExists(local.sidebarPath)) {
+if (Len(local.sidebarPath) && FileExists(local.sidebarPath)) {
     try {
         local.sections = DeserializeJSON(FileRead(local.sidebarPath));
     } catch (any e) {

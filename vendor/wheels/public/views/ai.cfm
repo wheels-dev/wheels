@@ -303,10 +303,24 @@ function getQuickReference() {
 // sidebar isn't present; callers should hit guides.wheels.dev directly.
 function getGuidesSummary() {
 	local.guides = [];
-	local.sidebarPath = expandPath("/wheels/../../web/sites/guides/src/sidebars/v4-0-0-snapshot.json");
 	local.base = "https://guides.wheels.dev";
 
-	if (!fileExists(local.sidebarPath)) {
+	// Discover the latest sidebar in the monorepo sidebars dir (snapshot
+	// or GA — whichever sorts highest). See vendor/wheels/public/docs/
+	// guides.cfm for the rationale; the same logic lives there. Hardcoding
+	// a single version slug broke this endpoint the moment v4.0.0 went GA
+	// and the snapshot file was renamed (issue ##2647).
+	local.sidebarDir = expandPath("/wheels/../../web/sites/guides/src/sidebars");
+	local.sidebarPath = "";
+	if (directoryExists(local.sidebarDir)) {
+		local.candidates = directoryList(local.sidebarDir, false, "name", "*.json");
+		if (arrayLen(local.candidates)) {
+			arraySort(local.candidates, "textnocase", "desc");
+			local.sidebarPath = local.sidebarDir & "/" & local.candidates[1];
+		}
+	}
+
+	if (!len(local.sidebarPath) || !fileExists(local.sidebarPath)) {
 		return local.guides;
 	}
 
