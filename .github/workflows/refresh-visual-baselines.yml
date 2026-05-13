@@ -57,6 +57,17 @@ jobs:
   refresh:
     name: Refresh ${{ inputs.sites }} baseline(s) on ${{ github.ref_name }}
     runs-on: ubuntu-latest
+    # Serialize per-branch so two simultaneous refreshes can't both build,
+    # commit, and race on `git push` (the second would be rejected as
+    # non-fast-forward). Matches the pattern web-deploy.yml uses for the
+    # visual-regression job.
+    concurrency:
+      group: refresh-visual-baselines-${{ github.ref }}
+      cancel-in-progress: true
+    # Worst-case real path: install + Chromium download + full site build +
+    # six screenshots is well under 10 minutes. 30 is a generous ceiling
+    # that cuts off runaway billable minutes if pnpm or Playwright hangs.
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
@@ -147,7 +158,7 @@ jobs:
           # above, but writing through a file keeps that contract obvious.
           commit_msg_file="$(mktemp)"
           {
-            printf '%s\n\n' "chore(docs): refresh visual baseline(s) ($SITES)"
+            printf '%s\n\n' "chore(web): refresh visual baseline(s) ($SITES)"
             printf '%s\n' "Manually triggered baseline refresh via"
             printf '%s\n\n' ".github/workflows/refresh-visual-baselines.yml on branch $BRANCH."
             printf '%s\n' "Run when an intentional content/layout change makes the visual-regression"
