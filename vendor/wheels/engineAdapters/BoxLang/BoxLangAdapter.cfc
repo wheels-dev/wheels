@@ -14,9 +14,23 @@ component extends="wheels.engineAdapters.Base" output="false" {
 
 	/**
 	 * BoxLang returns the response directly from GetPageContext().
+	 * Note: this returns the PageContext (not HttpServletResponse) so that
+	 * getContentType() can reach back to the request side. Methods that need
+	 * the real response object must override getResponse() locally — see
+	 * getStatusCode() below.
 	 */
 	public any function getResponse() {
 		return GetPageContext();
+	}
+
+	/**
+	 * BoxLang's PageContext does not expose a getStatus() method, so the
+	 * default Base.cfc::getStatusCode() (which resolves to
+	 * getResponse().getStatus()) throws against the PageContext override
+	 * above. Reach the underlying HttpServletResponse to read the status.
+	 */
+	public numeric function getStatusCode() {
+		return GetPageContext().getResponse().getStatus();
 	}
 
 	/**

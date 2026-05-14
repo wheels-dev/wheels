@@ -227,6 +227,7 @@ The default transaction mode in the test runner is `none` — writes persist acr
 - **Treating `findAll()` as an array.** `model("Post").findAll()` returns a CFML query, not an array. `<cfloop query="posts">` works; `<cfloop array="#posts#">` raises a type error. Check `.recordCount` for size.
 - **Forgetting `.reload()` after a callback writes server-generated columns.** A `beforeCreate` that sets `slug` from a database `DEFAULT` expression, or an `afterSave` that updates a counter, may not be reflected on the in-memory instance. Call `post.reload()` before asserting.
 - **Reaching for matchers that don't exist.** `toEqual`, `toBeTruthy`, and `toBeFalsy` are not shipped — neither is in the matcher set. Use `toBe` for value equality (it wraps `isEqual`, which recurses into structs and arrays), `toBeTrue` or `toBeFalse` for booleans, and `toBeArray` / `toBeStruct` / `toBeQuery` for type checks.
+- **`toBeInstanceOf("component")` is not cross-engine.** `getMetadata(obj).type` returns `"component"` on Lucee and Adobe CF but the fully-qualified class name on BoxLang, so this assertion passes on two engines and silently fails on the third. When asserting that a finder returned a Wheels model instance, use `expect(found).toBeWheelsModel()` instead.
 
 ## Related guides
 
