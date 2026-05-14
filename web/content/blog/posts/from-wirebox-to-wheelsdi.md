@@ -116,10 +116,10 @@ And it does not mean the internals are done. The package system has a staging-to
 
 ## Where to go next
 
-- [Package system reference](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/packages/) covers the `packages/` to `vendor/` activation model and the `package.json` manifest.
-- [DI container reference](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/dependency-injection/) covers scopes, interface binding, and declarative `inject()`.
-- [Testing guide](https://guides.wheels.dev/v4-0-0-snapshot/testing/) covers WheelsTest BDD syntax and the app-tests vs core-tests split.
-- [Contributing guide](https://github.com/wheels-dev/wheels/blob/develop/CONTRIBUTING.md) is the place to start if you want to work on a DI feature, a new adapter module, or a package.
+- [Package system reference](https://guides.wheels.dev/v4-0-0/digging-deeper/packages/) covers the `packages/` to `vendor/` activation model and the `package.json` manifest.
+- [DI container reference](https://guides.wheels.dev/v4-0-0/core-concepts/dependency-injection/) covers scopes, interface binding, and declarative `inject()`.
+- [Testing guide](https://guides.wheels.dev/v4-0-0/testing/) covers WheelsTest BDD syntax and the app-tests vs core-tests split.
+- [Contributing guide](https://guides.wheels.dev/v3-0-0/working-with-wheels/contributing-to-wheels/) is the place to start if you want to work on a DI feature, a new adapter module, or a package.
 
 The most important 4.0 feature is the one nobody feels directly — the one that lets future features ship faster. If you want to help shape what those future features look like, the door is open. Adapter modules, DI container features, and the package loader are all good first places to land a PR.
 
