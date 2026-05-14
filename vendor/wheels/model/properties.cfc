@@ -581,10 +581,9 @@ component {
 			(IsStruct(arguments.value) || IsArray(arguments.value))
 			&& StructKeyExists(variables.wheels.class, "properties")
 			&& StructKeyExists(variables.wheels.class.properties, arguments.property)
-			&& !$propertyIsBinaryColumn(arguments.property)
+			&& !(IsArray(arguments.value) && $propertyIsBinaryColumn(arguments.property))
 		) {
-			// Scoped to real DB columns so loaded hasMany arrays and control-param leakage still pass through. See #2412.
-			// Binary columns are exempt — BoxLang / Lucee 6 surface bytes as a CFML array. See #2660.
+			// Scoped to real DB columns; exempts array-on-binary so BoxLang / Lucee 6 byte uploads reach JDBC. See #2412, #2660.
 			Throw(
 				type = "Wheels.PropertyIsIncorrectType",
 				message = "Cannot assign a #(IsArray(arguments.value) ? 'array' : 'struct')# value to scalar column `#arguments.property#` on the `#variables.wheels.class.modelName#` model.",

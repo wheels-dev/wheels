@@ -203,7 +203,7 @@ local.photo = model("Photo").new(filename="avatar.png", fileData=local.bytes);
 local.photo.save();
 ```
 
-**When this matters**: only for columns whose `cf_sql_*` type resolves to `validationtype == "binary"` — blob, longblob, bytea, varbinary, clob. All other scalar columns (varchar, integer, datetime, ...) still reject array/struct values.
+**When this matters**: only for columns whose `cf_sql_*` type resolves to `validationtype == "binary"` — blob, longblob, bytea, varbinary, and clob. (Note: `clob` stores character data, not bytes — it's grouped here only because Wheels' internal `$getValidationType` maps `CF_SQL_CLOB` to `"binary"` for guard-exemption purposes.) All other scalar columns (varchar, integer, datetime, ...) still reject array/struct values; structs bound to *any* column, including binary ones, also still throw — the exemption is array-shape-only.
 
 ### `getMetadata().type` Returns FQN on BoxLang
 
