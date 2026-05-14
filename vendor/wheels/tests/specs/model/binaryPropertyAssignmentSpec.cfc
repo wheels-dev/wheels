@@ -4,7 +4,7 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 		// SQLite stores `c_o_r_e_photos.filedata` as TEXT (populate.cfm) → validationtype "string", so the carve-out is N/A.
-		var _isSQLite = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "SQLiteModel";
+		var _isSQLite = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "SQLite";
 
 		describe("Binary column property assignment", () => {
 
