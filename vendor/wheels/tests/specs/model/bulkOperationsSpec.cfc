@@ -75,7 +75,7 @@ component extends="wheels.WheelsTest" {
 					expect(result.insertedCount).toBe(1);
 
 					var found = g.model("bulkItem").findOne(where="code = 'BULK-NTS-1'");
-					expect(found).toBeInstanceOf("component");
+					expect(found).toBeWheelsModel();
 					expect(found.name).toBe("NoTimestamp1");
 					// Timestamps should be empty since the column is nullable and timestamps=false.
 					expect(Len(Trim(found.createdAt))).toBe(0, "createdAt should be empty when timestamps=false");
@@ -95,7 +95,7 @@ component extends="wheels.WheelsTest" {
 					expect(result.insertedCount).toBe(1);
 
 					var found = g.model("author").findOne(where="firstname = 'SingleBulk'");
-					expect(found).toBeInstanceOf("component");
+					expect(found).toBeWheelsModel();
 					expect(found.lastName).toBe("Test");
 
 					transaction action="rollback";
