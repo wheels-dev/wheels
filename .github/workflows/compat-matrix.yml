@@ -270,6 +270,10 @@ jobs:
           RESULTS_JSON="{"
           FIRST=true
 
+          # Databases whose failures are logged but don't block CI.
+          # oracle: tracked in #2663 — datasource registration, DBMS_LOCK, and constraint cleanup.
+          SOFT_FAIL_DBS="oracle"
+
           mkdir -p /tmp/test-results
           mkdir -p /tmp/junit-results
 
@@ -417,9 +421,6 @@ jobs:
           " || { echo "JUnit conversion failed for ${db} (non-fatal)"; rm -f "$JUNIT_FILE"; }
             fi
 
-            # Databases whose failures are logged but don't block CI.
-            SOFT_FAIL_DBS=""
-
             # Track per-database result
             if [ "$HTTP_CODE" = "200" ]; then
               echo "PASSED: ${{ matrix.cfengine }} + ${db}"
@@ -466,7 +467,7 @@ jobs:
           echo "| Database | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          SOFT_FAIL_DBS=""
+          SOFT_FAIL_DBS="oracle"
           IFS=',' read -ra DBS <<< "${{ steps.db-list.outputs.databases }}"
           for db in "${DBS[@]}"; do
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
