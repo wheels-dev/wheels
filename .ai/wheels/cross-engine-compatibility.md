@@ -184,6 +184,27 @@ if (!DirectoryExists(path)) {
 
 **Why**: `java.io.File.mkdirs()` is part of the JDK on every CFML engine and recurses parents the same way on Lucee, Adobe CF, and BoxLang. Reach for it whenever a path's parents may be missing — relying on the BIF's `createPath` extension is a portability trap.
 
+### Binary Data Representation (BoxLang / Lucee 6 vs Lucee 7 / Adobe)
+
+`FileReadBinary()` and multipart-upload byte content are surfaced differently across engines:
+
+| Engine | `IsArray(bytes)` | `IsBinary(bytes)` | Shape |
+|--------|-----------------|-------------------|-------|
+| Lucee 7, Adobe CF | `false` | `true` | `byte[]` Java array |
+| BoxLang, Lucee 6 (some configs) | `true` | `false` | CFML array of integers |
+
+Both shapes are valid representations that the JDBC driver accepts when binding a `cf_sql_blob` / `cf_sql_varbinary` parameter. Wheels' model property setter (`$setProperty`) is aware of this: the scalar-column type guard exempts binary columns so the array shape passes through to the JDBC layer unchanged (fix: #2660).
+
+```cfm
+// Works on all engines — the model exempts blob/longblob/bytea columns from
+// the array-rejection guard regardless of which shape the engine produces.
+local.bytes = FileReadBinary(expandPath("/uploads/tmp/") & cffile.serverFile);
+local.photo = model("Photo").new(filename="avatar.png", fileData=local.bytes);
+local.photo.save();
+```
+
+**When this matters**: only for columns whose `cf_sql_*` type resolves to `validationtype == "binary"` — blob, longblob, bytea, varbinary, clob. All other scalar columns (varchar, integer, datetime, ...) still reject array/struct values.
+
 ### Private View Helpers Not Integrated
 
 `$integrateComponents()` only copies `public` methods into controllers. Private helper functions in view CFCs are never available.
