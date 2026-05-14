@@ -3,6 +3,8 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
+		// SQLite stores `c_o_r_e_photos.filedata` as TEXT (populate.cfm) → validationtype "string", so the carve-out is N/A.
+		var _isSQLite = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "SQLiteModel";
 
 		describe("Binary column property assignment", () => {
 
@@ -15,16 +17,18 @@ component extends="wheels.WheelsTest" {
 			// must not reject array-shaped values bound for binary columns.
 
 			it("accepts array-shaped binary data without tripping the scalar-column guard", () => {
-				local.bytes = [137, 80, 78, 71, 13, 10, 26, 10]
+				if (_isSQLite) return;
+				var ctx = { bytes: [137, 80, 78, 71, 13, 10, 26, 10] }
 				expect(() => {
-					g.model("photo").new(filename = "test.png", fileData = local.bytes)
+					g.model("photo").new(filename = "test.png", fileData = ctx.bytes)
 				}).notToThrow(type = "Wheels.PropertyIsIncorrectType")
 			})
 
 			it("preserves the binary value on the model when assigned via new()", () => {
-				local.bytes = [137, 80, 78, 71, 13, 10, 26, 10]
-				local.photo = g.model("photo").new(filename = "test.png", fileData = local.bytes)
-				expect(local.photo).toHaveKey("fileData")
+				if (_isSQLite) return;
+				var ctx = { bytes: [137, 80, 78, 71, 13, 10, 26, 10] }
+				var photo = g.model("photo").new(filename = "test.png", fileData = ctx.bytes)
+				expect(photo.fileData).toBe(ctx.bytes)
 			})
 
 			it("still rejects array values bound to non-binary scalar columns (regression for ##2412)", () => {
