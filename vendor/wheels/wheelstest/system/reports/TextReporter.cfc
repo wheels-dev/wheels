@@ -37,9 +37,35 @@ component extends="BaseReporter" {
 		variables.bundleStats = arguments.results.getBundleStats();
 		// prepare incoming params
 		prepareIncomingParams();
-		// prepare the report
+		// prepare the report inline (the upstream "assets/text.cfm" template
+		// is not vendored alongside this CFC — see issue #2675)
+		var nl = chr( 10 );
 		savecontent variable="local.report" {
-			include "assets/text.cfm";
+			writeOutput( repeatString( "=", 64 ) & nl );
+			writeOutput( "TEST RESULTS - " & arguments.results.getCFMLEngine() & " " & arguments.results.getCFMLEngineVersion() & nl );
+			writeOutput( repeatString( "=", 64 ) & nl );
+			writeOutput( "Duration: " & arguments.results.getTotalDuration() & "ms" & nl );
+			writeOutput( "Bundles:  " & arguments.results.getTotalBundles() & nl );
+			writeOutput( "Suites:   " & arguments.results.getTotalSuites() & nl );
+			writeOutput( "Specs:    " & arguments.results.getTotalSpecs() & nl );
+			writeOutput( "Passed:   " & arguments.results.getTotalPass() & nl );
+			writeOutput( "Failed:   " & arguments.results.getTotalFail() & nl );
+			writeOutput( "Errored:  " & arguments.results.getTotalError() & nl );
+			writeOutput( "Skipped:  " & arguments.results.getTotalSkipped() & nl );
+			if ( arrayLen( arguments.results.getLabels() ) ) {
+				writeOutput( "Labels:   " & arrayToList( arguments.results.getLabels(), ", " ) & nl );
+			}
+			writeOutput( repeatString( "=", 64 ) & nl );
+			for ( var bundle in variables.bundleStats ) {
+				writeOutput( nl );
+				writeOutput( getBundleIndicator( bundle ) & " " & bundle.path & " (" & bundle.totalDuration & "ms)" & nl );
+				if ( isStruct( bundle.globalException ) && structKeyExists( bundle.globalException, "message" ) ) {
+					writeOutput( tab() & "Bundle Exception: " & bundle.globalException.message & nl );
+				}
+				for ( var suite in bundle.suiteStats ) {
+					$renderSuiteText( suite = suite, depth = 1, nl = nl );
+				}
+			}
 		}
 		return reReplace(
 			trim( local.report ),
@@ -47,6 +73,28 @@ component extends="BaseReporter" {
 			chr( 10 ),
 			"all"
 		);
+	}
+
+	/**
+	 * Recursively render a suite and its nested suites/specs as plain text.
+	 *
+	 * @suite The suite stats struct
+	 * @depth Indent depth (1-based)
+	 * @nl    Newline character to emit
+	 */
+	function $renderSuiteText( required struct suite, required numeric depth, required string nl ){
+		var indent = repeatString( "  ", arguments.depth );
+		writeOutput( indent & arguments.suite.name & " (" & arguments.suite.totalDuration & "ms)" & arguments.nl );
+		for ( var spec in arguments.suite.specStats ) {
+			var statusKey = lCase( spec.status );
+			writeOutput( indent & "  " & getStatusIndicator( statusKey ) & " " & spec.name & arguments.nl );
+			if ( ( statusKey == "failed" || statusKey == "error" ) && len( spec.failMessage ) ) {
+				writeOutput( indent & "      " & spec.failMessage & arguments.nl );
+			}
+		}
+		for ( var childSuite in arguments.suite.suiteStats ) {
+			$renderSuiteText( suite = childSuite, depth = arguments.depth + 1, nl = arguments.nl );
+		}
 	}
 
 	/**
