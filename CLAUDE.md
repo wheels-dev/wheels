@@ -508,6 +508,7 @@ component extends="wheels.WheelsTest" {
 - **`#` escape gotcha**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiters. In string literals, escape as `&##111;`. Comments (`//`) are fine since they aren't evaluated. Unescaped `#` in strings causes "Invalid Syntax Closing [#] not found" compilation errors that crash the **entire** test suite (not just that file).
 - **`$clearRoutes()` in test specs**: Test CFCs that manipulate routes must define their own `$clearRoutes()` method — it is NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc`.
 - **`Left(str, 0)` crashes Lucee 7**: Use a ternary guard: `local.match.pos[1] > 1 ? Left(str, local.match.pos[1] - 1) : ""`
+- **`toBeInstanceOf("component")` fails on BoxLang**: `getMetadata(obj).type` returns the literal string `"component"` on Lucee/Adobe but the fully-qualified class name on BoxLang, so `toBeInstanceOf("component")` passes on two engines and fails on the third. Use `toBeWheelsModel()` to assert that a finder result is a Wheels model instance.
 - Run with MCP `wheels_test()` or CLI `wheels test run`
 
 ## Running Tests Locally (Wheels CLI — Recommended)
