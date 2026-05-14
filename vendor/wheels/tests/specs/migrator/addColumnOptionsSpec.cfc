@@ -14,14 +14,29 @@
  * the user wrote both columns identically. Tutorial chapter 7's model spec
  * `requires a body` failed because of this.
  *
- * After the fix in Abstract.addColumnOptions, all three string-like types
- * with `default=""` produce the same DDL (no DEFAULT clause). That lines
- * the validatesPresenceOf skip up consistently.
+ * The F17 fix lives in `wheels.databaseAdapters.Abstract.addColumnOptions`:
+ * after the fix all three string-like types with `default=""` produce the
+ * same DDL (no DEFAULT clause) on Abstract-based adapters (MySQL, SQLite,
+ * H2, Oracle, Microsoft SQL Server).
+ *
+ * PostgreSQL and its CockroachDB subclass have their own `addColumnOptions`
+ * implementation that intentionally emits `DEFAULT ''` for empty strings,
+ * and serializes booleans as `true` / `false` (vs `1` / `0`). Those
+ * surface differences are part of those adapters' contract — this spec
+ * documents them rather than asserting them away. See #2661 for the cross-
+ * adapter triage that motivated this adapter-aware shape.
  */
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		variables.adapter = createObject("component", "wheels.migrator.Migration").init().adapter;
+		// PostgreSQL and CockroachDB share the PostgreSQLMigrator addColumnOptions
+		// implementation, which diverges from Abstract on empty string defaults
+		// and boolean serialization. Use the same adapterName() idiom that
+		// vendor/wheels/tests/specs/migrator/migrationSpec.cfc already uses
+		// for cross-adapter branching.
+		var name = variables.adapter.adapterName();
+		variables.isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
 	}
 
 	private string function buildOptions(string type, string default = "", boolean allowNull = true) {
@@ -37,19 +52,32 @@ component extends="wheels.WheelsTest" {
 
 		describe("addColumnOptions — symmetric default handling for string-like types (F17)", () => {
 
-			it("string with default='' omits the DEFAULT clause", () => {
+			it("string with default='' omits the DEFAULT clause on Abstract-based adapters", () => {
 				var sql = buildOptions(type = "string", default = "");
-				expect(sql).notToInclude("DEFAULT");
+				if (variables.isPostgresFamily) {
+					// PG adapter intentionally emits `DEFAULT ''` for empty strings.
+					expect(sql).toInclude("DEFAULT");
+				} else {
+					expect(sql).notToInclude("DEFAULT");
+				}
 			});
 
-			it("text with default='' omits the DEFAULT clause (regression for F17)", () => {
+			it("text with default='' omits the DEFAULT clause on Abstract-based adapters (F17)", () => {
 				var sql = buildOptions(type = "text", default = "");
-				expect(sql).notToInclude("DEFAULT");
+				if (variables.isPostgresFamily) {
+					expect(sql).toInclude("DEFAULT");
+				} else {
+					expect(sql).notToInclude("DEFAULT");
+				}
 			});
 
-			it("char with default='' omits the DEFAULT clause (regression for F17)", () => {
+			it("char with default='' omits the DEFAULT clause on Abstract-based adapters (F17)", () => {
 				var sql = buildOptions(type = "char", default = "");
-				expect(sql).notToInclude("DEFAULT");
+				if (variables.isPostgresFamily) {
+					expect(sql).toInclude("DEFAULT");
+				} else {
+					expect(sql).notToInclude("DEFAULT");
+				}
 			});
 
 			it("string with a real default (non-empty) still emits DEFAULT", () => {
@@ -64,14 +92,20 @@ component extends="wheels.WheelsTest" {
 				expect(sql).toInclude("'long body'");
 			});
 
-			it("integer with default='' becomes DEFAULT NULL (unchanged behavior)", () => {
+			it("integer with default='' becomes DEFAULT NULL across adapters", () => {
 				var sql = buildOptions(type = "integer", default = "");
 				expect(sql).toInclude("DEFAULT NULL");
 			});
 
-			it("boolean with default=true emits DEFAULT 1 (unchanged behavior)", () => {
+			it("boolean with default=true emits the adapter's true literal", () => {
 				var sql = buildOptions(type = "boolean", default = true);
-				expect(sql).toInclude("DEFAULT 1");
+				if (variables.isPostgresFamily) {
+					// PG adapter serializes booleans as `true` / `false` literals.
+					expect(sql).toInclude("DEFAULT true");
+				} else {
+					// Abstract-based adapters serialize booleans as `1` / `0`.
+					expect(sql).toInclude("DEFAULT 1");
+				}
 			});
 		});
 	}
