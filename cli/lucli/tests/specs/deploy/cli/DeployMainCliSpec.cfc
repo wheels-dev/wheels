@@ -207,6 +207,26 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 directoryDelete(tmpCwd, true);
             });
 
+            // Regression for issue #2658: `wheels deploy init` resolved
+            // templates via expandPath('/cli/lucli/...'), which uses the
+            // running app's mapping root. Inside a generated user app
+            // that path doesn't exist. Fix anchors resolution to the CFC
+            // location (mirrors JarLoader.cfc).
+            it("$cliInstallDir() resolves to the CLI install root, not the running app mapping", () => {
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var root = dc.$cliInstallDir();
+
+                expect(root).toBeString();
+                var normalized = replace(root, "\", "/", "all");
+                if (right(normalized, 1) == "/") normalized = left(normalized, len(normalized) - 1);
+                expect(reFindNoCase("/cli/lucli$", normalized)).toBeGT(0);
+
+                expect(directoryExists(root & "templates/deploy/init")).toBeTrue();
+                expect(fileExists(root & "templates/deploy/init/deploy.yml.mustache")).toBeTrue();
+            });
+
             it("audit dispatches tail of audit log to every host", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
