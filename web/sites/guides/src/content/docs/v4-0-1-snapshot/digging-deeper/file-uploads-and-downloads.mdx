@@ -152,6 +152,37 @@ component extends="Controller" {
 
 The stored path (`avatars/42/avatar.png`) is relative to a known root — a UUID or a hash of the contents is a safer stored filename than the client-supplied name, which can contain shell metacharacters, `..`, or Unicode lookalikes.
 
+## Storing binary content in a database column
+
+If your schema keeps file content in a `blob` / `longblob` / `bytea` column instead of on disk, you can assign the raw bytes directly to the model property:
+
+```cfm {test:compile} title="app/controllers/Photos.cfc"
+component extends="Controller" {
+    function create() {
+        local.tmpDir = expandPath("/var/uploads/tmp/");
+        cffile(action="upload", fileField="photo[fileData]", destination=local.tmpDir, nameconflict="makeunique");
+
+        local.bytes = FileReadBinary(local.tmpDir & cffile.serverFile);
+        fileDelete(local.tmpDir & cffile.serverFile);
+
+        local.photo = model("Photo").new(
+            filename = cffile.clientFile,
+            fileData = local.bytes
+        );
+
+        if (local.photo.save()) {
+            redirectTo(route="photo", key=local.photo.id);
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+<Aside type="note">
+  `FileReadBinary()` returns a `byte[]` on Lucee 7 and Adobe CF, but a CFML array of integers on BoxLang and some Lucee 6 configurations. Wheels' model property setter accepts both shapes for binary columns — the JDBC driver handles the binding correctly on all engines.
+</Aside>
+
 ## Storage backends
 
 The disk-writing code above works for a single-node app. The moment you add a second app server behind a load balancer, local disk stops being shared and uploads go missing half the time. Point at object storage instead:
