@@ -567,6 +567,23 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Reports whether this adapter supports standalone advisory locks — i.e.,
+	 * `$acquireAdvisoryLock` / `$releaseAdvisoryLock` can be invoked directly
+	 * (no enclosing transaction or extension setup required) and will succeed.
+	 *
+	 * Adapters that throw `Wheels.AdvisoryLockNotSupported` from the lock
+	 * methods, or that require additional context (transaction wrapper,
+	 * DBMS package setup) should leave this default in place. Adapters that
+	 * accept a direct call override to return `true`. Used by the test suite
+	 * to skip lock specs on adapters where the primitive isn't standalone
+	 * callable; callers in application code can also consult it before
+	 * dispatching to `withAdvisoryLock`.
+	 */
+	public boolean function $supportsAdvisoryLocks() {
+		return false;
+	}
+
+	/**
 	 * Returns the SQL clause for pessimistic row locking (e.g., "FOR UPDATE").
 	 * Individual database adapters override this when the default is not appropriate.
 	 */

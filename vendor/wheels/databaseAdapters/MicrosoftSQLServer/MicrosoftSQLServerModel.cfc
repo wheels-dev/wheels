@@ -235,6 +235,17 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * SQL Server's sp_getapplock requires an active user transaction; calling
+	 * `withAdvisoryLock` outside one raises "The statement or function must be
+	 * executed in the context of a user transaction." Until the locking path
+	 * grows an implicit transaction wrapper, report as unsupported so the test
+	 * suite (and any capability-aware callers) skip rather than error.
+	 */
+	public boolean function $supportsAdvisoryLocks() {
+		return false;
+	}
+
+	/**
 	 * SQL Server uses table hints (WITH (UPDLOCK)) instead of trailing FOR UPDATE.
 	 * Table hints require modifying the FROM clause which is too complex for initial implementation.
 	 * Returns empty string to no-op.
