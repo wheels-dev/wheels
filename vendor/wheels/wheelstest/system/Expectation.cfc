@@ -240,6 +240,25 @@ component accessors="true" {
 	}
 
 	/**
+	 * Assert that the actual object is a Wheels model instance, regardless of
+	 * how the underlying engine reflects the class.
+	 *
+	 * Lucee and Adobe return the literal string `"component"` from
+	 * `getMetadata(obj).type`, so `toBeInstanceOf("component")` happens to pass
+	 * on those engines. BoxLang returns the fully-qualified class name (e.g.
+	 * `wheels.tests._assets.models.BulkItem`), so the same assertion fails
+	 * there. This helper sidesteps the divergence by asserting against the
+	 * framework's `Model` base class via `IsInstanceOf`, which walks the
+	 * inheritance chain identically on Lucee, Adobe, and BoxLang.
+	 *
+	 * @message The message to send in the failure
+	 */
+	function toBeWheelsModel( message = "" ){
+		arguments.typeName = "Model";
+		return toBeInstanceOf( argumentCollection = arguments );
+	}
+
+	/**
 	 * Assert that the actual data matches the incoming regular expression with no case sensitivity
 	 *
 	 * @regex   The regex to check with
