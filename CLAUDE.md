@@ -639,7 +639,7 @@ curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
 - **`private` mixin functions not integrated**: `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helper functions in mixin CFCs (`vendor/wheels/model/*.cfc`, view helpers, etc.) MUST use `public` access. Use `$` prefix for internal scope instead of `private` keyword. BoxLang handles this differently, so `private` may pass BoxLang tests but fail Lucee/Adobe.
 
 ### CI soft-fail databases
-`SOFT_FAIL_DBS` appears twice in `.github/workflows/compat-matrix.yml` — once in the "Run test suites" step (before the per-database loop) and once in the "Generate per-engine summary" step (before the summary loop). Both must be kept in sync since the steps don't share shell state. It currently contains `"oracle"` — Oracle failures log as warnings rather than blocking the matrix while #2663 (datasource registration, DBMS_LOCK, constraint cleanup) is resolved. All other databases, including CockroachDB, are hard-gated. Remove a database from both occurrences once its tests are fixed.
+`SOFT_FAIL_DBS` appears twice in `.github/workflows/compat-matrix.yml` — once in the "Run test suites for all databases" step (before the per-database loop) and once in the "Generate per-engine summary" step (before the summary loop). Both must be kept in sync since the steps don't share shell state. It currently contains `"oracle"` — Oracle failures log as warnings rather than blocking the matrix while #2663 (datasource registration, DBMS_LOCK, constraint cleanup) is resolved. All other databases, including CockroachDB, are hard-gated. Remove a database from both occurrences once its tests are fixed.
 
 ### Cleanup
 ```bash
