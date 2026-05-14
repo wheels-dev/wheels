@@ -270,6 +270,10 @@ jobs:
           RESULTS_JSON="{"
           FIRST=true
 
+          # Databases whose failures are logged but don't block CI.
+          # oracle: tracked in #2663 — datasource registration, DBMS_LOCK, and constraint cleanup.
+          SOFT_FAIL_DBS="oracle"
+
           mkdir -p /tmp/test-results
           mkdir -p /tmp/junit-results
 
@@ -416,10 +420,6 @@ jobs:
               f.write(tostring(root))
           " || { echo "JUnit conversion failed for ${db} (non-fatal)"; rm -f "$JUNIT_FILE"; }
             fi
-
-            # Databases whose failures are logged but don't block CI.
-            # oracle: tracked in #2663 — datasource registration, DBMS_LOCK, and constraint cleanup.
-            SOFT_FAIL_DBS="oracle"
 
             # Track per-database result
             if [ "$HTTP_CODE" = "200" ]; then
