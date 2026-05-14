@@ -310,17 +310,9 @@ component {
              & "docs/" & arguments.section & ".md";
     }
 
-    /**
-     * Resolve the CLI install root (cli/lucli/) relative to this CFC's
-     * own location. expandPath('/cli/lucli/...') resolves against the
-     * *running app's* mapping root, which breaks `wheels deploy init`
-     * inside a generated user app where the CLI files don't live under
-     * the project root (issue #2658). Mirrors JarLoader.cfc.
-     */
+    // CFC-relative anchor — expandPath('/cli/lucli/...') uses the running app's mapping root and breaks in a generated user app (mirrors JarLoader.cfc). Public so the regression spec can assert path math directly. See #2658.
     public string function $cliInstallDir() {
         var here = getDirectoryFromPath(getCurrentTemplatePath());
-        // here = .../cli/lucli/services/deploy/cli/
-        // root = .../cli/lucli/
         var root = getCanonicalPath(here & "../../../");
         if (right(root, 1) != "/" && right(root, 1) != "\") root &= "/";
         return root;
