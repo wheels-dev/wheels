@@ -184,6 +184,22 @@ if (!DirectoryExists(path)) {
 
 **Why**: `java.io.File.mkdirs()` is part of the JDK on every CFML engine and recurses parents the same way on Lucee, Adobe CF, and BoxLang. Reach for it whenever a path's parents may be missing — relying on the BIF's `createPath` extension is a portability trap.
 
+### `getMetadata().type` Returns FQN on BoxLang
+
+`getMetadata(obj).type` returns the literal string `"component"` on Lucee and Adobe CF, but returns the fully-qualified class name (e.g. `wheels.tests._assets.models.BulkItem`) on BoxLang. Test assertions that hardcode the string `"component"` silently pass on Lucee/Adobe and silently fail on BoxLang.
+
+```cfm
+// WRONG — passes on Lucee/Adobe, fails on BoxLang
+expect(found).toBeInstanceOf("component");
+
+// RIGHT — asserts against the Model base class via IsInstanceOf (all engines)
+expect(found).toBeWheelsModel();
+```
+
+**Why**: `IsInstanceOf(obj, "Model")` walks the inheritance chain identically on Lucee, Adobe CF, and BoxLang. `toBeWheelsModel()` is a wrapper on `wheels.wheelstest.system.Expectation` that routes through `toBeInstanceOf("Model")`.
+
+**Reference**: `vendor/wheels/wheelstest/system/Expectation.cfc::toBeWheelsModel`, issue #2662.
+
 ### Private View Helpers Not Integrated
 
 `$integrateComponents()` only copies `public` methods into controllers. Private helper functions in view CFCs are never available.
