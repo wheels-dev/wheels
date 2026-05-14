@@ -42,6 +42,13 @@ component extends="wheels.WheelsTest" {
 					g.model("photo").new(filename = {nested = "should not work"})
 				}).toThrow(type = "Wheels.PropertyIsIncorrectType")
 			})
+
+			it("still rejects struct values bound to binary columns (regression for ##2412 — exemption is array-only)", () => {
+				if (_isSQLite) return;
+				expect(() => {
+					g.model("photo").new(filename = "ok.png", fileData = {nested = "should not work"})
+				}).toThrow(type = "Wheels.PropertyIsIncorrectType")
+			})
 		})
 	}
 }
