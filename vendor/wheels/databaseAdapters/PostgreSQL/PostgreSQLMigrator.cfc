@@ -55,7 +55,10 @@ component extends="wheels.databaseAdapters.Abstract" {
 				} else if (arguments.options.type == 'boolean') {
 					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, true, false)#";
 				} else if (arguments.options.type == 'string' && arguments.options.default eq "") {
-					arguments.sql = arguments.sql & "DEFAULT ''";
+					// Leading space required: when called with alter=true the upstream
+					// concatenates " SET" first, and without this space the resulting
+					// "SETDEFAULT ''" is invalid SQL (PG rejects the merged token).
+					arguments.sql = arguments.sql & " DEFAULT ''";
 				} else {
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
 				}

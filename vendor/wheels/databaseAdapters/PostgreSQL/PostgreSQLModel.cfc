@@ -217,6 +217,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * PostgreSQL implements advisory locks directly via pg_advisory_lock / pg_advisory_unlock
+	 * and does not require an enclosing transaction.
+	 */
+	public boolean function $supportsAdvisoryLocks() {
+		return true;
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 * PostgreSQL uses double-quotes to quote identifiers (ANSI SQL standard).
 	 */

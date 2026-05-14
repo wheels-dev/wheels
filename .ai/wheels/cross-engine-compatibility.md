@@ -267,6 +267,28 @@ execute(sql="INSERT INTO roles (name) VALUES (?)", parameters=[{value="admin"}])
 execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
 ```
 
+### PostgreSQL / CockroachDB — Migration DDL Differences
+
+`PostgreSQLMigrator.addColumnOptions` (shared by `CockroachDBMigrator`) diverges from `Abstract.addColumnOptions` in two intentional ways:
+
+- **Empty string defaults**: Abstract-based adapters (MySQL, SQLite, H2, Oracle, MSSQL) omit the `DEFAULT` clause entirely when `default=""` on string/text/char columns. The PostgreSQL family emits `DEFAULT ''` explicitly.
+- **Boolean literals**: Abstract-based adapters serialize `true` as `1` / `false` as `0`. The PostgreSQL family emits `DEFAULT true` / `DEFAULT false`.
+
+When writing migrator spec assertions that check generated DDL, branch on `adapter.adapterName()`:
+
+```cfm
+var name = adapter.adapterName();
+var isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
+if (isPostgresFamily) {
+    expect(sql).toInclude("DEFAULT true");
+} else {
+    // Abstract-based adapters (MySQL, SQLite, H2, Oracle, MSSQL)
+    expect(sql).toInclude("DEFAULT 1");
+}
+```
+
+See `vendor/wheels/tests/specs/migrator/addColumnOptionsSpec.cfc` and `migrationSpec.cfc` for working examples of this branching idiom.
+
 ### CockroachDB (Soft-Fail in CI)
 
 CockroachDB is in CI but marked as soft-fail — test failures are logged as warnings, not build failures. Controlled by `SOFT_FAIL_DBS` in `.github/workflows/tests.yml`.

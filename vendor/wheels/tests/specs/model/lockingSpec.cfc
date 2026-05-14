@@ -3,12 +3,26 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo
-		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
+
+		describe("$supportsAdvisoryLocks adapter capability", () => {
+
+			it("is implemented on the current model adapter and returns a boolean", () => {
+				local.adapter = g.model("author").$classData().adapter;
+				local.supported = local.adapter.$supportsAdvisoryLocks();
+				expect(IsBoolean(local.supported)).toBeTrue();
+			})
+
+		})
 
 		describe("Tests that withAdvisoryLock", () => {
 
+			beforeEach(() => {
+				if (!g.model("author").$classData().adapter.$supportsAdvisoryLocks()) {
+					skip("Adapter does not support standalone advisory locks on this database");
+				}
+			});
+
 			it("executes callback and returns result", () => {
-				if (_isCockroachDB) return;
 				local.result = g.model("author").withAdvisoryLock(name="test_lock_1", callback=function() {
 					return 42;
 				});
@@ -16,7 +30,6 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("releases lock even when callback throws an exception", () => {
-				if (_isCockroachDB) return;
 				local.exceptionThrown = false;
 				try {
 					g.model("author").withAdvisoryLock(name="test_lock_2", callback=function() {
@@ -35,7 +48,6 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("accepts a custom timeout argument", () => {
-				if (_isCockroachDB) return;
 				local.result = g.model("author").withAdvisoryLock(name="test_lock_timeout", timeout=5, callback=function() {
 					return "locked";
 				});
@@ -43,7 +55,6 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("safely handles lock names with single quotes", () => {
-				if (_isCockroachDB) return;
 				// Regression guard: verify lock names are parameterized, not interpolated.
 				// On SQLite this is a no-op, but the call must not throw a SQL syntax error
 				// regardless of adapter. With proper parameterization, "O'Brien" is fine.
