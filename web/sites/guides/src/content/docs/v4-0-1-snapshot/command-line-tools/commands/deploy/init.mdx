@@ -29,7 +29,7 @@ wheels deploy init [--service=<name>] [--image=<path>] [--registry-username=<use
 - `config/deploy.yml` — a starter manifest with `service`, `image`, `servers`, `registry`, `env` stubs.
 - `.kamal/secrets` — key/value placeholders for the registry password and any app secrets.
 - `.kamal/hooks/` — empty directory. Drop executable `pre-deploy`, `post-deploy`, or `post-deploy-failure` scripts here later.
-- `Dockerfile` — multi-stage build targeting Lucee 7 on Java 21 with a `/health` HEALTHCHECK and `EXPOSE 8080` (matches the default `proxy.app_port` in `deploy.yml`). Adjust the `COPY` lines and base image to match your app.
+- `Dockerfile` — multi-stage build targeting Lucee 7 on Java 21 with a `/up` HEALTHCHECK (aligned with the `proxy.healthcheck.path` in the generated `deploy.yml`) and `EXPOSE 8080` (matches the default `proxy.app_port`). Adjust the `COPY` lines and base image to match your app.
 - `.dockerignore` — keeps secrets, test fixtures, and IDE noise out of the build context. Only written if one doesn't already exist (unless `--force`).
 
 Add `.kamal/secrets*` to `.gitignore` before running.
