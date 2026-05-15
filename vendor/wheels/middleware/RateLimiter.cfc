@@ -596,6 +596,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	private struct function $dbIncrement(required string clientKey, required string storeKey, required numeric resetAt) {
 		$ensureTable();
 
+		// Kill-switch: maxRequests = 0 blocks every request. Short-circuit before the
+		// INSERT path, which would otherwise allow the first request per window through
+		// because local.allowed is initialised to true and the counter > maxRequests
+		// check (line below) only fires from the UPDATE branch on subsequent requests.
+		if (variables.maxRequests == 0) {
+			return {allowed: false, remaining: 0, resetAt: arguments.resetAt};
+		}
+
 		local.allowed = true;
 		local.remaining = variables.maxRequests;
 

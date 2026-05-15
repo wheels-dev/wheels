@@ -720,6 +720,27 @@ component extends="wheels.WheelsTest" {
 				expect(shared.callCount).toBe(0);
 			});
 
+			it("blocks the first request when maxRequests = 0 with strategy = fixedWindow and storage = database", function() {
+				var keyFn = function(req) { return "fw-db-killswitch-client"; };
+				var mw = new wheels.middleware.RateLimiter(
+					maxRequests = 0,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					storage = "database",
+					keyFunction = keyFn
+				);
+				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+				var shared = {callCount: 0};
+				var handler = function(required struct request) {
+					shared.callCount++;
+					return "ok";
+				};
+
+				var result = pipeline.run(request = {}, coreHandler = handler);
+				expect(result).toInclude("Rate limit exceeded");
+				expect(shared.callCount).toBe(0);
+			});
+
 			it("accepts a custom keyFunction", function() {
 				var keyFn = function(request) { return "custom-key"; };
 				var mw = new wheels.middleware.RateLimiter(
