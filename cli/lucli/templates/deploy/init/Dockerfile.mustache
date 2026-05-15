@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1.7
+#
+# Production Dockerfile for {{service_name}}.
+#
+# Built by `wheels deploy init`. Multi-stage: a builder that installs
+# front-end build dependencies (Node, npm), and a slim runtime layer that
+# ships Lucee 7 on Java 21 — the framework's primary CI target.
+#
+# Adjust the COPY lines to match your project's directory layout. The
+# health check assumes a `/health` route exists (add one to keep liveness
+# probes off your slow paths). See:
+#   /v4-0-1-snapshot/deployment/docker-deployment/
+#   /v4-0-1-snapshot/deployment/first-deploy/
+
+# --- Stage 1: builder ---------------------------------------------------------
+# Compile front-end assets and prune anything the runtime doesn't need.
+# Drop this stage if your app has no npm build step.
+FROM node:20-bookworm-slim AS builder
+
+WORKDIR /build
+
+# Install front-end dependencies first so layer cache survives source edits.
+COPY package.json package-lock.json* ./
+RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
+
+COPY . .
+
+# Skip silently if there is no build script defined.
+RUN if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.build ? 0 : 1)"; then \
+        npm run build; \
+    fi
+
+# --- Stage 2: runtime ---------------------------------------------------------
+# Lucee 7 on Java 21. The lucee/lucee image ships a ready webroot at /var/www.
+FROM lucee/lucee:7-tomcat10-jre21
+
+LABEL org.opencontainers.image.title="{{service_name}}"
+
+# Wheels reads these at boot. Override per-environment at `docker run` time.
+ENV WHEELS_ENV=production \
+    WHEELS_DATASOURCE=app \
+    RELOAD_PASSWORD=change-me \
+    CATALINA_OPTS="-Xms256m -Xmx1g -XX:MaxMetaspaceSize=256m"
+
+WORKDIR /var/www
+
+# Install curl for the HEALTHCHECK probe.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the app. Vendor code (framework + activated packages) ships inside the
+# image so production boot needs no network access.
+COPY --from=builder /build/app            ./app
+COPY --from=builder /build/config         ./config
+COPY --from=builder /build/public         ./public
+COPY --from=builder /build/vendor         ./vendor
+
+# Tomcat listens on 8080 in the lucee/lucee image — matches the default
+# proxy.app_port in config/deploy.yml.
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8080/health || exit 1
