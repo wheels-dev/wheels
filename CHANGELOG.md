@@ -22,6 +22,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Added
 
+- Docs: added "Reading the Changelog" guide page under the Upgrading section explaining where `CHANGELOG.md` lives (repo root, not inside `vendor/wheels/`), how to look up PR references cited in upgrade guides, and how to access the changelog offline when working with a vendored copy of the framework (#2719)
 - Document CORS allow-list defaults drift when migrating from 3.x `set(accessControlAllow*)` global settings to `wheels.middleware.Cors`; add header comparison table, explicit-constructor-args fix, and common-issues entry to the 3.x→4.x upgrade guide and a migration callout to the CORS reference page (#2708)
 - `wheels deploy init` now scaffolds a starter `Dockerfile` (Lucee 7 + Java 21 multi-stage, `/up` HEALTHCHECK aligned with the generated `kamal-proxy` healthcheck) and a `.dockerignore` alongside `config/deploy.yml` and `.kamal/secrets`. `--force` also gates the `Dockerfile` — an existing user-authored Dockerfile aborts the init without `--force`, while an existing `.dockerignore` is silently preserved (since it's commonly user-curated even before adopting `wheels deploy`). The npm builder stage works for any Wheels app — projects without a JS pipeline pass through unchanged; projects with a `package.json` install + build automatically. Secrets (reload password, DB password, registry password) are injected at deploy time via `.kamal/secrets`, never baked into the image (#2673)
 
