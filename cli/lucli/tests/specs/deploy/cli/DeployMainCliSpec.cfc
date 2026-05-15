@@ -507,7 +507,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(sawLogout).toBeTrue();
             });
 
-            it("deploy still propagates lock-release exceptions in the finally block as no-ops when release fails (##2696)", () => {
+            it("a failing lock-release in the finally block does not mask the original deploy exception (##2696)", () => {
                 // lock.release() runs in the deploy() finally block and must never
                 // shadow the original deploy exception. Inject a release failure
                 // alongside a pull failure and assert the surfaced exception is the

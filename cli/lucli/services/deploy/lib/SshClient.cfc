@@ -161,6 +161,11 @@ component {
 	 * Trims the command summary to 200 chars and stderr to 500 chars so log
 	 * output stays scannable when long shell pipelines or noisy stderr would
 	 * otherwise dominate the surfaced error.
+	 *
+	 * MIRROR: FakeSshPool.$raiseRemoteFailure must stay byte-identical to this
+	 * method. If you change the trim limits, throw type, or message template
+	 * here, update the test double in lockstep — tests assert against this
+	 * exact shape regardless of which pool the deploy layer is talking to.
 	 */
 	public void function $raiseRemoteFailure(
 		required string host,

@@ -50,6 +50,11 @@ component {
 	 * Mirror SshClient.$raiseRemoteFailure — same throw type / message shape /
 	 * detail-trim behavior so tests can assert one contract regardless of
 	 * which pool the deploy layer is talking to. Regression #2696.
+	 *
+	 * MIRROR: SshClient.$raiseRemoteFailure is the source of truth. If you
+	 * change the trim limits, throw type, or message template there, update
+	 * this method in lockstep. We don't share the helper because FakeSshPool
+	 * is a test double that should not import the real SSH client.
 	 */
 	public void function $raiseRemoteFailure(
 		required string host,

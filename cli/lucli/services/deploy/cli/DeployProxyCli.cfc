@@ -25,10 +25,12 @@ component {
     public string function boot(required struct opts)    { return $runOnAllHosts(arguments.opts, "boot",    "Booted kamal-proxy"); }
     public string function reboot(required struct opts)  { return $runOnAllHosts(arguments.opts, "reboot",  "Rebooted kamal-proxy"); }
     public string function start(required struct opts)   { return $runOnAllHosts(arguments.opts, "start",   "Started kamal-proxy"); }
-    public string function stop(required struct opts)    { return $runOnAllHosts(arguments.opts, "stop",    "Stopped kamal-proxy"); }
+    // `stop` and `remove` are idempotent teardowns — a missing kamal-proxy
+    // container should not be a hard error. #2696.
+    public string function stop(required struct opts)    { return $runOnAllHosts(arguments.opts, "stop",    "Stopped kamal-proxy", true); }
     public string function restart(required struct opts) { return $runOnAllHosts(arguments.opts, "restart", "Restarted kamal-proxy"); }
     public string function details(required struct opts) { return $runOnAllHosts(arguments.opts, "details", "Collected kamal-proxy details"); }
-    public string function remove(required struct opts)  { return $runOnAllHosts(arguments.opts, "remove",  "Removed kamal-proxy"); }
+    public string function remove(required struct opts)  { return $runOnAllHosts(arguments.opts, "remove",  "Removed kamal-proxy",  true); }
 
     public string function logs(required struct opts) {
         var tail = arguments.opts.tail ?: 100;
@@ -38,12 +40,12 @@ component {
 
     // ── Private plumbing ───────────────────────────────────────
 
-    private string function $runOnAllHosts(required struct opts, required string method, required string verbLabel) {
-        var n = $runOnAllHostsWithArg(arguments.opts, arguments.method, {});
+    private string function $runOnAllHosts(required struct opts, required string method, required string verbLabel, boolean allowFail = false) {
+        var n = $runOnAllHostsWithArg(arguments.opts, arguments.method, {}, arguments.allowFail);
         return $renderResult(arguments.opts, arguments.verbLabel & " on " & n & " host(s)");
     }
 
-    private numeric function $runOnAllHostsWithArg(required struct opts, required string method, required struct methodOpts) {
+    private numeric function $runOnAllHostsWithArg(required struct opts, required string method, required struct methodOpts, boolean allowFail = false) {
         arrayClear(variables.dryRunBuffer);
         var cfg = variables.loader.load(
             arguments.opts.configPath,
@@ -55,11 +57,7 @@ component {
         var cmdStr = structIsEmpty(arguments.methodOpts)
             ? invoke(proxyCmds, arguments.method)
             : invoke(proxyCmds, arguments.method, [arguments.methodOpts]);
-        // `remove` and `stop` are idempotent teardown verbs — a missing
-        // kamal-proxy container should not be a hard error. Everything else
-        // (boot, start, restart, details, logs, reboot) is strict by default.
-        var idempotentTeardown = (arguments.method == "remove" || arguments.method == "stop");
-        $dispatch(hosts, cmdStr, dryRun, idempotentTeardown);
+        $dispatch(hosts, cmdStr, dryRun, arguments.allowFail);
         return arrayLen(hosts);
     }
 
