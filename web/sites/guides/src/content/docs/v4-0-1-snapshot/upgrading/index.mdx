@@ -26,9 +26,13 @@ Three sources, in order of authority:
 
 - `vendor/wheels/events/onapplicationstart.cfc` — the `application.$wheels.version` assignment is the runtime truth. As of this snapshot, `4.0.0`.
 - `box.json` at the repo root — the package manifest version.
-- `CHANGELOG.md` — the most recent non-`[Unreleased]` heading.
+- `CHANGELOG.md` at the repo root — the most recent non-`[Unreleased]` heading.
 
 If any two disagree, the runtime constant wins — that's the version your app actually boots against.
+
+<Aside type="note">
+  `CHANGELOG.md` lives at the repository root and is not bundled inside `vendor/wheels/`. If you work with a vendored copy of the framework and cannot reach GitHub, see [Reading the Changelog](/v4-0-1-snapshot/upgrading/changelog/) for how to access it offline.
+</Aside>
 
 ## Release cadence
 
@@ -61,5 +65,10 @@ Four rules, in order:
     title="2.x to 3.x"
     description="The CFWheels to Wheels rebrand, test framework migration to WheelsTest BDD, and the foundational changes in 3.0. Kept here as a pointer for apps still on 2.x."
     href="/v4-0-1-snapshot/upgrading/2x-to-3x/"
+  />
+  <LinkCard
+    title="Reading the Changelog"
+    description="Where CHANGELOG.md lives, how to look up PR references cited in upgrade guides, and how to access it when working with a vendored copy offline."
+    href="/v4-0-1-snapshot/upgrading/changelog/"
   />
 </CardGrid>

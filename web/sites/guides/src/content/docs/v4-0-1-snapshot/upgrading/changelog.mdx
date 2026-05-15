@@ -1,0 +1,123 @@
+---
+title: Reading the Changelog
+description: Where to find the Wheels changelog when upgrading, how to look up PR references, and what each section means.
+type: reference
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Upgrade guides for Wheels cite `CHANGELOG.md` entries and PR numbers (e.g. "see #1930", "CHANGELOG.md → Fixed, #1985"). This page explains where to find the changelog, how to navigate it, and what to do when you're working offline or with a vendored copy of the framework.
+
+## Where the changelog lives
+
+The canonical `CHANGELOG.md` is at the **root of the Wheels repository** — not inside `vendor/wheels/`.
+
+If you are working with a vendored copy of the framework (the common case — `vendor/wheels/` is committed as part of your app), the changelog is **not** present in that directory. The `vendor/wheels/` subtree ships the framework source files only; `CHANGELOG.md` is a repository-level artifact and is not bundled.
+
+<Aside type="note">
+  Bundling `CHANGELOG.md` inside `vendor/wheels/` at release time is a tracked improvement ([#2719](https://github.com/wheels-dev/wheels/issues/2719)). Until it ships, use the methods below to read the changelog without leaving your editor.
+</Aside>
+
+## Accessing the changelog
+
+### Online (always current)
+
+The changelog for the version your app vendors is available at a stable GitHub URL:
+
+```
+https://github.com/wheels-dev/wheels/blob/<tag>/CHANGELOG.md
+```
+
+For example, if `vendor/wheels/box.json` reports `"version": "4.0.0"`, the changelog for that exact version is:
+
+```
+https://github.com/wheels-dev/wheels/blob/v4.0.0/CHANGELOG.md
+```
+
+You can also view the in-progress unreleased section on `develop`:
+
+```
+https://github.com/wheels-dev/wheels/blob/develop/CHANGELOG.md
+```
+
+### Finding your version tag
+
+Three ways to confirm the tag to substitute into the URL above:
+
+1. **`vendor/wheels/box.json`** — look for `"version"`. This is the version that was current when your project was scaffolded or last upgraded.
+2. **Runtime constant** — the `application.$wheels.version` assignment in `vendor/wheels/events/onapplicationstart.cfc` is the authoritative runtime value.
+3. **`git log --oneline -- vendor/wheels/`** — shows the commit that last updated the vendored subtree, which you can cross-reference with the tags in the upstream repo.
+
+### Offline / air-gapped environments
+
+If you cannot reach GitHub, check out the upstream repo alongside your project and read the file locally:
+
+```bash
+git clone --depth=1 --branch v4.0.0 https://github.com/wheels-dev/wheels.git /tmp/wheels-src
+cat /tmp/wheels-src/CHANGELOG.md
+```
+
+Or, if you already have a full clone of the upstream repo, `git show` reads the file without a working-tree checkout:
+
+```bash
+git -C /path/to/wheels-upstream show v4.0.0:CHANGELOG.md | less
+```
+
+## How to look up a PR reference
+
+Upgrade guides and changelog entries cite PR numbers in the form `(#1930)` or `(#1985)`. Each links back to the GitHub PR where the change was reviewed and merged.
+
+The URL pattern is:
+
+```
+https://github.com/wheels-dev/wheels/pull/<pr-number>
+```
+
+The PR description contains:
+- The motivation for the change
+- The before/after behavior
+- Links to any related issues
+- The test cases that were added
+
+When an upgrade guide says "see #1930", reading that PR description is the fastest way to understand the full context of a change.
+
+## Anatomy of a changelog entry
+
+Wheels follows the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format. Each release heading groups changes under one or more of these sections:
+
+| Section | What it contains |
+|---|---|
+| `Added` | New features, new CLI verbs, new helpers. These are additive and safe to ignore during an upgrade. |
+| `Changed` | Behavior that changed. Read these carefully — they are the source of most upgrade friction even when they don't rise to "breaking". |
+| `Deprecated` | Features that still work but will be removed in the next major. Act on these before upgrading again. |
+| `Removed` | Things that no longer exist. Check these when you get "component not found" errors after upgrading. |
+| `Fixed` | Bug fixes. Usually safe to skip, but worth skimming for edge cases that might have been masking a problem in your app. |
+| `Security` | Patches for security issues. Always apply these. |
+
+A full entry looks like this:
+
+```markdown
+### Changed
+
+- `wheels.middleware.Cors` default changed from `allowOrigins="*"` to deny-all.
+  Configure `allowOrigins` explicitly or all cross-origin requests will be rejected.
+  Wildcard-plus-credentials combinations are now rejected regardless (#2039, #2053).
+```
+
+The parenthetical at the end is the PR number. If the change spans multiple PRs, all are listed. When the PR number is absent, check `git log --grep="#<word>"` in the upstream repo.
+
+## The `[Unreleased]` section
+
+Changes merged to `develop` but not yet tagged appear under `## [Unreleased]` at the top of the file. If you track the bleeding-edge channel (`wheels-be`), your installed version may already include some of these entries. If you track stable, `[Unreleased]` is a preview of what the next release will contain.
+
+<Aside type="tip">
+  Snapshot version strings (`4.0.0-snapshot.1787`) correspond to the `develop` branch at the `github.run_number` shown. There is no tag per snapshot — use `git log --oneline` in the upstream repo to find the exact commit if you need to correlate a snapshot build with a changelog entry.
+</Aside>
+
+## Related guides
+
+- [Upgrading Wheels](/v4-0-1-snapshot/upgrading/) — versioning policy and release cadence
+- [3.x to 4.x](/v4-0-1-snapshot/upgrading/3x-to-4x/) — every breaking change in 4.0 with before/after examples
+- [Release Channels](/v4-0-1-snapshot/start-here/release-channels/) — stable vs bleeding-edge, and how to switch
