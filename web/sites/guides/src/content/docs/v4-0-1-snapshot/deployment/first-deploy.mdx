@@ -27,7 +27,7 @@ Three quick checks before running anything:
 
 - **SSH works.** `ssh deploy@your-host "uname -a"` succeeds without a password prompt.
 - **Registry login works.** `docker login <registry>` succeeds locally.
-- **Your app has a `Dockerfile`.** It builds and runs locally (`docker build . && docker run <image>`). If not, write the `Dockerfile` first — `wheels deploy` doesn't generate one.
+- **You can build a Docker image of your app.** `wheels deploy init` (next step) scaffolds a starter `Dockerfile` targeting Lucee 7 on Java 21. Verify it builds and runs locally with `docker build . && docker run <image>`, and tweak the `COPY` paths or base image if your app needs it.
 
 ## Walk-through
 
@@ -41,10 +41,12 @@ Three quick checks before running anything:
    wheels deploy init
    ```
 
-   Creates two files:
+   Creates four files:
 
    - `config/deploy.yml` — the deploy manifest. Under git.
    - `.kamal/secrets` — secret values. **Never under git.** Add `.kamal/secrets` to `.gitignore` immediately.
+   - `Dockerfile` — multi-stage build (Lucee 7 + Java 21) the deploy will push to your registry. Edit `COPY` paths and the base image to match your app.
+   - `.dockerignore` — keeps the build context lean and secrets out of the image. Only written if one doesn't already exist.
 
    A `.kamal/hooks/` directory is also created for optional local hook scripts. It's empty and safe to leave that way.
 
