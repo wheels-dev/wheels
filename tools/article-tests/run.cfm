@@ -2,7 +2,12 @@
 // Test harness that exercises every claim made in the blog post
 // "Skip the Plugin: Building a Rate-Limited API in Wheels 4.0".
 // Runs against the live middleware code in vendor/wheels/middleware/.
-// Run as: cd vendor && boxlang ../tools/article-tests/run.cfm
+//
+// Run via tools/article-tests/run.sh (recommended). For a manual
+// invocation from the repo root, use:
+//   boxlang --bx-config tools/article-tests/boxlang.json tools/article-tests/run.cfm
+// The --bx-config flag is required so the /wheels mapping resolves;
+// without it dotted-path imports like wheels.middleware.RateLimiter fail.
 
 results = {pass: 0, fail: 0, errors: []};
 
