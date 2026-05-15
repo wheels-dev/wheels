@@ -75,13 +75,14 @@ https://blog.wheels.dev/posts/skip-the-plugin-rate-limited-api
 If your API needs "no more than N per minute, period," reach for sliding.
 ```
 
-**Reply 2:**
-```
+**Reply 2:** (outer fence is `~~~~` so the inner ```` ```cfm ```` block renders correctly in the Markdown preview — the tweet itself is plain text)
+
+~~~~
 2/ The hero example — per-API-key, not per-IP:
 
 ```cfm
 keyFunction = function(req) {
-    if (Len(req.cgi.http_x_api_key ?: "")) {
+    if (StructKeyExists(req, "cgi") && StructKeyExists(req.cgi, "http_x_api_key") && Len(req.cgi.http_x_api_key)) {
         return "apikey:" & req.cgi.http_x_api_key;
     }
     return "ip:" & req.cgi.remote_addr;
@@ -89,7 +90,7 @@ keyFunction = function(req) {
 ```
 
 Alice and Bob behind the same office NAT, each with their own bucket.
-```
+~~~~
 
 **Reply 3:**
 ```
