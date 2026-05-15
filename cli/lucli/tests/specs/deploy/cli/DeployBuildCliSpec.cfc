@@ -85,6 +85,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 // Just assert we got SOMETHING after acme/demo:
                 expect(reFind("acme/demo:[^ ]+", out)).toBeGT(0);
             });
+
+            // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.
+            it("$gitShortSha() returns 'unknown' when run outside a git repo", () => {
+                var nonGitDir = getTempDirectory() & "/wheels-2671-build-" & createUUID();
+                directoryCreate(nonGitDir, true, true);
+                try {
+                    var cli = new cli.lucli.services.deploy.cli.DeployBuildCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    expect(cli.$gitShortSha(nonGitDir)).toBe("unknown");
+                } finally {
+                    directoryDelete(nonGitDir, true);
+                }
+            });
         });
     }
 }
