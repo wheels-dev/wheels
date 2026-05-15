@@ -321,7 +321,7 @@ See [Packages](/v4-0-0/digging-deeper/packages/) for manifest fields, per-method
 
 ### Monolithic `paginationLinks()`
 
-**CHANGELOG:** composable pagination helpers added (#1930). The 3.x `paginationLinks()` is retained. New code should use `paginationNav()` or compose the individual helpers (`paginationInfo`, `firstPageLink`, `previousPageLink`, `pageNumberLinks`, `nextPageLink`, `lastPageLink`).
+**CHANGELOG:** composable pagination helpers added (#1930). The 3.x `paginationLinks()` is retained but deprecated. As of #2727, calling `paginationLinks()` emits a one-time per-request `WriteLog(type="warning")` pointing at the replacement so apps see the signal without flooding the log. `wheels upgrade check --to=4.0.0` also greps `app/views/` for `paginationLinks(` and flags every hit with a remediation pointer. New code should use `paginationNav()` or compose the individual helpers (`paginationInfo`, `firstPageLink`, `previousPageLink`, `pageNumberLinks`, `nextPageLink`, `lastPageLink`).
 
 ### RocketUnit test style
 
