@@ -413,6 +413,9 @@ component output="false" {
 		// same alias) is recorded as a failed package and the loaded package
 		// is rolled back so its services/mixins don't ship under an alias
 		// nobody can resolve. See GH#2712.
+		// Return value intentionally discarded: $tryRegisterPackageMapping
+		// records its own failedPackages entry and calls $rollbackPackage on
+		// the false path.
 		$tryRegisterPackageMapping(arguments.dirName, local.manifest, arguments.pkgDir);
 	}
 
@@ -454,6 +457,16 @@ component output="false" {
 	 * public registries internally consistent: a package in failedPackages
 	 * never simultaneously appears in packages/packageMeta/lazyPackages or
 	 * contributes mixins/services/middleware.
+	 *
+	 * Intentionally does NOT clean variables.packageMappings or
+	 * variables.$mappingProviders: those registries are written only by
+	 * $registerPackageMapping on its success path, so by the time this
+	 * function runs (either from $discover's catch on a pre-mapping
+	 * exception, or from $tryRegisterPackageMapping's false path where the
+	 * registration itself never wrote anything) the mapping registries are
+	 * already clean. Adding cleanup here would be a no-op at best and could
+	 * mask a future bug that writes to those registries outside the success
+	 * path.
 	 */
 	private void function $rollbackPackage(required string dirName) {
 		StructDelete(variables.packageMeta, arguments.dirName);
