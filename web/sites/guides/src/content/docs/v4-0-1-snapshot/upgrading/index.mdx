@@ -25,7 +25,7 @@ Deprecations land in a minor release with a log warning and stay functional unti
 Three sources, in order of authority:
 
 - `vendor/wheels/events/onapplicationstart.cfc` — the `application.$wheels.version` assignment is the runtime truth. As of this snapshot, `4.0.0`.
-- `box.json` at the repo root — the package manifest version.
+- `wheels.json` at the repo root — the package manifest version.
 - `CHANGELOG.md` at the repo root — the most recent non-`[Unreleased]` heading.
 
 If any two disagree, the runtime constant wins — that's the version your app actually boots against.
