@@ -3733,20 +3733,14 @@ component extends="modules.BaseModule" {
 				extensions: "cfm,cfc",
 				fix: "Missing manifest entries throw Wheels.ViteAssetNotFound in production. Rebuild assets during deploy (npm run build) or set(viteStrictManifest=false) to restore 3.x silent fallback."
 			});
-			// paginationLinks() is deprecated in favor of paginationNav()
-			// (#1930) and now emits a one-time per-request warning at
-			// runtime (#2714). Flag any view still calling the deprecated
-			// helper so 3.x apps see the rename during `wheels upgrade check`.
-			// NOTE: '#' is doubled in the `fix` string because CFML strings
-			// interpret a bare '#' as expression interpolation; we want a
-			// literal '#' in the user-visible remediation text.
+			// paginationLinks() deprecation grep (#2714, replacement: paginationNav() per #1930).
 			arrayAppend(checks, {
 				description: "Deprecated paginationLinks() helper (renamed to paginationNav() in 4.0)",
 				pattern: "paginationLinks\s*\(",
 				checkType: "grep",
 				scanDir: "app/views",
 				extensions: "cfm,cfc",
-				fix: "Replace paginationLinks() with paginationNav() (the all-in-one nav helper) or compose firstPageLink/previousPageLink/pageNumberLinks/nextPageLink/lastPageLink directly. See CLAUDE.md ## Pagination View Helpers and issue ##1930."
+				fix: "Replace paginationLinks() with paginationNav() (the all-in-one nav helper) or compose firstPageLink/previousPageLink/pageNumberLinks/nextPageLink/lastPageLink directly. See https://github.com/wheels-dev/wheels/issues/1930."
 			});
 		}
 

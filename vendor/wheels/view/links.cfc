@@ -233,11 +233,7 @@ component {
 		boolean pageNumberAsParam,
 		any encode
 	) {
-		// Issue #2714: paginationLinks() is deprecated in favor of paginationNav().
-		// Emit a one-time per-request warning so 3.x → 4.x upgraders see the
-		// signal without flooding the log on a paginated view that renders
-		// the helper many times. Follows the $checkPluginsDeprecation() pattern
-		// in vendor/wheels/Plugins.cfc.
+		// One-time per-request deprecation warning (#2714) — mirrors $checkPluginsDeprecation() in Plugins.cfc.
 		if (!StructKeyExists(request.wheels, "$paginationLinksDeprecationLogged")) {
 			request.wheels.$paginationLinksDeprecationLogged = true;
 			WriteLog(
