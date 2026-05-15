@@ -363,6 +363,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     );
                     var sha = dc.$gitShortSha(nonGitDir);
                     expect(sha).toBe("unknown");
+                    // Belt-and-braces: explicit no-leak assertions documenting the original bug shape.
                     expect(findNoCase("fatal", sha)).toBe(0);
                     expect(findNoCase("not a git repository", sha)).toBe(0);
                 } finally {
