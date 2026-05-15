@@ -375,15 +375,16 @@ component output="false" {
 		local.canBeLazy = local.isLazy && local.mixinTargets == "none" && !local.hasMiddleware;
 
 		if (local.canBeLazy) {
-			// Log the lazy registration attempt before mapping registration so a
-			// reader scanning wheels.log on a failed-mapping outcome sees the
-			// "Loading package" entry that precedes the eager path's failure
-			// log too. Without this entry the lazy failure appears context-free.
+			// Log the lazy registration attempt before mapping registration so
+			// a reader scanning wheels.log on a failed-mapping outcome sees a
+			// "Loading package" entry. Writes to wheels.log (informational
+			// package-loading event); the pre-existing eager-path log writes
+			// to wheels_security.log for legacy reasons and is out of scope.
 			try {
 				WriteLog(
 					text = "[Wheels] Loading package '#arguments.dirName#' from #arguments.pkgDir# (lazy)",
 					type = "information",
-					file = "wheels_security"
+					file = "wheels"
 				);
 			} catch (any e) {}
 			// Store lazy package info — CFC will be instantiated on first access
