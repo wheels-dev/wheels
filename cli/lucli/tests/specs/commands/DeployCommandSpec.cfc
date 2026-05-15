@@ -110,7 +110,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// fires before the keys check inside DeploySecretsCli.fetch, so
 				// this doesn't prove every key landed in opts.keys (only a real
 				// adapter could verify the full slice — see Reviewer A on PR
-				// ##2699). What it does prove: the `for fsi=2 to arrayLen` loop
+				// #2699). What it does prove: the `for fsi=2 to arrayLen` loop
 				// completes without crashing on a non-trivial positional list
 				// (off-by-one would manifest here as a CFML index-out-of-range,
 				// not UnknownAdapter). Mirror coverage to the `exec` smoke test
