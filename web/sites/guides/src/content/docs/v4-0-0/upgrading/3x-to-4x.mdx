@@ -111,7 +111,7 @@ If you follow the recommendation above and move from `set(accessControlAllow*)` 
 | Methods (`accessControlAllowMethods` / `allowMethods`) | `"GET, POST, PATCH, PUT, DELETE, OPTIONS"` | `"GET,POST,PUT,PATCH,DELETE,OPTIONS"` |
 | Headers (`accessControlAllowHeaders` / `allowHeaders`) | `"Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With"` | `"Content-Type,Authorization,X-Requested-With"` |
 
-The middleware default drops `X-Auth-Token`, `X-Requested-By`, and `Origin` from the header allow-list. A like-for-like swap silently shrinks the list: preflight `OPTIONS` requests from clients that send those headers return no `Access-Control-Allow-Headers`, and the browser blocks the real request with no entry in your server logs.
+The middleware default drops `X-Auth-Token`, `X-Requested-By`, and `Origin` from the header allow-list. A like-for-like swap silently shrinks the list: preflight `OPTIONS` requests from clients that send those headers receive an `Access-Control-Allow-Headers` response that omits those headers, and the browser blocks the real request with no entry in your server logs.
 
 Pass the missing headers explicitly when constructing the middleware:
 
