@@ -102,6 +102,30 @@ Unless you intentionally want this asymmetry, running both simultaneously is not
 - Apps using the middleware: add `allowOrigins` explicitly (see the breaking change above).
 - New CORS configuration: prefer the middleware — it supports per-route scoping and has a secure deny-all default.
 
+#### Migrating from global settings to the middleware
+
+If you follow the recommendation above and move from `set(accessControlAllow*)` global settings to the `wheels.middleware.Cors` constructor, be aware that the allow-list defaults are not a like-for-like match.
+
+| Value | Legacy global setting default | `Cors` constructor default |
+|---|---|---|
+| Methods (`accessControlAllowMethods` / `allowMethods`) | `"GET, POST, PATCH, PUT, DELETE, OPTIONS"` | `"GET,POST,PUT,PATCH,DELETE,OPTIONS"` |
+| Headers (`accessControlAllowHeaders` / `allowHeaders`) | `"Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With"` | `"Content-Type,Authorization,X-Requested-With"` |
+
+The middleware default drops `X-Auth-Token`, `X-Requested-By`, and `Origin` from the header allow-list. A like-for-like swap silently shrinks the list: preflight `OPTIONS` requests from clients that send those headers return no `Access-Control-Allow-Headers`, and the browser blocks the real request with no entry in your server logs.
+
+Pass the missing headers explicitly when constructing the middleware:
+
+```cfm {test:compile} title="config/settings.cfm"
+set(middleware = [
+    new wheels.middleware.Cors(
+        allowOrigins = "https://myapp.com",
+        allowHeaders = "Content-Type,Authorization,X-Requested-With,X-Auth-Token,X-Requested-By,Origin"
+    )
+]);
+```
+
+The methods difference (spaces vs no spaces between list items) is cosmetic — HTTP implementations trim list values. No action is needed unless you pattern-match the exact string.
+
 ### 2. HSTS defaults on in production
 
 **CHANGELOG:** `Breaking: HSTS header defaults on in production` (#2081).
@@ -431,6 +455,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 
 - **"CSRF token invalid" on forms after upgrade.** Either the encryption key rotated (set `csrfEncryptionKey` explicitly) or a third-party embed is hitting `SameSite`. See #2035, #2054.
 - **Requests return 403 with no CORS header.** `allowOrigins` isn't set. See #2039.
+- **CORS preflight rejected after switching from global settings to the middleware.** The `Cors` constructor's `allowHeaders` default (`Content-Type,Authorization,X-Requested-With`) does not include `X-Auth-Token`, `X-Requested-By`, or `Origin` — all present in the legacy `accessControlAllowHeaders` global default. Pass the missing headers explicitly. See [Migrating from global settings to the middleware](#migrating-from-global-settings-to-the-middleware).
 - **Rate limiter counts wrong behind your load balancer.** `trustProxy` defaults to `false` now. See #2024, #2088.
 - **Test runner can't find specs.** Check for `tests/specs/functions/` — rename to `functional/`. See #1872.
 - **Plugin warning at startup.** Port to a package (see above) or accept the warning until you do.

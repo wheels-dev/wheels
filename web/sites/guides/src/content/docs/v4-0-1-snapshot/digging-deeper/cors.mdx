@@ -64,6 +64,10 @@ These are the constructor arguments on `wheels.middleware.Cors`, verified agains
 
 Matching is **exact string comparison** on the incoming `Origin` header. There is no wildcard-subdomain support: `https://*.myapp.com` is not a valid entry. Enumerate every origin you need — scheme + host + port, nothing more, nothing less.
 
+<Aside type="caution">
+  **Migrating from 3.x global settings?** The `allowHeaders` default above (`"Content-Type,Authorization,X-Requested-With"`) is narrower than the legacy `accessControlAllowHeaders` global-setting default, which also included `X-Auth-Token`, `X-Requested-By`, and `Origin`. A like-for-like swap silently drops those headers. See [Upgrading from 3.x — CORS allow-list defaults drift](/v4-0-1-snapshot/upgrading/3x-to-4x/#migrating-from-global-settings-to-the-middleware) for the side-by-side comparison and the explicit-constructor-args fix.
+</Aside>
+
 ## Preflight (OPTIONS) requests
 
 Before any non-simple cross-origin request (anything that uses a custom header, a non-GET/POST/HEAD method, or a non-simple content type), the browser sends a preflight `OPTIONS` request asking "may I?" The Cors middleware handles this for you:
