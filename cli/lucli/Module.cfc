@@ -1752,7 +1752,7 @@ component extends="modules.BaseModule" {
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
 
 		var dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
-			new modules.wheels.services.deploy.lib.SshPool()
+			$deployBuildSshPool(opts.configPath)
 		);
 
 		switch (sub) {
@@ -1790,7 +1790,7 @@ component extends="modules.BaseModule" {
 				}
 				var appVerb = positional[2];
 				var appCli = new modules.wheels.services.deploy.cli.DeployAppCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (appVerb) {
 					case "boot":
@@ -1813,7 +1813,7 @@ component extends="modules.BaseModule" {
 				}
 				var proxyVerb = positional[2];
 				var proxyCli = new modules.wheels.services.deploy.cli.DeployProxyCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (proxyVerb) {
 					case "boot":
@@ -1834,7 +1834,7 @@ component extends="modules.BaseModule" {
 				}
 				var registryVerb = positional[2];
 				var registryCli = new modules.wheels.services.deploy.cli.DeployRegistryCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (registryVerb) {
 					case "setup":
@@ -1851,7 +1851,7 @@ component extends="modules.BaseModule" {
 				}
 				var buildVerb = positional[2];
 				var buildCli = new modules.wheels.services.deploy.cli.DeployBuildCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (buildVerb) {
 					case "deliver":
@@ -1872,7 +1872,7 @@ component extends="modules.BaseModule" {
 				var accVerb = positional[2];
 				opts.name = arrayLen(positional) >= 3 ? positional[3] : "";
 				var accCli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (accVerb) {
 					case "boot":
@@ -1896,7 +1896,7 @@ component extends="modules.BaseModule" {
 					throw(message="Unknown wheels deploy prune verb: " & pruneVerb);
 				}
 				var pruneCli = new modules.wheels.services.deploy.cli.DeployPruneCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return invoke(pruneCli, pruneVerb, [opts]);
 			// `bootstrap` and `exec` are top-level aliases for `server bootstrap`
@@ -1943,7 +1943,7 @@ component extends="modules.BaseModule" {
 					opts.cmd = arrayToList(cmdParts, " ");
 				}
 				var serverCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (serverVerb) {
 					case "exec":
@@ -1960,7 +1960,7 @@ component extends="modules.BaseModule" {
 					throw(message="Unknown wheels deploy lock verb: " & lockVerb);
 				}
 				var lockCli = new modules.wheels.services.deploy.cli.DeployLockCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return invoke(lockCli, lockVerb, [opts]);
 			case "secrets":
@@ -1983,6 +1983,16 @@ component extends="modules.BaseModule" {
 			default:
 				throw(message="Unknown deploy subcommand: #sub#");
 		}
+	}
+
+	/**
+	 * Build an SshPool seeded from the deploy.yml at `configPath`.
+	 * Delegates to `SshPoolFactory.fromConfigPath` — see that CFC for the
+	 * load, fallback, and tilde-expansion semantics.
+	 */
+	private any function $deployBuildSshPool(string configPath = "") {
+		return new modules.wheels.services.deploy.lib.SshPoolFactory()
+			.fromConfigPath(arguments.configPath);
 	}
 
 	private struct function $deployArgsToOptions(required array args) {

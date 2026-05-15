@@ -325,11 +325,19 @@ component {
         var force = arguments.opts.force ?: false;
         var deployYmlPath = cwd & "config/deploy.yml";
         var secretsPath = cwd & ".kamal/secrets";
+        var dockerfilePath = cwd & "Dockerfile";
+        var dockerignorePath = cwd & ".dockerignore";
 
         if (!force && fileExists(deployYmlPath)) {
             throw(
                 type = "DeployMainCli.InitAlreadyExists",
                 message = "config/deploy.yml already exists at " & deployYmlPath & "; pass --force to overwrite"
+            );
+        }
+        if (!force && fileExists(dockerfilePath)) {
+            throw(
+                type = "DeployMainCli.InitAlreadyExists",
+                message = "Dockerfile already exists at " & dockerfilePath & "; pass --force to overwrite"
             );
         }
 
@@ -351,11 +359,23 @@ component {
         if (!directoryExists(cwd & ".kamal/hooks")) directoryCreate(cwd & ".kamal/hooks", true, true);
         fileWrite(secretsPath, mustache.render(fileRead(tplDir & "/secrets.mustache"), ctx));
 
-        return "Created config/deploy.yml and .kamal/secrets." & chr(10)
+        fileWrite(dockerfilePath, mustache.render(fileRead(tplDir & "/Dockerfile.mustache"), ctx));
+        // .dockerignore source filename is `dockerignore.mustache` so the
+        // template doesn't itself get hidden by tooling that ignores dotfiles.
+        var dockerignoreWritten = (force || !fileExists(dockerignorePath));
+        if (dockerignoreWritten) {
+            fileWrite(dockerignorePath, mustache.render(fileRead(tplDir & "/dockerignore.mustache"), ctx));
+        }
+
+        var summary = dockerignoreWritten
+            ? "Created config/deploy.yml, .kamal/secrets, Dockerfile, and .dockerignore."
+            : "Created config/deploy.yml, .kamal/secrets, and Dockerfile (preserved existing .dockerignore).";
+        return summary & chr(10)
              & "Next steps:" & chr(10)
              & "  1. Edit config/deploy.yml — update servers, proxy host, registry username." & chr(10)
-             & "  2. Populate .kamal/secrets with real values (or $(cmd) substitutions)." & chr(10)
-             & "  3. wheels deploy setup";
+             & "  2. Review the generated Dockerfile — adjust COPY paths and the Lucee/CFML base if your app needs it." & chr(10)
+             & "  3. Populate .kamal/secrets with real values (or $(cmd) substitutions)." & chr(10)
+             & "  4. wheels deploy setup";
     }
 
     private string function $basename(required string path) {

@@ -182,12 +182,15 @@ ssh:
   user: deploy
   port: 22
   proxy: bastion.example.com
+  keys:
+    - ~/.ssh/id_ed25519
   keys_only: false
 ```
 
 - `user:` — SSH user. Defaults to the current local user. If not root, `wheels deploy` wraps root-requiring commands with `sudo -n`.
 - `port:` — TCP port. Default 22.
 - `proxy:` — bastion host. Maps to OpenSSH's `ProxyJump`; every connection first hops through this host.
+- `keys:` — array of private key file paths. The first entry is passed to the SSH pool. Tilde (`~/`) is expanded against the JVM `user.home` because sshj reads key files via `java.io.File` and does not expand the shell shortcut. Omit to fall back to `ssh-agent`.
 - `keys_only:` — if true, disables agent-based auth and requires explicit `keys:`.
 
 SSH config picks up your usual `~/.ssh/config`, `~/.ssh/known_hosts`, and `ssh-agent` — you don't re-declare that here.
