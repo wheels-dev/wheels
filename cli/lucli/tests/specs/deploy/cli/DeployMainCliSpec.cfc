@@ -146,7 +146,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(findNoCase("hook post-deploy", joined)).toBe(0);
             });
 
-            it("init_stub writes config/deploy.yml and .kamal/secrets to the target cwd", () => {
+            it("init_stub writes config/deploy.yml, .kamal/secrets, Dockerfile, and .dockerignore to the target cwd", () => {
                 var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
                 directoryCreate(tmpCwd, true, true);
 
@@ -157,7 +157,32 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(fileExists(tmpCwd & "/config/deploy.yml")).toBeTrue();
                 expect(fileExists(tmpCwd & "/.kamal/secrets")).toBeTrue();
                 expect(directoryExists(tmpCwd & "/.kamal/hooks")).toBeTrue();
+                expect(fileExists(tmpCwd & "/Dockerfile")).toBeTrue();
+                expect(fileExists(tmpCwd & "/.dockerignore")).toBeTrue();
                 expect(msg).toInclude("config/deploy.yml");
+                expect(msg).toInclude("Dockerfile");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub renders a Lucee 7 multi-stage Dockerfile with the service name in the label", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                localCli.init_stub({cwd: tmpCwd, service: "myapp", image: "acme/myapp"});
+
+                var df = fileRead(tmpCwd & "/Dockerfile");
+                expect(df).toInclude("FROM lucee/lucee:7-tomcat10-jre21");
+                expect(df).toInclude("EXPOSE 8080");
+                expect(df).toInclude("HEALTHCHECK");
+                expect(df).toInclude("myapp");
+
+                var di = fileRead(tmpCwd & "/.dockerignore");
+                expect(di).toInclude(".kamal/secrets");
+                expect(di).toInclude("vendor/wheels/tests");
 
                 directoryDelete(tmpCwd, true);
             });
@@ -192,17 +217,60 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 directoryDelete(tmpCwd, true);
             });
 
-            it("init_stub overwrites when force=true", () => {
+            it("init_stub refuses to overwrite an existing Dockerfile without force", () => {
                 var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
-                directoryCreate(tmpCwd & "/config", true, true);
-                fileWrite(tmpCwd & "/config/deploy.yml", "old content");
+                directoryCreate(tmpCwd, true, true);
+                fileWrite(tmpCwd & "/Dockerfile", "FROM scratch");
 
                 var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
                     new cli.lucli.services.deploy.lib.FakeSshPool()
                 );
-                localCli.init_stub({cwd: tmpCwd, service: "new", image: "new/web", force: true});
+                expect(() => localCli.init_stub({cwd: tmpCwd, service: "x", image: "y/z"}))
+                    .toThrow();
+
+                // Existing Dockerfile must be untouched after the abort.
+                expect(fileRead(tmpCwd & "/Dockerfile")).toBe("FROM scratch");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub overwrites when force=true", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd & "/config", true, true);
+                fileWrite(tmpCwd & "/config/deploy.yml", "old content");
+                fileWrite(tmpCwd & "/Dockerfile", "FROM scratch");
+                fileWrite(tmpCwd & "/.dockerignore", "## sentinel — pre-existing dockerignore");
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var summary = localCli.init_stub({cwd: tmpCwd, service: "new", image: "new/web", force: true});
                 var yml = fileRead(tmpCwd & "/config/deploy.yml");
                 expect(yml).toInclude("service: new");
+                var df = fileRead(tmpCwd & "/Dockerfile");
+                expect(df).toInclude("FROM lucee/lucee");
+                // force=true exercises the `force ||` branch of the dockerignore guard.
+                var di = fileRead(tmpCwd & "/.dockerignore");
+                expect(di).notToInclude("sentinel");
+                expect(summary).toInclude(".dockerignore");
+                expect(summary).notToInclude("preserved");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub silently preserves an existing .dockerignore without force", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                var sentinel = "## sentinel — user's dockerignore must survive";
+                fileWrite(tmpCwd & "/.dockerignore", sentinel);
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var summary = localCli.init_stub({cwd: tmpCwd, service: "x", image: "y/z"});
+
+                expect(fileRead(tmpCwd & "/.dockerignore")).toBe(sentinel);
+                expect(summary).toInclude("preserved existing .dockerignore");
 
                 directoryDelete(tmpCwd, true);
             });
@@ -221,6 +289,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
                 expect(directoryExists(root & "templates/deploy/init")).toBeTrue();
                 expect(fileExists(root & "templates/deploy/init/deploy.yml.mustache")).toBeTrue();
+                expect(fileExists(root & "templates/deploy/init/Dockerfile.mustache")).toBeTrue();
+                expect(fileExists(root & "templates/deploy/init/dockerignore.mustache")).toBeTrue();
             });
 
             it("audit dispatches tail of audit log to every host", () => {

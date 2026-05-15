@@ -7,7 +7,7 @@ sidebar:
   order: 6
 ---
 
-Scaffold the files `wheels deploy` reads: `config/deploy.yml` and `.kamal/secrets`. Also creates `.kamal/hooks/` (empty) for optional hook scripts.
+Scaffold the files `wheels deploy` reads: `config/deploy.yml`, `.kamal/secrets`, `Dockerfile`, and `.dockerignore`. Also creates `.kamal/hooks/` (empty) for optional hook scripts.
 
 ## Synopsis
 
@@ -22,13 +22,15 @@ wheels deploy init [--service=<name>] [--image=<path>] [--registry-username=<use
 | `--service=<name>` | Service name to bake in. Defaults to the project directory basename. |
 | `--image=<path>` | Image path. Defaults to `<service>/web`. |
 | `--registry-username=<user>` | Registry username. Defaults to `changeme` — you'll edit it. |
-| `--force` | Overwrite existing files. Without this, an existing `config/deploy.yml` aborts with `DeployMainCli.InitAlreadyExists`. |
+| `--force` | Overwrite existing files. Without this, an existing `config/deploy.yml` or `Dockerfile` aborts with `DeployMainCli.InitAlreadyExists`. |
 
 ## What it creates
 
 - `config/deploy.yml` — a starter manifest with `service`, `image`, `servers`, `registry`, `env` stubs.
 - `.kamal/secrets` — key/value placeholders for the registry password and any app secrets.
 - `.kamal/hooks/` — empty directory. Drop executable `pre-deploy`, `post-deploy`, or `post-deploy-failure` scripts here later.
+- `Dockerfile` — multi-stage build targeting Lucee 7 on Java 21 with a `/up` HEALTHCHECK (aligned with the `proxy.healthcheck.path` in the generated `deploy.yml`) and `EXPOSE 8080` (matches the default `proxy.app_port`). Adjust the `COPY` lines and base image to match your app.
+- `.dockerignore` — keeps secrets, test fixtures, and IDE noise out of the build context. Only written if one doesn't already exist (unless `--force`).
 
 Add `.kamal/secrets*` to `.gitignore` before running.
 
