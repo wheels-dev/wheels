@@ -134,12 +134,15 @@ component {
         return arguments.summary;
     }
 
-    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
         }
+        // raise defaults to true so nonzero remote exits surface as
+        // Wheels.Deploy.RemoteExecutionFailed instead of silently passing — #2696.
         var c = arguments.cmd;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 }
