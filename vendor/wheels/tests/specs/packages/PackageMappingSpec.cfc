@@ -257,12 +257,17 @@ component extends="wheels.WheelsTest" {
 				// pkgfirst:  name=wheels-mc-first,  alias=wheelsMcFirst,  registers $sharedFn on controller
 				// pkgsecond: name=wheels-mc-second, mapping=wheelsMcFirst (collides), also has $sharedFn
 				//
-				// pkgsecond's $instantiatePackage succeeds and $collectMixins
-				// records a method-collision entry. Then $tryRegisterPackageMapping
-				// fails on the alias and $rollbackPackage(pkgsecond) runs. The
-				// collision diagnostic must be cleaned alongside the mixins/
-				// $methodProviders so getMixinCollisions() doesn't leak a
-				// record referencing a package that's actually in failedPackages.
+				// Whichever DirectoryList enumerates first claims the alias and
+				// becomes the surviving package; the other lands in
+				// failedPackages. Its $instantiatePackage completed first so
+				// $collectMixins recorded a method-collision entry for $sharedFn,
+				// then $tryRegisterPackageMapping failed on the alias and
+				// $rollbackPackage runs. The collision diagnostic must be
+				// cleaned alongside the mixins/$methodProviders so
+				// getMixinCollisions() doesn't leak a record referencing a
+				// package that's actually in failedPackages. Assertions are
+				// order-agnostic for filesystems that don't enumerate
+				// alphabetically.
 
 				it("removes mixinCollisions entries when a package is rolled back after mapping failure", () => {
 					var loader = new wheels.PackageLoader(
@@ -270,11 +275,19 @@ component extends="wheels.WheelsTest" {
 						componentPrefix = methodCollidePrefix
 					);
 					var failedNames = $failedPackageNames(loader);
-					expect(ArrayFindNoCase(failedNames, "pkgsecond")).toBeGT(0);
+					// Exactly one of the two fixtures must be in failedPackages.
+					var failedMcNames = [];
+					for (var n in failedNames) {
+						if (ListFindNoCase("pkgfirst,pkgsecond", n)) {
+							ArrayAppend(failedMcNames, n);
+						}
+					}
+					expect(ArrayLen(failedMcNames)).toBe(1);
+					var rolledBack = failedMcNames[1];
 					var collisions = loader.getMixinCollisions();
 					for (var c in collisions) {
-						expect(c.secondProvider).notToBe("pkgsecond");
-						expect(c.firstProvider).notToBe("pkgsecond");
+						expect(c.secondProvider).notToBe(rolledBack);
+						expect(c.firstProvider).notToBe(rolledBack);
 					}
 				});
 
@@ -283,12 +296,14 @@ component extends="wheels.WheelsTest" {
 						vendorPath = methodCollideFixturesPath,
 						componentPrefix = methodCollidePrefix
 					);
-					// pkgfirst loaded first and owns wheelsMcFirst plus $sharedFn
-					// on controller. The mapping must still point at pkgfirst's
-					// directory after pkgsecond's rollback.
+					// Whichever package won the alias keeps the mapping; assert
+					// the mapping resolves to one of the two fixture dirs and
+					// that the winner is the one NOT in failedPackages.
 					var mappings = loader.getPackageMappings();
 					expect(mappings).toHaveKey("wheelsMcFirst");
-					expect(Find("pkgfirst", mappings.wheelsMcFirst)).toBeGT(0);
+					var failedNames = $failedPackageNames(loader);
+					var winner = ArrayFindNoCase(failedNames, "pkgfirst") > 0 ? "pkgsecond" : "pkgfirst";
+					expect(Find(winner, mappings.wheelsMcFirst)).toBeGT(0);
 				});
 
 			});

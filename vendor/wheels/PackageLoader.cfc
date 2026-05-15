@@ -125,9 +125,13 @@ component output="false" {
 	 * Each entry: {target, method, firstProvider, secondProvider, acknowledged}.
 	 * An `acknowledged` true means the overwriting package declared the method
 	 * in its `provides.overrides` list, which suppresses the warning log.
+	 *
+	 * Returns a defensive copy: $rollbackPackage walks the internal array
+	 * with ArrayDeleteAt, so a caller mutating the returned reference (e.g.
+	 * sorting or appending) would corrupt that walk on a subsequent rollback.
 	 */
 	public array function getMixinCollisions() {
-		return variables.mixinCollisions;
+		return Duplicate(variables.mixinCollisions);
 	}
 
 	/**
@@ -377,9 +381,7 @@ component output="false" {
 		if (local.canBeLazy) {
 			// Log the lazy registration attempt before mapping registration so
 			// a reader scanning wheels.log on a failed-mapping outcome sees a
-			// "Loading package" entry. Writes to wheels.log (informational
-			// package-loading event); the pre-existing eager-path log writes
-			// to wheels_security.log for legacy reasons and is out of scope.
+			// "Loading package" entry symmetric with the eager path.
 			try {
 				WriteLog(
 					text = "[Wheels] Loading package '#arguments.dirName#' from #arguments.pkgDir# (lazy)",
@@ -414,7 +416,7 @@ component output="false" {
 			WriteLog(
 				text = "[Wheels] Loading package '#arguments.dirName#' from #arguments.pkgDir#",
 				type = "information",
-				file = "wheels_security"
+				file = "wheels"
 			);
 		} catch (any e) {}
 
