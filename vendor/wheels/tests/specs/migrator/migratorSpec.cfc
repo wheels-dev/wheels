@@ -60,15 +60,7 @@ component extends="wheels.WheelsTest" {
 				for (local.table in ["c_o_r_e_bunyips", "c_o_r_e_dropbears", "c_o_r_e_hoopsnakes", "migrations"]) {
 					migration.dropTable(local.table)
 				}
-				// Drop both migrator-version table families so the bootstrap path
-				// in $getVersionsPreviouslyMigrated() can recreate them cleanly.
-				// The "uses specified versions table name" test swaps the configured
-				// table to `c_o_r_e_migrator_versions`, and its bootstrap adds an FK
-				// constraint named `fk_wheels_level`. Without this cleanup the
-				// constraint collides with the one already created on
-				// `wheels_migrator_versions` by earlier tests, since MySQL, H2,
-				// SQL Server, and Oracle scope FK names per-schema rather than
-				// per-table (ORA-02264 / "Duplicate foreign key constraint name").
+				// Drop both FK-bearing tables — MySQL/H2/SQLServer/Oracle scope FK names per-schema so fk_wheels_level collides otherwise.
 				for (local.table in ["c_o_r_e_migrator_versions", "wheels_migrator_versions"]) {
 					try { migration.dropTable(local.table); } catch (any e) {}
 				}
