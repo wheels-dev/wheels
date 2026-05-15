@@ -375,6 +375,17 @@ component output="false" {
 		local.canBeLazy = local.isLazy && local.mixinTargets == "none" && !local.hasMiddleware;
 
 		if (local.canBeLazy) {
+			// Log the lazy registration attempt before mapping registration so a
+			// reader scanning wheels.log on a failed-mapping outcome sees the
+			// "Loading package" entry that precedes the eager path's failure
+			// log too. Without this entry the lazy failure appears context-free.
+			try {
+				WriteLog(
+					text = "[Wheels] Loading package '#arguments.dirName#' from #arguments.pkgDir# (lazy)",
+					type = "information",
+					file = "wheels_security"
+				);
+			} catch (any e) {}
 			// Store lazy package info — CFC will be instantiated on first access
 			variables.lazyPackages[arguments.dirName] = {
 				dirName = arguments.dirName,
@@ -384,6 +395,9 @@ component output="false" {
 			};
 			// Register the CFML mapping for a lazy package up front so consumer
 			// code can reference siblings via the alias before first access.
+			// Return value intentionally discarded on the failure path:
+			// $tryRegisterPackageMapping records its own failedPackages entry
+			// and calls $rollbackPackage so lazyPackages is cleaned too.
 			if (!$tryRegisterPackageMapping(arguments.dirName, local.manifest, arguments.pkgDir)) {
 				return;
 			}

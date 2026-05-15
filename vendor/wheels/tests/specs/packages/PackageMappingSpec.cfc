@@ -21,6 +21,8 @@ component extends="wheels.WheelsTest" {
 				invalidPrefix = "wheels.tests._assets.packages_mapping_invalid";
 				staleFixturesPath = ExpandPath("/wheels/tests/_assets/packages_mapping_stale");
 				stalePrefix = "wheels.tests._assets.packages_mapping_stale";
+				lazyInvalidFixturesPath = ExpandPath("/wheels/tests/_assets/packages_mapping_lazy_invalid");
+				lazyInvalidPrefix = "wheels.tests._assets.packages_mapping_lazy_invalid";
 			});
 
 			describe("Alias derivation from manifest name", () => {
@@ -208,6 +210,42 @@ component extends="wheels.WheelsTest" {
 					expect(mappings).toHaveKey("wheelsStaleShared");
 					expect(Find("samealias", mappings.wheelsStaleShared)).toBeGT(0);
 					expect(Find("badmixin", mappings.wheelsStaleShared)).toBe(0);
+				});
+
+			});
+
+			describe("Lazy package mapping failure", () => {
+
+				// The lazy branch in $loadPackage has its own $tryRegisterPackageMapping
+				// call and its own early-return on failure. Confirm rollback removes
+				// both packageMeta AND lazyPackages so a failed lazy registration
+				// can't leak into isPackageLoaded()/getPackage() either.
+
+				it("records a lazy package with an invalid mapping as a failed package", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = lazyInvalidFixturesPath,
+						componentPrefix = lazyInvalidPrefix
+					);
+					var failedNames = $failedPackageNames(loader);
+					expect(ArrayFindNoCase(failedNames, "lazybadmapping")).toBeGT(0);
+				});
+
+				it("rolls back the lazyPackages entry so isPackageLoaded() returns false", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = lazyInvalidFixturesPath,
+						componentPrefix = lazyInvalidPrefix
+					);
+					expect(loader.isPackageLoaded("lazybadmapping")).toBeFalse();
+				});
+
+				it("continues loading other lazy packages past the failure", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = lazyInvalidFixturesPath,
+						componentPrefix = lazyInvalidPrefix
+					);
+					var mappings = loader.getPackageMappings();
+					expect(mappings).toHaveKey("wheelsLazyGood");
+					expect(loader.isPackageLoaded("lazygoodsibling")).toBeTrue();
 				});
 
 			});
