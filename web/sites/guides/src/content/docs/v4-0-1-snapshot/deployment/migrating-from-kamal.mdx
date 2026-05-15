@@ -95,7 +95,7 @@ The verb surface mirrors Kamal's. Most invocations are identical save the leadin
 | `kamal app logs --follow` | `wheels deploy app logs --follow` |
 | `kamal proxy boot` | `wheels deploy proxy boot` |
 | `kamal accessory boot db` | `wheels deploy accessory boot db` |
-| `kamal secrets fetch --from op://...` | `wheels deploy secrets fetch --adapter=op --from=op://...` |
+| `kamal secrets fetch --from op://...` | `wheels deploy fetch-secrets --adapter=op --from=op://...` (flat alias — picocli intercepts the nested `secrets` form; see [#2697](https://github.com/wheels-dev/wheels/issues/2697)) |
 | `kamal version` | `wheels deploy version` |
 
 Two CLI-level differences worth flagging:
