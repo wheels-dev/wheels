@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+### Added
+
+- `wheels deploy init` now scaffolds a starter `Dockerfile` (Lucee 7 + Java 21 multi-stage, `/up` HEALTHCHECK aligned with the generated `kamal-proxy` healthcheck) and a `.dockerignore` alongside `config/deploy.yml` and `.kamal/secrets`. `--force` also gates the `Dockerfile` — an existing user-authored Dockerfile aborts the init without `--force`, while an existing `.dockerignore` is silently preserved (since it's commonly user-curated even before adopting `wheels deploy`). The npm builder stage works for any Wheels app — projects without a JS pipeline pass through unchanged; projects with a `package.json` install + build automatically. Secrets (reload password, DB password, registry password) are injected at deploy time via `.kamal/secrets`, never baked into the image (#2673)
+
 ### Changed
 
 - `lockingSpec` now consults the new `$supportsAdvisoryLocks()` model adapter capability and skips the `withAdvisoryLock` describe block via `beforeEach { skip(...) }` instead of erroring on adapters that don't support standalone advisory locks (H2, SQL Server, Oracle, CockroachDB). PostgreSQL, MySQL, and SQLite (no-op) report `true`; SQL Server reports `false` until its lock path grows an implicit-transaction wrapper. Compat-matrix can now distinguish "lock implementation broken" from "lock not applicable to this DB"

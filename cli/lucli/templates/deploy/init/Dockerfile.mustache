@@ -7,8 +7,9 @@
 # ships Lucee 7 on Java 21 — the framework's primary CI target.
 #
 # Adjust the COPY lines to match your project's directory layout. The
-# health check assumes a `/health` route exists (add one to keep liveness
-# probes off your slow paths). See:
+# health check probes `/up` — the same path `kamal-proxy` polls per the
+# generated `config/deploy.yml`. Add a lightweight `/up` route that
+# returns 200 without touching slow dependencies. See:
 #   /v4-0-1-snapshot/deployment/docker-deployment/
 #   /v4-0-1-snapshot/deployment/first-deploy/
 
@@ -69,4 +70,4 @@ COPY --from=builder /build/vendor         ./vendor
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8080/health || exit 1
+    CMD curl -fsS http://127.0.0.1:8080/up || exit 1
