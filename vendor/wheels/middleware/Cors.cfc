@@ -45,6 +45,22 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	}
 
 	/**
+	 * Resolves the value to emit as Access-Control-Allow-Origin for a
+	 * given request origin. Returns an empty string when no header
+	 * should be emitted. The CORS spec requires this header to be a
+	 * single origin or `*` — never a comma-delimited list.
+	 */
+	public string function $resolveAllowOrigin(string requestOrigin = "") {
+		if (variables.allowOrigins == "*") {
+			return "*";
+		}
+		if (Len(arguments.requestOrigin) && ListFindNoCase(variables.allowOrigins, arguments.requestOrigin)) {
+			return arguments.requestOrigin;
+		}
+		return "";
+	}
+
+	/**
 	 * Computes the response headers this middleware would emit for the given request,
 	 * without actually writing them. Exposed for testability and so the handle()
 	 * path has a single source of truth.
@@ -69,16 +85,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		// Resolve the value of Access-Control-Allow-Origin.
-		local.allowOrigin = variables.allowOrigins;
-		local.reflected = false;
-		if (variables.allowOrigins != "*" && Len(local.origin)) {
-			if (ListFindNoCase(variables.allowOrigins, local.origin)) {
-				local.allowOrigin = local.origin;
-				local.reflected = true;
-			} else {
-				local.allowOrigin = "";
-			}
-		}
+		local.allowOrigin = $resolveAllowOrigin(local.origin);
+		local.reflected = Len(local.allowOrigin) && local.allowOrigin != "*";
 
 		if (Len(local.allowOrigin)) {
 			local.headers["Access-Control-Allow-Origin"] = local.allowOrigin;
