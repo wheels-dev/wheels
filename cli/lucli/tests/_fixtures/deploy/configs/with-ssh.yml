@@ -1,0 +1,13 @@
+service: demo
+image: acme/demo
+servers:
+  - 1.2.3.4
+ssh:
+  user: admin
+  port: 2222
+  keys:
+    - /tmp/deploy_key_fixture
+registry:
+  username: demo
+  password:
+    - REGISTRY_PASSWORD
