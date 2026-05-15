@@ -144,9 +144,9 @@ The `env()` helper is the canonical pattern for flowing `.env` values into frame
 
 #### `config/environment.cfm` has the same load-order gap
 
-The same issue affects `config/environment.cfm` when it reads the running environment from `.env` via `application.env`:
+`wheels new` scaffolds a hardcoded `set(environment="development")` in `config/environment.cfm`, so this gap does not affect freshly generated apps. If you wired the running environment from `.env` by hand — for example, `set(environment=application.env.environment)` — the same load-order issue applies:
 
-```cfm {test:compile} title="config/environment.cfm — unreliable pattern"
+```cfm title="config/environment.cfm — unreliable pattern"
 // application.env may not be populated before this file runs.
 set(environment=application.env.environment);
 ```
