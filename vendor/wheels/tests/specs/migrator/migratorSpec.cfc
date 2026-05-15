@@ -64,8 +64,8 @@ component extends="wheels.WheelsTest" {
 				// so re-runs don't collide with "duplicate constraint name" on
 				// MySQL / H2 / SQL Server / Oracle. Child tables first so the
 				// FK back-reference is gone before the parent levels table.
-				for (local.t in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
-					try { migration.dropTable(local.t); } catch (any e) {}
+				for (local.table in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
+					try { migration.dropTable(local.table); } catch (any e) {}
 				}
 				deleteMigratorVersions(2);
 				$cleanSqlDirectory()
@@ -78,8 +78,8 @@ component extends="wheels.WheelsTest" {
 				// revert to orginal values
 				application.wheels.writeMigratorSQLFiles = originalWriteMigratorSQLFiles
 				application.wheels.migratorTableName = originalMigratorTableName
-				for (local.t in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
-					try { migration.dropTable(local.t); } catch (any e) {}
+				for (local.table in ["wheels_migrator_versions", "c_o_r_e_migrator_versions", "wheels_levels", "c_o_r_e_levels"]) {
+					try { migration.dropTable(local.table); } catch (any e) {}
 				}
 			})
 
@@ -171,8 +171,9 @@ component extends="wheels.WheelsTest" {
 			// leaves c_o_r_e_migrator_versions + the fk_wheels_level FK behind;
 			// matrix re-runs then collide with "duplicate constraint name" on
 			// MySQL / H2 / SQL Server / Oracle (engine-scoped FK namespaces).
+			// Runs on every engine — the afterEach drops the table on all of
+			// them, so a regression here would catch a cleanup gap anywhere.
 			it("drops the migrator system tables between specs (regression: ##2664)", () => {
-				if (_isCockroachDB) return;
 				var info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_migrator_versions")
 				expect(listFindNoCase(ValueList(info.table_name), "c_o_r_e_migrator_versions")).toBe(0)
 			})
