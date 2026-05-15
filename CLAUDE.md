@@ -462,7 +462,8 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 ```cfm
 // All-in-one nav (wraps first/prev/page-numbers/next/last in <nav>)
 #paginationNav()#
-#paginationNav(showInfo=true, showFirst=false, showLast=false, navClass="my-pagination")#
+#paginationNav(showInfo=true, showFirst="never", showLast="never", navClass="my-pagination")#
+#paginationNav(windowSize=3)#  // widens window used by auto-mode boundary detection
 
 // Individual helpers for custom layouts
 #paginationInfo()#            // "Showing 26-50 of 1,000 records"
@@ -474,7 +475,7 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #pageNumberLinks(windowSize=5, classForCurrent="active")#
 ```
 
-Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
+`showFirst` / `showLast` / `showPrevious` / `showNext` accept `"auto"` (default), `"always"`, or `"never"`. Under `"auto"` the first/last anchors are hidden when the visible page-number window already reaches the boundary. Booleans coerce for backwards compatibility (`true` → `"always"`, `false` → `"never"`). Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
 
 ## Testing Quick Reference
 

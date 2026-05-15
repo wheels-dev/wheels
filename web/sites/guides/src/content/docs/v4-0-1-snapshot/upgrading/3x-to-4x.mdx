@@ -321,7 +321,7 @@ See [Packages](/v4-0-1-snapshot/digging-deeper/packages/) for manifest fields, p
 
 ### Monolithic `paginationLinks()`
 
-**CHANGELOG:** composable pagination helpers added (#1930). The 3.x `paginationLinks()` is retained. New code should use `paginationNav()` or compose the individual helpers (`paginationInfo`, `firstPageLink`, `previousPageLink`, `pageNumberLinks`, `nextPageLink`, `lastPageLink`).
+**CHANGELOG:** composable pagination helpers added (#1930). The 3.x `paginationLinks()` is retained. New code should use `paginationNav()` or compose the individual helpers (`paginationInfo`, `firstPageLink`, `previousPageLink`, `pageNumberLinks`, `nextPageLink`, `lastPageLink`). The 3.x `alwaysShowAnchors=false` behavior — hiding first/last when the page-number window already reaches the boundary — is now the default in `paginationNav()` via `showFirst="auto"` / `showLast="auto"` (default since v4.0.1, #2716). Pass `showFirst="always"` / `showLast="always"` to force the old always-visible behavior.
 
 ### RocketUnit test style
 
