@@ -4,7 +4,7 @@
 # Inputs (env vars):
 #   WHEELS_VERSION   — full version including any -snapshot.N suffix
 #   CHANNEL          — "stable" or "bleeding-edge" (default: stable)
-#   ARTIFACTS_DIR    — directory holding wheels-cli-<v>.zip and wheels-core-<v>.zip
+#   ARTIFACTS_DIR    — directory holding wheels-module-<v>.tar.gz and wheels-core-<v>.zip
 #                       (default: artifacts/wheels/${WHEELS_VERSION})
 #   LUCLI_LINUX_URL  — URL for the Linux LuCLI binary (default: cybersonic upstream)
 #   OUT_DIR          — where to write the .deb / .rpm (default: dist/)
@@ -47,15 +47,25 @@ echo "  Output:   ${OUT_DIR}"
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/build/module" "${BUILD_DIR}/build/framework"
 
-# 1. Unzip the CLI module into build/module/
-unzip -q "${ARTIFACTS_DIR}/wheels-cli-${WHEELS_VERSION}.zip" -d "${BUILD_DIR}/build/module/"
+# 1. Untar the lucli-native CLI module into build/module/.
+#    Source-of-truth: release.yml builds wheels-module-${WHEELS_VERSION}.tar.gz
+#    from cli/lucli/ — that artifact has Module.cfc at top and is what the
+#    brew formula + Scoop manifest stage. The older wheels-cli-${WHEELS_VERSION}.zip
+#    is the CommandBox-shaped ForgeBox artifact built from cli/src/; staging
+#    it here ships the wrong module and makes `wheels start` fail with
+#    `Unknown command: 'start'`. See issue #2700.
+tar -xzf "${ARTIFACTS_DIR}/wheels-module-${WHEELS_VERSION}.tar.gz" -C "${BUILD_DIR}/build/module/"
 
 # 2. Unzip the framework into build/framework/
 unzip -q "${ARTIFACTS_DIR}/wheels-core-${WHEELS_VERSION}.zip" -d "${BUILD_DIR}/build/framework/"
 
-# 3. Download the LuCLI Linux binary as build/lucli
-curl -fsSL -o "${BUILD_DIR}/build/lucli" "${LUCLI_LINUX_URL}"
-chmod +x "${BUILD_DIR}/build/lucli"
+# 3. Download the LuCLI Linux binary as build/wheels. Renaming at stage time
+#    (mirroring the brew formula's `libexec.install resource("lucli") => "wheels"`)
+#    means basename(argv[0]) is `wheels` when the wrapper execs it, so lucli's
+#    module dispatcher resolves `wheels start` to the bundled wheels module
+#    instead of throwing `Unknown command`. See issue #2700.
+curl -fsSL -o "${BUILD_DIR}/build/wheels" "${LUCLI_LINUX_URL}"
+chmod +x "${BUILD_DIR}/build/wheels"
 
 # 4. Download SQLite JDBC
 curl -fsSL -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
@@ -71,7 +81,8 @@ cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
 #     /opt/wheels/module/ into ~/.wheels/modules/wheels/
 #   - stages SQLite JDBC into Lucee Express's lib/ext/ (cliff fix)
 #   - intercepts --version / -v before LuCLI's picocli absorbs it
-#   - execs /opt/wheels/lucli with the original argv
+#   - execs /opt/wheels/wheels (LuCLI renamed at stage time) so basename(argv[0])
+#     is `wheels` and LuCLI's module dispatcher routes via the bundled module
 
 set -euo pipefail
 
@@ -128,20 +139,16 @@ if [ -n "${LUCEE_EXT_DIR}" ] && ! ls "${LUCEE_EXT_DIR}"/sqlite-jdbc*.jar >/dev/n
   cp /opt/wheels/sqlite-jdbc.jar "${LUCEE_EXT_DIR}/sqlite-jdbc.jar"
 fi
 
-exec /opt/wheels/lucli "$@"
+exec /opt/wheels/wheels "$@"
 WRAPPER_EOF
 
-# 6. Stamp the version + channel into /opt/wheels so the wrapper can read them
+# 6. Stamp the version + channel into build/ so nfpm can ship them at
+#    /opt/wheels/.version and /opt/wheels/.channel. The wrapper script reads
+#    both at runtime to render `wheels --version`. Without them shipping in
+#    the package, `wheels --version` returns "unknown (stable)" — see #2700.
+#    The corresponding nfpm `contents:` entries live in nfpm-wheels*.yaml.
 echo "${WHEELS_VERSION}" > "${BUILD_DIR}/build/.version"
 echo "${CHANNEL}" > "${BUILD_DIR}/build/.channel"
-# Add these to the nfpm contents list dynamically
-cat >> "${NFPM_CONFIG}" <<NFPM_EXTRA_EOF || true
-# Channel/version stamps — appended by build-linux-packages.sh
-NFPM_EXTRA_EOF
-# Note: we won't actually mutate the YAML here since nfpm reads contents
-# directly from disk paths. Drop the .version and .channel files into the
-# staging dir instead and add corresponding lines via sed if needed. For now,
-# they live alongside lucli in /opt/wheels/.
 
 # ── Run nfpm ─────────────────────────────────────────────────────────────
 # Resolve the output path BEFORE cd-ing into BUILD_DIR. OUT_DIR is documented

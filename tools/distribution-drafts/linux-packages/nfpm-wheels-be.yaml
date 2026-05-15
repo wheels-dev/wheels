@@ -25,8 +25,10 @@ vendor: Wheels
 homepage: https://wheels.dev
 license: Apache-2.0
 contents:
-  - src: ./build/lucli
-    dst: /opt/wheels/lucli
+  # LuCLI renamed to `wheels` at stage time so argv[0]-based dispatch works.
+  # See #2700.
+  - src: ./build/wheels
+    dst: /opt/wheels/wheels
     file_info:
       mode: 0755
   - src: ./build/module/
@@ -39,6 +41,15 @@ contents:
     dst: /opt/wheels/sqlite-jdbc.jar
     file_info:
       mode: 0644
+  # Version + channel stamps read by the wrapper for `wheels --version`. See #2700.
+  - src: ./build/.version
+    dst: /opt/wheels/.version
+    file_info:
+      mode: 0644
+  - src: ./build/.channel
+    dst: /opt/wheels/.channel
+    file_info:
+      mode: 0644
   - src: ./build/wrapper.sh
     dst: /usr/bin/wheels
     file_info:
@@ -47,6 +58,7 @@ overrides:
   deb:
     depends:
       - openjdk-21-jre-headless | openjdk-21-jre
+      - tar
     conflicts:
       - wheels
     replaces:
@@ -54,6 +66,8 @@ overrides:
   rpm:
     depends:
       - java-21-openjdk-headless
+      # Rocky Linux 10 minimal cloud images do not ship tar. See #2700.
+      - tar
     conflicts:
       - wheels
 deb:
