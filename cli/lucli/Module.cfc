@@ -1963,6 +1963,29 @@ component extends="modules.BaseModule" {
 					$deployBuildSshPool(opts.configPath)
 				);
 				return invoke(lockCli, lockVerb, [opts]);
+			// `fetch-secrets`, `extract-secrets`, and `print-secrets` are
+			// top-level aliases for `secrets fetch`/`extract`/`print`. LuCLI's
+			// picocli root registers `secrets` as a top-level subcommand for
+			// the local secrets store (init/set/list/rm/get/provider), so the
+			// nested `wheels deploy secrets <verb>` form gets shortcut into
+			// LuCLI's own secrets help before module dispatch — see #2697.
+			// These flat aliases sidestep the collision entirely, mirroring
+			// the `bootstrap`/`exec` pattern from #2677. The original
+			// `secrets` branch below is retained for Kamal parity and direct
+			// callers (MCP, internal tests) that don't go through LuCLI's
+			// picocli root.
+			case "fetch-secrets":
+				opts.keys = [];
+				for (var fsi = 2; fsi <= arrayLen(positional); fsi++) arrayAppend(opts.keys, positional[fsi]);
+				var fetchSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
+				return fetchSecretsCli.fetch(opts);
+			case "extract-secrets":
+				opts.key = arrayLen(positional) >= 2 ? positional[2] : "";
+				var extractSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
+				return extractSecretsCli.extract(opts);
+			case "print-secrets":
+				var printSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
+				return printSecretsCli.print(opts);
 			case "secrets":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy secrets requires a verb (fetch/extract/print)");

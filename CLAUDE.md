@@ -836,7 +836,10 @@ wheels deploy exec "<cmd>"       // run a command on every host (flat alias — 
 wheels deploy server <verb>      // exec/bootstrap (legacy nested form — see #2677)
 wheels deploy prune <verb>       // all/images/containers [--keep=N]
 wheels deploy lock <verb>        // acquire/release/status (manual — normal deploys auto-lock)
-wheels deploy secrets <verb>     // fetch/extract/print (adapters: op/bitwarden/aws/lastpass/doppler)
+wheels deploy fetch-secrets ...  // resolve KEY=VALUE lines from an adapter (flat alias — preferred)
+wheels deploy extract-secrets    // pull one key from a KEY=VALUE block (flat alias — preferred)
+wheels deploy print-secrets      // print resolved .kamal/secrets (flat alias — preferred)
+wheels deploy secrets <verb>     // fetch/extract/print (legacy nested form — see #2697)
 wheels deploy audit              // tail /tmp/kamal-audit.log on each server
 wheels deploy details            // aggregate app + proxy + accessory status
 wheels deploy remove --confirm   // teardown all app/proxy/accessory containers
@@ -879,6 +882,7 @@ Commands-are-strings invariant: every `*Commands.cfc` method returns a shell-com
 5. **Lucee reserved scope names in subagent-authored deploy code.** `client`, `session`, `application` — use `ssh`/`sc`, `sess`, `app` instead. Bit us multiple times during the port.
 6. **No `--dry-run` flag in Ruby Kamal 2.4.0.** The `tools/deploy-config-diff.sh` harness compares config-layer output only. Byte-identical command-string parity is aspirational; see `tools/deploy-dry-run-diff.sh` for the plan.
 7. **`wheels deploy server <verb>` collides with LuCLI's top-level `server` command.** LuCLI (the picocli runtime under the wheels brand) registers `server` for Lucee dev-server lifecycle, so picocli grabs the `server` token before it can reach the deploy dispatcher. The wheels module exposes flat aliases `wheels deploy bootstrap` and `wheels deploy exec` that sidestep the collision — these are the canonical CLI form. The nested `server <verb>` branch is retained in `Module.cfc::deploy()` for MCP/programmatic callers that don't go through picocli. See [#2677](https://github.com/wheels-dev/wheels/issues/2677).
+8. **`wheels deploy secrets <verb>` collides with LuCLI's top-level `secrets` command.** Same shape as #2677 — LuCLI registers `secrets` for its own credential store (init/set/list/rm/get/provider), so picocli intercepts the token before it can reach the deploy dispatcher. The wheels module exposes flat aliases `wheels deploy fetch-secrets`, `wheels deploy extract-secrets`, and `wheels deploy print-secrets` that sidestep the collision — these are the canonical CLI form. The nested `secrets <verb>` branch is retained in `Module.cfc::deploy()` for MCP/programmatic callers that don't go through picocli. See [#2697](https://github.com/wheels-dev/wheels/issues/2697).
 
 ### Testing
 
