@@ -277,7 +277,9 @@ component output="false" extends="wheels.Global"{
 			request.wheels.params = {};
 			// Cors.handle() reads the verb from arguments.request.cgi.request_method
 			// rather than arguments.request.method, so we don't carry the method
-			// field on this context — only Cors is run from this short-circuit.
+			// field on this context. Cors is the only middleware that gates on
+			// this path; once it short-circuits, middleware registered after it
+			// does not run. Middleware registered before Cors still executes.
 			local.preflightContext = {
 				params = {},
 				route = {},
