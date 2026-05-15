@@ -342,6 +342,46 @@ component extends="wheels.WheelsTest" {
 					expect(result).notToInclude("First")
 				})
 
+				it("renders disabled Previous span in auto mode on first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 1, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Previous")
+					expect(result).toInclude("disabled")
+				})
+
+				it("renders Previous link in auto mode when not on first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 3, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Previous")
+					expect(result).toInclude("<a")
+				})
+
+				it("renders disabled Next span in auto mode on last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Next")
+					expect(result).toInclude("disabled")
+				})
+
+				it("renders Next link in auto mode when not on last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 3, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Next")
+					expect(result).toInclude("<a")
+				})
+
+				it("hides Previous entirely with never mode on first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 1, perPage = 10)
+					result = _controller.paginationNav(showPrevious = "never")
+					expect(result).notToInclude("Previous")
+				})
+
+				it("hides Next entirely with never mode on last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav(showNext = "never")
+					expect(result).notToInclude("Next")
+				})
+
 				it("rejects unknown anchor mode strings", () => {
 					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
 					expect(() => {

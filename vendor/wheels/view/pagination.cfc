@@ -316,6 +316,9 @@ component {
 	 * backwards compatibility: `true` maps to `"always"`, `false` maps to `"never"`.
 	 * Under `"auto"` the first/last anchors only render when the visible page-number
 	 * window does not already reach the boundary (matching legacy 3.x semantics).
+	 * Under `"auto"` the previous/next anchors always delegate to their sub-helper,
+	 * which renders a disabled `<span class="disabled">` at the boundary by default —
+	 * use `"never"` to suppress the boundary indicator entirely.
 	 *
 	 * [section: View Helpers]
 	 * [category: Pagination Functions]
@@ -355,8 +358,10 @@ component {
 		local.subArgs = {};
 		local.subArgs.handle = arguments.handle;
 		local.subArgs.encode = arguments.encode;
-		// Pass through any extra arguments (route, controller, action, key, params, etc.)
-		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,encode";
+		// Pass through any extra arguments (route, controller, action, key, params, etc.).
+		// `windowSize` is excluded because the anchor sub-helpers do not declare it; it
+		// is delivered explicitly to `pageNumberLinks()` below.
+		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,windowSize,encode";
 		for (local.key in arguments) {
 			if (!ListFindNoCase(local.skipArgs, local.key)) {
 				local.subArgs[local.key] = arguments[local.key];
@@ -385,7 +390,7 @@ component {
 			local.content &= " ";
 		}
 
-		local.content &= pageNumberLinks(argumentCollection = local.subArgs);
+		local.content &= pageNumberLinks(argumentCollection = local.subArgs, windowSize = arguments.windowSize);
 
 		if ($paginationShouldShowAnchor(mode = local.nextMode, side = "next", pg = local.pg, windowSize = arguments.windowSize)) {
 			local.content &= " ";
@@ -429,8 +434,11 @@ component {
 	 * given a normalized mode and the current pagination state.
 	 *
 	 * Under "auto" the first/last anchors only render when the visible page-number
-	 * window does not already reach the boundary. Previous/next render whenever
-	 * the current page is not at that boundary.
+	 * window does not already reach the boundary. Previous/next under "auto" always
+	 * delegate to their sub-helper (`previousPageLink()` / `nextPageLink()`), which
+	 * renders a disabled `<span class="disabled">` at the boundary by default —
+	 * matching the legacy `showPrevious=true` / `showNext=true` behavior so the
+	 * boundary indicator is preserved unless the caller opts out with `"never"`.
 	 */
 	public boolean function $paginationShouldShowAnchor(
 		required string mode,
@@ -447,10 +455,6 @@ component {
 		switch (arguments.side) {
 			case "first":
 				return (arguments.pg.currentPage - arguments.windowSize) > 1;
-			case "previous":
-				return arguments.pg.currentPage > 1;
-			case "next":
-				return arguments.pg.currentPage < arguments.pg.totalPages;
 			case "last":
 				return arguments.pg.totalPages > (arguments.pg.currentPage + arguments.windowSize);
 		}

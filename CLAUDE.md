@@ -475,7 +475,7 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #pageNumberLinks(windowSize=5, classForCurrent="active")#
 ```
 
-`showFirst` / `showLast` / `showPrevious` / `showNext` accept `"auto"` (default), `"always"`, or `"never"`. Under `"auto"` the first/last anchors are hidden when the visible page-number window already reaches the boundary. Booleans coerce for backwards compatibility (`true` → `"always"`, `false` → `"never"`). Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
+`showFirst` / `showLast` / `showPrevious` / `showNext` accept `"auto"` (default), `"always"`, or `"never"`. Under `"auto"` the first/last anchors are hidden when the visible page-number window already reaches the boundary. Under `"auto"` the previous/next anchors always delegate to `previousPageLink()` / `nextPageLink()` — those render a disabled `<span class="disabled">` at the boundary so the position indicator is preserved; use `"never"` to hide the boundary indicator entirely. Booleans coerce for backwards compatibility (`true` → `"always"`, `false` → `"never"`). Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
 
 ## Testing Quick Reference
 
