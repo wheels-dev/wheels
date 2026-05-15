@@ -62,6 +62,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
+		if (arguments.windowSeconds <= 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter windowSeconds: #arguments.windowSeconds#. Must be a positive number — every strategy treats this as a divisor or an interval, so zero or negative values would either divide by zero (fixedWindow, tokenBucket) or let every request through (slidingWindow)."
+			);
+		}
+
+		if (arguments.maxRequests < 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter maxRequests: #arguments.maxRequests#. Must be zero or positive. Use maxRequests=0 to block every request (kill-switch); negative values are meaningless."
+			);
+		}
+
 		if (!ListFindNoCase("memory,database", arguments.storage)) {
 			throw(
 				type = "Wheels.RateLimiter.InvalidStorage",
