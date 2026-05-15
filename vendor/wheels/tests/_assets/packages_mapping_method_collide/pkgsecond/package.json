@@ -1,0 +1,9 @@
+{
+	"name": "wheels-mc-second",
+	"version": "1.0.0",
+	"description": "Test fixture: also registers $sharedFn on controller (method collision with pkgfirst), AND declares mapping=wheelsMcFirst (alias collision). Both collisions hit during the SAME load — $instantiatePackage succeeds and $collectMixins records the method collision, then $tryRegisterPackageMapping fails on the alias and rollback must clean both",
+	"provides": {
+		"mixins": "controller"
+	},
+	"mapping": "wheelsMcFirst"
+}

@@ -23,6 +23,8 @@ component extends="wheels.WheelsTest" {
 				stalePrefix = "wheels.tests._assets.packages_mapping_stale";
 				lazyInvalidFixturesPath = ExpandPath("/wheels/tests/_assets/packages_mapping_lazy_invalid");
 				lazyInvalidPrefix = "wheels.tests._assets.packages_mapping_lazy_invalid";
+				methodCollideFixturesPath = ExpandPath("/wheels/tests/_assets/packages_mapping_method_collide");
+				methodCollidePrefix = "wheels.tests._assets.packages_mapping_method_collide";
 			});
 
 			describe("Alias derivation from manifest name", () => {
@@ -246,6 +248,47 @@ component extends="wheels.WheelsTest" {
 					var mappings = loader.getPackageMappings();
 					expect(mappings).toHaveKey("wheelsLazyGood");
 					expect(loader.isPackageLoaded("lazygoodsibling")).toBeTrue();
+				});
+
+			});
+
+			describe("Rollback cleans mixin-collision records", () => {
+
+				// pkgfirst:  name=wheels-mc-first,  alias=wheelsMcFirst,  registers $sharedFn on controller
+				// pkgsecond: name=wheels-mc-second, mapping=wheelsMcFirst (collides), also has $sharedFn
+				//
+				// pkgsecond's $instantiatePackage succeeds and $collectMixins
+				// records a method-collision entry. Then $tryRegisterPackageMapping
+				// fails on the alias and $rollbackPackage(pkgsecond) runs. The
+				// collision diagnostic must be cleaned alongside the mixins/
+				// $methodProviders so getMixinCollisions() doesn't leak a
+				// record referencing a package that's actually in failedPackages.
+
+				it("removes mixinCollisions entries when a package is rolled back after mapping failure", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = methodCollideFixturesPath,
+						componentPrefix = methodCollidePrefix
+					);
+					var failedNames = $failedPackageNames(loader);
+					expect(ArrayFindNoCase(failedNames, "pkgsecond")).toBeGT(0);
+					var collisions = loader.getMixinCollisions();
+					for (var c in collisions) {
+						expect(c.secondProvider).notToBe("pkgsecond");
+						expect(c.firstProvider).notToBe("pkgsecond");
+					}
+				});
+
+				it("keeps the surviving package's mixin claim intact after the collider rolls back", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = methodCollideFixturesPath,
+						componentPrefix = methodCollidePrefix
+					);
+					// pkgfirst loaded first and owns wheelsMcFirst plus $sharedFn
+					// on controller. The mapping must still point at pkgfirst's
+					// directory after pkgsecond's rollback.
+					var mappings = loader.getPackageMappings();
+					expect(mappings).toHaveKey("wheelsMcFirst");
+					expect(Find("pkgfirst", mappings.wheelsMcFirst)).toBeGT(0);
 				});
 
 			});

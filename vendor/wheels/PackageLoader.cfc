@@ -470,7 +470,7 @@ component output="false" {
 	 * post-instantiation failure (e.g. mapping collision). Keeps the loader's
 	 * public registries internally consistent: a package in failedPackages
 	 * never simultaneously appears in packages/packageMeta/lazyPackages or
-	 * contributes mixins/services/middleware.
+	 * contributes mixins/services/middleware/mixinCollisions.
 	 *
 	 * Intentionally does NOT clean variables.packageMappings or
 	 * variables.$mappingProviders: those registries are written only by
@@ -511,6 +511,18 @@ component output="false" {
 		for (local.i = ArrayLen(variables.packageMiddleware); local.i >= 1; local.i--) {
 			if (variables.packageMiddleware[local.i].packageName == arguments.dirName) {
 				ArrayDeleteAt(variables.packageMiddleware, local.i);
+			}
+		}
+		// Drop any mixin-collision diagnostic records that reference this
+		// package — getMixinCollisions() is a public API and a stale entry
+		// describing a method collision against a package no longer loaded
+		// would mislead a consumer reading both getFailedPackages() and
+		// getMixinCollisions(). Walk in reverse so ArrayDeleteAt is safe.
+		for (local.i = ArrayLen(variables.mixinCollisions); local.i >= 1; local.i--) {
+			local.entry = variables.mixinCollisions[local.i];
+			if (local.entry.firstProvider == arguments.dirName
+				|| local.entry.secondProvider == arguments.dirName) {
+				ArrayDeleteAt(variables.mixinCollisions, local.i);
 			}
 		}
 	}
