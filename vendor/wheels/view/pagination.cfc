@@ -336,12 +336,6 @@ component {
 		any encode
 	) {
 		$args(name = "paginationNav", args = arguments);
-		local.pg = pagination(arguments.handle);
-
-		// Return empty if only one page and showSinglePage is false
-		if (local.pg.totalPages <= 1 && !arguments.showSinglePage) {
-			return "";
-		}
 
 		// Build passthrough arguments for sub-helpers
 		local.subArgs = {};
@@ -366,12 +360,36 @@ component {
 				}
 			}
 		}
+		// Named-route segment variables (e.g. userId in route "userTimeline") are
+		// forwarded by $paginationLinkToArgs at link-build time but are not in the
+		// static allowlist. Filter them out before deciding to throw — otherwise
+		// paginationNav(route="userTimeline", userId=user.id) trips a false-positive
+		// InvalidArgument.
+		if (Len(local.unknownArgs) && StructKeyExists(local.subArgs, "route") && Len(local.subArgs.route)) {
+			local.routeVarList = $findRoute(argumentCollection = local.subArgs).foundvariables;
+			local.filteredUnknown = "";
+			for (local.uk in ListToArray(local.unknownArgs)) {
+				if (!ListFindNoCase(local.routeVarList, local.uk)) {
+					local.filteredUnknown = ListAppend(local.filteredUnknown, local.uk);
+				}
+			}
+			local.unknownArgs = local.filteredUnknown;
+		}
+		// Validate before the totalPages early-return so the check fires on
+		// single-page (or empty) result sets too.
 		if (Len(local.unknownArgs) && application.wheels.showErrorInformation) {
 			Throw(
 				type = "Wheels.PaginationNav.InvalidArgument",
 				message = "paginationNav() received unknown argument(s): [#local.unknownArgs#].",
 				detail = "Accepted pass-through arguments are: #local.allowedSubArgs#. paginationNav's own arguments are: #local.skipArgs#."
 			);
+		}
+
+		local.pg = pagination(arguments.handle);
+
+		// Return empty if only one page and showSinglePage is false
+		if (local.pg.totalPages <= 1 && !arguments.showSinglePage) {
+			return "";
 		}
 
 		local.content = "";
