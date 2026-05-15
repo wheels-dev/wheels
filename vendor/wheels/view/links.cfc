@@ -233,6 +233,19 @@ component {
 		boolean pageNumberAsParam,
 		any encode
 	) {
+		// Issue #2714: paginationLinks() is deprecated in favor of paginationNav().
+		// Emit a one-time per-request warning so 3.x → 4.x upgraders see the
+		// signal without flooding the log on a paginated view that renders
+		// the helper many times. Follows the $checkPluginsDeprecation() pattern
+		// in vendor/wheels/Plugins.cfc.
+		if (!StructKeyExists(request.wheels, "$paginationLinksDeprecationLogged")) {
+			request.wheels.$paginationLinksDeprecationLogged = true;
+			WriteLog(
+				type = "warning",
+				text = "[Wheels] paginationLinks() is deprecated and will be removed in a future release. Use paginationNav() instead (or compose the individual helpers: firstPageLink/previousPageLink/pageNumberLinks/nextPageLink/lastPageLink). See https://github.com/wheels-dev/wheels/issues/1930"
+			);
+		}
+
 		/* To fix the bug below:
 			https://github.com/wheels-dev/wheels/issues/942
 
