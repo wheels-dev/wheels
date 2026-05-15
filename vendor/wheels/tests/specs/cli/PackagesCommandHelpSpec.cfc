@@ -14,17 +14,20 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		// Shared struct so nested `it()` closures can reach `modulePath` —
+		// CFML closures can't reliably access outer `var` slots, only struct
+		// references (see CLAUDE.md Testing Quick Reference, "Closure gotcha").
+		var ctx = {repoRoot: expandPath("/wheels/../..")};
+		ctx.modulePath = ctx.repoRoot & "/cli/lucli/Module.cfc";
+
 		describe("wheels packages — top-level help summary alignment", () => {
 
-			var repoRoot = expandPath("/wheels/../..");
-			var modulePath = repoRoot & "/cli/lucli/Module.cfc";
-
 			it("Module.cfc source file is reachable", () => {
-				expect(fileExists(modulePath)).toBeTrue("Missing file: " & modulePath);
+				expect(fileExists(ctx.modulePath)).toBeTrue("Missing file: " & ctx.modulePath);
 			});
 
 			it("showHelp() summary line no longer leads with the broken `Install` verb", () => {
-				var source = fileRead(modulePath);
+				var source = fileRead(ctx.modulePath);
 
 				// The legacy phrasing leads with "Install" — the exact verb
 				// users will then try to type, which LuCLI intercepts.
@@ -36,7 +39,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("showHelp() summary line for `packages` points at the canonical `add` verb", () => {
-				var source = fileRead(modulePath);
+				var source = fileRead(ctx.modulePath);
 
 				// Find the line that starts the `packages` summary entry in
 				// the showHelp() block and confirm it names `add` (or `Add`)
