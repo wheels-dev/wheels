@@ -700,6 +700,26 @@ component extends="wheels.WheelsTest" {
 				expect(mw).toBeInstanceOf("wheels.middleware.RateLimiter");
 			});
 
+			it("blocks every request when maxRequests = 0 with strategy = tokenBucket", function() {
+				var keyFn = function(req) { return "tb-killswitch-client"; };
+				var mw = new wheels.middleware.RateLimiter(
+					maxRequests = 0,
+					windowSeconds = 60,
+					strategy = "tokenBucket",
+					keyFunction = keyFn
+				);
+				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+				var shared = {callCount: 0};
+				var handler = function(required struct request) {
+					shared.callCount++;
+					return "ok";
+				};
+
+				var result = pipeline.run(request = {}, coreHandler = handler);
+				expect(result).toInclude("Rate limit exceeded");
+				expect(shared.callCount).toBe(0);
+			});
+
 			it("accepts a custom keyFunction", function() {
 				var keyFn = function(request) { return "custom-key"; };
 				var mw = new wheels.middleware.RateLimiter(

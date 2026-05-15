@@ -363,6 +363,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Token bucket: allows bursts up to capacity, refills at a steady rate.
 	 */
 	private struct function $checkTokenBucket(required string clientKey, required numeric now) {
+		// Kill-switch: maxRequests = 0 blocks every request. Short-circuit here so the
+		// refillRate (0 / windowSeconds = 0) and the subsequent 1 / refillRate division
+		// never execute. Without this guard tokenBucket would throw a generic
+		// "You cannot divide by zero." while fixedWindow and slidingWindow already block.
+		if (variables.maxRequests == 0) {
+			return {allowed: false, remaining: 0, resetAt: arguments.now + variables.windowSeconds};
+		}
+
 		local.refillRate = variables.maxRequests / variables.windowSeconds;
 		local.resetAt = arguments.now + (1 / local.refillRate);
 
