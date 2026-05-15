@@ -306,8 +306,16 @@ component {
     }
 
     private string function $docsPath(required string section) {
-        return expandPath("/cli/lucli/services/deploy/cli/docs")
-             & "/" & arguments.section & ".md";
+        return getDirectoryFromPath(getCurrentTemplatePath())
+             & "docs/" & arguments.section & ".md";
+    }
+
+    // CFC-relative anchor — expandPath('/cli/lucli/...') uses the running app's mapping root and breaks in a generated user app (mirrors JarLoader.cfc). Public so the regression spec can assert path math directly. See #2658.
+    public string function $cliInstallDir() {
+        var here = getDirectoryFromPath(getCurrentTemplatePath());
+        var root = getCanonicalPath(here & "../../../");
+        if (right(root, 1) != "/" && right(root, 1) != "\") root &= "/";
+        return root;
     }
 
     public string function init_stub(required struct opts) {
@@ -330,7 +338,7 @@ component {
         var registryUser = arguments.opts.registryUsername ?: "changeme";
 
         var mustache = new modules.wheels.services.deploy.lib.Mustache();
-        var tplDir = expandPath("/cli/lucli/templates/deploy/init");
+        var tplDir = $cliInstallDir() & "templates/deploy/init";
         var ctx = {
             service_name: serviceName,
             image_name: imageName,

@@ -207,6 +207,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 directoryDelete(tmpCwd, true);
             });
 
+            // Regression for #2658 — expandPath('/cli/lucli/...') resolved against the running app's mapping root, breaking init inside a generated user app.
+            it("$cliInstallDir() resolves to the CLI install root, not the running app mapping", () => {
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var root = dc.$cliInstallDir();
+
+                expect(root).toBeString();
+                var normalized = replace(root, "\", "/", "all");
+                if (right(normalized, 1) == "/") normalized = left(normalized, len(normalized) - 1);
+                expect(reFindNoCase("/cli/lucli$", normalized)).toBeGT(0);
+
+                expect(directoryExists(root & "templates/deploy/init")).toBeTrue();
+                expect(fileExists(root & "templates/deploy/init/deploy.yml.mustache")).toBeTrue();
+            });
+
             it("audit dispatches tail of audit log to every host", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
@@ -271,11 +287,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect($anyInclude(cmds, "docker logout")).toBeTrue();
             });
 
-            // Regression tests for issue #2230 — deploy verbs returned a blank
-            // string in real (non-dry-run) mode because Module.cfc wrapped the
-            // void methods with dryRunOutput(), which is only populated during
-            // dry-run. Real deploys must return a visible success summary;
-            // dry-run must continue to return the buffered command list.
+            // Regression tests for issue #2230 — deploy verbs returned a blank string in real (non-dry-run) mode because Module.cfc wrapped the void methods with dryRunOutput(), which is only populated during dry-run. Real deploys must return a visible success summary; dry-run must continue to return the buffered command list.
 
             it("deploy (real mode) returns a non-empty success summary", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
