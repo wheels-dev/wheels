@@ -207,11 +207,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 directoryDelete(tmpCwd, true);
             });
 
-            // Regression for issue #2658: `wheels deploy init` resolved
-            // templates via expandPath('/cli/lucli/...'), which uses the
-            // running app's mapping root. Inside a generated user app
-            // that path doesn't exist. Fix anchors resolution to the CFC
-            // location (mirrors JarLoader.cfc).
+            // Regression for #2658 — expandPath('/cli/lucli/...') resolved against the running app's mapping root, breaking init inside a generated user app.
             it("$cliInstallDir() resolves to the CLI install root, not the running app mapping", () => {
                 var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
                     new cli.lucli.services.deploy.lib.FakeSshPool()
