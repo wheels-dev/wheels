@@ -25,9 +25,12 @@ vendor: Wheels
 homepage: https://wheels.dev
 license: Apache-2.0
 contents:
-  # The LuCLI binary (renamed `wheels`) lives in /opt/wheels.
-  - src: ./build/lucli
-    dst: /opt/wheels/lucli
+  # The LuCLI binary, renamed to `wheels` at stage time so basename(argv[0])
+  # is `wheels` when the wrapper execs it — LuCLI's module dispatcher routes
+  # via argv[0], so renaming is what makes `wheels start` reach the bundled
+  # module. See #2700.
+  - src: ./build/wheels
+    dst: /opt/wheels/wheels
     file_info:
       mode: 0755
   # The CLI module — what LuCLI dispatches `wheels new`, `wheels migrate`, etc. into.
@@ -44,8 +47,18 @@ contents:
     dst: /opt/wheels/sqlite-jdbc.jar
     file_info:
       mode: 0644
+  # Version + channel stamps. The wrapper reads both to render `wheels --version`.
+  # Without them, `wheels --version` returns "unknown (stable)". See #2700.
+  - src: ./build/.version
+    dst: /opt/wheels/.version
+    file_info:
+      mode: 0644
+  - src: ./build/.channel
+    dst: /opt/wheels/.channel
+    file_info:
+      mode: 0644
   # User-facing wrapper script. Sets JAVA_HOME, LUCLI_HOME, syncs the module
-  # to ~/.wheels/ on first run, then execs /opt/wheels/lucli.
+  # to ~/.wheels/ on first run, then execs /opt/wheels/wheels.
   - src: ./build/wrapper.sh
     dst: /usr/bin/wheels
     file_info:
@@ -54,11 +67,16 @@ overrides:
   deb:
     depends:
       - openjdk-21-jre-headless | openjdk-21-jre
+      - tar
     recommends:
       - sqlite3   # not strictly required (driver bundled), but useful for the user
   rpm:
     depends:
       - java-21-openjdk-headless
+      # Rocky Linux 10 minimal cloud images do not ship tar, and any role that
+      # unpacks /opt/wheels/module/ (or other tarball payloads) fails without
+      # it. Declare it here so dnf pulls it in. See #2700.
+      - tar
     recommends:
       - sqlite
 deb:
