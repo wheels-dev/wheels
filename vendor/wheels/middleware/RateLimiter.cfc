@@ -76,6 +76,22 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
+		// A non-positive window is nonsensical and divides by zero in the fixedWindow / tokenBucket math.
+		if (arguments.windowSeconds <= 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter windowSeconds: #arguments.windowSeconds#. Must be a positive number of seconds."
+			);
+		}
+
+		// maxRequests = 0 is a legitimate kill-switch (block everything); negative values are not.
+		if (arguments.maxRequests < 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter maxRequests: #arguments.maxRequests#. Must be zero or greater."
+			);
+		}
+
 		variables.maxRequests = arguments.maxRequests;
 		variables.windowSeconds = arguments.windowSeconds;
 		variables.strategy = arguments.strategy;

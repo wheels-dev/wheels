@@ -665,6 +665,41 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.RateLimiter.InvalidStorage");
 			});
 
+			it("throws on windowSeconds = 0 for fixedWindow", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0, strategy = "fixedWindow");
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on windowSeconds = 0 for slidingWindow", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0, strategy = "slidingWindow");
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on windowSeconds = 0 for tokenBucket", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0, strategy = "tokenBucket");
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on negative windowSeconds", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = -1);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on negative maxRequests", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = -1, windowSeconds = 60);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("permits maxRequests = 0 as a kill-switch value", function() {
+				var mw = new wheels.middleware.RateLimiter(maxRequests = 0, windowSeconds = 60);
+				expect(mw).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
 			it("accepts a custom keyFunction", function() {
 				var keyFn = function(request) { return "custom-key"; };
 				var mw = new wheels.middleware.RateLimiter(
