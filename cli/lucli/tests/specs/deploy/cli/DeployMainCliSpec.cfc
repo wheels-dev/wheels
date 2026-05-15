@@ -287,11 +287,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect($anyInclude(cmds, "docker logout")).toBeTrue();
             });
 
-            // Regression tests for issue #2230 — deploy verbs returned a blank
-            // string in real (non-dry-run) mode because Module.cfc wrapped the
-            // void methods with dryRunOutput(), which is only populated during
-            // dry-run. Real deploys must return a visible success summary;
-            // dry-run must continue to return the buffered command list.
+            // Regression tests for issue #2230 — deploy verbs returned a blank string in real (non-dry-run) mode because Module.cfc wrapped the void methods with dryRunOutput(), which is only populated during dry-run. Real deploys must return a visible success summary; dry-run must continue to return the buffered command list.
 
             it("deploy (real mode) returns a non-empty success summary", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
