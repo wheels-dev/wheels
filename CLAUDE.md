@@ -332,6 +332,8 @@ new wheels.middleware.RateLimiter(keyFunction=function(req) {
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` (default) or `database`. Adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers. Returns `429 Too Many Requests` with `Retry-After` when limit exceeded.
 
+`windowSeconds` must be > 0; `maxRequests` must be >= 0. Invalid values throw `Wheels.RateLimiter.InvalidConfiguration` at construction. `maxRequests = 0` is a valid kill-switch that blocks all requests.
+
 ## Package System
 
 Optional first-party modules are distributed as standalone repositories and installed into `vendor/<name>/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
