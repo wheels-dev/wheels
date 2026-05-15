@@ -90,15 +90,24 @@ component {
 	 *       - sudo   boolean, default false. If true AND user != "root", prefixes
 	 *                the command with `sudo -n `. Throws SshClient.SudoNoPassword
 	 *                if NOPASSWD isn't configured on the remote host.
+	 *       - raise  boolean, default false. If true and the remote exit code is
+	 *                nonzero, throws Wheels.Deploy.RemoteExecutionFailed with the
+	 *                host, exitCode, and a command summary in the message and the
+	 *                trimmed stderr in the detail. Mirrors the existing sudo-no-
+	 *                password throw shape, just for arbitrary remote failures.
+	 *                Regression #2696 — deploy verbs used to discard the result
+	 *                struct and silently treat any nonzero exit as success.
 	 *
 	 * @return struct {exitCode, stdout, stderr, durationMs}
 	 */
 	public struct function run(required string cmd, struct opts = {}) {
 		var useSudo = (arguments.opts.sudo ?: false) && variables.$opts.user != "root";
+		var raise = arguments.opts.raise ?: false;
 		var effectiveCmd = useSudo ? "sudo -n " & arguments.cmd : arguments.cmd;
 		var loader = variables.$loader;
 		var hostRef = variables.$host;
 		var sshjRef = variables.$sshj;
+		var origCmd = arguments.cmd;
 		var start = getTickCount();
 
 		return loader.withIsolatedTCCL(() => {
@@ -134,11 +143,49 @@ component {
 						message = "Passwordless sudo not configured on #hostRef#"
 					);
 				}
+				if (raise && exitCode != 0) {
+					$raiseRemoteFailure(hostRef, origCmd, result);
+				}
 				return result;
 			} finally {
 				sess.close();
 			}
 		});
+	}
+
+	/**
+	 * Throw Wheels.Deploy.RemoteExecutionFailed with structured detail. Public
+	 * so FakeSshPool can share the exact same throw shape; tests assert against
+	 * this contract. Regression #2696.
+	 *
+	 * Trims the command summary to 200 chars and stderr to 500 chars so log
+	 * output stays scannable when long shell pipelines or noisy stderr would
+	 * otherwise dominate the surfaced error.
+	 *
+	 * MIRROR: FakeSshPool.$raiseRemoteFailure must stay byte-identical to this
+	 * method. If you change the trim limits, throw type, or message template
+	 * here, update the test double in lockstep — tests assert against this
+	 * exact shape regardless of which pool the deploy layer is talking to.
+	 */
+	public void function $raiseRemoteFailure(
+		required string host,
+		required string cmd,
+		required struct result
+	) {
+		var stderr = arguments.result.stderr ?: "";
+		if (len(stderr) > 500) {
+			stderr = left(stderr, 500) & "…";
+		}
+		var cmdSummary = arguments.cmd;
+		if (len(cmdSummary) > 200) {
+			cmdSummary = left(cmdSummary, 200) & "…";
+		}
+		throw(
+			type = "Wheels.Deploy.RemoteExecutionFailed",
+			message = "Remote command failed on " & arguments.host
+				& " (exit " & arguments.result.exitCode & "): " & cmdSummary,
+			detail = stderr
+		);
 	}
 
 	/**

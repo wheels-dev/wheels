@@ -100,7 +100,11 @@ component {
                     }
                 }
             } finally {
-                $dispatchAny(hosts, lock.release(), dryRun);
+                // Tolerate release failures so they can never shadow the
+                // original deploy exception inside this finally block. rm -f
+                // is idempotent; if it genuinely fails on a remote, the deploy
+                // already has a real error to surface from the try body.
+                $dispatchAny(hosts, lock.release(), dryRun, true);
             }
 
             hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
@@ -270,17 +274,19 @@ component {
                 $dispatch([host], broadRemove, dryRun);
             }
         }
-        // Remove proxy.
-        $dispatch(hosts, proxyCmds.remove(), dryRun);
-        // Remove each accessory.
+        // Remove proxy / accessories / registry-logout are all idempotent
+        // teardowns — a missing container or stale credentials should not
+        // abort the overall remove flow. Strict-by-default still applies
+        // to the broad container teardown above (xargs -r already makes it
+        // exit-0 when nothing matches; daemon-offline is loud on purpose).
+        $dispatch(hosts, proxyCmds.remove(), dryRun, true);
         if (arrayLen(cfg.accessories())) {
             var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
             for (var acc in cfg.accessories()) {
-                $dispatch(acc.hosts(), accCmds.remove(acc), dryRun);
+                $dispatch(acc.hosts(), accCmds.remove(acc), dryRun, true);
             }
         }
-        // Logout of registry.
-        $dispatch(hosts, regCmds.logout(), dryRun);
+        $dispatch(hosts, regCmds.logout(), dryRun, true);
 
         return $renderResult(
             arguments.opts,
@@ -403,7 +409,8 @@ component {
     private void function $dispatch(
         required array hosts,
         required string cmd,
-        required boolean dryRun
+        required boolean dryRun,
+        boolean allowFail = false
     ) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) {
@@ -411,11 +418,14 @@ component {
             }
             return;
         }
-        // Capture cmd into a local so the closure sees a stable reference
-        // (Adobe CF argument-scope closures can be flaky otherwise).
+        // Capture cmd + raise flag into locals so the closure sees stable
+        // references (Adobe CF argument-scope closures can be flaky otherwise).
+        // raise=true is the default — see #2696 for why discarding nonzero
+        // remote exit codes was the silent-success bug.
         var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
-            ssh.run(c);
+            ssh.run(c, {raise: doRaise});
         });
     }
 
@@ -427,7 +437,8 @@ component {
     private void function $dispatchAny(
         required array hosts,
         required string cmd,
-        required boolean dryRun
+        required boolean dryRun,
+        boolean allowFail = false
     ) {
         if (arguments.dryRun) {
             arrayAppend(variables.dryRunBuffer, "[any] " & arguments.cmd);
@@ -435,15 +446,16 @@ component {
         }
         if (arrayLen(arguments.hosts) == 0) return;
         var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
         // Prefer onAny when available (both real SshPool and FakeSshPool
         // expose it). Fall back to onEach with a single host otherwise.
         if (structKeyExists(variables.sshPool, "onAny")) {
             variables.sshPool.onAny(arguments.hosts, function(ssh, host) {
-                ssh.run(c);
+                ssh.run(c, {raise: doRaise});
             });
         } else {
             variables.sshPool.onEach([arguments.hosts[1]], function(ssh, host) {
-                ssh.run(c);
+                ssh.run(c, {raise: doRaise});
             });
         }
     }

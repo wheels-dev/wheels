@@ -122,13 +122,16 @@ component {
         }
     }
 
-    private void function $dispatchSsh(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatchSsh(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
         }
+        // #2696: raise defaults to true. Build/push failures (image not found,
+        // registry unreachable) must surface as errors, not silent success.
         var c = arguments.cmd;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 
     private array function $allHosts(required any cfg) {
