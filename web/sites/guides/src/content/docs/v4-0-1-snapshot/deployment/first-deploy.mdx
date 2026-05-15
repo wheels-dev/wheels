@@ -155,7 +155,7 @@ Three quick checks before running anything:
 
    Same command, no `setup`. The rolling flow kicks in: new image builds, pushes, pulls to every host, then the proxy cuts traffic over host-by-host. Zero downtime — `kamal-proxy` drains in-flight requests to the old container before switching.
 
-   The version label is the short git sha by default. Override with `--version=<tag>` if you tag releases differently.
+   The version label is the short git sha by default. Override with `--version=<tag>` if you tag releases differently (or `--release=<tag>` on older wrappers that pre-date the `--version` rewrite — see [Migrating from Kamal](/v4-0-1-snapshot/deployment/migrating-from-kamal/) for details).
 
 </Steps>
 
