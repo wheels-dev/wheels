@@ -1737,6 +1737,8 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy config                   - print resolved config as YAML
 	 *   wheels deploy init                     - create config stub
 	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy bootstrap                - install Docker on every host
+	 *   wheels deploy exec "uname -a"          - run a command on every host
 	 *   wheels deploy version                  - show version pinning
 	 */
 	public string function deploy() {
@@ -1897,6 +1899,33 @@ component extends="modules.BaseModule" {
 					$deployBuildSshPool(opts.configPath)
 				);
 				return invoke(pruneCli, pruneVerb, [opts]);
+			// `bootstrap` and `exec` are top-level aliases for `server bootstrap`
+			// and `server exec`. LuCLI's picocli root registers `server` as a
+			// top-level subcommand for Lucee instance management, so the nested
+			// `wheels deploy server <verb>` form gets shortcut into LuCLI's
+			// own server help before module dispatch — see #2677. These flat
+			// aliases sidestep the collision entirely. The original `server`
+			// branch below is retained for Kamal parity and direct callers
+			// (MCP, internal tests) that don't go through LuCLI's picocli root.
+			case "bootstrap":
+				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
+					new modules.wheels.services.deploy.lib.SshPool()
+				);
+				return bootstrapCli.bootstrap(opts);
+			case "exec":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy exec requires a command");
+				}
+				// Preserve multi-token commands: join all positional args after `exec`.
+				var execCmdParts = [];
+				for (var ei = 2; ei <= arrayLen(positional); ei++) {
+					arrayAppend(execCmdParts, positional[ei]);
+				}
+				opts.cmd = arrayToList(execCmdParts, " ");
+				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
+					new modules.wheels.services.deploy.lib.SshPool()
+				);
+				return execCli.exec(opts);
 			case "server":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy server requires a verb (exec or bootstrap)");

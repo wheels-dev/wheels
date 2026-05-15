@@ -122,9 +122,14 @@ for fix in minimal full with-accessories; do
     # prune
     smoke "prune all"               prune all --dry-run "$PATH_OPT"
 
-    # server
+    # server (legacy — see #2677 about the picocli collision)
     smoke "server bootstrap"        server bootstrap --dry-run "$PATH_OPT"
     smoke "server exec"             server exec "uname -a" --dry-run "$PATH_OPT"
+
+    # top-level bootstrap/exec aliases that sidestep the LuCLI `server`
+    # collision (#2677). These are the canonical CLI form.
+    smoke "bootstrap (flat)"        bootstrap --dry-run "$PATH_OPT"
+    smoke "exec (flat)"             exec "uname -a" --dry-run "$PATH_OPT"
 
     # lock
     smoke "lock status"             lock status --dry-run "$PATH_OPT"
