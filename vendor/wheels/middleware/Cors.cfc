@@ -83,10 +83,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Prefer the request struct passed to the middleware (the canonical
 		// per-request context, mirroring how RateLimiter resolves remote_addr
 		// from arguments.request.cgi) and fall back to the engine CGI scope
-		// when the request context doesn't carry a method. Inside a function,
-		// a bare `request` reference resolves to the engine REQUEST scope, not
-		// the function argument — `arguments.request` is required to address
-		// the passed struct.
+		// when the request context doesn't carry a method. The engine CGI
+		// scope is read-only on Lucee 7, so unit tests that need to exercise
+		// the OPTIONS branch must inject the verb through arguments.request.cgi
+		// — hence the lookup order.
 		local.requestMethod = "GET";
 		if (StructKeyExists(arguments.request, "cgi") && StructKeyExists(arguments.request.cgi, "request_method")) {
 			local.requestMethod = arguments.request.cgi.request_method;
@@ -97,7 +97,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			}
 		}
 
-		if (local.requestMethod == "OPTIONS") {
+		if (UCase(local.requestMethod) == "OPTIONS") {
 			try {
 				cfheader(name = "Access-Control-Max-Age", value = variables.maxAge);
 			} catch (any e) {

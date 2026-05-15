@@ -275,11 +275,13 @@ component output="false" extends="wheels.Global"{
 		}
 		if (UCase(local.preflightMethod) == "OPTIONS" && $hasPreflightCapableMiddleware()) {
 			request.wheels.params = {};
+			// Cors.handle() reads the verb from arguments.request.cgi.request_method
+			// rather than arguments.request.method, so we don't carry the method
+			// field on this context — only Cors is run from this short-circuit.
 			local.preflightContext = {
 				params = {},
 				route = {},
-				pathInfo = arguments.pathInfo,
-				method = local.preflightMethod
+				pathInfo = arguments.pathInfo
 			};
 			local.preflightHandler = function(required struct request) {
 				return "";
