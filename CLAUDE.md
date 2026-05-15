@@ -829,7 +829,9 @@ wheels deploy proxy <verb>       // boot/reboot/start/stop/restart/details/logs/
 wheels deploy accessory <verb>   // boot/reboot/start/stop/restart/details/logs/remove (sidecars: db/redis/search)
 wheels deploy build <verb>       // deliver/push/pull/create/remove/details/dev
 wheels deploy registry <verb>    // setup/login/logout/remove
-wheels deploy server <verb>      // exec/bootstrap
+wheels deploy bootstrap          // install Docker on every host (flat alias — preferred)
+wheels deploy exec "<cmd>"       // run a command on every host (flat alias — preferred)
+wheels deploy server <verb>      // exec/bootstrap (legacy nested form — see #2677)
 wheels deploy prune <verb>       // all/images/containers [--keep=N]
 wheels deploy lock <verb>        // acquire/release/status (manual — normal deploys auto-lock)
 wheels deploy secrets <verb>     // fetch/extract/print (adapters: op/bitwarden/aws/lastpass/doppler)
@@ -874,6 +876,7 @@ Commands-are-strings invariant: every `*Commands.cfc` method returns a shell-com
 4. **`wheels deploy remove` is destructive and requires `--confirm`.** Bare `wheels deploy remove` throws without touching anything.
 5. **Lucee reserved scope names in subagent-authored deploy code.** `client`, `session`, `application` — use `ssh`/`sc`, `sess`, `app` instead. Bit us multiple times during the port.
 6. **No `--dry-run` flag in Ruby Kamal 2.4.0.** The `tools/deploy-config-diff.sh` harness compares config-layer output only. Byte-identical command-string parity is aspirational; see `tools/deploy-dry-run-diff.sh` for the plan.
+7. **`wheels deploy server <verb>` collides with LuCLI's top-level `server` command.** LuCLI (the picocli runtime under the wheels brand) registers `server` for Lucee dev-server lifecycle, so picocli grabs the `server` token before it can reach the deploy dispatcher. The wheels module exposes flat aliases `wheels deploy bootstrap` and `wheels deploy exec` that sidestep the collision — these are the canonical CLI form. The nested `server <verb>` branch is retained in `Module.cfc::deploy()` for MCP/programmatic callers that don't go through picocli. See [#2677](https://github.com/wheels-dev/wheels/issues/2677).
 
 ### Testing
 

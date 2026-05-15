@@ -18,7 +18,7 @@ This page takes an existing Wheels app and ships it to one or more Linux servers
 - How to verify the rollout, tail logs, and roll back if something breaks
 
 <Aside type="note" title="Assumptions">
-  You have a Wheels app that already builds into a working Docker image. You have at least one Linux server you can reach over SSH as a user with passwordless `sudo`, or as root. Docker can be installed later with `wheels deploy server bootstrap` — you don't need it preinstalled. You have a container registry (Docker Hub, GHCR, ECR, or self-hosted) you can push to.
+  You have a Wheels app that already builds into a working Docker image. You have at least one Linux server you can reach over SSH as a user with passwordless `sudo`, or as root. Docker can be installed later with `wheels deploy bootstrap` — you don't need it preinstalled. You have a container registry (Docker Hub, GHCR, ECR, or self-hosted) you can push to.
 </Aside>
 
 ## Before you start
@@ -117,11 +117,15 @@ Three quick checks before running anything:
 
    If Docker is already installed on the target, skip this step. Otherwise:
 
-   ```bash {test:cli cmd="wheels deploy server bootstrap"}
-   wheels deploy server bootstrap
+   ```bash {test:cli cmd="wheels deploy bootstrap"}
+   wheels deploy bootstrap
    ```
 
    Runs `which docker || curl -fsSL https://get.docker.com | sh` on every host. Idempotent — safe to run on a host that already has Docker. Fails fast if SSH or `sudo` isn't configured correctly.
+
+   :::note[`bootstrap` is the canonical form]
+   The Kamal-style nested form `wheels deploy server bootstrap` is also accepted by the deploy dispatcher, but the wheels CLI's underlying runtime registers `server` as a top-level command (for managing the local Lucee dev server). When you type the three-token form at the shell, the CLI runtime grabs `server` before it reaches the deploy dispatcher. The flat `wheels deploy bootstrap` (and `wheels deploy exec`) aliases sidestep that collision. See [issue #2677](https://github.com/wheels-dev/wheels/issues/2677).
+   :::
 
 6. **Run setup once.**
 

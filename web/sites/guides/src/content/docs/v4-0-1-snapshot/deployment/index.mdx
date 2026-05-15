@@ -70,7 +70,7 @@ The framework is narrow about production. Wheels gives you a CFML app that boots
 
 **You provide:**
 
-- The Linux hosts. Bare VMs, cloud instances, it doesn't matter — Docker is the only hard requirement. `wheels deploy server bootstrap` installs Docker on a fresh host.
+- The Linux hosts. Bare VMs, cloud instances, it doesn't matter — Docker is the only hard requirement. `wheels deploy bootstrap` installs Docker on a fresh host.
 - The Docker image. Wheels doesn't ship a canonical base image; your `Dockerfile` lives in your app repo.
 - The container registry. Docker Hub, GHCR, ECR, or self-hosted — `wheels deploy` logs in, pushes, and pulls; the registry itself is yours to operate.
 - TLS certificates. `kamal-proxy` will request Let's Encrypt certs automatically when `proxy.ssl: true`, but if you need wildcards, custom CAs, or static certs, you configure the proxy.
