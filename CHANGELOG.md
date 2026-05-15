@@ -22,6 +22,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Added
 
+- `paginationNav()` and `pageNumberLinks()` now accept a `viewStyle` argument with named CSS-framework presets (`"plain"`, `"bootstrap5"`, `"bootstrap4"`, `"tailwind"`). Bootstrap presets emit the canonical `<nav><ul class="pagination"><li class="page-item active" aria-current="page"><span class="page-link">N</span></li>` structure — with the active class on the `<li>` wrapper and a `<span>` (not anchor) for the current page — so Bootstrap-styled apps no longer need a `Replace()` regex hack to move the active class off the anchor. `viewStyle` defaults to `"plain"`, preserving today's output byte-for-byte (#2718)
 - `wheels deploy init` now scaffolds a starter `Dockerfile` (Lucee 7 + Java 21 multi-stage, `/up` HEALTHCHECK aligned with the generated `kamal-proxy` healthcheck) and a `.dockerignore` alongside `config/deploy.yml` and `.kamal/secrets`. `--force` also gates the `Dockerfile` — an existing user-authored Dockerfile aborts the init without `--force`, while an existing `.dockerignore` is silently preserved (since it's commonly user-curated even before adopting `wheels deploy`). The npm builder stage works for any Wheels app — projects without a JS pipeline pass through unchanged; projects with a `package.json` install + build automatically. Secrets (reload password, DB password, registry password) are injected at deploy time via `.kamal/secrets`, never baked into the image (#2673)
 
 ### Changed

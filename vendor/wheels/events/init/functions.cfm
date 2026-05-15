@@ -307,6 +307,7 @@
 			prependToPage = "",
 			appendToPage = "",
 			pageNumberAsParam = true,
+			viewStyle = "plain",
 			encode = true
 		};
 		application.$wheels.functions.paginationNav = {
@@ -317,6 +318,7 @@
 			showNext = true,
 			showInfo = false,
 			showSinglePage = false,
+			viewStyle = "plain",
 			encode = true
 		};
 		application.$wheels.functions.paginationLinks = {
