@@ -35,7 +35,9 @@ component {
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
-        $dispatchAny($allHosts(cfg), lock.release(), dryRun);
+        // rm -f is idempotent; surfacing a failure here only obscures the
+        // operator's intent ("clear the lock if it's there"). #2696.
+        $dispatchAny($allHosts(cfg), lock.release(), dryRun, true);
         return $renderResult(arguments.opts, "Released deploy lock for " & cfg.service());
     }
 
@@ -44,7 +46,10 @@ component {
         var dryRun = arguments.opts.dryRun ?: false;
         arrayClear(variables.dryRunBuffer);
         var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
-        $dispatchAny($allHosts(cfg), lock.status(), dryRun);
+        // readlink exits nonzero when the lock file is missing — which is
+        // exactly what the operator wants to learn from `status`. Treat that
+        // as advisory output, not a thrown error. #2696.
+        $dispatchAny($allHosts(cfg), lock.status(), dryRun, true);
         return $renderResult(arguments.opts, "Checked deploy lock status for " & cfg.service());
     }
 
@@ -68,16 +73,18 @@ component {
         return out;
     }
 
-    private void function $dispatchAny(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatchAny(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             if (arrayLen(arguments.hosts)) {
                 arrayAppend(variables.dryRunBuffer, "[" & arguments.hosts[1] & "] " & arguments.cmd);
             }
             return;
         }
-        var c = arguments.cmd;
         // Lock ops target just one host (the lock file lives on one path; any host works).
-        variables.sshPool.onAny(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        // #2696: acquire stays strict (contention should surface); release/status tolerate.
+        var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onAny(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 
     private string function $currentUser() {

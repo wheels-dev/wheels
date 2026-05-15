@@ -423,6 +423,116 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("demo");
             });
 
+            // Regression suite for #2696 — deploy verbs reported success even when the
+            // underlying SSH command on the remote exited nonzero. The fix has SshClient
+            // raise Wheels.Deploy.RemoteExecutionFailed on nonzero exits, and the
+            // deploy dispatchers opt-in to that strict mode for every non-teardown verb.
+
+            it("deploy throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails on the remote (#2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                // Use the same component the production deploy uses to compute the exact pull command.
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                var pullCmd = builder.pull("v1");
+                fake.expect("1.2.3.4", pullCmd, {
+                    exitCode: 1, stdout: "",
+                    stderr: "Error response from daemon: manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                expect(() => dc.deploy({configPath: variables.fixture, version: "v1"}))
+                    .toThrow(type="Wheels.Deploy.RemoteExecutionFailed", regex="exit 1");
+            });
+
+            it("setup throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails (alias for deploy) (#2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                expect(() => dc.setup({configPath: variables.fixture, version: "v1"}))
+                    .toThrow(type="Wheels.Deploy.RemoteExecutionFailed");
+            });
+
+            it("the thrown Wheels.Deploy.RemoteExecutionFailed names the host, exit code, and a command summary (#2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 125, stdout: "",
+                    stderr: "denied: requested access to the resource is denied"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                try {
+                    dc.deploy({configPath: variables.fixture, version: "v1"});
+                    fail("expected deploy to throw");
+                } catch (any e) {
+                    expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                    expect(e.message).toInclude("1.2.3.4");
+                    expect(e.message).toInclude("125");
+                    expect(e.message).toInclude("docker pull");
+                    expect(e.detail).toInclude("denied");
+                }
+            });
+
+            it("rollback throws on a failing docker start (#2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                var startCmd = app.start(cfg.roles()[1], "v-old");
+                fake.expect("1.2.3.4", startCmd, {
+                    exitCode: 1, stdout: "", stderr: "No such container: demo-web-v-old"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                expect(() => dc.rollback({configPath: variables.fixture, version: "v-old"}))
+                    .toThrow(type="Wheels.Deploy.RemoteExecutionFailed");
+            });
+
+            it("remove --confirm tolerates a missing kamal-proxy and still dispatches the remaining teardown steps (#2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+                fake.expect("1.2.3.4", proxyCmds.remove(), {
+                    exitCode: 1, stdout: "", stderr: "Error: No such container: kamal-proxy"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.remove({configPath: variables.fixture, confirm: true});
+                expect(out).toInclude("Removed");
+                // After the tolerated proxy step, registry logout must still have been issued.
+                var cmds = [];
+                for (var c in fake.calls()) arrayAppend(cmds, c.cmd ?: "");
+                var sawLogout = false;
+                for (var s in cmds) if (findNoCase("docker logout", s)) sawLogout = true;
+                expect(sawLogout).toBeTrue();
+            });
+
+            it("deploy still propagates lock-release exceptions in the finally block as no-ops when release fails (#2696)", () => {
+                // lock.release() runs in the deploy() finally block and must never
+                // shadow the original deploy exception. Inject a release failure
+                // alongside a pull failure and assert the surfaced exception is the
+                // pull one (the original cause), not the release one.
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                fake.expect("1.2.3.4", lockCmds.release(), {
+                    exitCode: 1, stdout: "", stderr: "rm: cannot remove"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                try {
+                    dc.deploy({configPath: variables.fixture, version: "v1"});
+                    fail("expected deploy to throw");
+                } catch (any e) {
+                    // The surfaced error must be the pull failure, NOT the lock release failure.
+                    expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                    expect(e.message).toInclude("docker pull");
+                }
+            });
+
             // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.
             it("$gitShortSha() returns 'unknown' when run outside a git repo", () => {
                 var nonGitDir = getTempDirectory() & "/wheels-2671-main-" & createUUID();

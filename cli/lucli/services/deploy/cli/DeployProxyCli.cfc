@@ -55,7 +55,11 @@ component {
         var cmdStr = structIsEmpty(arguments.methodOpts)
             ? invoke(proxyCmds, arguments.method)
             : invoke(proxyCmds, arguments.method, [arguments.methodOpts]);
-        $dispatch(hosts, cmdStr, dryRun);
+        // `remove` and `stop` are idempotent teardown verbs — a missing
+        // kamal-proxy container should not be a hard error. Everything else
+        // (boot, start, restart, details, logs, reboot) is strict by default.
+        var idempotentTeardown = (arguments.method == "remove" || arguments.method == "stop");
+        $dispatch(hosts, cmdStr, dryRun, idempotentTeardown);
         return arrayLen(hosts);
     }
 
@@ -74,12 +78,15 @@ component {
         return out;
     }
 
-    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
         }
+        // #2696: raise defaults to true; only the explicit idempotent teardowns
+        // (remove, stop) tolerate a nonzero exit.
         var c = arguments.cmd;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 }
