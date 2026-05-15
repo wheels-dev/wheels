@@ -464,6 +464,16 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #paginationNav()#
 #paginationNav(showInfo=true, showFirst=false, showLast=false, navClass="my-pagination")#
 
+// Bootstrap 5 — active class on <li>, current page as <span class="page-link">, aria-current
+#paginationNav(viewStyle="bootstrap5")#
+#pageNumberLinks(viewStyle="bootstrap5")#
+
+// Bootstrap 4 — same as bootstrap5 but omits aria-current
+#pageNumberLinks(viewStyle="bootstrap4")#
+
+// Tailwind — flat structure with pagination-current / pagination-link utility classes
+#pageNumberLinks(viewStyle="tailwind")#
+
 // Individual helpers for custom layouts
 #paginationInfo()#            // "Showing 26-50 of 1,000 records"
 #firstPageLink()#             // link to page 1
@@ -473,6 +483,8 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #lastPageLink()#              // link to last page
 #pageNumberLinks(windowSize=5, classForCurrent="active")#
 ```
+
+`viewStyle` accepts `"plain"` (default, preserves original output), `"bootstrap5"`, `"bootstrap4"`, or `"tailwind"`. Bootstrap presets emit `<li class="page-item active" aria-current="page"><span class="page-link">N</span></li>` for the current page, with the active class on the `<li>` wrapper — no `Replace()` post-processing needed. Non-plain presets ignore `prependToPage`, `appendToPage`, `classForCurrent`, and `class` in favour of the preset markup.
 
 Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
 
