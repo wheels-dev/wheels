@@ -349,10 +349,29 @@ component {
 		local.subArgs.encode = arguments.encode;
 		// Pass through any extra arguments (route, controller, action, key, params, etc.)
 		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,encode";
+		// Union of args accepted by sub-helpers (paginationInfo, firstPageLink,
+		// previousPageLink, pageNumberLinks, nextPageLink, lastPageLink) plus the
+		// URL-building keys forwarded by $paginationLinkToArgs. Keys outside this
+		// allowlist are silently dropped by CFML's argumentCollection dispatch,
+		// which makes typos like prependToList="<ul>" invisible — see issue #2717.
+		local.allowedSubArgs = "format,text,name,class,disabledClass,showDisabled,pageNumberAsParam"
+			& ",windowSize,classForCurrent,linkToCurrentPage,prependToPage,appendToPage"
+			& ",route,controller,action,key,anchor,onlyPath,host,protocol,port,params";
+		local.unknownArgs = "";
 		for (local.key in arguments) {
 			if (!ListFindNoCase(local.skipArgs, local.key)) {
 				local.subArgs[local.key] = arguments[local.key];
+				if (!ListFindNoCase(local.allowedSubArgs, local.key)) {
+					local.unknownArgs = ListAppend(local.unknownArgs, local.key);
+				}
 			}
+		}
+		if (Len(local.unknownArgs) && application.wheels.showErrorInformation) {
+			Throw(
+				type = "Wheels.PaginationNav.InvalidArgument",
+				message = "paginationNav() received unknown argument(s): [#local.unknownArgs#].",
+				detail = "Accepted pass-through arguments are: #local.allowedSubArgs#. paginationNav's own arguments are: #local.skipArgs#."
+			);
 		}
 
 		local.content = "";
