@@ -101,6 +101,7 @@ The verb surface mirrors Kamal's. Most invocations are identical save the leadin
 Two CLI-level differences worth flagging:
 
 - **Flag style.** `wheels deploy` uses `--flag=value` everywhere. Positional args for a few verbs (`accessory boot <name>`, `rollback <version>` in Kamal) become named flags (`accessory boot --name=<name>`, `rollback --version=<version>`) for consistency across the CFML arg parser.
+- **`--version` and `--release` are interchangeable.** The brew and scoop wrappers transparently rewrite `--version[=val]` to `--release[=val]` when `deploy` is the first positional argument — the underlying LuCLI runtime reserves `--version` as a root-level boolean flag (issue [#2674](https://github.com/wheels-dev/wheels/issues/2674)), so the rewrite keeps the documented Kamal-compatible form working. If you ever invoke `wheels deploy` from a wrapper that pre-dates this rewrite (or directly against the LuCLI binary), pass `--release=<tag>` instead and the parser will treat it identically.
 - **`--dry-run` is everywhere.** Every `wheels deploy` verb accepts `--dry-run` and prints the commands it would have run, prefixed by host. This is wider coverage than Kamal's `KAMAL_DEBUG=1` logs.
 
 ## The coexistence guarantee
