@@ -48,6 +48,10 @@ set(middleware = [
 
 With no other arguments you get: `strategy="fixedWindow"`, `storage="memory"`, and keying by client IP. Every client gets 60 requests per 60 seconds.
 
+<Aside type="caution">
+  `windowSeconds` must be a positive integer. A value of `0` or less throws `Wheels.RateLimiter.InvalidConfiguration` at app startup — the same place you set your other middleware — so misconfigurations surface immediately rather than causing a cryptic divide-by-zero at runtime. `maxRequests = 0` is a valid kill-switch that blocks every request (useful for maintenance windows or route-scope lockdowns).
+</Aside>
+
 ## Sliding window
 
 Swap the strategy for smoother enforcement:
