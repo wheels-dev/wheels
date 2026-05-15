@@ -105,6 +105,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(() => mod.deploy()).toThrow(regex="at least one key");
 			});
 
+			it("does not crash on a multi-key positional list (boundary smoke)", () => {
+				// Three positional keys + an unknown adapter. The adapter check
+				// fires before the keys check inside DeploySecretsCli.fetch, so
+				// this doesn't prove every key landed in opts.keys (only a real
+				// adapter could verify the full slice — see Reviewer A on PR
+				// ##2699). What it does prove: the `for fsi=2 to arrayLen` loop
+				// completes without crashing on a non-trivial positional list
+				// (off-by-one would manifest here as a CFML index-out-of-range,
+				// not UnknownAdapter). Mirror coverage to the `exec` smoke test
+				// at line 43.
+				mod.__arguments = ["fetch-secrets", "K1", "K2", "K3", "--adapter=nope-not-a-real-adapter"];
+				expect(() => mod.deploy()).toThrow(regex="Unknown adapter");
+			});
+
 		});
 
 		describe("wheels deploy extract-secrets (top-level alias for ##2697)", () => {
