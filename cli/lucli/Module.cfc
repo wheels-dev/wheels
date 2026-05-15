@@ -2062,7 +2062,12 @@ component extends="modules.BaseModule" {
 		// verb that LuCLI itself intercepts (#2713). Owning the text here
 		// guarantees `wheels packages help`, `wheels packages --help`, and
 		// `wheels packages -h` all reach $packagesHelp().
-		if (opts.help ?: false || sub == "help" || sub == "-h") {
+		//
+		// Note: `-h` is consumed by $packagesArgsToOptions (sets opts.help =
+		// true) and stripped from positionals by $packagesStripFlags before
+		// `sub` is read, so it arrives here as opts.help — never as a
+		// positional. No `sub == "-h"` clause is needed.
+		if ((opts.help ?: false) || sub == "help") {
 			return $packagesHelp();
 		}
 

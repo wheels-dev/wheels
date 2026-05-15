@@ -34,6 +34,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(Len(out)).toBeGT(0);
 			});
 
+			it("treats `-h` short flag as a help request", () => {
+				mod.__arguments = ["-h"];
+				var out = mod.packages();
+				expect(Len(out)).toBeGT(0);
+				// Sanity: the short flag reaches the same hand-written help body,
+				// so it should mention `add` just like the other two forms.
+				expect(out).toInclude("wheels packages add");
+			});
+
 			it("documents `add` as the canonical install verb", () => {
 				mod.__arguments = ["help"];
 				var out = mod.packages();
