@@ -661,11 +661,15 @@ component {
 			? arguments.subArgs.pageNumberAsParam
 			: true;
 
+		local.safeText = (IsBoolean(local.encode) && local.encode)
+			? EncodeForHTML(arguments.text)
+			: arguments.text;
+
 		switch (arguments.viewStyle) {
 			case "bootstrap5":
 			case "bootstrap4":
 				if (arguments.isDisabled) {
-					return '<li class="page-item disabled"><span class="page-link">' & arguments.text & '</span></li>';
+					return '<li class="page-item disabled"><span class="page-link">' & local.safeText & '</span></li>';
 				}
 				local.linkArgs = $paginationLinkToArgs(
 					page = arguments.targetPage,
@@ -679,7 +683,7 @@ component {
 				return '<li class="page-item">' & linkTo(argumentCollection = local.linkArgs) & '</li>';
 			case "tailwind":
 				if (arguments.isDisabled) {
-					return '<span class="pagination-disabled">' & arguments.text & '</span>';
+					return '<span class="pagination-disabled">' & local.safeText & '</span>';
 				}
 				local.linkArgs = $paginationLinkToArgs(
 					page = arguments.targetPage,

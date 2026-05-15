@@ -246,11 +246,13 @@ component extends="wheels.WheelsTest" {
 					expect(result).toInclude('<span class="page-link">2</span>')
 				})
 
-				it("emits Tailwind markup with aria-current on current page", () => {
+				it("emits Tailwind markup with pagination-current/pagination-link wrappers", () => {
 					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
 					result = _controller.pageNumberLinks(viewStyle = "tailwind")
-					expect(result).toInclude('aria-current="page"')
-					expect(result).toInclude("2")
+					expect(result).toInclude('<span class="pagination-current" aria-current="page">')
+					expect(result).toInclude('class="pagination-link"')
+					expect(result).toInclude("2</span>")
+					expect(result).notToInclude('<li class="page-item')
 				})
 
 				it("preserves default (plain) behavior when viewStyle is plain", () => {
@@ -297,6 +299,55 @@ component extends="wheels.WheelsTest" {
 					g.model("author").findAll(page = 1, perPage = 3, order = "lastName")
 					result = _controller.paginationNav(viewStyle = "bootstrap5")
 					expect(result).toInclude('<li class="page-item disabled">')
+				})
+
+				it("wraps Bootstrap 4 markup in <ul class='pagination'> without aria-current on current page", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap4")
+					expect(result).toInclude('<nav')
+					expect(result).toInclude('<ul class="pagination">')
+					expect(result).toInclude('<li class="page-item active">')
+					expect(result).toInclude('<span class="page-link">2</span>')
+					// BS4 omits aria-current on the active page
+					expect(result).notToInclude('aria-current="page"')
+				})
+
+				it("marks first/previous as disabled <li> when on first page in Bootstrap 4", () => {
+					g.model("author").findAll(page = 1, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap4")
+					expect(result).toInclude('<li class="page-item disabled">')
+				})
+
+				it("wraps Tailwind markup in a flat <nav class='pagination'> with no <ul>", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "tailwind")
+					expect(result).toInclude('<nav aria-label="Pagination" class="pagination">')
+					expect(result).toInclude('<span class="pagination-current" aria-current="page">')
+					expect(result).toInclude('class="pagination-link"')
+					expect(result).notToInclude('<ul')
+					expect(result).notToInclude('<li class="page-item')
+				})
+
+				it("emits Tailwind pagination-disabled span for first/previous when on first page", () => {
+					g.model("author").findAll(page = 1, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "tailwind")
+					expect(result).toInclude('<span class="pagination-disabled">')
+					expect(result).toInclude('First')
+					expect(result).toInclude('Previous')
+				})
+
+				it("places paginationInfo between <nav> and <ul> for Bootstrap 5 with showInfo=true", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap5", showInfo = true)
+					expect(result).toInclude('<nav aria-label="Pagination">')
+					expect(result).toInclude('Showing')
+					expect(result).toInclude('<ul class="pagination">')
+					// Info text must appear before the <ul>
+					infoPos = FindNoCase("Showing", result)
+					ulPos = FindNoCase("<ul", result)
+					expect(infoPos).toBeGT(0)
+					expect(ulPos).toBeGT(0)
+					expect(infoPos).toBeLT(ulPos)
 				})
 
 			})
