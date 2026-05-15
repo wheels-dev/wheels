@@ -237,8 +237,8 @@ component extends="wheels.WheelsTest" {
 					expect(result).toInclude("pagination")
 				})
 
-				it("includes all sections by default", () => {
-					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				it("includes all sections by default when window does not reach boundaries", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
 					result = _controller.paginationNav()
 					expect(result).toInclude("First")
 					expect(result).toInclude("Previous")
@@ -278,6 +278,75 @@ component extends="wheels.WheelsTest" {
 					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
 					result = _controller.paginationNav(navClass = "custom-pagination")
 					expect(result).toInclude("custom-pagination")
+				})
+
+			})
+
+			/* ── paginationNav anchor display modes ────── */
+
+			describe("paginationNav anchor display modes", () => {
+
+				it("hides First in auto mode when window already reaches first page", () => {
+					g.setPagination(totalRecords = 12, currentPage = 2, perPage = 3)
+					result = _controller.paginationNav()
+					expect(result).notToInclude("First")
+				})
+
+				it("hides Last in auto mode when window already reaches last page", () => {
+					g.setPagination(totalRecords = 12, currentPage = 3, perPage = 3)
+					result = _controller.paginationNav()
+					expect(result).notToInclude("Last")
+				})
+
+				it("shows First in auto mode when window does not reach first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("First")
+				})
+
+				it("shows Last in auto mode when window does not reach last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 1, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Last")
+				})
+
+				it("renders First with always mode when window already reaches first page", () => {
+					g.setPagination(totalRecords = 12, currentPage = 2, perPage = 3)
+					result = _controller.paginationNav(showFirst = "always")
+					expect(result).toInclude("First")
+				})
+
+				it("hides First with never mode when window does not reach first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav(showFirst = "never")
+					expect(result).notToInclude("First")
+				})
+
+				it("treats boolean true as always for backwards compatibility", () => {
+					g.setPagination(totalRecords = 12, currentPage = 2, perPage = 3)
+					result = _controller.paginationNav(showFirst = true, showLast = true)
+					expect(result).toInclude("First")
+					expect(result).toInclude("Last")
+				})
+
+				it("treats boolean false as never for backwards compatibility", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					result = _controller.paginationNav(showFirst = false, showLast = false)
+					expect(result).notToInclude("First")
+					expect(result).notToInclude("Last")
+				})
+
+				it("respects windowSize when computing auto mode predicates", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					result = _controller.paginationNav(windowSize = 4)
+					expect(result).notToInclude("First")
+				})
+
+				it("rejects unknown anchor mode strings", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					expect(() => {
+						_controller.paginationNav(showFirst = "bogus")
+					}).toThrow()
 				})
 
 			})

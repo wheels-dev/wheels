@@ -311,28 +311,36 @@ component {
 	 * Creates a complete pagination navigation element wrapping individual pagination helpers.
 	 * Outputs a `<nav>` element containing first/previous/page-numbers/next/last links and optional info text.
 	 *
+	 * The `showFirst` / `showLast` / `showPrevious` / `showNext` args accept the
+	 * strings `"auto"`, `"always"`, or `"never"`. Booleans are normalized for
+	 * backwards compatibility: `true` maps to `"always"`, `false` maps to `"never"`.
+	 * Under `"auto"` the first/last anchors only render when the visible page-number
+	 * window does not already reach the boundary (matching legacy 3.x semantics).
+	 *
 	 * [section: View Helpers]
 	 * [category: Pagination Functions]
 	 *
 	 * @handle The handle given to the query that the pagination should be displayed for.
 	 * @navClass CSS class for the wrapping nav element.
-	 * @showFirst Whether to show the first page link.
-	 * @showLast Whether to show the last page link.
-	 * @showPrevious Whether to show the previous page link.
-	 * @showNext Whether to show the next page link.
+	 * @showFirst Anchor display mode for the first page link: "auto" (default), "always", "never", or boolean.
+	 * @showLast Anchor display mode for the last page link: "auto" (default), "always", "never", or boolean.
+	 * @showPrevious Anchor display mode for the previous page link: "auto" (default), "always", "never", or boolean.
+	 * @showNext Anchor display mode for the next page link: "auto" (default), "always", "never", or boolean.
 	 * @showInfo Whether to show the pagination info text.
 	 * @showSinglePage Whether to show pagination when there is only one page.
+	 * @windowSize Number of page links shown around the current page in `pageNumberLinks` and used by the auto-mode predicates.
 	 * @encode [see:styleSheetLinkTag].
 	 */
 	public string function paginationNav(
 		string handle = "query",
 		string navClass,
-		boolean showFirst,
-		boolean showLast,
-		boolean showPrevious,
-		boolean showNext,
+		any showFirst,
+		any showLast,
+		any showPrevious,
+		any showNext,
 		boolean showInfo,
 		boolean showSinglePage,
+		numeric windowSize,
 		any encode
 	) {
 		$args(name = "paginationNav", args = arguments);
@@ -355,6 +363,11 @@ component {
 			}
 		}
 
+		local.firstMode = $paginationAnchorMode(value = arguments.showFirst, argName = "showFirst");
+		local.lastMode = $paginationAnchorMode(value = arguments.showLast, argName = "showLast");
+		local.previousMode = $paginationAnchorMode(value = arguments.showPrevious, argName = "showPrevious");
+		local.nextMode = $paginationAnchorMode(value = arguments.showNext, argName = "showNext");
+
 		local.content = "";
 
 		if (arguments.showInfo) {
@@ -362,24 +375,24 @@ component {
 			local.content &= " ";
 		}
 
-		if (arguments.showFirst) {
+		if ($paginationShouldShowAnchor(mode = local.firstMode, side = "first", pg = local.pg, windowSize = arguments.windowSize)) {
 			local.content &= firstPageLink(argumentCollection = local.subArgs);
 			local.content &= " ";
 		}
 
-		if (arguments.showPrevious) {
+		if ($paginationShouldShowAnchor(mode = local.previousMode, side = "previous", pg = local.pg, windowSize = arguments.windowSize)) {
 			local.content &= previousPageLink(argumentCollection = local.subArgs);
 			local.content &= " ";
 		}
 
 		local.content &= pageNumberLinks(argumentCollection = local.subArgs);
 
-		if (arguments.showNext) {
+		if ($paginationShouldShowAnchor(mode = local.nextMode, side = "next", pg = local.pg, windowSize = arguments.windowSize)) {
 			local.content &= " ";
 			local.content &= nextPageLink(argumentCollection = local.subArgs);
 		}
 
-		if (arguments.showLast) {
+		if ($paginationShouldShowAnchor(mode = local.lastMode, side = "last", pg = local.pg, windowSize = arguments.windowSize)) {
 			local.content &= " ";
 			local.content &= lastPageLink(argumentCollection = local.subArgs);
 		}
@@ -390,6 +403,58 @@ component {
 			class = arguments.navClass,
 			encode = false
 		);
+	}
+
+	/**
+	 * Internal: normalizes a showFirst/showLast/showPrevious/showNext value into "auto" | "always" | "never".
+	 * Booleans are coerced: true -> "always", false -> "never". Strings are matched case-insensitively.
+	 * Public access required so $integrateComponents() pulls it into the view mixin scope on Lucee/Adobe.
+	 */
+	public string function $paginationAnchorMode(required any value, string argName = "anchor mode") {
+		if (IsBoolean(arguments.value)) {
+			return arguments.value ? "always" : "never";
+		}
+		if (ListFindNoCase("auto,always,never", arguments.value)) {
+			return LCase(arguments.value);
+		}
+		Throw(
+			type = "Wheels.InvalidArgument",
+			message = "Invalid pagination anchor mode '#arguments.value#' for argument '#arguments.argName#'.",
+			detail = "The argument must be one of 'auto', 'always', 'never', or a boolean."
+		);
+	}
+
+	/**
+	 * Internal: decides whether a first/previous/next/last anchor should render
+	 * given a normalized mode and the current pagination state.
+	 *
+	 * Under "auto" the first/last anchors only render when the visible page-number
+	 * window does not already reach the boundary. Previous/next render whenever
+	 * the current page is not at that boundary.
+	 */
+	public boolean function $paginationShouldShowAnchor(
+		required string mode,
+		required string side,
+		required struct pg,
+		required numeric windowSize
+	) {
+		if (arguments.mode == "never") {
+			return false;
+		}
+		if (arguments.mode == "always") {
+			return true;
+		}
+		switch (arguments.side) {
+			case "first":
+				return (arguments.pg.currentPage - arguments.windowSize) > 1;
+			case "previous":
+				return arguments.pg.currentPage > 1;
+			case "next":
+				return arguments.pg.currentPage < arguments.pg.totalPages;
+			case "last":
+				return arguments.pg.totalPages > (arguments.pg.currentPage + arguments.windowSize);
+		}
+		return true;
 	}
 
 	/**
