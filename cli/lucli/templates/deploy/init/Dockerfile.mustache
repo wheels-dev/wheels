@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.7
+#
+# Production Dockerfile for {{service_name}}.
+#
+# Built by `wheels deploy init`. Multi-stage: a builder that installs
+# front-end build dependencies (Node, npm), and a slim runtime layer that
+# ships Lucee 7 on Java 21 — the framework's primary CI target.
+#
+# Adjust the COPY lines to match your project's directory layout. The
+# health check probes `/up` — the same path `kamal-proxy` polls per the
+# generated `config/deploy.yml`. Add a lightweight `/up` route that
+# returns 200 without touching slow dependencies. See:
+#   /v4-0-1-snapshot/deployment/docker-deployment/
+#   /v4-0-1-snapshot/deployment/first-deploy/
+
+# --- Stage 1: builder ---------------------------------------------------------
+# Compile front-end assets and prune anything the runtime doesn't need.
+# Drop this stage if your app has no npm build step.
+FROM node:20-bookworm-slim AS builder
+
+WORKDIR /build
+
+# Copy the whole build context. The npm steps below run only when
+# `package.json` exists, so Wheels apps without a JS pipeline pass through
+# this stage unchanged. (A separate `COPY package.json ...` would fail the
+# build for apps that don't have one.)
+COPY . .
+
+RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
+
+# Skip silently if there is no build script defined.
+RUN if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.build ? 0 : 1)"; then \
+        npm run build; \
+    fi
+
+# --- Stage 2: runtime ---------------------------------------------------------
+# Lucee 7 on Java 21. The lucee/lucee image ships a ready webroot at /var/www.
+FROM lucee/lucee:7-tomcat10-jre21
+
+LABEL org.opencontainers.image.title="{{service_name}}"
+
+# Wheels reads these at boot. Override per-environment at `docker run` time.
+#
+# Secrets (reload password, DB password, API keys) are NOT baked here — they
+# are injected at deploy time from `.kamal/secrets` via `config/deploy.yml`.
+# The bundled secrets template exposes `WHEELS_RELOAD_PASSWORD`; wire your
+# `config/settings.cfm` reloadPassword to `getenv("WHEELS_RELOAD_PASSWORD")`
+# to pick it up.
+ENV WHEELS_ENV=production \
+    WHEELS_DATASOURCE=app \
+    CATALINA_OPTS="-Xms256m -Xmx1g -XX:MaxMetaspaceSize=256m"
+
+WORKDIR /var/www
+
+# Install curl for the HEALTHCHECK probe.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the app. Vendor code (framework + activated packages) ships inside the
+# image so production boot needs no network access. If you still use the
+# deprecated `plugins/` directory, add `COPY --from=builder /build/plugins ./plugins`.
+COPY --from=builder /build/app            ./app
+COPY --from=builder /build/config         ./config
+COPY --from=builder /build/public         ./public
+COPY --from=builder /build/vendor         ./vendor
+
+# Tomcat listens on 8080 in the lucee/lucee image — matches the default
+# proxy.app_port in config/deploy.yml.
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8080/up || exit 1
