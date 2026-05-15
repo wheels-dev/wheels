@@ -46,9 +46,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(out).toInclude("uname -a");
 			});
 
-			it("throws when no command is supplied", () => {
+			it("throws when no command follows exec (bare positional)", () => {
+				// Truly bare ["exec"] — positional length is 1 directly,
+				// independent of any $deployStripFlags behavior. Guards the
+				// arrayLen(positional) < 2 check at Module.cfc:1916.
+				mod.__arguments = ["exec"];
+				expect(() => mod.deploy()).toThrow(regex="requires a command");
+			});
+
+			it("throws when only flags follow exec", () => {
+				// With flags after `exec`, $deployStripFlags removes them so
+				// positional resolves to ["exec"] (length 1), still hitting
+				// the guard. This relies on the flag-stripping behavior —
+				// the bare-positional test above is the direct guard test.
 				mod.__arguments = ["exec", "--configPath=#variables.fixture#"];
-				expect(() => mod.deploy()).toThrow();
+				expect(() => mod.deploy()).toThrow(regex="requires a command");
 			});
 
 		});
