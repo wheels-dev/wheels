@@ -42,6 +42,14 @@ component output="false" {
 		variables.loadOrder = [];
 		variables.lazyPackages = {};
 		variables.mixinCollisions = [];
+		// Per-package CFML mapping registry: alias → absolute package directory.
+		// Populated during load so each installed package gets a static, identifier-
+		// safe alias usable in `new <alias>.Sibling()` even when the on-disk dir
+		// name contains hyphens (e.g. `wheels-sentry`). See GH##2712.
+		variables.packageMappings = {};
+		// Tracks which package first claimed each alias so a later collision can
+		// be reported instead of silently overwriting.
+		variables.$mappingProviders = {};
 		// Tracks which package first registered each method per target so a
 		// later registration can be flagged as an overwrite. Keyed by target,
 		// then by method name, holding the originating package dir name.
@@ -96,6 +104,16 @@ component output="false" {
 
 	public array function getLoadOrder() {
 		return variables.loadOrder;
+	}
+
+	/**
+	 * Returns the per-package CFML mapping registry built during load.
+	 * Keys are identifier-safe aliases (e.g. `wheelsSentry` derived from
+	 * `wheels-sentry`, or an explicit `mapping` value from package.json);
+	 * values are absolute paths to the package install directory. See GH##2712.
+	 */
+	public struct function getPackageMappings() {
+		return variables.packageMappings;
 	}
 
 	/**
@@ -317,6 +335,28 @@ component output="false" {
 			manifest = local.manifest,
 			directory = arguments.pkgDir
 		};
+
+		// Derive and register the per-package CFML mapping so a sibling CFC
+		// inside the package can be referenced via a static, identifier-safe
+		// alias even when the install dir name contains hyphens. A collision
+		// (two packages computing the same alias) is recorded as a failed
+		// package and the subsequent registration is skipped — the first
+		// claimant keeps its mapping. See GH##2712.
+		local.aliasResult = $registerPackageMapping(arguments.dirName, local.manifest, arguments.pkgDir);
+		if (!local.aliasResult.ok) {
+			ArrayAppend(variables.failedPackages, {
+				name = arguments.dirName,
+				error = local.aliasResult.error,
+				detail = local.aliasResult.detail
+			});
+			WriteLog(
+				text = "[Wheels] Package '#arguments.dirName#' failed mapping registration: #local.aliasResult.error#",
+				type = "error",
+				file = "wheels"
+			);
+			StructDelete(variables.packageMeta, arguments.dirName);
+			return;
+		}
 
 		// Resolve the provides block
 		local.provides = {};
@@ -700,6 +740,123 @@ component output="false" {
 				);
 			}
 		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Per-package CFML mapping (GH##2712)
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Derives a CFML-identifier-safe alias from a package manifest. If the
+	 * manifest declares an explicit `mapping` field and it is a valid CFML
+	 * identifier, that value wins. Otherwise the alias is built from the
+	 * manifest `name` by splitting on hyphens/underscores and lower-camel-casing
+	 * the segments (`wheels-sentry` → `wheelsSentry`,
+	 * `wheels_legacy_adapter` → `wheelsLegacyAdapter`). Returns an empty
+	 * string if no valid alias can be derived — caller treats that as failure.
+	 *
+	 * @manifest Parsed package.json struct
+	 * @dirName  Package directory name (fallback when manifest lacks `name`)
+	 */
+	private string function $deriveMapping(required struct manifest, required string dirName) {
+		// Explicit override takes precedence when valid.
+		if (StructKeyExists(arguments.manifest, "mapping")
+			&& IsSimpleValue(arguments.manifest.mapping)
+			&& Len(Trim(arguments.manifest.mapping))) {
+			local.override = Trim(arguments.manifest.mapping);
+			if (REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.override)) {
+				return local.override;
+			}
+			// Invalid override → return empty so caller records the failure
+			// with a specific error message.
+			return "";
+		}
+
+		local.source = StructKeyExists(arguments.manifest, "name") && IsSimpleValue(arguments.manifest.name) && Len(Trim(arguments.manifest.name))
+			? Trim(arguments.manifest.name)
+			: arguments.dirName;
+
+		local.segments = ListToArray(local.source, "-_");
+		if (!ArrayLen(local.segments)) {
+			return "";
+		}
+
+		local.alias = LCase(local.segments[1]);
+		for (local.i = 2; local.i <= ArrayLen(local.segments); local.i++) {
+			local.seg = local.segments[local.i];
+			if (!Len(local.seg)) {
+				continue;
+			}
+			local.alias &= UCase(Left(local.seg, 1)) & LCase(Mid(local.seg, 2, Len(local.seg)));
+		}
+
+		// Strip any character outside [A-Za-z0-9_] that snuck through (e.g.
+		// numeric-only segments are fine, but leading digit must be guarded).
+		if (!REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.alias)) {
+			return "";
+		}
+		return local.alias;
+	}
+
+	/**
+	 * Registers a per-package CFML mapping for the given package. Records
+	 * the alias → pkgDir entry in `variables.packageMappings`, tracks the
+	 * first claimant in `variables.$mappingProviders` for collision detection,
+	 * and (best-effort) reflects the entry into `application.mappings` so the
+	 * static `new <alias>.Sibling()` form resolves at runtime.
+	 *
+	 * Returns `{ok: boolean, error: string, detail: string, alias: string}`.
+	 * The caller records a failed package when `ok` is false.
+	 */
+	private struct function $registerPackageMapping(
+		required string dirName,
+		required struct manifest,
+		required string pkgDir
+	) {
+		local.alias = $deriveMapping(arguments.manifest, arguments.dirName);
+		if (!Len(local.alias)) {
+			local.declared = StructKeyExists(arguments.manifest, "mapping") && IsSimpleValue(arguments.manifest.mapping)
+				? Trim(arguments.manifest.mapping)
+				: "";
+			return {
+				ok = false,
+				error = "Invalid package mapping alias",
+				detail = "Package '#arguments.dirName#' did not yield a valid CFML identifier from manifest 'mapping' (#local.declared#) or 'name'. Aliases must match [A-Za-z_][A-Za-z0-9_]*.",
+				alias = ""
+			};
+		}
+
+		if (StructKeyExists(variables.$mappingProviders, local.alias)) {
+			local.firstProvider = variables.$mappingProviders[local.alias];
+			return {
+				ok = false,
+				error = "Duplicate package mapping alias",
+				detail = "Package '#arguments.dirName#' computes alias '#local.alias#' which is already claimed by package '#local.firstProvider#'. Set a unique 'mapping' value in package.json to resolve.",
+				alias = local.alias
+			};
+		}
+
+		variables.packageMappings[local.alias] = arguments.pkgDir;
+		variables.$mappingProviders[local.alias] = arguments.dirName;
+
+		// Reflect into application.mappings when available so packages can
+		// reference siblings as `new <alias>.Sibling()`. Wrapped defensively:
+		// not every embedding context has a writable application scope (e.g.
+		// some testing harnesses), and the in-process `packageMappings`
+		// registry is the authoritative record either way.
+		try {
+			if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
+				application.mappings["/" & local.alias] = arguments.pkgDir;
+			}
+		} catch (any e) {
+			WriteLog(
+				text = "[Wheels] Package '#arguments.dirName#' could not register application mapping '/#local.alias#': #e.message#",
+				type = "warning",
+				file = "wheels"
+			);
+		}
+
+		return {ok = true, error = "", detail = "", alias = local.alias};
 	}
 
 	// ---------------------------------------------------------------------------
