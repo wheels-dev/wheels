@@ -79,7 +79,7 @@ You do not write an `options` action on your controllers. The middleware owns `O
 
 ## CDN and proxy caching
 
-When the middleware reflects a specific allowed origin — that is, when `allowOrigins` is a comma-delimited list and the incoming `Origin` matches one of the entries — it also emits `Vary: Origin` on the response. This tells CDN, reverse-proxy, and browser disk caches to key separate cache entries per origin rather than serving a cached response with the wrong `Access-Control-Allow-Origin` to callers from a different origin.
+When the middleware reflects a specific allowed origin — that is, when `allowOrigins` is not the wildcard `"*"` and the incoming `Origin` header matches one of the entries — it also emits `Vary: Origin` on the response. This tells CDN, reverse-proxy, and browser disk caches to key separate cache entries per origin rather than serving a cached response with the wrong `Access-Control-Allow-Origin` to callers from a different origin.
 
 `Vary: Origin` is **not** emitted for wildcard responses (`allowOrigins="*"`), because a wildcard response is identical for every caller. It is also omitted when the origin is not in the allowlist, because no `Access-Control-*` headers are written at all in that case.
 
