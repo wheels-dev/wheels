@@ -236,6 +236,7 @@ component {
 	 * @linkToCurrentPage Whether to render the current page as a link.
 	 * @prependToPage String to prepend before each page number.
 	 * @appendToPage String to append after each page number.
+	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom).
 	 * @pageNumberAsParam Decides whether to link the page number as a param or as part of a route.
 	 * @encode [see:styleSheetLinkTag].
 	 */
@@ -248,6 +249,7 @@ component {
 		boolean linkToCurrentPage,
 		string prependToPage,
 		string appendToPage,
+		boolean addActiveClassToPrependedParent,
 		boolean pageNumberAsParam,
 		any encode
 	) {
@@ -259,9 +261,23 @@ component {
 		local.startPage = Max(1, local.pg.currentPage - arguments.windowSize);
 		local.endPage = Min(local.pg.totalPages, local.pg.currentPage + arguments.windowSize);
 
+		// Resolve addActiveClassToPrependedParent default locally to tolerate callers that don't pass it
+		// (e.g. paginationNav passthrough on Lucee where $args defaults haven't been re-applied after reload).
+		local.addActiveOnParent = StructKeyExists(arguments, "addActiveClassToPrependedParent")
+			? arguments.addActiveClassToPrependedParent
+			: false;
+
 		for (local.i = local.startPage; local.i <= local.endPage; local.i++) {
 			if (Len(arguments.prependToPage)) {
-				local.rv &= arguments.prependToPage;
+				local.prependForThisPage = arguments.prependToPage;
+				if (local.i == local.pg.currentPage && local.addActiveOnParent) {
+					if (reFindNoCase('class\s*=\s*[''"]', arguments.prependToPage)) {
+						local.prependForThisPage = reReplaceNoCase(arguments.prependToPage, '(class\s*=\s*[''"])', '\1active ', 'one');
+					} else if (reFindNoCase('class\s*=', arguments.prependToPage)) {
+						local.prependForThisPage = reReplaceNoCase(arguments.prependToPage, '(class\s*=\s*)', '\1active ', 'one');
+					}
+				}
+				local.rv &= local.prependForThisPage;
 			}
 
 			if (local.i == local.pg.currentPage && !arguments.linkToCurrentPage) {
@@ -322,6 +338,12 @@ component {
 	 * @showNext Whether to show the next page link.
 	 * @showInfo Whether to show the pagination info text.
 	 * @showSinglePage Whether to show pagination when there is only one page.
+	 * @prepend String or HTML to be prepended inside the `<nav>` before the link list (e.g. `<ul class="pagination">`).
+	 * @append String or HTML to be appended inside the `<nav>` after the link list (e.g. `</ul>`).
+	 * @prependToPage String or HTML to wrap before each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
+	 * @appendToPage String or HTML to wrap after each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
+	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom — forwards to `pageNumberLinks`).
+	 * @anchorDivider Separator inserted between the first/previous/page-numbers/next/last sections.
 	 * @encode [see:styleSheetLinkTag].
 	 */
 	public string function paginationNav(
@@ -333,6 +355,12 @@ component {
 		boolean showNext,
 		boolean showInfo,
 		boolean showSinglePage,
+		string prepend,
+		string append,
+		string prependToPage,
+		string appendToPage,
+		boolean addActiveClassToPrependedParent,
+		string anchorDivider,
 		any encode
 	) {
 		$args(name = "paginationNav", args = arguments);
@@ -342,14 +370,19 @@ component {
 		local.subArgs.handle = arguments.handle;
 		local.subArgs.encode = arguments.encode;
 		// Pass through any extra arguments (route, controller, action, key, params, etc.)
-		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,encode";
+		// prepend/append are paginationNav-only and are NOT forwarded — they wrap the whole content.
+		// prependToPage/appendToPage forward to pageNumberLinks AND wrap the first/prev/next/last anchors here.
+		// anchorDivider is paginationNav-only and is NOT forwarded.
+		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,prepend,append,anchorDivider,encode";
 		// Union of args accepted by sub-helpers (paginationInfo, firstPageLink,
 		// previousPageLink, pageNumberLinks, nextPageLink, lastPageLink) plus the
 		// URL-building keys forwarded by $paginationLinkToArgs. Keys outside this
 		// allowlist are silently dropped by CFML's argumentCollection dispatch,
 		// which makes typos like prependToList="<ul>" invisible — see issue #2717.
+		// `addActiveClassToPrependedParent` is forwarded to `pageNumberLinks` per #2715
+		// so it must appear in the allowlist alongside `prependToPage`/`appendToPage`.
 		local.allowedSubArgs = "format,text,name,class,disabledClass,showDisabled,pageNumberAsParam"
-			& ",windowSize,classForCurrent,linkToCurrentPage,prependToPage,appendToPage"
+			& ",windowSize,classForCurrent,linkToCurrentPage,prependToPage,appendToPage,addActiveClassToPrependedParent"
 			& ",route,controller,action,key,anchor,onlyPath,host,protocol,port,params";
 		local.unknownArgs = "";
 		for (local.key in arguments) {
@@ -395,34 +428,62 @@ component {
 			return "";
 		}
 
-		local.content = "";
+		local.sections = [];
 
 		if (arguments.showInfo) {
-			local.content &= paginationInfo(argumentCollection = local.subArgs);
-			local.content &= " ";
+			ArrayAppend(local.sections, paginationInfo(argumentCollection = local.subArgs));
 		}
 
 		if (arguments.showFirst) {
-			local.content &= firstPageLink(argumentCollection = local.subArgs);
-			local.content &= " ";
+			local.firstLink = firstPageLink(argumentCollection = local.subArgs);
+			if (Len(local.firstLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.firstLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
 
 		if (arguments.showPrevious) {
-			local.content &= previousPageLink(argumentCollection = local.subArgs);
-			local.content &= " ";
+			local.prevLink = previousPageLink(argumentCollection = local.subArgs);
+			if (Len(local.prevLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.prevLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
 
-		local.content &= pageNumberLinks(argumentCollection = local.subArgs);
+		local.numberLinks = pageNumberLinks(argumentCollection = local.subArgs);
+		if (Len(local.numberLinks)) {
+			ArrayAppend(local.sections, local.numberLinks);
+		}
 
 		if (arguments.showNext) {
-			local.content &= " ";
-			local.content &= nextPageLink(argumentCollection = local.subArgs);
+			local.nextLink = nextPageLink(argumentCollection = local.subArgs);
+			if (Len(local.nextLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.nextLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
 
 		if (arguments.showLast) {
-			local.content &= " ";
-			local.content &= lastPageLink(argumentCollection = local.subArgs);
+			local.lastLink = lastPageLink(argumentCollection = local.subArgs);
+			if (Len(local.lastLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.lastLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
+
+		local.content = arguments.prepend & ArrayToList(local.sections, arguments.anchorDivider) & arguments.append;
 
 		return $element(
 			name = "nav",
@@ -430,6 +491,20 @@ component {
 			class = arguments.navClass,
 			encode = false
 		);
+	}
+
+	/**
+	 * Internal: wraps a single anchor in prependToPage/appendToPage, mirroring pageNumberLinks's wrapping behavior.
+	 */
+	public string function $paginationWrapAnchor(
+		required string anchor,
+		string prependToPage = "",
+		string appendToPage = ""
+	) {
+		if (!Len(arguments.anchor)) {
+			return "";
+		}
+		return arguments.prependToPage & arguments.anchor & arguments.appendToPage;
 	}
 
 	/**
