@@ -97,11 +97,19 @@
 
 <!--- list of tables to delete --->
 <cfset local.tables = "c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems">
+<!---
+	On Oracle, append CASCADE CONSTRAINTS so the drop removes incoming FK
+	references along with the table. PURGE skips the recycle bin so the
+	original constraint names are freed immediately — without it, BIN$...
+	renames work in theory but matrix re-runs still collide with
+	ORA-02264 in practice.
+--->
+<cfset local.dropSuffix = (local.db IS "oracle") ? " CASCADE CONSTRAINTS PURGE" : "">
 <cfloop list="#local.tables#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
 			<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-			DROP TABLE #local.i#
+			DROP TABLE #local.i##local.dropSuffix#
 			</cfquery>
 			<cfcatch></cfcatch>
 		</cftry>

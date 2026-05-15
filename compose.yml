@@ -260,7 +260,7 @@ services:
       - wheels-network
 
   mysql:
-    image: mysql:9
+    image: mysql:9.7.0
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: wheelstestdb
@@ -281,7 +281,7 @@ services:
       - wheels-network
 
   postgres:
-    image: postgres:18
+    image: postgres:18.4
     restart: always
     environment:
       POSTGRES_USER: wheelstestdb
@@ -331,7 +331,7 @@ services:
       - wheels-network
 
   cockroachdb:
-    image: cockroachdb/cockroach:latest-v24.3
+    image: cockroachdb/cockroach:v24.3.32
     restart: always
     command: start-single-node --insecure --advertise-addr=cockroachdb
     ports:
@@ -349,7 +349,7 @@ services:
       - wheels-network
 
   cockroachdb-init:
-    image: cockroachdb/cockroach:latest-v24.3
+    image: cockroachdb/cockroach:v24.3.32
     depends_on:
       cockroachdb:
         condition: service_healthy
@@ -359,7 +359,7 @@ services:
       - wheels-network
 
   oracle:
-    image: gvenzl/oracle-free:23-slim
+    image: gvenzl/oracle-free:23.26.1-slim
     restart: always
     environment:
       ORACLE_PASSWORD: wheelstestdb
