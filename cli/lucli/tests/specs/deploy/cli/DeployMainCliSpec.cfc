@@ -428,7 +428,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             // raise Wheels.Deploy.RemoteExecutionFailed on nonzero exits, and the
             // deploy dispatchers opt-in to that strict mode for every non-teardown verb.
 
-            it("deploy throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails on the remote (#2696)", () => {
+            it("deploy throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails on the remote (##2696)", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 // Use the same component the production deploy uses to compute the exact pull command.
                 var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
@@ -443,7 +443,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     .toThrow(type="Wheels.Deploy.RemoteExecutionFailed", regex="exit 1");
             });
 
-            it("setup throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails (alias for deploy) (#2696)", () => {
+            it("setup throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails (alias for deploy) (##2696)", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
                 var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
@@ -455,7 +455,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     .toThrow(type="Wheels.Deploy.RemoteExecutionFailed");
             });
 
-            it("the thrown Wheels.Deploy.RemoteExecutionFailed names the host, exit code, and a command summary (#2696)", () => {
+            it("the thrown Wheels.Deploy.RemoteExecutionFailed names the host, exit code, and a command summary (##2696)", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
                 var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
@@ -476,7 +476,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 }
             });
 
-            it("rollback throws on a failing docker start (#2696)", () => {
+            it("rollback throws on a failing docker start (##2696)", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
                 var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
@@ -489,7 +489,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     .toThrow(type="Wheels.Deploy.RemoteExecutionFailed");
             });
 
-            it("remove --confirm tolerates a missing kamal-proxy and still dispatches the remaining teardown steps (#2696)", () => {
+            it("remove --confirm tolerates a missing kamal-proxy and still dispatches the remaining teardown steps (##2696)", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
                 var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
@@ -507,7 +507,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(sawLogout).toBeTrue();
             });
 
-            it("deploy still propagates lock-release exceptions in the finally block as no-ops when release fails (#2696)", () => {
+            it("deploy still propagates lock-release exceptions in the finally block as no-ops when release fails (##2696)", () => {
                 // lock.release() runs in the deploy() finally block and must never
                 // shadow the original deploy exception. Inject a release failure
                 // alongside a pull failure and assert the surfaced exception is the
