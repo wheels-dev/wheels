@@ -139,7 +139,7 @@ component {
         return out;
     }
 
-    // Stderr is drained but discarded on non-zero exit so git's "fatal: not a git repository..." doesn't surface as the version string (issue #2671).
+    // Stderr is drained but discarded on non-zero exit so git's "fatal: not a git repository..." doesn't surface as the version string.
     public string function $gitShortSha(string workingDir = "") {
         try {
             var pb = createObject("java", "java.lang.ProcessBuilder")
