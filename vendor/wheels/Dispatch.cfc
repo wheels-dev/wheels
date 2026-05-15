@@ -257,6 +257,35 @@ component output="false" extends="wheels.Global"{
 			$debugPoint("setup");
 		}
 
+		// CORS preflight short-circuit: when the global middleware pipeline contains
+		// a `wheels.middleware.Cors` instance, run OPTIONS through the pipeline
+		// before route matching so unmatched preflight verbs reach the CORS handler
+		// instead of 404ing in $findMatchingRoute. The legacy
+		// `set(allowCorsRequests=true)` path aborted OPTIONS in EventMethods.cfc
+		// before dispatch; this preserves that contract for middleware users.
+		// See issue #2703.
+		local.preflightMethod = "";
+		try {
+			local.preflightMethod = $getRequestMethod();
+		} catch (any e) {
+		}
+		if (UCase(local.preflightMethod) == "OPTIONS" && $hasPreflightCapableMiddleware()) {
+			request.wheels.params = {};
+			local.preflightContext = {
+				params = {},
+				route = {},
+				pathInfo = arguments.pathInfo,
+				method = local.preflightMethod
+			};
+			local.preflightHandler = function(required struct request) {
+				return "";
+			};
+			return variables.$middlewarePipeline.run(
+				request = local.preflightContext,
+				coreHandler = local.preflightHandler
+			);
+		}
+
 		local.params = $paramParser(argumentCollection = arguments);
 
 		// Set params in the request scope as well so we can display it in the debug info outside of the controller context.
@@ -323,6 +352,21 @@ component output="false" extends="wheels.Global"{
 
 			return variables.$middlewarePipeline.run(request = local.requestContext, coreHandler = local.coreHandler);
 		}
+	}
+
+	/**
+	 * Returns true if the global middleware pipeline contains a CORS middleware
+	 * instance capable of handling an OPTIONS preflight short-circuit. Used to
+	 * preserve the legacy `allowCorsRequests=true` short-circuit semantics in
+	 * the new middleware pipeline. See issue #2703.
+	 */
+	private boolean function $hasPreflightCapableMiddleware() {
+		for (local.mw in variables.$middlewarePipeline.getMiddleware()) {
+			if (IsObject(local.mw) && IsInstanceOf(local.mw, "wheels.middleware.Cors")) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
