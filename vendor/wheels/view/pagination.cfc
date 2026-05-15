@@ -560,7 +560,11 @@ component {
 				arguments.linkArgs.class = "pagination-link";
 				return linkTo(argumentCollection = arguments.linkArgs);
 			default:
-				return local.label;
+				Throw(
+					type = "Wheels.InvalidViewStyle",
+					message = "Unknown viewStyle [#arguments.viewStyle#] passed to pageNumberLinks().",
+					detail = "Supported values are ""plain"", ""bootstrap5"", ""bootstrap4"", and ""tailwind""."
+				);
 		}
 	}
 
@@ -641,7 +645,11 @@ component {
 			case "tailwind":
 				return '<nav aria-label="Pagination" class="pagination">' & local.infoHtml & local.items & '</nav>';
 			default:
-				return '<nav>' & local.infoHtml & local.items & '</nav>';
+				Throw(
+					type = "Wheels.InvalidViewStyle",
+					message = "Unknown viewStyle [#arguments.viewStyle#] passed to paginationNav().",
+					detail = "Supported values are ""plain"", ""bootstrap5"", ""bootstrap4"", and ""tailwind""."
+				);
 		}
 	}
 
@@ -696,7 +704,11 @@ component {
 				local.linkArgs.class = "pagination-link";
 				return linkTo(argumentCollection = local.linkArgs);
 			default:
-				return arguments.text;
+				Throw(
+					type = "Wheels.InvalidViewStyle",
+					message = "Unknown viewStyle [#arguments.viewStyle#] passed to paginationNav() nav link rendering.",
+					detail = "Supported values are ""plain"", ""bootstrap5"", ""bootstrap4"", and ""tailwind""."
+				);
 		}
 	}
 

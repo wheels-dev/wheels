@@ -350,6 +350,20 @@ component extends="wheels.WheelsTest" {
 					expect(infoPos).toBeLT(ulPos)
 				})
 
+				it("throws Wheels.InvalidViewStyle on typo passed to pageNumberLinks", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					expect(function() {
+						_controller.pageNumberLinks(viewStyle = "boostrap5")
+					}).toThrow("Wheels.InvalidViewStyle")
+				})
+
+				it("throws Wheels.InvalidViewStyle on typo passed to paginationNav", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					expect(function() {
+						_controller.paginationNav(viewStyle = "boostrap5")
+					}).toThrow("Wheels.InvalidViewStyle")
+				})
+
 			})
 
 			/* ── paginationNav ─────────────────────────── */
