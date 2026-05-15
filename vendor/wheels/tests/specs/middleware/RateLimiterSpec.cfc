@@ -906,19 +906,19 @@ component extends="wheels.WheelsTest" {
 
 		describe("RateLimiter input validation", function() {
 
-			it("rejects windowSeconds=0 with a framework-shaped configuration error (#2693)", function() {
+			it("rejects windowSeconds=0 with a framework-shaped configuration error (##2693)", function() {
 				expect(function() {
 					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0);
 				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
 			});
 
-			it("rejects negative windowSeconds (#2693)", function() {
+			it("rejects negative windowSeconds (##2693)", function() {
 				expect(function() {
 					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = -10);
 				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
 			});
 
-			it("rejects negative maxRequests (#2693)", function() {
+			it("rejects negative maxRequests (##2693)", function() {
 				expect(function() {
 					new wheels.middleware.RateLimiter(maxRequests = -1, windowSeconds = 60);
 				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
