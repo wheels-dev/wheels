@@ -109,7 +109,7 @@ component {
         var versionOptional = arguments.flags.versionOptional ?: false;
         if (!versionOptional && !len(version)) {
             throw(type="DeployAppCli.MissingVersion",
-                  message="This verb requires --version");
+                  message="This verb requires --release (or --version on a wrapper that rewrites it)");
         }
         var dryRun = arguments.opts.dryRun ?: false;
         var appCmds = new modules.wheels.services.deploy.commands.AppCommands(cfg);
