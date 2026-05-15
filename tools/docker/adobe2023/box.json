@@ -2,7 +2,7 @@
     "name": "wheels-test-suite-adobe2023",
     "version": "1.0.0",
     "devDependencies": {
-        "commandbox-dotenv": "*",
-        "commandbox-cfconfig": "*"
+        "commandbox-dotenv": "2.4.1",
+        "commandbox-cfconfig": "2.2.1"
     }
 }

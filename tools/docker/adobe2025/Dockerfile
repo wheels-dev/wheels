@@ -1,4 +1,4 @@
-FROM ortussolutions/commandbox:jdk21
+FROM ortussolutions/commandbox:jdk21@sha256:d65126caeb6c80c115d4cc93f9b9db88697c4fe2aa4ca83ea9a36dadc62c02c1
 
 LABEL maintainer "Wheels Core Team"
 

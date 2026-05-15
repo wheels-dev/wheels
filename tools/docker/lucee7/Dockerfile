@@ -1,4 +1,4 @@
-FROM ortussolutions/commandbox:latest
+FROM ortussolutions/commandbox:latest@sha256:1f180edf899d1db7fc906835e20c12ed18a93db2c2c1053ac5cace2f28626da0
 
 LABEL maintainer "Wheels Core Team"
 

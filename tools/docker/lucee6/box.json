@@ -2,6 +2,6 @@
     "name": "wheels-test-suite-lucee6",
     "version": "1.0.0",
     "devDependencies": {
-        "commandbox-dotenv": "*"
+        "commandbox-dotenv": "2.4.1"
     }
 }
