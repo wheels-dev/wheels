@@ -904,6 +904,37 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("RateLimiter input validation", function() {
+
+			it("rejects windowSeconds=0 with a framework-shaped configuration error (##2693)", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("rejects negative windowSeconds (##2693)", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = -10);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("rejects negative maxRequests (##2693)", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = -1, windowSeconds = 60);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("accepts maxRequests=0 (kill-switch — block every request)", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 0, windowSeconds = 60);
+				var result = limiter.handle(
+					request = {cgi: {remote_addr: "192.0.2.1"}},
+					next = function(req) { return "should-not-fire"; }
+				);
+				expect(result).toInclude("Rate limit exceeded");
+			});
+
+		});
+
 	}
 
 }
