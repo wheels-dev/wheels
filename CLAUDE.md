@@ -469,9 +469,11 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #pageNumberLinks(viewStyle="bootstrap5")#
 
 // Bootstrap 4 — same as bootstrap5 but omits aria-current
+#paginationNav(viewStyle="bootstrap4")#
 #pageNumberLinks(viewStyle="bootstrap4")#
 
 // Tailwind — flat structure with pagination-current / pagination-link utility classes
+#paginationNav(viewStyle="tailwind")#
 #pageNumberLinks(viewStyle="tailwind")#
 
 // Individual helpers for custom layouts
