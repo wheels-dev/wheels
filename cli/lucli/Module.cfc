@@ -1956,7 +1956,7 @@ component extends="modules.BaseModule" {
 		}
 	}
 
-	public struct function $deployArgsToOptions(required array args) {
+	private struct function $deployArgsToOptions(required array args) {
 		// Delegates to a standalone parser CFC so the logic can be unit-tested
 		// without instantiating Module.cfc (which requires the modules.BaseModule
 		// mapping that only exists inside the LuCLI runtime). See issue #2674

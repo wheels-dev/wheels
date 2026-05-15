@@ -53,6 +53,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(opts.destination).toBe("staging");
                 expect(opts.dryRun).toBeTrue();
             });
+
+            // Documents the pre-existing silent-drop on last-token flags.
+            // The behavior is symmetric between --release and --version
+            // (same `i < n` guard); freezing it under test guards against
+            // an accidental change in either arm.
+            it("silently drops --release when no value follows", () => {
+                var opts = parser.parse(["--release"]);
+                expect(structKeyExists(opts, "version")).toBeFalse();
+            });
+
+            it("silently drops --version when no value follows", () => {
+                var opts = parser.parse(["--version"]);
+                expect(structKeyExists(opts, "version")).toBeFalse();
+            });
         });
     }
 }
