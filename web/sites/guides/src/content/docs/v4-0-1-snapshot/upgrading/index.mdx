@@ -25,10 +25,14 @@ Deprecations land in a minor release with a log warning and stay functional unti
 Three sources, in order of authority:
 
 - `vendor/wheels/events/onapplicationstart.cfc` — the `application.$wheels.version` assignment is the runtime truth. As of this snapshot, `4.0.0`.
-- `box.json` at the repo root — the package manifest version.
-- `CHANGELOG.md` — the most recent non-`[Unreleased]` heading.
+- `wheels.json` at the repo root — the package manifest version.
+- `CHANGELOG.md` at the repo root — the most recent non-`[Unreleased]` heading.
 
 If any two disagree, the runtime constant wins — that's the version your app actually boots against.
+
+<Aside type="note">
+  `CHANGELOG.md` lives at the repository root and is not bundled inside `vendor/wheels/`. If you work with a vendored copy of the framework and cannot reach GitHub, see [Reading the Changelog](/v4-0-1-snapshot/upgrading/changelog/) for how to access it offline.
+</Aside>
 
 ## Release cadence
 
@@ -49,7 +53,7 @@ Four rules, in order:
   Wheels 4.0 deprecates the legacy `plugins/` system in favor of first-party packages distributed as standalone repos (indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) and installed into `vendor/<name>/`. If your 3.x app depends on plugins, read [Packages](/v4-0-1-snapshot/digging-deeper/packages/) alongside the 3.x→4.x guide — it explains the new activation model.
 </Aside>
 
-## Upgrade guides
+## Upgrade guides and reference
 
 <CardGrid>
   <LinkCard
@@ -61,5 +65,10 @@ Four rules, in order:
     title="2.x to 3.x"
     description="The CFWheels to Wheels rebrand, test framework migration to WheelsTest BDD, and the foundational changes in 3.0. Kept here as a pointer for apps still on 2.x."
     href="/v4-0-1-snapshot/upgrading/2x-to-3x/"
+  />
+  <LinkCard
+    title="Reading the Changelog"
+    description="Where CHANGELOG.md lives, how to look up PR references cited in upgrade guides, and how to access it when working with a vendored copy offline."
+    href="/v4-0-1-snapshot/upgrading/changelog/"
   />
 </CardGrid>
