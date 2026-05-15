@@ -2056,6 +2056,16 @@ component extends="modules.BaseModule" {
 		var positional = $packagesStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
 
+		// `--help` / `-h` short-circuits to a deterministic help string the
+		// module owns directly. LuCLI's auto-introspected help previously
+		// drifted from the real CLI surface — advertising the dead `install`
+		// verb that LuCLI itself intercepts (#2713). Owning the text here
+		// guarantees `wheels packages help`, `wheels packages --help`, and
+		// `wheels packages -h` all reach $packagesHelp().
+		if (opts.help ?: false || sub == "help" || sub == "-h") {
+			return $packagesHelp();
+		}
+
 		switch (sub) {
 			case "list":
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
@@ -2121,6 +2131,43 @@ component extends="modules.BaseModule" {
 		}
 	}
 
+	// Hand-written help for `wheels packages`. Owned by the module rather than
+	// auto-derived from picocli introspection because the auto-help drifted
+	// from the real CLI surface (#2713 — advertised `install <name> [--force]`
+	// even though LuCLI's built-in extension installer intercepts the literal
+	// `install` verb before dispatch reaches this module). Same trap that hit
+	// `wheels browser install` (renamed to `setup` in #2345).
+	private string function $packagesHelp() {
+		var nl = chr(10);
+		var help = "Usage: wheels packages <subcommand> [options]" & nl;
+		help &= "  Install, update, search, and list Wheels packages from the wheels-packages registry." & nl & nl;
+		help &= "Subcommands:" & nl;
+		help &= "  list [--tag=<tag>]                      List packages (optionally filtered by tag)" & nl;
+		help &= "  search <query>                          Search package names, descriptions, and tags" & nl;
+		help &= "  show <name>                             Show package details and compatible versions" & nl;
+		help &= "  add <name>[@<version>] [--force]        Install a package into vendor/<name>/ (canonical)" & nl;
+		help &= "  update <name> --yes                     Update an installed package" & nl;
+		help &= "  update --all --yes                      Update every installed package" & nl;
+		help &= "  remove <name>                           Delete an installed package from vendor/" & nl;
+		help &= "  registry refresh                        Bust the 24-hour registry cache" & nl;
+		help &= "  registry info                           Show the registry URL and cache state" & nl;
+		help &= "  help, --help, -h                        Show this help" & nl & nl;
+		help &= "Note: the install verb is `add`, NOT `install`." & nl;
+		help &= "  Typing `wheels packages install <name>` is intercepted by LuCLI's built-in" & nl;
+		help &= "  extension installer before dispatch reaches this module, and prints" & nl;
+		help &= "  '[INFO] No git or extension dependencies to install' without installing" & nl;
+		help &= "  anything. Use `wheels packages add <name>` instead. Same trap that bit" & nl;
+		help &= "  `wheels browser install` (renamed to `wheels browser setup` in #2345)." & nl & nl;
+		help &= "Examples:" & nl;
+		help &= "  wheels packages list" & nl;
+		help &= "  wheels packages search ui" & nl;
+		help &= "  wheels packages add wheels-basecoat" & nl;
+		help &= "  wheels packages add wheels-basecoat@1.0.1" & nl;
+		help &= "  wheels packages update --all --yes" & nl;
+		help &= "  wheels packages remove wheels-basecoat" & nl;
+		return help;
+	}
+
 	private struct function $packagesArgsToOptions(required array args) {
 		var opts = {};
 		var n = arrayLen(arguments.args);
@@ -2133,6 +2180,8 @@ component extends="modules.BaseModule" {
 				opts.yes = true;
 			} else if (a == "--force") {
 				opts.force = true;
+			} else if (a == "--help" || a == "-h") {
+				opts.help = true;
 			} else if (left(a, 6) == "--tag=") {
 				opts.tag = mid(a, 7, 99999);
 			} else if (a == "--tag" && i < n) {
@@ -2151,10 +2200,14 @@ component extends="modules.BaseModule" {
 		while (i <= n) {
 			var a = arguments.args[i];
 			if (left(a, 2) == "--") {
-				var booleans = "--all,--yes,--force";
+				var booleans = "--all,--yes,--force,--help";
 				if (!find("=", a) && !listFindNoCase(booleans, a) && i < n && left(arguments.args[i+1], 2) != "--") {
 					i++;
 				}
+				i++;
+				continue;
+			}
+			if (a == "-h") {
 				i++;
 				continue;
 			}
