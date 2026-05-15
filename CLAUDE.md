@@ -374,6 +374,8 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
 }
 ```
 
+**`mapping`**: Optional CFML-identifier-safe alias registered as a CFML mapping at load time. Lets CFCs inside the package use `new wheelsSentry.SentryClient()` instead of `CreateObject("component", "vendor.wheels-sentry.SentryClient")`. Defaults to lower-camel-case of `name` (`wheels-sentry` → `wheelsSentry`). Must match `[A-Za-z_][A-Za-z0-9_]*`. Two packages that compute the same alias: the second fails with `Duplicate package mapping alias`. Inspect registered aliases via `PackageLoader.getPackageMappings()`.
+
 **`provides.mixins`**: Comma-delimited targets from the allowlist `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus the special values `global` (inject into all targets) and `none` (explicit opt-out). Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`). Unknown targets (typos, `view`, `service`, etc.) are rejected with a clear error — view helpers belong in `controller` mixins since Wheels views execute in the controller's variables scope.
 
 ### Installing a Package
