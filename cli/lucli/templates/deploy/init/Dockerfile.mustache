@@ -19,11 +19,13 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /build
 
-# Install front-end dependencies first so layer cache survives source edits.
-COPY package.json package-lock.json* ./
-RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
-
+# Copy the whole build context. The npm steps below run only when
+# `package.json` exists, so Wheels apps without a JS pipeline pass through
+# this stage unchanged. (A separate `COPY package.json ...` would fail the
+# build for apps that don't have one.)
 COPY . .
+
+RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
 
 # Skip silently if there is no build script defined.
 RUN if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.build ? 0 : 1)"; then \
@@ -37,9 +39,14 @@ FROM lucee/lucee:7-tomcat10-jre21
 LABEL org.opencontainers.image.title="{{service_name}}"
 
 # Wheels reads these at boot. Override per-environment at `docker run` time.
+#
+# Secrets (reload password, DB password, API keys) are NOT baked here — they
+# are injected at deploy time from `.kamal/secrets` via `config/deploy.yml`.
+# The bundled secrets template exposes `WHEELS_RELOAD_PASSWORD`; wire your
+# `config/settings.cfm` reloadPassword to `getenv("WHEELS_RELOAD_PASSWORD")`
+# to pick it up.
 ENV WHEELS_ENV=production \
     WHEELS_DATASOURCE=app \
-    RELOAD_PASSWORD=change-me \
     CATALINA_OPTS="-Xms256m -Xmx1g -XX:MaxMetaspaceSize=256m"
 
 WORKDIR /var/www
@@ -50,7 +57,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the app. Vendor code (framework + activated packages) ships inside the
-# image so production boot needs no network access.
+# image so production boot needs no network access. If you still use the
+# deprecated `plugins/` directory, add `COPY --from=builder /build/plugins ./plugins`.
 COPY --from=builder /build/app            ./app
 COPY --from=builder /build/config         ./config
 COPY --from=builder /build/public         ./public

@@ -239,15 +239,38 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 directoryCreate(tmpCwd & "/config", true, true);
                 fileWrite(tmpCwd & "/config/deploy.yml", "old content");
                 fileWrite(tmpCwd & "/Dockerfile", "FROM scratch");
+                fileWrite(tmpCwd & "/.dockerignore", "## sentinel — pre-existing dockerignore");
 
                 var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
                     new cli.lucli.services.deploy.lib.FakeSshPool()
                 );
-                localCli.init_stub({cwd: tmpCwd, service: "new", image: "new/web", force: true});
+                var summary = localCli.init_stub({cwd: tmpCwd, service: "new", image: "new/web", force: true});
                 var yml = fileRead(tmpCwd & "/config/deploy.yml");
                 expect(yml).toInclude("service: new");
                 var df = fileRead(tmpCwd & "/Dockerfile");
                 expect(df).toInclude("FROM lucee/lucee");
+                // force=true exercises the `force ||` branch of the dockerignore guard.
+                var di = fileRead(tmpCwd & "/.dockerignore");
+                expect(di).notToInclude("sentinel");
+                expect(summary).toInclude(".dockerignore");
+                expect(summary).notToInclude("preserved");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub silently preserves an existing .dockerignore without force", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                var sentinel = "## sentinel — user's dockerignore must survive";
+                fileWrite(tmpCwd & "/.dockerignore", sentinel);
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var summary = localCli.init_stub({cwd: tmpCwd, service: "x", image: "y/z"});
+
+                expect(fileRead(tmpCwd & "/.dockerignore")).toBe(sentinel);
+                expect(summary).toInclude("preserved existing .dockerignore");
 
                 directoryDelete(tmpCwd, true);
             });

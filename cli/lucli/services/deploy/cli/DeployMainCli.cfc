@@ -362,11 +362,15 @@ component {
         fileWrite(dockerfilePath, mustache.render(fileRead(tplDir & "/Dockerfile.mustache"), ctx));
         // .dockerignore source filename is `dockerignore.mustache` so the
         // template doesn't itself get hidden by tooling that ignores dotfiles.
-        if (force || !fileExists(dockerignorePath)) {
+        var dockerignoreWritten = (force || !fileExists(dockerignorePath));
+        if (dockerignoreWritten) {
             fileWrite(dockerignorePath, mustache.render(fileRead(tplDir & "/dockerignore.mustache"), ctx));
         }
 
-        return "Created config/deploy.yml, .kamal/secrets, Dockerfile, and .dockerignore." & chr(10)
+        var summary = dockerignoreWritten
+            ? "Created config/deploy.yml, .kamal/secrets, Dockerfile, and .dockerignore."
+            : "Created config/deploy.yml, .kamal/secrets, and Dockerfile (preserved existing .dockerignore).";
+        return summary & chr(10)
              & "Next steps:" & chr(10)
              & "  1. Edit config/deploy.yml — update servers, proxy host, registry username." & chr(10)
              & "  2. Review the generated Dockerfile — adjust COPY paths and the Lucee/CFML base if your app needs it." & chr(10)
