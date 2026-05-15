@@ -1,22 +1,20 @@
 ---
-title: "wheels deploy server bootstrap"
-description: Install Docker on a fresh host. Idempotent — safe to re-run.
+title: "wheels deploy bootstrap"
+description: Install Docker on every deploy host. Flat alias for `wheels deploy server bootstrap`.
 type: reference
 sidebar:
   label: "bootstrap"
-  order: 2
+  order: 71
 ---
 
 Install Docker on every host. Idempotent — re-runs on already-installed hosts are no-ops.
 
-:::caution[Prefer `wheels deploy bootstrap` at the shell]
-This nested form is accepted by the deploy dispatcher but does not work when invoked through the wheels CLI — the runtime intercepts `server` for Lucee server lifecycle before deploy sees it. Use the flat alias [`wheels deploy bootstrap`](/v4-0-1-snapshot/command-line-tools/commands/deploy/bootstrap/) instead. See [issue #2677](https://github.com/wheels-dev/wheels/issues/2677).
-:::
+This is the **canonical CLI form** for the bootstrap operation. The Kamal-style nested `wheels deploy server bootstrap` is also accepted by the deploy dispatcher, but the CLI runtime registers `server` as a top-level command (for Lucee server lifecycle) and intercepts the three-token form before deploy can see it. The flat alias sidesteps the collision — see [issue #2677](https://github.com/wheels-dev/wheels/issues/2677).
 
 ## Synopsis
 
 ```txt title="synopsis"
-wheels deploy server bootstrap [--destination=<name>] [--dry-run]
+wheels deploy bootstrap [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
@@ -39,5 +37,5 @@ The convenience script runs as root (or via `sudo`). For production hardening, i
 ## Example
 
 ```bash title="example"
-wheels deploy server bootstrap
+wheels deploy bootstrap
 ```

@@ -422,6 +422,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("Removed");
                 expect(out).toInclude("demo");
             });
+
+            // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.
+            it("$gitShortSha() returns 'unknown' when run outside a git repo", () => {
+                var nonGitDir = getTempDirectory() & "/wheels-2671-main-" & createUUID();
+                directoryCreate(nonGitDir, true, true);
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var sha = dc.$gitShortSha(nonGitDir);
+                    expect(sha).toBe("unknown");
+                    // Belt-and-braces: explicit no-leak assertions documenting the original bug shape.
+                    expect(findNoCase("fatal", sha)).toBe(0);
+                    expect(findNoCase("not a git repository", sha)).toBe(0);
+                } finally {
+                    directoryDelete(nonGitDir, true);
+                }
+            });
         });
     }
 

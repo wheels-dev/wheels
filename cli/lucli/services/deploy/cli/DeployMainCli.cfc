@@ -520,13 +520,16 @@ component {
         return out;
     }
 
-    private string function $gitShortSha() {
+    // Stderr is drained but discarded on non-zero exit so git's "fatal: not a git repository..." doesn't surface as the version string.
+    public string function $gitShortSha(string workingDir = "") {
         try {
             var pb = createObject("java", "java.lang.ProcessBuilder")
                 .init(["git", "rev-parse", "--short", "HEAD"]);
+            if (len(arguments.workingDir)) {
+                pb.directory(createObject("java", "java.io.File").init(arguments.workingDir));
+            }
             pb.redirectErrorStream(true);
             var proc = pb.start();
-            proc.waitFor();
             var reader = createObject("java", "java.io.BufferedReader").init(
                 createObject("java", "java.io.InputStreamReader").init(
                     proc.getInputStream(), "UTF-8"
@@ -538,6 +541,8 @@ component {
                 sb.append(line);
                 line = reader.readLine();
             }
+            var exitCode = proc.waitFor();
+            if (exitCode != 0) return "unknown";
             return trim(sb.toString());
         } catch (any e) {
             return "unknown";

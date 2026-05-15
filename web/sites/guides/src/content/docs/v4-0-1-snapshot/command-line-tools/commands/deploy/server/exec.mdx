@@ -9,6 +9,10 @@ sidebar:
 
 Run a command on every host. Filter to one host with `--host=`.
 
+:::caution[Prefer `wheels deploy exec` at the shell]
+This nested form is accepted by the deploy dispatcher but does not work when invoked through the wheels CLI — the runtime intercepts `server` for Lucee server lifecycle before deploy sees it. Use the flat alias [`wheels deploy exec`](/v4-0-1-snapshot/command-line-tools/commands/deploy/exec/) instead. See [issue #2677](https://github.com/wheels-dev/wheels/issues/2677).
+:::
+
 ## Synopsis
 
 ``` title="synopsis"
