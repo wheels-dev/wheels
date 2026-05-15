@@ -395,8 +395,20 @@ component extends="wheels.WheelsTest" {
 
 				it("uses anchorDivider between adjacent sub-helper output sections", () => {
 					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
-					result = _controller.paginationNav(anchorDivider = "|")
-					expect(result).toInclude("|")
+					// Use a sentinel that cannot incidentally appear inside a URL, page-number
+					// text, attribute value, or tag name — otherwise the assertion can pass
+					// even when anchorDivider is ignored.
+					result = _controller.paginationNav(
+						anchorDivider = "XDIVX",
+						showFirst = true,
+						showLast = true,
+						showPrevious = true,
+						showNext = true
+					)
+					expect(result).toInclude("XDIVX")
+					// And it must sit *between* sections — never inside a tag, never inside
+					// rendered text — i.e. between a closing tag and the next opening tag.
+					expect(result).toMatch("</[^>]+>XDIVX<")
 				})
 
 			})

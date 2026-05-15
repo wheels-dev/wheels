@@ -236,7 +236,7 @@ component {
 	 * @linkToCurrentPage Whether to render the current page as a link.
 	 * @prependToPage String to prepend before each page number.
 	 * @appendToPage String to append after each page number.
-	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom).
+	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom). Has no effect if `prependToPage` contains no `class` attribute.
 	 * @pageNumberAsParam Decides whether to link the page number as a param or as part of a route.
 	 * @encode [see:styleSheetLinkTag].
 	 */
@@ -260,6 +260,13 @@ component {
 		// Calculate window boundaries
 		local.startPage = Max(1, local.pg.currentPage - arguments.windowSize);
 		local.endPage = Min(local.pg.totalPages, local.pg.currentPage + arguments.windowSize);
+
+		// Scrub event-handler attributes and javascript: URIs from author-supplied wrappers once,
+		// before the loop. Applies the same entity-decode + on\w+= / javascript: strip contract that
+		// `paginationLinks()` applies to `prependToPage`, extended here to `appendToPage` as well so
+		// the new `pageNumberLinks` / `paginationNav` code path inherits the full defense-in-depth.
+		arguments.prependToPage = $paginationSanitizeWrapper(arguments.prependToPage);
+		arguments.appendToPage = $paginationSanitizeWrapper(arguments.appendToPage);
 
 		// Resolve addActiveClassToPrependedParent default locally to tolerate callers that don't pass it
 		// (e.g. paginationNav passthrough on Lucee where $args defaults haven't been re-applied after reload).
@@ -342,7 +349,7 @@ component {
 	 * @append String or HTML to be appended inside the `<nav>` after the link list (e.g. `</ul>`).
 	 * @prependToPage String or HTML to wrap before each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
 	 * @appendToPage String or HTML to wrap after each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
-	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom — forwards to `pageNumberLinks`).
+	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom — forwards to `pageNumberLinks`). Has no effect if `prependToPage` contains no `class` attribute.
 	 * @anchorDivider Separator inserted between the first/previous/page-numbers/next/last sections.
 	 * @encode [see:styleSheetLinkTag].
 	 */
@@ -495,6 +502,11 @@ component {
 
 	/**
 	 * Internal: wraps a single anchor in prependToPage/appendToPage, mirroring pageNumberLinks's wrapping behavior.
+	 * Applies the same entity-decode + `on\w+=` / `javascript:` strip contract that `paginationLinks()`
+	 * applies to `prependToPage`, extended here to `appendToPage` as well: HTML numeric entities are
+	 * decoded first so payloads like `&##111;nmouseover` cannot bypass the strip, then event handlers
+	 * and `javascript:` URIs are removed. paginationNav() is the canonical migration target for
+	 * paginationLinks() and must inherit the same defense-in-depth contract.
 	 */
 	public string function $paginationWrapAnchor(
 		required string anchor,
@@ -504,7 +516,26 @@ component {
 		if (!Len(arguments.anchor)) {
 			return "";
 		}
-		return arguments.prependToPage & arguments.anchor & arguments.appendToPage;
+		local.safePrepend = $paginationSanitizeWrapper(arguments.prependToPage);
+		local.safeAppend = $paginationSanitizeWrapper(arguments.appendToPage);
+		return local.safePrepend & arguments.anchor & local.safeAppend;
+	}
+
+	/**
+	 * Internal: strips event-handler attributes and javascript: URIs from a user-supplied wrapper string,
+	 * after first decoding HTML numeric entities so encoded payloads cannot bypass the regex pass.
+	 * Centralised here so both prependToPage and appendToPage receive identical treatment, and so the
+	 * single audit surface stays in lockstep with the parallel scrub in `paginationLinks()` (links.cfc).
+	 */
+	public string function $paginationSanitizeWrapper(required string input) {
+		if (!Len(arguments.input)) {
+			return arguments.input;
+		}
+		local.rv = $decodeHtmlEntities(arguments.input);
+		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, 'javascript\s*:', '', 'all');
+		return local.rv;
 	}
 
 	/**
