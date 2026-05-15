@@ -27,7 +27,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function run() {
 
-		describe("wheels deploy bootstrap (top-level alias for #2677)", () => {
+		describe("wheels deploy bootstrap (top-level alias for ##2677)", () => {
 
 			it("dispatches to DeployServerCli.bootstrap via dry-run", () => {
 				mod.__arguments = ["bootstrap", "--configPath=#variables.fixture#", "--dry-run"];
@@ -38,7 +38,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("wheels deploy exec (top-level alias for #2677)", () => {
+		describe("wheels deploy exec (top-level alias for ##2677)", () => {
 
 			it("dispatches to DeployServerCli.exec with multi-token commands", () => {
 				mod.__arguments = ["exec", "uname", "-a", "--configPath=#variables.fixture#", "--dry-run"];
