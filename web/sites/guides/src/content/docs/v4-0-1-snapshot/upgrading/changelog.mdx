@@ -3,10 +3,10 @@ title: Reading the Changelog
 description: Where to find the Wheels changelog when upgrading, how to look up PR references, and what each section means.
 type: reference
 sidebar:
-  order: 1
+  order: 4
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
 Upgrade guides for Wheels cite `CHANGELOG.md` entries and PR numbers (e.g. "see #1930", "CHANGELOG.md → Fixed, #1985"). This page explains where to find the changelog, how to navigate it, and what to do when you're working offline or with a vendored copy of the framework.
 
@@ -14,11 +14,7 @@ Upgrade guides for Wheels cite `CHANGELOG.md` entries and PR numbers (e.g. "see 
 
 The canonical `CHANGELOG.md` is at the **root of the Wheels repository** — not inside `vendor/wheels/`.
 
-If you are working with a vendored copy of the framework (the common case — `vendor/wheels/` is committed as part of your app), the changelog is **not** present in that directory. The `vendor/wheels/` subtree ships the framework source files only; `CHANGELOG.md` is a repository-level artifact and is not bundled.
-
-<Aside type="note">
-  Bundling `CHANGELOG.md` inside `vendor/wheels/` at release time is a tracked improvement ([#2719](https://github.com/wheels-dev/wheels/issues/2719)). Until it ships, use the methods below to read the changelog without leaving your editor.
-</Aside>
+If you are working with a vendored copy of the framework (the common case — `vendor/wheels/` is committed as part of your app), the changelog is **not** present in that directory. The `vendor/wheels/` subtree ships the framework source files only; `CHANGELOG.md` is a repository-level artifact and is not bundled. Use the methods below to read it without leaving your editor.
 
 ## Accessing the changelog
 
@@ -30,7 +26,7 @@ The changelog for the version your app vendors is available at a stable GitHub U
 https://github.com/wheels-dev/wheels/blob/<tag>/CHANGELOG.md
 ```
 
-For example, if `vendor/wheels/box.json` reports `"version": "4.0.0"`, the changelog for that exact version is:
+For example, if `vendor/wheels/wheels.json` reports `"version": "4.0.0"`, the changelog for that exact version is:
 
 ```
 https://github.com/wheels-dev/wheels/blob/v4.0.0/CHANGELOG.md
@@ -46,7 +42,7 @@ https://github.com/wheels-dev/wheels/blob/develop/CHANGELOG.md
 
 Three ways to confirm the tag to substitute into the URL above:
 
-1. **`vendor/wheels/box.json`** — look for `"version"`. This is the version that was current when your project was scaffolded or last upgraded.
+1. **`vendor/wheels/wheels.json`** — look for `"version"`. This is the version that was current when your project was scaffolded or last upgraded.
 2. **Runtime constant** — the `application.$wheels.version` assignment in `vendor/wheels/events/onapplicationstart.cfc` is the authoritative runtime value.
 3. **`git log --oneline -- vendor/wheels/`** — shows the commit that last updated the vendored subtree, which you can cross-reference with the tags in the upstream repo.
 
@@ -113,7 +109,7 @@ The parenthetical at the end is the PR number. If the change spans multiple PRs,
 Changes merged to `develop` but not yet tagged appear under `## [Unreleased]` at the top of the file. If you track the bleeding-edge channel (`wheels-be`), your installed version may already include some of these entries. If you track stable, `[Unreleased]` is a preview of what the next release will contain.
 
 <Aside type="tip">
-  Snapshot version strings (`4.0.0-snapshot.1787`) correspond to the `develop` branch at the `github.run_number` shown. There is no tag per snapshot — use `git log --oneline` in the upstream repo to find the exact commit if you need to correlate a snapshot build with a changelog entry.
+  Snapshot version strings (`v4.0.0-SNAPSHOT+1787`) correspond to the `develop` branch at the build number shown. There is no tag per snapshot — use `git log --oneline` in the upstream repo to find the exact commit if you need to correlate a snapshot build with a changelog entry.
 </Aside>
 
 ## Related guides
