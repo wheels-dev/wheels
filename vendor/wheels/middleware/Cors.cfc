@@ -80,10 +80,21 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		// Handle preflight OPTIONS request — return empty response immediately.
+		// Prefer the request struct passed to the middleware (the canonical
+		// per-request context, mirroring how RateLimiter resolves remote_addr
+		// from arguments.request.cgi) and fall back to the engine CGI scope
+		// when the request context doesn't carry a method. Inside a function,
+		// a bare `request` reference resolves to the engine REQUEST scope, not
+		// the function argument — `arguments.request` is required to address
+		// the passed struct.
 		local.requestMethod = "GET";
-		try {
-			local.requestMethod = cgi.request_method;
-		} catch (any e) {
+		if (StructKeyExists(arguments.request, "cgi") && StructKeyExists(arguments.request.cgi, "request_method")) {
+			local.requestMethod = arguments.request.cgi.request_method;
+		} else {
+			try {
+				local.requestMethod = cgi.request_method;
+			} catch (any e) {
+			}
 		}
 
 		if (local.requestMethod == "OPTIONS") {

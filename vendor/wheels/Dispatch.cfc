@@ -268,6 +268,10 @@ component output="false" extends="wheels.Global"{
 		try {
 			local.preflightMethod = $getRequestMethod();
 		} catch (any e) {
+			// Swallow intentionally: when request.cgi is not yet populated
+			// (e.g. test contexts or unusual dispatch paths) we fail closed by
+			// leaving preflightMethod empty so the short-circuit guard below is
+			// skipped and normal routing proceeds.
 		}
 		if (UCase(local.preflightMethod) == "OPTIONS" && $hasPreflightCapableMiddleware()) {
 			request.wheels.params = {};

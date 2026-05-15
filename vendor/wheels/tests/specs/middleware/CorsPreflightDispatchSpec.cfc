@@ -18,7 +18,7 @@ component extends="wheels.WheelsTest" {
 					? Duplicate(application.wheels.middleware) : [];
 				_savedRoutes = Duplicate(application.wheels.routes);
 				_savedStaticRoutes = StructKeyExists(application.wheels, "staticRoutes")
-					? StructCopy(application.wheels.staticRoutes) : {};
+					? Duplicate(application.wheels.staticRoutes) : {};
 				_savedCgiMethod = request.cgi.request_method;
 				application.wheels.routes = [];
 				application.wheels.staticRoutes = {};
@@ -32,6 +32,15 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not 404 on OPTIONS preflight when CORS middleware is registered", () => {
+				// This test validates the dispatch-layer fix: OPTIONS preflight
+				// reaches the middleware pipeline instead of 404ing in
+				// $findMatchingRoute. The `result == ""` assertion is satisfied
+				// by Dispatch's no-op preflightHandler closure, not by Cors's
+				// own OPTIONS short-circuit branch — Cors.handle() reads
+				// `cgi.request_method` from the engine CGI scope (which is the
+				// GET from the test runner request), so the middleware falls
+				// through to next() and the no-op handler returns "". The
+				// Cors middleware's own OPTIONS branch is tested in CorsSpec.cfc.
 				application.wheels.middleware = [
 					new wheels.middleware.Cors(allowOrigins = "https://portal.pai.com")
 				];
