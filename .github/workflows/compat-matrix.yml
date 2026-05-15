@@ -56,7 +56,25 @@ jobs:
             -O ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
 
       - name: Start CF engine
-        run: docker compose build --no-cache ${{ matrix.cfengine }} && docker compose up -d ${{ matrix.cfengine }}
+        # Retry the build to absorb transient external download failures
+        # (GitHub Releases 503/504s for Adoptium JDK/JRE and similar). The
+        # build itself is idempotent; only `up -d` runs after success.
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          set -e
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          until docker compose build --no-cache "$CFENGINE"; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              exit 1
+            fi
+            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 30
+          done
+          docker compose up -d "$CFENGINE"
 
       - name: Start all databases
         run: |
