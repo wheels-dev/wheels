@@ -1,0 +1,6 @@
+{
+	"name": "wheels-empty-alias",
+	"version": "1.0.0",
+	"description": "Test fixture: explicit-but-empty `mapping` is treated as an invalid override, not a fallback to name-derivation",
+	"mapping": ""
+}

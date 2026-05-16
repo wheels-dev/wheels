@@ -1,0 +1,6 @@
+{
+	"name": "wheels-lazy-good",
+	"version": "1.0.0",
+	"description": "Test fixture: valid lazy package alongside the failing one — confirms the lazy load path continues past a failed lazy registration",
+	"lazy": true
+}
