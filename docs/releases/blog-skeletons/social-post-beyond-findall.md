@@ -1,8 +1,8 @@
 # Social Posts — "Beyond findAll: Scopes, Enums, and the Chainable Query Builder"
 
 **Status:** Copy-paste ready. Fourth post in the post-GA series.
-**Pairs with:** [web/content/blog/posts/beyond-findall-scopes-enums-query-builder.md](../../../web/content/blog/posts/beyond-findall-scopes-enums-query-builder.md)
-**Post date:** 2026-06-05 (same day as the article)
+**Pairs with:** [docs/releases/blog-drafts/beyond-findall-scopes-enums-query-builder.md](../blog-drafts/beyond-findall-scopes-enums-query-builder.md)
+**Post date:** 2026-05-21 (same day as the article)
 **Tone:** Post-GA, present tense, "three features, one design" angle.
 
 **Canonical URL** (use everywhere):

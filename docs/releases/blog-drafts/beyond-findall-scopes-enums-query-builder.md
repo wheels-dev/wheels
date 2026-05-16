@@ -1,8 +1,8 @@
 ---
 title: 'Beyond findAll: Scopes, Enums, and the Chainable Query Builder'
 slug: beyond-findall-scopes-enums-query-builder
-publishedAt: '2026-06-05T14:00:00.000Z'
-updatedAt: '2026-06-05T14:00:00.000Z'
+publishedAt: '2026-05-21T14:00:00.000Z'
+updatedAt: '2026-05-21T14:00:00.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
@@ -262,4 +262,4 @@ There are a few related rough edges I didn't fix in this PR but that are worth n
 - **No `defaultScope()` / `unscoped()`.** Rails lets you declare a model-wide default scope (e.g. "always filter out soft-deleted rows") with an escape hatch (`unscoped`). Wheels doesn't have either. Soft-delete is the obvious motivating case; if your model has a `deletedAt` and you want every query to filter on `WHERE deletedAt IS NULL`, you currently scatter `.whereNull("deletedAt")` through every call site or write a wrapper. Not a bug — just a missing affordance.
 - **Enum value-name collisions are unchecked.** `enum(property="action", values="create,update,delete")` will silently shadow the model's own `update()` and `delete()` chain methods. The framework could refuse to register an enum value whose name matches an existing method; today it doesn't. Pick value names that aren't verbs.
 
-The next post in the series is the last one: *From Empty Directory to Deployed SaaS — end-to-end with generators, multi-tenancy, jobs, browser tests, and `wheels deploy`*. That one's a longer post. Coming next week.
+The next post in the series is the last one: *From Empty Directory to Deployed SaaS — end-to-end with generators, multi-tenancy, jobs, browser tests, and `wheels deploy`*. That one's a longer post. Coming Saturday.
