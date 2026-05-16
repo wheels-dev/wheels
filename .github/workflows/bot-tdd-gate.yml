@@ -58,9 +58,9 @@ jobs:
           echo "$changed"
           echo "---"
 
-          spec_changes=$(echo "$changed" | grep -E '^(tests/specs/|vendor/wheels/tests/specs/)' || true)
+          spec_changes=$(echo "$changed" | grep -E '^(tests/specs/|vendor/wheels/tests/specs/|cli/lucli/tests/specs/)' || true)
           if [[ -z "$spec_changes" ]]; then
-            echo "::error::Bot PRs must include a failing-then-passing spec under tests/specs/ or vendor/wheels/tests/specs/"
+            echo "::error::Bot PRs must include a failing-then-passing spec under tests/specs/, vendor/wheels/tests/specs/, or cli/lucli/tests/specs/"
             echo ""
             echo "This PR was authored by the bot (or on a bot branch) but contains no spec changes."
             echo "Either add a spec, or close this PR and reopen with one."
@@ -70,7 +70,7 @@ jobs:
           # Narrow the test-path exclusion to `specs/` so non-spec files under tests/ (e.g.
           # vendor/wheels/tests/html.cfm, the test-runner result-page UI rendered to users'
           # browsers) correctly count as implementation when a bot fix touches them.
-          impl_changes=$(echo "$changed" | grep -vE '^(tests/specs/|vendor/wheels/tests/specs/|\.ai/|CHANGELOG\.md|docs/|web/|\.github/)' || true)
+          impl_changes=$(echo "$changed" | grep -vE '^(tests/specs/|vendor/wheels/tests/specs/|cli/lucli/tests/specs/|\.ai/|CHANGELOG\.md|docs/|web/|\.github/)' || true)
           if [[ -z "$impl_changes" ]]; then
             echo "::error::Bot PR has tests but no implementation"
             echo ""

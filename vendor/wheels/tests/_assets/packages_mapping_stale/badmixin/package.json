@@ -1,0 +1,8 @@
+{
+	"name": "wheels-stale-shared",
+	"version": "1.0.0",
+	"description": "Test fixture: derived alias wheelsStaleShared, but declares an invalid mixin target so $validateMixinTargets throws after the alias slot could have been claimed — regression guard for GH#2712 stale-mapping bug",
+	"provides": {
+		"mixins": "view"
+	}
+}

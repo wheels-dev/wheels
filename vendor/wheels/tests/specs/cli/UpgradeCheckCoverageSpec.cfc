@@ -88,6 +88,12 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
+			it("scans for deprecated paginationLinks() helper", () => {
+				expect(findNoCase("paginationLinks", block) > 0).toBeTrue(
+					"3.x -> 4.x checks should grep views for paginationLinks( (renamed to paginationNav(), CHANGELOG ##2714)."
+				);
+			});
+
 		});
 
 	}

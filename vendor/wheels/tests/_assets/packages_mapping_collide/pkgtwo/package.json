@@ -1,0 +1,6 @@
+{
+	"name": "wheels-other",
+	"version": "1.0.0",
+	"description": "Test fixture: explicit mapping `wheelsCollide` collides with pkgone's derived alias",
+	"mapping": "wheelsCollide"
+}

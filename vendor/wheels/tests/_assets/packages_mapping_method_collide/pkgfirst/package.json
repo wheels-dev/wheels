@@ -1,0 +1,8 @@
+{
+	"name": "wheels-mc-first",
+	"version": "1.0.0",
+	"description": "Test fixture: registers $sharedFn on controller, claims alias wheelsMcFirst — first to claim, must survive untouched after pkgsecond is rolled back",
+	"provides": {
+		"mixins": "controller"
+	}
+}

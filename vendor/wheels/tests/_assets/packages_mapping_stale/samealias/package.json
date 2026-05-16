@@ -1,0 +1,6 @@
+{
+	"name": "wheels-other",
+	"version": "1.0.0",
+	"description": "Test fixture: declares mapping=wheelsStaleShared so it would collide with the badmixin package if badmixin had leaked its alias claim despite failing $validateMixinTargets",
+	"mapping": "wheelsStaleShared"
+}

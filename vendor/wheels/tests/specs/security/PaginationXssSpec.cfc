@@ -18,6 +18,12 @@ component extends="wheels.WheelsTest" {
 				application.wheels.URLRewriting = "On";
 				g.set(functionName = "linkTo", encode = false);
 				g.set(functionName = "paginationLinks", encode = false);
+				g.set(functionName = "paginationNav", encode = false);
+				g.set(functionName = "firstPageLink", encode = false);
+				g.set(functionName = "previousPageLink", encode = false);
+				g.set(functionName = "nextPageLink", encode = false);
+				g.set(functionName = "lastPageLink", encode = false);
+				g.set(functionName = "pageNumberLinks", encode = false);
 			});
 
 			afterEach(() => {
@@ -26,6 +32,12 @@ component extends="wheels.WheelsTest" {
 				application.wheels.URLRewriting = _originalRewrite;
 				g.set(functionName = "linkTo", encode = true);
 				g.set(functionName = "paginationLinks", encode = true);
+				g.set(functionName = "paginationNav", encode = true);
+				g.set(functionName = "firstPageLink", encode = true);
+				g.set(functionName = "previousPageLink", encode = true);
+				g.set(functionName = "nextPageLink", encode = true);
+				g.set(functionName = "lastPageLink", encode = true);
+				g.set(functionName = "pageNumberLinks", encode = true);
 			});
 
 			it("strips decimal entity-encoded onmouseover handler", () => {
@@ -81,6 +93,97 @@ component extends="wheels.WheelsTest" {
 				var input = "&##111;&##x6E;mouseover";
 				var result = _controller.$decodeHtmlEntities(input);
 				expect(result).toBe("onmouseover");
+			});
+
+			// Regression: paginationNav() is documented as the migration target for paginationLinks(),
+			// so the same prependToPage/appendToPage scrub must apply through the new code path.
+
+			it("paginationNav strips decimal entity-encoded onmouseover from prependToPage", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				// &#111; = 'o', so this decodes to <li onmouseover="alert(1)">
+				var result = _controller.paginationNav(
+					prependToPage = '<li &##111;nmouseover="alert(1)">',
+					appendToPage = '</li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
+			});
+
+			it("paginationNav strips hex entity-encoded onmouseover from prependToPage", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				// &#x6F; = 'o', so this decodes to <li onmouseover="alert(1)">
+				var result = _controller.paginationNav(
+					prependToPage = '<li &##x6F;nmouseover="alert(1)">',
+					appendToPage = '</li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
+			});
+
+			it("paginationNav strips entity-encoded javascript URI from prependToPage", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				// &#106; = 'j', so this decodes to javascript:alert(1)
+				var result = _controller.paginationNav(
+					prependToPage = '<li><a href="&##106;avascript:alert(1)">',
+					appendToPage = '</a></li>'
+				);
+				expect(result).notToInclude("javascript:");
+			});
+
+			it("paginationNav strips entity-encoded onmouseover from appendToPage", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				// Trailing wrapper carrying an entity-encoded handler must also be neutralised.
+				var result = _controller.paginationNav(
+					prependToPage = '<li>',
+					appendToPage = '<span &##111;nmouseover="alert(1)">x</span></li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
+			});
+
+			it("paginationNav still strips plain onmouseover without entity encoding", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				var result = _controller.paginationNav(
+					prependToPage = '<li onmouseover="alert(1)">',
+					appendToPage = '</li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
+			});
+
+			it("paginationNav preserves benign class and id attributes on wrappers", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				var result = _controller.paginationNav(
+					prependToPage = '<li class="page-item" id="nav">',
+					appendToPage = '</li>'
+				);
+				expect(result).toInclude('class="page-item"');
+				expect(result).toInclude('id="nav"');
+			});
+
+			// Regression anchor for `pageNumberLinks` directly (not via `paginationNav`). The CHANGELOG
+			// entry states `pageNumberLinks` itself scrubs author-supplied wrappers, so verify the
+			// promise without routing through `paginationNav`.
+
+			it("pageNumberLinks strips entity-encoded onmouseover from prependToPage when called directly", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				// &#111; = 'o', so this decodes to <li onmouseover="alert(1)">
+				var result = _controller.pageNumberLinks(
+					prependToPage = '<li &##111;nmouseover="alert(1)">',
+					appendToPage = '</li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
+			});
+
+			it("pageNumberLinks strips plain onmouseover from prependToPage when called directly", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				var result = _controller.pageNumberLinks(
+					prependToPage = '<li onmouseover="alert(1)">',
+					appendToPage = '</li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
 			});
 
 		});

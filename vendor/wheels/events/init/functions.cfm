@@ -306,6 +306,7 @@
 			linkToCurrentPage = false,
 			prependToPage = "",
 			appendToPage = "",
+			addActiveClassToPrependedParent = false,
 			pageNumberAsParam = true,
 			viewStyle = "plain",
 			encode = true
@@ -319,6 +320,12 @@
 			showInfo = false,
 			showSinglePage = false,
 			viewStyle = "plain",
+			prepend = "",
+			append = "",
+			prependToPage = "",
+			appendToPage = "",
+			addActiveClassToPrependedParent = false,
+			anchorDivider = " ",
 			encode = true
 		};
 		application.$wheels.functions.paginationLinks = {

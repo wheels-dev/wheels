@@ -338,7 +338,7 @@ Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `m
 
 Optional first-party modules are distributed as standalone repositories and installed into `vendor/<name>/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
 
-Public author-facing guide: [Packages](web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/packages.mdx) — manifest fields, mixin targets, lifecycle, service providers, lazy loading, testing, publishing flow. Submission workflow: [wheels-packages/CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md).
+Public author-facing guide: [Packages](web/sites/guides/src/content/docs/v4-0-1-snapshot/digging-deeper/packages.mdx) — manifest fields (including `mapping`), mixin targets, lifecycle, service providers, lazy loading, testing, publishing flow. Submission workflow: [wheels-packages/CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md).
 
 Six first-party packages live in standalone repos under `wheels-dev/`, indexed by the `wheels-dev/wheels-packages` registry:
 
@@ -370,11 +370,17 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
         "services": [],
         "middleware": []
     },
-    "dependencies": {}
+    "requires": {},
+    "replaces": {},
+    "suggests": {}
 }
 ```
 
+**`mapping`**: Optional CFML-identifier-safe alias registered as a CFML mapping at load time. Lets CFCs inside the package use `new wheelsSentry.SentryClient()` instead of `CreateObject("component", "vendor.wheels-sentry.SentryClient")`. Defaults to lower-camel-case of `name` (`wheels-sentry` → `wheelsSentry`). Must match `[A-Za-z_][A-Za-z0-9_]*`. Two packages that compute the same alias: the second fails with `Duplicate package mapping alias`. Inspect registered aliases via `PackageLoader.getPackageMappings()`.
+
 **`provides.mixins`**: Comma-delimited targets from the allowlist `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus the special values `global` (inject into all targets) and `none` (explicit opt-out). Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`). Unknown targets (typos, `view`, `service`, etc.) are rejected with a clear error — view helpers belong in `controller` mixins since Wheels views execute in the controller's variables scope.
+
+**`requires` / `replaces` / `suggests`**: Inter-package relationships, each a map of package name → semver constraint. `requires` is a hard dependency (missing target or version mismatch fails this package). `replaces` excludes the named package from loading when present and version-matched (migration path). `suggests` is a soft edge — influences load order but never fails on absence. The loader reads these fields, not legacy `dependencies` (which belongs to the 3.x plugin shape and is ignored on the package surface).
 
 ### Installing a Package
 
@@ -464,17 +470,29 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #paginationNav()#
 #paginationNav(showInfo=true, showFirst=false, showLast=false, navClass="my-pagination")#
 
-// Bootstrap 5 — active class on <li>, current page as <span class="page-link">, aria-current
+// Bootstrap 5 — declarative preset: active class on <li>, current page as <span class="page-link">, aria-current
 #paginationNav(viewStyle="bootstrap5")#
 #pageNumberLinks(viewStyle="bootstrap5")#
 
-// Bootstrap 4 — same as bootstrap5 but omits aria-current
+// Bootstrap 4 — declarative preset: same as bootstrap5 but omits aria-current
 #paginationNav(viewStyle="bootstrap4")#
 #pageNumberLinks(viewStyle="bootstrap4")#
 
-// Tailwind — flat structure with pagination-current / pagination-link utility classes
+// Tailwind — declarative preset: flat structure with pagination-current / pagination-link utility classes
 #paginationNav(viewStyle="tailwind")#
 #pageNumberLinks(viewStyle="tailwind")#
+
+// Bootstrap 5 — manual composition (granular alternative to viewStyle preset, like-for-like swap for legacy paginationLinks())
+#paginationNav(
+    navClass="",
+    prepend='<ul class="pagination">',
+    append="</ul>",
+    prependToPage='<li class="page-item">',
+    appendToPage="</li>",
+    class="page-link",
+    classForCurrent="active",
+    addActiveClassToPrependedParent=true
+)#
 
 // Individual helpers for custom layouts
 #paginationInfo()#            // "Showing 26-50 of 1,000 records"
@@ -483,14 +501,14 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #pageNumberLinks()#           // windowed page number links (default windowSize=2)
 #nextPageLink()#              // link to next page
 #lastPageLink()#              // link to last page
-#pageNumberLinks(windowSize=5, classForCurrent="active")#
+#pageNumberLinks(windowSize=5, classForCurrent="active", addActiveClassToPrependedParent=true)#
 ```
 
 `viewStyle` accepts `"plain"` (default, preserves original output), `"bootstrap5"`, `"bootstrap4"`, or `"tailwind"`. Bootstrap presets emit `<li class="page-item active" aria-current="page"><span class="page-link">N</span></li>` for the current page, with the active class on the `<li>` wrapper — no `Replace()` post-processing needed. Non-plain presets ignore `prependToPage`, `appendToPage`, `classForCurrent`, and `class` in favour of the preset markup.
 
-Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
+Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries. `paginationNav()` also accepts `prepend`/`append` (HTML inside `<nav>` before/after the link list), `prependToPage`/`appendToPage` (per-anchor wrappers applied to all navigation anchors including first/prev/next/last), `addActiveClassToPrependedParent` (injects `active ` into the current-page `prependToPage` class attribute), and `anchorDivider` (separator between sections, default `" "`) — these compose into the same Bootstrap-style output as the `viewStyle="bootstrap5"` preset but with finer-grained control.
 
-In development (`showErrorInformation = true`), `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` if passed an argument not accepted by any of its sub-helpers. Accepted pass-through keys: `format`, `text`, `name`, `class`, `disabledClass`, `showDisabled`, `pageNumberAsParam`, `windowSize`, `classForCurrent`, `linkToCurrentPage`, `prependToPage`, `appendToPage`, `route`, `controller`, `action`, `key`, `anchor`, `onlyPath`, `host`, `protocol`, `port`, `params`. Named route segment variables (e.g., `userId` when `route="userTimeline"` and the pattern contains `[userId]`) are automatically exempted from this check. In production the unknown argument is silently dropped.
+In development (`showErrorInformation = true`), `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` if passed an argument not accepted by any of its sub-helpers. Accepted pass-through keys: `format`, `text`, `name`, `class`, `disabledClass`, `showDisabled`, `pageNumberAsParam`, `windowSize`, `classForCurrent`, `linkToCurrentPage`, `prependToPage`, `appendToPage`, `addActiveClassToPrependedParent`, `route`, `controller`, `action`, `key`, `anchor`, `onlyPath`, `host`, `protocol`, `port`, `params`. Named route segment variables (e.g., `userId` when `route="userTimeline"` and the pattern contains `[userId]`) are automatically exempted from this check. In production the unknown argument is silently dropped.
 
 ## Testing Quick Reference
 
