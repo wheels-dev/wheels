@@ -475,6 +475,13 @@ component extends="wheels.WheelsTest" {
 					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
 					result = _controller.paginationNav(windowSize = 4)
 					expect(result).notToInclude("First")
+					// windowSize=4 expands the rendered page-number window to pages 1-9,
+					// so page 8 must appear in the output. If windowSize were silently
+					// dropped from the pageNumberLinks() call (default 2), the window
+					// would shrink to 3-7 and page 8 would disappear — the notToInclude
+					// "First" assertion alone would still pass since the First-hide
+					// predicate is evaluated on arguments.windowSize directly.
+					expect(result).toInclude(">8<")
 				})
 
 				it("renders disabled Previous span in auto mode on first page", () => {

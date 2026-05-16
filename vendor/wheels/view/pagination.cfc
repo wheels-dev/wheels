@@ -450,17 +450,22 @@ component {
 			}
 		}
 
+		// Validate anchor mode strings before the totalPages early-return so an invalid
+		// mode like showFirst="bogus" throws on single-page (or empty) result sets too,
+		// matching the unknown-arg validation rationale above. Invalid mode strings are
+		// coding errors, so $paginationAnchorMode always throws — no showErrorInformation
+		// gate.
+		local.firstMode = $paginationAnchorMode(value = arguments.showFirst, argName = "showFirst");
+		local.lastMode = $paginationAnchorMode(value = arguments.showLast, argName = "showLast");
+		local.previousMode = $paginationAnchorMode(value = arguments.showPrevious, argName = "showPrevious");
+		local.nextMode = $paginationAnchorMode(value = arguments.showNext, argName = "showNext");
+
 		local.pg = pagination(arguments.handle);
 
 		// Return empty if only one page and showSinglePage is false
 		if (local.pg.totalPages <= 1 && !arguments.showSinglePage) {
 			return "";
 		}
-
-		local.firstMode = $paginationAnchorMode(value = arguments.showFirst, argName = "showFirst");
-		local.lastMode = $paginationAnchorMode(value = arguments.showLast, argName = "showLast");
-		local.previousMode = $paginationAnchorMode(value = arguments.showPrevious, argName = "showPrevious");
-		local.nextMode = $paginationAnchorMode(value = arguments.showNext, argName = "showNext");
 
 		local.sections = [];
 
