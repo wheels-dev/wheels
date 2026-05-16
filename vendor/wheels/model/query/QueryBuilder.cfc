@@ -33,7 +33,7 @@ component output="false" {
 		variables.distinctValue = false;
 		variables.groupClause = "";
 		variables.forUpdateValue = false;
-		// Set true on whereIn(empty); terminals short-circuit so we never hand the WHERE parser a column-less literal it can't resolve.
+		// Set on whereIn(empty); terminals short-circuit before the WHERE parser sees a column-less clause.
 		variables.$alwaysEmpty = false;
 		return this;
 	}
@@ -125,7 +125,7 @@ component output="false" {
 	 */
 	public any function whereIn(required string property, required any values) {
 		$validatePropertyName(arguments.property);
-		// Empty IN -> no rows (matching Rails/Sequel/Django/Eloquent). Flag rather than raw SQL: Wheels' WHERE parser extracts a column name from every clause it sees, so a literal "1 = 0" would be parsed as property "1" and fail Wheels.ColumnNotFound.
+		// Empty IN -> no rows (Rails/Sequel/Django/Eloquent). Flag, not raw SQL: a "1 = 0" literal trips Wheels' WHERE parser as property "1".
 		local.valueArray = IsArray(arguments.values) ? arguments.values : ListToArray(arguments.values);
 		if (!ArrayLen(local.valueArray)) {
 			variables.$alwaysEmpty = true;
@@ -333,7 +333,8 @@ component output="false" {
 	 */
 	public any function findAll() {
 		if (variables.$alwaysEmpty) {
-			// Empty query with the model's full columnList — matches the shape a normal zero-row findAll() returns. NOTE: any chained select() or include() is intentionally ignored on this path; the result has zero rows so projection/eager-load are moot in practice, and computing them from $classData would duplicate read.cfc's $createSQLFieldList logic.
+			// Empty query shaped like a normal zero-row findAll() — full columnList from $classData().
+			// NOTE: chained select()/include() are ignored; zero rows makes projection moot.
 			return QueryNew(variables.modelReference.$classData().columnList);
 		}
 		local.args = $buildFinderArgs(arguments);
