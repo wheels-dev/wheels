@@ -476,6 +476,8 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 
 Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
 
+In development (`showErrorInformation = true`), `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` if passed an argument not accepted by any of its sub-helpers. Accepted pass-through keys: `format`, `text`, `name`, `class`, `disabledClass`, `showDisabled`, `pageNumberAsParam`, `windowSize`, `classForCurrent`, `linkToCurrentPage`, `prependToPage`, `appendToPage`, `route`, `controller`, `action`, `key`, `anchor`, `onlyPath`, `host`, `protocol`, `port`, `params`. Named route segment variables (e.g., `userId` when `route="userTimeline"` and the pattern contains `[userId]`) are automatically exempted from this check. In production the unknown argument is silently dropped.
+
 ## Testing Quick Reference
 
 **All new tests use WheelsTest BDD syntax.** RocketUnit (`test_` prefix, `assert()`) is legacy only — never use it for new tests.
