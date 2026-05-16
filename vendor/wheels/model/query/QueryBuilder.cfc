@@ -333,7 +333,8 @@ component output="false" {
 	 */
 	public any function findAll() {
 		if (variables.$alwaysEmpty) {
-			return QueryNew("");
+			// Construct an empty query with the model's own columns so callers that introspect result.columnList see the same shape as a regular no-match findAll(). $classData().columnList is the framework's authoritative list.
+			return QueryNew(variables.modelReference.$classData().columnList);
 		}
 		local.args = $buildFinderArgs(arguments);
 		return variables.modelReference.findAll(argumentCollection = local.args);

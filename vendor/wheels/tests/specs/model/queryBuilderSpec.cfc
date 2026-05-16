@@ -111,6 +111,25 @@ component extends="wheels.WheelsTest" {
 					expect(result).toBe(1);
 				})
 
+				it("whereIn() with an empty array returns a properly-shaped empty query from findAll()", () => {
+					var result = model("author").whereIn("id", []).findAll();
+					expect(result.recordcount).toBe(0);
+					// columnList should match the model's columns, not be empty —
+					// callers introspecting result.columnList expect the same shape
+					// they'd get from a regular zero-row findAll().
+					expect(Len(result.columnList)).toBeGT(0);
+				})
+
+				it("whereIn() with an empty array returns false from first()/findOne()", () => {
+					var result = model("author").whereIn("id", []).first();
+					expect(result).toBeFalse();
+				})
+
+				it("whereIn() with an empty array returns false from exists()", () => {
+					var result = model("author").whereIn("id", []).exists();
+					expect(result).toBeFalse();
+				})
+
 			})
 
 			describe("orderBy()", () => {
