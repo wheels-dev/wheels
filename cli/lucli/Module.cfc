@@ -3733,6 +3733,15 @@ component extends="modules.BaseModule" {
 				extensions: "cfm,cfc",
 				fix: "Missing manifest entries throw Wheels.ViteAssetNotFound in production. Rebuild assets during deploy (npm run build) or set(viteStrictManifest=false) to restore 3.x silent fallback."
 			});
+			// paginationLinks() deprecation grep (#2714, replacement: paginationNav() per #1930).
+			arrayAppend(checks, {
+				description: "Deprecated paginationLinks() helper (renamed to paginationNav() in 4.0)",
+				pattern: "paginationLinks\s*\(",
+				checkType: "grep",
+				scanDir: "app/views",
+				extensions: "cfm,cfc",
+				fix: "Replace paginationLinks() with paginationNav() (the all-in-one nav helper) or compose firstPageLink/previousPageLink/pageNumberLinks/nextPageLink/lastPageLink directly. See https://github.com/wheels-dev/wheels/issues/1930."
+			});
 		}
 
 		// Run checks
