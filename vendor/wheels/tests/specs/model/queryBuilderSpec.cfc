@@ -128,6 +128,52 @@ component extends="wheels.WheelsTest" {
 					expect(result).toBeFalse();
 				})
 
+				it("whereIn() with an empty array returns 0 from updateAll() without touching rows", () => {
+					var before = model("author").count();
+					var affected = model("author").whereIn("id", []).updateAll(firstName="ShouldNotChange");
+					var after = model("author").where("firstName", "ShouldNotChange").count();
+					expect(affected).toBe(0);
+					expect(after).toBe(0);
+					expect(model("author").count()).toBe(before);
+				})
+
+				it("whereIn() with an empty array returns 0 from deleteAll() without removing rows", () => {
+					var before = model("author").count();
+					var affected = model("author").whereIn("id", []).deleteAll();
+					expect(affected).toBe(0);
+					expect(model("author").count()).toBe(before);
+				})
+
+				it("whereIn() with an empty array never invokes the findEach() callback", () => {
+					var state = {invoked: 0};
+					model("author").whereIn("id", []).findEach(callback=function(row) {
+						state.invoked += 1;
+					});
+					expect(state.invoked).toBe(0);
+				})
+
+				it("whereIn() with an empty array never invokes the findInBatches() callback", () => {
+					var state = {invoked: 0};
+					model("author").whereIn("id", []).findInBatches(callback=function(batch) {
+						state.invoked += 1;
+					});
+					expect(state.invoked).toBe(0);
+				})
+
+				it("whereIn() with an empty array ignores chained select() / include() on findAll()", () => {
+					// Documented trade-off (QueryBuilder.cfc findAll() short-circuit):
+					// the $alwaysEmpty path returns the model's full columnList,
+					// not a projection of the chained select(). Zero rows makes
+					// projection moot; this spec locks in the observable shape.
+					var result = model("author")
+						.select("id")
+						.whereIn("id", [])
+						.findAll();
+					expect(result.recordcount).toBe(0);
+					// The full author columnList is returned, not a one-column "id"-only projection.
+					expect(Len(result.columnList)).toBeGT(1);
+				})
+
 			})
 
 			describe("orderBy()", () => {
