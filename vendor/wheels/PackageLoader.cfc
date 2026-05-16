@@ -450,22 +450,75 @@ component output="false" {
 		required string pkgDir
 	) {
 		local.aliasResult = $registerPackageMapping(arguments.dirName, arguments.manifest, arguments.pkgDir);
-		if (local.aliasResult.ok) {
+		if (!local.aliasResult.ok) {
+			ArrayAppend(variables.failedPackages, {
+				name = arguments.dirName,
+				error = local.aliasResult.error,
+				detail = local.aliasResult.detail
+			});
+			WriteLog(
+				text = "[Wheels] Package '#arguments.dirName#' failed mapping registration: #local.aliasResult.error#",
+				type = "error",
+				file = "wheels"
+			);
+			$rollbackPackage(arguments.dirName);
+			return false;
+		}
+
+		// Plural `mappings` entries register after the singular alias so the
+		// singular slot is always claimed first. A plural failure unwinds any
+		// plural entries that did succeed AND the singular alias, then rolls
+		// the package back — leaves the mapping registries clean for the next
+		// load attempt.
+		local.pluralResult = $registerAdditionalMappings(arguments.dirName, arguments.manifest, arguments.pkgDir);
+		if (local.pluralResult.ok) {
 			return true;
 		}
 
+		$unregisterMappings(local.pluralResult.registered);
+		// Singular alias used Len() to validate, so it's always present here.
+		$unregisterMappings([local.aliasResult.alias]);
 		ArrayAppend(variables.failedPackages, {
 			name = arguments.dirName,
-			error = local.aliasResult.error,
-			detail = local.aliasResult.detail
+			error = local.pluralResult.error,
+			detail = local.pluralResult.detail
 		});
 		WriteLog(
-			text = "[Wheels] Package '#arguments.dirName#' failed mapping registration: #local.aliasResult.error#",
+			text = "[Wheels] Package '#arguments.dirName#' failed plural mapping registration: #local.pluralResult.error#",
 			type = "error",
 			file = "wheels"
 		);
 		$rollbackPackage(arguments.dirName);
 		return false;
+	}
+
+	/**
+	 * Removes the given mapping aliases from the in-process registry and
+	 * (best-effort) from `application.mappings`. Used to unwind partial
+	 * progress when a multi-entry plural-mapping registration fails midway.
+	 * Singular aliases store their identifier-form (e.g. `wheelsSentry`);
+	 * plural aliases store their dotted form (e.g. `plugins.sentry`).
+	 * `application.mappings` is keyed by slash-form (`/wheelsSentry`,
+	 * `/plugins/sentry`) so we translate at the unregister site too.
+	 */
+	private void function $unregisterMappings(required array aliases) {
+		for (local.alias in arguments.aliases) {
+			if (!Len(local.alias)) {
+				continue;
+			}
+			StructDelete(variables.packageMappings, local.alias);
+			StructDelete(variables.$mappingProviders, local.alias);
+			local.slashForm = "/" & Replace(local.alias, ".", "/", "all");
+			try {
+				if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
+					StructDelete(application.mappings, local.slashForm);
+				}
+			} catch (any e) {
+				// Engines without a writable application.mappings reach this
+				// path through the same try/catch shape as the register side;
+				// the in-process registries above remain authoritative.
+			}
+		}
 	}
 
 	/**
@@ -979,6 +1032,169 @@ component output="false" {
 		}
 
 		return {ok = true, error = "", detail = "", alias = local.alias};
+	}
+
+	/**
+	 * Registers the package's plural `mappings` block — a struct of
+	 * dotted-CFML-mapping-name → relative-path-from-pkgDir entries. Lets a
+	 * package author claim additional namespaces beyond the singular
+	 * identifier-form alias (e.g. `plugins.sentry` for legacy compatibility,
+	 * or namespaces pointing at internal subdirectories).
+	 *
+	 * Each key must be a dotted identifier where every segment matches
+	 * `[A-Za-z_][A-Za-z0-9_]*` so the resulting `application.mappings`
+	 * slash-form (`/plugins/sentry`) is resolvable by `new plugins.sentry.X()`
+	 * dotted lookups on every CFML engine.
+	 *
+	 * Each value is a relative path inside the package directory: `"."` or
+	 * `""` means the package root; `"subdir"` resolves to `pkgDir/subdir`.
+	 * Absolute paths and `..` traversal are rejected so a package can't
+	 * register a mapping pointing outside its own install tree.
+	 *
+	 * Returns `{ok, error, detail, registered}` where `registered` lists the
+	 * mapping names actually written so the caller can unwind on later
+	 * failure. The struct shape mirrors `$registerPackageMapping` so both
+	 * registration paths plug into the same failedPackages bookkeeping.
+	 */
+	private struct function $registerAdditionalMappings(
+		required string dirName,
+		required struct manifest,
+		required string pkgDir
+	) {
+		local.result = {ok = true, error = "", detail = "", registered = []};
+
+		if (!StructKeyExists(arguments.manifest, "mappings")) {
+			return local.result;
+		}
+		if (!IsStruct(arguments.manifest.mappings)) {
+			local.result.ok = false;
+			local.result.error = "Invalid package mappings block";
+			local.result.detail = "Package '#arguments.dirName#' declared a 'mappings' field that is not a struct. Expected a map of dotted mapping name to relative path.";
+			return local.result;
+		}
+
+		// StructKeyArray returns keys in iteration order; tests assert
+		// failure on the *first* invalid entry by author-declared name so a
+		// stable iteration is necessary. Lucee/Adobe/BoxLang all preserve
+		// insertion order for struct literals parsed from JSON.
+		local.entries = StructKeyArray(arguments.manifest.mappings);
+		for (local.name in local.entries) {
+			local.value = arguments.manifest.mappings[local.name];
+
+			if (!IsSimpleValue(local.value)) {
+				local.result.ok = false;
+				local.result.error = "Invalid package mapping path";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#' must be a string path relative to the package directory.";
+				return local.result;
+			}
+
+			local.validation = $validatePluralMappingName(local.name);
+			if (!local.validation.ok) {
+				local.result.ok = false;
+				local.result.error = "Invalid package mapping name";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#': #local.validation.detail#";
+				return local.result;
+			}
+
+			local.resolution = $resolvePluralMappingPath(arguments.pkgDir, Trim(local.value));
+			if (!local.resolution.ok) {
+				local.result.ok = false;
+				local.result.error = "Invalid package mapping path";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#' → '#local.value#': #local.resolution.detail#";
+				return local.result;
+			}
+
+			if (StructKeyExists(variables.$mappingProviders, local.name)) {
+				local.firstProvider = variables.$mappingProviders[local.name];
+				local.result.ok = false;
+				local.result.error = "Duplicate package mapping alias";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#' is already claimed by package '#local.firstProvider#'. Choose a unique mapping name in package.json to resolve.";
+				return local.result;
+			}
+
+			variables.packageMappings[local.name] = local.resolution.path;
+			variables.$mappingProviders[local.name] = arguments.dirName;
+			ArrayAppend(local.result.registered, local.name);
+
+			local.slashForm = "/" & Replace(local.name, ".", "/", "all");
+			try {
+				if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
+					application.mappings[local.slashForm] = local.resolution.path;
+				}
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#arguments.dirName#' could not register application mapping '#local.slashForm#': #e.message#",
+					type = "warning",
+					file = "wheels"
+				);
+			}
+		}
+
+		return local.result;
+	}
+
+	/**
+	 * Validates a dotted plural-mapping name. Each segment must match the
+	 * CFML identifier regex so the resulting `/seg1/seg2/...` form resolves
+	 * cleanly via static-dotted `new` syntax. Leading/trailing dots and
+	 * consecutive dots produce empty segments which the segment regex
+	 * rejects. Returns `{ok, detail}`.
+	 */
+	private struct function $validatePluralMappingName(required string name) {
+		local.trimmed = Trim(arguments.name);
+		if (!Len(local.trimmed)) {
+			return {ok = false, detail = "mapping name must not be empty"};
+		}
+		if (Left(local.trimmed, 1) == "." || Right(local.trimmed, 1) == ".") {
+			return {ok = false, detail = "mapping name must not start or end with '.'"};
+		}
+		local.segments = ListToArray(local.trimmed, ".");
+		if (!ArrayLen(local.segments)) {
+			return {ok = false, detail = "mapping name produced no segments"};
+		}
+		for (local.seg in local.segments) {
+			if (!Len(local.seg) || !REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.seg)) {
+				return {ok = false, detail = "segment '#local.seg#' must match [A-Za-z_][A-Za-z0-9_]*"};
+			}
+		}
+		return {ok = true, detail = ""};
+	}
+
+	/**
+	 * Resolves a relative mapping path against the package directory.
+	 * `"."` and `""` resolve to the package directory itself. Subdirectory
+	 * paths are appended with a single separator. Absolute paths (`/foo`,
+	 * `C:\foo`) and any `..` traversal segment are rejected so a package
+	 * cannot register a mapping pointing outside its install tree.
+	 * Returns `{ok, path, detail}`.
+	 */
+	private struct function $resolvePluralMappingPath(required string pkgDir, required string relPath) {
+		local.norm = Replace(arguments.relPath, "\", "/", "all");
+		if (!Len(local.norm) || local.norm == ".") {
+			return {ok = true, path = arguments.pkgDir, detail = ""};
+		}
+		if (Left(local.norm, 1) == "/") {
+			return {ok = false, path = "", detail = "absolute paths are not allowed"};
+		}
+		if (REFind("^[A-Za-z]:", local.norm)) {
+			return {ok = false, path = "", detail = "absolute paths are not allowed"};
+		}
+		// Strip a leading "./" before scanning for traversal so authors can
+		// write `./subdir` interchangeably with `subdir`. A bare `./` collapses
+		// to the package root once the prefix is stripped.
+		if (Left(local.norm, 2) == "./") {
+			local.norm = Len(local.norm) > 2 ? Mid(local.norm, 3, Len(local.norm) - 2) : "";
+			if (!Len(local.norm)) {
+				return {ok = true, path = arguments.pkgDir, detail = ""};
+			}
+		}
+		local.segments = ListToArray(local.norm, "/");
+		for (local.seg in local.segments) {
+			if (local.seg == "..") {
+				return {ok = false, path = "", detail = "'..' traversal is not allowed"};
+			}
+		}
+		return {ok = true, path = arguments.pkgDir & "/" & local.norm, detail = ""};
 	}
 
 	// ---------------------------------------------------------------------------

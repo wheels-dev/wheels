@@ -1,0 +1,8 @@
+{
+	"name": "wheels-invalidpath",
+	"version": "1.0.0",
+	"description": "Test fixture: plural mapping path is absolute — rejected so a package can't claim mappings outside its install tree",
+	"mappings": {
+		"invalidpath.foo": "/etc"
+	}
+}

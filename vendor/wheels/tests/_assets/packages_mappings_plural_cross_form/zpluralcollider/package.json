@@ -1,0 +1,8 @@
+{
+	"name": "wheels-pluralcollider",
+	"version": "1.0.0",
+	"description": "Test fixture: its own singular alias `wheelsPluralcollider` is unique, but its plural mapping `crossFormShared` collides with singularholder's singular alias. Package must fail and its singular alias must be unwound from the registry.",
+	"mappings": {
+		"crossFormShared": "."
+	}
+}

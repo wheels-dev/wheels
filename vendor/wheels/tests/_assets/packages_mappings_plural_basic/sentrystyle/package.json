@@ -1,0 +1,8 @@
+{
+	"name": "wheels-sentrystyle",
+	"version": "1.0.0",
+	"description": "Test fixture: plural `mappings` registers legacy-style dotted alias `plugins.sentry` → package root (the wheels-sentry@1.0.0 compatibility case from #2705)",
+	"mappings": {
+		"plugins.sentry": "."
+	}
+}
