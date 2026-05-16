@@ -99,11 +99,13 @@ Field reference:
 - **`version`** — semver. Required. Used in load logs and by future install tooling.
 - **`author`** — free-form string. Not validated.
 - **`description`** — one-line description shown in logs and tooling.
-- **`wheelsVersion`** — compatibility range (npm semver syntax). Declared as a constraint against the framework version; mismatches are logged.
+- **`wheelsVersion`** — compatibility range (npm semver syntax). Declared as a constraint against the framework version. An incompatible package is excluded from the load order before its CFC is instantiated and recorded in `failedPackages` with the constraint and the running version named in the log. Use `"*"` or omit the field to skip the check.
 - **`provides.mixins`** — comma-delimited target list drawn from the framework's allowlist: `application`, `dispatch`, `controller`, `mapper`, `model`, `base`, `sqlserver`, `mysql`, `postgresql`, `h2`, `test`. Plus two special values: `global` (inject everywhere) and `none` (opt out). **Default is `none`** — a package with no `provides.mixins` field contributes no mixed-in methods. This is the explicit opt-in model and a deliberate break from legacy plugins, which defaulted to `global` and made reasoning about method provenance hard. Unknown targets (typos, or unsupported names like `view` or `service`) are rejected at load time with a clear error.
 - **`provides.services`** — reserved for services the package registers with the DI container. Currently populated by the package's own `register()` hook rather than read from the manifest; the field is here for future tooling.
 - **`provides.middleware`** — array of middleware entries the loader appends to the global pipeline. Each entry is `{"component": "vendor.mypackage.MyMiddleware", "options": {...}}`.
-- **`dependencies`** — map of other package names to version ranges. The loader resolves these into a load order (topological sort) so a dependent package sees its dependencies already loaded.
+- **`requires`** — map of other package names to semver constraints. Hard dependencies: a required package must be present and satisfy the constraint or this package fails to load with a clear "Required package not found" / "does not satisfy constraint" entry in `failedPackages`. Dependents are loaded after their dependencies (topological sort), so a dependent's `init()` sees its dependencies' mixins and services already installed.
+- **`replaces`** — map of other package names to semver constraints. If a named package is present and satisfies the constraint, it is *excluded* from loading and this package takes its slot. Useful for migration paths — `wheels-foo-v2` can declare `"replaces": {"wheels-foo": "*"}` and an install of v2 cleanly supersedes v1.
+- **`suggests`** — map of other package names to semver constraints. Soft edges: if the suggested package is present it loads first (so this package sees its mixins), but its absence does not cause this package to fail. Use for optional integration points.
 - **`lazy`** — optional boolean. When `true` on a package with no mixins and no middleware, the CFC isn't instantiated until something calls `getPackage(name)`. Use it for service-only packages that are expensive to initialize and not always needed.
 
 In practice, the target you pick most often is `controller`. Wheels views execute inside the controller's `variables` scope, so methods mixed into `controller` are callable from views and partials too — there is no separate `view` target. If you need a method on models, use `model`. If you need something everywhere, use `global`, sparingly. If your package is service-only or middleware-only, use `none` (or just omit the field).
@@ -274,7 +276,13 @@ Package authors typically keep a matching set of specs in their repo and rely on
 
 ## Dependency resolution
 
-When a package's manifest declares `dependencies`, the loader builds a dependency graph and loads in topological order — dependencies first, dependents later. A package with no dependencies can load anytime; a package that declares `"dependencies": {"hotwire": ">=0.1.0"}` is guaranteed to see the Hotwire mixins already installed before its own `init()` runs.
+When a package's manifest declares `requires`, `replaces`, or `suggests`, the loader builds a dependency graph and loads packages in topological order — dependencies first, dependents later. A package with no `requires` can load anytime; a package that declares `"requires": {"wheels-hotwire": ">=0.1.0"}` is guaranteed to see Hotwire's mixins already installed before its own `init()` runs.
+
+The three relationship fields differ in how missing or version-mismatched targets are handled:
+
+- **`requires`** — hard dependency. Missing target, version mismatch, or a target excluded by another package's `replaces` causes this package to fail to load. The error is recorded in `failedPackages`.
+- **`replaces`** — exclusion. If the named package is present and satisfies the constraint, it is excluded from loading. The replacer takes over without further work on the application side.
+- **`suggests`** — soft dependency. Loads the suggested package first if present, but never fails this package on absence. Use for optional integration hooks.
 
 If a declared dependency isn't present in `vendor/`, or if two packages form a cycle, the loader records the error and excludes every package involved in the failure — again, without taking down the app.
 
