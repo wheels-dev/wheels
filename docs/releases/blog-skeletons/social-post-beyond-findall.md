@@ -23,7 +23,7 @@ What it covers:
 • The chainable query builder — .where("col", value), .whereIn, .whereBetween, .orderBy, .limit, .get(). Auto-quoting + type validation on the way to SQL, so integer/float/boolean payloads can't sneak past the binding layer.
 • Three features, one design — they all return deferred-query proxies that materialise into the same finder-argument struct on a terminal call. The chain reads top-to-bottom in the order you'd describe the query out loud.
 
-Side effect of writing the post: framework fix (#2736) — whereIn / whereNotIn with empty arrays no longer emit malformed `IN ()` SQL. Now short-circuits to `1=0` (no rows) and `1=1` (every row) respectively, matching every mature ORM. Four regression specs locked in.
+Side effect of writing the post: framework fix (#2736) — whereIn / whereNotIn with empty arrays no longer emit malformed `IN ()` SQL. whereIn(empty) now sets a flag the terminals honour (count → 0, exists → false, findAll → empty query, etc.); whereNotIn(empty) is a no-op (exclude-none = match-all). Same user-facing behaviour as Rails / Sequel / Django / Eloquent. Six regression specs locked in.
 ```
 
 ---
@@ -43,7 +43,7 @@ The first thing you learn about Wheels' ORM is findAll(where="..."). The first t
 
 Three features, but one design. They all return deferred-query objects that flow into the same finder-argument struct on a terminal call (.get / .findAll / .first / .count). You can chain a scope onto an enum onto a builder onto a .get() without thinking about which is which.
 
-A side note in the post: writing it surfaced a real framework bug. whereIn / whereNotIn with empty arrays produced literal SQL "property IN ()" — malformed in every supported engine, surfacing as a generic JDBC error with no pointer back to the call site that built the empty collection. Fixed in the same week the article landed. whereIn now short-circuits to "1 = 0" (no rows match — the SQL-spec answer for "match any of these zero values") and whereNotIn short-circuits to "1 = 1" (every row matches). Matches the behaviour Rails, Sequel, Django, and Laravel Eloquent all converged on. Four regression specs lock the behaviour in.
+A side note in the post: writing it surfaced a real framework bug. whereIn / whereNotIn with empty arrays produced literal SQL "property IN ()" — malformed in every supported engine, surfacing as a generic JDBC error with no pointer back to the call site that built the empty collection. Fixed in the same week the article landed. whereIn(empty) now sets a flag the terminal methods honour (count returns 0, exists returns false, findAll returns an empty query, and so on); whereNotIn(empty) is a no-op so the chain proceeds normally. The user-facing behaviour matches what Rails, Sequel, Django, and Laravel Eloquent all converged on. Six regression specs lock the behaviour in.
 
 Read: https://blog.wheels.dev/posts/beyond-findall-scopes-enums-query-builder
 
@@ -111,9 +111,9 @@ Auto-quoting alone doesn't fix that — type validation does.
 ```
 4/ Side effect of writing the post: framework fix (#2736).
 
-whereIn("id", []) used to emit literal "id IN ()" — malformed SQL. Now short-circuits to "1 = 0" (no rows), matching Rails / Sequel / Django / Laravel Eloquent.
+whereIn("id", []) used to emit literal "id IN ()" — malformed SQL. Now sets a flag the terminals honour, returning the zero-row sentinel before reaching the finder. Same user-facing behaviour as Rails / Sequel / Django / Laravel Eloquent.
 
-Four regression specs. Behaviour documented in the guide.
+Six regression specs. Behaviour documented in the guide.
 ```
 
 ---
@@ -138,9 +138,9 @@ The post walks three features that look separate but compose into one design:
 
 Drafting the post, I tried `model("Post").whereIn("id", [])` to see what the framework did with an empty array. The answer: it emitted literal SQL `id IN ()`, which is malformed in every supported engine — Postgres, MySQL, SQL Server, SQLite, H2 — and surfaced as a generic JDBC syntax error with no pointer back to the call site that built the empty array.
 
-Empty inputs to `WHERE IN` aren't exotic. They're what you get whenever the values come from another query, a form filter, or any computation that might return zero results. Rails converged on this pattern in 2016, Sequel matches it, Django matches it, Laravel Eloquent matches it: an empty `IN` short-circuits to `1=0` (no rows match — the SQL-spec answer for "match any of these zero values"), and an empty `NOT IN` short-circuits to `1=1` (every row matches).
+Empty inputs to `WHERE IN` aren't exotic. They're what you get whenever the values come from another query, a form filter, or any computation that might return zero results. Rails converged on this pattern in 2016, Sequel matches it, Django matches it, Laravel Eloquent matches it: an empty `IN` matches no rows, and an empty `NOT IN` matches every row.
 
-That's [#2736](https://github.com/wheels-dev/wheels/pull/2736), fixed in the same week the article landed. `whereIn("id", [])` now appends `1 = 0` to the WHERE chain; `whereNotIn("id", [])` appends `1 = 1`. Both compose cleanly — `.where("status", "active").whereIn("id", []).count()` returns 0 because the AND-combined chain can't satisfy `1=0`. Four new specs lock the behaviour in. The reference table in both copies of the query-builder guide was updated so a reader skimming the methods doesn't have to read the source to know what happens on empty input.
+That's [#2736](https://github.com/wheels-dev/wheels/pull/2736), fixed in the same week the article landed. `whereIn("id", [])` sets an `$alwaysEmpty` flag on the builder so every terminal (`.count()`, `.findAll()`, `.first()`, `.exists()`, `.updateAll()`, `.deleteAll()`, `.findEach()`, `.findInBatches()`) short-circuits to the appropriate zero-row sentinel before going through the finder. `whereNotIn("id", [])` is a no-op so the chain proceeds normally. The first cut tried the obvious raw-SQL approach (append `1 = 0` / `1 = 1` as clauses) but Wheels' WHERE-clause parser runs a property-extraction regex over every clause it sees and threw `Wheels.ColumnNotFound` on the literal `1`. The flag-based design works alongside the parser instead of around it. Six new specs lock the behaviour in. The reference table in both copies of the query-builder guide was updated so a reader skimming the methods doesn't have to read the source to know what happens on empty input.
 
 Three related rough edges are flagged in the post but not fixed in this PR:
 

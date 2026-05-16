@@ -106,6 +106,11 @@ component extends="wheels.WheelsTest" {
 					expect(result).toBe(0);
 				})
 
+				it("whereNotIn() with an empty array composes cleanly with other clauses", () => {
+					var result = model("author").where("lastName", "Djurner").whereNotIn("id", []).count();
+					expect(result).toBe(1);
+				})
+
 			})
 
 			describe("orderBy()", () => {

@@ -53,8 +53,8 @@ The two-argument form of `where` means equality. The three-argument form takes a
 | `whereNull(column)` | `column IS NULL` |
 | `whereNotNull(column)` | `column IS NOT NULL` |
 | `whereBetween(column, low, high)` | `column BETWEEN low AND high` |
-| `whereIn(column, list)` | `column IN (...)` — empty list short-circuits to `1 = 0` (no rows) |
-| `whereNotIn(column, list)` | `column NOT IN (...)` — empty list short-circuits to `1 = 1` (every row) |
+| `whereIn(column, list)` | `column IN (...)` — empty list short-circuits the terminal to return no rows |
+| `whereNotIn(column, list)` | `column NOT IN (...)` — empty list is a no-op (every row matches) |
 | `orderBy(column, direction)` | `ORDER BY column direction` (direction defaults to `ASC`) |
 | `limit(n)` | `LIMIT n` |
 | `offset(n)` | `OFFSET n` |
