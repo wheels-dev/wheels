@@ -1,0 +1,6 @@
+{
+	"name": "wheels-singularholder",
+	"version": "1.0.0",
+	"description": "Test fixture: claims the singular alias `crossFormShared` so pluralcollider's plural entry of the same name fails",
+	"mapping": "crossFormShared"
+}

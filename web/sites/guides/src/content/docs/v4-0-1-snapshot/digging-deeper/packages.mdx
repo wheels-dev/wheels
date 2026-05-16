@@ -83,6 +83,9 @@ Every package declares a `package.json` at its root. The loader parses it before
     "author": "PAI Industries",
     "description": "Sentry error tracking for Wheels with framework-aware context enrichment",
     "wheelsVersion": ">=3.0",
+    "mappings": {
+        "plugins.sentry": "."
+    },
     "provides": {
         "mixins": "controller",
         "services": [],
@@ -96,6 +99,7 @@ Field reference:
 
 - **`name`** — the package name as you'd reference it in docs or the registry. Usually matches the `vendor/` directory (`wheels-sentry` → `vendor/wheels-sentry/`). Required.
 - **`mapping`** — optional CFML identifier registered as this package's root namespace. Lets CFCs inside the package reference siblings via `new wheelsSentry.SentryClient()` instead of the verbose `CreateObject("component", "vendor.wheels-sentry.SentryClient")`. Defaults to lower-camel-case of `name`: `wheels-sentry` → `wheelsSentry`, `wheels_legacy_adapter` → `wheelsLegacyAdapter`. Must match `[A-Za-z_][A-Za-z0-9_]*`. If two packages derive or declare the same alias the second is recorded in `failedPackages` with a `Duplicate package mapping alias` error — set a unique `mapping` to resolve. Registered aliases are available via `PackageLoader.getPackageMappings()`.
+- **`mappings`** — optional struct of additional CFML mapping aliases the package wants to register. Each key is a dotted mapping name (e.g. `plugins.sentry`, `mytools.utils`); each value is a path *relative to the package install directory* (`"."` or `""` for the package root, `"sub"` for a subdirectory). Use this when you need a namespace beyond the singular alias — most often to keep a legacy dotted path resolvable after a directory rename. Example: a package that historically lived at `plugins/sentry/` can declare `{"mappings": {"plugins.sentry": "."}}` so existing `new plugins.sentry.SentryClient()` callsites keep working when the package is installed at `vendor/wheels-sentry/`. Each dotted segment must satisfy `[A-Za-z_][A-Za-z0-9_]*`; absolute paths and `..` traversal are rejected. Names collide with the singular `mapping` registry as well — a plural entry that matches an existing singular alias (from any package) fails the package, with the singular alias unwound from the registry to keep state consistent. Inspect plural entries alongside singular ones via `PackageLoader.getPackageMappings()`.
 - **`version`** — semver. Required. Used in load logs and by future install tooling.
 - **`author`** — free-form string. Not validated.
 - **`description`** — one-line description shown in logs and tooling.

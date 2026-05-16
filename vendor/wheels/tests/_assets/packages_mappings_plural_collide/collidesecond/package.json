@@ -1,0 +1,8 @@
+{
+	"name": "wheels-collidesecond",
+	"version": "1.0.0",
+	"description": "Test fixture: collides with collidefirst on `shared.collide`. The loser lands in failedPackages.",
+	"mappings": {
+		"shared.collide": "."
+	}
+}

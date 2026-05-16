@@ -365,6 +365,9 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
     "author": "PAI Industries",
     "description": "Sentry error tracking",
     "wheelsVersion": ">=3.0",
+    "mappings": {
+        "plugins.sentry": "."
+    },
     "provides": {
         "mixins": "controller",
         "services": [],
@@ -377,6 +380,8 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
 ```
 
 **`mapping`**: Optional CFML-identifier-safe alias registered as a CFML mapping at load time. Lets CFCs inside the package use `new wheelsSentry.SentryClient()` instead of `CreateObject("component", "vendor.wheels-sentry.SentryClient")`. Defaults to lower-camel-case of `name` (`wheels-sentry` → `wheelsSentry`). Must match `[A-Za-z_][A-Za-z0-9_]*`. Two packages that compute the same alias: the second fails with `Duplicate package mapping alias`. Inspect registered aliases via `PackageLoader.getPackageMappings()`.
+
+**`mappings`** (plural): Optional struct of additional dotted CFML mapping aliases beyond the singular `mapping`. Keys are dotted names (e.g. `plugins.sentry`); values are paths relative to the package directory (`"."` for the root, `"sub"` for a subdirectory). Each dot-separated segment must match `[A-Za-z_][A-Za-z0-9_]*`. Absolute paths and `..` traversal are rejected. Collisions with another package's singular OR plural alias fail the package and unwind its singular alias from the registry. Use this to declare legacy compatibility paths so callsites like `new plugins.sentry.SentryClient()` keep resolving when a package is renamed or relocated. See GH#2705.
 
 **`provides.mixins`**: Comma-delimited targets from the allowlist `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus the special values `global` (inject into all targets) and `none` (explicit opt-out). Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`). Unknown targets (typos, `view`, `service`, etc.) are rejected with a clear error — view helpers belong in `controller` mixins since Wheels views execute in the controller's variables scope.
 

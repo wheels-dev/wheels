@@ -1,0 +1,8 @@
+{
+	"name": "wheels-collidefirst",
+	"version": "1.0.0",
+	"description": "Test fixture: two packages claim the same plural mapping `shared.collide` — first one to register wins",
+	"mappings": {
+		"shared.collide": "."
+	}
+}

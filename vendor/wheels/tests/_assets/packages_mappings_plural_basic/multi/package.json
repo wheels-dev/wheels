@@ -1,0 +1,10 @@
+{
+	"name": "wheels-multi",
+	"version": "1.0.0",
+	"description": "Test fixture: multiple plural mappings register all entries; mix of identifier-form and dotted form",
+	"mappings": {
+		"multiOne": ".",
+		"multi.two": ".",
+		"multi.three.four": "."
+	}
+}

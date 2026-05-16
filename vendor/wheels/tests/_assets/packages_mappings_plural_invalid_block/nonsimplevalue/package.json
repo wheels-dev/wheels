@@ -1,0 +1,8 @@
+{
+	"name": "wheels-nonsimplevalue",
+	"version": "1.0.0",
+	"description": "Test fixture: plural `mappings` entry value is an array instead of a string path — fails the per-entry IsSimpleValue guard in $registerAdditionalMappings",
+	"mappings": {
+		"plugins.nonsimple": ["."]
+	}
+}
