@@ -82,6 +82,96 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toBe("same-origin");
 			});
 
+			describe("Vary: Origin header", function() {
+
+				it("emits Vary: Origin when reflecting an allowed origin", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "https://myapp.com");
+					local.reqCtx = {cgi = {http_origin = "https://myapp.com"}};
+					local.headers = local.cors.$headersFor(request = local.reqCtx);
+					expect(local.headers).toHaveKey("Vary");
+					expect(local.headers["Vary"]).toBe("Origin");
+					expect(local.headers["Access-Control-Allow-Origin"]).toBe("https://myapp.com");
+				});
+
+				it("emits Vary: Origin for one of multiple allowed origins", function() {
+					local.cors = new wheels.middleware.Cors(
+						allowOrigins = "https://myapp.com,https://admin.myapp.com"
+					);
+					local.reqCtx = {cgi = {http_origin = "https://admin.myapp.com"}};
+					local.headers = local.cors.$headersFor(request = local.reqCtx);
+					expect(local.headers).toHaveKey("Vary");
+					expect(local.headers["Vary"]).toBe("Origin");
+					expect(local.headers["Access-Control-Allow-Origin"]).toBe("https://admin.myapp.com");
+				});
+
+				it("does not emit Vary: Origin when allowOrigins is wildcard", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "*");
+					local.reqCtx = {cgi = {http_origin = "https://anything.com"}};
+					local.headers = local.cors.$headersFor(request = local.reqCtx);
+					expect(local.headers).notToHaveKey("Vary");
+					expect(local.headers["Access-Control-Allow-Origin"]).toBe("*");
+				});
+
+				it("does not emit Vary: Origin when origin is not allowed", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "https://myapp.com");
+					local.reqCtx = {cgi = {http_origin = "https://evil.com"}};
+					local.headers = local.cors.$headersFor(request = local.reqCtx);
+					expect(local.headers).notToHaveKey("Vary");
+					expect(local.headers).notToHaveKey("Access-Control-Allow-Origin");
+				});
+
+				it("does not emit Vary: Origin when no Origin header is present", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "https://myapp.com");
+					local.reqCtx = {cgi = {}};
+					local.headers = local.cors.$headersFor(request = local.reqCtx);
+					expect(local.headers).notToHaveKey("Vary");
+				});
+
+			});
+
+			describe("Access-Control-Allow-Origin header resolution", function() {
+
+				it("returns empty string when allowOrigins is a comma list and no Origin header is present", function() {
+					// Regression: previously the raw comma list flowed through as the
+					// header value, violating the CORS spec requirement that
+					// Access-Control-Allow-Origin be a single origin or `*`.
+					local.cors = new wheels.middleware.Cors(
+						allowOrigins = "https://portal.pai.com,https://portal.paiindustries.com"
+					);
+					expect(local.cors.$resolveAllowOrigin("")).toBe("");
+				});
+
+				it("returns empty string when allowOrigins is a single origin and no Origin header is present", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "https://myapp.com");
+					expect(local.cors.$resolveAllowOrigin("")).toBe("");
+				});
+
+				it("returns the matched origin when the request Origin is in the comma list", function() {
+					local.cors = new wheels.middleware.Cors(
+						allowOrigins = "https://portal.pai.com,https://portal.paiindustries.com"
+					);
+					expect(local.cors.$resolveAllowOrigin("https://portal.paiindustries.com"))
+						.toBe("https://portal.paiindustries.com");
+				});
+
+				it("returns empty string when the request Origin is not in the allowlist", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "https://myapp.com");
+					expect(local.cors.$resolveAllowOrigin("https://evil.com")).toBe("");
+				});
+
+				it("returns '*' when allowOrigins is wildcard, regardless of Origin header presence", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "*");
+					expect(local.cors.$resolveAllowOrigin("")).toBe("*");
+					expect(local.cors.$resolveAllowOrigin("https://anything.com")).toBe("*");
+				});
+
+				it("returns empty string when allowOrigins is empty and no Origin header is present", function() {
+					local.cors = new wheels.middleware.Cors();
+					expect(local.cors.$resolveAllowOrigin("")).toBe("");
+				});
+
+			});
+
 			describe("wildcard + credentials validation", function() {
 
 				it("throws when allowOrigins is wildcard and allowCredentials is true", function() {
