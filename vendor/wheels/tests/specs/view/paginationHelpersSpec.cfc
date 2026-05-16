@@ -225,6 +225,164 @@ component extends="wheels.WheelsTest" {
 
 			})
 
+			/* ── pageNumberLinks viewStyle presets ─────── */
+
+			describe("pageNumberLinks with viewStyle presets", () => {
+
+				it("emits Bootstrap 5 markup with active class on <li> wrapper and <span> for current page", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.pageNumberLinks(viewStyle = "bootstrap5")
+					expect(result).toInclude('<li class="page-item active" aria-current="page">')
+					expect(result).toInclude('<span class="page-link">2</span>')
+					expect(result).toInclude('<li class="page-item">')
+					expect(result).toInclude('class="page-link"')
+				})
+
+				it("emits Bootstrap 4 markup with active class on <li> wrapper but no aria-current", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.pageNumberLinks(viewStyle = "bootstrap4")
+					expect(result).toInclude('<li class="page-item active">')
+					expect(result).notToInclude('aria-current')
+					expect(result).toInclude('<span class="page-link">2</span>')
+				})
+
+				it("emits Tailwind markup with pagination-current/pagination-link wrappers", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.pageNumberLinks(viewStyle = "tailwind")
+					expect(result).toInclude('<span class="pagination-current" aria-current="page">')
+					expect(result).toInclude('class="pagination-link"')
+					expect(result).toInclude("2</span>")
+					expect(result).notToInclude('<li class="page-item')
+				})
+
+				it("preserves default (plain) behavior when viewStyle is plain", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					resultDefault = _controller.pageNumberLinks()
+					resultPlain = _controller.pageNumberLinks(viewStyle = "plain")
+					expect(resultPlain).toBe(resultDefault)
+				})
+
+				it("preserves default (plain) behavior — active class stays on anchor, not <li>", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.pageNumberLinks(classForCurrent = "active")
+					expect(result).notToInclude('<li class="page-item active">')
+				})
+
+			})
+
+			/* ── paginationNav viewStyle presets ───────── */
+
+			describe("paginationNav with viewStyle presets", () => {
+
+				it("wraps Bootstrap 5 markup in <ul class='pagination'> inside <nav>", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap5")
+					expect(result).toInclude('<nav')
+					expect(result).toInclude('<ul class="pagination">')
+					expect(result).toInclude('</ul>')
+					expect(result).toInclude('</nav>')
+					expect(result).toInclude('<li class="page-item active" aria-current="page">')
+					expect(result).toInclude('<span class="page-link">2</span>')
+				})
+
+				it("wraps first/previous/next/last in <li class='page-item'> for Bootstrap 5", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					// Default showFirst/showLast = "auto" auto-suppresses these when the windowed page
+					// list already reaches the boundary (page 2 with windowSize=2 renders pages 1-4),
+					// so opt in explicitly to test the preset's anchor wrapping markup.
+					result = _controller.paginationNav(viewStyle = "bootstrap5", showFirst = "always", showLast = "always")
+					expect(result).toInclude('<li class="page-item">')
+					expect(result).toInclude('First')
+					expect(result).toInclude('Previous')
+					expect(result).toInclude('Next')
+					expect(result).toInclude('Last')
+				})
+
+				it("marks first/previous as disabled <li> when on first page in Bootstrap 5", () => {
+					g.model("author").findAll(page = 1, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap5")
+					expect(result).toInclude('<li class="page-item disabled">')
+				})
+
+				it("wraps Bootstrap 4 markup in <ul class='pagination'> without aria-current on current page", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap4")
+					expect(result).toInclude('<nav')
+					expect(result).toInclude('<ul class="pagination">')
+					expect(result).toInclude('<li class="page-item active">')
+					expect(result).toInclude('<span class="page-link">2</span>')
+					// BS4 omits aria-current on the active page
+					expect(result).notToInclude('aria-current="page"')
+				})
+
+				it("marks first/previous as disabled <li> when on first page in Bootstrap 4", () => {
+					g.model("author").findAll(page = 1, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap4")
+					expect(result).toInclude('<li class="page-item disabled">')
+				})
+
+				it("wraps Tailwind markup in a flat <nav class='pagination'> with no <ul>", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "tailwind")
+					expect(result).toInclude('<nav aria-label="Pagination" class="pagination">')
+					expect(result).toInclude('<span class="pagination-current" aria-current="page">')
+					expect(result).toInclude('class="pagination-link"')
+					expect(result).notToInclude('<ul')
+					expect(result).notToInclude('<li class="page-item')
+				})
+
+				it("emits Tailwind pagination-disabled span for first/previous when on first page", () => {
+					g.model("author").findAll(page = 1, perPage = 3, order = "lastName")
+					// Opt into showFirst="always" since auto-mode suppresses First when the rendered
+					// page-number window already includes page 1.
+					result = _controller.paginationNav(viewStyle = "tailwind", showFirst = "always")
+					expect(result).toInclude('<span class="pagination-disabled">')
+					expect(result).toInclude('First')
+					expect(result).toInclude('Previous')
+				})
+
+				it("places paginationInfo between <nav> and <ul> for Bootstrap 5 with showInfo=true", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(viewStyle = "bootstrap5", showInfo = true)
+					expect(result).toInclude('<nav aria-label="Pagination">')
+					expect(result).toInclude('Showing')
+					expect(result).toInclude('<ul class="pagination">')
+					// Info text must appear before the <ul>
+					infoPos = FindNoCase("Showing", result)
+					ulPos = FindNoCase("<ul", result)
+					expect(infoPos).toBeGT(0)
+					expect(ulPos).toBeGT(0)
+					expect(infoPos).toBeLT(ulPos)
+				})
+
+				it("throws Wheels.InvalidViewStyle on typo passed to pageNumberLinks", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					expect(function() {
+						_controller.pageNumberLinks(viewStyle = "boostrap5")
+					}).toThrow("Wheels.InvalidViewStyle")
+				})
+
+				it("throws Wheels.InvalidViewStyle on typo passed to paginationNav", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					expect(function() {
+						_controller.paginationNav(viewStyle = "boostrap5")
+					}).toThrow("Wheels.InvalidViewStyle")
+				})
+
+				it("forwards windowSize to pageNumberLinks() on the viewStyle path", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					result = _controller.paginationNav(viewStyle = "bootstrap5", windowSize = 4)
+					// windowSize=4 expands the rendered page-number window to pages 1-9,
+					// so page 8 must appear in the output. If windowSize were silently
+					// dropped from the $renderPaginationNav() → pageNumberLinks() call
+					// (default 2), the window would shrink to 3-7 and page 8 would
+					// disappear — guards against the auto-mode predicate and rendered
+					// window using mismatched windowSize values.
+					expect(result).toInclude(">8<")
+				})
+
+			})
+
 			/* ── paginationNav ─────────────────────────── */
 
 			describe("paginationNav", () => {
@@ -237,8 +395,8 @@ component extends="wheels.WheelsTest" {
 					expect(result).toInclude("pagination")
 				})
 
-				it("includes all sections by default", () => {
-					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				it("includes all sections by default when window does not reach boundaries", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
 					result = _controller.paginationNav()
 					expect(result).toInclude("First")
 					expect(result).toInclude("Previous")
@@ -362,10 +520,14 @@ component extends="wheels.WheelsTest" {
 
 				it("wraps every anchor (first/prev/page/next/last) with prependToPage and appendToPage", () => {
 					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					// Explicit "always" overrides the auto-mode defaults so this test
+					// exercises wrapping regardless of where the page-number window sits.
 					result = _controller.paginationNav(
 						prependToPage = '<li class="page-item">',
 						appendToPage = '</li>',
-						class = "page-link"
+						class = "page-link",
+						showFirst = "always",
+						showLast = "always"
 					)
 					// One <li> for first, prev, each numbered page, next, last
 					expect(ListLen(result, "<")).toBeGT(5)
@@ -409,6 +571,122 @@ component extends="wheels.WheelsTest" {
 					// And it must sit *between* sections — never inside a tag, never inside
 					// rendered text — i.e. between a closing tag and the next opening tag.
 					expect(result).toMatch("</[^>]+>XDIVX<")
+				})
+
+			})
+
+			/* ── paginationNav anchor display modes ────── */
+
+			describe("paginationNav anchor display modes", () => {
+
+				it("hides First in auto mode when window already reaches first page", () => {
+					g.setPagination(totalRecords = 12, currentPage = 2, perPage = 3)
+					result = _controller.paginationNav()
+					expect(result).notToInclude("First")
+				})
+
+				it("hides Last in auto mode when window already reaches last page", () => {
+					g.setPagination(totalRecords = 12, currentPage = 3, perPage = 3)
+					result = _controller.paginationNav()
+					expect(result).notToInclude("Last")
+				})
+
+				it("shows First in auto mode when window does not reach first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("First")
+				})
+
+				it("shows Last in auto mode when window does not reach last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 1, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Last")
+				})
+
+				it("renders First with always mode when window already reaches first page", () => {
+					g.setPagination(totalRecords = 12, currentPage = 2, perPage = 3)
+					result = _controller.paginationNav(showFirst = "always")
+					expect(result).toInclude("First")
+				})
+
+				it("hides First with never mode when window does not reach first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav(showFirst = "never")
+					expect(result).notToInclude("First")
+				})
+
+				it("treats boolean true as always for backwards compatibility", () => {
+					g.setPagination(totalRecords = 12, currentPage = 2, perPage = 3)
+					result = _controller.paginationNav(showFirst = true, showLast = true)
+					expect(result).toInclude("First")
+					expect(result).toInclude("Last")
+				})
+
+				it("treats boolean false as never for backwards compatibility", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					result = _controller.paginationNav(showFirst = false, showLast = false)
+					expect(result).notToInclude("First")
+					expect(result).notToInclude("Last")
+				})
+
+				it("respects windowSize when computing auto mode predicates", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					result = _controller.paginationNav(windowSize = 4)
+					expect(result).notToInclude("First")
+					// windowSize=4 expands the rendered page-number window to pages 1-9,
+					// so page 8 must appear in the output. If windowSize were silently
+					// dropped from the pageNumberLinks() call (default 2), the window
+					// would shrink to 3-7 and page 8 would disappear — the notToInclude
+					// "First" assertion alone would still pass since the First-hide
+					// predicate is evaluated on arguments.windowSize directly.
+					expect(result).toInclude(">8<")
+				})
+
+				it("renders disabled Previous span in auto mode on first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 1, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Previous")
+					expect(result).toInclude("disabled")
+				})
+
+				it("renders Previous link in auto mode when not on first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 3, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Previous")
+					expect(result).toInclude("<a")
+				})
+
+				it("renders disabled Next span in auto mode on last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Next")
+					expect(result).toInclude("disabled")
+				})
+
+				it("renders Next link in auto mode when not on last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 3, perPage = 10)
+					result = _controller.paginationNav()
+					expect(result).toInclude("Next")
+					expect(result).toInclude("<a")
+				})
+
+				it("hides Previous entirely with never mode on first page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 1, perPage = 10)
+					result = _controller.paginationNav(showPrevious = "never")
+					expect(result).notToInclude("Previous")
+				})
+
+				it("hides Next entirely with never mode on last page", () => {
+					g.setPagination(totalRecords = 100, currentPage = 10, perPage = 10)
+					result = _controller.paginationNav(showNext = "never")
+					expect(result).notToInclude("Next")
+				})
+
+				it("rejects unknown anchor mode strings", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					expect(() => {
+						_controller.paginationNav(showFirst = "bogus")
+					}).toThrow()
 				})
 
 			})

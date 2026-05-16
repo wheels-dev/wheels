@@ -308,16 +308,19 @@
 			appendToPage = "",
 			addActiveClassToPrependedParent = false,
 			pageNumberAsParam = true,
+			viewStyle = "plain",
 			encode = true
 		};
 		application.$wheels.functions.paginationNav = {
 			navClass = "pagination",
-			showFirst = true,
-			showLast = true,
-			showPrevious = true,
-			showNext = true,
+			showFirst = "auto",
+			showLast = "auto",
+			showPrevious = "auto",
+			showNext = "auto",
 			showInfo = false,
 			showSinglePage = false,
+			windowSize = 2,
+			viewStyle = "plain",
 			prepend = "",
 			append = "",
 			prependToPage = "",
