@@ -338,7 +338,7 @@ Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `m
 
 Optional first-party modules are distributed as standalone repositories and installed into `vendor/<name>/`. The framework auto-discovers `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
 
-Public author-facing guide: [Packages](web/sites/guides/src/content/docs/v4-0-0-snapshot/digging-deeper/packages.mdx) — manifest fields, mixin targets, lifecycle, service providers, lazy loading, testing, publishing flow. Submission workflow: [wheels-packages/CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md).
+Public author-facing guide: [Packages](web/sites/guides/src/content/docs/v4-0-1-snapshot/digging-deeper/packages.mdx) — manifest fields (including `mapping`), mixin targets, lifecycle, service providers, lazy loading, testing, publishing flow. Submission workflow: [wheels-packages/CONTRIBUTING.md](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md).
 
 Six first-party packages live in standalone repos under `wheels-dev/`, indexed by the `wheels-dev/wheels-packages` registry:
 
@@ -373,6 +373,8 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
     "dependencies": {}
 }
 ```
+
+**`mapping`**: Optional CFML-identifier-safe alias registered as a CFML mapping at load time. Lets CFCs inside the package use `new wheelsSentry.SentryClient()` instead of `CreateObject("component", "vendor.wheels-sentry.SentryClient")`. Defaults to lower-camel-case of `name` (`wheels-sentry` → `wheelsSentry`). Must match `[A-Za-z_][A-Za-z0-9_]*`. Two packages that compute the same alias: the second fails with `Duplicate package mapping alias`. Inspect registered aliases via `PackageLoader.getPackageMappings()`.
 
 **`provides.mixins`**: Comma-delimited targets from the allowlist `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus the special values `global` (inject into all targets) and `none` (explicit opt-out). Determines which framework components receive the package's public methods. Default: `none` (explicit opt-in, unlike legacy plugins which default to `global`). Unknown targets (typos, `view`, `service`, etc.) are rejected with a clear error — view helpers belong in `controller` mixins since Wheels views execute in the controller's variables scope.
 
