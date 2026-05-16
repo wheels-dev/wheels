@@ -77,6 +77,14 @@ Before any non-simple cross-origin request (anything that uses a custom header, 
 
 You do not write an `options` action on your controllers. The middleware owns `OPTIONS` entirely.
 
+## CDN and proxy caching
+
+When the middleware reflects a specific allowed origin — that is, when `allowOrigins` is not the wildcard `"*"` and the incoming `Origin` header matches one of the entries — it also emits `Vary: Origin` on the response. This tells CDN, reverse-proxy, and browser disk caches to key separate cache entries per origin rather than serving a cached response with the wrong `Access-Control-Allow-Origin` to callers from a different origin.
+
+`Vary: Origin` is **not** emitted for wildcard responses (`allowOrigins="*"`), because a wildcard response is identical for every caller. It is also omitted when the origin is not in the allowlist, because no `Access-Control-*` headers are written at all in that case.
+
+If you are behind a CDN or reverse proxy that strips or ignores `Vary` headers, verify that per-origin CORS responses are cached and served correctly.
+
 ## Credentials mode
 
 `allowCredentials=true` tells the browser it may attach cookies and `Authorization` headers to cross-origin requests. You need this for session-based auth across origins (a React SPA on `https://app.example.com` calling `https://api.example.com`).
