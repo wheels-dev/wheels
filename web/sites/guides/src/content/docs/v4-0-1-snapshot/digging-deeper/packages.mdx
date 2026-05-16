@@ -95,6 +95,7 @@ Every package declares a `package.json` at its root. The loader parses it before
 Field reference:
 
 - **`name`** — the package name as you'd reference it in docs or the registry. Usually matches the `vendor/` directory (`wheels-sentry` → `vendor/wheels-sentry/`). Required.
+- **`mapping`** — optional CFML identifier registered as this package's root namespace. Lets CFCs inside the package reference siblings via `new wheelsSentry.SentryClient()` instead of the verbose `CreateObject("component", "vendor.wheels-sentry.SentryClient")`. Defaults to lower-camel-case of `name`: `wheels-sentry` → `wheelsSentry`, `wheels_legacy_adapter` → `wheelsLegacyAdapter`. Must match `[A-Za-z_][A-Za-z0-9_]*`. If two packages derive or declare the same alias the second is recorded in `failedPackages` with a `Duplicate package mapping alias` error — set a unique `mapping` to resolve. Registered aliases are available via `PackageLoader.getPackageMappings()`.
 - **`version`** — semver. Required. Used in load logs and by future install tooling.
 - **`author`** — free-form string. Not validated.
 - **`description`** — one-line description shown in logs and tooling.
@@ -239,6 +240,7 @@ Common failure modes and what happens:
 - **Missing required manifest fields (`name`, `version`)** — same: logged and skipped.
 - **Dependency not installed** — the dependency-resolution phase records the error before any CFC is instantiated. Dependent packages are excluded from the load order.
 - **Circular dependencies** — surfaces as a graph error at resolution time; all packages in the cycle are excluded with a clear log message.
+- **Duplicate mapping alias** — two packages derive or declare the same value for `mapping` (or the same lower-camel-case form of their `name`). The first claimant keeps its mapping; the second is excluded. Set a unique `mapping` in `package.json` to resolve.
 - **Exception during CFC `init()`** — caught, logged with stack, package skipped. Mixins are never partially applied.
 
 The framework's contract is that activating a broken package cannot take down a working app. Check the application log after a deploy to see which packages loaded, which were skipped, and why.
