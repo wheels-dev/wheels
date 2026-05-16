@@ -225,7 +225,7 @@ component implements="wheels.ServiceProviderInterface" output="false" {
     public void function register(required any container) {
         arguments.container
             .map("greetingService")
-            .to("vendor.wheels-greeter.lib.GreetingService")
+            .to("wheelsGreeter.lib.GreetingService")
             .asSingleton();
     }
 
