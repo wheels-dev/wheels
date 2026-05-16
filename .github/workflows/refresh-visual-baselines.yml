@@ -156,11 +156,16 @@ jobs:
           # readable inside the YAML and the SITES value is never spliced into
           # a shell-expanded string. SITES is constrained to the choice list
           # above, but writing through a file keeps that contract obvious.
+          #
+          # Branch name lives on its own line so long names (e.g. bot-generated
+          # fix/bot-NNNN-<slug>) can't push the body past the 100-char
+          # body-max-line-length enforced by commitlint.
           commit_msg_file="$(mktemp)"
           {
             printf '%s\n\n' "chore(web): refresh visual baseline(s) ($SITES)"
             printf '%s\n' "Manually triggered baseline refresh via"
-            printf '%s\n\n' ".github/workflows/refresh-visual-baselines.yml on branch $BRANCH."
+            printf '%s\n' ".github/workflows/refresh-visual-baselines.yml"
+            printf '%s\n\n' "on branch $BRANCH."
             printf '%s\n' "Run when an intentional content/layout change makes the visual-regression"
             printf '%s\n' "check fail. The new PNG(s) under web/tests/visual-baselines/ are now the"
             printf '%s\n' "expected rendering; re-run the failing visual-regression job to flip the"
