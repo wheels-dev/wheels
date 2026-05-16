@@ -104,6 +104,25 @@ component extends="wheels.WheelsTest" {
 					expect(mappings).notToHaveKey("wheelsNotastruct");
 				});
 
+				it("fails a package whose plural mapping entry value is not a simple value", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = invalidBlockPath,
+						componentPrefix = invalidBlockPrefix
+					);
+					var failedNames = $failedPackageNames(loader);
+					expect(ArrayFindNoCase(failedNames, "nonsimplevalue")).toBeGT(0);
+				});
+
+				it("does not register the invalid plural entry, and rolls back the singular alias when an entry value is non-simple", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = invalidBlockPath,
+						componentPrefix = invalidBlockPrefix
+					);
+					var mappings = loader.getPackageMappings();
+					expect(mappings).notToHaveKey("plugins.nonsimple");
+					expect(mappings).notToHaveKey("wheelsNonsimplevalue");
+				});
+
 			});
 
 			describe("Invalid mapping names", () => {
