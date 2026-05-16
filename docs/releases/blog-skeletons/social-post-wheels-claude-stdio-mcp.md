@@ -1,8 +1,8 @@
 # Social Posts — "Wheels + Claude: Building a Feature via the stdio MCP"
 
 **Status:** Copy-paste ready. Third post in the post-GA series after the rate-limiter and packages articles.
-**Pairs with:** [web/content/blog/posts/wheels-claude-stdio-mcp.md](../../../web/content/blog/posts/wheels-claude-stdio-mcp.md)
-**Post date:** 2026-05-29 (same day as the article)
+**Pairs with:** [docs/releases/blog-drafts/wheels-claude-stdio-mcp.md](../blog-drafts/wheels-claude-stdio-mcp.md)
+**Post date:** 2026-05-19 (same day as the article)
 **Tone:** Post-GA, present tense, "AI is just another developer using the same CLI" angle.
 
 **Canonical URL** (use everywhere):

@@ -1,8 +1,8 @@
 # Social Posts — "Anatomy of a Wheels Package"
 
 **Status:** Copy-paste ready. Second post in the post-GA series after the rate-limiter article.
-**Pairs with:** [web/content/blog/posts/anatomy-of-a-wheels-package.md](../../../web/content/blog/posts/anatomy-of-a-wheels-package.md)
-**Post date:** 2026-05-22 (same day as the article)
+**Pairs with:** [docs/releases/blog-drafts/anatomy-of-a-wheels-package.md](../blog-drafts/anatomy-of-a-wheels-package.md)
+**Post date:** 2026-05-17 (same day as the article)
 **Tone:** Post-GA, present tense, how-to angle. Picks up the "now go build with it" thread from the rate-limiter post and applies it to the framework's other inversion: plugins → packages.
 
 **Canonical URL** (use everywhere):

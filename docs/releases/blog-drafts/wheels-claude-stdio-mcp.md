@@ -1,8 +1,8 @@
 ---
 title: 'Wheels + Claude: Building a Feature via the stdio MCP'
 slug: wheels-claude-stdio-mcp
-publishedAt: '2026-05-29T14:00:00.000Z'
-updatedAt: '2026-05-29T14:00:00.000Z'
+publishedAt: '2026-05-19T14:00:00.000Z'
+updatedAt: '2026-05-19T14:00:00.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
@@ -243,4 +243,4 @@ The second piece of drift is smaller and worth flagging without fixing in this P
 
 Neither of these is a code-path bug. They're documentation-and-templates drift, the same shape as the package-system fixes from the previous post. The pattern keeps holding: writing the article forces you to actually walk every path a reader will walk, and the parts where the docs disagree with the code are exactly the parts where the next person was going to get stuck.
 
-The next post in the series picks up the other surface where 4.0 quietly changed posture: *Beyond findAll — scopes, enums, and the chainable query builder*. Coming next week.
+The next post in the series picks up the other surface where 4.0 quietly changed posture: *Beyond findAll — scopes, enums, and the chainable query builder*. Coming Thursday.
