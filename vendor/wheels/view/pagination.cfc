@@ -347,12 +347,6 @@ component {
 		any encode
 	) {
 		$args(name = "paginationNav", args = arguments);
-		local.pg = pagination(arguments.handle);
-
-		// Return empty if only one page and showSinglePage is false
-		if (local.pg.totalPages <= 1 && !arguments.showSinglePage) {
-			return "";
-		}
 
 		// Build passthrough arguments for sub-helpers
 		local.subArgs = {};
@@ -362,10 +356,56 @@ component {
 		// `windowSize` is excluded because the anchor sub-helpers do not declare it; it
 		// is delivered explicitly to `pageNumberLinks()` below.
 		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,windowSize,encode";
+		// Union of args accepted by sub-helpers (paginationInfo, firstPageLink,
+		// previousPageLink, pageNumberLinks, nextPageLink, lastPageLink) plus the
+		// URL-building keys forwarded by $paginationLinkToArgs. Keys outside this
+		// allowlist are silently dropped by CFML's argumentCollection dispatch,
+		// which makes typos like prependToList="<ul>" invisible — see issue #2717.
+		local.allowedSubArgs = "format,text,name,class,disabledClass,showDisabled,pageNumberAsParam"
+			& ",classForCurrent,linkToCurrentPage,prependToPage,appendToPage"
+			& ",route,controller,action,key,anchor,onlyPath,host,protocol,port,params";
+		local.unknownArgs = "";
 		for (local.key in arguments) {
 			if (!ListFindNoCase(local.skipArgs, local.key)) {
 				local.subArgs[local.key] = arguments[local.key];
+				if (!ListFindNoCase(local.allowedSubArgs, local.key)) {
+					local.unknownArgs = ListAppend(local.unknownArgs, local.key);
+				}
 			}
+		}
+		// Validate before the totalPages early-return so the check fires on
+		// single-page (or empty) result sets too. Gated on showErrorInformation
+		// so production skips both the $findRoute lookup and the throw entirely.
+		if (Len(local.unknownArgs) && application.wheels.showErrorInformation) {
+			// Named-route segment variables (e.g. userId in route "userTimeline") are
+			// forwarded by $paginationLinkToArgs at link-build time but are not in the
+			// static allowlist. Filter them out before throwing — otherwise
+			// paginationNav(route="userTimeline", userId=user.id) trips a false-positive
+			// InvalidArgument.
+			if (StructKeyExists(local.subArgs, "route") && Len(local.subArgs.route)) {
+				local.routeVarList = $findRoute(argumentCollection = local.subArgs).foundvariables;
+				local.filteredUnknown = "";
+				for (local.uk in ListToArray(local.unknownArgs)) {
+					if (!ListFindNoCase(local.routeVarList, local.uk)) {
+						local.filteredUnknown = ListAppend(local.filteredUnknown, local.uk);
+					}
+				}
+				local.unknownArgs = local.filteredUnknown;
+			}
+			if (Len(local.unknownArgs)) {
+				Throw(
+					type = "Wheels.PaginationNav.InvalidArgument",
+					message = "paginationNav() received unknown argument(s): [#local.unknownArgs#].",
+					detail = "Accepted pass-through arguments are: #local.allowedSubArgs#. paginationNav's own arguments are: #local.skipArgs#."
+				);
+			}
+		}
+
+		local.pg = pagination(arguments.handle);
+
+		// Return empty if only one page and showSinglePage is false
+		if (local.pg.totalPages <= 1 && !arguments.showSinglePage) {
+			return "";
 		}
 
 		local.firstMode = $paginationAnchorMode(value = arguments.showFirst, argName = "showFirst");

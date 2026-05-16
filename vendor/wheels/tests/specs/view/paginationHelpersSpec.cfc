@@ -280,6 +280,74 @@ component extends="wheels.WheelsTest" {
 					expect(result).toInclude("custom-pagination")
 				})
 
+				it("throws when passed an unknown argument and showErrorInformation is on", () => {
+					_origShowErr = application.wheels.showErrorInformation
+					application.wheels.showErrorInformation = true
+					try {
+						g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+						expect(() => _controller.paginationNav(prependToList = "<ul>"))
+							.toThrow(type = "Wheels.PaginationNav.InvalidArgument")
+					} finally {
+						application.wheels.showErrorInformation = _origShowErr
+					}
+				})
+
+				it("does not throw for documented sub-helper args", () => {
+					_origShowErr = application.wheels.showErrorInformation
+					application.wheels.showErrorInformation = true
+					try {
+						g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+						expect(() => _controller.paginationNav(
+							windowSize = 3,
+							classForCurrent = "active",
+							prependToPage = "<li>",
+							appendToPage = "</li>",
+							class = "page-link"
+						)).notToThrow()
+					} finally {
+						application.wheels.showErrorInformation = _origShowErr
+					}
+				})
+
+				it("does not throw on unknown arg when showErrorInformation is off", () => {
+					_origShowErr = application.wheels.showErrorInformation
+					application.wheels.showErrorInformation = false
+					try {
+						g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+						expect(() => _controller.paginationNav(prependToList = "<ul>"))
+							.notToThrow()
+					} finally {
+						application.wheels.showErrorInformation = _origShowErr
+					}
+				})
+
+				it("does not throw when passing a named-route segment variable", () => {
+					// Regression test for the C1 false positive: paginationNav(route=..., <segmentVar>=...)
+					// must not trip InvalidArgument, because $paginationLinkToArgs forwards the route's
+					// foundvariables to linkTo() at link-build time.
+					_origShowErr = application.wheels.showErrorInformation
+					_origRoutes = Duplicate(application.wheels.routes)
+					_origStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+					_origNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+					_origRewrite = application.wheels.URLRewriting
+					application.wheels.showErrorInformation = true
+					try {
+						$clearRoutes()
+						g.mapper().$match(name = "userTimeline", pattern = "users/[userId]/timeline", to = "users##timeline").end()
+						g.$setNamedRoutePositions()
+						application.wheels.URLRewriting = "On"
+						g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+						expect(() => _controller.paginationNav(route = "userTimeline", userId = 42))
+							.notToThrow()
+					} finally {
+						application.wheels.showErrorInformation = _origShowErr
+						application.wheels.routes = _origRoutes
+						application.wheels.staticRoutes = _origStaticRoutes
+						application.wheels.namedRoutePositions = _origNamedRoutePositions
+						application.wheels.URLRewriting = _origRewrite
+					}
+				})
+
 			})
 
 			/* ── paginationNav anchor display modes ────── */
@@ -393,6 +461,12 @@ component extends="wheels.WheelsTest" {
 
 		})
 
+	}
+
+	public void function $clearRoutes() {
+		application.wheels.routes = []
+		application.wheels.staticRoutes = {}
+		application.wheels.namedRoutePositions = {}
 	}
 
 }
