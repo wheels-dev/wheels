@@ -64,6 +64,10 @@ These are the constructor arguments on `wheels.middleware.Cors`, verified agains
 
 Matching is **exact string comparison** on the incoming `Origin` header. There is no wildcard-subdomain support: `https://*.myapp.com` is not a valid entry. Enumerate every origin you need — scheme + host + port, nothing more, nothing less.
 
+<Aside type="caution">
+  **Migrating from 3.x global settings?** The `allowHeaders` default above (`"Content-Type,Authorization,X-Requested-With"`) is narrower than the legacy `accessControlAllowHeaders` global-setting default, which also included `X-Auth-Token`, `X-Requested-By`, and `Origin`. A like-for-like swap silently drops those headers. See [Upgrading from 3.x — CORS allow-list defaults drift](/v4-0-1-snapshot/upgrading/3x-to-4x/#migrating-from-global-settings-to-the-middleware) for the side-by-side comparison and the explicit-constructor-args fix.
+</Aside>
+
 ## Preflight (OPTIONS) requests
 
 Before any non-simple cross-origin request (anything that uses a custom header, a non-GET/POST/HEAD method, or a non-simple content type), the browser sends a preflight `OPTIONS` request asking "may I?" The Cors middleware handles this for you:
@@ -72,6 +76,14 @@ Before any non-simple cross-origin request (anything that uses a custom header, 
 - If the `Origin` is not in the allowlist, the middleware still short-circuits the `OPTIONS` request with an empty body but **omits the `Access-Control-Allow-*` headers**. The browser sees no opt-in and blocks the subsequent real request.
 
 You do not write an `options` action on your controllers. The middleware owns `OPTIONS` entirely.
+
+## CDN and proxy caching
+
+When the middleware reflects a specific allowed origin — that is, when `allowOrigins` is not the wildcard `"*"` and the incoming `Origin` header matches one of the entries — it also emits `Vary: Origin` on the response. This tells CDN, reverse-proxy, and browser disk caches to key separate cache entries per origin rather than serving a cached response with the wrong `Access-Control-Allow-Origin` to callers from a different origin.
+
+`Vary: Origin` is **not** emitted for wildcard responses (`allowOrigins="*"`), because a wildcard response is identical for every caller. It is also omitted when the origin is not in the allowlist, because no `Access-Control-*` headers are written at all in that case.
+
+If you are behind a CDN or reverse proxy that strips or ignores `Vary` headers, verify that per-origin CORS responses are cached and served correctly.
 
 ## Credentials mode
 
@@ -137,6 +149,7 @@ When a cross-origin request fails, work through this checklist:
 - **Port drift.** `https://myapp.com` and `https://myapp.com:8080` are different origins. Dev on `:3000` and prod on `:443` need separate entries (or separate environments).
 - **Subdomain drift.** `https://myapp.com` does not cover `https://www.myapp.com` or `https://admin.myapp.com`. List each.
 - **Credentials with wildcard.** `allowOrigins="*"` + `allowCredentials=true` throws `Wheels.Cors.InvalidConfiguration` at app start. Good — silent versions of this bug have haunted JavaScript developers for a decade.
+- **No `Origin` header, no CORS header.** On specific-origin and comma-list `allowOrigins` configurations, requests that arrive without an `Origin` header — same-origin browser navigation, server-to-server calls, and `curl` without `-H "Origin: ..."` — never receive an `Access-Control-Allow-Origin` response header. This is correct CORS spec behavior. (Wildcard configurations `allowOrigins="*"` are the exception: they emit `Access-Control-Allow-Origin: *` on every response regardless of whether `Origin` is set.) If you test a non-wildcard allowlist with bare `curl` and see no header, add `-H "Origin: https://yourallowedorigin.com"` to verify it is working.
 - **Double headers.** If your controller also writes `Access-Control-Allow-Origin` via `cfheader`, you'll end up with two values in one response. Browsers reject it. Pick one: the middleware or the controller, not both.
 
 ## SSE and CORS

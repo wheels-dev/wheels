@@ -102,6 +102,30 @@ Unless you intentionally want this asymmetry, running both simultaneously is not
 - Apps using the middleware: add `allowOrigins` explicitly (see the breaking change above).
 - New CORS configuration: prefer the middleware — it supports per-route scoping and has a secure deny-all default.
 
+#### Migrating from global settings to the middleware
+
+If you follow the recommendation above and move from `set(accessControlAllow*)` global settings to the `wheels.middleware.Cors` constructor, be aware that the allow-list defaults are not a like-for-like match.
+
+| Value | Legacy global setting default | `Cors` constructor default |
+|---|---|---|
+| Methods (`accessControlAllowMethods` / `allowMethods`) | `"GET, POST, PATCH, PUT, DELETE, OPTIONS"` | `"GET,POST,PUT,PATCH,DELETE,OPTIONS"` |
+| Headers (`accessControlAllowHeaders` / `allowHeaders`) | `"Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With"` | `"Content-Type,Authorization,X-Requested-With"` |
+
+The middleware default drops `X-Auth-Token`, `X-Requested-By`, and `Origin` from the header allow-list. A like-for-like swap silently shrinks the list: preflight `OPTIONS` requests from clients that send those headers receive an `Access-Control-Allow-Headers` response that omits those headers, and the browser blocks the real request with no entry in your server logs.
+
+Pass the missing headers explicitly when constructing the middleware:
+
+```cfm {test:compile} title="config/settings.cfm"
+set(middleware = [
+    new wheels.middleware.Cors(
+        allowOrigins = "https://myapp.com",
+        allowHeaders = "Content-Type,Authorization,X-Requested-With,X-Auth-Token,X-Requested-By,Origin"
+    )
+]);
+```
+
+The methods difference (spaces vs no spaces between list items) is cosmetic — HTTP implementations trim list values. No action is needed unless you pattern-match the exact string.
+
 ### 2. HSTS defaults on in production
 
 **CHANGELOG:** `Breaking: HSTS header defaults on in production` (#2081).
@@ -141,6 +165,27 @@ WARN  Wheels: reloadPassword is empty — URL-based environment switching and ap
 ```
 
 The `env()` helper is the canonical pattern for flowing `.env` values into framework settings. Use the same approach for `csrfEncryptionKey` and other security settings.
+
+#### `config/environment.cfm` has the same load-order gap
+
+`wheels new` scaffolds a hardcoded `set(environment="development")` in `config/environment.cfm`, so this gap does not affect freshly generated apps. If you wired the running environment from `.env` by hand — for example, `set(environment=application.env.environment)` — the same load-order issue applies:
+
+```cfm title="config/environment.cfm — unreliable pattern"
+// application.env may not be populated before this file runs.
+set(environment=application.env.environment);
+```
+
+When `application.env` is not yet initialized, the expression resolves to `""`. The `set()` call either errors or silently leaves the environment at the wrong value. In production this commonly manifests as servers reporting `environment=development` to Sentry, the debug bar, and anywhere `get("environment")` is consumed — despite `.env` containing `environment=production`.
+
+Use `env()` directly:
+
+```cfm {test:compile} title="config/environment.cfm — correct pattern"
+// env() reads from .env (or OS environment) without going through application.env.
+// Default "production" is intentional: a missing key fails safe to prod, not dev.
+set(environment=env("environment", "production"));
+```
+
+The `"production"` default is deliberate: a misconfigured or missing `environment` key in `.env` resolves to the safer environment rather than `development`, where debug output, verbose errors, and a lower security posture would be active on a live server.
 
 ### 5. RateLimiter defaults hardened
 
@@ -431,6 +476,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 
 - **"CSRF token invalid" on forms after upgrade.** Either the encryption key rotated (set `csrfEncryptionKey` explicitly) or a third-party embed is hitting `SameSite`. See #2035, #2054.
 - **Requests return 403 with no CORS header.** `allowOrigins` isn't set. See #2039.
+- **CORS preflight rejected after switching from global settings to the middleware.** The `Cors` constructor's `allowHeaders` default (`Content-Type,Authorization,X-Requested-With`) does not include `X-Auth-Token`, `X-Requested-By`, or `Origin` — all present in the legacy `accessControlAllowHeaders` global default. Pass the missing headers explicitly. See [Migrating from global settings to the middleware](#migrating-from-global-settings-to-the-middleware).
 - **Rate limiter counts wrong behind your load balancer.** `trustProxy` defaults to `false` now. See #2024, #2088.
 - **Test runner can't find specs.** Check for `tests/specs/functions/` — rename to `functional/`. See #1872.
 - **Plugin warning at startup.** Port to a package (see above) or accept the warning until you do.
@@ -438,6 +484,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 - **`Wheels.ViteAssetNotFound` thrown on first request after deploy.** The deploy shipped code referencing a Vite entrypoint that isn't in the manifest. Rebuild Vite assets (`npm run build`) before deploy, or temporarily `set(viteStrictManifest=false)` to restore 3.x silent fallback. See #2133.
 - **Boot fails with a "wirebox" package-not-found error.** The `wirebox` package was removed from `vendor/wheels/` (#1883). Installing the legacy adapter does not restore it. Replace `new wirebox.system.ioc.Injector(...)` in `Application.cfc` with `new wheels.Injector()`, and replace any `application.wirebox` references with `application.wheelsdi`. See [item 10](#10-applicationwirebox-renamed-to-applicationwheelsdi).
 - **"reloadPassword is empty" boot warning despite having `reloadPassword` in `.env`.** The reload password is populated only by `set(reloadPassword = ...)` in `config/settings.cfm` — a `.env` value does not flow through automatically. Add `set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""));` to `config/settings.cfm`. See #2631.
+- **Production servers report `environment=development` despite `.env` containing `environment=production`.** `application.env.environment` is not reliably populated before `config/environment.cfm` runs — the load-order gap means the expression resolves to `""` and `set()` picks up the wrong value. Replace `set(environment=application.env.environment)` with `set(environment=env("environment", "production"))`. The `"production"` default ensures a missing key fails safe to production rather than development. See #2709.
 - **Static assets under `/miscellaneous/`, `/javascripts/`, `/stylesheets/`, or `/files/` return 404 after upgrade.** LuCLI's bundled-default `rewrite.config` uses a narrow allow-list (`images|css|js|fonts|assets|static`) that excludes 3.x-conventional directory names. `wheels start` now auto-provisions a project-level `rewrite.config` that covers these dirs on the first boot. If you upgraded before this fix, run `wheels start` once against your upgraded project — the file is dropped automatically and existing user-authored `rewrite.config` files are left untouched. See #2626.
 
 ## Related guides
