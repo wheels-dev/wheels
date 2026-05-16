@@ -100,6 +100,8 @@ After the exclusions, the surface looks like this:
 
 | Tool | Purpose |
 |---|---|
+| `wheels_version` | Show framework + LuCLI runtime + JVM version. |
+| `wheels_showHelp` | Print the CLI's top-level help text. |
 | `wheels_generate` | Create models, controllers, migrations, scaffolds, tests, helpers. |
 | `wheels_destroy` | Remove generated components, cascading by default. |
 | `wheels_migrate` | Run migrations (`latest`, `up`, `down`, `info`). |
