@@ -117,6 +117,8 @@ Routes under `/api` get the Cors middleware. `resources("pages")` and everything
 
 <Aside type="caution">
   The preflight short-circuit that prevents unmatched `OPTIONS` requests from reaching the route table applies only when `Cors` is registered in the **global** pipeline via `config/settings.cfm`. Route-scoped `Cors` declared inside `.scope()` in `config/routes.cfm` does not benefit: route matching runs before route-scoped middleware executes, so a browser preflight to a path that only declares `POST` will 404 with `Wheels.RouteNotFound` unless `Cors` is also in the global pipeline.
+
+  The dispatcher detects preflight-capable middleware with `IsInstanceOf(mw, "wheels.middleware.Cors")`, so the short-circuit fires for `wheels.middleware.Cors` **and any subclass that extends it**. A custom CORS middleware that implements `wheels.middleware.MiddlewareInterface` directly without extending `wheels.middleware.Cors` will not trigger the short-circuit — extend `wheels.middleware.Cors` (overriding `handle()` as needed) if you want the same dispatch-level OPTIONS handling.
 </Aside>
 
 ## Debugging CORS failures
