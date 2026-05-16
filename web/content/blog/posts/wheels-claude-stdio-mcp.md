@@ -83,18 +83,18 @@ A handful of functions don't belong over RPC, though, and the framework names th
 ```cfm title="cli/lucli/Module.cfc"
 public array function mcpHiddenTools() {
     return [
-        "mcp",      // meta — would let an MCP client spawn another MCP server
-        "d",        // alias for destroy — duplicate surface
-        "new",      // scaffolds a whole project; not what an in-session tool should do
-        "console",  // interactive CFML REPL — needs a bidirectional terminal
-        "start",    // dev server lifecycle — stateful, long-lived
-        "stop",     // dev server lifecycle — same
+        "mcp",      // meta command — prints MCP setup instructions
+        "d",        // alias for destroy
+        "new",      // scaffolds a whole new Wheels project
+        "console",  // interactive CFML REPL — not usable over stdio
+        "start",    // dev server lifecycle (stateful)
+        "stop",     // dev server lifecycle (stateful)
         "browser"   // multi-step browser testing flow
     ];
 }
 ```
 
-Each exclusion has a reason that maps to a property of the tool. `start` and `stop` manage long-lived processes, which are awkward over a single JSON-RPC call. `console` needs a bidirectional interactive terminal; stdio MCP gives you one direction per message. `new` creates a whole project hierarchy and isn't something a model should fire mid-session without an explicit out-of-band confirmation. `mcp` would let one MCP server spawn another, which is a recursion you don't want.
+Each exclusion has a reason that maps to a property of the tool. `start` and `stop` manage long-lived processes, which are awkward over a single JSON-RPC call. `console` needs a bidirectional interactive terminal; stdio MCP gives you one direction per message. `new` creates a whole project hierarchy and isn't something a model should fire mid-session without an explicit out-of-band confirmation. `mcp` itself is hidden because calling it over RPC would let one MCP server spawn another, which is a recursion you don't want.
 
 After the exclusions, the surface looks like this:
 
@@ -105,6 +105,7 @@ After the exclusions, the surface looks like this:
 | `wheels_migrate` | Run migrations (`latest`, `up`, `down`, `info`). |
 | `wheels_seed` | Run convention-based seed scripts. |
 | `wheels_db` | Database utilities (reset, status, version). |
+| `wheels_packages` | List, search, and add packages from the registry. |
 | `wheels_test` | Run the test suite or a named subset. |
 | `wheels_reload` | Reload a running dev-server app. |
 | `wheels_routes` | Print the routing table. |
@@ -122,7 +123,7 @@ Most of these are read-only or strictly additive. `destroy` is the one to think 
 
 ## A worked example: shipping commenting in 90 seconds
 
-The post the previous one in this series introduced — wheels-greeter — was a toy. Here's a real flow: add commenting to an existing `Post` model. Migration, association, controller, routes, tests. The whole loop.
+The [previous post in this series](/posts/anatomy-of-a-wheels-package/) introduced a deliberately toy package called `wheels-greeter` to walk the manifest fields. Here's a real flow with no toy in sight: add commenting to an existing `Post` model on a blog. Migration, association, controller, routes, tests. The whole loop, driven by Claude through the MCP surface.
 
 Type this into Claude Code:
 
