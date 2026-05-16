@@ -79,6 +79,27 @@ component extends="wheels.WheelsTest" {
 					expect(result.recordcount).toBe(totalCount - 2);
 				})
 
+				it("whereIn() with an empty array matches no rows", () => {
+					var result = model("author").whereIn("id", []).count();
+					expect(result).toBe(0);
+				})
+
+				it("whereIn() with an empty list matches no rows", () => {
+					var result = model("author").whereIn("id", "").count();
+					expect(result).toBe(0);
+				})
+
+				it("whereNotIn() with an empty array matches every row", () => {
+					var totalCount = model("author").count();
+					var result = model("author").whereNotIn("id", []).count();
+					expect(result).toBe(totalCount);
+				})
+
+				it("whereIn() with an empty array composes cleanly with other clauses", () => {
+					var result = model("author").where("lastName", "Djurner").whereIn("id", []).count();
+					expect(result).toBe(0);
+				})
+
 			})
 
 			describe("orderBy()", () => {
