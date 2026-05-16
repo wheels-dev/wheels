@@ -236,6 +236,7 @@ component {
 	 * @linkToCurrentPage Whether to render the current page as a link.
 	 * @prependToPage String to prepend before each page number.
 	 * @appendToPage String to append after each page number.
+	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom). Has no effect if `prependToPage` contains no `class` attribute.
 	 * @pageNumberAsParam Decides whether to link the page number as a param or as part of a route.
 	 * @encode [see:styleSheetLinkTag].
 	 */
@@ -248,6 +249,7 @@ component {
 		boolean linkToCurrentPage,
 		string prependToPage,
 		string appendToPage,
+		boolean addActiveClassToPrependedParent,
 		boolean pageNumberAsParam,
 		any encode
 	) {
@@ -259,9 +261,30 @@ component {
 		local.startPage = Max(1, local.pg.currentPage - arguments.windowSize);
 		local.endPage = Min(local.pg.totalPages, local.pg.currentPage + arguments.windowSize);
 
+		// Scrub event-handler attributes and javascript: URIs from author-supplied wrappers once,
+		// before the loop. Applies the same entity-decode + on\w+= / javascript: strip contract that
+		// `paginationLinks()` applies to `prependToPage`, extended here to `appendToPage` as well so
+		// the new `pageNumberLinks` / `paginationNav` code path inherits the full defense-in-depth.
+		arguments.prependToPage = $paginationSanitizeWrapper(arguments.prependToPage);
+		arguments.appendToPage = $paginationSanitizeWrapper(arguments.appendToPage);
+
+		// Resolve addActiveClassToPrependedParent default locally to tolerate callers that don't pass it
+		// (e.g. paginationNav passthrough on Lucee where $args defaults haven't been re-applied after reload).
+		local.addActiveOnParent = StructKeyExists(arguments, "addActiveClassToPrependedParent")
+			? arguments.addActiveClassToPrependedParent
+			: false;
+
 		for (local.i = local.startPage; local.i <= local.endPage; local.i++) {
 			if (Len(arguments.prependToPage)) {
-				local.rv &= arguments.prependToPage;
+				local.prependForThisPage = arguments.prependToPage;
+				if (local.i == local.pg.currentPage && local.addActiveOnParent) {
+					if (reFindNoCase('class\s*=\s*[''"]', arguments.prependToPage)) {
+						local.prependForThisPage = reReplaceNoCase(arguments.prependToPage, '(class\s*=\s*[''"])', '\1active ', 'one');
+					} else if (reFindNoCase('class\s*=', arguments.prependToPage)) {
+						local.prependForThisPage = reReplaceNoCase(arguments.prependToPage, '(class\s*=\s*)', '\1active ', 'one');
+					}
+				}
+				local.rv &= local.prependForThisPage;
 			}
 
 			if (local.i == local.pg.currentPage && !arguments.linkToCurrentPage) {
@@ -332,6 +355,12 @@ component {
 	 * @showInfo Whether to show the pagination info text.
 	 * @showSinglePage Whether to show pagination when there is only one page.
 	 * @windowSize Number of page links shown around the current page in `pageNumberLinks` and used by the auto-mode predicates.
+	 * @prepend String or HTML to be prepended inside the `<nav>` before the link list (e.g. `<ul class="pagination">`).
+	 * @append String or HTML to be appended inside the `<nav>` after the link list (e.g. `</ul>`).
+	 * @prependToPage String or HTML to wrap before each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
+	 * @appendToPage String or HTML to wrap after each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
+	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom — forwards to `pageNumberLinks`). Applies only to numbered-page anchors, not to first / previous / next / last (which are never "current" in the Bootstrap sense). Has no effect if `prependToPage` contains no `class` attribute.
+	 * @anchorDivider Separator inserted between the first/previous/page-numbers/next/last sections.
 	 * @encode [see:styleSheetLinkTag].
 	 */
 	public string function paginationNav(
@@ -344,9 +373,24 @@ component {
 		boolean showInfo,
 		boolean showSinglePage,
 		numeric windowSize,
+		string prepend,
+		string append,
+		string prependToPage,
+		string appendToPage,
+		boolean addActiveClassToPrependedParent,
+		string anchorDivider,
 		any encode
 	) {
 		$args(name = "paginationNav", args = arguments);
+
+		// Sanitize the per-anchor wrappers once at this entry point so the four downstream
+		// `$paginationWrapAnchor()` calls receive pre-scrubbed input and don't each repeat the
+		// strip. `pageNumberLinks()` still scrubs its own inputs as a defense-in-depth measure for
+		// direct callers; the redundant pass when invoked from here is idempotent. Single audit
+		// surface: any future contributor only has to verify scrubbing happens here, not at every
+		// downstream wrap call.
+		arguments.prependToPage = $paginationSanitizeWrapper(arguments.prependToPage);
+		arguments.appendToPage = $paginationSanitizeWrapper(arguments.appendToPage);
 
 		// Build passthrough arguments for sub-helpers
 		local.subArgs = {};
@@ -355,14 +399,19 @@ component {
 		// Pass through any extra arguments (route, controller, action, key, params, etc.).
 		// `windowSize` is excluded because the anchor sub-helpers do not declare it; it
 		// is delivered explicitly to `pageNumberLinks()` below.
-		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,windowSize,encode";
+		// prepend/append are paginationNav-only and are NOT forwarded — they wrap the whole content.
+		// prependToPage/appendToPage forward to pageNumberLinks AND wrap the first/prev/next/last anchors here.
+		// anchorDivider is paginationNav-only and is NOT forwarded.
+		local.skipArgs = "handle,navClass,showFirst,showLast,showPrevious,showNext,showInfo,showSinglePage,windowSize,prepend,append,anchorDivider,encode";
 		// Union of args accepted by sub-helpers (paginationInfo, firstPageLink,
 		// previousPageLink, pageNumberLinks, nextPageLink, lastPageLink) plus the
 		// URL-building keys forwarded by $paginationLinkToArgs. Keys outside this
 		// allowlist are silently dropped by CFML's argumentCollection dispatch,
 		// which makes typos like prependToList="<ul>" invisible — see issue #2717.
+		// `addActiveClassToPrependedParent` is forwarded to `pageNumberLinks` per #2715
+		// so it must appear in the allowlist alongside `prependToPage`/`appendToPage`.
 		local.allowedSubArgs = "format,text,name,class,disabledClass,showDisabled,pageNumberAsParam"
-			& ",classForCurrent,linkToCurrentPage,prependToPage,appendToPage"
+			& ",classForCurrent,linkToCurrentPage,prependToPage,appendToPage,addActiveClassToPrependedParent"
 			& ",route,controller,action,key,anchor,onlyPath,host,protocol,port,params";
 		local.unknownArgs = "";
 		for (local.key in arguments) {
@@ -413,34 +462,68 @@ component {
 		local.previousMode = $paginationAnchorMode(value = arguments.showPrevious, argName = "showPrevious");
 		local.nextMode = $paginationAnchorMode(value = arguments.showNext, argName = "showNext");
 
-		local.content = "";
+		local.sections = [];
 
 		if (arguments.showInfo) {
-			local.content &= paginationInfo(argumentCollection = local.subArgs);
-			local.content &= " ";
+			ArrayAppend(local.sections, paginationInfo(argumentCollection = local.subArgs));
 		}
 
 		if ($paginationShouldShowAnchor(mode = local.firstMode, side = "first", pg = local.pg, windowSize = arguments.windowSize)) {
-			local.content &= firstPageLink(argumentCollection = local.subArgs);
-			local.content &= " ";
+			local.firstLink = firstPageLink(argumentCollection = local.subArgs);
+			if (Len(local.firstLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.firstLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
 
 		if ($paginationShouldShowAnchor(mode = local.previousMode, side = "previous", pg = local.pg, windowSize = arguments.windowSize)) {
-			local.content &= previousPageLink(argumentCollection = local.subArgs);
-			local.content &= " ";
+			local.prevLink = previousPageLink(argumentCollection = local.subArgs);
+			if (Len(local.prevLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.prevLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
 
-		local.content &= pageNumberLinks(argumentCollection = local.subArgs, windowSize = arguments.windowSize);
+		local.numberLinks = pageNumberLinks(argumentCollection = local.subArgs, windowSize = arguments.windowSize);
+		if (Len(local.numberLinks)) {
+			ArrayAppend(local.sections, local.numberLinks);
+		}
 
 		if ($paginationShouldShowAnchor(mode = local.nextMode, side = "next", pg = local.pg, windowSize = arguments.windowSize)) {
-			local.content &= " ";
-			local.content &= nextPageLink(argumentCollection = local.subArgs);
+			local.nextLink = nextPageLink(argumentCollection = local.subArgs);
+			if (Len(local.nextLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.nextLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
 
 		if ($paginationShouldShowAnchor(mode = local.lastMode, side = "last", pg = local.pg, windowSize = arguments.windowSize)) {
-			local.content &= " ";
-			local.content &= lastPageLink(argumentCollection = local.subArgs);
+			local.lastLink = lastPageLink(argumentCollection = local.subArgs);
+			if (Len(local.lastLink)) {
+				ArrayAppend(local.sections, $paginationWrapAnchor(
+					anchor = local.lastLink,
+					prependToPage = arguments.prependToPage,
+					appendToPage = arguments.appendToPage
+				));
+			}
 		}
+
+		// `prepend` / `append` are intentionally NOT scrubbed by `$paginationSanitizeWrapper`.
+		// They wrap the entire link list (e.g. `<ul class="pagination">` / `</ul>`) and are
+		// expected to be developer-authored structural markup, not per-page templates supplied by
+		// untrusted authors. `prependToPage` / `appendToPage` get the scrub because they're the
+		// extension points a CMS / theme would expose. If a future feature opens up `prepend` /
+		// `append` to author-supplied input, route them through `$paginationSanitizeWrapper` too.
+		local.content = arguments.prepend & ArrayToList(local.sections, arguments.anchorDivider) & arguments.append;
 
 		return $element(
 			name = "nav",
@@ -499,6 +582,41 @@ component {
 				return arguments.pg.totalPages > (arguments.pg.currentPage + arguments.windowSize);
 		}
 		return true;
+	}
+
+	/**
+	 * Internal: wraps a single anchor in prependToPage/appendToPage. Pure concatenation — callers MUST
+	 * pre-sanitize `prependToPage` and `appendToPage` via `$paginationSanitizeWrapper()` before passing
+	 * them here. Sole caller is `paginationNav()`, which performs that scrub once at its entry so the
+	 * four anchor sites (first / previous / next / last) don't each repeat the work. Keeping this helper
+	 * pure leaves a single audit surface for the XSS scrub up in `paginationNav()`.
+	 */
+	public string function $paginationWrapAnchor(
+		required string anchor,
+		string prependToPage = "",
+		string appendToPage = ""
+	) {
+		if (!Len(arguments.anchor)) {
+			return "";
+		}
+		return arguments.prependToPage & arguments.anchor & arguments.appendToPage;
+	}
+
+	/**
+	 * Internal: strips event-handler attributes and javascript: URIs from a user-supplied wrapper string,
+	 * after first decoding HTML numeric entities so encoded payloads cannot bypass the regex pass.
+	 * Centralised here so both prependToPage and appendToPage receive identical treatment, and so the
+	 * single audit surface stays in lockstep with the parallel scrub in `paginationLinks()` (links.cfc).
+	 */
+	public string function $paginationSanitizeWrapper(required string input) {
+		if (!Len(arguments.input)) {
+			return arguments.input;
+		}
+		local.rv = $decodeHtmlEntities(arguments.input);
+		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, 'javascript\s*:', '', 'all');
+		return local.rv;
 	}
 
 	/**

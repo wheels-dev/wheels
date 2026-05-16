@@ -348,6 +348,73 @@ component extends="wheels.WheelsTest" {
 					}
 				})
 
+				// ── Bootstrap-style markup parity with legacy paginationLinks() (issue #2715) ──
+
+				it("emits prepend HTML immediately inside the nav element", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(prepend = '<ul class="pagination">', append = "</ul>")
+					expect(result).toInclude('<ul class="pagination">')
+					expect(result).toInclude("</ul>")
+					// prepend must appear before the first anchor, append after the last
+					expect(result).toMatch('<nav[^>]*><ul class="pagination">')
+					expect(result).toMatch('</ul></nav>')
+				})
+
+				it("wraps every anchor (first/prev/page/next/last) with prependToPage and appendToPage", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					// Explicit "always" overrides the auto-mode defaults so this test
+					// exercises wrapping regardless of where the page-number window sits.
+					result = _controller.paginationNav(
+						prependToPage = '<li class="page-item">',
+						appendToPage = '</li>',
+						class = "page-link",
+						showFirst = "always",
+						showLast = "always"
+					)
+					// One <li> for first, prev, each numbered page, next, last
+					expect(ListLen(result, "<")).toBeGT(5)
+					// All five navigation anchors must be wrapped, not just the numbered links
+					expect(result).toMatch('<li class="page-item">[^<]*<[^>]*>First')
+					expect(result).toMatch('<li class="page-item">[^<]*<[^>]*>Previous')
+					expect(result).toMatch('<li class="page-item">[^<]*<[^>]*>Next')
+					expect(result).toMatch('<li class="page-item">[^<]*<[^>]*>Last')
+				})
+
+				it("injects active into prependToPage class attribute on current page when addActiveClassToPrependedParent is true", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(
+						prependToPage = '<li class="page-item">',
+						appendToPage = '</li>',
+						classForCurrent = "active",
+						addActiveClassToPrependedParent = true
+					)
+					expect(result).toInclude('<li class="active page-item">')
+				})
+
+				it("applies class to page-number anchors via the explicit class arg", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					result = _controller.paginationNav(class = "page-link")
+					expect(result).toInclude('class="page-link"')
+				})
+
+				it("uses anchorDivider between adjacent sub-helper output sections", () => {
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+					// Use a sentinel that cannot incidentally appear inside a URL, page-number
+					// text, attribute value, or tag name — otherwise the assertion can pass
+					// even when anchorDivider is ignored.
+					result = _controller.paginationNav(
+						anchorDivider = "XDIVX",
+						showFirst = true,
+						showLast = true,
+						showPrevious = true,
+						showNext = true
+					)
+					expect(result).toInclude("XDIVX")
+					// And it must sit *between* sections — never inside a tag, never inside
+					// rendered text — i.e. between a closing tag and the next opening tag.
+					expect(result).toMatch("</[^>]+>XDIVX<")
+				})
+
 			})
 
 			/* ── paginationNav anchor display modes ────── */

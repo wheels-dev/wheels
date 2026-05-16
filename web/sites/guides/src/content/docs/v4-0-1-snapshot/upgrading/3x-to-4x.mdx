@@ -368,6 +368,23 @@ See [Packages](/v4-0-1-snapshot/digging-deeper/packages/) for manifest fields, p
 
 **CHANGELOG:** composable pagination helpers added (#1930). The 3.x `paginationLinks()` is retained but deprecated. As of #2727, calling `paginationLinks()` emits a one-time per-request `WriteLog(type="warning")` pointing at the replacement so apps see the signal without flooding the log. `wheels upgrade check --to=4.0.0` also greps `app/views/` for `paginationLinks(` and flags every hit with a remediation pointer. New code should use `paginationNav()` or compose the individual helpers (`paginationInfo`, `firstPageLink`, `previousPageLink`, `pageNumberLinks`, `nextPageLink`, `lastPageLink`). The 3.x `alwaysShowAnchors=false` behavior — hiding first/last when the page-number window already reaches the boundary — is now the default in `paginationNav()` via `showFirst="auto"` / `showLast="auto"` (default since v4.0.1, #2716). Pass `showFirst="always"` / `showLast="always"` to force the old always-visible behavior. The previous/next anchors under the new `showPrevious="auto"` / `showNext="auto"` defaults continue to delegate to `previousPageLink()` / `nextPageLink()`, which render a disabled `<span class="disabled">` at the boundary — matching the legacy `showPrevious=true` / `showNext=true` indicator. Use `showPrevious="never"` / `showNext="never"` to hide the boundary indicator entirely.
 
+Bootstrap-styled 3.x apps that relied on `paginationLinks()` emitting `<li class="page-item active">` wrappers can now do a like-for-like swap using `paginationNav()` with the Bootstrap-style arguments added in v4.0.1 (#2715):
+
+```cfm
+##paginationNav(
+    navClass                    = "",
+    prepend                     = '<ul class="pagination">',
+    append                      = "</ul>",
+    prependToPage               = '<li class="page-item">',
+    appendToPage                = "</li>",
+    class                       = "page-link",
+    classForCurrent             = "active",
+    addActiveClassToPrependedParent = true
+)##
+```
+
+This produces markup equivalent to the 3.x output: `<nav><ul class="pagination"><li class="active page-item"><span class="page-link">N</span></li>…</ul></nav>`.
+
 ### RocketUnit test style
 
 **CHANGELOG:** `Deprecated: RocketUnit test style for new tests` (#1925) and `Removed: Legacy RocketUnit core test scaffolding` (#1925). Existing app specs still run; the framework-level RocketUnit runner is gone. Do not write new tests in RocketUnit style.

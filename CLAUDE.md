@@ -471,6 +471,18 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #paginationNav(showInfo=true, showFirst="never", showLast="never", navClass="my-pagination")#
 #paginationNav(windowSize=3)#  // widens window used by auto-mode boundary detection
 
+// Bootstrap 5 — like-for-like swap for legacy paginationLinks() Bootstrap markup
+#paginationNav(
+    navClass="",
+    prepend='<ul class="pagination">',
+    append="</ul>",
+    prependToPage='<li class="page-item">',
+    appendToPage="</li>",
+    class="page-link",
+    classForCurrent="active",
+    addActiveClassToPrependedParent=true
+)#
+
 // Individual helpers for custom layouts
 #paginationInfo()#            // "Showing 26-50 of 1,000 records"
 #firstPageLink()#             // link to page 1
@@ -478,12 +490,12 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #pageNumberLinks()#           // windowed page number links (default windowSize=2)
 #nextPageLink()#              // link to next page
 #lastPageLink()#              // link to last page
-#pageNumberLinks(windowSize=5, classForCurrent="active")#
+#pageNumberLinks(windowSize=5, classForCurrent="active", addActiveClassToPrependedParent=true)#
 ```
 
-`showFirst` / `showLast` / `showPrevious` / `showNext` accept `"auto"` (default), `"always"`, or `"never"`. Under `"auto"` the first/last anchors are hidden when the visible page-number window already reaches the boundary. Under `"auto"` the previous/next anchors always delegate to `previousPageLink()` / `nextPageLink()` — those render a disabled `<span class="disabled">` at the boundary so the position indicator is preserved; use `"never"` to hide the boundary indicator entirely. Booleans coerce for backwards compatibility (`true` → `"always"`, `false` → `"never"`). Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
+`showFirst` / `showLast` / `showPrevious` / `showNext` accept `"auto"` (default), `"always"`, or `"never"`. Under `"auto"` the first/last anchors are hidden when the visible page-number window already reaches the boundary. Under `"auto"` the previous/next anchors always delegate to `previousPageLink()` / `nextPageLink()` — those render a disabled `<span class="disabled">` at the boundary so the position indicator is preserved; use `"never"` to hide the boundary indicator entirely. Booleans coerce for backwards compatibility (`true` → `"always"`, `false` → `"never"`). Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries. `paginationNav()` also accepts `prepend`/`append` (HTML inside `<nav>` before/after the link list), `prependToPage`/`appendToPage` (per-anchor wrappers applied to all navigation anchors including first/prev/next/last), `addActiveClassToPrependedParent` (injects `active ` into the current-page `prependToPage` class attribute), and `anchorDivider` (separator between sections, default `" "`).
 
-In development (`showErrorInformation = true`), `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` if passed an argument not accepted by any of its sub-helpers. Accepted pass-through keys: `format`, `text`, `name`, `class`, `disabledClass`, `showDisabled`, `pageNumberAsParam`, `windowSize`, `classForCurrent`, `linkToCurrentPage`, `prependToPage`, `appendToPage`, `route`, `controller`, `action`, `key`, `anchor`, `onlyPath`, `host`, `protocol`, `port`, `params`. Named route segment variables (e.g., `userId` when `route="userTimeline"` and the pattern contains `[userId]`) are automatically exempted from this check. In production the unknown argument is silently dropped.
+In development (`showErrorInformation = true`), `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` if passed an argument not accepted by any of its sub-helpers. Accepted pass-through keys: `format`, `text`, `name`, `class`, `disabledClass`, `showDisabled`, `pageNumberAsParam`, `windowSize`, `classForCurrent`, `linkToCurrentPage`, `prependToPage`, `appendToPage`, `addActiveClassToPrependedParent`, `route`, `controller`, `action`, `key`, `anchor`, `onlyPath`, `host`, `protocol`, `port`, `params`. Named route segment variables (e.g., `userId` when `route="userTimeline"` and the pattern contains `[userId]`) are automatically exempted from this check. In production the unknown argument is silently dropped.
 
 ## Testing Quick Reference
 
