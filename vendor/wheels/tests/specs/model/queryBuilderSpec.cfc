@@ -160,14 +160,16 @@ component extends="wheels.WheelsTest" {
 					expect(state.invoked).toBe(0);
 				})
 
-				it("whereIn() with an empty array ignores chained select() / include() on findAll()", () => {
+				it("whereIn() with an empty array ignores chained select() on findAll()", () => {
 					// Documented trade-off (QueryBuilder.cfc findAll() short-circuit):
 					// the $alwaysEmpty path returns the model's full columnList,
 					// not a projection of the chained select(). Zero rows makes
 					// projection moot; this spec locks in the observable shape.
+					// whereIn first because it's the QueryBuilder entry point; select()
+					// then chains on the builder (it's not in the model's onMissingMethod entry list).
 					var result = model("author")
-						.select("id")
 						.whereIn("id", [])
+						.select("id")
 						.findAll();
 					expect(result.recordcount).toBe(0);
 					// The full author columnList is returned, not a one-column "id"-only projection.
