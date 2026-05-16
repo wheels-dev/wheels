@@ -82,6 +82,23 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toBe("same-origin");
 			});
 
+			it("short-circuits OPTIONS preflight with empty string instead of calling next", function() {
+				// Cors.handle() prefers request.cgi.request_method (when present)
+				// over the engine CGI scope, mirroring its http_origin lookup.
+				// If the OPTIONS branch fires, the result is "" (empty body).
+				// If the middleware falls through to next(), the closure below
+				// would return "should-not-reach" instead.
+				local.cors = new wheels.middleware.Cors(allowOrigins = "https://example.com");
+				local.reqCtx = {cgi = {request_method = "OPTIONS", http_origin = "https://example.com"}};
+				local.result = local.cors.handle(
+					request = local.reqCtx,
+					next = function(required struct request) {
+						return "should-not-reach";
+					}
+				);
+				expect(local.result).toBe("");
+			});
+
 			describe("Vary: Origin header", function() {
 
 				it("emits Vary: Origin when reflecting an allowed origin", function() {
