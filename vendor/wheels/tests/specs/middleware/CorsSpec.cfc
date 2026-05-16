@@ -129,6 +129,49 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("Access-Control-Allow-Origin header resolution", function() {
+
+				it("returns empty string when allowOrigins is a comma list and no Origin header is present", function() {
+					// Regression: previously the raw comma list flowed through as the
+					// header value, violating the CORS spec requirement that
+					// Access-Control-Allow-Origin be a single origin or `*`.
+					local.cors = new wheels.middleware.Cors(
+						allowOrigins = "https://portal.pai.com,https://portal.paiindustries.com"
+					);
+					expect(local.cors.$resolveAllowOrigin("")).toBe("");
+				});
+
+				it("returns empty string when allowOrigins is a single origin and no Origin header is present", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "https://myapp.com");
+					expect(local.cors.$resolveAllowOrigin("")).toBe("");
+				});
+
+				it("returns the matched origin when the request Origin is in the comma list", function() {
+					local.cors = new wheels.middleware.Cors(
+						allowOrigins = "https://portal.pai.com,https://portal.paiindustries.com"
+					);
+					expect(local.cors.$resolveAllowOrigin("https://portal.paiindustries.com"))
+						.toBe("https://portal.paiindustries.com");
+				});
+
+				it("returns empty string when the request Origin is not in the allowlist", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "https://myapp.com");
+					expect(local.cors.$resolveAllowOrigin("https://evil.com")).toBe("");
+				});
+
+				it("returns '*' when allowOrigins is wildcard, regardless of Origin header presence", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = "*");
+					expect(local.cors.$resolveAllowOrigin("")).toBe("*");
+					expect(local.cors.$resolveAllowOrigin("https://anything.com")).toBe("*");
+				});
+
+				it("returns empty string when allowOrigins is empty and no Origin header is present", function() {
+					local.cors = new wheels.middleware.Cors();
+					expect(local.cors.$resolveAllowOrigin("")).toBe("");
+				});
+
+			});
+
 			describe("wildcard + credentials validation", function() {
 
 				it("throws when allowOrigins is wildcard and allowCredentials is true", function() {
