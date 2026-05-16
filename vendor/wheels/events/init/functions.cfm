@@ -306,6 +306,7 @@
 			linkToCurrentPage = false,
 			prependToPage = "",
 			appendToPage = "",
+			addActiveClassToPrependedParent = false,
 			pageNumberAsParam = true,
 			encode = true
 		};
@@ -317,6 +318,12 @@
 			showNext = true,
 			showInfo = false,
 			showSinglePage = false,
+			prepend = "",
+			append = "",
+			prependToPage = "",
+			appendToPage = "",
+			addActiveClassToPrependedParent = false,
+			anchorDivider = " ",
 			encode = true
 		};
 		application.$wheels.functions.paginationLinks = {
