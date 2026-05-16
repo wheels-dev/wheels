@@ -70,7 +70,7 @@ The Claude Code config is tiny:
 
 That's the whole thing — a command and its arguments. Claude Code reads it on startup, spawns `wheels mcp wheels`, and starts speaking JSON-RPC over the subprocess's stdio. There's no installation step, no API key, no auth handshake. If the `wheels` binary is on your `PATH` and the project has a `vendor/wheels/` checkout, you have a working MCP integration.
 
-Cursor, Continue, and Windsurf all read the same `.mcp.json` — there's no per-IDE wrapper shape to configure. The setup command writes the two files and stops there; the IDE-specific config you'll see in some older docs is for tools that don't speak the standard MCP config format and need an entry in their own settings file. None of the four IDEs above falls into that bucket.
+Claude Code, Cursor, Continue, and Windsurf all read the same `.mcp.json` — there's no per-IDE wrapper shape to configure. The setup command writes the two files and stops there; the IDE-specific config you'll see in some older docs is for tools that don't speak the standard MCP config format and need an entry in their own settings file. None of these four falls into that bucket.
 
 Restart your editor after running the setup command. On first start, the editor will spawn the subprocess and call `initialize` and `tools/list` — and the tools panel should now list `wheels_generate`, `wheels_migrate`, and the rest.
 
