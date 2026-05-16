@@ -1,0 +1,5 @@
+{
+	"name": "wheels-hyphen-pkg",
+	"version": "1.0.0",
+	"description": "Test fixture: hyphenated manifest name; auto-derived alias should be wheelsHyphenPkg"
+}
