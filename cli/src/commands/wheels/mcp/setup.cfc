@@ -75,7 +75,7 @@ component extends="../base" {
 		print.boldLine("Next Steps:");
 		print.indentedLine("1. Ensure the 'wheels' CLI binary is on PATH (brew install wheels)");
 		print.indentedLine("2. Restart your AI IDE so it re-reads .mcp.json / .opencode.json");
-		print.indentedLine("3. Verify tool discovery in the IDE's MCP panel — 16 tools should appear");
+		print.indentedLine("3. Verify tool discovery in the IDE's MCP panel — 20 tools should appear");
 		print.line();
 
 		print.boldLine("Available MCP Commands:");
