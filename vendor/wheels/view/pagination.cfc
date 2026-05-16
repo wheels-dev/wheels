@@ -349,7 +349,7 @@ component {
 	 * @append String or HTML to be appended inside the `<nav>` after the link list (e.g. `</ul>`).
 	 * @prependToPage String or HTML to wrap before each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
 	 * @appendToPage String or HTML to wrap after each anchor (first/previous/page numbers/next/last). Forwards to `pageNumberLinks` for the numbered links.
-	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom — forwards to `pageNumberLinks`). Has no effect if `prependToPage` contains no `class` attribute.
+	 * @addActiveClassToPrependedParent Whether to inject `active ` into the prependToPage `class` attribute on the current page (Bootstrap idiom — forwards to `pageNumberLinks`). Applies only to numbered-page anchors, not to first / previous / next / last (which are never "current" in the Bootstrap sense). Has no effect if `prependToPage` contains no `class` attribute.
 	 * @anchorDivider Separator inserted between the first/previous/page-numbers/next/last sections.
 	 * @encode [see:styleSheetLinkTag].
 	 */
@@ -371,6 +371,15 @@ component {
 		any encode
 	) {
 		$args(name = "paginationNav", args = arguments);
+
+		// Sanitize the per-anchor wrappers once at this entry point so the four downstream
+		// `$paginationWrapAnchor()` calls receive pre-scrubbed input and don't each repeat the
+		// strip. `pageNumberLinks()` still scrubs its own inputs as a defense-in-depth measure for
+		// direct callers; the redundant pass when invoked from here is idempotent. Single audit
+		// surface: any future contributor only has to verify scrubbing happens here, not at every
+		// downstream wrap call.
+		arguments.prependToPage = $paginationSanitizeWrapper(arguments.prependToPage);
+		arguments.appendToPage = $paginationSanitizeWrapper(arguments.appendToPage);
 
 		// Build passthrough arguments for sub-helpers
 		local.subArgs = {};
@@ -490,6 +499,12 @@ component {
 			}
 		}
 
+		// `prepend` / `append` are intentionally NOT scrubbed by `$paginationSanitizeWrapper`.
+		// They wrap the entire link list (e.g. `<ul class="pagination">` / `</ul>`) and are
+		// expected to be developer-authored structural markup, not per-page templates supplied by
+		// untrusted authors. `prependToPage` / `appendToPage` get the scrub because they're the
+		// extension points a CMS / theme would expose. If a future feature opens up `prepend` /
+		// `append` to author-supplied input, route them through `$paginationSanitizeWrapper` too.
 		local.content = arguments.prepend & ArrayToList(local.sections, arguments.anchorDivider) & arguments.append;
 
 		return $element(
@@ -501,12 +516,11 @@ component {
 	}
 
 	/**
-	 * Internal: wraps a single anchor in prependToPage/appendToPage, mirroring pageNumberLinks's wrapping behavior.
-	 * Applies the same entity-decode + `on\w+=` / `javascript:` strip contract that `paginationLinks()`
-	 * applies to `prependToPage`, extended here to `appendToPage` as well: HTML numeric entities are
-	 * decoded first so payloads like `&##111;nmouseover` cannot bypass the strip, then event handlers
-	 * and `javascript:` URIs are removed. paginationNav() is the canonical migration target for
-	 * paginationLinks() and must inherit the same defense-in-depth contract.
+	 * Internal: wraps a single anchor in prependToPage/appendToPage. Pure concatenation — callers MUST
+	 * pre-sanitize `prependToPage` and `appendToPage` via `$paginationSanitizeWrapper()` before passing
+	 * them here. Sole caller is `paginationNav()`, which performs that scrub once at its entry so the
+	 * four anchor sites (first / previous / next / last) don't each repeat the work. Keeping this helper
+	 * pure leaves a single audit surface for the XSS scrub up in `paginationNav()`.
 	 */
 	public string function $paginationWrapAnchor(
 		required string anchor,
@@ -516,9 +530,7 @@ component {
 		if (!Len(arguments.anchor)) {
 			return "";
 		}
-		local.safePrepend = $paginationSanitizeWrapper(arguments.prependToPage);
-		local.safeAppend = $paginationSanitizeWrapper(arguments.appendToPage);
-		return local.safePrepend & arguments.anchor & local.safeAppend;
+		return arguments.prependToPage & arguments.anchor & arguments.appendToPage;
 	}
 
 	/**

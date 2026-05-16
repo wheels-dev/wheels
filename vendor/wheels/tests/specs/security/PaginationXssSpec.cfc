@@ -161,6 +161,31 @@ component extends="wheels.WheelsTest" {
 				expect(result).toInclude('id="nav"');
 			});
 
+			// Regression anchor for `pageNumberLinks` directly (not via `paginationNav`). The CHANGELOG
+			// entry states `pageNumberLinks` itself scrubs author-supplied wrappers, so verify the
+			// promise without routing through `paginationNav`.
+
+			it("pageNumberLinks strips entity-encoded onmouseover from prependToPage when called directly", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				// &#111; = 'o', so this decodes to <li onmouseover="alert(1)">
+				var result = _controller.pageNumberLinks(
+					prependToPage = '<li &##111;nmouseover="alert(1)">',
+					appendToPage = '</li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
+			});
+
+			it("pageNumberLinks strips plain onmouseover from prependToPage when called directly", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName");
+				var result = _controller.pageNumberLinks(
+					prependToPage = '<li onmouseover="alert(1)">',
+					appendToPage = '</li>'
+				);
+				expect(result).notToInclude("onmouseover");
+				expect(result).notToInclude("alert");
+			});
+
 		});
 
 	}
