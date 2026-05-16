@@ -365,6 +365,9 @@ plugins/               # DEPRECATED: legacy plugins still work with warning
     "author": "PAI Industries",
     "description": "Sentry error tracking",
     "wheelsVersion": ">=3.0",
+    "mappings": {
+        "plugins.sentry": "."
+    },
     "provides": {
         "mixins": "controller",
         "services": [],

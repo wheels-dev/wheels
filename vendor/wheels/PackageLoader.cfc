@@ -529,14 +529,13 @@ component output="false" {
 	 * contributes mixins/services/middleware/mixinCollisions.
 	 *
 	 * Intentionally does NOT clean variables.packageMappings or
-	 * variables.$mappingProviders: those registries are written only by
-	 * $registerPackageMapping on its success path, so by the time this
-	 * function runs (either from $discover's catch on a pre-mapping
-	 * exception, or from $tryRegisterPackageMapping's false path where the
-	 * registration itself never wrote anything) the mapping registries are
-	 * already clean. Adding cleanup here would be a no-op at best and could
-	 * mask a future bug that writes to those registries outside the success
-	 * path.
+	 * variables.$mappingProviders: callers are responsible for unwinding
+	 * those registries before reaching here. From $discover's catch
+	 * (pre-mapping exception) nothing was ever written; from
+	 * $tryRegisterPackageMapping's false path, $unregisterMappings has
+	 * already cleaned both any partial plural entries and the singular
+	 * alias. Adding cleanup here would mask a future caller that forgets
+	 * to unwind.
 	 */
 	private void function $rollbackPackage(required string dirName) {
 		StructDelete(variables.packageMeta, arguments.dirName);

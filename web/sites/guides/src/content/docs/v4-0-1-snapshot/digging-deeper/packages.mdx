@@ -83,6 +83,9 @@ Every package declares a `package.json` at its root. The loader parses it before
     "author": "PAI Industries",
     "description": "Sentry error tracking for Wheels with framework-aware context enrichment",
     "wheelsVersion": ">=3.0",
+    "mappings": {
+        "plugins.sentry": "."
+    },
     "provides": {
         "mixins": "controller",
         "services": [],

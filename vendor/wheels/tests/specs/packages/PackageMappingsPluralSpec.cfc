@@ -28,6 +28,8 @@ component extends="wheels.WheelsTest" {
 				collidePrefix = "wheels.tests._assets.packages_mappings_plural_collide";
 				crossFormPath = ExpandPath("/wheels/tests/_assets/packages_mappings_plural_cross_form");
 				crossFormPrefix = "wheels.tests._assets.packages_mappings_plural_cross_form";
+				invalidBlockPath = ExpandPath("/wheels/tests/_assets/packages_mappings_plural_invalid_block");
+				invalidBlockPrefix = "wheels.tests._assets.packages_mappings_plural_invalid_block";
 			});
 
 			describe("Basic registration", () => {
@@ -74,6 +76,32 @@ component extends="wheels.WheelsTest" {
 					// Trailing segment must reflect the subdir join, not the
 					// package root alone.
 					expect(Find("relpath/sub", Replace(mappings["relpath.sub"], "\", "/", "all"))).toBeGT(0);
+				});
+
+			});
+
+			describe("Invalid mappings block", () => {
+
+				it("fails a package whose `mappings` field is not a struct", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = invalidBlockPath,
+						componentPrefix = invalidBlockPrefix
+					);
+					var failedNames = $failedPackageNames(loader);
+					expect(ArrayFindNoCase(failedNames, "notastruct")).toBeGT(0);
+				});
+
+				it("rolls back the singular alias of a package whose `mappings` field is not a struct", () => {
+					var loader = new wheels.PackageLoader(
+						vendorPath = invalidBlockPath,
+						componentPrefix = invalidBlockPrefix
+					);
+					var mappings = loader.getPackageMappings();
+					// `wheels-notastruct` would derive to `wheelsNotastruct`.
+					// The IsStruct guard rejects the block before any plural
+					// entry is read, so the only thing to unwind is the
+					// singular alias.
+					expect(mappings).notToHaveKey("wheelsNotastruct");
 				});
 
 			});
