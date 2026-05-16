@@ -470,7 +470,19 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #paginationNav()#
 #paginationNav(showInfo=true, showFirst=false, showLast=false, navClass="my-pagination")#
 
-// Bootstrap 5 — like-for-like swap for legacy paginationLinks() Bootstrap markup
+// Bootstrap 5 — declarative preset: active class on <li>, current page as <span class="page-link">, aria-current
+#paginationNav(viewStyle="bootstrap5")#
+#pageNumberLinks(viewStyle="bootstrap5")#
+
+// Bootstrap 4 — declarative preset: same as bootstrap5 but omits aria-current
+#paginationNav(viewStyle="bootstrap4")#
+#pageNumberLinks(viewStyle="bootstrap4")#
+
+// Tailwind — declarative preset: flat structure with pagination-current / pagination-link utility classes
+#paginationNav(viewStyle="tailwind")#
+#pageNumberLinks(viewStyle="tailwind")#
+
+// Bootstrap 5 — manual composition (granular alternative to viewStyle preset, like-for-like swap for legacy paginationLinks())
 #paginationNav(
     navClass="",
     prepend='<ul class="pagination">',
@@ -492,7 +504,9 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recomme
 #pageNumberLinks(windowSize=5, classForCurrent="active", addActiveClassToPrependedParent=true)#
 ```
 
-Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries. `paginationNav()` also accepts `prepend`/`append` (HTML inside `<nav>` before/after the link list), `prependToPage`/`appendToPage` (per-anchor wrappers applied to all navigation anchors including first/prev/next/last), `addActiveClassToPrependedParent` (injects `active ` into the current-page `prependToPage` class attribute), and `anchorDivider` (separator between sections, default `" "`).
+`viewStyle` accepts `"plain"` (default, preserves original output), `"bootstrap5"`, `"bootstrap4"`, or `"tailwind"`. Bootstrap presets emit `<li class="page-item active" aria-current="page"><span class="page-link">N</span></li>` for the current page, with the active class on the `<li>` wrapper — no `Replace()` post-processing needed. Non-plain presets ignore `prependToPage`, `appendToPage`, `classForCurrent`, `class`, `prepend`, `append`, and `anchorDivider` in favour of the preset markup.
+
+Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries. `paginationNav()` also accepts `prepend`/`append` (HTML inside `<nav>` before/after the link list), `prependToPage`/`appendToPage` (per-anchor wrappers applied to all navigation anchors including first/prev/next/last), `addActiveClassToPrependedParent` (injects `active ` into the current-page `prependToPage` class attribute), and `anchorDivider` (separator between sections, default `" "`) — these compose into the same Bootstrap-style output as the `viewStyle="bootstrap5"` preset but with finer-grained control.
 
 In development (`showErrorInformation = true`), `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` if passed an argument not accepted by any of its sub-helpers. Accepted pass-through keys: `format`, `text`, `name`, `class`, `disabledClass`, `showDisabled`, `pageNumberAsParam`, `windowSize`, `classForCurrent`, `linkToCurrentPage`, `prependToPage`, `appendToPage`, `addActiveClassToPrependedParent`, `route`, `controller`, `action`, `key`, `anchor`, `onlyPath`, `host`, `protocol`, `port`, `params`. Named route segment variables (e.g., `userId` when `route="userTimeline"` and the pattern contains `[userId]`) are automatically exempted from this check. In production the unknown argument is silently dropped.
 
