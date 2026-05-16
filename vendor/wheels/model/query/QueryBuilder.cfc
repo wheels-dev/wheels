@@ -333,7 +333,7 @@ component output="false" {
 	 */
 	public any function findAll() {
 		if (variables.$alwaysEmpty) {
-			// Construct an empty query with the model's own columns so callers that introspect result.columnList see the same shape as a regular no-match findAll(). $classData().columnList is the framework's authoritative list.
+			// Empty query with the model's full columnList — matches the shape a normal zero-row findAll() returns. NOTE: any chained select() or include() is intentionally ignored on this path; the result has zero rows so projection/eager-load are moot in practice, and computing them from $classData would duplicate read.cfc's $createSQLFieldList logic.
 			return QueryNew(variables.modelReference.$classData().columnList);
 		}
 		local.args = $buildFinderArgs(arguments);

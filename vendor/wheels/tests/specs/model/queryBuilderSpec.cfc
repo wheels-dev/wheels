@@ -114,9 +114,7 @@ component extends="wheels.WheelsTest" {
 				it("whereIn() with an empty array returns a properly-shaped empty query from findAll()", () => {
 					var result = model("author").whereIn("id", []).findAll();
 					expect(result.recordcount).toBe(0);
-					// columnList should match the model's columns, not be empty —
-					// callers introspecting result.columnList expect the same shape
-					// they'd get from a regular zero-row findAll().
+					// columnList must match a normal zero-row findAll() shape — callers introspect it.
 					expect(Len(result.columnList)).toBeGT(0);
 				})
 
