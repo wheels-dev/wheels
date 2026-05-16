@@ -33,6 +33,8 @@ component output="false" {
 		variables.distinctValue = false;
 		variables.groupClause = "";
 		variables.forUpdateValue = false;
+		// Set on whereIn(empty); terminals short-circuit before the WHERE parser sees a column-less clause.
+		variables.$alwaysEmpty = false;
 		return this;
 	}
 
@@ -123,6 +125,12 @@ component output="false" {
 	 */
 	public any function whereIn(required string property, required any values) {
 		$validatePropertyName(arguments.property);
+		// Empty IN -> no rows (Rails/Sequel/Django/Eloquent). Flag, not raw SQL: a "1 = 0" literal trips Wheels' WHERE parser as property "1".
+		local.valueArray = IsArray(arguments.values) ? arguments.values : ListToArray(arguments.values);
+		if (!ArrayLen(local.valueArray)) {
+			variables.$alwaysEmpty = true;
+			return this;
+		}
 		local.valueList = $quoteValueList(arguments.property, arguments.values);
 		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# IN (#local.valueList#)"});
 		return this;
@@ -136,6 +144,11 @@ component output="false" {
 	 */
 	public any function whereNotIn(required string property, required any values) {
 		$validatePropertyName(arguments.property);
+		// Empty NOT IN -> "exclude none" = every row, so this call becomes a no-op (no clause appended).
+		local.valueArray = IsArray(arguments.values) ? arguments.values : ListToArray(arguments.values);
+		if (!ArrayLen(local.valueArray)) {
+			return this;
+		}
 		local.valueList = $quoteValueList(arguments.property, arguments.values);
 		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# NOT IN (#local.valueList#)"});
 		return this;
@@ -319,6 +332,11 @@ component output="false" {
 	 * Terminal method: execute the query and return all matching records.
 	 */
 	public any function findAll() {
+		if (variables.$alwaysEmpty) {
+			// Empty query shaped like a normal zero-row findAll() — full columnList from $classData().
+			// NOTE: chained select()/include() are ignored; zero rows makes projection moot.
+			return QueryNew(variables.modelReference.$classData().columnList);
+		}
 		local.args = $buildFinderArgs(arguments);
 		return variables.modelReference.findAll(argumentCollection = local.args);
 	}
@@ -335,6 +353,9 @@ component output="false" {
 	 * Terminal method: return the first matching record.
 	 */
 	public any function findOne() {
+		if (variables.$alwaysEmpty) {
+			return false;
+		}
 		local.args = $buildFinderArgs(arguments);
 		return variables.modelReference.findOne(argumentCollection = local.args);
 	}
@@ -343,6 +364,9 @@ component output="false" {
 	 * Terminal method: return the count of matching records.
 	 */
 	public any function count() {
+		if (variables.$alwaysEmpty) {
+			return 0;
+		}
 		local.args = $buildFinderArgs(arguments);
 		return variables.modelReference.count(argumentCollection = local.args);
 	}
@@ -351,6 +375,9 @@ component output="false" {
 	 * Terminal method: check if any matching records exist.
 	 */
 	public any function exists() {
+		if (variables.$alwaysEmpty) {
+			return false;
+		}
 		local.args = $buildFinderArgs(arguments);
 		return variables.modelReference.exists(argumentCollection = local.args);
 	}
@@ -359,6 +386,9 @@ component output="false" {
 	 * Terminal method: update all matching records.
 	 */
 	public any function updateAll() {
+		if (variables.$alwaysEmpty) {
+			return 0;
+		}
 		local.args = $buildFinderArgs(arguments);
 		return variables.modelReference.updateAll(argumentCollection = local.args);
 	}
@@ -367,6 +397,9 @@ component output="false" {
 	 * Terminal method: delete all matching records.
 	 */
 	public any function deleteAll() {
+		if (variables.$alwaysEmpty) {
+			return 0;
+		}
 		local.args = $buildFinderArgs(arguments);
 		return variables.modelReference.deleteAll(argumentCollection = local.args);
 	}
@@ -375,6 +408,9 @@ component output="false" {
 	 * Terminal method: process records one at a time in batches.
 	 */
 	public void function findEach() {
+		if (variables.$alwaysEmpty) {
+			return;
+		}
 		local.args = $buildFinderArgs(arguments);
 		variables.modelReference.findEach(argumentCollection = local.args);
 	}
@@ -383,6 +419,9 @@ component output="false" {
 	 * Terminal method: process records in batch groups.
 	 */
 	public void function findInBatches() {
+		if (variables.$alwaysEmpty) {
+			return;
+		}
 		local.args = $buildFinderArgs(arguments);
 		variables.modelReference.findInBatches(argumentCollection = local.args);
 	}

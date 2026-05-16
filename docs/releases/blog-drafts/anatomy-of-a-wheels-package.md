@@ -1,8 +1,8 @@
 ---
 title: Anatomy of a Wheels Package
 slug: anatomy-of-a-wheels-package
-publishedAt: '2026-05-22T14:00:00.000Z'
-updatedAt: '2026-05-22T14:00:00.000Z'
+publishedAt: '2026-05-17T14:00:00.000Z'
+updatedAt: '2026-05-17T14:00:00.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
@@ -293,4 +293,4 @@ The second was the `wheelsVersion` constraint. The guide described mismatches as
 
 Neither of these is a code change — both are documentation fixes — but they're the kind of drift that costs an hour the first time you hit it, and they're the reason a piece like this is worth writing. Anything you have to write down to be sure of is something the next person was going to have to figure out from scratch.
 
-The next post in the series — *Wheels + Claude: building a feature via the stdio MCP* — picks up the same theme on a different surface: what the framework's tools look like when the consumer is a model rather than a developer. Coming next week.
+The next post in the series — *Wheels + Claude: building a feature via the stdio MCP* — picks up the same theme on a different surface: what the framework's tools look like when the consumer is a model rather than a developer. Coming Tuesday.
