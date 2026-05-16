@@ -511,6 +511,7 @@ component {
 				showPrevious = $paginationShouldShowAnchor(mode = local.previousMode, side = "previous", pg = local.pg, windowSize = arguments.windowSize),
 				showNext = $paginationShouldShowAnchor(mode = local.nextMode, side = "next", pg = local.pg, windowSize = arguments.windowSize),
 				showLast = $paginationShouldShowAnchor(mode = local.lastMode, side = "last", pg = local.pg, windowSize = arguments.windowSize),
+				windowSize = arguments.windowSize,
 				subArgs = local.subArgs
 			);
 		}
@@ -819,6 +820,7 @@ component {
 		required boolean showPrevious,
 		required boolean showNext,
 		required boolean showLast,
+		required numeric windowSize,
 		required struct subArgs
 	) {
 		local.firstDisabled = arguments.pg.currentPage <= 1;
@@ -845,8 +847,11 @@ component {
 		}
 
 		// Reuse pageNumberLinks() so the window logic stays in one place.
+		// windowSize is excluded from subArgs (see skipArgs in paginationNav), so
+		// re-add it here to keep the auto-mode predicate and rendered window aligned.
 		local.pageArgs = StructCopy(arguments.subArgs);
 		local.pageArgs.viewStyle = arguments.viewStyle;
+		local.pageArgs.windowSize = arguments.windowSize;
 		local.items &= pageNumberLinks(argumentCollection = local.pageArgs);
 
 		if (arguments.showNext) {

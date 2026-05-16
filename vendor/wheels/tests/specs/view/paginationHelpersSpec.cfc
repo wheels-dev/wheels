@@ -369,6 +369,18 @@ component extends="wheels.WheelsTest" {
 					}).toThrow("Wheels.InvalidViewStyle")
 				})
 
+				it("forwards windowSize to pageNumberLinks() on the viewStyle path", () => {
+					g.setPagination(totalRecords = 100, currentPage = 5, perPage = 10)
+					result = _controller.paginationNav(viewStyle = "bootstrap5", windowSize = 4)
+					// windowSize=4 expands the rendered page-number window to pages 1-9,
+					// so page 8 must appear in the output. If windowSize were silently
+					// dropped from the $renderPaginationNav() → pageNumberLinks() call
+					// (default 2), the window would shrink to 3-7 and page 8 would
+					// disappear — guards against the auto-mode predicate and rendered
+					// window using mismatched windowSize values.
+					expect(result).toInclude(">8<")
+				})
+
 			})
 
 			/* ── paginationNav ─────────────────────────── */
