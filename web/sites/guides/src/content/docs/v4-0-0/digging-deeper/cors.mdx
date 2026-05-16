@@ -145,6 +145,7 @@ When a cross-origin request fails, work through this checklist:
 - **Port drift.** `https://myapp.com` and `https://myapp.com:8080` are different origins. Dev on `:3000` and prod on `:443` need separate entries (or separate environments).
 - **Subdomain drift.** `https://myapp.com` does not cover `https://www.myapp.com` or `https://admin.myapp.com`. List each.
 - **Credentials with wildcard.** `allowOrigins="*"` + `allowCredentials=true` throws `Wheels.Cors.InvalidConfiguration` at app start. Good — silent versions of this bug have haunted JavaScript developers for a decade.
+- **No `Origin` header, no CORS header.** On specific-origin and comma-list `allowOrigins` configurations, requests that arrive without an `Origin` header — same-origin browser navigation, server-to-server calls, and `curl` without `-H "Origin: ..."` — never receive an `Access-Control-Allow-Origin` response header. This is correct CORS spec behavior. (Wildcard configurations `allowOrigins="*"` are the exception: they emit `Access-Control-Allow-Origin: *` on every response regardless of whether `Origin` is set.) If you test a non-wildcard allowlist with bare `curl` and see no header, add `-H "Origin: https://yourallowedorigin.com"` to verify it is working.
 - **Double headers.** If your controller also writes `Access-Control-Allow-Origin` via `cfheader`, you'll end up with two values in one response. Browsers reject it. Pick one: the middleware or the controller, not both.
 
 ## SSE and CORS
