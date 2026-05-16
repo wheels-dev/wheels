@@ -95,6 +95,12 @@ component extends="wheels.WheelsTest" {
 					expect(result).toBe(totalCount);
 				})
 
+				it("whereNotIn() with an empty list matches every row", () => {
+					var totalCount = model("author").count();
+					var result = model("author").whereNotIn("id", "").count();
+					expect(result).toBe(totalCount);
+				})
+
 				it("whereIn() with an empty array composes cleanly with other clauses", () => {
 					var result = model("author").where("lastName", "Djurner").whereIn("id", []).count();
 					expect(result).toBe(0);

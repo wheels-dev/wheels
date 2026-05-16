@@ -123,11 +123,7 @@ component output="false" {
 	 */
 	public any function whereIn(required string property, required any values) {
 		$validatePropertyName(arguments.property);
-		// Empty array/list short-circuits to a never-match clause. SQL `IN ()`
-		// is malformed in every supported engine; the semantically correct
-		// answer for "match any of these zero values" is "no rows." Matches
-		// the behavior every mature ORM converged on (Rails, Sequel, Django,
-		// Laravel Eloquent all emit `1=0` for this shape).
+		// SQL `IN ()` is malformed in every engine; empty IN -> `1=0` (no rows), matching Rails/Sequel/Django/Eloquent.
 		local.valueArray = IsArray(arguments.values) ? arguments.values : ListToArray(arguments.values);
 		if (!ArrayLen(local.valueArray)) {
 			ArrayAppend(variables.whereClauses, {type = "AND", clause = "1 = 0"});
@@ -146,10 +142,7 @@ component output="false" {
 	 */
 	public any function whereNotIn(required string property, required any values) {
 		$validatePropertyName(arguments.property);
-		// Empty array/list short-circuits to an always-match clause. "Exclude
-		// any of these zero values" is satisfied by every row, so the clause
-		// becomes a no-op. `1=1` is symmetric with whereIn's `1=0` and keeps
-		// the chain semantically readable even when it folds down to no-op.
+		// Empty NOT IN -> `1=1` (every row), symmetric with whereIn's `1=0`.
 		local.valueArray = IsArray(arguments.values) ? arguments.values : ListToArray(arguments.values);
 		if (!ArrayLen(local.valueArray)) {
 			ArrayAppend(variables.whereClauses, {type = "AND", clause = "1 = 1"});
