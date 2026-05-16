@@ -2,8 +2,8 @@
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "wheels": {
-      "url": "http://localhost:{PORT}/wheels/mcp",
-      "type": "remote",
+      "type": "local",
+      "command": ["wheels", "mcp", "wheels"],
       "enabled": true
     },
     "browsermcp": {
