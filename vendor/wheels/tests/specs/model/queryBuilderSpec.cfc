@@ -115,7 +115,7 @@ component extends="wheels.WheelsTest" {
 					var result = model("author").whereIn("id", []).findAll();
 					expect(result.recordcount).toBe(0);
 					// columnList must match a normal zero-row findAll() shape — callers introspect it.
-					expect(Len(result.columnList)).toBeGT(0);
+					expect(ListLen(result.columnList)).toBeGT(0);
 				})
 
 				it("whereIn() with an empty array returns false from first()/findOne()", () => {
