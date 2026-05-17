@@ -50,8 +50,19 @@ component {
 				writeDump( var = "resetHTMLHead() not supported #e.message#", output = "console" );
 			}
 		}
-		// reset cfheader from integration tests
-		getPageContextResponse().reset();
+		// Reset cfheader from integration tests. Best-effort — Adobe CF 2023/2025
+		// runs on Undertow, which throws `IllegalStateException: UT010019:
+		// Response already commited` from `HttpServletResponseImpl.reset()` when
+		// the response has already flushed (e.g. populate.cfm wrote output during
+		// test setup). The reset is cleanup; if it fails, the reporter still
+		// emits its content — it just appends to the existing output. Adjacent
+		// `resetHTMLHead()` call above is already swallowed for the same reason.
+		try {
+			getPageContextResponse().reset();
+		} catch ( any e ) {
+			// Response already committed — skip the reset; the reporter content
+			// will append to whatever already flushed.
+		}
 	}
 
 	/**
