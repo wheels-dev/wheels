@@ -233,24 +233,27 @@ private string function myHelper() { ... }
 public string function $myHelper() { ... }
 ```
 
-### `attributeCollection` with the `arguments` Scope (Adobe CF 2023)
+### `attributeCollection` with the `arguments` Scope (Adobe CF 2023/2025)
 
-Adobe CF 2023 rejects the raw `arguments` scope when passed as `attributeCollection` to *any* built-in CFML tag, throwing engine-specific errors (`cfheader` reports `"Failed to add HTML header"`) and aborting the request. Lucee 6/7, BoxLang, and Adobe CF 2018/2021 all accept the `arguments` scope without complaint. Both the string-interpolated form (`attributeCollection = "#arguments#"`) and the CFScript direct-struct form (`attributeCollection = arguments`) are affected.
+Adobe CF 2023 and 2025 reject the raw `arguments` scope when passed as `attributeCollection` to *any* built-in CFML tag, throwing engine-specific errors (`cfheader` reports `"Failed to add HTML header"`) and aborting the request. Lucee 6/7, BoxLang, and Adobe CF 2018/2021 all accept the `arguments` scope without complaint. Both the string-interpolated form (`attributeCollection = "#arguments#"`) and the CFScript direct-struct form (`attributeCollection = arguments`) are affected.
 
 ```cfm
-// WRONG — crashes Adobe CF 2023
+// WRONG — crashes Adobe CF 2023 and 2025
 cfheader(attributeCollection = "#arguments#");
 cfimage(attributeCollection = arguments);
 
-// RIGHT — copy to a plain struct first
+// RIGHT — copy to a plain struct first; either invocation form works once
+// `local.args` is a plain struct (the engine's stricter check only objects
+// to the special `arguments` scope object, not to the form of the call).
 local.args = {};
 for (local.key in arguments) {
     local.args[local.key] = arguments[local.key];
 }
 cfheader(attributeCollection = "#local.args#");
+cfimage(attributeCollection = local.args);
 ```
 
-**Why**: Adobe CF 2023 imposes a stricter type check on `attributeCollection` and requires a plain CFML struct, not the special `arguments` scope object. The struct-copy pattern is safe and idiomatic across all engines. `$header()` is the dispatch-path blocker (runs on every request) — the others surface as soon as the corresponding helper is called.
+**Why**: Adobe CF 2023 and 2025 impose a stricter type check on `attributeCollection` and require a plain CFML struct, not the special `arguments` scope object. The struct-copy pattern is safe and idiomatic across all engines. `$header()` is the dispatch-path blocker (runs on every request) — the others surface as soon as the corresponding helper is called.
 
 **Reference fix**: [#2750](https://github.com/wheels-dev/wheels/pull/2750) (closes #2741) — patches all 13 affected wrappers in `vendor/wheels/Global.cfc` uniformly: `$header`, `$cache`, `$content`, `$mail`, `$directory`, `$file`, `$location`, `$htmlhead`, `$image`, `$dbinfo`, `$invoke`, `$wddx`, `$zip`. `$dbinfo()` rebuilds the local copy before each of its four `cfdbinfo` calls because the catch path mutates `arguments` between calls — a useful pattern when a helper writes through `arguments` between tag invocations.
 
