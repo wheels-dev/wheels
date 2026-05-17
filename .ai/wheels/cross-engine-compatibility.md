@@ -323,7 +323,7 @@ If you write code that generates raw bulk-insert SQL for Oracle (or adds a new a
 
 ### Oracle — DDL Auto-Commit and Transaction Wrapper
 
-Oracle implicitly commits DDL statements (RENAME, CREATE, ALTER, DROP, …) and closes the JDBC statement as part of that commit. If the DDL is wrapped in `transaction action="begin" { ... commit }`, the subsequent `transaction action="commit"` runs against a closed statement and raises `ORA: Closed statement`. Other engines (Postgres, SQLite via SAVEPOINT, MySQL on InnoDB) honor the wrapper and roll the DDL back on error; Oracle cannot.
+Oracle implicitly commits DDL statements (RENAME, CREATE, ALTER, DROP, …) and closes the JDBC statement as part of that commit. If the DDL is wrapped in `transaction action="begin" { ... commit }`, the subsequent `transaction action="commit"` runs against a closed statement and raises `ORA: Closed statement`. PostgreSQL and SQLite (via SAVEPOINT) honor the wrapper and will roll back DDL on error. MySQL DDL also causes an implicit commit (the wrapper is a no-op there), but MySQL's multi-rename form — `RENAME TABLE a TO a', b TO b'` — is itself a single atomic statement, so no partial-rename scenario arises. Oracle cannot use the wrapper at all.
 
 If you write code that runs DDL inside a transaction block, branch on the adapter and run the DDL bare on Oracle. The canonical implementation is `vendor/wheels/Migrator.cfc::renameSystemTables`:
 
