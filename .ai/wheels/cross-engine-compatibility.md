@@ -254,6 +254,8 @@ try {
 expect(caught).toBeTrue();
 ```
 
+**Why the bare-`var` form survives**: BoxLang's catch-scoped local only shadows keys written via explicit `local.X = ...`; an unscoped write to a `var`-declared name appears to resolve through the var-declaration slot and escapes the catch-scope shadow. Prefer the struct-field form anyway — it's cleaner, mirrors the prior-art `TenantResolverSpec` pattern, and doesn't rely on this behaviour being preserved across BoxLang releases.
+
 **Why this fires only in specs**: production code rarely needs a catch to flip a boolean for a later read in the same function — typical catch blocks rethrow, log, or assign struct fields. Specs that use `try/catch` to *assert* exception propagation are the natural trap, since they need the post-catch flag.
 
 **Reference**: issue #2744, regression test `vendor/wheels/tests/specs/model/lockingSpec.cfc :: "releases lock even when callback throws an exception"`. The same pattern works in `vendor/wheels/tests/specs/middleware/TenantResolverSpec.cfc` because it tracks state via `var result = {threw = false}; result.threw = true`.
