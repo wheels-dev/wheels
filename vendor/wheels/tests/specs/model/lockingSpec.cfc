@@ -30,15 +30,23 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("releases lock even when callback throws an exception", () => {
-				local.exceptionThrown = false;
+				// Track state via a struct field, not `local.X`. On BoxLang,
+				// `local.X = value` inside a `catch` block writes to a
+				// catch-scoped local that gets discarded when the block exits,
+				// so a subsequent `expect(local.X)` reads the un-touched outer
+				// value. Struct field assignment (`state.X = ...`) targets a
+				// heap object and survives the scope transition on every
+				// engine. Same pattern as TenantResolverSpec's `result.threw`.
+				// Regression: issue #2744.
+				var state = {exceptionThrown: false};
 				try {
 					g.model("author").withAdvisoryLock(name="test_lock_2", callback=function() {
 						Throw(type="TestException", message="deliberate error");
 					});
 				} catch (TestException e) {
-					local.exceptionThrown = true;
+					state.exceptionThrown = true;
 				}
-				expect(local.exceptionThrown).toBeTrue();
+				expect(state.exceptionThrown).toBeTrue();
 
 				// Verify the lock was released by successfully acquiring it again
 				local.result = g.model("author").withAdvisoryLock(name="test_lock_2", callback=function() {
