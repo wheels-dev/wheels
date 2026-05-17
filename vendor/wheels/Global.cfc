@@ -580,9 +580,11 @@ return local.$wheels;
 	 * [category: Miscellaneous Functions]
 	 *
 	 * @name The environment variable name to look up.
-	 * @default Value to return if the variable is not found.
+	 * @defaultValue Value to return if the variable is not found. The legacy
+	 *   named argument `default` is also accepted for backwards compatibility
+	 *   with pre-rename callers.
 	 */
-	public any function env(required string name, any default = "") {
+	public any function env(required string name, any defaultValue = "") {
 		if (StructKeyExists(application, "env") && StructKeyExists(application.env, arguments.name)) {
 			return application.env[arguments.name];
 		}
@@ -593,20 +595,25 @@ return local.$wheels;
 		) {
 			return server.system.environment[arguments.name];
 		}
-		// Adobe CF doesn't auto-populate `arguments.default` from the signature
-		// default when the caller omits the second arg — `default` is a CFML
-		// reserved word (switch/case/default) and the Adobe binder leaves the
-		// scope key undefined rather than seeding it. Lucee/BoxLang seed it
-		// correctly. Reading `arguments.default` directly therefore throws
-		// `UndefinedElementException: Element DEFAULT is undefined in ARGUMENTS`
-		// on Adobe CF whenever someone calls `env("KEY")` with no fallback,
-		// which is the common case for "this env var must be set". Defensive
-		// access closes the gap without changing the public `@default` API.
-		// NOTE: the inline `""` fallback below MUST stay in sync with the
-		// signature default at the top of this function — if you change one,
-		// change the other, otherwise Adobe CF and Lucee/BoxLang will silently
-		// diverge for the no-second-arg case.
-		return StructKeyExists(arguments, "default") ? arguments.default : "";
+		// The second parameter is named `defaultValue` rather than `default`
+		// because `default` is a CFML reserved word (switch/case/default).
+		// Adobe CF 2023/2025 refuses to bind a parameter named `default` at
+		// all — neither the signature default nor a caller-supplied positional
+		// value populates `arguments.default`, so the function silently
+		// returned `""` for every call. Lucee and BoxLang bind it correctly,
+		// which is why the original signature worked everywhere except Adobe
+		// and only surfaced after this PR's other fixes stopped the cfheader
+		// cascade from masking the test failure.
+		//
+		// Back-compat for any caller still using the named-arg form
+		// `env(name = "X", default = "Y")`: named arguments land in the
+		// arguments scope under their literal key regardless of the
+		// declared parameter list, so we look there first and fall back
+		// to the renamed parameter.
+		if (StructKeyExists(arguments, "default")) {
+			return arguments.default;
+		}
+		return arguments.defaultValue;
 	}
 
 	/**
