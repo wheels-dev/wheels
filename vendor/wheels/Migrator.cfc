@@ -710,13 +710,15 @@ component output="false" extends="wheels.Global"{
 		}
 
 		// Execute. Wrap in a transaction so a partial failure rolls back
-		// rather than leaving a half-renamed schema. Note: DDL inside a
-		// transaction is a no-op on Oracle (auto-commits) and MSSQL has
-		// adapter-specific behavior, but on the engines that DO honor it
-		// (Postgres, SQLite via SAVEPOINT, MySQL on InnoDB) we get atomicity.
-		// On Oracle the auto-commit closes the JDBC statement, so a subsequent
-		// `transaction action="commit"` reports "Closed statement". Run the
-		// DDL bare on Oracle — there is no rollback to forfeit.
+		// rather than leaving a half-renamed schema. Postgres and SQLite
+		// (via SAVEPOINT) honor the wrapper and roll back DDL on error.
+		// MySQL DDL also implicitly commits (the wrapper is a no-op there),
+		// but MySQL's multi-pair `RENAME TABLE a TO a', b TO b'` is itself
+		// a single atomic statement, so no partial-rename arises. MSSQL has
+		// adapter-specific behavior. On Oracle the implicit DDL commit
+		// closes the JDBC statement, so a subsequent
+		// `transaction action="commit"` reports "Closed statement" — run
+		// the DDL bare on Oracle. There is no rollback to forfeit.
 		try {
 			if (FindNoCase("Oracle", dbType)) {
 				for (var sql in rv.sql) {
