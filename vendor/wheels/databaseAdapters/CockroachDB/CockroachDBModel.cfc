@@ -44,8 +44,7 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 	 * stubs that error rather than honoring the contract. Override the
 	 * PostgreSQL adapter's `true` and report unsupported so `withAdvisoryLock`
 	 * callers (and the capability-aware lockingSpec `beforeEach`) skip
-	 * standalone-lock paths instead of erroring. Use `forUpdate()` for
-	 * row-level locking inside a transaction instead.
+	 * standalone-lock paths instead of erroring.
 	 */
 	public boolean function $supportsAdvisoryLocks() {
 		return false;
