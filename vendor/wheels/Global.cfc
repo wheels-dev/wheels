@@ -77,7 +77,11 @@ component output="false" {
 			local.tagContent = arguments.tagContent;
 			StructDelete(arguments, "tagContent");
 		}
-		cfmail(attributeCollection = "#arguments#") {
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfmail(attributeCollection = "#local.args#") {
 			if (StructKeyExists(local, "mailparams")) {
 				for (local.i in local.mailparams) {
 					cfmailparam(attributeCollection = "#local.i#");
@@ -101,12 +105,20 @@ component output="false" {
 	public any function $cache() {
 		// If cache is found only the function is aborted, not page. --->
 		variables.$instance.reCache = false;
-		cfcache(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfcache(attributeCollection = "#local.args#");
 		variables.$instance.reCache = true;
 	}
 
 	public any function $content() {
-		cfcontent(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfcontent(attributeCollection = "#local.args#");
 	}
 
 	public void function $header() {
@@ -198,12 +210,20 @@ return local.$wheels;
 	public any function $directory() {
 		local.rv = "";
 		arguments.name = "rv";
-		cfdirectory(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfdirectory(attributeCollection = "#local.args#");
 		return local.rv;
 	}
 
 	public any function $file() {
-		cffile(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cffile(attributeCollection = "#local.args#");
 	}
 
 	public any function $cfinvoke(required string component, required string method, struct invokeArguments) {
@@ -242,7 +262,11 @@ return local.$wheels;
 
 			StructDelete(arguments, "invokeArgs");
 		}
-		cfinvoke(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfinvoke(attributeCollection = "#local.args#");
 		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
@@ -252,12 +276,20 @@ return local.$wheels;
 		StructDelete(arguments, "$args", false);
 		if (NOT arguments.delay) {
 			StructDelete(arguments, "delay", false);
-			cflocation(attributeCollection = "#arguments#");
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cflocation(attributeCollection = "#local.args#");
 		}
 	}
 
 	public void function $htmlhead() {
-		cfhtmlhead(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfhtmlhead(attributeCollection = "#local.args#");
 	}
 
 	public any function $dbinfo() {
@@ -426,7 +458,11 @@ return local.$wheels;
 
 	public any function $wddx(required any input, string action = "cfml2wddx", boolean useTimeZoneInfo = true) {
 		arguments.output = "local.output";
-		cfwddx(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfwddx(attributeCollection = "#local.args#");
 		if (StructKeyExists(local, "output")) {
 			return local.output;
 		}
@@ -434,7 +470,11 @@ return local.$wheels;
 
 	public any function $zip() {
 		$engineAdapter().prepareZipArgs(arguments);
-		cfzip(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfzip(attributeCollection = "#local.args#");
 	}
 
 	public any function $query(required string sql) {

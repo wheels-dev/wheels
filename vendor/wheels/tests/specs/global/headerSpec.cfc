@@ -11,9 +11,12 @@ component extends="wheels.WheelsTest" {
 			// arguments scope. The helper must hand cfheader a plain struct.
 			// See issue #2741.
 
+			// Cleanup uses cfheader directly, not g.$header() — the function under test.
+			// If $header() regresses, every spec should fail in its own `it`, not via
+			// an opaque `afterEach` lifecycle error.
 			afterEach(() => {
 				cfheader(statuscode = 200)
-				g.$header(name = "content-type", value = "text/html", charset = "utf-8")
+				cfheader(name = "content-type", value = "text/html")
 			})
 
 			it("accepts a name/value pair without throwing", () => {
