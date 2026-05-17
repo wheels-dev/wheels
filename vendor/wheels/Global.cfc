@@ -147,26 +147,6 @@ component output="false" {
 				local.args[local.key] = arguments[local.key];
 			}
 		}
-		// Suppress `statuscode` mutations inside an active test harness window —
-		// internal calls like `processRequest()` invoke Wheels routing, which
-		// can throw `Wheels.RouteNotFound` and call `$header(statusCode = 404)`
-		// via `$throwErrorOrShow404Page`. That's correct for the inner request
-		// (processRequest returns `status = 404` to the spec), but `cfheader`
-		// mutates the OUTER response status — so a single 404 inside the suite
-		// bleeds into the outer test runner's HTTP code, which the compat-matrix
-		// CI parser only counts as success on 200 or 417. `runner.cfm` opens the
-		// window before `testBox.run()` and closes it after, so its own
-		// `$header(statusCode = 200|417)` calls land normally.
-		if (
-			StructKeyExists(request, "$wheelsTestSuppressStatusCode")
-			&& request.$wheelsTestSuppressStatusCode
-		) {
-			StructDelete(local.args, "statuscode", false);
-			StructDelete(local.args, "statusCode", false);
-			if (StructIsEmpty(local.args)) {
-				return;
-			}
-		}
 		// Skip when the response buffer has already committed (Adobe CF throws
 		// "Failed to add HTML header" once any output has flushed — e.g. inside
 		// onError after partial view rendering, or after a controller view has
