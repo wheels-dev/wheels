@@ -39,6 +39,18 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 	}
 
 	/**
+	 * CockroachDB intentionally omits the PostgreSQL advisory-lock primitives
+	 * (`pg_advisory_lock` / `pg_advisory_unlock`) — it surfaces them as no-op
+	 * stubs that error rather than honoring the contract. Override the
+	 * PostgreSQL adapter's `true` and report unsupported so `withAdvisoryLock`
+	 * callers (and the capability-aware lockingSpec `beforeEach`) skip
+	 * standalone-lock paths instead of erroring.
+	 */
+	public boolean function $supportsAdvisoryLocks() {
+		return false;
+	}
+
+	/**
 	 * CockroachDB does not support advisory locks.
 	 * Use forUpdate() for row-level locking instead.
 	 */

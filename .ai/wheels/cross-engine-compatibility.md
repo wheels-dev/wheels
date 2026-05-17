@@ -289,6 +289,26 @@ if (isPostgresFamily) {
 
 See `vendor/wheels/tests/specs/migrator/addColumnOptionsSpec.cfc` and `migrationSpec.cfc` for working examples of this branching idiom.
 
+### MySQL — TEXT and FLOAT DEFAULT suppression
+
+`MySQLMigrator.optionsIncludeDefault` returns `false` for `text`, `mediumtext`, `longtext`, and `float` columns. The inherited `Abstract.addColumnOptions` short-circuits the entire `DEFAULT` clause when `optionsIncludeDefault` returns false — meaning a non-empty `default="long body"` on a `text` column is silently dropped in the emitted DDL on MySQL. Rationale: pre-8.0.13 MySQL rejects `DEFAULT` on `TEXT`/`BLOB` columns outright.
+
+When writing migrator spec assertions that involve TEXT-family columns with non-empty defaults, add an `isMySQLFamily` carve-out alongside the `isPostgresFamily` one:
+
+```cfm
+var name = adapter.adapterName();
+var isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
+var isMySQLFamily = (name == "MySQL");
+
+if (isMySQLFamily) {
+    // DEFAULT clause is suppressed entirely for text/float on MySQL
+    expect(sql).notToInclude("DEFAULT");
+} else {
+    expect(sql).toInclude("DEFAULT");
+    expect(sql).toInclude("'long body'");
+}
+```
+
 ### CockroachDB (Soft-Fail in CI)
 
 CockroachDB is in CI but marked as soft-fail — test failures are logged as warnings, not build failures. Controlled by `SOFT_FAIL_DBS` in `.github/workflows/tests.yml`.
