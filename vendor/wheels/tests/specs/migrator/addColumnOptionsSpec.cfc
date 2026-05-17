@@ -25,6 +25,14 @@
  * surface differences are part of those adapters' contract — this spec
  * documents them rather than asserting them away. See #2661 for the cross-
  * adapter triage that motivated this adapter-aware shape.
+ *
+ * MySQL is also a documented divergence: `MySQLMigrator.optionsIncludeDefault`
+ * returns false for `text` / `mediumtext` / `longtext` / `float`, so the
+ * Abstract `addColumnOptions` short-circuits the entire DEFAULT clause for
+ * those types on MySQL — a real, non-empty `default="long body"` is silently
+ * suppressed in the emitted DDL. The legacy MySQL constraint that motivated
+ * this (pre-8.0.13 TEXT/BLOB columns reject DEFAULT) is documented on the
+ * adapter; this spec asserts the resulting cross-engine contract. See #2742.
  */
 component extends="wheels.WheelsTest" {
 
@@ -37,6 +45,11 @@ component extends="wheels.WheelsTest" {
 		// for cross-adapter branching.
 		var name = variables.adapter.adapterName();
 		variables.isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
+		// MySQL suppresses the entire DEFAULT clause for TEXT-family and FLOAT
+		// columns via optionsIncludeDefault, so any text-with-real-default
+		// assertion must carve out MySQL the same way isPostgresFamily does for
+		// the empty-default cases.
+		variables.isMySQLFamily = (name == "MySQL");
 	}
 
 	private string function buildOptions(string type, string default = "", boolean allowNull = true) {
@@ -88,8 +101,18 @@ component extends="wheels.WheelsTest" {
 
 			it("text with a real default (non-empty) still emits DEFAULT", () => {
 				var sql = buildOptions(type = "text", default = "long body");
-				expect(sql).toInclude("DEFAULT");
-				expect(sql).toInclude("'long body'");
+				if (variables.isMySQLFamily) {
+					// MySQL's optionsIncludeDefault returns false for TEXT, so the
+					// Abstract addColumnOptions short-circuits the DEFAULT clause
+					// entirely. The user's `default="long body"` is silently
+					// suppressed in the emitted DDL — surprising but intentional,
+					// rooted in the pre-8.0.13 MySQL constraint that TEXT/BLOB
+					// columns cannot carry a DEFAULT.
+					expect(sql).notToInclude("DEFAULT");
+				} else {
+					expect(sql).toInclude("DEFAULT");
+					expect(sql).toInclude("'long body'");
+				}
 			});
 
 			it("integer with default='' becomes DEFAULT NULL across adapters", () => {
