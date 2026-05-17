@@ -99,7 +99,7 @@ component extends="wheels.WheelsTest" {
 				expect(sql).toInclude("'hello'");
 			});
 
-			it("text with a real default (non-empty) still emits DEFAULT", () => {
+			it("text with a real default (non-empty): DEFAULT clause is adapter-dependent", () => {
 				var sql = buildOptions(type = "text", default = "long body");
 				if (variables.isMySQLFamily) {
 					// MySQL's optionsIncludeDefault returns false for TEXT, so the
