@@ -593,7 +593,16 @@ return local.$wheels;
 		) {
 			return server.system.environment[arguments.name];
 		}
-		return arguments.default;
+		// Adobe CF doesn't auto-populate `arguments.default` from the signature
+		// default when the caller omits the second arg — `default` is a CFML
+		// reserved word (switch/case/default) and the Adobe binder leaves the
+		// scope key undefined rather than seeding it. Lucee/BoxLang seed it
+		// correctly. Reading `arguments.default` directly therefore throws
+		// `UndefinedElementException: Element DEFAULT is undefined in ARGUMENTS`
+		// on Adobe CF whenever someone calls `env("KEY")` with no fallback,
+		// which is the common case for "this env var must be set". Defensive
+		// access closes the gap without changing the public `@default` API.
+		return StructKeyExists(arguments, "default") ? arguments.default : "";
 	}
 
 	/**
