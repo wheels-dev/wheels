@@ -15,9 +15,16 @@ component extends="wheels.WheelsTest" {
 			// If $header() regresses, every spec should fail in its own `it`, not via
 			// an opaque `afterEach` lifecycle error. Semicolons required: Lucee 7's
 			// parser cannot disambiguate back-to-back `cfheader(...)` script calls.
+			// Each cfheader is wrapped in its own try/catch because Adobe CF 2023/2025
+			// commits the response when a prior spec writes output, after which the
+			// bare cfheader throws InvalidHeaderException ("Failed to add HTML header").
+			// The cleanup is best-effort — a committed response keeps whatever headers
+			// the engine wrote — and a thrown afterEach would surface as an opaque
+			// lifecycle error masking the actual unit-under-test results, the exact
+			// problem the bare-cfheader contract above was meant to avoid.
 			afterEach(() => {
-				cfheader(statuscode = 200);
-				cfheader(name = "content-type", value = "text/html");
+				try { cfheader(statuscode = 200); } catch (any e) {}
+				try { cfheader(name = "content-type", value = "text/html"); } catch (any e) {}
 			})
 
 			it("accepts a name/value pair without throwing", () => {
