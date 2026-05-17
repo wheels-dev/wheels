@@ -60,8 +60,14 @@ component {
 		try {
 			getPageContextResponse().reset();
 		} catch ( any e ) {
-			// Response already committed — skip the reset; the reporter content
-			// will append to whatever already flushed.
+			// Catches the known "response already committed" case (Adobe CF +
+			// Undertow `IllegalStateException` UT010019) and any other reason
+			// `reset()` might be unavailable on a future engine — the reset is
+			// cleanup, not a contract, so falling back to appending is correct
+			// regardless of why it failed. Deliberately silent (no `writeDump`)
+			// because the committed-response path is the expected steady state
+			// on Adobe CF runs; the adjacent `resetHTMLHead()` `writeDump` only
+			// makes sense for an engine-compat probe, not a runtime-state one.
 		}
 	}
 
