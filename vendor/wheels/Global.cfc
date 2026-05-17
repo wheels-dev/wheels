@@ -122,16 +122,15 @@ component output="false" {
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
 		}
-		// Skip when the response buffer has already committed (Adobe CF rejects
-		// `cfcontent` once headers are out — same scenario as `$header()`,
-		// e.g. setting Content-Type after a test runner has flushed JSON
-		// output mid-suite). Same defensive shape as `$header()`.
+		// Best-effort: cfcontent throws on a committed response (Adobe CF).
 		if ($responseCommitted()) {
 			return;
 		}
 		try {
 			cfcontent(attributeCollection = "#local.args#");
 		} catch (any e) {
+			// Re-probe to handle the isCommitted/throw race; rethrow only when
+			// the response is still uncommitted (a genuine caller error).
 			if (!$responseCommitted()) {
 				rethrow;
 			}
@@ -139,33 +138,26 @@ component output="false" {
 	}
 
 	public void function $header() {
-		// Adobe CF 2023+ rejects the raw `arguments` scope as an attributeCollection;
-		// copy into a plain struct first. Also strip `statusText` (removed in Adobe CF 2025).
+		// Plain-struct copy: Adobe CF 2023+ rejects `arguments` as
+		// attributeCollection (#10 cross-engine invariant). `statusText` is
+		// stripped because Adobe CF 2025 removed it.
 		local.args = {};
 		for (local.key in arguments) {
 			if (local.key != "statusText") {
 				local.args[local.key] = arguments[local.key];
 			}
 		}
-		// Skip when the response buffer has already committed (Adobe CF throws
-		// "Failed to add HTML header" once any output has flushed — e.g. inside
-		// onError after partial view rendering, or after a controller view has
-		// rendered). Letting cfheader's exception escape would replace the
-		// original error with the cfheader-failure stack and mask the real bug.
-		// Best-effort header updates are the right contract; callers needing
-		// guaranteed headers should set them before producing output.
+		// Best-effort: cfheader throws on a committed response (Adobe CF). The
+		// short-circuit is critical inside onError, where letting the exception
+		// escape would replace the original error with the cfheader-failure stack.
 		if ($responseCommitted()) {
 			return;
 		}
 		try {
 			cfheader(attributeCollection = "#local.args#");
 		} catch (any e) {
-			// Race window: `isCommitted()` returned false a few lines above but
-			// `cfheader` still rejected the call. Re-probe — if the response
-			// committed between the two calls, swallow so the original error in
-			// `onError` is not replaced. Otherwise the rejection is a genuine
-			// caller bug (bad attribute combination, engine bug, ...) and we
-			// rethrow so it surfaces normally.
+			// Re-probe to handle the isCommitted/throw race; rethrow only when
+			// the response is still uncommitted (a genuine caller error).
 			if (!$responseCommitted()) {
 				rethrow;
 			}
@@ -173,11 +165,7 @@ component output="false" {
 	}
 
 	/**
-	 * Returns true when the underlying servlet response has been committed and
-	 * headers can no longer be modified. Used by header- and content-setting
-	 * helpers to short-circuit gracefully instead of throwing inside error
-	 * handlers (where some output has typically already flushed). Defaults to
-	 * false on engines or contexts where the page-context probe fails.
+	 * Returns true when the servlet response has been committed and headers can no longer be modified. Returns false on engines or contexts where the probe is unavailable.
 	 */
 	public boolean function $responseCommitted() {
 		try {
@@ -595,21 +583,10 @@ return local.$wheels;
 		) {
 			return server.system.environment[arguments.name];
 		}
-		// The second parameter is named `defaultValue` rather than `default`
-		// because `default` is a CFML reserved word (switch/case/default).
-		// Adobe CF 2023/2025 refuses to bind a parameter named `default` at
-		// all — neither the signature default nor a caller-supplied positional
-		// value populates `arguments.default`, so the function silently
-		// returned `""` for every call. Lucee and BoxLang bind it correctly,
-		// which is why the original signature worked everywhere except Adobe
-		// and only surfaced after this PR's other fixes stopped the cfheader
-		// cascade from masking the test failure.
-		//
-		// Back-compat for any caller still using the named-arg form
-		// `env(name = "X", default = "Y")`: named arguments land in the
-		// arguments scope under their literal key regardless of the
-		// declared parameter list, so we look there first and fall back
-		// to the renamed parameter.
+		// Back-compat for the legacy `default = "Y"` named-arg form. The
+		// parameter was renamed from `default` (a CFML reserved word Adobe CF
+		// refuses to bind) to `defaultValue`; named arguments still land in
+		// `arguments` under their literal key on every engine.
 		if (StructKeyExists(arguments, "default")) {
 			return arguments.default;
 		}
