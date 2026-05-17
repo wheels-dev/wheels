@@ -6,6 +6,16 @@
     // wheels.controller.flash::$inTestHarness().
     request.$wheelsTestRun = true;
 
+    // Suppress `statuscode` mutations from internal request fixtures (e.g.,
+    // a spec calling `processRequest()` whose inner Wheels routing throws
+    // `Wheels.RouteNotFound` and triggers `$header(statusCode = 404)`).
+    // Without this guard, an inner 404 set during the suite mutates the
+    // OUTER response status — so the compat-matrix CI gets HTTP 404 back
+    // even when the JSON test results say `totalPass = 3681`. The flag is
+    // toggled off below after each `testBox.run()` so the runner's own
+    // final-status `$header()` calls land normally.
+    request.$wheelsTestSuppressStatusCode = true;
+
     // Define helper functions as variables-scoped closures to avoid Adobe CF's
     // DuplicateFunctionDefinitionException (this file can be included from multiple
     // CFC methods via different include paths)
@@ -148,6 +158,9 @@
         result = testBox.run(
             reporter = "wheels.wheelstest.system.reports.JSONReporter"
         );
+        // Tests done — release the statuscode suppression so the runner's own
+        // final-status `$header()` calls below mutate the response normally.
+        request.$wheelsTestSuppressStatusCode = false;
         DeJsonResult = DeserializeJSON(result);
 
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
@@ -160,6 +173,9 @@
         result = testBox.run(
             reporter = "wheels.wheelstest.system.reports.JSONReporter"
         );
+        // Tests done — release the statuscode suppression so the runner's own
+        // final-status `$header()` calls below mutate the response normally.
+        request.$wheelsTestSuppressStatusCode = false;
         // `$header()` / `$content()` short-circuit when the servlet response is
         // already committed (Adobe CF 2023/2025 commits mid-`testBox.run()` once
         // any test output flushes the buffer). The status-code header is the
@@ -259,6 +275,7 @@
         result = testBox.run(
             reporter = "wheels.wheelstest.system.reports.TextReporter"
         )
+        request.$wheelsTestSuppressStatusCode = false;
         application.wo.$content(type="text/plain");
         writeOutput(result)
     }
@@ -266,6 +283,7 @@
         result = testBox.run(
             reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter"
         )
+        request.$wheelsTestSuppressStatusCode = false;
         application.wo.$content(type="text/xml");
         writeOutput(result)
     }
