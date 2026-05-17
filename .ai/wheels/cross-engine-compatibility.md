@@ -233,6 +233,26 @@ private string function myHelper() { ... }
 public string function $myHelper() { ... }
 ```
 
+### `attributeCollection` with the `arguments` Scope (Adobe CF 2023)
+
+Adobe CF 2023 rejects the raw `arguments` scope when passed as `attributeCollection` to built-in tags such as `cfheader`, throwing `"Failed to add HTML header"` and aborting the request. Lucee 6/7, BoxLang, and Adobe CF 2018/2021 all accept the `arguments` scope without complaint.
+
+```cfm
+// WRONG — crashes Adobe CF 2023 with "Failed to add HTML header"
+cfheader(attributeCollection = "#arguments#");
+
+// RIGHT — copy to a plain struct first
+local.args = {};
+for (local.key in arguments) {
+    local.args[local.key] = arguments[local.key];
+}
+cfheader(attributeCollection = "#local.args#");
+```
+
+**Why**: Adobe CF 2023 imposes a stricter type check on `attributeCollection` and requires a plain CFML struct, not the special `arguments` scope object. The struct-copy pattern is safe and idiomatic across all engines.
+
+**Reference example**: `vendor/wheels/Global.cfc::$header` (fix: #2741).
+
 ## Database-Specific Gotchas
 
 ### H2 Database (Test Default)
