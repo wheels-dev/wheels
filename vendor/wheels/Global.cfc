@@ -147,8 +147,15 @@ component output="false" {
 		try {
 			cfheader(attributeCollection = "#local.args#");
 		} catch (any e) {
-			// Defense-in-depth — if isCommitted() returned false but cfheader
-			// still rejected the call, don't propagate over the original error.
+			// Race window: `isCommitted()` returned false a few lines above but
+			// `cfheader` still rejected the call. Re-probe — if the response
+			// committed between the two calls, swallow so the original error in
+			// `onError` is not replaced. Otherwise the rejection is a genuine
+			// caller bug (bad attribute combination, engine bug, ...) and we
+			// rethrow so it surfaces normally.
+			if (!$responseCommitted()) {
+				rethrow;
+			}
 		}
 	}
 

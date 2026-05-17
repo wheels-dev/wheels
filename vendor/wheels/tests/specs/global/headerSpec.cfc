@@ -46,5 +46,22 @@ component extends="wheels.WheelsTest" {
 
 		})
 
+		describe("Tests that \$responseCommitted()", () => {
+
+			// The probe walks GetPageContext().getResponse().isCommitted(), which
+			// has a known-good shape on every supported engine — but the helper
+			// catches and returns false on engines where the call path is
+			// unavailable. This spec confirms the declared `boolean` return
+			// contract holds in-process on every engine in the matrix, so a
+			// future engine API shift surfaces here instead of in a compat run.
+			it("returns a boolean without throwing", () => {
+				$assert.notThrows(function() {
+					g.$responseCommitted()
+				})
+				expect(IsBoolean(g.$responseCommitted())).toBeTrue()
+			})
+
+		})
+
 	}
 }
