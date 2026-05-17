@@ -3442,6 +3442,26 @@ return local.$wheels;
 		// Set to ignore CSRF errors during testing.
 		local.controller.protectsFromForgery(with = "ignore");
 
+		// Capture the OUTER response status code before the inner action runs.
+		// Inner actions (and `$throwErrorOrShow404Page` paths) call `cfheader`
+		// directly, which mutates the shared servlet response — without this
+		// snapshot, a `Wheels.RouteNotFound` raised by an inner test spec sets
+		// the outer test-runner response to 404. By the time `runner.cfm`'s
+		// end-of-suite `$header(statusCode = 200|417)` fires, the response is
+		// committed and the call no-ops, so the outer HTTP code ships as 404
+		// and the compat-matrix CI parser drops the JSON body (only 200/417
+		// are accepted). Saving here and restoring via `setStatus()` after
+		// reading `$statusCode()` keeps the inner status readable for the
+		// caller's spec assertion while preventing the outer bleed-through.
+		// `setStatus()` is a no-op on committed responses per servlet spec, so
+		// this is best-effort — most processRequest calls inside a typical
+		// suite happen before the buffer flushes and the restore lands.
+		try {
+			local.outerStatusBeforeAction = GetPageContext().getResponse().getStatus();
+		} catch (any e) {
+			local.outerStatusBeforeAction = 200;
+		}
+
 		local.controller.processAction(includeFilters = arguments.includeFilters);
 		local.response = local.controller.response();
 
@@ -3487,6 +3507,21 @@ return local.$wheels;
 		// Set back email delivery setting to previous value.
 		$set(functionName = "sendEmail", deliver = local.deliverEmail);
 		$set(functionName = "sendFile", deliver = local.deliverFile);
+
+		// Restore the OUTER response status to what it was before the inner
+		// action ran. Both calls below are best-effort — `setStatus()` writes
+		// through to the servlet response immediately on uncommitted runs
+		// (which is the case for the bulk of in-suite `processRequest` calls
+		// before the buffer fills), and `$header()` is the legacy reset
+		// path retained for engines / versions where the direct servlet
+		// call is unavailable. `$header()`'s own `$responseCommitted()`
+		// short-circuit means neither propagates after the response commits.
+		try {
+			GetPageContext().getResponse().setStatus(local.outerStatusBeforeAction);
+		} catch (any e) {
+			// `setStatus` on committed response is a no-op per servlet spec;
+			// the `$header()` fallback below covers the legacy `cfheader` path.
+		}
 
 		// Set back the status code to 200 so the test suite does not use the same code that the action that was tested did.
 		// If the test suite fails it will set the status code to 500 later.
