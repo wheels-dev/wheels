@@ -221,6 +221,45 @@ expect(found).toBeWheelsModel();
 
 **Reference**: `vendor/wheels/wheelstest/system/Expectation.cfc::toBeWheelsModel`, issue #2662.
 
+### `local.X = ...` Inside `catch` Doesn't Persist (BoxLang)
+
+Writes to the `local` scope inside a `catch` block don't survive past the block on BoxLang. The catch body apparently runs under a nested `local` that gets discarded when control leaves; on Lucee and Adobe CF the catch shares the enclosing function's `local`, so the assignment sticks.
+
+```cfm
+// WRONG — passes on Lucee/Adobe, fails on BoxLang
+local.caught = false;
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    local.caught = true;   // discarded when catch exits on BoxLang
+}
+expect(local.caught).toBeTrue();   // reads outer local — still false
+
+// RIGHT — struct field assignment targets a heap object (all engines)
+var state = {caught = false};
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    state.caught = true;
+}
+expect(state.caught).toBeTrue();
+
+// ALSO RIGHT — var-declared name without `local.` prefix
+var caught = false;
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    caught = true;
+}
+expect(caught).toBeTrue();
+```
+
+**Why the bare-`var` form survives**: BoxLang's catch-scoped local only shadows keys written via explicit `local.X = ...`; an unscoped write to a `var`-declared name appears to resolve through the var-declaration slot and escapes the catch-scope shadow. Prefer the struct-field form anyway — it's cleaner, mirrors the prior-art `TenantResolverSpec` pattern, and doesn't rely on this behaviour being preserved across BoxLang releases.
+
+**Why this fires only in specs**: production code rarely needs a catch to flip a boolean for a later read in the same function — typical catch blocks rethrow, log, or assign struct fields. Specs that use `try/catch` to *assert* exception propagation are the natural trap, since they need the post-catch flag.
+
+**Reference**: issue #2744, regression test `vendor/wheels/tests/specs/model/lockingSpec.cfc :: "releases lock even when callback throws an exception"`. The same pattern works in `vendor/wheels/tests/specs/middleware/TenantResolverSpec.cfc` because it tracks state via `var result = {threw = false}; result.threw = true`.
+
 ### Private View Helpers Not Integrated
 
 `$integrateComponents()` only copies `public` methods into controllers. Private helper functions in view CFCs are never available.
@@ -344,6 +383,34 @@ Oracle 23 rejects `INSERT INTO t (cols) VALUES (?,?), (?,?), ...` (the SQL-stand
 `OracleModel` overrides `$bulkInsertSQL()` to emit `INSERT ALL INTO t (cols) VALUES (...) INTO t (cols) VALUES (...) SELECT 1 FROM dual` — Oracle's idiomatic multi-row form, which avoids both the table value constructor and the RETURNING expansion. This is transparent to framework users; `insertAll()` works the same on Oracle as on other databases.
 
 If you write code that generates raw bulk-insert SQL for Oracle (or adds a new adapter), use `INSERT ALL ... SELECT 1 FROM dual` rather than multi-row VALUES. The canonical implementation is `vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc::$bulkInsertSQL`.
+
+### Oracle — DDL Auto-Commit and Transaction Wrapper
+
+Oracle implicitly commits DDL statements (RENAME, CREATE, ALTER, DROP, …) and closes the JDBC statement as part of that commit. If the DDL is wrapped in `transaction action="begin" { ... commit }`, the subsequent `transaction action="commit"` runs against a closed statement and raises `ORA: Closed statement`. PostgreSQL and SQLite (via SAVEPOINT) honor the wrapper and will roll back DDL on error. MySQL DDL also causes an implicit commit (the wrapper is a no-op there), but MySQL's multi-rename form — `RENAME TABLE a TO a', b TO b'` — is itself a single atomic statement, so no partial-rename scenario arises. Oracle cannot use the wrapper at all.
+
+If you write code that runs DDL inside a transaction block, branch on the adapter and run the DDL bare on Oracle. The canonical implementation is `vendor/wheels/Migrator.cfc::renameSystemTables`:
+
+```cfm
+if (FindNoCase("Oracle", dbType)) {
+    for (var sql in rv.sql) {
+        $query(datasource = dsn, sql = sql);
+    }
+} else {
+    transaction action="begin" {
+        try {
+            for (var sql in rv.sql) {
+                $query(datasource = dsn, sql = sql);
+            }
+            transaction action="commit";
+        } catch (any e) {
+            transaction action="rollback";
+            rethrow;
+        }
+    }
+}
+```
+
+There is no rollback to forfeit on Oracle — the implicit commit makes each DDL atomic on its own.
 
 ## Testing Across Engines
 
