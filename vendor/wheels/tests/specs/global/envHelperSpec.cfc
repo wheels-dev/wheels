@@ -33,16 +33,7 @@ component extends="wheels.WheelsTest" {
 				expect(env("NONEXISTENT_KEY_12345", "custom_default")).toBe("custom_default");
 			})
 
-			// Back-compat: the parameter was renamed from `default` to
-			// `defaultValue` because Adobe CF 2023/2025 refuses to bind a
-			// parameter named with the CFML reserved word `default`. The
-			// function still accepts the legacy named-arg form via the
-			// `StructKeyExists(arguments, "default")` guard in Global.cfc —
-			// named arguments land in the arguments scope under their literal
-			// key regardless of the declared parameter list. This spec is the
-			// regression catch: if the guard is ever removed or a future
-			// engine rejects `default` as a named-arg key at the call site,
-			// this assertion will fail.
+			// Regression guard for the legacy `default = "Y"` named-arg form.
 			it("accepts the legacy 'default' named arg for back-compat", () => {
 				application.env = {};
 				expect(env(name = "NONEXISTENT_KEY_12345", default = "legacy_default")).toBe("legacy_default");
