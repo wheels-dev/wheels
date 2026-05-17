@@ -767,8 +767,68 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Generates bulk INSERT SQL for a batch of records as an array of SQL arrays,
+	 * each compatible with `$querySetup()`. The default emits a single multi-row
+	 * `INSERT INTO ... VALUES (...), (...), ...` statement. Adapters whose drivers
+	 * cannot run multi-row VALUES against generated-keys retrieval (Oracle) should
+	 * override to return one entry per row.
+	 *
+	 * @tableName The quoted table name.
+	 * @columns Array of column names to insert.
+	 * @validProperties Array of model property names corresponding to `columns`.
+	 * @records Array of record structs.
+	 * @batchStart Starting index in the records array.
+	 * @batchEnd Ending index in the records array.
+	 * @propertyInfo Struct of model property metadata.
+	 */
+	public array function $bulkInsertSQL(
+		required string tableName,
+		required array columns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo
+	) {
+		local.sql = [];
+
+		local.colList = "";
+		for (local.col in arguments.columns) {
+			if (Len(local.colList)) {
+				local.colList &= ", ";
+			}
+			local.colList &= $quoteIdentifier(local.col);
+		}
+
+		ArrayAppend(local.sql, "INSERT INTO #arguments.tableName# (#local.colList#) VALUES ");
+
+		local.propCount = ArrayLen(arguments.validProperties);
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			if (local.r > arguments.batchStart) {
+				ArrayAppend(local.sql, ", ");
+			}
+			ArrayAppend(local.sql, "(");
+			for (local.p = 1; local.p <= local.propCount; local.p++) {
+				if (local.p > 1) {
+					ArrayAppend(local.sql, ", ");
+				}
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				ArrayAppend(local.sql, $buildBulkParam(
+					value = local.val,
+					propName = local.propName,
+					propertyInfo = arguments.propertyInfo
+				));
+			}
+			ArrayAppend(local.sql, ")");
+		}
+
+		return [local.sql];
+	}
+
+	/**
 	 * Builds parameter struct for a single value in a bulk operation.
-	 * Used by adapter upsert implementations.
+	 * Used by adapter bulk insert and upsert implementations.
 	 */
 	public struct function $buildBulkParam(
 		required string value,

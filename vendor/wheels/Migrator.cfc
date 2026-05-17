@@ -714,16 +714,25 @@ component output="false" extends="wheels.Global"{
 		// transaction is a no-op on Oracle (auto-commits) and MSSQL has
 		// adapter-specific behavior, but on the engines that DO honor it
 		// (Postgres, SQLite via SAVEPOINT, MySQL on InnoDB) we get atomicity.
+		// On Oracle the auto-commit closes the JDBC statement, so a subsequent
+		// `transaction action="commit"` reports "Closed statement". Run the
+		// DDL bare on Oracle — there is no rollback to forfeit.
 		try {
-			transaction action="begin" {
-				try {
-					for (var sql in rv.sql) {
-						$query(datasource = dsn, sql = sql);
+			if (FindNoCase("Oracle", dbType)) {
+				for (var sql in rv.sql) {
+					$query(datasource = dsn, sql = sql);
+				}
+			} else {
+				transaction action="begin" {
+					try {
+						for (var sql in rv.sql) {
+							$query(datasource = dsn, sql = sql);
+						}
+						transaction action="commit";
+					} catch (any e) {
+						transaction action="rollback";
+						rethrow;
 					}
-					transaction action="commit";
-				} catch (any e) {
-					transaction action="rollback";
-					rethrow;
 				}
 			}
 

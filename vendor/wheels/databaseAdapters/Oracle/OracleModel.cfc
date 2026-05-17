@@ -177,6 +177,51 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Oracle does not support multi-row `INSERT INTO ... VALUES (...), (...)` together with
+	 * the JDBC driver's auto-RETURNING (which `cfquery result="..."` triggers for generated
+	 * keys). Emit one single-row INSERT per record so each statement is a plain
+	 * `INSERT INTO ... VALUES (...)` that Oracle's JDBC driver handles cleanly.
+	 */
+	public array function $bulkInsertSQL(
+		required string tableName,
+		required array columns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo
+	) {
+		local.batches = [];
+
+		local.colList = "";
+		for (local.col in arguments.columns) {
+			if (Len(local.colList)) local.colList &= ", ";
+			local.colList &= $quoteIdentifier(local.col);
+		}
+		local.prefix = "INSERT INTO #arguments.tableName# (#local.colList#) VALUES (";
+
+		local.propCount = ArrayLen(arguments.validProperties);
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			local.sql = [];
+			ArrayAppend(local.sql, local.prefix);
+			for (local.p = 1; local.p <= local.propCount; local.p++) {
+				if (local.p > 1) ArrayAppend(local.sql, ", ");
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				ArrayAppend(local.sql, $buildBulkParam(
+					value = local.val,
+					propName = local.propName,
+					propertyInfo = arguments.propertyInfo
+				));
+			}
+			ArrayAppend(local.sql, ")");
+			ArrayAppend(local.batches, local.sql);
+		}
+
+		return local.batches;
+	}
+
+	/**
 	 * Oracle upsert using MERGE with USING (SELECT ... FROM dual UNION ALL ...) source.
 	 * Uses parameterized values via $buildBulkParam — never interpolates user data into SQL.
 	 */
