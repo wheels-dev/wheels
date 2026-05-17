@@ -37,6 +37,10 @@ component extends="wheels.WheelsTest" {
 		// for cross-adapter branching.
 		var name = variables.adapter.adapterName();
 		variables.isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
+		// MySQL's optionsIncludeDefault() returns false for text/mediumtext/longtext/float
+		// because MySQL forbids DEFAULT on TEXT/BLOB columns pre-8.0.13. So text columns
+		// — even with a real non-empty default — emit no DEFAULT clause on MySQL.
+		variables.isMySQLFamily = (name == "MySQL");
 	}
 
 	private string function buildOptions(string type, string default = "", boolean allowNull = true) {
@@ -88,8 +92,14 @@ component extends="wheels.WheelsTest" {
 
 			it("text with a real default (non-empty) still emits DEFAULT", () => {
 				var sql = buildOptions(type = "text", default = "long body");
-				expect(sql).toInclude("DEFAULT");
-				expect(sql).toInclude("'long body'");
+				if (variables.isMySQLFamily) {
+					// MySQL adapter suppresses DEFAULT on TEXT columns entirely
+					// (MySQLMigrator.optionsIncludeDefault returns false for text).
+					expect(sql).notToInclude("DEFAULT");
+				} else {
+					expect(sql).toInclude("DEFAULT");
+					expect(sql).toInclude("'long body'");
+				}
 			});
 
 			it("integer with default='' becomes DEFAULT NULL across adapters", () => {
