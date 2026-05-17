@@ -134,7 +134,37 @@ component output="false" {
 				local.args[local.key] = arguments[local.key];
 			}
 		}
-		cfheader(attributeCollection = "#local.args#");
+		// Skip when the response buffer has already committed (Adobe CF throws
+		// "Failed to add HTML header" once any output has flushed — e.g. inside
+		// onError after partial view rendering, or after a controller view has
+		// rendered). Letting cfheader's exception escape would replace the
+		// original error with the cfheader-failure stack and mask the real bug.
+		// Best-effort header updates are the right contract; callers needing
+		// guaranteed headers should set them before producing output.
+		if ($responseCommitted()) {
+			return;
+		}
+		try {
+			cfheader(attributeCollection = "#local.args#");
+		} catch (any e) {
+			// Defense-in-depth — if isCommitted() returned false but cfheader
+			// still rejected the call, don't propagate over the original error.
+		}
+	}
+
+	/**
+	 * Returns true when the underlying servlet response has been committed and
+	 * headers can no longer be modified. Used by header- and content-setting
+	 * helpers to short-circuit gracefully instead of throwing inside error
+	 * handlers (where some output has typically already flushed). Defaults to
+	 * false on engines or contexts where the page-context probe fails.
+	 */
+	public boolean function $responseCommitted() {
+		try {
+			return GetPageContext().getResponse().isCommitted();
+		} catch (any e) {
+			return false;
+		}
 	}
 
 	public void function $include(required string template) {
