@@ -321,6 +321,34 @@ Oracle 23 rejects `INSERT INTO t (cols) VALUES (?,?), (?,?), ...` (the SQL-stand
 
 If you write code that generates raw bulk-insert SQL for Oracle (or adds a new adapter), use `INSERT ALL ... SELECT 1 FROM dual` rather than multi-row VALUES. The canonical implementation is `vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc::$bulkInsertSQL`.
 
+### Oracle — DDL Auto-Commit and Transaction Wrapper
+
+Oracle implicitly commits DDL statements (RENAME, CREATE, ALTER, DROP, …) and closes the JDBC statement as part of that commit. If the DDL is wrapped in `transaction action="begin" { ... commit }`, the subsequent `transaction action="commit"` runs against a closed statement and raises `ORA: Closed statement`. Other engines (Postgres, SQLite via SAVEPOINT, MySQL on InnoDB) honor the wrapper and roll the DDL back on error; Oracle cannot.
+
+If you write code that runs DDL inside a transaction block, branch on the adapter and run the DDL bare on Oracle. The canonical implementation is `vendor/wheels/Migrator.cfc::renameSystemTables`:
+
+```cfm
+if (FindNoCase("Oracle", dbType)) {
+    for (var sql in rv.sql) {
+        $query(datasource = dsn, sql = sql);
+    }
+} else {
+    transaction action="begin" {
+        try {
+            for (var sql in rv.sql) {
+                $query(datasource = dsn, sql = sql);
+            }
+            transaction action="commit";
+        } catch (any e) {
+            transaction action="rollback";
+            rethrow;
+        }
+    }
+}
+```
+
+There is no rollback to forfeit on Oracle — the implicit commit makes each DDL atomic on its own.
+
 ## Testing Across Engines
 
 ### Local Test Procedure
