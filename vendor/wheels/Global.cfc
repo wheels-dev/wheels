@@ -110,18 +110,15 @@ component output="false" {
 	}
 
 	public void function $header() {
-		// Adobe CF 2025 removed statusText attribute - remove it if present
-		if (StructKeyExists(arguments, "statusText")) {
-			local.args = {};
-			for (local.key in arguments) {
-				if (local.key != "statusText") {
-					local.args[local.key] = arguments[local.key];
-				}
+		// Adobe CF 2023+ rejects the raw `arguments` scope as an attributeCollection;
+		// copy into a plain struct first. Also strip `statusText` (removed in Adobe CF 2025).
+		local.args = {};
+		for (local.key in arguments) {
+			if (local.key != "statusText") {
+				local.args[local.key] = arguments[local.key];
 			}
-			cfheader(attributeCollection = "#local.args#");
-		} else {
-			cfheader(attributeCollection = "#arguments#");
 		}
+		cfheader(attributeCollection = "#local.args#");
 	}
 
 	public void function $include(required string template) {
