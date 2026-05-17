@@ -122,7 +122,20 @@ component output="false" {
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
 		}
-		cfcontent(attributeCollection = "#local.args#");
+		// Skip when the response buffer has already committed (Adobe CF rejects
+		// `cfcontent` once headers are out — same scenario as `$header()`,
+		// e.g. setting Content-Type after a test runner has flushed JSON
+		// output mid-suite). Same defensive shape as `$header()`.
+		if ($responseCommitted()) {
+			return;
+		}
+		try {
+			cfcontent(attributeCollection = "#local.args#");
+		} catch (any e) {
+			if (!$responseCommitted()) {
+				rethrow;
+			}
+		}
 	}
 
 	public void function $header() {

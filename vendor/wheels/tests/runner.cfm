@@ -128,8 +128,12 @@
             options={ coverage = { enabled = false } }
         );
     } catch (any e) {
-        cfheader(statuscode="500");
-        cfcontent(type="application/json");
+        // Best-effort response setup — `application.wo.$header()` / `$content()`
+        // short-circuit if the response is already committed (Adobe CF + Undertow)
+        // so a downstream cfheader/cfcontent rejection doesn't mask the actual
+        // TestBox-creation failure we're trying to report.
+        application.wo.$header(statuscode="500");
+        application.wo.$content(type="application/json");
         writeOutput('{"success":false,"error":"Failed to create TestBox instance: ' & replace(e.message, '"', '\"', "all") & '"}');
         abort;
     }
@@ -147,24 +151,30 @@
         DeJsonResult = DeserializeJSON(result);
 
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-            cfheader(statuscode=417);
+            application.wo.$header(statuscode=417);
         } else {
-            cfheader(statuscode=200);
+            application.wo.$header(statuscode=200);
         }
     }
     else if(url.format eq "json"){
         result = testBox.run(
             reporter = "wheels.wheelstest.system.reports.JSONReporter"
         );
-        cfcontent(type="application/json");
-        cfheader(name="Access-Control-Allow-Origin", value="*");
+        // `$header()` / `$content()` short-circuit when the servlet response is
+        // already committed (Adobe CF 2023/2025 commits mid-`testBox.run()` once
+        // any test output flushes the buffer). The status-code header is the
+        // signal the CI parser keys on, so best-effort is the right contract —
+        // a committed response keeps whatever statuscode the engine already
+        // wrote, and the JSON body still appends below.
+        application.wo.$content(type="application/json");
+        application.wo.$header(name="Access-Control-Allow-Origin", value="*");
         DeJsonResult = DeserializeJSON(result);
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
             if(!structKeyExists(url, "cli") || !url.cli){
-                cfheader(statuscode=417);
+                application.wo.$header(statuscode=417);
             }
         } else {
-            cfheader(statuscode=200);
+            application.wo.$header(statuscode=200);
         }
         // Check if 'only' parameter is provided in the URL
         if (structKeyExists(url, "only") && url.only eq "failure,error") {
@@ -249,14 +259,14 @@
         result = testBox.run(
             reporter = "wheels.wheelstest.system.reports.TextReporter"
         )
-        cfcontent(type="text/plain");
+        application.wo.$content(type="text/plain");
         writeOutput(result)
     }
     else if(url.format eq "junit"){
         result = testBox.run(
             reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter"
         )
-        cfcontent(type="text/xml");
+        application.wo.$content(type="text/xml");
         writeOutput(result)
     }
     // reset the original environment
