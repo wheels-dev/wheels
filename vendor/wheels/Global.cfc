@@ -117,7 +117,7 @@ component output="false" {
 		variables.$instance.reCache = true;
 	}
 
-	public any function $content() {
+	public void function $content() {
 		local.args = {};
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];

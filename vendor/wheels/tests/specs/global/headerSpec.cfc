@@ -53,6 +53,31 @@ component extends="wheels.WheelsTest" {
 
 		})
 
+		describe("Tests that \$content()", () => {
+
+			// `$content()` picked up the same `$responseCommitted()` short-circuit
+			// and race-window catch shape as `$header()` (Global.cfc:120-138).
+			// This spec parallels the `$header()` coverage above — confirms a
+			// straight `type` call lands without throwing on every engine in
+			// the matrix and that the plain-struct copy works for `cfcontent`
+			// as it does for `cfheader`.
+
+			afterEach(() => {
+				// Best-effort reset — same shape as the cleanup for `$header()`
+				// above (each call wrapped because Adobe CF rejects bare
+				// `cfheader`/`cfcontent` when the response has committed).
+				try { cfheader(statuscode = 200); } catch (any e) {}
+				try { cfheader(name = "content-type", value = "text/html"); } catch (any e) {}
+			})
+
+			it("accepts type without throwing", () => {
+				$assert.notThrows(function() {
+					g.$content(type = "application/json")
+				})
+			})
+
+		})
+
 		describe("Tests that \$responseCommitted()", () => {
 
 			// The probe walks GetPageContext().getResponse().isCommitted(), which

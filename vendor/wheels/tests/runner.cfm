@@ -6,6 +6,28 @@
     // wheels.controller.flash::$inTestHarness().
     request.$wheelsTestRun = true;
 
+    // Pre-size the response buffer so the servlet response stays uncommitted
+    // through the entire `testBox.run()` call. On Adobe CF 2023/2025 the
+    // default 8KB output buffer auto-flushes once any spec writes that crosses
+    // it (test runner debug output, partial spec writes from `processRequest`
+    // controllers, etc.); once the response is committed, every subsequent
+    // `cfheader` is a no-op — and any `statusCode = 404` an inner spec
+    // happened to set via `$throwErrorOrShow404Page` becomes the response's
+    // final HTTP code. The compat-matrix CI parser only accepts 200/417, so
+    // the 404 leak fails the run even when the JSON test body reports
+    // `totalPass = 3681`. Expanding the buffer to 16 MB keeps the response
+    // uncommitted long enough for `runner.cfm`'s end-of-suite
+    // `$header(statusCode = 200|417)` to land. Best-effort: engines that
+    // don't expose `setBufferSize` or reject the value fall through silently
+    // and rely on the defensive helpers downstream.
+    try {
+        getPageContext().getResponse().setBufferSize(16 * 1024 * 1024);
+    } catch (any e) {
+        // Engine doesn't support the call or rejected the size — skip and
+        // let the defensive `$header()` / `$content()` short-circuits handle
+        // whatever committed-response state the request ends up in.
+    }
+
     // Define helper functions as variables-scoped closures to avoid Adobe CF's
     // DuplicateFunctionDefinitionException (this file can be included from multiple
     // CFC methods via different include paths)
