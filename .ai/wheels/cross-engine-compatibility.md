@@ -313,6 +313,14 @@ if (isMySQLFamily) {
 
 CockroachDB is in CI but marked as soft-fail — test failures are logged as warnings, not build failures. Controlled by `SOFT_FAIL_DBS` in `.github/workflows/tests.yml`.
 
+### Oracle — Multi-Row INSERT and RETURNING Incompatibility
+
+Oracle 23 rejects `INSERT INTO t (cols) VALUES (?,?), (?,?), ...` (the SQL-standard table value constructor) when the JDBC driver also requests `RETURN_GENERATED_KEYS`. The Oracle JDBC driver translates `RETURN_GENERATED_KEYS` into a `RETURNING ROWID INTO` clause, and Oracle 23 does not permit `RETURNING` combined with multi-row VALUES.
+
+`OracleModel` overrides `$bulkInsertSQL()` to emit `INSERT ALL INTO t (cols) VALUES (...) INTO t (cols) VALUES (...) SELECT 1 FROM dual` — Oracle's idiomatic multi-row form, which avoids both the table value constructor and the RETURNING expansion. This is transparent to framework users; `insertAll()` works the same on Oracle as on other databases.
+
+If you write code that generates raw bulk-insert SQL for Oracle (or adds a new adapter), use `INSERT ALL ... SELECT 1 FROM dual` rather than multi-row VALUES. The canonical implementation is `vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc::$bulkInsertSQL`.
+
 ## Testing Across Engines
 
 ### Local Test Procedure
