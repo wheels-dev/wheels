@@ -14,6 +14,7 @@
     try {
         getPageContext().getResponse().setBufferSize(16 * 1024 * 1024);
     } catch (any e) {
+        // Engine lacks setBufferSize or rejected the size — fall through.
     }
 
     // Define helper functions as variables-scoped closures to avoid Adobe CF's

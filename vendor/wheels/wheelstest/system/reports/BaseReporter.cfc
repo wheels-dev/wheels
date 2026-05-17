@@ -57,6 +57,7 @@ component {
 		try {
 			getPageContextResponse().reset();
 		} catch ( any e ) {
+			// Response already committed or reset unavailable — fall through.
 		}
 	}
 
