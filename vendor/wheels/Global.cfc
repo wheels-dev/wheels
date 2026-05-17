@@ -58,7 +58,11 @@ component output="false" {
 		} else {
 			// Adobe or Lucee: use cfimage
 			arguments.structName = "rv";
-			cfimage(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfimage(attributeCollection = local.args);
 			local.rv = local.rv;
 		}
 		return local.rv;
@@ -77,7 +81,11 @@ component output="false" {
 			local.tagContent = arguments.tagContent;
 			StructDelete(arguments, "tagContent");
 		}
-		cfmail(attributeCollection = "#arguments#") {
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfmail(attributeCollection = "#local.args#") {
 			if (StructKeyExists(local, "mailparams")) {
 				for (local.i in local.mailparams) {
 					cfmailparam(attributeCollection = "#local.i#");
@@ -101,27 +109,32 @@ component output="false" {
 	public any function $cache() {
 		// If cache is found only the function is aborted, not page. --->
 		variables.$instance.reCache = false;
-		cfcache(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfcache(attributeCollection = "#local.args#");
 		variables.$instance.reCache = true;
 	}
 
 	public any function $content() {
-		cfcontent(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfcontent(attributeCollection = "#local.args#");
 	}
 
 	public void function $header() {
-		// Adobe CF 2025 removed statusText attribute - remove it if present
-		if (StructKeyExists(arguments, "statusText")) {
-			local.args = {};
-			for (local.key in arguments) {
-				if (local.key != "statusText") {
-					local.args[local.key] = arguments[local.key];
-				}
+		// Adobe CF 2023+ rejects the raw `arguments` scope as an attributeCollection;
+		// copy into a plain struct first. Also strip `statusText` (removed in Adobe CF 2025).
+		local.args = {};
+		for (local.key in arguments) {
+			if (local.key != "statusText") {
+				local.args[local.key] = arguments[local.key];
 			}
-			cfheader(attributeCollection = "#local.args#");
-		} else {
-			cfheader(attributeCollection = "#arguments#");
 		}
+		cfheader(attributeCollection = "#local.args#");
 	}
 
 	public void function $include(required string template) {
@@ -201,12 +214,20 @@ return local.$wheels;
 	public any function $directory() {
 		local.rv = "";
 		arguments.name = "rv";
-		cfdirectory(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfdirectory(attributeCollection = "#local.args#");
 		return local.rv;
 	}
 
 	public any function $file() {
-		cffile(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cffile(attributeCollection = "#local.args#");
 	}
 
 	public any function $cfinvoke(required string component, required string method, struct invokeArguments) {
@@ -245,7 +266,11 @@ return local.$wheels;
 
 			StructDelete(arguments, "invokeArgs");
 		}
-		cfinvoke(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfinvoke(attributeCollection = "#local.args#");
 		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
@@ -255,12 +280,20 @@ return local.$wheels;
 		StructDelete(arguments, "$args", false);
 		if (NOT arguments.delay) {
 			StructDelete(arguments, "delay", false);
-			cflocation(attributeCollection = "#arguments#");
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cflocation(attributeCollection = "#local.args#");
 		}
 	}
 
 	public void function $htmlhead() {
-		cfhtmlhead(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfhtmlhead(attributeCollection = "#local.args#");
 	}
 
 	public any function $dbinfo() {
@@ -393,12 +426,24 @@ return local.$wheels;
 		// In that case the database name is not known by the CF server and it will just use any of the databases that the data source has access to.
 		// That can incorrectly be "information_schema" for example.
 		try {
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 		} catch (any e) {
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 			local.type = arguments.type;
 			arguments.type = "dbnames";
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 			if (local.rv.recordCount GT 1) {
 				for (local.i in local.rv) {
 					if (local.i.database_name IS NOT "information_schema") {
@@ -407,7 +452,11 @@ return local.$wheels;
 				}
 			}
 			arguments.type = local.type;
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 		}
 
 		// Override name for test mode
@@ -429,7 +478,11 @@ return local.$wheels;
 
 	public any function $wddx(required any input, string action = "cfml2wddx", boolean useTimeZoneInfo = true) {
 		arguments.output = "local.output";
-		cfwddx(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfwddx(attributeCollection = "#local.args#");
 		if (StructKeyExists(local, "output")) {
 			return local.output;
 		}
@@ -437,7 +490,11 @@ return local.$wheels;
 
 	public any function $zip() {
 		$engineAdapter().prepareZipArgs(arguments);
-		cfzip(attributeCollection = "#arguments#");
+		local.args = {};
+		for (local.key in arguments) {
+			local.args[local.key] = arguments[local.key];
+		}
+		cfzip(attributeCollection = "#local.args#");
 	}
 
 	public any function $query(required string sql) {
