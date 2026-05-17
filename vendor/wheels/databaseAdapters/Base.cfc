@@ -821,7 +821,7 @@ component output=false extends="wheels.Global"{
 
 	/**
 	 * Builds parameter struct for a single value in a bulk operation.
-	 * Used by adapter upsert implementations.
+	 * Used by adapter bulk insert and upsert implementations.
 	 */
 	public struct function $buildBulkParam(
 		required string value,
