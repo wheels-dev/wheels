@@ -58,7 +58,11 @@ component output="false" {
 		} else {
 			// Adobe or Lucee: use cfimage
 			arguments.structName = "rv";
-			cfimage(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfimage(attributeCollection = local.args);
 			local.rv = local.rv;
 		}
 		return local.rv;
@@ -422,12 +426,24 @@ return local.$wheels;
 		// In that case the database name is not known by the CF server and it will just use any of the databases that the data source has access to.
 		// That can incorrectly be "information_schema" for example.
 		try {
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 		} catch (any e) {
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 			local.type = arguments.type;
 			arguments.type = "dbnames";
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 			if (local.rv.recordCount GT 1) {
 				for (local.i in local.rv) {
 					if (local.i.database_name IS NOT "information_schema") {
@@ -436,7 +452,11 @@ return local.$wheels;
 				}
 			}
 			arguments.type = local.type;
-			cfdbinfo(attributeCollection = arguments);
+			local.args = {};
+			for (local.key in arguments) {
+				local.args[local.key] = arguments[local.key];
+			}
+			cfdbinfo(attributeCollection = local.args);
 		}
 
 		// Override name for test mode
