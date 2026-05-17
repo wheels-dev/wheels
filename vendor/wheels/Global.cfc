@@ -602,6 +602,10 @@ return local.$wheels;
 		// on Adobe CF whenever someone calls `env("KEY")` with no fallback,
 		// which is the common case for "this env var must be set". Defensive
 		// access closes the gap without changing the public `@default` API.
+		// NOTE: the inline `""` fallback below MUST stay in sync with the
+		// signature default at the top of this function — if you change one,
+		// change the other, otherwise Adobe CF and Lucee/BoxLang will silently
+		// diverge for the no-second-arg case.
 		return StructKeyExists(arguments, "default") ? arguments.default : "";
 	}
 
