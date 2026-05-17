@@ -90,7 +90,7 @@ component extends="wheels.WheelsTest" {
 				expect(sql).toInclude("'hello'");
 			});
 
-			it("text with a real default (non-empty) still emits DEFAULT", () => {
+			it("text with a real default: emits DEFAULT except on MySQL (TEXT columns suppressed)", () => {
 				var sql = buildOptions(type = "text", default = "long body");
 				if (variables.isMySQLFamily) {
 					// MySQL adapter suppresses DEFAULT on TEXT columns entirely
