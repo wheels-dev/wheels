@@ -177,10 +177,19 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Oracle does not support multi-row `INSERT INTO ... VALUES (...), (...)` together with
-	 * the JDBC driver's auto-RETURNING (which `cfquery result="..."` triggers for generated
-	 * keys). Emit one single-row INSERT per record so each statement is a plain
-	 * `INSERT INTO ... VALUES (...)` that Oracle's JDBC driver handles cleanly.
+	 * Oracle bulk insert using `INSERT ALL INTO ... SELECT 1 FROM dual`.
+	 *
+	 * The default Base adapter shape — `INSERT INTO t (cols) VALUES (?,?), (?,?), ...`
+	 * (SQL standard table value constructor) — was rejected on Oracle 23 with
+	 * `ORA: returning clause is not allowed with INSERT and Table Value Constructor`.
+	 * The CFML engine's `cfquery` for INSERT statements implicitly sets
+	 * `Statement.RETURN_GENERATED_KEYS`, which the Oracle JDBC driver translates into a
+	 * RETURNING clause — and Oracle 23 does not permit RETURNING with multi-row VALUES.
+	 *
+	 * `INSERT ALL` is the Oracle-idiomatic multi-row insert form, doesn't trigger the
+	 * RETURNING-clause expansion, and works on every Oracle version Wheels targets.
+	 * Uses parameterized values via `$buildBulkParam` — never interpolates user data
+	 * into SQL.
 	 */
 	public array function $bulkInsertSQL(
 		required string tableName,
@@ -191,21 +200,25 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		required numeric batchEnd,
 		required struct propertyInfo
 	) {
-		local.batches = [];
+		local.sql = [];
 
 		local.colList = "";
 		for (local.col in arguments.columns) {
-			if (Len(local.colList)) local.colList &= ", ";
+			if (Len(local.colList)) {
+				local.colList &= ", ";
+			}
 			local.colList &= $quoteIdentifier(local.col);
 		}
-		local.prefix = "INSERT INTO #arguments.tableName# (#local.colList#) VALUES (";
+
+		ArrayAppend(local.sql, "INSERT ALL");
 
 		local.propCount = ArrayLen(arguments.validProperties);
 		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
-			local.sql = [];
-			ArrayAppend(local.sql, local.prefix);
+			ArrayAppend(local.sql, " INTO #arguments.tableName# (#local.colList#) VALUES (");
 			for (local.p = 1; local.p <= local.propCount; local.p++) {
-				if (local.p > 1) ArrayAppend(local.sql, ", ");
+				if (local.p > 1) {
+					ArrayAppend(local.sql, ", ");
+				}
 				local.propName = arguments.validProperties[local.p];
 				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
 				ArrayAppend(local.sql, $buildBulkParam(
@@ -215,10 +228,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				));
 			}
 			ArrayAppend(local.sql, ")");
-			ArrayAppend(local.batches, local.sql);
 		}
 
-		return local.batches;
+		ArrayAppend(local.sql, " SELECT 1 FROM dual");
+
+		return local.sql;
 	}
 
 	/**

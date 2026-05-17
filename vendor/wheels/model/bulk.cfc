@@ -42,11 +42,7 @@ component {
 		for (local.batchStart = 1; local.batchStart <= local.totalRecords; local.batchStart += local.batchSize) {
 			local.batchEnd = Min(local.batchStart + local.batchSize - 1, local.totalRecords);
 
-			// Adapter returns an array of SQL arrays — one entry per query to
-			// execute. Most adapters emit a single multi-row INSERT; Oracle
-			// returns one entry per record because it does not support
-			// multi-row VALUES with the JDBC driver's auto-RETURNING.
-			local.sqlBatches = variables.wheels.class.adapter.$bulkInsertSQL(
+			local.sql = variables.wheels.class.adapter.$bulkInsertSQL(
 				tableName = $quotedTableName(),
 				columns = local.mapped.columns,
 				validProperties = local.mapped.validProperties,
@@ -56,12 +52,10 @@ component {
 				propertyInfo = variables.wheels.class.properties
 			);
 
-			for (local.bSql in local.sqlBatches) {
-				variables.wheels.class.adapter.$querySetup(
-					parameterize = arguments.parameterize,
-					sql = local.bSql
-				);
-			}
+			variables.wheels.class.adapter.$querySetup(
+				parameterize = arguments.parameterize,
+				sql = local.sql
+			);
 
 			local.totalInserted += (local.batchEnd - local.batchStart + 1);
 		}

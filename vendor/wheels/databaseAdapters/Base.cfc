@@ -735,51 +735,12 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
-	 * Generates database-specific UPSERT SQL as an array compatible with `$querySetup()`.
-	 * Base implementation throws an error — each adapter must override with its own syntax.
-	 *
-	 * @tableName The quoted table name.
-	 * @columns Array of column names to insert/update.
-	 * @uniqueBy Array of column names forming the unique constraint.
-	 * @updateColumns Array of column names to update on conflict.
-	 * @validProperties Array of model property names corresponding to `columns`.
-	 * @records Array of record structs.
-	 * @batchStart Starting index in the records array.
-	 * @batchEnd Ending index in the records array.
-	 * @propertyInfo Struct of model property metadata.
-	 */
-	public array function $upsertSQL(
-		required string tableName,
-		required array columns,
-		required array uniqueBy,
-		required array updateColumns,
-		required array validProperties,
-		required array records,
-		required numeric batchStart,
-		required numeric batchEnd,
-		required struct propertyInfo
-	) {
-		Throw(
-			type = "Wheels.UpsertNotSupported",
-			message = "Upsert is not supported by this database adapter.",
-			extendedInfo = "Override `$upsertSQL()` in the specific database adapter to enable upsert support."
-		);
-	}
-
-	/**
-	 * Generates bulk INSERT SQL for a batch of records as an array of SQL arrays,
-	 * each compatible with `$querySetup()`. The default emits a single multi-row
-	 * `INSERT INTO ... VALUES (...), (...), ...` statement. Adapters whose drivers
-	 * cannot run multi-row VALUES against generated-keys retrieval (Oracle) should
-	 * override to return one entry per row.
-	 *
-	 * @tableName The quoted table name.
-	 * @columns Array of column names to insert.
-	 * @validProperties Array of model property names corresponding to `columns`.
-	 * @records Array of record structs.
-	 * @batchStart Starting index in the records array.
-	 * @batchEnd Ending index in the records array.
-	 * @propertyInfo Struct of model property metadata.
+	 * Generates a multi-row INSERT statement as an array compatible with `$querySetup()`.
+	 * Default shape is `INSERT INTO ... VALUES (?,?), (?,?), ...` (SQL standard table value
+	 * constructor) — used by every adapter except Oracle, which overrides this method to
+	 * emit `INSERT ALL ... SELECT 1 FROM dual` because Oracle 23 rejects multi-row VALUES
+	 * combined with the JDBC driver's implicit RETURNING (RETURN_GENERATED_KEYS) handling
+	 * with `ORA: returning clause is not allowed with INSERT and Table Value Constructor`.
 	 */
 	public array function $bulkInsertSQL(
 		required string tableName,
@@ -823,7 +784,39 @@ component output=false extends="wheels.Global"{
 			ArrayAppend(local.sql, ")");
 		}
 
-		return [local.sql];
+		return local.sql;
+	}
+
+	/**
+	 * Generates database-specific UPSERT SQL as an array compatible with `$querySetup()`.
+	 * Base implementation throws an error — each adapter must override with its own syntax.
+	 *
+	 * @tableName The quoted table name.
+	 * @columns Array of column names to insert/update.
+	 * @uniqueBy Array of column names forming the unique constraint.
+	 * @updateColumns Array of column names to update on conflict.
+	 * @validProperties Array of model property names corresponding to `columns`.
+	 * @records Array of record structs.
+	 * @batchStart Starting index in the records array.
+	 * @batchEnd Ending index in the records array.
+	 * @propertyInfo Struct of model property metadata.
+	 */
+	public array function $upsertSQL(
+		required string tableName,
+		required array columns,
+		required array uniqueBy,
+		required array updateColumns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo
+	) {
+		Throw(
+			type = "Wheels.UpsertNotSupported",
+			message = "Upsert is not supported by this database adapter.",
+			extendedInfo = "Override `$upsertSQL()` in the specific database adapter to enable upsert support."
+		);
 	}
 
 	/**

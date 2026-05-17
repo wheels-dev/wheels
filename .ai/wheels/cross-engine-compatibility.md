@@ -289,9 +289,37 @@ if (isPostgresFamily) {
 
 See `vendor/wheels/tests/specs/migrator/addColumnOptionsSpec.cfc` and `migrationSpec.cfc` for working examples of this branching idiom.
 
+### MySQL — TEXT and FLOAT DEFAULT suppression
+
+`MySQLMigrator.optionsIncludeDefault` returns `false` for `text`, `mediumtext`, `longtext`, and `float` columns. The inherited `Abstract.addColumnOptions` short-circuits the entire `DEFAULT` clause when `optionsIncludeDefault` returns false — meaning a non-empty `default="long body"` on a `text` column is silently dropped in the emitted DDL on MySQL. Rationale: pre-8.0.13 MySQL rejects `DEFAULT` on `TEXT`/`BLOB` columns outright.
+
+When writing migrator spec assertions that involve TEXT-family columns with non-empty defaults, add an `isMySQLFamily` carve-out alongside the `isPostgresFamily` one:
+
+```cfm
+var name = adapter.adapterName();
+var isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
+var isMySQLFamily = (name == "MySQL");
+
+if (isMySQLFamily) {
+    // DEFAULT clause is suppressed entirely for text/float on MySQL
+    expect(sql).notToInclude("DEFAULT");
+} else {
+    expect(sql).toInclude("DEFAULT");
+    expect(sql).toInclude("'long body'");
+}
+```
+
 ### CockroachDB (Soft-Fail in CI)
 
 CockroachDB is in CI but marked as soft-fail — test failures are logged as warnings, not build failures. Controlled by `SOFT_FAIL_DBS` in `.github/workflows/tests.yml`.
+
+### Oracle — Multi-Row INSERT and RETURNING Incompatibility
+
+Oracle 23 rejects `INSERT INTO t (cols) VALUES (?,?), (?,?), ...` (the SQL-standard table value constructor) when the JDBC driver also requests `RETURN_GENERATED_KEYS`. The Oracle JDBC driver translates `RETURN_GENERATED_KEYS` into a `RETURNING ROWID INTO` clause, and Oracle 23 does not permit `RETURNING` combined with multi-row VALUES.
+
+`OracleModel` overrides `$bulkInsertSQL()` to emit `INSERT ALL INTO t (cols) VALUES (...) INTO t (cols) VALUES (...) SELECT 1 FROM dual` — Oracle's idiomatic multi-row form, which avoids both the table value constructor and the RETURNING expansion. This is transparent to framework users; `insertAll()` works the same on Oracle as on other databases.
+
+If you write code that generates raw bulk-insert SQL for Oracle (or adds a new adapter), use `INSERT ALL ... SELECT 1 FROM dual` rather than multi-row VALUES. The canonical implementation is `vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc::$bulkInsertSQL`.
 
 ## Testing Across Engines
 
