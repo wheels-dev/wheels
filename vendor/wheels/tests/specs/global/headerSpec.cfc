@@ -13,10 +13,11 @@ component extends="wheels.WheelsTest" {
 
 			// Cleanup uses cfheader directly, not g.$header() — the function under test.
 			// If $header() regresses, every spec should fail in its own `it`, not via
-			// an opaque `afterEach` lifecycle error.
+			// an opaque `afterEach` lifecycle error. Semicolons required: Lucee 7's
+			// parser cannot disambiguate back-to-back `cfheader(...)` script calls.
 			afterEach(() => {
-				cfheader(statuscode = 200)
-				cfheader(name = "content-type", value = "text/html")
+				cfheader(statuscode = 200);
+				cfheader(name = "content-type", value = "text/html");
 			})
 
 			it("accepts a name/value pair without throwing", () => {
