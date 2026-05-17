@@ -30,15 +30,16 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("releases lock even when callback throws an exception", () => {
-				local.exceptionThrown = false;
+				// BoxLang: local.X inside catch doesn't persist — struct field survives. See .ai/wheels/cross-engine-compatibility.md (#2744).
+				var state = {exceptionThrown = false};
 				try {
 					g.model("author").withAdvisoryLock(name="test_lock_2", callback=function() {
 						Throw(type="TestException", message="deliberate error");
 					});
 				} catch (TestException e) {
-					local.exceptionThrown = true;
+					state.exceptionThrown = true;
 				}
-				expect(local.exceptionThrown).toBeTrue();
+				expect(state.exceptionThrown).toBeTrue();
 
 				// Verify the lock was released by successfully acquiring it again
 				local.result = g.model("author").withAdvisoryLock(name="test_lock_2", callback=function() {

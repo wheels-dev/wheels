@@ -221,6 +221,45 @@ expect(found).toBeWheelsModel();
 
 **Reference**: `vendor/wheels/wheelstest/system/Expectation.cfc::toBeWheelsModel`, issue #2662.
 
+### `local.X = ...` Inside `catch` Doesn't Persist (BoxLang)
+
+Writes to the `local` scope inside a `catch` block don't survive past the block on BoxLang. The catch body apparently runs under a nested `local` that gets discarded when control leaves; on Lucee and Adobe CF the catch shares the enclosing function's `local`, so the assignment sticks.
+
+```cfm
+// WRONG — passes on Lucee/Adobe, fails on BoxLang
+local.caught = false;
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    local.caught = true;   // discarded when catch exits on BoxLang
+}
+expect(local.caught).toBeTrue();   // reads outer local — still false
+
+// RIGHT — struct field assignment targets a heap object (all engines)
+var state = {caught = false};
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    state.caught = true;
+}
+expect(state.caught).toBeTrue();
+
+// ALSO RIGHT — var-declared name without `local.` prefix
+var caught = false;
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    caught = true;
+}
+expect(caught).toBeTrue();
+```
+
+**Why the bare-`var` form survives**: BoxLang's catch-scoped local only shadows keys written via explicit `local.X = ...`; an unscoped write to a `var`-declared name appears to resolve through the var-declaration slot and escapes the catch-scope shadow. Prefer the struct-field form anyway — it's cleaner, mirrors the prior-art `TenantResolverSpec` pattern, and doesn't rely on this behaviour being preserved across BoxLang releases.
+
+**Why this fires only in specs**: production code rarely needs a catch to flip a boolean for a later read in the same function — typical catch blocks rethrow, log, or assign struct fields. Specs that use `try/catch` to *assert* exception propagation are the natural trap, since they need the post-catch flag.
+
+**Reference**: issue #2744, regression test `vendor/wheels/tests/specs/model/lockingSpec.cfc :: "releases lock even when callback throws an exception"`. The same pattern works in `vendor/wheels/tests/specs/middleware/TenantResolverSpec.cfc` because it tracks state via `var result = {threw = false}; result.threw = true`.
+
 ### Private View Helpers Not Integrated
 
 `$integrateComponents()` only copies `public` methods into controllers. Private helper functions in view CFCs are never available.

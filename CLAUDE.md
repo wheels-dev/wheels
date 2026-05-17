@@ -46,6 +46,7 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 7. **`private` mixin functions are not integrated.** `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helpers in `vendor/wheels/model/*.cfc`, view helpers, etc. MUST use `public` access with `$` prefix for internal scope. BoxLang passes; Lucee/Adobe fail.
 8. **`Left(str, 0)` crashes Lucee 7.** Guard: `len > 0 ? Left(str, len) : ""`.
 9. **`toBeInstanceOf("component")` fails on BoxLang** — returns the FQN, not the literal `"component"`. Use `toBeWheelsModel()` for finder results.
+10. **`local.X = ...` inside `catch` doesn't persist on BoxLang.** Catch body runs under a nested `local` that gets discarded on exit, so `expect(local.X)` after the catch reads the un-touched outer value. Use a struct field: `var state = {flag = false}; ... state.flag = true;`. Bare `var bareName` + unscoped `bareName = true` also works but the struct form mirrors `TenantResolverSpec` and is the prior-art pattern.
 
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
