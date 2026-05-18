@@ -1,17 +1,17 @@
 # Workflow Results: Test Lucee 7 + MySQL
 
 **Status:** PASSED
-**Run:** [#22](https://github.com/wheels-dev/wheels/actions/runs/23116312830)
-**Commit:** fd13e5c7bb2e5cec1762ca24a646c1e56cdbef70
+**Run:** [#23](https://github.com/wheels-dev/wheels/actions/runs/26032173536)
+**Commit:** 6b6d1acc0e60fe9cb42d3d731cd80a1d1a6f4829
 **Branch:** claude/evaluate-rustcfml-feasibility-40oUw
-**Date:** 2026-03-15 18:17:51 UTC
+**Date:** 2026-05-18 12:03:32 UTC
 
 ## Test Results
 
 ```
 Bundle: wheels.tests.specs.BasicsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 6ms
+Duration: 7ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -22,7 +22,7 @@ Labels:
 
 Bundle: wheels.tests.specs.channel.DatabaseAdapterSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 213ms
+Duration: 203ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -33,7 +33,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.cachingSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 82ms
+Duration: 76ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -44,7 +44,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.channelSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 100ms
+Duration: 88ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -55,7 +55,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.csrf.cookieSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 320ms
+Duration: 277ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -66,7 +66,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.csrf.sessionSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 203ms
+Duration: 211ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -77,7 +77,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.filtersSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 58ms
+Duration: 61ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -88,7 +88,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.flashSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 114ms
+Duration: 152ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -99,7 +99,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.initializationSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 27ms
+Duration: 43ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -110,7 +110,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.miscellaneousSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 126ms
+Duration: 146ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -121,7 +121,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.providesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 39ms
+Duration: 43ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -132,7 +132,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.redirectionSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 66ms
+Duration: 68ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -143,7 +143,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.renderingSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 1003ms
+Duration: 955ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -154,7 +154,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.requestSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 30ms
+Duration: 28ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -176,7 +176,7 @@ Labels:
 
 Bundle: wheels.tests.specs.controller.verifiesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 38ms
+Duration: 40ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -187,7 +187,7 @@ Labels:
 
 Bundle: wheels.tests.specs.di.InjectorSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 49ms
+Duration: 44ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -209,7 +209,7 @@ Labels:
 
 Bundle: wheels.tests.specs.dispatch.findMatchingRouteMegaSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 919ms
+Duration: 859ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -220,7 +220,7 @@ Labels:
 
 Bundle: wheels.tests.specs.dispatch.findMatchingRouteSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 40ms
+Duration: 25ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -231,7 +231,7 @@ Labels:
 
 Bundle: wheels.tests.specs.dispatch.getrequestmethodSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 7ms
+Duration: 5ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -242,7 +242,7 @@ Labels:
 
 Bundle: wheels.tests.specs.dispatch.requestSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 10ms
+Duration: 8ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -253,7 +253,7 @@ Labels:
 
 Bundle: wheels.tests.specs.dispatch.setCorsHeadersSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 1ms
+Duration: 0ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -264,7 +264,7 @@ Labels:
 
 Bundle: wheels.tests.specs.environment.ipbasedaccessSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 6ms
+Duration: 4ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -275,7 +275,7 @@ Labels:
 
 Bundle: wheels.tests.specs.events.onerrorSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 256ms
+Duration: 246ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -286,7 +286,7 @@ Labels:
 
 Bundle: wheels.tests.specs.global.cachingSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 4ms
+Duration: 5ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -297,7 +297,7 @@ Labels:
 
 Bundle: wheels.tests.specs.global.dbinfoSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 80ms
+Duration: 66ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -308,7 +308,7 @@ Labels:
 
 Bundle: wheels.tests.specs.global.internalSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 82ms
+Duration: 62ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -330,7 +330,7 @@ Labels:
 
 Bundle: wheels.tests.specs.global.publicSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 55ms
+Duration: 46ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -341,7 +341,7 @@ Labels:
 
 Bundle: wheels.tests.specs.global.stringsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 21ms
+Duration: 17ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -352,7 +352,7 @@ Labels:
 
 Bundle: wheels.tests.specs.global.urlforSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 38ms
+Duration: 32ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -363,7 +363,7 @@ Labels:
 
 Bundle: wheels.tests.specs.internal.model.validationsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 41ms
+Duration: 31ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -374,7 +374,7 @@ Labels:
 
 Bundle: wheels.tests.specs.jobs.JobQueueSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 156ms
+Duration: 126ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -385,7 +385,7 @@ Labels:
 
 Bundle: wheels.tests.specs.jobs.JobWorkerSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 156ms
+Duration: 101ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -396,7 +396,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.MapperSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 13ms
+Duration: 11ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -407,7 +407,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.MappingSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 13ms
+Duration: 11ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -418,7 +418,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.MatchingSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 51ms
+Duration: 47ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -429,7 +429,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.NestedResourcesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 126ms
+Duration: 97ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -440,7 +440,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.ResourcesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 50ms
+Duration: 31ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -451,7 +451,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.RootSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 7ms
+Duration: 5ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -462,7 +462,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.UtilsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 21ms
+Duration: 15ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -473,7 +473,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapper.WildcardSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 27ms
+Duration: 17ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -484,7 +484,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapperModernSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 77ms
+Duration: 64ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -495,7 +495,7 @@ Labels:
 
 Bundle: wheels.tests.specs.mapperSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 186ms
+Duration: 124ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -506,7 +506,7 @@ Labels:
 
 Bundle: wheels.tests.specs.middleware.MultiTenantIntegrationSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 128ms
+Duration: 96ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -517,7 +517,7 @@ Labels:
 
 Bundle: wheels.tests.specs.middleware.TenantResolverSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 15ms
+Duration: 9ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -528,7 +528,7 @@ Labels:
 
 Bundle: wheels.tests.specs.migrator.migration.mysqlTextSizesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 316ms
+Duration: 213ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -539,7 +539,7 @@ Labels:
 
 Bundle: wheels.tests.specs.migrator.migrationSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 1055ms
+Duration: 920ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -550,7 +550,7 @@ Labels:
 
 Bundle: wheels.tests.specs.migrator.migratorSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 344ms
+Duration: 299ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -561,7 +561,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.associationsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 734ms
+Duration: 600ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -572,7 +572,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.calculationsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 158ms
+Duration: 117ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -583,7 +583,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.callbacksSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 500ms
+Duration: 297ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -594,7 +594,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.crudSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 1295ms
+Duration: 1082ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -605,7 +605,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.deleteSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 147ms
+Duration: 170ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -616,7 +616,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.errorsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 71ms
+Duration: 111ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -627,7 +627,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.miscellaneousSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 87ms
+Duration: 107ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -638,7 +638,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.MultiTenantSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 14ms
+Duration: 16ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -649,7 +649,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.nestedpropertiesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 654ms
+Duration: 686ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -660,7 +660,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.onmissingmethod.belongsToSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 49ms
+Duration: 65ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -671,7 +671,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.onmissingmethod.hasManySpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 219ms
+Duration: 224ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -682,7 +682,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.onmissingmethod.hasOneSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 127ms
+Duration: 125ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -693,7 +693,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.propertiesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 619ms
+Duration: 544ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -704,7 +704,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.raceconditionSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 121ms
+Duration: 162ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -715,7 +715,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.raisedErrorsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 41ms
+Duration: 28ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -726,7 +726,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.readSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 380ms
+Duration: 271ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -737,7 +737,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.sqlSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 59ms
+Duration: 49ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -748,7 +748,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.transactionsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 488ms
+Duration: 408ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -759,7 +759,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.useindexSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 61ms
+Duration: 59ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -770,7 +770,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.validationsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 1680ms
+Duration: 1328ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -781,7 +781,7 @@ Labels:
 
 Bundle: wheels.tests.specs.model.viewsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 58ms
+Duration: 74ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -792,7 +792,7 @@ Labels:
 
 Bundle: wheels.tests.specs.pluginsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 372ms
+Duration: 363ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -803,7 +803,7 @@ Labels:
 
 Bundle: wheels.tests.specs.routingSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 20ms
+Duration: 21ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -814,7 +814,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.assetsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 570ms
+Duration: 705ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -825,7 +825,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.autoLinkSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 7ms
+Duration: 8ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -836,7 +836,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.checkboxSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 35ms
+Duration: 27ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -847,7 +847,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.contentSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 100ms
+Duration: 96ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -858,7 +858,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.csrfSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 31ms
+Duration: 9ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -869,7 +869,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.dateselectSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 106ms
+Duration: 84ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -880,7 +880,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.datesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 28ms
+Duration: 44ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -891,7 +891,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.errorsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 34ms
+Duration: 38ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -902,7 +902,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.flashMessagesSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 7ms
+Duration: 15ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -913,7 +913,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.formsdateobjectSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 131ms
+Duration: 144ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -924,7 +924,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.formsdateplainSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 177ms
+Duration: 271ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -935,7 +935,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.formsdateSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 2ms
+Duration: 5ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -946,7 +946,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.formsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 353ms
+Duration: 436ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -957,7 +957,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.html5FormHelpersSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 47ms
+Duration: 46ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -968,7 +968,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.linksSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 114ms
+Duration: 126ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -979,7 +979,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.miscellaneousSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 52ms
+Duration: 35ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -990,7 +990,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.sanitizeSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 12ms
+Duration: 8ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -1001,7 +1001,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.textfieldSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 12ms
+Duration: 8ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -1012,7 +1012,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.textSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 28ms
+Duration: 20ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
@@ -1023,7 +1023,7 @@ Labels:
 
 Bundle: wheels.tests.specs.view.urlsSpec
 CFML Engine: Lucee 7.0.1.100
-Duration: 114ms
+Duration: 84ms
 Labels: 
 ╔═══════════════════════════════════════════════════════════╗
 ║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║
