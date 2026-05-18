@@ -275,7 +275,7 @@ component {
 							$collectFailures(
 								suiteStats = bs.suiteStats,
 								bundleName = structKeyExists(bs, "name") ? bs.name : "unknown",
-								failures = aggregated.failures
+								aggregated = aggregated
 							);
 						}
 					}
@@ -348,19 +348,23 @@ component {
 	}
 
 	/**
-	 * Recursively collect failure/error specs from suiteStats.
+	 * Recursively collect failure/error specs from suiteStats. Takes the
+	 * `aggregated` parent struct rather than the inner `failures` array
+	 * directly: Adobe CF copies arrays by value out of struct literals
+	 * (Cross-Engine Invariant #6), so mutating `failures` via a separate
+	 * argument writes to a copy that never propagates back to the caller.
 	 */
 	private void function $collectFailures(
 		required array suiteStats,
 		required string bundleName,
-		required array failures
+		required struct aggregated
 	) {
 		for (var suite in arguments.suiteStats) {
 			if (structKeyExists(suite, "specStats") && isArray(suite.specStats)) {
 				for (var spec in suite.specStats) {
 					var status = structKeyExists(spec, "status") ? spec.status : "";
 					if (status == "Failed" || status == "Error") {
-						arrayAppend(arguments.failures, {
+						arrayAppend(arguments.aggregated.failures, {
 							bundle = arguments.bundleName,
 							spec = structKeyExists(spec, "name") ? spec.name : "unknown",
 							status = status,
@@ -374,7 +378,7 @@ component {
 				$collectFailures(
 					suiteStats = suite.suiteStats,
 					bundleName = arguments.bundleName,
-					failures = arguments.failures
+					aggregated = arguments.aggregated
 				);
 			}
 		}

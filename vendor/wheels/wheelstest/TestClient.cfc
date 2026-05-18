@@ -502,14 +502,21 @@ component {
 				cfhttpparam(type = "cookie", name = cName, value = variables.cookies[cName]);
 			}
 
-			// Add body for POST/PUT/PATCH
-			if (ListFindNoCase("POST,PUT,PATCH", arguments.method) && !StructIsEmpty(arguments.body)) {
-				if (variables.sendAsJson) {
-					cfhttpparam(type = "body", value = SerializeJSON(arguments.body));
-				} else {
-					for (var fName in arguments.body) {
-						cfhttpparam(type = "formfield", name = fName, value = arguments.body[fName]);
+			// Add body for POST/PUT/PATCH. Adobe CF rejects a POST/PUT/PATCH
+			// `cfhttp` block with zero `cfhttpparam` children, so when the
+			// caller passes an empty body and no extra headers/cookies the
+			// fallback emits an empty body param to satisfy the engine check.
+			if (ListFindNoCase("POST,PUT,PATCH", arguments.method)) {
+				if (!StructIsEmpty(arguments.body)) {
+					if (variables.sendAsJson) {
+						cfhttpparam(type = "body", value = SerializeJSON(arguments.body));
+					} else {
+						for (var fName in arguments.body) {
+							cfhttpparam(type = "formfield", name = fName, value = arguments.body[fName]);
+						}
 					}
+				} else {
+					cfhttpparam(type = "body", value = "");
 				}
 			}
 		}
