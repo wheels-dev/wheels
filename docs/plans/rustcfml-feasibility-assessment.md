@@ -1,154 +1,195 @@
 # RustCFML Feasibility Assessment for Wheels Framework
 
-**Date:** 2026-03-15
+**Date:** 2026-05-18 (updated from initial 2026-03-15 evaluation)
 **Project:** [pixl8/RustCFML](https://github.com/pixl8/RustCFML)
-**Version Evaluated:** 0.4.0 (released March 14, 2026)
+**Version Evaluated:** 0.9.1 (released May 3, 2026)
+**Previous Version Evaluated:** 0.4.0 (March 14, 2026)
 
 ## Executive Summary
 
-RustCFML is a **complete CFML interpreter written in Rust** — not a library or extension for existing CFML engines. It aims to replace Lucee/ACF as a runtime, compiling CFML to bytecode executed on a stack-based VM with no JVM dependency.
+RustCFML is a **complete CFML interpreter written in Rust** — not a library or extension. It replaces Lucee/ACF as a runtime, compiling CFML to bytecode executed on a stack-based VM with no JVM dependency.
 
-**Verdict: Not feasible today. Worth monitoring for future potential.**
+**Updated Verdict: Feasibility has improved significantly. Several previous blockers are now resolved. A proof-of-concept trial is now reasonable.**
 
-RustCFML is too early-stage to run Wheels in production, but its architecture and performance characteristics make it a compelling long-term target. The project would need to mature significantly in areas Wheels depends on (ORM-like dynamic method dispatch, complex component inheritance, Java interop) before Wheels could realistically target it.
+Since the initial evaluation two months ago, RustCFML has gone from v0.4.0 to v0.9.1 (14 releases, 108 commits), addressing three of the four critical blockers identified previously. The project has also grown from 3 to 20 stars and gained its first fork, indicating rising community awareness.
 
-## What RustCFML Actually Is
+## Progress Since Initial Evaluation (March 2026)
 
-It is important to clarify: RustCFML is **not** a Rust extension library that adds functions to Lucee/ACF (like a ForgeBox package). It is a standalone CFML runtime that:
+### Previously Identified Blockers — Status Update
 
-- Parses CFML/CFScript source code
-- Compiles it to custom bytecode
-- Executes it on a Rust-based VM
-- Includes a built-in web server (Axum-based)
-- Ships as a single native binary (~8 MB memory footprint)
+| Blocker | March Status | May Status | Impact |
+|---------|-------------|------------|--------|
+| **`onMissingMethod`** | Unknown/unlikely | **Implemented** | Wheels' dynamic finders (`findAllByEmail()`) may now work |
+| **`cflock`** | Unknown | **Implemented** (RwLock-based) | Thread-safe rate limiting, caching, initialization possible |
+| **`getMetadata`** | Unknown | **Implemented** | Model configuration, routing, test discovery possible |
+| **`CreateObject`** | Not supported | **Implemented** (for components) | Component instantiation works |
+| **Java interop (`CreateObject("java", ...)`)** | Not supported | **Still not supported** | Remains a blocker for `ConcurrentHashMap` usage |
+| **`cfthread` (true concurrency)** | Sequential only | **Still sequential** | Background jobs would block |
+| **Query-of-Queries** | Not supported | **Still not supported** | Low impact for Wheels |
 
-This means the feasibility question is: **"Can Wheels run on RustCFML as an alternative to Lucee?"** — not "Can we add RustCFML to our Lucee stack?"
+### New Capabilities Since v0.4.0
 
-## Performance Profile
+- **`cflock`** with real named locks using RwLock-based concurrency
+- **`onMissingMethod`** for dynamic method dispatch
+- **`getMetadata`** for component introspection
+- **`createObject`** for component instantiation
+- **`cfinvoke`** tag support
+- **Session lifecycle** (`onSessionStart`/`onSessionEnd`)
+- **`cfthread`** tag (sequential model)
+- **`cfzip`** operations
+- **`cfexecute`** for OS command execution
+- **`cfstoredproc`/`cfprocparam`** for stored procedures
+- **Custom tags** with `cf_` prefix
+- **`cfimport`** with `.tld` support
+- **Bytecode caching** with modification-time tracking (no recompilation for unchanged files)
+- **Performance tuning** across VM hot paths (v0.8.0-v0.9.0 focus)
+- **CFMX_COMPAT** encryption algorithm support
+- **Taffy framework** compatibility (claimed feature-complete)
 
-RustCFML's benchmarks are impressive for a Hello World page:
+### Project Growth Metrics
 
-| Metric | RustCFML | Lucee 7.0.1 | BoxLang 1.10 |
-|--------|----------|-------------|--------------|
-| Memory (RSS) | ~8 MB | ~350 MB | ~305 MB |
-| Requests/sec | 1,949 | 635 | 293 |
-| Avg response | 0.5 ms | 1.6 ms | 3.4 ms |
-| Startup | Instant | ~15s | ~15s |
+| Indicator | March 2026 | May 2026 | Change |
+|-----------|-----------|----------|--------|
+| Version | 0.4.0 | 0.9.1 | 14 releases in 2 months |
+| Stars | 3 | 20 | 7x increase |
+| Forks | 0 | 1 | First community fork |
+| Commits | 39 | 108 | 69 new commits |
+| Test assertions | 1,181 / 89 suites | 1,181+ / 89+ suites | Baseline maintained |
+| Release cadence | ~weekly | ~weekly | Consistent |
 
-These numbers are for trivial workloads. Real-world Wheels applications involve ORM queries, component inheritance chains, dynamic method resolution, and session management — none of which are benchmarked.
+## Revised Compatibility Analysis
 
-## Wheels Dependencies vs RustCFML Capabilities
+### Now Supported (previously blocked or unknown)
 
-### Supported (would work today)
+| Wheels Feature | RustCFML Support | Notes |
+|---------------|-----------------|-------|
+| Dynamic finders (`findAllByEmail`) | `onMissingMethod` implemented | Needs behavioral verification |
+| Thread-safe middleware | `cflock` with RwLock | Real concurrency, not just advisory |
+| Component metadata inspection | `getMetadata` implemented | Model config, test discovery |
+| Component instantiation | `createObject` for components | CFC creation works |
+| CSRF tokens | `csrfGenerateToken`/`csrfVerifyToken` | Behavioral compat with Lucee TBD |
+| Encrypt/Decrypt | AES, DES, DESEDE, Blowfish, CFMX_COMPAT | Cookie compat needs testing |
+| Session management | Full lifecycle with CFID cookie | `onSessionStart`/`onSessionEnd` |
+| Transaction management | `cftransaction` | Rollback/savepoint needs testing |
+| Named locks | `cflock` (read/write) | RwLock-based, real concurrency |
+| Password hashing | bcrypt, scrypt, argon2, PBKDF2 | Better than stock Lucee |
+| Stored procedures | `cfstoredproc`/`cfprocparam` | Database-dependent |
+| File operations | 23+ file I/O functions | Upload, read, write, directory ops |
+| Caching | 8 cache functions | `cachePut`, `cacheGet`, etc. |
+| Error context | `cfcatch.tagContext` with stack traces | Line/column/template info |
 
-| Wheels Feature | RustCFML Support |
-|---------------|-----------------|
-| CFScript syntax | Full support, 50+ tags converted |
-| Component inheritance (`extends`) | Supported with interfaces |
-| Closures and arrow functions | Supported with scope capture |
-| Built-in string/array/struct functions | 400+ functions implemented |
-| `queryExecute` with params | MySQL, PostgreSQL, SQLite, MSSQL |
-| `cfhttp` for external calls | GET/POST/PUT/DELETE/PATCH |
-| Session/cookie management | Supported |
-| `Hash()`, `Encrypt()`, `Decrypt()` | Supported (including bcrypt/scrypt/argon2) |
-| `SerializeJSON`/`DeserializeJSON` | Supported |
-| URL rewriting | Tuckey-compatible XML config |
-| Application.cfc lifecycle | onApplicationStart, onRequestStart, etc. |
-| File I/O operations | Supported |
+### Remaining Blockers
 
-### Critical Gaps (blockers for Wheels)
+| Wheels Requirement | Status | Severity | Workaround |
+|-------------------|--------|----------|------------|
+| **`CreateObject("java", ...)`** | Not supported | **Medium** | Replace `ConcurrentHashMap` with CFML struct + `cflock`. Replace `StringBuilder` with string concatenation or array join. Only 2-3 call sites in Wheels core. |
+| **`cfthread` true concurrency** | Sequential only | **Low** | Background jobs (`wheels.Job`) would block, but most Wheels apps don't use in-request threading. Worker processes are typically separate. |
+| **Query-of-Queries** | Not supported | **Low** | Wheels rarely uses QoQ. Any instances could be rewritten as database queries. |
+| **`GetComponentMetaData`** (as distinct from `getMetadata`) | Unconfirmed | **Low** | `getMetadata` is confirmed; `GetComponentMetaData` may work as an alias or may not be needed. |
 
-| Wheels Requirement | RustCFML Status | Impact |
-|-------------------|----------------|--------|
-| **Dynamic method dispatch** (`onMissingMethod`) | Unknown/unlikely | Wheels ORM relies heavily on dynamic finders like `findAllByEmail()` via `onMissingMethod`. This is fundamental to the ActiveRecord pattern. |
-| **Complex `CreateObject("java", ...)`** | Not supported | Wheels uses `ConcurrentHashMap` in RateLimiter, and Lucee/ACF-specific Java objects throughout. No JVM = no Java interop. |
-| **Query-of-Queries** | Explicitly unsupported | Wheels doesn't heavily use QoQ, but some internal operations may depend on it. |
-| **`cflock` tag** | Unknown | Wheels uses `cflock` extensively for thread-safe rate limiting, caching, and initialization. |
-| **Metadata introspection** (`GetMetadata`, `GetComponentMetaData`) | Unknown | Wheels inspects component metadata for model configuration, routing, and test discovery. |
-| **`Evaluate()` / dynamic evaluation** | Unknown | Some Wheels internals use dynamic evaluation for scope resolution. |
-| **ORM/Hibernate** | Not supported | Wheels has its own ActiveRecord ORM (not Hibernate), but it relies on deep CFML engine features for dynamic method resolution. |
-| **Custom tag paths / mappings** | Partial (component mappings exist) | Wheels uses custom mappings for `vendor/`, `app/`, etc. |
-| **`cfthread` (true concurrency)** | Sequential only | Background job processing (`wheels.Job`) needs real async. |
-| **Transaction management** | Supported (`cftransaction`) | Wheels uses this — would need verification of rollback/savepoint behavior. |
+### Critical Behavioral Questions (need testing)
 
-### Partially Supported (would need testing)
+These features are nominally supported but Wheels depends on specific behavioral contracts:
 
-| Feature | Notes |
-|---------|-------|
-| `CsrfGenerateToken()` / `CsrfVerifyToken()` | Confirmed supported in RustCFML. Behavioral compatibility with Lucee's implementation (session binding, token format) needs verification. |
-| `cfheader` / `cfcookie` in middleware | RustCFML's web server handles these differently than servlet-based engines. |
-| Application scope persistence | Wheels stores extensive config in `application.$wheels`. Behavior under RustCFML's Application.cfc lifecycle needs validation. |
-| Error handling (`cftry`/`cfcatch`/`cfthrow`) | Basic support likely exists, but Wheels uses typed exceptions (`type="Wheels.InvalidAuthenticityToken"`) that need precise matching. |
+1. **`onMissingMethod` argument passing**: Wheels passes `missingMethodName` and `missingMethodArguments` — does RustCFML match this signature exactly?
+2. **`getMetadata` depth**: Wheels inspects `functions`, `extends`, `name`, `fullname`, `path` from metadata. How complete is the returned struct?
+3. **`Encrypt`/`Decrypt` output format**: CSRF cookies encrypted on Lucee must be decryptable on RustCFML if migrating a running app (probably not a concern for fresh deploys).
+4. **Application scope persistence**: Wheels stores extensive config in `application.$wheels`. Does `application` scope persist correctly across requests with the same semantics?
+5. **`cflock` timeout behavior**: Wheels uses `timeout=1` on rate limiter locks. Does RustCFML respect lock timeout and fail gracefully?
+6. **Scope resolution order**: Wheels depends on specific scope precedence (`local` > `arguments` > `variables`). CFML engines vary subtly here.
+7. **`isInstanceOf` behavior**: Wheels uses this for type checking in DI and model resolution.
+8. **Interface `implements` enforcement**: Wheels middleware uses `implements="wheels.middleware.MiddlewareInterface"`.
 
-## Wheels-Specific Code Analysis
+## Wheels Code Changes Needed
 
-### Crypto/Security Usage
-Wheels uses these crypto operations that RustCFML would need to support identically:
-- `GenerateSecretKey("AES")` — CSRF cookie encryption key generation
-- `Encrypt()`/`Decrypt()` with AES algorithm — CSRF cookie values
-- `Hash()` — Cache keys, asset fingerprinting, model IDs, transaction hashing
-- `CsrfGenerateToken()`/`CsrfVerifyToken()` — Session-based CSRF (Lucee built-in)
+### Minimal changes (to eliminate remaining blockers)
 
-RustCFML claims bcrypt/scrypt/argon2 support, which is actually **better** than stock Lucee for password hashing, but the standard `Encrypt()`/`Decrypt()` output format must be byte-compatible with existing cookies.
-
-### Java Interop Dependencies
-Found in Wheels core:
-- `CreateObject("java", "java.util.concurrent.ConcurrentHashMap")` — RateLimiter middleware
-- Various Lucee/ACF-specific internal APIs used implicitly
-
-### Dynamic Method Resolution
-Wheels' ActiveRecord pattern is built on dynamic method dispatch:
-```cfm
-model("User").findAllByEmail("test@example.com")  // via onMissingMethod
-model("User").findOneByUsernameAndPassword(...)    // compound dynamic finders
-user.hasOrders()                                   // dynamic association checker
 ```
-This is the single biggest compatibility concern.
+vendor/wheels/middleware/RateLimiter.cfc (line 55):
+  - CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init()
+  + StructNew()  // with cflock protection (already present)
 
-## Project Maturity Assessment
+vendor/wheels/Channel.cfc:
+  - Same ConcurrentHashMap replacement
 
-| Indicator | Value | Assessment |
-|-----------|-------|------------|
-| Version | 0.4.0 | Pre-1.0, expect breaking changes |
-| Stars | 3 | Minimal community adoption |
-| Forks | 0 | No community contributions |
-| Commits | 39 | Early development |
-| Contributors | ~1 (Pixl8) | Single-maintainer risk |
-| Test coverage | 1,181 assertions / 89 suites | Reasonable for scope |
-| License | MIT | No licensing concerns |
-| Last activity | March 2026 | Actively developed |
+vendor/wheels/model/read.cfc (if StringBuilder used):
+  - Replace java.lang.StringBuilder with array + ArrayToList
+```
 
-## Recommendations
+These are 2-3 small, isolated changes that would make the Wheels core Java-interop-free without affecting Lucee/ACF compatibility (struct + cflock works on all engines).
 
-### Short-term (Now): No action needed
-- RustCFML cannot run Wheels today due to missing dynamic method dispatch, Java interop, and unverified CFML engine built-ins
-- Do not invest engineering time in compatibility work
+### No changes needed for
 
-### Medium-term (6-12 months): Monitor and engage
-1. **Watch the repo** for releases that add `onMissingMethod`, metadata introspection, and `cflock` support
-2. **Open a dialog** with the Pixl8 team about framework compatibility goals — if they want RustCFML to run real-world apps, Wheels is a good benchmark
-3. **Create a compatibility test suite** — a minimal Wheels app that exercises core ORM, routing, CSRF, and middleware features, runnable against any CFML engine
+- CSRF protection (uses standard `Encrypt`/`Decrypt`/`GenerateSecretKey`/`CsrfGenerateToken`)
+- Hash-based cache keys (uses standard `Hash()`)
+- Model identification and transactions (uses standard `Hash()`)
+- Route matching and dispatch (pure CFML)
+- View rendering (pure CFML)
+- Migration system (uses `queryExecute` which is supported)
+- Validation framework (pure CFML)
+- Association/relationship definitions (pure CFML, depends on `onMissingMethod`)
 
-### Long-term (12+ months): Evaluate as a deployment target
-If RustCFML reaches 1.0 with:
-- Full `onMissingMethod` support
-- Component metadata introspection
-- Robust `cflock` implementation
-- Compatible `Encrypt()`/`Decrypt()` output
+## Performance Implications for Wheels
 
-Then Wheels could potentially offer RustCFML as a **lightweight deployment target** — attractive for:
-- Containerized/serverless deployments (8 MB vs 350 MB)
-- Edge computing scenarios
-- High-throughput API-only Wheels apps (no view layer)
-- Development/CI environments (instant startup)
+| Scenario | Expected Benefit | Confidence |
+|----------|-----------------|------------|
+| Cold start (container/serverless) | **Massive** — instant vs ~15s JVM warmup | High |
+| Memory per instance | **44x reduction** — 8 MB vs 350 MB | High (trivial workloads verified) |
+| Simple page renders | **3x throughput** — 1,949 vs 635 req/s | High |
+| ORM-heavy pages | **Unknown** — dynamic method dispatch overhead not benchmarked | Low |
+| Complex model graphs | **Unknown** — component instantiation + metadata perf not tested | Low |
+| Concurrent requests | **Uncertain** — Axum is async but cfthread is sequential | Medium |
 
-### What Wheels could do to prepare
-1. **Reduce Java interop dependence** — Replace `ConcurrentHashMap` in RateLimiter with pure CFML struct + cflock (already partially done)
-2. **Abstract engine-specific built-ins** — Wrap `CsrfGenerateToken()` so alternative implementations can be swapped
-3. **Document dynamic method contracts** — Clearly specify what `onMissingMethod` patterns Wheels requires, so runtime implementors know the target
+## Recommendations (Updated)
+
+### Immediate (now): Proof-of-concept trial
+
+The resolution of `onMissingMethod`, `cflock`, and `getMetadata` makes a PoC reasonable:
+
+1. **Build RustCFML from source** and attempt to boot the Wheels demo app (`app/`)
+2. **Run the core test suite** against RustCFML to get a compatibility baseline
+3. **Document failures** — categorize as (a) missing function, (b) behavioral difference, (c) Java interop dependency
+4. **Estimate gap size** — if >80% of tests pass, active pursuit is justified
+
+### Short-term (1-3 months): Eliminate Java interop in Wheels core
+
+Regardless of RustCFML adoption, removing `CreateObject("java", ...)` from the framework core is good hygiene:
+
+- Makes Wheels more portable across all CFML engines (including BoxLang)
+- Only 2-3 call sites need changes
+- The `cflock`-protected struct pattern already exists alongside the Java calls
+
+### Medium-term (3-6 months): Engage with Pixl8
+
+If the PoC shows >80% compatibility:
+
+1. **File issues** for specific behavioral gaps discovered during testing
+2. **Contribute test cases** from Wheels' test suite that exercise edge cases
+3. **Explore adding Wheels/RustCFML to the CI compat matrix** as a soft-fail target (like Oracle)
+4. **Document the "Wheels on RustCFML" story** for containerized/edge deployments
+
+### Long-term (6-12 months): Lightweight deployment target
+
+Position RustCFML as an optional deployment runtime for:
+- **Docker/Kubernetes** — 8 MB image vs 350+ MB
+- **Serverless/edge functions** — instant cold start
+- **CI/test environments** — faster test cycles
+- **API-only Wheels apps** — no view layer complexity
+
+## Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Project abandoned (single maintainer) | Medium | High | MIT license allows forking; Pixl8 is an established CFML shop |
+| Behavioral incompatibilities surface at scale | High | Medium | Incremental adoption starting with simple apps |
+| Performance gains disappear with complex apps | Medium | Low | Still wins on memory/startup even if throughput is similar |
+| Breaking changes in pre-1.0 releases | High | Low | Pin versions; don't depend on internals |
+| Community doesn't grow | Medium | Medium | Wheels adoption would itself grow the community |
 
 ## Conclusion
 
-RustCFML represents an exciting direction for the CFML ecosystem — a modern, high-performance runtime with minimal resource requirements. However, it is a pre-1.0 single-maintainer project that lacks several features fundamental to how Wheels operates. The performance benefits are compelling but academic until the compatibility gap closes.
+RustCFML has made remarkable progress in two months. The three most critical Wheels blockers — `onMissingMethod`, `cflock`, and `getMetadata` — are now implemented. The remaining gap (Java interop) affects only 2-3 isolated call sites in Wheels core, and the fix is straightforward and engine-agnostic.
 
-**The right move is to watch, not adopt.** If the project gains momentum and addresses dynamic method dispatch and metadata introspection, it could become a viable lightweight runtime for Wheels applications within 12-18 months.
+**The project has moved from "watch and wait" to "try it and see."** A proof-of-concept attempt to boot Wheels on RustCFML is now the right next step. The outcome will determine whether this becomes a real deployment option or needs another 6-12 months of runtime maturation.
+
+The 44x memory reduction and instant cold start alone would make RustCFML a compelling option for containerized Wheels deployments — if the compatibility gap can be bridged.
