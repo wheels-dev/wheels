@@ -20,6 +20,34 @@ fi
 
 CHANNELS="stable bleeding-edge"
 
+# nfpm produces unsigned .rpm files. The wheels.repo / wheels-be.repo files
+# served by this bucket set gpgcheck=1, so dnf REJECTS unsigned packages with
+# "Package is not signed: GPG check FAILED". Sign every .rpm in the channel's
+# packages/ dir before regenerating metadata — rpm --addsign embeds the
+# signature in the .rpm header, which createrepo_c then records in the
+# primary.xml.gz hash chain. Re-runs are idempotent (rpm --addsign replaces
+# any existing signature).
+#
+# Requires rpm-sign (Fedora/RHEL) for the rpm command itself.
+cat > ~/.rpmmacros <<RPMMACROS
+%_signature gpg
+%_gpg_name ${GPG_KEY_ID}
+%_gpg_path ${GNUPGHOME:-${HOME}/.gnupg}
+%__gpg $(command -v gpg)
+RPMMACROS
+
+# rpm --addsign drives gpg via the agent; force loopback so the passphrase
+# can come from the env var without a TTY.
+mkdir -p "${GNUPGHOME:-${HOME}/.gnupg}"
+cat > "${GNUPGHOME:-${HOME}/.gnupg}/gpg-agent.conf" <<GPGAGENT
+allow-loopback-pinentry
+GPGAGENT
+cat > "${GNUPGHOME:-${HOME}/.gnupg}/gpg.conf" <<GPGCONF
+use-agent
+pinentry-mode loopback
+GPGCONF
+gpg-connect-agent reloadagent /bye >/dev/null 2>&1 || true
+
 for CHANNEL in $CHANNELS; do
   CHANNEL_DIR="$CHANNEL"
   PKG_DIR="${CHANNEL_DIR}/packages"
@@ -29,6 +57,15 @@ for CHANNEL in $CHANNELS; do
     echo "── Skipping ${CHANNEL} (no .rpm files in ${PKG_DIR}) ──"
     continue
   fi
+
+  echo "── Signing .rpm files in ${PKG_DIR}/ ──"
+  for rpm_file in "${PKG_DIR}"/*.rpm; do
+    [ -f "$rpm_file" ] || continue
+    # --addsign with the macro setup above. Passphrase via env (rpm reads
+    # $GNUPGHOME/gpg.conf which sets pinentry-mode loopback).
+    rpm --addsign "$rpm_file" >/dev/null
+    echo "  ✓ signed $(basename "$rpm_file")"
+  done
 
   echo "── Regenerating ${CHANNEL_DIR}/repodata/ ──"
 

@@ -1,10 +1,10 @@
 This file is a placeholder. The real `wheels.gpg` at the bucket-repo root must
 be the ASCII-armored *public* half of the signing key whose private half lives
-in 1Password at `op://Infrastructure/wheels-linux-repo-signing/private-key`.
+in 1Password at `op://Wheels/wheels-linux-repo-signing/private-key`.
 
 Once the key is minted:
 
-    op read 'op://Infrastructure/wheels-linux-repo-signing/public-key' > wheels.gpg
+    op read 'op://Wheels/wheels-linux-repo-signing/public-key' > wheels.gpg
     # or, from a host that has the secret key imported:
     gpg --armor --export <KEY_ID> > wheels.gpg
 

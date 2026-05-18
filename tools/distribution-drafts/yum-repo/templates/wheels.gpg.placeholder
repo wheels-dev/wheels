@@ -6,7 +6,7 @@ distributions.
 
 Once the key is minted:
 
-    op read 'op://Infrastructure/wheels-linux-repo-signing/public-key' > wheels.gpg
+    op read 'op://Wheels/wheels-linux-repo-signing/public-key' > wheels.gpg
 
 Commit `wheels.gpg` to the **root** of the bucket repo (not in `templates/`).
 Cloudflare Pages will serve it at `https://yum.wheels.dev/wheels.gpg`, which

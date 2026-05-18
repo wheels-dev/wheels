@@ -120,12 +120,14 @@ Bucket-repo templates are now drafted in:
 
 The remaining work is operational:
 
-1. **Mint a GPG signing key** for the Wheels project (one key signs both
-   `Release` / `InRelease` and `repomd.xml.asc`). Store the private key +
-   passphrase in 1Password under
-   `op://Infrastructure/wheels-linux-repo-signing/`. Commit the public half
-   to the root of *each* bucket repo as `wheels.gpg` (template placeholders
-   live at `<bucket>/templates/wheels.gpg.placeholder`).
+1. **Mint a GPG signing key** for the Wheels project (one key signs the apt
+   `Release`/`InRelease`, the yum `repomd.xml.asc`, AND each individual `.rpm`
+   via `rpm --addsign`). Store the private key + passphrase in 1Password under
+   `op://Wheels/wheels-linux-repo-signing/` (the Wheels project vault on the
+   personal `my.1password.com` tenant — NOT the PAI work `op://Infrastructure/`
+   vault). Commit the public half to the root of *each* bucket repo as
+   `wheels.gpg` (template placeholders live at
+   `<bucket>/templates/wheels.gpg.placeholder`).
 2. **Create the two bucket repos** under `wheels-dev`:
    - `wheels-dev/apt-wheels-dev` — copy contents of `apt-repo/` template
    - `wheels-dev/yum-wheels-dev` — copy contents of `yum-repo/` template

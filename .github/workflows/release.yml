@@ -288,9 +288,16 @@ jobs:
           nfpm --version
 
       - name: Build Linux packages (.deb / .rpm)
+        # CHANNEL derives from the version so develop snapshots produce the
+        # `wheels-be` package (which the Phase 2 bleeding-edge receiver
+        # downloads) instead of `wheels`. Without this, the snapshot release
+        # ships `wheels_<v>_amd64.deb` and the apt-wheels-dev / yum-wheels-dev
+        # receiver workflow 404s on its `wheels-be_<v>_amd64.deb` fetch.
+        # RC builds keep CHANNEL=stable — RCs aren't fanned out to apt/yum
+        # (see release.yml § "Dispatch Linux repo buckets").
         env:
           WHEELS_VERSION: ${{ env.WHEELS_VERSION }}
-          CHANNEL: stable
+          CHANNEL: ${{ contains(env.WHEELS_VERSION, '-snapshot') && 'bleeding-edge' || 'stable' }}
           OUT_DIR: artifacts/wheels/${{ env.WHEELS_VERSION }}
         run: bash tools/distribution-drafts/linux-packages/build-linux-packages.sh
 
@@ -428,8 +435,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.x86_64.rpm
 
       #############################################
       # Create Snapshot Pre-Release (develop only)
@@ -487,8 +494,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.x86_64.rpm
 
       #############################################
       # Dispatch downstream package managers
