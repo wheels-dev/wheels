@@ -296,6 +296,29 @@ cfimage(attributeCollection = local.args);
 
 **Reference fix**: [#2750](https://github.com/wheels-dev/wheels/pull/2750) (closes #2741) — patches all 13 affected wrappers in `vendor/wheels/Global.cfc` uniformly: `$header`, `$cache`, `$content`, `$mail`, `$directory`, `$file`, `$location`, `$htmlhead`, `$image`, `$dbinfo`, `$invoke`, `$wddx`, `$zip`. `$dbinfo()` rebuilds the local copy before each of its four `cfdbinfo` calls because the catch path mutates `arguments` between calls — a useful pattern when a helper writes through `arguments` between tag invocations.
 
+### `cfheader` / `cfcontent` on a Committed Response (Adobe CF 2023/2025)
+
+Adobe CF 2023/2025 throws `InvalidHeaderException: Failed to add HTML header` from `cfheader`, and a similar exception from `cfcontent`, once the servlet response has been committed (the output buffer flushed). This bites hardest inside `onError` handlers, where partial view output has typically already flushed before the handler runs — the secondary `cfheader` failure then replaces the original exception in the response. Lucee and BoxLang tolerate the same call as a no-op.
+
+Use the canonical `$responseCommitted()` probe — `public boolean function $responseCommitted()` in `vendor/wheels/Global.cfc` — to short-circuit defensively. Wrap the actual tag call in `try/catch` and re-probe in the catch to rethrow only when the response is still uncommitted (a genuine caller bug):
+
+```cfm
+public void function $myTagWrapper() {
+    local.args = {};
+    for (local.key in arguments) local.args[local.key] = arguments[local.key];
+    if ($responseCommitted()) return;
+    try {
+        cfheader(attributeCollection = "#local.args#");
+    } catch (any e) {
+        if (!$responseCommitted()) rethrow;
+    }
+}
+```
+
+`$header()` and `$content()` already adopt this shape. Future tag wrappers (`$location`, `$cache`, `$htmlhead`, `$mail`, …) should pick up `$responseCommitted()` rather than reinventing the probe.
+
+**Reference fix**: [#2756](https://github.com/wheels-dev/wheels/pull/2756) — adds `$responseCommitted()` and applies the defensive shape to `$header()` and `$content()`.
+
 ## Database-Specific Gotchas
 
 ### H2 Database (Test Default)

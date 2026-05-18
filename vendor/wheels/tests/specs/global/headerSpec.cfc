@@ -15,9 +15,16 @@ component extends="wheels.WheelsTest" {
 			// If $header() regresses, every spec should fail in its own `it`, not via
 			// an opaque `afterEach` lifecycle error. Semicolons required: Lucee 7's
 			// parser cannot disambiguate back-to-back `cfheader(...)` script calls.
+			// Each cfheader is wrapped in its own try/catch because Adobe CF 2023/2025
+			// commits the response when a prior spec writes output, after which the
+			// bare cfheader throws InvalidHeaderException ("Failed to add HTML header").
+			// The cleanup is best-effort — a committed response keeps whatever headers
+			// the engine wrote — and a thrown afterEach would surface as an opaque
+			// lifecycle error masking the actual unit-under-test results, the exact
+			// problem the bare-cfheader contract above was meant to avoid.
 			afterEach(() => {
-				cfheader(statuscode = 200);
-				cfheader(name = "content-type", value = "text/html");
+				try { cfheader(statuscode = 200); } catch (any e) {}
+				try { cfheader(name = "content-type", value = "text/html"); } catch (any e) {}
 			})
 
 			it("accepts a name/value pair without throwing", () => {
@@ -42,6 +49,49 @@ component extends="wheels.WheelsTest" {
 				$assert.notThrows(function() {
 					g.$header(name = "Content-Type", value = "application/json", charset = "utf-8")
 				})
+			})
+
+		})
+
+		describe("Tests that \$content()", () => {
+
+			// Parallel coverage for `$content()` — same defensive shape as `$header()`.
+
+			afterEach(() => {
+				// Best-effort reset — same shape as the cleanup for `$header()`
+				// above (each call wrapped because Adobe CF rejects bare
+				// `cfheader`/`cfcontent` when the response has committed).
+				try { cfheader(statuscode = 200); } catch (any e) {}
+				try { cfheader(name = "content-type", value = "text/html"); } catch (any e) {}
+			})
+
+			it("accepts type without throwing", () => {
+				$assert.notThrows(function() {
+					g.$content(type = "application/json")
+				})
+			})
+
+			it("accepts type with reset=true (boolean coercion through attributeCollection)", () => {
+				$assert.notThrows(function() {
+					g.$content(type = "application/json", reset = true)
+				})
+			})
+
+		})
+
+		describe("Tests that \$responseCommitted()", () => {
+
+			// The probe walks GetPageContext().getResponse().isCommitted(), which
+			// has a known-good shape on every supported engine — but the helper
+			// catches and returns false on engines where the call path is
+			// unavailable. This spec confirms the declared `boolean` return
+			// contract holds in-process on every engine in the matrix, so a
+			// future engine API shift surfaces here instead of in a compat run.
+			it("returns a boolean without throwing", () => {
+				$assert.notThrows(function() {
+					g.$responseCommitted()
+				})
+				expect(IsBoolean(g.$responseCommitted())).toBeTrue()
 			})
 
 		})

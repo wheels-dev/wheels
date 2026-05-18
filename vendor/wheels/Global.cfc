@@ -117,24 +117,64 @@ component output="false" {
 		variables.$instance.reCache = true;
 	}
 
-	public any function $content() {
+	public void function $content() {
 		local.args = {};
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
 		}
-		cfcontent(attributeCollection = "#local.args#");
+		// Best-effort: cfcontent throws on a committed response (Adobe CF).
+		if ($responseCommitted()) {
+			return;
+		}
+		try {
+			cfcontent(attributeCollection = "#local.args#");
+		} catch (any e) {
+			// Re-probe to handle the isCommitted/throw race; rethrow only when
+			// the response is still uncommitted (a genuine caller error).
+			if (!$responseCommitted()) {
+				rethrow;
+			}
+		}
 	}
 
 	public void function $header() {
-		// Adobe CF 2023+ rejects the raw `arguments` scope as an attributeCollection;
-		// copy into a plain struct first. Also strip `statusText` (removed in Adobe CF 2025).
+		// Plain-struct copy: Adobe CF 2023+ rejects `arguments` as
+		// attributeCollection (#10 cross-engine invariant). `statusText` is
+		// stripped because Adobe CF 2025 removed it.
 		local.args = {};
 		for (local.key in arguments) {
 			if (local.key != "statusText") {
 				local.args[local.key] = arguments[local.key];
 			}
 		}
-		cfheader(attributeCollection = "#local.args#");
+		// Best-effort: cfheader throws on a committed response (Adobe CF). The
+		// short-circuit is critical inside onError, where letting the exception
+		// escape would replace the original error with the cfheader-failure stack.
+		if ($responseCommitted()) {
+			return;
+		}
+		try {
+			cfheader(attributeCollection = "#local.args#");
+		} catch (any e) {
+			// Re-probe to handle the isCommitted/throw race; rethrow only when
+			// the response is still uncommitted (a genuine caller error).
+			if (!$responseCommitted()) {
+				rethrow;
+			}
+		}
+	}
+
+	/**
+	 * Returns true when the servlet response has been committed and headers
+	 * can no longer be modified. Returns false on engines or contexts where
+	 * the underlying servlet probe is unavailable.
+	 */
+	public boolean function $responseCommitted() {
+		try {
+			return GetPageContext().getResponse().isCommitted();
+		} catch (any e) {
+			return false;
+		}
 	}
 
 	public void function $include(required string template) {
@@ -293,7 +333,20 @@ return local.$wheels;
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
 		}
-		cfhtmlhead(attributeCollection = "#local.args#");
+		// Best-effort: cfhtmlhead throws "Unable to add text to HTML HEAD tag"
+		// on a committed response (Adobe CF). Same defensive shape as $header().
+		if ($responseCommitted()) {
+			return;
+		}
+		try {
+			cfhtmlhead(attributeCollection = "#local.args#");
+		} catch (any e) {
+			// Re-probe to handle the isCommitted/throw race; rethrow only when
+			// the response is still uncommitted (a genuine caller error).
+			if (!$responseCommitted()) {
+				rethrow;
+			}
+		}
 	}
 
 	public any function $dbinfo() {
@@ -530,9 +583,11 @@ return local.$wheels;
 	 * [category: Miscellaneous Functions]
 	 *
 	 * @name The environment variable name to look up.
-	 * @default Value to return if the variable is not found.
+	 * @defaultValue Value to return if the variable is not found. The legacy
+	 *   named argument `default` is also accepted for backwards compatibility
+	 *   with pre-rename callers.
 	 */
-	public any function env(required string name, any default = "") {
+	public any function env(required string name, any defaultValue = "") {
 		if (StructKeyExists(application, "env") && StructKeyExists(application.env, arguments.name)) {
 			return application.env[arguments.name];
 		}
@@ -543,7 +598,14 @@ return local.$wheels;
 		) {
 			return server.system.environment[arguments.name];
 		}
-		return arguments.default;
+		// Back-compat for the legacy `default = "Y"` named-arg form. The
+		// parameter was renamed from `default` (a CFML reserved word Adobe CF
+		// refuses to bind) to `defaultValue`; named arguments still land in
+		// `arguments` under their literal key on every engine.
+		if (StructKeyExists(arguments, "default")) {
+			return arguments.default;
+		}
+		return arguments.defaultValue;
 	}
 
 	/**
