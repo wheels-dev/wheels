@@ -57,14 +57,22 @@ Install the latest stable release:
 
 ```bash title="illustrative — Debian / Ubuntu"
 WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+  | jq -r '.tag_name | sub("^v"; "")')
+if [ -z "$WHEELS_VERSION" ] || [ "$WHEELS_VERSION" = "null" ]; then
+  echo "Error: could not resolve release tag. Check your network, GitHub API rate limit, or set WHEELS_VERSION manually." >&2
+  exit 1
+fi
 curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
 sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
 ```
 
 ```bash title="illustrative — Fedora / RHEL"
 WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
+  | jq -r '.tag_name | sub("^v"; "")')
+if [ -z "$WHEELS_VERSION" ] || [ "$WHEELS_VERSION" = "null" ]; then
+  echo "Error: could not resolve release tag. Check your network, GitHub API rate limit, or set WHEELS_VERSION manually." >&2
+  exit 1
+fi
 sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
 ```
 
