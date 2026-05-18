@@ -198,7 +198,7 @@ component extends="wheels.WheelsTest" {
 				it("calls next handler and returns its result", function() {
 					local.mw = new wheels.middleware.SecurityHeaders();
 					local.result = local.mw.handle(
-						req = variables.reqCtx,
+						request = variables.reqCtx,
 						next = variables.nextHandler
 					);
 					expect(local.result).toBe("ok");
@@ -211,7 +211,7 @@ component extends="wheels.WheelsTest" {
 						permissionsPolicy = "camera=()"
 					);
 					local.result = local.mw.handle(
-						req = variables.reqCtx,
+						request = variables.reqCtx,
 						next = variables.nextHandler
 					);
 					expect(local.result).toBe("ok");

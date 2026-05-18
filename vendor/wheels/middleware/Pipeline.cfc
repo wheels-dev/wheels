@@ -48,16 +48,11 @@ component output="false" {
 	/**
 	 * Create a closure that invokes a single middleware's handle() with the given next function.
 	 * Uses a shared struct to avoid CFML closure scoping issues (closures have their own local scope).
-	 *
-	 * Calls `handle()` positionally so user-defined middleware that still
-	 * uses the legacy `required struct request` parameter name continues to
-	 * work alongside the framework's built-in middleware (which renamed the
-	 * parameter to `req` to avoid CFML reserved-scope shadowing on Adobe CF).
 	 */
 	private any function $wrapMiddleware(required any mw, required any nextFn) {
 		var ctx = {mw = arguments.mw, nextFn = arguments.nextFn};
 		return function(required struct request) {
-			return ctx.mw.handle(arguments.request, ctx.nextFn);
+			return ctx.mw.handle(request = arguments.request, next = ctx.nextFn);
 		};
 	}
 
