@@ -160,7 +160,11 @@ lucli modules install wheels --force \
 
 ```bash title="bleeding-edge — resolve the snapshot tag, then install"
 SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+  | jq -r '.[0].tag_name | sub("^v"; "")')
+if [ -z "$SNAP_TAG" ] || [ "$SNAP_TAG" = "null" ]; then
+  echo "Error: could not resolve snapshot tag. Check your network, GitHub API rate limit, or set SNAP_TAG manually." >&2
+  exit 1
+fi
 lucli modules install wheels --force \
   --url="https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-module-${SNAP_TAG}.zip"
 ```
