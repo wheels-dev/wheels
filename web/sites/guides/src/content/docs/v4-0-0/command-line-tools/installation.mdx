@@ -118,6 +118,11 @@ Until the native repos are live, download integrity relies on GitHub's HTTPS tra
 Wheels ships on Windows through [Scoop](https://scoop.sh) — a portable, sandboxed package manager that fits the project's release cadence (hourly autoupdate for both stable and bleeding-edge channels). The legacy Chocolatey path is no longer supported; the old v1.x `wheels` package at `community.chocolatey.org/packages/wheels` is the CommandBox-based release and won't drive a v4 tutorial.
 
 ```powershell
+# git is required by Scoop to clone any third-party bucket — Scoop's installer
+# doesn't ship git. The main bucket (where git itself lives) is bundled with
+# the Scoop installer, which is why this works from a totally fresh shell.
+scoop install git
+
 scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
 
 # Pick a channel:

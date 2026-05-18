@@ -126,7 +126,15 @@ The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x relea
    Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
    ```
 
-2. Add the Wheels bucket and install a channel:
+2. Install git (required by Scoop to add any third-party bucket — skip if `git --version` already works):
+
+   ```powershell title="PowerShell"
+   scoop install git
+   ```
+
+   The Scoop installer doesn't ship git, but `scoop bucket add` uses `git clone` under the hood. The default `main` bucket is the one exception — its metadata is bundled with Scoop, which is why `scoop install git` from a fresh shell works without any prior bucket setup.
+
+3. Add the Wheels bucket and install a channel:
 
    ```powershell title="PowerShell"
    scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
@@ -137,7 +145,7 @@ The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x relea
 
    Both packages inline OpenJDK 21 — no separate `java` bucket or `JAVA_HOME` setup required. Both expose the same `wheels` shim on PATH, so Scoop refuses to install both at once. See [Release Channels](/v4-0-0/start-here/release-channels/) for the comparison.
 
-3. Verify:
+4. Verify:
 
    ```powershell title="PowerShell"
    wheels --version
