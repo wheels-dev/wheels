@@ -165,7 +165,9 @@ component output="false" {
 	}
 
 	/**
-	 * Returns true when the servlet response has been committed and headers can no longer be modified. Returns false on engines or contexts where the probe is unavailable.
+	 * Returns true when the servlet response has been committed and headers
+	 * can no longer be modified. Returns false on engines or contexts where
+	 * the underlying servlet probe is unavailable.
 	 */
 	public boolean function $responseCommitted() {
 		try {

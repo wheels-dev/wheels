@@ -76,6 +76,12 @@ component extends="wheels.WheelsTest" {
 				})
 			})
 
+			it("accepts type with reset=true (boolean coercion through attributeCollection)", () => {
+				$assert.notThrows(function() {
+					g.$content(type = "application/json", reset = true)
+				})
+			})
+
 		})
 
 		describe("Tests that \$responseCommitted()", () => {
