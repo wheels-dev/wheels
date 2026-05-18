@@ -333,7 +333,20 @@ return local.$wheels;
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
 		}
-		cfhtmlhead(attributeCollection = "#local.args#");
+		// Best-effort: cfhtmlhead throws "Unable to add text to HTML HEAD tag"
+		// on a committed response (Adobe CF). Same defensive shape as $header().
+		if ($responseCommitted()) {
+			return;
+		}
+		try {
+			cfhtmlhead(attributeCollection = "#local.args#");
+		} catch (any e) {
+			// Re-probe to handle the isCommitted/throw race; rethrow only when
+			// the response is still uncommitted (a genuine caller error).
+			if (!$responseCommitted()) {
+				rethrow;
+			}
+		}
 	}
 
 	public any function $dbinfo() {
