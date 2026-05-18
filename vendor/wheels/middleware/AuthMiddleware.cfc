@@ -66,31 +66,31 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Authenticate the request. On success, attach auth context and proceed.
 	 * On failure, short-circuit with an error response (or proceed if allowAnonymous).
 	 */
-	public string function handle(required struct request, required any next) {
+	public string function handle(required struct req, required any next) {
 		local.auth = $resolveAuthenticator();
 
 		// Authenticate — restricted to specific strategies or all
 		if (ArrayLen(variables.strategies)) {
-			local.result = $authenticateWithStrategies(local.auth, arguments.request);
+			local.result = $authenticateWithStrategies(local.auth, arguments.req);
 		} else {
-			local.result = local.auth.authenticate(arguments.request);
+			local.result = local.auth.authenticate(arguments.req);
 		}
 
 		// Attach auth result to the request context
-		arguments.request.auth = local.result;
+		arguments.req.auth = local.result;
 
 		if (local.result.success) {
-			return arguments.next(arguments.request);
+			return arguments.next(arguments.req);
 		}
 
 		// Authentication failed
 		if (variables.allowAnonymous) {
-			return arguments.next(arguments.request);
+			return arguments.next(arguments.req);
 		}
 
 		// Custom failure handler
 		if (IsCustomFunction(variables.onFailure) || IsClosure(variables.onFailure)) {
-			return variables.onFailure(arguments.request, local.result);
+			return variables.onFailure(arguments.req, local.result);
 		}
 
 		// Default: set HTTP status and return JSON error

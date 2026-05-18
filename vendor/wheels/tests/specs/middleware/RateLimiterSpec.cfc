@@ -29,8 +29,8 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
 				expect(result1).toBe("ok");
 				expect(result2).toInclude("Rate limit exceeded");
 			});
@@ -55,8 +55,8 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
 				expect(result1).toBe("ok");
 				expect(result2).toBe("ok");
 
@@ -67,7 +67,7 @@ component extends="wheels.WheelsTest" {
 						http_x_forwarded_for: "3.3.3.3"
 					}
 				};
-				var result3 = limiter.handle(request = req3, next = nextFn);
+				var result3 = limiter.handle(req = req3, next = nextFn);
 				expect(result3).toInclude("Rate limit exceeded");
 			});
 
@@ -97,9 +97,9 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
-				var result3 = limiter.handle(request = req3, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
+				var result3 = limiter.handle(req = req3, next = nextFn);
 
 				// All three should pass because each has a unique X-Forwarded-For (separate buckets).
 				expect(result1).toBe("ok");
@@ -123,7 +123,7 @@ component extends="wheels.WheelsTest" {
 							http_x_forwarded_for: "fake-#i#.#i#.#i#.#i#"
 						}
 					};
-					limiter.handle(request = req, next = nextFn);
+					limiter.handle(req = req, next = nextFn);
 				}
 
 				// Fourth request should be blocked regardless of spoofed header.
@@ -133,7 +133,7 @@ component extends="wheels.WheelsTest" {
 						http_x_forwarded_for: "99.99.99.99"
 					}
 				};
-				var result = limiter.handle(request = blockedReq, next = nextFn);
+				var result = limiter.handle(req = blockedReq, next = nextFn);
 				expect(result).toInclude("Rate limit exceeded");
 			});
 
@@ -158,8 +158,8 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
 
 				// Both should pass because they have different remoteAddr keys.
 				expect(result1).toBe("ok");
@@ -194,8 +194,8 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
 
 				// Both keyed to "1.1.1.1" so second is blocked.
 				expect(result1).toBe("ok");
@@ -227,8 +227,8 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
 
 				// Both keyed to "10.0.0.1" so second is blocked.
 				expect(result1).toBe("ok");
@@ -265,9 +265,9 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
-				var result3 = limiter.handle(request = req3, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
+				var result3 = limiter.handle(req = req3, next = nextFn);
 
 				// All keyed to "192.168.1.100" — third request blocked.
 				expect(result1).toBe("ok");
@@ -299,11 +299,11 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
 				expect(result1).toBe("ok");
 
 				// Second request from "different" first IP but SAME last IP should be blocked
-				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
 				expect(result2).toInclude("Rate limit exceeded");
 			});
 
@@ -341,12 +341,12 @@ component extends="wheels.WheelsTest" {
 				// Send requests from 10 unique IPs to exceed the store size of 5.
 				for (var i = 1; i <= 10; i++) {
 					var req = {remoteAddr: "client-evict-#i#"};
-					limiter.handle(request = req, next = nextFn);
+					limiter.handle(req = req, next = nextFn);
 				}
 
 				// The limiter should still function correctly (not error out).
 				var finalReq = {remoteAddr: "client-evict-final"};
-				var result = limiter.handle(request = finalReq, next = nextFn);
+				var result = limiter.handle(req = finalReq, next = nextFn);
 				expect(result).toBe("ok");
 			});
 
@@ -390,12 +390,12 @@ component extends="wheels.WheelsTest" {
 				// Send 20 requests from the same client.
 				for (var i = 1; i <= 20; i++) {
 					var req = {remoteAddr: "flood-client"};
-					limiter.handle(request = req, next = nextFn);
+					limiter.handle(req = req, next = nextFn);
 				}
 
 				// The limiter should still function correctly after capping.
 				var finalReq = {remoteAddr: "flood-client"};
-				var result = limiter.handle(request = finalReq, next = nextFn);
+				var result = limiter.handle(req = finalReq, next = nextFn);
 				expect(result).toBe("ok");
 			});
 
@@ -409,10 +409,10 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
-				var r1 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
-				var r2 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
-				var r3 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
-				var r4 = limiter.handle(request = {remoteAddr: "cap-test"}, next = nextFn);
+				var r1 = limiter.handle(req = {remoteAddr: "cap-test"}, next = nextFn);
+				var r2 = limiter.handle(req = {remoteAddr: "cap-test"}, next = nextFn);
+				var r3 = limiter.handle(req = {remoteAddr: "cap-test"}, next = nextFn);
+				var r4 = limiter.handle(req = {remoteAddr: "cap-test"}, next = nextFn);
 
 				expect(r1).toBe("ok");
 				expect(r2).toBe("ok");
@@ -437,11 +437,11 @@ component extends="wheels.WheelsTest" {
 				// Fill store to capacity with unique clients.
 				for (var i = 1; i <= 8; i++) {
 					var req = {remoteAddr: "evict25-#i#"};
-					limiter.handle(request = req, next = nextFn);
+					limiter.handle(req = req, next = nextFn);
 				}
 
 				// Should still work after eviction.
-				var result = limiter.handle(request = {remoteAddr: "evict25-final"}, next = nextFn);
+				var result = limiter.handle(req = {remoteAddr: "evict25-final"}, next = nextFn);
 				expect(result).toBe("ok");
 			});
 
@@ -477,8 +477,8 @@ component extends="wheels.WheelsTest" {
 				var req1 = {remoteAddr: shortKey};
 				var req2 = {remoteAddr: longKey};
 
-				var result1 = limiter.handle(request = req1, next = nextFn);
-				var result2 = limiter.handle(request = req2, next = nextFn);
+				var result1 = limiter.handle(req = req1, next = nextFn);
+				var result2 = limiter.handle(req = req2, next = nextFn);
 
 				// Both should succeed (different keys, both under maxRequests).
 				expect(result1).toBe("ok");
@@ -501,12 +501,12 @@ component extends="wheels.WheelsTest" {
 				var nextFn = function(req) { return "ok"; };
 
 				// First request should pass.
-				var r1 = limiter.handle(request = {}, next = nextFn);
+				var r1 = limiter.handle(req = {}, next = nextFn);
 				expect(r1).toBe("ok");
 
 				// Second request with the same long key should be rate limited
 				// (proving the key was hashed consistently to the same value).
-				var r2 = limiter.handle(request = {}, next = nextFn);
+				var r2 = limiter.handle(req = {}, next = nextFn);
 				expect(r2).toInclude("Rate limit exceeded");
 			});
 
@@ -520,8 +520,8 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
-				var r1 = limiter.handle(request = {remoteAddr: "key-a"}, next = nextFn);
-				var r2 = limiter.handle(request = {remoteAddr: "key-b"}, next = nextFn);
+				var r1 = limiter.handle(req = {remoteAddr: "key-a"}, next = nextFn);
+				var r2 = limiter.handle(req = {remoteAddr: "key-b"}, next = nextFn);
 
 				// Both pass because they are different short keys.
 				expect(r1).toBe("ok");
@@ -549,11 +549,11 @@ component extends="wheels.WheelsTest" {
 				// Flood with unique keys to trigger cleanup/eviction.
 				for (var i = 1; i <= 100; i++) {
 					var req = {remoteAddr: "cleanup-test-#i#"};
-					limiter.handle(request = req, next = nextFn);
+					limiter.handle(req = req, next = nextFn);
 				}
 
 				// Should still function correctly after cleanup cycles.
-				var result = limiter.handle(request = {remoteAddr: "cleanup-final"}, next = nextFn);
+				var result = limiter.handle(req = {remoteAddr: "cleanup-final"}, next = nextFn);
 				expect(result).toBe("ok");
 			});
 
@@ -585,9 +585,9 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
-				var r1 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
-				var r2 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
-				var r3 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
+				var r1 = limiter.handle(req = {remoteAddr: "failclose-fw-1"}, next = nextFn);
+				var r2 = limiter.handle(req = {remoteAddr: "failclose-fw-1"}, next = nextFn);
+				var r3 = limiter.handle(req = {remoteAddr: "failclose-fw-1"}, next = nextFn);
 
 				expect(r1).toBe("ok");
 				expect(r2).toBe("ok");
@@ -603,9 +603,9 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
-				var r1 = limiter.handle(request = {remoteAddr: "failclose-sw-1"}, next = nextFn);
-				var r2 = limiter.handle(request = {remoteAddr: "failclose-sw-1"}, next = nextFn);
-				var r3 = limiter.handle(request = {remoteAddr: "failclose-sw-1"}, next = nextFn);
+				var r1 = limiter.handle(req = {remoteAddr: "failclose-sw-1"}, next = nextFn);
+				var r2 = limiter.handle(req = {remoteAddr: "failclose-sw-1"}, next = nextFn);
+				var r3 = limiter.handle(req = {remoteAddr: "failclose-sw-1"}, next = nextFn);
 
 				expect(r1).toBe("ok");
 				expect(r2).toBe("ok");
@@ -621,9 +621,9 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
-				var r1 = limiter.handle(request = {remoteAddr: "failclose-tb-1"}, next = nextFn);
-				var r2 = limiter.handle(request = {remoteAddr: "failclose-tb-1"}, next = nextFn);
-				var r3 = limiter.handle(request = {remoteAddr: "failclose-tb-1"}, next = nextFn);
+				var r1 = limiter.handle(req = {remoteAddr: "failclose-tb-1"}, next = nextFn);
+				var r2 = limiter.handle(req = {remoteAddr: "failclose-tb-1"}, next = nextFn);
+				var r3 = limiter.handle(req = {remoteAddr: "failclose-tb-1"}, next = nextFn);
 
 				expect(r1).toBe("ok");
 				expect(r2).toBe("ok");
@@ -640,9 +640,9 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
-				var r1 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
-				var r2 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
-				var r3 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
+				var r1 = limiter.handle(req = {remoteAddr: "failopen-normal-1"}, next = nextFn);
+				var r2 = limiter.handle(req = {remoteAddr: "failopen-normal-1"}, next = nextFn);
+				var r3 = limiter.handle(req = {remoteAddr: "failopen-normal-1"}, next = nextFn);
 
 				expect(r1).toBe("ok");
 				expect(r2).toBe("ok");

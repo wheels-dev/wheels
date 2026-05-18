@@ -84,9 +84,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		return variables.headers;
 	}
 
-	public string function handle(required struct request, required any next) {
+	public string function handle(required struct req, required any next) {
 		// Execute the rest of the pipeline first.
-		local.response = arguments.next(arguments.request);
+		local.response = arguments.next(arguments.req);
 
 		// Apply security headers.
 		try {

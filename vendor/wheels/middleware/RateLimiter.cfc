@@ -137,8 +137,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	/**
 	 * Handle the incoming request — check rate limit, set headers, and either pass through or block.
 	 */
-	public string function handle(required struct request, required any next) {
-		local.clientKey = $resolveKey(arguments.request);
+	public string function handle(required struct req, required any next) {
+		local.clientKey = $resolveKey(arguments.req);
 		local.now = GetTickCount() / 1000;
 
 		// Periodic cleanup for memory storage.
@@ -181,7 +181,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			return "Rate limit exceeded. Try again later.";
 		}
 
-		return arguments.next(arguments.request);
+		return arguments.next(arguments.req);
 	}
 
 	// ---------------------------------------------------------------------------

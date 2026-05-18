@@ -7,7 +7,7 @@
  */
 component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
-	public string function handle(required struct request, required any next) {
+	public string function handle(required struct req, required any next) {
 		// Generate a unique request ID.
 		local.requestId = CreateUUID();
 		// Ensure `request.wheels` exists. In normal Wheels dispatch flow
@@ -19,7 +19,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		request.wheels.requestId = local.requestId;
 
 		// Call the next middleware / controller dispatch.
-		local.response = arguments.next(arguments.request);
+		local.response = arguments.next(arguments.req);
 
 		// Set response header (safe to call even if headers already sent).
 		try {

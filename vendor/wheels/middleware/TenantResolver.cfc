@@ -44,14 +44,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	/**
 	 * Resolve the tenant, set request.wheels.tenant, then delegate to the next middleware.
 	 */
-	public string function handle(required struct request, required any next) {
-		// Note: In CFML, bare `request` inside a function always refers to the
-		// built-in request scope, even when a parameter is named `request`.
-		// We use `arguments.request` to access the middleware pipeline's request struct,
-		// but set tenant state on the built-in `request` scope since that's what
-		// $performQuery() and $get() read from.
+	public string function handle(required struct req, required any next) {
+		// Parameter is named `req` (not `request`) so writes to the `request`
+		// scope below resolve unambiguously to the built-in scope on every
+		// engine. A parameter literally named `request` shadows the scope on
+		// Adobe CF (CFML reserved-scope shadowing), even though Lucee and
+		// BoxLang treat the shadow loosely and write through to the scope.
 
-		local.tenant = $resolveTenant(arguments.request);
+		local.tenant = $resolveTenant(arguments.req);
 
 		// Only set tenant context if the resolver returned a non-empty struct with a dataSource
 		if (IsStruct(local.tenant) && !StructIsEmpty(local.tenant) && StructKeyExists(local.tenant, "dataSource") && Len(local.tenant.dataSource)) {
@@ -76,7 +76,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		try {
-			return arguments.next(arguments.request);
+			return arguments.next(arguments.req);
 		} finally {
 			// Clean up tenant context from the built-in request scope
 			if (IsDefined("request.wheels.tenant")) {
