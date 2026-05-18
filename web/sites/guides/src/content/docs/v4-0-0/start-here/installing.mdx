@@ -126,17 +126,16 @@ The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x relea
    Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
    ```
 
-2. Add the `java` and `wheels` buckets, then install a channel:
+2. Add the Wheels bucket and install a channel:
 
    ```powershell title="PowerShell"
-   scoop bucket add java
    scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
    scoop install wheels        # stable - tracks v4.0.0 GA tags
    # OR:
    scoop install wheels-be     # bleeding-edge - tracks every develop merge
    ```
 
-   The `java` bucket is needed because the Wheels manifest declares `java/openjdk21` as a dependency — Scoop will pull JDK 21 in automatically once the bucket is added, but it does not auto-add the bucket on your behalf. Both `wheels` packages expose the same `wheels` shim on PATH — Scoop refuses to install both at once. See [Release Channels](/v4-0-0/start-here/release-channels/) for the comparison.
+   Both packages inline OpenJDK 21 — no separate `java` bucket or `JAVA_HOME` setup required. Both expose the same `wheels` shim on PATH, so Scoop refuses to install both at once. See [Release Channels](/v4-0-0/start-here/release-channels/) for the comparison.
 
 3. Verify:
 
