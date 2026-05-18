@@ -1,6 +1,6 @@
 # Wheels Build Scripts
 
-This directory contains the build scripts that replace the previous Ant-based build system. These scripts are used by the GitHub Actions workflow to build the three Wheels variants: Core, Base Template, and CLI.
+This directory contains the build scripts that replace the previous Ant-based build system. These scripts are used by the GitHub Actions workflow to build the four Wheels variants: Core, Base Template, CLI, and Starter App.
 
 ## Two Types of Scripts
 
@@ -11,7 +11,7 @@ This directory contains the build scripts that replace the previous Ant-based bu
 - Files remain in place for the publish action to package
 
 ### 2. Build Scripts (for GitHub Artifacts)
-- `build-core.sh`, `build-base.sh`, `build-cli.sh`
+- `build-core.sh`, `build-base.sh`, `build-cli.sh`, `build-starterApp.sh`
 - These scripts create complete ZIP packages with checksums
 - Used for creating GitHub release artifacts
 - Creates both versioned and bleeding-edge (-be) packages
@@ -23,6 +23,7 @@ This directory contains the build scripts that replace the previous Ant-based bu
 - **`build-core.sh`** - Builds the Wheels Core framework package
 - **`build-base.sh`** - Builds the Wheels Base Template (application starter template)
 - **`build-cli.sh`** - Builds the Wheels CLI commands module
+- **`build-starterApp.sh`** - Builds the Wheels Starter App
 
 Each script takes 4 parameters:
 1. `VERSION` - The version string (e.g., "5.3.0+123")
@@ -32,7 +33,7 @@ Each script takes 4 parameters:
 
 ### Convenience Scripts
 
-- **`build-all.sh`** - Builds all three variants sequentially (useful for local testing)
+- **`build-all.sh`** - Builds all four variants sequentially (useful for local testing)
 
 ## Usage
 
@@ -80,17 +81,21 @@ artifacts/
   wheels/
     {version}/
       wheels-core-{version}.zip
-      wheels-core-{version}.md5
-      wheels-core-{version}.sha512
+      wheels-core-{version}.zip.md5
+      wheels-core-{version}.zip.sha512
       wheels-base-template-{version}.zip
-      wheels-base-template-{version}.md5
-      wheels-base-template-{version}.sha512
+      wheels-base-template-{version}.zip.md5
+      wheels-base-template-{version}.zip.sha512
       wheels-cli-{version}.zip
-      wheels-cli-{version}.md5
-      wheels-cli-{version}.sha512
+      wheels-cli-{version}.zip.md5
+      wheels-cli-{version}.zip.sha512
+      wheels-starter-app-{version}.zip
+      wheels-starter-app-{version}.zip.md5
+      wheels-starter-app-{version}.zip.sha512
     wheels-core-be.zip
     wheels-base-template-be.zip
     wheels-cli-be.zip
+    wheels-starter-app-be.zip
 ```
 
 ## Version Handling
