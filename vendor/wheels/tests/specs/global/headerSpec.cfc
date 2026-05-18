@@ -55,12 +55,7 @@ component extends="wheels.WheelsTest" {
 
 		describe("Tests that \$content()", () => {
 
-			// `$content()` picked up the same `$responseCommitted()` short-circuit
-			// and race-window catch shape as `$header()` (Global.cfc:120-138).
-			// This spec parallels the `$header()` coverage above — confirms a
-			// straight `type` call lands without throwing on every engine in
-			// the matrix and that the plain-struct copy works for `cfcontent`
-			// as it does for `cfheader`.
+			// Parallel coverage for `$content()` — same defensive shape as `$header()`.
 
 			afterEach(() => {
 				// Best-effort reset — same shape as the cleanup for `$header()`
