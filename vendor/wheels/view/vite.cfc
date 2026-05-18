@@ -225,8 +225,7 @@ component {
 				importKeys=local.entry.imports,
 				manifest=local.manifest,
 				visited=local.visited,
-				preloads=local.rv.preloads,
-				styles=local.rv.styles
+				rv=local.rv
 			);
 		}
 
@@ -235,15 +234,18 @@ component {
 
 	/**
 	 * Depth-first walks a list of chunk import keys, mutating the passed-in
-	 * preloads and styles arrays as it visits each chunk. The visited struct
-	 * prevents cycles and dedupes diamond dependencies.
+	 * `rv` struct's preloads and styles arrays as it visits each chunk. The
+	 * visited struct prevents cycles and dedupes diamond dependencies. Takes
+	 * the parent struct rather than the inner arrays directly: Adobe CF
+	 * copies arrays by value out of struct literals (Cross-Engine Invariant
+	 * #6), so mutating `preloads` / `styles` references passed as separate
+	 * arguments writes to copies, not the caller's `local.rv`.
 	 */
 	public void function $viteWalkImports(
 		required array importKeys,
 		required struct manifest,
 		required struct visited,
-		required array preloads,
-		required array styles
+		required struct rv
 	) {
 		for (local.key in arguments.importKeys) {
 			if (StructKeyExists(arguments.visited, local.key)) {
@@ -254,10 +256,10 @@ component {
 				continue;
 			}
 			local.chunk = arguments.manifest[local.key];
-			ArrayAppend(arguments.preloads, local.chunk.file);
+			ArrayAppend(arguments.rv.preloads, local.chunk.file);
 			if (StructKeyExists(local.chunk, "css") && IsArray(local.chunk.css)) {
 				for (local.cssFile in local.chunk.css) {
-					ArrayAppend(arguments.styles, local.cssFile);
+					ArrayAppend(arguments.rv.styles, local.cssFile);
 				}
 			}
 			if (StructKeyExists(local.chunk, "imports") && IsArray(local.chunk.imports)) {
@@ -265,8 +267,7 @@ component {
 					importKeys=local.chunk.imports,
 					manifest=arguments.manifest,
 					visited=arguments.visited,
-					preloads=arguments.preloads,
-					styles=arguments.styles
+					rv=arguments.rv
 				);
 			}
 		}
