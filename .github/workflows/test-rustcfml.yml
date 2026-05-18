@@ -1,0 +1,239 @@
+name: Test RustCFML Compatibility (Experimental)
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-rustcfml:
+    name: RustCFML + SQLite (experimental)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      PORT: 60100
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build RustCFML image
+        id: build
+        continue-on-error: true
+        run: |
+          echo "Building RustCFML Docker image (this may take several minutes on first run)..."
+          docker compose build rustcfml 2>&1 | tail -20
+          echo "build_ok=$?" >> $GITHUB_OUTPUT
+
+      - name: Start RustCFML
+        if: steps.build.outcome == 'success'
+        run: docker compose up -d rustcfml
+
+      - name: Wait for RustCFML to be ready
+        if: steps.build.outcome == 'success'
+        id: health
+        continue-on-error: true
+        run: |
+          echo "Waiting for RustCFML on port ${PORT}..."
+          MAX_WAIT=30
+          WAIT_COUNT=0
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 \
+              -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || echo "000")
+            echo "Attempt ${WAIT_COUNT}/${MAX_WAIT}: HTTP ${HTTP_CODE}"
+            if echo "$HTTP_CODE" | grep -q "200\|404\|302\|500"; then
+              echo "RustCFML is responding (HTTP ${HTTP_CODE})"
+              echo "ready=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "RustCFML did not become ready within ${MAX_WAIT} attempts"
+          echo "ready=false" >> $GITHUB_OUTPUT
+
+      - name: Smoke test - basic CFML execution
+        if: steps.health.outcome == 'success' && steps.health.outputs.ready == 'true'
+        id: smoke
+        continue-on-error: true
+        run: |
+          echo "=== Smoke test: basic page load ==="
+          HTTP_CODE=$(curl -s -o /tmp/smoke-result.txt --max-time 30 \
+            -w "%{http_code}" "http://localhost:${PORT}/" || echo "000")
+          echo "Root page: HTTP ${HTTP_CODE}"
+          if [ -f /tmp/smoke-result.txt ]; then
+            head -50 /tmp/smoke-result.txt
+          fi
+
+          echo ""
+          echo "=== Smoke test: reload request ==="
+          HTTP_CODE=$(curl -s -o /tmp/reload-result.txt --max-time 60 \
+            -w "%{http_code}" "http://localhost:${PORT}/?reload=true" || echo "000")
+          echo "Reload: HTTP ${HTTP_CODE}"
+          if [ -f /tmp/reload-result.txt ]; then
+            head -50 /tmp/reload-result.txt
+          fi
+
+      - name: Run test suite
+        if: steps.health.outcome == 'success' && steps.health.outputs.ready == 'true'
+        id: run-tests
+        continue-on-error: true
+        run: |
+          TEST_URL="http://localhost:${PORT}/wheels/core/tests?db=sqlite&format=json"
+          RESULT_FILE="/tmp/rustcfml-sqlite-result.txt"
+
+          echo "Running test suite: ${TEST_URL}"
+          echo "This may take several minutes..."
+
+          HTTP_CODE=$(curl -s -o "${RESULT_FILE}" \
+            --max-time 900 \
+            --write-out "%{http_code}" \
+            "${TEST_URL}" || echo "000")
+
+          echo "HTTP Code: ${HTTP_CODE}"
+          echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
+
+          if [ -f "$RESULT_FILE" ]; then
+            # Try to parse as JSON for summary stats
+            python3 -c "
+          import json, sys
+          try:
+              d = json.load(open('$RESULT_FILE'))
+              total = int(d.get('totalSpecs', 0))
+              passed = int(d.get('totalPass', 0))
+              failed = int(d.get('totalFail', 0))
+              errors = int(d.get('totalError', 0))
+              skipped = int(d.get('totalSkipped', 0))
+              print(f'Total: {total} | Passed: {passed} | Failed: {failed} | Errors: {errors} | Skipped: {skipped}')
+              pct = round(passed / total * 100, 1) if total > 0 else 0
+              print(f'Pass rate: {pct}%')
+          except Exception as e:
+              print(f'Could not parse JSON results: {e}')
+              # Show first 200 chars of response
+              with open('$RESULT_FILE') as f:
+                  content = f.read()
+                  print(f'Response preview ({len(content)} bytes):')
+                  print(content[:500])
+          " 2>&1 || echo "Result parsing failed"
+          else
+            echo "No result file generated"
+          fi
+
+      - name: Generate compatibility report
+        if: always()
+        run: |
+          RESULTS_DIR=".github/workflow-results"
+          RESULTS_FILE="${RESULTS_DIR}/test-rustcfml.md"
+          mkdir -p "$RESULTS_DIR"
+
+          {
+            echo "# RustCFML Compatibility Report (Experimental)"
+            echo ""
+            echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Commit:** ${{ github.sha }}"
+            echo "**Branch:** ${{ github.ref_name }}"
+            echo "**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            echo "## Stage Results"
+            echo ""
+            echo "| Stage | Result |"
+            echo "|-------|--------|"
+            echo "| Docker build | ${{ steps.build.outcome }} |"
+            echo "| Server startup | ${{ steps.health.outcome }} |"
+            echo "| Smoke test | ${{ steps.smoke.outcome }} |"
+            echo "| Test suite | ${{ steps.run-tests.outcome }} |"
+            echo ""
+          } > "$RESULTS_FILE"
+
+          # Add test results if available
+          if [ -f "/tmp/rustcfml-sqlite-result.txt" ]; then
+            {
+              echo "## Test Results"
+              echo ""
+              python3 -c "
+          import json, sys
+          try:
+              d = json.load(open('/tmp/rustcfml-sqlite-result.txt'))
+              total = int(d.get('totalSpecs', 0))
+              passed = int(d.get('totalPass', 0))
+              failed = int(d.get('totalFail', 0))
+              errors = int(d.get('totalError', 0))
+              skipped = int(d.get('totalSkipped', 0))
+              pct = round(passed / total * 100, 1) if total > 0 else 0
+              print(f'- **Total specs:** {total}')
+              print(f'- **Passed:** {passed} ({pct}%)')
+              print(f'- **Failed:** {failed}')
+              print(f'- **Errors:** {errors}')
+              print(f'- **Skipped:** {skipped}')
+              print()
+              # List first 20 failures
+              if failed > 0 or errors > 0:
+                  print('### First failures/errors')
+                  print()
+                  count = 0
+                  for b in d.get('bundleStats', []):
+                      for s in b.get('suiteStats', []):
+                          for sp in s.get('specStats', []):
+                              if sp.get('status') in ('Failed', 'Error') and count < 20:
+                                  print(f'- **{sp.get(\"name\", \"unknown\")}**: {sp.get(\"failMessage\", \"\")}')
+                                  count += 1
+                  if count == 0:
+                      # Check nested suites
+                      for b in d.get('bundleStats', []):
+                          for s in b.get('suiteStats', []):
+                              for child in s.get('suiteStats', []):
+                                  for sp in child.get('specStats', []):
+                                      if sp.get('status') in ('Failed', 'Error') and count < 20:
+                                          print(f'- **{sp.get(\"name\", \"unknown\")}**: {sp.get(\"failMessage\", \"\")}')
+                                          count += 1
+          except Exception as e:
+              print(f'Could not parse results: {e}')
+          " 2>&1 || echo "Parse error"
+            } >> "$RESULTS_FILE"
+          fi
+
+          # Add debug info
+          {
+            echo ""
+            echo "## Container Logs"
+            echo ""
+            echo '```'
+            docker logs wheels-rustcfml-1 2>&1 | tail -80 || echo "No container logs available"
+            echo '```'
+          } >> "$RESULTS_FILE"
+
+      - name: Debug information
+        if: always()
+        run: |
+          echo "=== Docker Container Status ==="
+          docker ps -a --filter "name=rustcfml" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+          echo -e "\n=== RustCFML Container Logs (last 80 lines) ==="
+          docker logs wheels-rustcfml-1 2>&1 | tail -80 || echo "No logs available"
+
+      - name: Commit compatibility report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ".github/workflow-results/test-rustcfml.md"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "ci: add RustCFML compatibility report [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustcfml-test-results
+          path: |
+            /tmp/rustcfml-sqlite-result.txt
+            /tmp/smoke-result.txt
+            /tmp/reload-result.txt

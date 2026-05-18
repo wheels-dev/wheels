@@ -22,6 +22,9 @@ jobs:
         cfengine:
           ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023", "adobe2025", "boxlang"]
         experimental: [false]
+        include:
+          - cfengine: rustcfml
+            experimental: true
     env:
       PORT_lucee5: 60005
       PORT_lucee6: 60006
@@ -31,6 +34,7 @@ jobs:
       PORT_adobe2023: 62023
       PORT_adobe2025: 62025
       PORT_boxlang: 60001
+      PORT_rustcfml: 60100
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -50,6 +54,10 @@ jobs:
               # adobe2018 also excludes sqlite
               DATABASES="mysql,postgres,sqlserver,oracle"
               ;;
+            rustcfml)
+              # RustCFML uses native Rust drivers, not JDBC — start with SQLite only
+              DATABASES="sqlite"
+              ;;
           esac
 
           echo "databases=${DATABASES}" >> $GITHUB_OUTPUT
@@ -63,7 +71,13 @@ jobs:
             -O ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
 
       - name: Start CF engine
-        run: docker compose build --no-cache ${{ matrix.cfengine }} && docker compose up -d ${{ matrix.cfengine }}
+        run: |
+          # RustCFML builds Rust from source — allow Docker layer caching to avoid 15+ min rebuild
+          if [ "${{ matrix.cfengine }}" = "rustcfml" ]; then
+            docker compose build ${{ matrix.cfengine }} && docker compose up -d ${{ matrix.cfengine }}
+          else
+            docker compose build --no-cache ${{ matrix.cfengine }} && docker compose up -d ${{ matrix.cfengine }}
+          fi
 
       - name: Start all databases
         run: |
@@ -514,7 +528,7 @@ jobs:
           MATRIX_MD="${MATRIX_MD}
           |--------|:-----:|:----------:|:----------:|:--:|:------:|:------:|"
 
-          for engine in lucee5 lucee6 lucee7 adobe2018 adobe2021 adobe2023 adobe2025 boxlang; do
+          for engine in lucee5 lucee6 lucee7 adobe2018 adobe2021 adobe2023 adobe2025 boxlang rustcfml; do
             ROW="| **${engine}** |"
             for db in mysql postgres sqlserver h2 oracle sqlite; do
               FILE="results/test-results-${engine}/${engine}-${db}-result.txt"

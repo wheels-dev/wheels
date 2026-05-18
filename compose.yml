@@ -259,6 +259,24 @@ services:
     networks:
       - wheels-network
 
+  rustcfml:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/rustcfml/Dockerfile
+    image: wheels-test-rustcfml:v0.1.0
+    volumes:
+      - ./:/wheels-test-suite
+      - type: bind
+        source: ./tools/docker/rustcfml/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/rustcfml/app.cfm
+        target: /wheels-test-suite/config/app.cfm
+    ports:
+      - "60100:60100"
+    networks:
+      - wheels-network
+
   mysql:
     image: mysql:9
     restart: always
