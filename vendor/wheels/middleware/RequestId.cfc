@@ -10,11 +10,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	public string function handle(required struct request, required any next) {
 		// Generate a unique request ID.
 		local.requestId = CreateUUID();
-		// Ensure `request.wheels` exists. In a normal Wheels dispatch flow
-		// `$initializeRequestScope()` has already populated it, but middleware
-		// can run from contexts that bypass dispatch — and Adobe CF refuses
-		// implicit struct creation on `request.wheels.requestId = …` when
-		// `request.wheels` itself is missing.
+		// Ensure `request.wheels` exists. In normal Wheels dispatch flow
+		// `$initializeRequestScope()` has already populated it; middleware
+		// can also be invoked from test contexts that bypass dispatch.
 		if (!StructKeyExists(request, "wheels")) {
 			request.wheels = {};
 		}
