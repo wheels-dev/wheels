@@ -36,6 +36,10 @@ for DIST in $DISTRIBUTIONS; do
   echo "── Regenerating dists/${DIST}/ ──"
   DIST_DIR="dists/${DIST}"
   mkdir -p "$DIST_DIR"
+  # First publish for a brand-new channel: the pool dir may not exist yet.
+  # apt-ftparchive aborts on a missing scan path, so create an empty pool
+  # for now — it'll be backfilled by the first publish dispatch on that channel.
+  mkdir -p "pool/${DIST}"
 
   for COMPONENT in $COMPONENTS; do
     for ARCH in $ARCHITECTURES; do

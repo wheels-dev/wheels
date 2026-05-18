@@ -98,7 +98,8 @@ Before this bucket repo will function:
 
 1. **GPG signing key** — generate a 4096-bit RSA key (or Ed25519 if you prefer)
    for `Wheels Distribution <hello@wheels.dev>`. Private key + passphrase go
-   into 1Password under `op://Infrastructure/wheels-linux-repo-signing/`.
+   into 1Password under `op://Wheels/wheels-linux-repo-signing/` (Wheels
+   project vault on `my.1password.com`).
    Public key (ASCII-armored) overwrites `wheels.gpg` at the bucket-repo root.
 2. **Cloudflare Pages** — create a Pages project pointing at this repo, bind
    the apex domain `apt.wheels.dev`. The build command is empty (the repo

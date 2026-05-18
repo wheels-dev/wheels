@@ -84,12 +84,17 @@ jobs:
           fetch-depth: 1
           persist-credentials: true
 
-      - name: Install createrepo_c + gpg
+      - name: Install createrepo_c + gpg + rpm
+        # `rpm` brings the `rpm --addsign` tool, used by
+        # regenerate-yum-metadata.sh to sign each .rpm before createrepo_c
+        # records the hash chain. Without it, dnf clients refuse to install
+        # because the wheels.repo files set gpgcheck=1.
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends createrepo-c gnupg
+          sudo apt-get install -y --no-install-recommends createrepo-c gnupg rpm
           createrepo_c --version
           gpg --version | head -1
+          rpm --version
 
       - name: Import GPG signing key
         env:
@@ -102,10 +107,15 @@ jobs:
             exit 1
           fi
           echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
+          # See apt-repo/workflows/wheels-released.yml for the fingerprint-vs-key_id
+          # rationale — import-ownertrust needs the 40-char fingerprint, not the
+          # 16-char key_id (otherwise: "gpg: error in '[stdin]': invalid fingerprint").
+          FINGERPRINT=$(gpg --list-secret-keys --with-colons \
+            | awk -F: '/^fpr:/ { print $10; exit }')
           KEY_ID=$(gpg --list-secret-keys --keyid-format=long --with-colons \
             | awk -F: '/^sec:/ { print $5; exit }')
-          echo "Imported signing key: $KEY_ID"
-          echo "$KEY_ID:6:" | gpg --batch --yes --import-ownertrust
+          echo "Imported signing key: $KEY_ID (fpr $FINGERPRINT)"
+          echo "$FINGERPRINT:6:" | gpg --batch --yes --import-ownertrust
           echo "GPG_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
 
       - name: Download .rpm from upstream Release
