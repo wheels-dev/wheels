@@ -118,7 +118,6 @@ Until the native repos are live, download integrity relies on GitHub's HTTPS tra
 Wheels ships on Windows through [Scoop](https://scoop.sh) — a portable, sandboxed package manager that fits the project's release cadence (hourly autoupdate for both stable and bleeding-edge channels). The legacy Chocolatey path is no longer supported; the old v1.x `wheels` package at `community.chocolatey.org/packages/wheels` is the CommandBox-based release and won't drive a v4 tutorial.
 
 ```powershell
-scoop bucket add java
 scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
 
 # Pick a channel:
@@ -128,7 +127,7 @@ scoop install wheels-be     # bleeding-edge - tracks every develop merge
 wheels --version
 ```
 
-Both packages declare `java/openjdk21` as a dependency. Scoop pulls the JDK in automatically *once the `java` bucket has been added* — it doesn't add the bucket on your behalf, so the `scoop bucket add java` step is required before the install. Both packages expose the same `wheels` PATH shim — Scoop refuses to install both at once. To switch channels:
+Both packages bundle OpenJDK 21 inline — no separate `java` bucket, no `JAVA_HOME` setup. Both expose the same `wheels` PATH shim, so Scoop refuses to install both at once. To switch channels:
 
 ```powershell
 scoop uninstall wheels && scoop install wheels-be
@@ -137,7 +136,7 @@ scoop uninstall wheels-be && scoop install wheels
 
 See [Release Channels](/v4-0-1-snapshot/start-here/release-channels/) for the full channel comparison.
 
-The Scoop bucket lives at [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels). The bucket's `checkver`/`autoupdate` blocks pull new versions from GitHub Releases hourly via the community [Excavator](https://github.com/ScoopInstaller/Excavator) bot — no manual maintenance per release.
+The Scoop bucket lives at [`wheels-dev/scoop-wheels`](https://github.com/wheels-dev/scoop-wheels). New versions land in the bucket via [`autoupdate.yml`](https://github.com/wheels-dev/scoop-wheels/blob/main/.github/workflows/autoupdate.yml), a self-hosted workflow that listens for a `repository_dispatch` event from this repo's `release.yml`. End-to-end latency from upstream tag to user-installable manifest: ~5-7 min. A daily cron tick at 08:30 UTC catches any dispatch the workflow missed.
 
 WinGet support (`winget install Wheels.Wheels`) is planned for post-v4.0.0 GA once a proper installer artifact is built. Until then, use Scoop.
 
