@@ -33,7 +33,7 @@ Each script takes 4 parameters:
 
 ### Convenience Scripts
 
-- **`build-all.sh`** - Builds all three variants sequentially (useful for local testing)
+- **`build-all.sh`** - Builds all four variants sequentially (useful for local testing)
 
 ## Usage
 

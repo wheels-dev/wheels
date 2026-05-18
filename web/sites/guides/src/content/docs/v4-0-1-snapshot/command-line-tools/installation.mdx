@@ -74,7 +74,11 @@ The bleeding-edge channel publishes `.deb`/`.rpm` to [`wheels-dev/wheels-snapsho
 
 ```bash title="illustrative — Debian / Ubuntu (bleeding-edge)"
 SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+  | jq -r '.[0].tag_name | sub("^v"; "")')
+if [ -z "$SNAP_TAG" ] || [ "$SNAP_TAG" = "null" ]; then
+  echo "Error: could not resolve snapshot tag. Check your network, GitHub API rate limit, or set SNAP_TAG manually." >&2
+  exit 1
+fi
 SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
 curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
 sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
@@ -82,7 +86,11 @@ sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
 
 ```bash title="illustrative — Fedora / RHEL (bleeding-edge)"
 SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+  | jq -r '.[0].tag_name | sub("^v"; "")')
+if [ -z "$SNAP_TAG" ] || [ "$SNAP_TAG" = "null" ]; then
+  echo "Error: could not resolve snapshot tag. Check your network, GitHub API rate limit, or set SNAP_TAG manually." >&2
+  exit 1
+fi
 SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
 sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
 ```
