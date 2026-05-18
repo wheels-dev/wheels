@@ -15,9 +15,11 @@ on:
       FORGEBOX_PASS:
         required: true
       # Optional — when present, the build job's "Dispatch downstream package
-      # managers" step fires repository_dispatch on homebrew/chocolatey-wheels
-      # so their auto-update workflows pick up the new release in ~5min instead
-      # of waiting for the daily cron. When absent, the step warns and exits 0.
+      # managers" step fires repository_dispatch on homebrew-wheels and
+      # scoop-wheels so their auto-update workflows pick up the new release
+      # in ~5min instead of waiting for the daily cron. When absent, the step
+      # warns and exits 0. The chocolatey path was retired in favor of Scoop
+      # for the v4.x Windows install — see scoop-wheels#4.
       DOWNSTREAM_DISPATCH_TOKEN:
         required: false
       # Optional — when present, the build job's "Dispatch Linux repo buckets"
@@ -501,12 +503,16 @@ jobs:
       # Dispatch downstream package managers
       #
       # Fires repository_dispatch on wheels-dev/homebrew-wheels and
-      # wheels-dev/chocolatey-wheels so their auto-update workflows pick
-      # up the new release within minutes instead of waiting up to 24h
-      # for their daily cron. Both repos have:
+      # wheels-dev/scoop-wheels so their auto-update workflows pick up
+      # the new release within minutes instead of waiting up to 24h for
+      # their daily cron. Both repos have:
       #   on:
       #     repository_dispatch:
       #       types: [wheels-released]
+      #
+      # Chocolatey was dropped — the v1.x chocolatey-wheels package is
+      # CommandBox-based and can't drive v4. Windows installs go through
+      # Scoop now. See scoop-wheels#4 for the bucket's autoupdate workflow.
       #
       # Requires DOWNSTREAM_DISPATCH_TOKEN — a fine-grained PAT (or app
       # token) with `metadata: read` + `actions: write` on the two
@@ -522,7 +528,7 @@ jobs:
           set -euo pipefail
 
           if [ -z "${GH_DISPATCH_TOKEN:-}" ]; then
-            echo "::warning::DOWNSTREAM_DISPATCH_TOKEN is not set on the repository — homebrew/chocolatey auto-update will fall back to the daily cron tick."
+            echo "::warning::DOWNSTREAM_DISPATCH_TOKEN is not set on the repository — homebrew-wheels and scoop-wheels auto-update will fall back to the daily cron tick."
             exit 0
           fi
 
@@ -546,7 +552,7 @@ jobs:
           # Static event type, fixed repo list — no untrusted input flows
           # into the curl arguments. WHEELS_RELEASE_VERSION is generated
           # earlier in the same workflow from wheels.json + run number.
-          for repo in homebrew-wheels chocolatey-wheels; do
+          for repo in homebrew-wheels scoop-wheels; do
             echo "Dispatching wheels-released to wheels-dev/${repo}..."
             http_status=$(curl -sS -o /tmp/dispatch-resp.txt -w "%{http_code}" \
               -X POST \
@@ -564,7 +570,7 @@ jobs:
             fi
           done
 
-          echo "Downstream package manager workflows dispatched (homebrew + chocolatey)."
+          echo "Downstream package manager workflows dispatched (homebrew + scoop)."
 
       #############################################
       # Dispatch Linux repo buckets (apt.wheels.dev / yum.wheels.dev)
@@ -596,7 +602,7 @@ jobs:
             exit 0
           fi
 
-          # Same channel derivation as the homebrew/chocolatey dispatch.
+          # Same channel derivation as the homebrew/scoop dispatch.
           # apt-wheels-dev / yum-wheels-dev route on `channel` in the payload
           # to slot the .deb/.rpm into the right pool (stable vs bleeding-edge).
           # RC releases aren't currently published to apt/yum, so we skip them.
@@ -645,7 +651,7 @@ jobs:
             exit 0
           fi
 
-          # Reuse the same channel-derivation rule as the homebrew/chocolatey
+          # Reuse the same channel-derivation rule as the homebrew/scoop
           # step so this stays in sync. Only stable GA releases bump develop.
           if echo "${WHEELS_RELEASE_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
             CHANNEL="bleeding-edge"
@@ -657,7 +663,7 @@ jobs:
 
           # Fire bump-develop at this repo to open the develop-bump PR.
           # Only stable GA releases bump develop; snapshots and RCs don't.
-          # Same workaround as the homebrew/chocolatey dispatches above:
+          # Same workaround as the homebrew/scoop dispatches above:
           # the release-publish step runs under the default workflow token,
           # which cannot trigger downstream workflows. We dispatch from
           # this step (which runs under DOWNSTREAM_DISPATCH_TOKEN, a PAT)
