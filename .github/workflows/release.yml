@@ -269,6 +269,19 @@ jobs:
           # for the wheels-cli ForgeBox artifact. See #2326.
           find cli/lucli -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) -exec sed -i.bak "s/@build\.version@/${MODULE_VERSION}/g" {} \;
           find cli/lucli -name "*.bak" -delete
+          # Generate .module-version at build time with the canonical version.
+          # This file is read at runtime by the brew/scoop/.deb/.rpm wrappers
+          # for two purposes:
+          #   (1) `wheels --version` displays its contents verbatim
+          #   (2) The wrappers compare staged-module-version vs installed-version
+          #       to decide whether to re-sync the module on first run
+          # The substitution above only matches *.json *.md *.cfm *.cfc, so
+          # `.module-version` (no extension) was previously sourced from a stale
+          # source-tracked file and embedded into every artifact (snapshot AND
+          # GA). That made every release look like the same snapshot tag and
+          # broke channel-switch sync detection. Generating it here ensures
+          # both behaviors stay correct. See #2758 follow-up.
+          echo "${MODULE_VERSION}" > cli/lucli/.module-version
           tar czf "artifacts/wheels/${MODULE_VERSION}/wheels-module-${MODULE_VERSION}.tar.gz" -C cli/lucli .
           cd cli/lucli && zip -r "../../artifacts/wheels/${MODULE_VERSION}/wheels-module-${MODULE_VERSION}.zip" . && cd ../..
           cd artifacts/wheels/${{ env.WHEELS_VERSION }}

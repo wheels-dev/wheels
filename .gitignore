@@ -19,6 +19,11 @@ META-INF
 !/vendor/wheels/
 /cli/workspace/
 /cli/simpletestapp/
+# Generated at release time by .github/workflows/release.yml — see #2758
+# follow-up. Source-tracked stale values cause `wheels --version` to show
+# a snapshot tag on GA installs and break channel-switch detection in the
+# brew/scoop wrappers (which compare staged vs installed `.module-version`).
+/cli/lucli/.module-version
 
 # Database files
 /db/
