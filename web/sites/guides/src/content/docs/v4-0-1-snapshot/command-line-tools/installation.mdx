@@ -102,6 +102,7 @@ Until the native repos are live, download integrity relies on GitHub's HTTPS tra
 Wheels ships on Windows through [Scoop](https://scoop.sh) — a portable, sandboxed package manager that fits the project's release cadence (hourly autoupdate for both stable and bleeding-edge channels). The legacy Chocolatey path is no longer supported; the old v1.x `wheels` package at `community.chocolatey.org/packages/wheels` is the CommandBox-based release and won't drive a v4 tutorial.
 
 ```powershell
+scoop bucket add java
 scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
 
 # Pick a channel:
@@ -111,7 +112,7 @@ scoop install wheels-be     # bleeding-edge - tracks every develop merge
 wheels --version
 ```
 
-Both packages depend on `java/openjdk21` (Scoop pulls it automatically) and expose the same `wheels` PATH shim — Scoop refuses to install both at once. To switch channels:
+Both packages declare `java/openjdk21` as a dependency. Scoop pulls the JDK in automatically *once the `java` bucket has been added* — it doesn't add the bucket on your behalf, so the `scoop bucket add java` step is required before the install. Both packages expose the same `wheels` PATH shim — Scoop refuses to install both at once. To switch channels:
 
 ```powershell
 scoop uninstall wheels && scoop install wheels-be
@@ -147,6 +148,37 @@ If Homebrew and Scoop don't fit your environment — a locked-down CI host, a Do
    Persist these in your shell profile (`~/.zshrc`, `~/.bashrc`, or `$PROFILE` on PowerShell).
 
 Pick LuCLI and Wheels Module versions that are known to be paired — the Homebrew formula's `LUCLI_VERSION` and `MODULE_VERSION` constants in [`Formula/wheels.rb`](https://github.com/wheels-dev/homebrew-wheels/blob/main/Formula/wheels.rb) are the canonical source for "what's currently shipping together."
+
+## Advanced: existing LuCLI install
+
+If you already have standalone [LuCLI](https://lucli.dev) installed and want to layer the Wheels module on top, LuCLI's built-in installer can pull the same module zip the package managers ship — but only via `--url=`, not by bare name. The registry entry for `wheels` currently points at the [`wheels-cli-lucli`](https://github.com/wheels-dev/wheels-cli-lucli) mirror, which has been slow to sync from `develop`, so `lucli modules install wheels` without `--url` may land an older version. There is no `wheels@be` tag in the LuCLI registry; channel selection happens at the URL level.
+
+```bash title="stable — installs Wheels 4.0.0 GA"
+lucli modules install wheels --force \
+  --url=https://github.com/wheels-dev/wheels/releases/download/v4.0.0/wheels-module-4.0.0.zip
+```
+
+```bash title="bleeding-edge — resolve the snapshot tag, then install"
+SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
+  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
+lucli modules install wheels --force \
+  --url="https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-module-${SNAP_TAG}.zip"
+```
+
+`--force` overwrites a previously installed version. The module lands in `~/.lucli/modules/wheels/` and is invoked as `lucli wheels …`.
+
+<Aside type="caution" title="What you give up vs. the Scoop / Homebrew / .deb / .rpm paths">
+The package-manager installs do extra work on your behalf that this path skips. Trade-offs:
+
+- **Binary name.** The Scoop and Homebrew installs rename the LuCLI launcher to `wheels`, which activates LuCLI's binary-name detection so commands are typed as `wheels new …`. With a bare `lucli modules install`, you keep the `lucli` prefix: `lucli wheels new …`.
+- **`LUCLI_HOME` isolation.** Package installs export `LUCLI_HOME=$HOME/.wheels` so installed modules live in `~/.wheels/modules/wheels/` and stay out of the way of any other LuCLI work. Standalone LuCLI uses `~/.lucli/modules/wheels/` — fine on its own, but a previously installed `wheels` module (e.g. v3.1.0 from the older registry entry) will shadow your new install unless you pass `--force`.
+- **JDK resolution.** Package installs probe for a Java 21 install and export `JAVA_HOME` inside their `wheels` wrapper. Standalone LuCLI uses whatever `java` is on your `PATH` — if that's a different major version, the runtime will refuse to start. Make sure `java -version` reports 21.x before installing.
+- **First-run SQLite shim.** The package wrappers auto-stage `sqlite-jdbc-*.jar` into Lucee Express's `lib/ext/` so `wheels start` against a SQLite datasource works out of the box. With a bare LuCLI install you'll need to drop the JAR there yourself the first time you create a SQLite-backed app.
+- **Channel awareness.** `wheels --version` from a packaged install reports `(stable)` or `(bleeding-edge)`. From a bare LuCLI install, the module reports its own version but there's no channel marker — you have to remember which tarball URL you installed from.
+- **No `scoop update` / `brew upgrade` story.** Upgrades are manual: re-run `lucli modules install wheels --force --url=…` with a newer release URL.
+
+This path exists for people who already run LuCLI for other modules and don't want a second binary on `PATH`. For everyone else, the Scoop / Homebrew / Linux package paths are the better default.
+</Aside>
 
 ## Verifying installation
 

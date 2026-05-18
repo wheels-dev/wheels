@@ -80,14 +80,14 @@ artifacts/
   wheels/
     {version}/
       wheels-core-{version}.zip
-      wheels-core-{version}.md5
-      wheels-core-{version}.sha512
+      wheels-core-{version}.zip.md5
+      wheels-core-{version}.zip.sha512
       wheels-base-template-{version}.zip
-      wheels-base-template-{version}.md5
-      wheels-base-template-{version}.sha512
+      wheels-base-template-{version}.zip.md5
+      wheels-base-template-{version}.zip.sha512
       wheels-cli-{version}.zip
-      wheels-cli-{version}.md5
-      wheels-cli-{version}.sha512
+      wheels-cli-{version}.zip.md5
+      wheels-cli-{version}.zip.sha512
     wheels-core-be.zip
     wheels-base-template-be.zip
     wheels-cli-be.zip

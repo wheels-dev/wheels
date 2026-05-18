@@ -307,8 +307,8 @@ jobs:
           name: build-artifacts-base-template
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.sha512
             artifacts/wheels/wheels-base-template-be.zip
 
       - name: Upload Wheels Core Artifact
@@ -317,8 +317,8 @@ jobs:
           name: build-artifacts-core
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
             artifacts/wheels/wheels-core-be.zip
 
       - name: Upload Wheels CLI Artifact
@@ -327,8 +327,8 @@ jobs:
           name: build-artifacts-cli
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
             artifacts/wheels/wheels-cli-be.zip
       
       - name: Upload Wheels Starter App Artifact
@@ -337,8 +337,8 @@ jobs:
           name: build-artifacts-starter-app
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
             artifacts/wheels/wheels-starter-app-be.zip
 
       - name: Upload Wheels Module Artifact
@@ -418,17 +418,17 @@ jobs:
             overwrite_files: true
             files: |
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
@@ -477,17 +477,17 @@ jobs:
             token: ${{ secrets.WHEELS_SNAPSHOTS_TOKEN }}
             files: |
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
