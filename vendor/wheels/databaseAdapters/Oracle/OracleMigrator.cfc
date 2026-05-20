@@ -86,9 +86,14 @@ component extends="wheels.databaseAdapters.Abstract" {
 
     /**
 	 * generates sql to drop a table
+	 *
+	 * CASCADE CONSTRAINTS drops referential integrity constraints that point
+	 * at this table from other tables. Without it, re-running the migrator
+	 * tests collides with ORA-02264 (name already used by an existing
+	 * constraint) because the parent table's incoming FK survives the drop.
 	 */
     public string function dropTable(required string name) {
-		return "DROP TABLE IF EXISTS #objectCase(arguments.name)#";
+		return "DROP TABLE IF EXISTS #objectCase(arguments.name)# CASCADE CONSTRAINTS";
 	}
 
     /**

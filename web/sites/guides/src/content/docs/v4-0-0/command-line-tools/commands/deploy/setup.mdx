@@ -1,0 +1,37 @@
+---
+title: "wheels deploy setup"
+description: First-time deploy. Runs the full deploy flow plus proxy and accessory boot.
+type: reference
+sidebar:
+  label: "setup"
+  order: 4
+---
+
+The first-time deploy verb. Runs the full `wheels deploy` flow and also boots `kamal-proxy` and every declared accessory. Use it once per environment; after that, plain `wheels deploy` is enough.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy setup [--version=<v>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+Same as [`wheels deploy`](/v4-0-0/command-line-tools/commands/deploy/deploy/).
+
+## Behavior
+
+In Phase 2 the `setup` implementation reduces to the same flow as `wheels deploy`. The intent remains: on first run, the proxy container and any accessories boot as a side effect. On a fresh host, the first `wheels deploy setup` is slower than subsequent deploys because `docker pull` fetches every base image.
+
+Expected preconditions:
+
+- Docker is installed on every host. Run [`wheels deploy server bootstrap`](/v4-0-0/command-line-tools/commands/deploy/server/bootstrap/) first if not.
+- Registry credentials resolve in `.kamal/secrets`.
+- `ssh.user` has passwordless `sudo` (or is `root`).
+
+## Examples
+
+```bash title="illustrative — requires Docker/Kamal environment"
+wheels deploy setup
+wheels deploy setup --destination=staging
+```

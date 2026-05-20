@@ -44,11 +44,39 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		return this;
 	}
 
-	public string function handle(required struct request, required any next) {
+	/**
+	 * Resolves the value to emit as Access-Control-Allow-Origin for a
+	 * given request origin. Returns an empty string when no header
+	 * should be emitted. The CORS spec requires this header to be a
+	 * single origin or `*` — never a comma-delimited list.
+	 */
+	public string function $resolveAllowOrigin(string requestOrigin = "") {
+		if (variables.allowOrigins == "*") {
+			return "*";
+		}
+		if (Len(arguments.requestOrigin) && ListFindNoCase(variables.allowOrigins, arguments.requestOrigin)) {
+			return arguments.requestOrigin;
+		}
+		return "";
+	}
+
+	/**
+	 * Computes the response headers this middleware would emit for the given request,
+	 * without actually writing them. Exposed for testability and so the handle()
+	 * path has a single source of truth.
+	 *
+	 * Emits `Vary: Origin` whenever the response varies by request Origin — i.e.
+	 * when a specific origin is reflected back. Skipped on wildcard responses
+	 * (the response is identical for every caller) and on disallowed origins
+	 * (no CORS headers are emitted at all).
+	 */
+	public struct function $headersFor(required struct request) {
+		local.headers = {};
+
 		// Determine the request origin.
 		local.origin = "";
-		if (StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "http_origin")) {
-			local.origin = request.cgi.http_origin;
+		if (StructKeyExists(arguments.request, "cgi") && StructKeyExists(arguments.request.cgi, "http_origin")) {
+			local.origin = arguments.request.cgi.http_origin;
 		} else {
 			try {
 				local.origin = cgi.http_origin;
@@ -56,37 +84,56 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			}
 		}
 
-		// Set CORS headers.
-		local.allowOrigin = variables.allowOrigins;
-		if (variables.allowOrigins != "*" && Len(local.origin)) {
-			// Only reflect the origin if it's in the allowed list.
-			if (ListFindNoCase(variables.allowOrigins, local.origin)) {
-				local.allowOrigin = local.origin;
-			} else {
-				local.allowOrigin = "";
+		// Resolve the value of Access-Control-Allow-Origin.
+		local.allowOrigin = $resolveAllowOrigin(local.origin);
+		local.reflected = Len(local.allowOrigin) && local.allowOrigin != "*";
+
+		if (Len(local.allowOrigin)) {
+			local.headers["Access-Control-Allow-Origin"] = local.allowOrigin;
+			local.headers["Access-Control-Allow-Methods"] = variables.allowMethods;
+			local.headers["Access-Control-Allow-Headers"] = variables.allowHeaders;
+			if (variables.allowCredentials) {
+				local.headers["Access-Control-Allow-Credentials"] = "true";
+			}
+			// When the response is keyed on the request Origin, intermediary caches
+			// must not serve a cached response to a request with a different Origin.
+			if (local.reflected) {
+				local.headers["Vary"] = "Origin";
 			}
 		}
 
-		if (Len(local.allowOrigin)) {
+		return local.headers;
+	}
+
+	public string function handle(required struct request, required any next) {
+		local.headers = $headersFor(request = arguments.request);
+
+		try {
+			for (local.name in local.headers) {
+				cfheader(name = local.name, value = local.headers[local.name]);
+			}
+		} catch (any e) {
+		}
+
+		// Handle preflight OPTIONS request — return empty response immediately.
+		// Prefer the request struct passed to the middleware (the canonical
+		// per-request context, mirroring how RateLimiter resolves remote_addr
+		// from arguments.request.cgi) and fall back to the engine CGI scope
+		// when the request context doesn't carry a method. The engine CGI
+		// scope is read-only on Lucee 7, so unit tests that need to exercise
+		// the OPTIONS branch must inject the verb through arguments.request.cgi
+		// — hence the lookup order.
+		local.requestMethod = "GET";
+		if (StructKeyExists(arguments.request, "cgi") && StructKeyExists(arguments.request.cgi, "request_method")) {
+			local.requestMethod = arguments.request.cgi.request_method;
+		} else {
 			try {
-				cfheader(name = "Access-Control-Allow-Origin", value = local.allowOrigin);
-				cfheader(name = "Access-Control-Allow-Methods", value = variables.allowMethods);
-				cfheader(name = "Access-Control-Allow-Headers", value = variables.allowHeaders);
-				if (variables.allowCredentials) {
-					cfheader(name = "Access-Control-Allow-Credentials", value = "true");
-				}
+				local.requestMethod = cgi.request_method;
 			} catch (any e) {
 			}
 		}
 
-		// Handle preflight OPTIONS request — return empty response immediately.
-		local.requestMethod = "GET";
-		try {
-			local.requestMethod = cgi.request_method;
-		} catch (any e) {
-		}
-
-		if (local.requestMethod == "OPTIONS") {
+		if (UCase(local.requestMethod) == "OPTIONS") {
 			try {
 				cfheader(name = "Access-Control-Max-Age", value = variables.maxAge);
 			} catch (any e) {

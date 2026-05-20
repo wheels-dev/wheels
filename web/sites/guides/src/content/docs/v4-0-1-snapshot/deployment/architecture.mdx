@@ -1,0 +1,171 @@
+---
+title: Architecture of wheels deploy
+description: How the wheels deploy CLI is structured — the port strategy, the byte-compatibility contract with Ruby Kamal, the commands-are-strings invariant that makes --dry-run and offline tests trivial, and the URLClassLoader-isolated JAR loading for snakeyaml, sshj, and jmustache.
+type: reference
+sidebar:
+  order: 13
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is for readers who want to understand how `wheels deploy` is put together — whether you're extending it, debugging it, evaluating it against other deploy tools, or just curious about the port strategy. If you're just trying to ship an app, start with [Your First Deploy](/v4-0-1-snapshot/deployment/first-deploy/) instead.
+
+**You'll learn:**
+
+- Why `wheels deploy` is a port of [Basecamp's Kamal](https://kamal-deploy.org/) rather than a new tool
+- The byte-compatibility contract that makes a Kamal-managed server takeoverable by `wheels deploy` without cleanup
+- The one deliberate divergence from Kamal's config schema (ERB removed; `${VAR}` interpolation kept unchanged) and why
+- The commands-are-strings invariant that makes `--dry-run` trivial and lets the test suite run offline
+- How the three third-party JARs load in isolation so they don't collide with the rest of the JVM
+
+## Port strategy
+
+Kamal solves the hard parts of container-based Linux deploys: zero-downtime rolling cutover, container naming conventions, a proxy tier for traffic draining, secret-manager adapters for 1Password / Bitwarden / AWS / LastPass / Doppler, and a battle-tested on-server layout. Basecamp spent three years building it in the open.
+
+Kamal's proxy component ([kamal-proxy](https://github.com/basecamp/kamal-proxy)) is already a standalone Go binary — no Ruby runtime. What's Ruby-specific is only the developer-side orchestrator: the CLI that opens SSH connections, uploads config, and runs `docker` commands.
+
+`wheels deploy` ports that orchestrator into the Wheels CLI. The Go proxy is unchanged — we invoke the same `basecamp/kamal-proxy:v0.8.6` image Kamal does. This means the hardest and most error-prone piece of the puzzle (atomic traffic cutover under load) is not reimplemented. It's the same code path Kamal users have been exercising in production for years.
+
+## Byte-compatibility contract
+
+The design bet: a server managed by Ruby Kamal can be taken over by `wheels deploy` without cleanup, and vice versa. This is enforced by matching the Kamal 2.4.0 on-server contract exactly.
+
+| Concern | Value |
+|---|---|
+| Container name | `<service>-<role>-<version>` |
+| Container labels | `service=`, `role=`, `destination=`, `version=` |
+| Docker network | `kamal` |
+| Proxy image | `basecamp/kamal-proxy:v0.8.6` |
+| Proxy config dir | `/home/<user>/.config/kamal-proxy/` |
+| Lock file | `/tmp/kamal_deploy_lock_<service>` |
+| Audit log | `/tmp/kamal-audit.log` |
+| Hook directory | `.kamal/hooks/` |
+| Hook env prefix | `KAMAL_*` |
+| Secret file | `.kamal/secrets`, `.kamal/secrets.<destination>` |
+
+Two choices in that table warrant commentary.
+
+**Why `KAMAL_*` and not `WHEELS_*`.** Every hook script ever written for Ruby Kamal reads environment variables named `KAMAL_SERVICE`, `KAMAL_VERSION`, and so on. Renaming to `WHEELS_*` would be slightly more consistent with the rest of the Wheels CLI — and it would break every user's existing hook scripts for zero benefit.
+
+**Why `.kamal/` and not `.wheels/deploy/`.** Teams evaluating a switch from Ruby Kamal can run both tools against the same hosts during the transition. Both read the same `.kamal/secrets` and `.kamal/hooks/`. There's no migration step and no point of no return.
+
+<Aside type="tip" title="Try-before-you-buy">
+If you have a working Ruby Kamal setup, you can run `wheels deploy config` against your existing `config/deploy.yml` and see the resolved configuration — without changing anything on your servers.
+</Aside>
+
+See [Migrating from Kamal](/v4-0-1-snapshot/deployment/migrating-from-kamal/) for the complete switch-over checklist.
+
+## The one divergence: ERB removed
+
+`config/deploy.yml` does not support ERB. This is the only schema-level incompatibility with Ruby Kamal, and it's deliberate.
+
+Ruby Kamal allows ERB inside `deploy.yml`:
+
+```yaml title="Ruby Kamal ERB (NOT supported in wheels deploy)"
+# Ruby Kamal — NOT SUPPORTED in wheels deploy
+service: <%= ENV["APP_NAME"] %>
+image: <%= ENV["REGISTRY"] %>/<%= ENV["APP_NAME"] %>
+```
+
+ERB is a Ruby template language — it executes arbitrary Ruby at render time. To support it, `wheels deploy` would need to embed a Ruby runtime, which defeats the purpose of the port.
+
+What `wheels deploy` keeps unchanged is Kamal's other built-in interpolation: `${UPPER_SNAKE}` env-var tokens. Most ERB-using configs convert mechanically by dropping the `<%= ENV["..."] %>` wrapper:
+
+```yaml title="${VAR} interpolation (supported)"
+service: ${APP_NAME}
+image: ${REGISTRY}/${APP_NAME}
+```
+
+The interpolator (`ConfigLoader.$interpolate`) walks the parsed YAML tree and resolves each `${VAR}` token through this lookup chain:
+
+1. CLI `--env` overrides (test/CI shims).
+2. `.kamal/secrets`, then `.kamal/secrets.<destination>` overlay if `--destination` is set.
+3. `System.getenv(VAR)` on the machine running `wheels deploy`.
+4. Empty string for unset vars (matching Kamal's behavior).
+
+Only uppercase-and-underscore tokens are expanded — the regex is `\$\{([A-Z_][A-Z0-9_]*)\}`. That keeps shell-style `${service}` placeholders elsewhere in the config from being captured by accident, the same rule Kamal applies.
+
+No conditionals, no method calls, no computed expressions. If your existing config uses ERB logic (`<%= ... if ENV["ROLE"] == "staging" %>`), move that logic into `.kamal/secrets` (or a `.kamal/secrets.<destination>` overlay) and reference the resolved value with `${VAR}`.
+
+We considered preserving ERB by shelling out to a system Ruby. The problem is that it turns a single-binary install into a "works if you also have Ruby" story, and every user without Ruby installed gets a cryptic error on their first deploy. Naming the divergence up front — and keeping Kamal's `${VAR}` syntax untouched — is the honest trade-off.
+
+<Aside type="note" title="Mustache is used elsewhere — not in deploy.yml at runtime">
+The `cli/lucli/services/deploy/lib/Mustache.cfc` wrapper is a thin facade over jmustache, but it is **not** applied to `deploy.yml` at runtime. It's used by `wheels deploy init` to render the initial scaffolding templates (`config/deploy.yml` and `.kamal/secrets`) when a project doesn't have one yet. Once those files exist, `${VAR}` is the only interpolation that runs.
+</Aside>
+
+## Commands-are-strings invariant
+
+The most important structural property of the codebase: **every method on a `*Commands.cfc` component returns a plain string containing a shell command. Only the CLI layer and the orchestrator actually execute those strings.**
+
+```cfm {test:compile}
+// cli/lucli/services/deploy/commands/AppCommands.cfc
+public string function boot(required struct role, required string version) {
+    return "docker run -d --name #role.containerName# --network kamal #role.image#:#version#";
+}
+```
+
+The `AppCli.cfc` or orchestrator is what runs `boot()` and passes the returned string to the SSH pool for execution.
+
+This invariant is why `--dry-run` is trivial — instead of swapping out the SSH transport, `--dry-run` just prints the strings. It's also why the unit test suite runs completely offline: a `FakeSshPool` records every command string without opening a socket, and assertions check the recorded strings against expected values. No Docker, no sshd, no network required for the commands-layer suite.
+
+```bash title="--dry-run prints commands without opening SSH connections"
+wheels deploy --dry-run          # any verb, no SSH connections opened
+wheels deploy rollback v1 --dry-run
+wheels deploy app boot --dry-run
+```
+
+## Code layout
+
+```title="Code layout"
+cli/lucli/services/deploy/
+├── cli/*.cfc           # User-facing CLI entry points (DeployMainCli, DeployAppCli, ...)
+├── commands/*.cfc      # Pure string-returning command builders (AppCommands, ProxyCommands, ...)
+├── config/*.cfc        # Config model + loader (snakeyaml-backed)
+├── lib/*.cfc           # JarLoader, Mustache, Yaml, SshClient, SshPool, FakeSshPool, SecretResolver
+└── secrets/*.cfc       # Secret-manager adapters (OnePassword, Bitwarden, AwsSecrets, LastPass, Doppler)
+
+cli/lucli/lib/deploy/*.jar       # snakeyaml, jmustache, sshj (+ BouncyCastle transitives)
+cli/lucli/templates/deploy/      # Mustache templates used by `wheels deploy init`
+```
+
+The separation of `cli/` (user-facing orchestration) from `commands/` (pure command builders) is what enforces the commands-are-strings invariant. A `commands/` method that executed something directly would be a structural bug.
+
+## URLClassLoader-isolated JARs
+
+`wheels deploy` depends on three third-party libraries:
+
+- **snakeyaml** — YAML parsing for `config/deploy.yml`
+- **sshj** (with BouncyCastle transitives) — SSH transport
+- **jmustache** — template rendering for the `wheels deploy init` scaffolding (`deploy.yml.mustache`, `secrets.mustache`); not applied to `deploy.yml` at runtime
+
+These JARs load through a dedicated `URLClassLoader` isolated from the main JVM classpath. That isolation matters because CFML engines (Lucee, Adobe CF) ship their own copies of some transitive dependencies (older BouncyCastle versions, in particular). Without isolation, class-resolution order would be nondeterministic and you'd get obscure `NoSuchMethodError` failures depending on load order.
+
+The `JarLoader.cfc` helper in `lib/` handles this. It's also why `wheels deploy` doesn't pollute the rest of the Wheels runtime — if you're running a Wheels app that uses BouncyCastle elsewhere (CSRF encryption, for instance), `wheels deploy`'s copy is invisible to it.
+
+## Testing
+
+Tests live in `cli/lucli/tests/specs/deploy/` and extend `wheels.wheelstest.system.BaseSpec`.
+
+- **Unit tests** assert against recorded command strings via `FakeSshPool`. No Docker, no network. Run via `bash tools/test-cli-local.sh`.
+- **Integration tests** for `SshClient` and `SshPool` exercise real SSH against a disposable sshd fixture at `cli/lucli/tests/_fixtures/deploy/sshd/`, brought up by `tools/deploy-sshd-up.sh`.
+- **Config fixtures** at `cli/lucli/tests/_fixtures/deploy/configs/` cover `minimal.yml`, `full.yml`, `with-accessories.yml`, and intentionally-broken configs under `invalid/`.
+
+## Non-goals
+
+Naming what `wheels deploy` deliberately isn't helps calibrate when to reach for it:
+
+- **Not Kubernetes.** `wheels deploy` drives `docker` remotely over SSH, not the Kubernetes API. For k8s, use your existing pipeline; see [Docker Deployment](/v4-0-1-snapshot/deployment/docker-deployment/) for image hygiene guidance.
+- **Not systemd-native.** For servlet-container deploys under systemd (CommandBox, Tomcat, Jetty), stay on that path — see [VM and bare-metal deployment](/v4-0-1-snapshot/deployment/vm-deployment/).
+- **Not Compose-only.** Single-host Docker Compose is simpler via [Docker Deployment](/v4-0-1-snapshot/deployment/docker-deployment/). `wheels deploy` adds value at 2+ servers.
+- **Not a Windows server target.** Kamal doesn't support Windows servers; `wheels deploy` inherits that limitation. Windows developer workstations are best-effort.
+- **Not Ruby-Kamal-plugin-compatible.** Shell-script hooks in `.kamal/hooks/` work unchanged; the Ruby `Kamal::Commands` plugin API is Ruby-specific.
+- **Not a Wheels reload mechanism.** It ships the container; the in-process `?reload=true` endpoint is a separate concern.
+
+## Related reading
+
+<CardGrid>
+  <LinkCard title="Your first deploy" href="/v4-0-1-snapshot/deployment/first-deploy/" description="Hands-on walkthrough — scaffold, configure, ship." />
+  <LinkCard title="Migrating from Kamal" href="/v4-0-1-snapshot/deployment/migrating-from-kamal/" description="Full compatibility contract and switch-over checklist." />
+  <LinkCard title="deploy.yml reference" href="/v4-0-1-snapshot/deployment/config-reference/" description="Every config key, what it does, defaults." />
+  <LinkCard title="Deployment landing" href="/v4-0-1-snapshot/deployment/" description="When to reach for wheels deploy vs. other paths." />
+</CardGrid>

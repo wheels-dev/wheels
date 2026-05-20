@@ -1,0 +1,24 @@
+---
+title: "wheels deploy lock"
+description: Deploy-lock management — acquire, release, status.
+type: reference
+sidebar:
+  label: "lock"
+  order: 90
+---
+
+Deploy-lock management. The rolling `wheels deploy` flow acquires and releases a per-service lock automatically; these verbs expose manual escape hatches.
+
+## Verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`acquire`](/v4-0-0/command-line-tools/commands/deploy/lock/acquire/) | Manually take the lock. |
+| [`release`](/v4-0-0/command-line-tools/commands/deploy/lock/release/) | Manually release the lock. |
+| [`status`](/v4-0-0/command-line-tools/commands/deploy/lock/status/) | Report whether the lock is held and who holds it. |
+
+## The lock
+
+One file per service at `/tmp/kamal_deploy_lock_<service>`. Created by symlink for atomicity — if another deploy is running, the symlink creation fails and the verb errors. Released when `wheels deploy` exits (success or failure).
+
+A stale lock after a crashed deploy blocks new deploys — use `lock release` to clear it. Always run `lock status` first to confirm it isn't actually held by someone else.

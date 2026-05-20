@@ -1,0 +1,350 @@
+---
+title: Packages
+description: Installing first-party packages, writing your own, the package.json manifest, and the activation model.
+type: howto
+sidebar:
+  order: 10
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to work with Wheels packages — optional first-party modules that ship as standalone repos and activate when installed into `vendor/`. It covers both sides: installing packages into your app, and writing and publishing your own.
+
+**You'll learn:**
+
+- How the `vendor/` activation model works and why there's no registration step
+- Which first-party packages ship with Wheels and what each one does
+- The `wheels packages` CLI — install, search, update, pin, remove
+- Every field in the `package.json` manifest, including the explicit `provides.mixins` opt-in
+- How to write your own package — directory layout, lifecycle, mixin targets, service providers, lazy loading
+- How error isolation keeps a broken package from crashing the app
+- How to publish to the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry
+
+<Aside type="note">
+  You should already know how middleware and the DI container work if your package provides those. See [Middleware Pipeline](/v4-0-1-snapshot/core-concepts/middleware-pipeline/) and [Dependency Injection](/v4-0-1-snapshot/core-concepts/dependency-injection/).
+</Aside>
+
+## The activation model
+
+On application startup, Wheels runs `vendor/wheels/PackageLoader.cfc`. It scans `vendor/` for every subdirectory that contains a `package.json`, skips `vendor/wheels/` (the framework core itself), resolves the dependency graph across whatever it finds, and loads each package in topological order. There is no separate registration step — presence of a directory under `vendor/` with a valid manifest *is* the activation.
+
+This inverts the classic plugin pattern. Instead of a registry that names every installed plugin, the filesystem layout is the registry. To add a package, you put its files where the loader looks. To remove one, you take them away.
+
+Packages are distributed as standalone Git repositories, indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry. Activation means getting a copy of a package into `vendor/` under its own directory, and the `wheels packages` CLI handles that end-to-end — registry lookup, tarball download, sha256 verification, extraction.
+
+Install a package:
+
+```bash title="your shell"
+wheels packages add wheels-hotwire
+wheels reload
+```
+
+Browse, search, inspect, update, or remove:
+
+```bash title="your shell"
+wheels packages list                    # installed packages with versions
+wheels packages search hotwire          # match name/description/tags
+wheels packages show wheels-sentry      # registry detail page
+wheels packages add wheels-sentry@1.2.0   # pin a specific version
+wheels packages update wheels-sentry --yes
+wheels packages update --all --yes
+wheels packages remove wheels-hotwire
+```
+
+Deactivation is a single command — `remove` deletes the `vendor/<name>/` directory. Version updates are explicit: the CLI never auto-pulls; you ask for an update, the CLI checks the registry, and a changed `tarball` / `sha256` is what authorises a re-extraction.
+
+<Aside type="note">
+  The registry caches its index for 24 hours. If you want to see a just-published version immediately, `wheels packages registry refresh` busts the cache. `wheels packages registry info` shows the configured registry URL and cache state.
+</Aside>
+
+The reload step re-runs `PackageLoader`, which rediscovers what's in `vendor/` and reconciles the mixin, service, and middleware tables with the new state.
+
+## First-party packages
+
+Six packages are maintained as first-party modules under the `wheels-dev` GitHub org. All are optional; the framework core runs fine with none of them installed.
+
+- **[`wheels-hotwire`](https://github.com/wheels-dev/wheels-hotwire)** — Turbo Drive, Turbo Frames, Turbo Streams, and Stimulus integration for server-rendered UI. Mixes into controllers (and therefore views). Used heavily in the tutorial app.
+- **[`wheels-basecoat`](https://github.com/wheels-dev/wheels-basecoat)** — UI component helpers styled with Tailwind CSS. shadcn/ui-quality forms, buttons, and cards without React. Mixes into controllers.
+- **[`wheels-sentry`](https://github.com/wheels-dev/wheels-sentry)** — Sentry.io error tracking with framework-aware context enrichment. Captures exceptions with request, user, and route context. Mixes into controllers.
+- **[`wheels-legacy-adapter`](https://github.com/wheels-dev/wheels-legacy-adapter)** — Backward-compatibility shim for Wheels 3.x plugins. Deprecation logging, API adapters, and a scanner that flags 3.x patterns you should modernize. Mixes into controllers.
+- **[`wheels-i18n`](https://github.com/wheels-dev/wheels-i18n)** — Internationalization with JSON-file or database-backed translations, parameter interpolation, and pluralization. Mixes into controllers.
+- **[`wheels-seo-suite`](https://github.com/wheels-dev/wheels-seo-suite)** — Meta tags, Open Graph, Twitter Cards, canonical URLs, XML sitemaps, robots.txt, and an in-page debug/admin panel. Mixes into controllers.
+
+In development mode, the debug bar's **Packages** tab shows both the currently installed packages (from `vendor/`) and a live "Available from registry" table pulled from the same 24-hour registry cache used by the CLI. This lets you discover and compare first-party packages without leaving your browser.
+
+## The `package.json` manifest
+
+Every package declares a `package.json` at its root. The loader parses it before instantiating any CFC, so a manifest error isolates cleanly — the package is skipped, but the rest of the app boots.
+
+```json title="wheels-sentry/package.json"
+{
+    "name": "wheels-sentry",
+    "version": "1.0.0",
+    "author": "PAI Industries",
+    "description": "Sentry error tracking for Wheels with framework-aware context enrichment",
+    "wheelsVersion": ">=3.0",
+    "mappings": {
+        "plugins.sentry": "."
+    },
+    "provides": {
+        "mixins": "controller",
+        "services": [],
+        "middleware": []
+    },
+    "dependencies": {}
+}
+```
+
+Field reference:
+
+- **`name`** — the package name as you'd reference it in docs or the registry. Usually matches the `vendor/` directory (`wheels-sentry` → `vendor/wheels-sentry/`). Required.
+- **`mapping`** — optional CFML identifier registered as this package's root namespace. Lets CFCs inside the package reference siblings via `new wheelsSentry.SentryClient()` instead of the verbose `CreateObject("component", "vendor.wheels-sentry.SentryClient")`. Defaults to lower-camel-case of `name`: `wheels-sentry` → `wheelsSentry`, `wheels_legacy_adapter` → `wheelsLegacyAdapter`. Must match `[A-Za-z_][A-Za-z0-9_]*`. If two packages derive or declare the same alias the second is recorded in `failedPackages` with a `Duplicate package mapping alias` error — set a unique `mapping` to resolve. Registered aliases are available via `PackageLoader.getPackageMappings()`.
+- **`mappings`** — optional struct of additional CFML mapping aliases the package wants to register. Each key is a dotted mapping name (e.g. `plugins.sentry`, `mytools.utils`); each value is a path *relative to the package install directory* (`"."` or `""` for the package root, `"sub"` for a subdirectory). Use this when you need a namespace beyond the singular alias — most often to keep a legacy dotted path resolvable after a directory rename. Example: a package that historically lived at `plugins/sentry/` can declare `{"mappings": {"plugins.sentry": "."}}` so existing `new plugins.sentry.SentryClient()` callsites keep working when the package is installed at `vendor/wheels-sentry/`. Each dotted segment must satisfy `[A-Za-z_][A-Za-z0-9_]*`; absolute paths and `..` traversal are rejected. Names collide with the singular `mapping` registry as well — a plural entry that matches an existing singular alias (from any package) fails the package, with the singular alias unwound from the registry to keep state consistent. Inspect plural entries alongside singular ones via `PackageLoader.getPackageMappings()`.
+- **`version`** — semver. Required. Used in load logs and by future install tooling.
+- **`author`** — free-form string. Not validated.
+- **`description`** — one-line description shown in logs and tooling.
+- **`wheelsVersion`** — compatibility range (npm semver syntax). Declared as a constraint against the framework version. An incompatible package is excluded from the load order before its CFC is instantiated and recorded in `failedPackages` with the constraint and the running version named in the log. Use `"*"` or omit the field to skip the check.
+- **`provides.mixins`** — comma-delimited target list drawn from the framework's allowlist: `application`, `dispatch`, `controller`, `mapper`, `model`, `base`, `sqlserver`, `mysql`, `postgresql`, `h2`, `test`. Plus two special values: `global` (inject everywhere) and `none` (opt out). **Default is `none`** — a package with no `provides.mixins` field contributes no mixed-in methods. This is the explicit opt-in model and a deliberate break from legacy plugins, which defaulted to `global` and made reasoning about method provenance hard. Unknown targets (typos, or unsupported names like `view` or `service`) are rejected at load time with a clear error.
+- **`provides.services`** — reserved for services the package registers with the DI container. Currently populated by the package's own `register()` hook rather than read from the manifest; the field is here for future tooling.
+- **`provides.middleware`** — array of middleware entries the loader appends to the global pipeline. Each entry is `{"component": "vendor.mypackage.MyMiddleware", "options": {...}}`.
+- **`requires`** — map of other package names to semver constraints. Hard dependencies: a required package must be present and satisfy the constraint or this package fails to load with a clear "Required package not found" / "does not satisfy constraint" entry in `failedPackages`. Dependents are loaded after their dependencies (topological sort), so a dependent's `init()` sees its dependencies' mixins and services already installed.
+- **`replaces`** — map of other package names to semver constraints. If a named package is present and satisfies the constraint, it is *excluded* from loading and this package takes its slot. Useful for migration paths — `wheels-foo-v2` can declare `"replaces": {"wheels-foo": "*"}` and an install of v2 cleanly supersedes v1.
+- **`suggests`** — map of other package names to semver constraints. Soft edges: if the suggested package is present it loads first (so this package sees its mixins), but its absence does not cause this package to fail. Use for optional integration points.
+- **`lazy`** — optional boolean. When `true` on a package with no mixins and no middleware, the CFC isn't instantiated until something calls `getPackage(name)`. Use it for service-only packages that are expensive to initialize and not always needed.
+
+In practice, the target you pick most often is `controller`. Wheels views execute inside the controller's `variables` scope, so methods mixed into `controller` are callable from views and partials too — there is no separate `view` target. If you need a method on models, use `model`. If you need something everywhere, use `global`, sparingly. If your package is service-only or middleware-only, use `none` (or just omit the field).
+
+## Writing your own package
+
+A package is a directory with a `package.json` and at least one CFC. The loader's convention is that the main CFC's filename matches the directory name — `vendor/myfeature/MyFeature.cfc` — and gets instantiated via `CreateObject("component", "vendor.myfeature.MyFeature").init()`. If that file doesn't exist, the loader falls back to the first `.cfc` it finds in the directory.
+
+A minimal layout (in your own package repo, installed to `vendor/myfeature/`):
+
+```text title="myfeature/ directory layout"
+myfeature/
+  package.json                     # manifest (required)
+  MyFeature.cfc                    # main entry — matches directory name
+  middleware/MyMiddleware.cfc      # optional — referenced in provides.middleware
+  tests/                           # optional — runs via the core test runner
+```
+
+A minimal manifest:
+
+```json title="myfeature/package.json"
+{
+    "name": "my-feature",
+    "version": "0.1.0",
+    "description": "Adds a thing to Wheels",
+    "wheelsVersion": ">=4.0",
+    "provides": {
+        "mixins": "controller"
+    }
+}
+```
+
+A minimal entry CFC:
+
+```cfm {test:compile} title="myfeature/MyFeature.cfc"
+component output="false" {
+
+    public any function init() {
+        return this;
+    }
+
+    /**
+     * Public methods become mixins on the targets declared in provides.mixins.
+     * This one lands on every controller because the manifest says "controller".
+     */
+    public string function myHelper(required string name) {
+        return "Hello, " & arguments.name;
+    }
+}
+```
+
+After installing the package into `vendor/myfeature/` and reloading, every controller has `myHelper()` available. The framework collects public methods from the package instance and merges them into the application mixin tables — the same machinery that runs for plugins, but scoped to the targets you named in the manifest.
+
+Lifecycle hook names the loader specifically skips when collecting mixins: `init`, `onPluginLoad`, `onPluginActivate`, `register`, `boot`. If you name a method any of those, it won't be mixed in — the loader treats them as package infrastructure.
+
+## Service providers
+
+Packages that need to register services with the DI container declare the `wheels.ServiceProviderInterface` and implement two hooks — `register(container)` for binding services and `boot(app)` for work that needs every service already registered (e.g. wiring cross-service listeners). The loader calls both phases for you: `register` fires after every package is instantiated, `boot` fires after every `register` has returned.
+
+```cfm title="vendor/myfeature/MyFeature.cfc"
+component implements="wheels.ServiceProviderInterface" output="false" {
+
+    public any function init() {
+        return this;
+    }
+
+    // Bind services. Runs once per app, before boot().
+    public void function register(required any container) {
+        arguments.container.map("myFeatureService").to("vendor.myfeature.lib.MyFeatureService").asSingleton();
+    }
+
+    // Hook up runtime state. Runs after every package has registered.
+    public void function boot(required struct app) {
+        // Resolve a dependency that another package registered, wire a listener, etc.
+    }
+}
+```
+
+`register` and `boot` are not mixed into controllers or models — they're infrastructure hooks. Your package's public business methods still follow `provides.mixins` normally.
+
+## Lazy loading
+
+For service-only packages that are expensive to initialise but not always needed, set `"lazy": true` in the manifest. The loader then records the package's presence without instantiating its CFC. The CFC is created on first call to `application.wheels.PackageLoaderObj.getPackage("name")`.
+
+```json title="vendor/expensive-thing/package.json"
+{
+    "name": "expensive-thing",
+    "version": "1.0.0",
+    "wheelsVersion": ">=4.0",
+    "lazy": true,
+    "provides": { "mixins": "none" }
+}
+```
+
+Lazy loading is only honoured when the package has no mixins (`"mixins": "none"`) and no middleware — a package that contributes to the mixin or middleware pipelines has to instantiate at boot so those tables are complete.
+
+## Per-method mixin overrides
+
+The manifest-level `provides.mixins` sets the default for every public method. If one method needs a different target, annotate the method with a `mixin` metadata attribute — the loader reads it via `GetMetadata()` and overrides the package default for that method only.
+
+```cfm {test:compile} title="myfeature/MyFeature.cfc"
+component output="false" {
+
+    public any function init() {
+        return this;
+    }
+
+    // Follows the manifest default (controller — available in controllers
+    // and views, since Wheels views run in the controller's variables scope).
+    public string function controllerHelper() {
+        return "I'm on controllers and views";
+    }
+
+    // Overrides to model target, even if the manifest says "controller".
+    public string function modelOnlyHelper() mixin="model" {
+        return "I'm on models only";
+    }
+
+    // Opt a method out of mixin injection entirely while keeping it callable
+    // via getPackage("myfeature").internalOnly().
+    public string function internalOnly() mixin="none" {
+        return "Not mixed in anywhere";
+    }
+}
+```
+
+## Error isolation
+
+Every package loads inside its own try/catch. A package that throws during manifest parsing, CFC instantiation, or mixin collection is recorded in the loader's `failedPackages` array and logged to the application log. The rest of the app — framework core, other packages, application code — continues loading normally.
+
+Common failure modes and what happens:
+
+- **Malformed `package.json`** — logged as a manifest error, package skipped.
+- **Missing required manifest fields (`name`, `version`)** — same: logged and skipped.
+- **Dependency not installed** — the dependency-resolution phase records the error before any CFC is instantiated. Dependent packages are excluded from the load order.
+- **Circular dependencies** — surfaces as a graph error at resolution time; all packages in the cycle are excluded with a clear log message.
+- **Duplicate mapping alias** — two packages derive or declare the same value for `mapping` (or the same lower-camel-case form of their `name`). The first claimant keeps its mapping; the second is excluded. Set a unique `mapping` in `package.json` to resolve.
+- **Exception during CFC `init()`** — caught, logged with stack, package skipped. Mixins are never partially applied.
+
+The framework's contract is that activating a broken package cannot take down a working app. Check the application log after a deploy to see which packages loaded, which were skipped, and why.
+
+## Testing a package
+
+Package tests live under `<package>/tests/` in the package's own repo. Specs extend `wheels.WheelsTest` and use the same BDD syntax as core Wheels tests. Each first-party package ships its own suite.
+
+```cfm title="vendor/myfeature/tests/MyFeatureSpec.cfc"
+component extends="wheels.WheelsTest" output="false" {
+    function run() {
+        describe("MyFeature", () => {
+            it("does the thing", () => {
+                var svc = createObject("component", "vendor.myfeature.lib.MyService").init();
+                expect(svc.greet("world")).toBe("Hello, world");
+            });
+        });
+    }
+}
+```
+
+Scope a run to a single package with the `directory=` URL param on the core test runner:
+
+```bash title="your shell"
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.mypackage.tests"
+```
+
+The runner accepts two allowlisted roots: `wheels.tests.*` (the framework core) and `vendor.<package>.tests.*` (any installed package). Any other value is silently ignored and the full core suite runs instead — the endpoint is unauthenticated and the allowlist prevents it from driving arbitrary CFC compilation.
+
+Package authors typically keep a matching set of specs in their repo and rely on the registry's `validate.yml` plus the package's own CI to catch regressions before tagging a release.
+
+## Dependency resolution
+
+When a package's manifest declares `requires`, `replaces`, or `suggests`, the loader builds a dependency graph and loads packages in topological order — dependencies first, dependents later. A package with no `requires` can load anytime; a package that declares `"requires": {"wheels-hotwire": ">=0.1.0"}` is guaranteed to see Hotwire's mixins already installed before its own `init()` runs.
+
+The three relationship fields differ in how missing or version-mismatched targets are handled:
+
+- **`requires`** — hard dependency. Missing target, version mismatch, or a target excluded by another package's `replaces` causes this package to fail to load. The error is recorded in `failedPackages`.
+- **`replaces`** — exclusion. If the named package is present and satisfies the constraint, it is excluded from loading. The replacer takes over without further work on the application side.
+- **`suggests`** — soft dependency. Loads the suggested package first if present, but never fails this package on absence. Use for optional integration hooks.
+
+If a declared dependency isn't present in `vendor/`, or if two packages form a cycle, the loader records the error and excludes every package involved in the failure — again, without taking down the app.
+
+## Publishing
+
+The [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) repository is the community registry. It holds a curated list of package names, repository URLs, and version metadata. Every first-party package and any third party that wants listing goes through the same submission flow.
+
+Submission checklist (full details in the registry's [`CONTRIBUTING.md`](https://github.com/wheels-dev/wheels-packages/blob/main/CONTRIBUTING.md)):
+
+1. Your package lives in its own **public** git repo on GitHub.
+2. The repo has a `package.json` at the root with `name`, `version`, `wheelsVersion`, and either `provides.mixins` or at least one of `provides.services` / `provides.middleware`.
+3. You've tagged the version you're submitting — the tag name must be `v<version>` (e.g. `v1.2.0`).
+4. The tagged tree ships only allowlisted file types: `.cfc`, `.cfm`, `.cfml`, `.md`, `.json`, `.js`, `.mjs`, `.ts`, `.css`, `.scss`, `.html`, `.txt`, `.sql`, `.yml`, `.yaml`, `.gitkeep`, plus `LICENSE` and `CHANGELOG`. Binary assets (screenshots, videos) belong on GitHub release assets, not in the tarball.
+5. The uncompressed tree is under 10 MB.
+6. The manifest declares a `license` field (SPDX identifier).
+
+Submission flow:
+
+1. Fork [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages).
+2. Create `packages/wheels-foo/` with a `manifest.json` (see the schema at `schema/manifest.schema.json`) and a one-paragraph `README.md`. Leave `tarball` and `sha256` as `null` — the mirror workflow fills these in on merge.
+3. Open a PR titled `Add wheels-foo v1.0.0`.
+4. CI validates schema, name uniqueness, that the source repo and tag resolve, the file-type allowlist, and the size cap.
+5. A maintainer reviews — they confirm the author's repo looks real and the package fits the ecosystem, then merge.
+6. The `mirror-tarball` workflow clones the tagged source, builds a deterministic tarball, uploads it to a release on the registry repo, computes a sha256, and bot-commits both back into your manifest.
+7. Users install via `wheels packages add wheels-foo`.
+
+Publishing a new version is the same PR flow — append to the `versions[]` array, don't mutate previous entries. `wheels packages update` is explicit; users opt in to version bumps.
+
+## The `wheels packages` CLI
+
+The install/update surface is covered by the commands shown earlier under [The activation model](#the-activation-model). The full set (see `wheels packages --help`):
+
+- `wheels packages list | search | show | add | update | remove` — day-to-day install and lifecycle operations.
+- `wheels packages add <name>@<version>` — pin a specific version; omit for the latest compatible.
+- `wheels packages add <name> --force` — overwrite an existing `vendor/<name>/`.
+
+The install verb is `add`, not `install`, because LuCLI's built-in extension installer intercepts `install` across all modules — typing `wheels packages install foo` runs LuCLI's own `lucee.json` dependency resolver and never reaches the Wheels package handler. (Same trap that earlier renamed `wheels browser install` to `wheels browser setup`.) `add` is the canonical verb across the docs.
+- `wheels packages update --all --yes` — bulk-update every installed package, no prompt.
+- `wheels packages registry refresh | info` — manage the 24-hour registry cache.
+
+Override the default registry with the `WHEELS_PACKAGES_REGISTRY` environment variable (format: `<org>/<repo>`). The default is `wheels-dev/wheels-packages`.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Middleware Pipeline"
+    description="Where packages plug in request-level concerns. A package that provides middleware appends to the same pipeline you configure directly in settings.cfm."
+    href="/v4-0-1-snapshot/core-concepts/middleware-pipeline/"
+  />
+  <LinkCard
+    title="Dependency Injection"
+    description="Packages that implement ServiceProviderInterface register services with the DI container. If your package provides services, start here."
+    href="/v4-0-1-snapshot/core-concepts/dependency-injection/"
+  />
+  <LinkCard
+    title="Contributing"
+    description="Submitting a package for first-party inclusion goes through the same process as any other framework contribution."
+    href="/v4-0-1-snapshot/contributing/"
+  />
+</CardGrid>

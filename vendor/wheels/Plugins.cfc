@@ -141,7 +141,7 @@ component output="false" extends="wheels.Global"{
 			local.pluginValue = local.plugins[local.pluginKey];
 			try {
 				WriteLog(
-					text = "[Wheels] Loading plugin '##local.pluginKey##' from ##local.pluginValue.folderPath##",
+					text = "[Wheels] Loading plugin '#local.pluginKey#' from #local.pluginValue.folderPath#",
 					type = "information",
 					file = "wheels_security"
 				);

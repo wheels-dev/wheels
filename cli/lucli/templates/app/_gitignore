@@ -18,7 +18,7 @@ WEB-INF
 /temp/
 /bin/
 
-# Vendor dependencies (install with: wheels install)
+# Vendor dependencies (install with: wheels packages add <name>)
 /vendor/
 
 # Database files (SQLite databases are created by the server)

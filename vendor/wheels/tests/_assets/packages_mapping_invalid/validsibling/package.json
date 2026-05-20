@@ -1,0 +1,5 @@
+{
+	"name": "wheels-valid-sibling",
+	"version": "1.0.0",
+	"description": "Test fixture: valid package alongside invalid ones — verifies loader continues past the bad packages and still registers good ones"
+}

@@ -1,0 +1,6 @@
+{
+	"name": "wheels-invalid-alias",
+	"version": "1.0.0",
+	"description": "Test fixture: non-empty `mapping` that violates [A-Za-z_][A-Za-z0-9_]* (leading digit)",
+	"mapping": "123bad"
+}

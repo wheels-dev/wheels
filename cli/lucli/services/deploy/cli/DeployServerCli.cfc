@@ -78,12 +78,15 @@ component {
         return filtered;
     }
 
-    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
         }
+        // #2696: server-level `exec` and `bootstrap` are strict — a nonzero
+        // exit on either is a real failure that CI should see.
         var c = arguments.cmd;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 }

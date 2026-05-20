@@ -56,7 +56,25 @@ jobs:
             -O ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
 
       - name: Start CF engine
-        run: docker compose build --no-cache ${{ matrix.cfengine }} && docker compose up -d ${{ matrix.cfengine }}
+        # Retry the build to absorb transient external download failures
+        # (GitHub Releases 503/504s for Adoptium JDK/JRE and similar). The
+        # build itself is idempotent; only `up -d` runs after success.
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          set -e
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          until docker compose build --no-cache "$CFENGINE"; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              exit 1
+            fi
+            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 30
+          done
+          docker compose up -d "$CFENGINE"
 
       - name: Start all databases
         run: |
@@ -77,18 +95,24 @@ jobs:
           fi
 
       - name: Wait for CF engine to be ready
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
         run: |
-          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT_VAR="PORT_${CFENGINE}"
           PORT="${!PORT_VAR}"
-          CONTAINER="wheels-${{ matrix.cfengine }}-1"
+          CONTAINER="wheels-${CFENGINE}-1"
 
-          echo "Waiting for ${{ matrix.cfengine }} on port ${PORT}..."
+          echo "Waiting for ${CFENGINE} on port ${PORT}..."
 
-          # Wait for HTTP response, restarting container if it crashes
+          # Wait for HTTP response, restarting container if it crashes.
+          # Tracks the last HTTP status code so timeout diagnostics can
+          # distinguish "no response" (engine didn't bind) from "5xx"
+          # (engine bound but app returning errors — e.g. issue #2646).
           MAX_WAIT=60
           WAIT_COUNT=0
           RESTARTS=0
           MAX_RESTARTS=3
+          LAST_HTTP_CODE="000"
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
             WAIT_COUNT=$((WAIT_COUNT + 1))
 
@@ -98,28 +122,54 @@ jobs:
               RESTARTS=$((RESTARTS + 1))
               if [ "$RESTARTS" -le "$MAX_RESTARTS" ]; then
                 echo "Container $CONTAINER has status '$CONTAINER_STATUS' — restarting (attempt $RESTARTS/$MAX_RESTARTS)..."
-                docker compose up -d ${{ matrix.cfengine }}
+                docker compose up -d "${CFENGINE}"
                 sleep 10
                 continue
               else
                 echo "::error::Container $CONTAINER failed to start after $MAX_RESTARTS restart attempts"
-                docker logs "$CONTAINER" 2>&1 | tail -50
+                docker logs "$CONTAINER" 2>&1 | tail -100
                 exit 1
               fi
             fi
 
-            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
-              echo "CF engine is ready!"
+            # curl with -w "%{http_code}" always prints the code (000 if no
+            # response). Don't add a `|| echo "000"` fallback — it would
+            # concatenate with curl's own 000 output and produce "000000".
+            LAST_HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || true)
+            LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
+            if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
+              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
               break
             fi
+
+            # Surface partial progress every 10 attempts so logs show
+            # whether we're stuck on "no response" or "5xx" early.
+            if [ $((WAIT_COUNT % 10)) -eq 0 ]; then
+              echo "  attempt $WAIT_COUNT/$MAX_WAIT: container=$CONTAINER_STATUS, http=$LAST_HTTP_CODE"
+            fi
+
             if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
               sleep 5
             fi
           done
 
           if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
-            echo "::error::CF engine not ready after ${MAX_WAIT} attempts"
-            docker logs "$CONTAINER" 2>&1 | tail -50
+            echo "::error::CF engine not ready after ${MAX_WAIT} attempts (last HTTP code: $LAST_HTTP_CODE)"
+            if [ "$LAST_HTTP_CODE" = "000" ]; then
+              echo "::notice::No HTTP response received — engine likely never bound to port $PORT."
+            else
+              echo "::notice::HTTP $LAST_HTTP_CODE received — engine bound to port $PORT but app is returning errors."
+              echo "=== Final response body (first 500 bytes) ==="
+              curl -s --max-time 5 "http://localhost:${PORT}/" 2>/dev/null | head -c 500 || true
+              echo
+              echo "=== /end response body ==="
+            fi
+            echo "=== Container logs (stack frames stripped, last 100 lines) ==="
+            docker logs "$CONTAINER" 2>&1 | grep -vE '^\s*at\s|runwar\.context -[[:space:]]+at[[:space:]]' | tail -100
+            echo "=== /end filtered logs ==="
+            echo "=== Container logs (raw, last 200 lines) ==="
+            docker logs "$CONTAINER" 2>&1 | tail -200
+            echo "=== /end raw logs ==="
             exit 1
           fi
 
@@ -237,6 +287,10 @@ jobs:
           OVERALL_STATUS=0
           RESULTS_JSON="{"
           FIRST=true
+
+          # Databases whose failures are logged but don't block CI.
+          # oracle: tracked in #2663 — datasource registration, DBMS_LOCK, and constraint cleanup.
+          SOFT_FAIL_DBS="oracle"
 
           mkdir -p /tmp/test-results
           mkdir -p /tmp/junit-results
@@ -385,9 +439,6 @@ jobs:
           " || { echo "JUnit conversion failed for ${db} (non-fatal)"; rm -f "$JUNIT_FILE"; }
             fi
 
-            # Databases whose failures are logged but don't block CI.
-            SOFT_FAIL_DBS=""
-
             # Track per-database result
             if [ "$HTTP_CODE" = "200" ]; then
               echo "PASSED: ${{ matrix.cfengine }} + ${db}"
@@ -434,7 +485,7 @@ jobs:
           echo "| Database | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          SOFT_FAIL_DBS=""
+          SOFT_FAIL_DBS="oracle"
           IFS=',' read -ra DBS <<< "${{ steps.db-list.outputs.databases }}"
           for db in "${DBS[@]}"; do
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"

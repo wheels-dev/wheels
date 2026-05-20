@@ -44,8 +44,8 @@ every host run in parallel.
 
 ## Troubleshooting
 
-    wheels deploy server exec "uptime"   # smoke test SSH + sudo
-    wheels deploy server exec --interactive "bash"
+    wheels deploy exec "uptime"   # smoke test SSH + sudo
+    wheels deploy exec --interactive "bash"
 
 If a host is unreachable, deploy fails fast with the host in the error
 message. There is no built-in retry — `wheels deploy` stays strict on

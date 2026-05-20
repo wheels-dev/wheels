@@ -177,6 +177,65 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Oracle bulk insert using `INSERT ALL INTO ... SELECT 1 FROM dual`.
+	 *
+	 * The default Base adapter shape — `INSERT INTO t (cols) VALUES (?,?), (?,?), ...`
+	 * (SQL standard table value constructor) — was rejected on Oracle 23 with
+	 * `ORA: returning clause is not allowed with INSERT and Table Value Constructor`.
+	 * The CFML engine's `cfquery` for INSERT statements implicitly sets
+	 * `Statement.RETURN_GENERATED_KEYS`, which the Oracle JDBC driver translates into a
+	 * RETURNING clause — and Oracle 23 does not permit RETURNING with multi-row VALUES.
+	 *
+	 * `INSERT ALL` is the Oracle-idiomatic multi-row insert form, doesn't trigger the
+	 * RETURNING-clause expansion, and works on every Oracle version Wheels targets.
+	 * Uses parameterized values via `$buildBulkParam` — never interpolates user data
+	 * into SQL.
+	 */
+	public array function $bulkInsertSQL(
+		required string tableName,
+		required array columns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo
+	) {
+		local.sql = [];
+
+		local.colList = "";
+		for (local.col in arguments.columns) {
+			if (Len(local.colList)) {
+				local.colList &= ", ";
+			}
+			local.colList &= $quoteIdentifier(local.col);
+		}
+
+		ArrayAppend(local.sql, "INSERT ALL");
+
+		local.propCount = ArrayLen(arguments.validProperties);
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			ArrayAppend(local.sql, " INTO #arguments.tableName# (#local.colList#) VALUES (");
+			for (local.p = 1; local.p <= local.propCount; local.p++) {
+				if (local.p > 1) {
+					ArrayAppend(local.sql, ", ");
+				}
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				ArrayAppend(local.sql, $buildBulkParam(
+					value = local.val,
+					propName = local.propName,
+					propertyInfo = arguments.propertyInfo
+				));
+			}
+			ArrayAppend(local.sql, ")");
+		}
+
+		ArrayAppend(local.sql, " SELECT 1 FROM dual");
+
+		return local.sql;
+	}
+
+	/**
 	 * Oracle upsert using MERGE with USING (SELECT ... FROM dual UNION ALL ...) source.
 	 * Uses parameterized values via $buildBulkParam — never interpolates user data into SQL.
 	 */

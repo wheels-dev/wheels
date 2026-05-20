@@ -1,0 +1,6 @@
+{
+	"name": "wheels-whitespace-alias",
+	"version": "1.0.0",
+	"description": "Test fixture: whitespace-only `mapping` is treated as an invalid override",
+	"mapping": "   "
+}

@@ -100,7 +100,11 @@ component {
                     }
                 }
             } finally {
-                $dispatchAny(hosts, lock.release(), dryRun);
+                // Tolerate release failures so they can never shadow the
+                // original deploy exception inside this finally block. rm -f
+                // is idempotent; if it genuinely fails on a remote, the deploy
+                // already has a real error to surface from the try body.
+                $dispatchAny(hosts, lock.release(), dryRun, true);
             }
 
             hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
@@ -270,17 +274,19 @@ component {
                 $dispatch([host], broadRemove, dryRun);
             }
         }
-        // Remove proxy.
-        $dispatch(hosts, proxyCmds.remove(), dryRun);
-        // Remove each accessory.
+        // Remove proxy / accessories / registry-logout are all idempotent
+        // teardowns — a missing container or stale credentials should not
+        // abort the overall remove flow. Strict-by-default still applies
+        // to the broad container teardown above (xargs -r already makes it
+        // exit-0 when nothing matches; daemon-offline is loud on purpose).
+        $dispatch(hosts, proxyCmds.remove(), dryRun, true);
         if (arrayLen(cfg.accessories())) {
             var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
             for (var acc in cfg.accessories()) {
-                $dispatch(acc.hosts(), accCmds.remove(acc), dryRun);
+                $dispatch(acc.hosts(), accCmds.remove(acc), dryRun, true);
             }
         }
-        // Logout of registry.
-        $dispatch(hosts, regCmds.logout(), dryRun);
+        $dispatch(hosts, regCmds.logout(), dryRun, true);
 
         return $renderResult(
             arguments.opts,
@@ -306,8 +312,16 @@ component {
     }
 
     private string function $docsPath(required string section) {
-        return expandPath("/cli/lucli/services/deploy/cli/docs")
-             & "/" & arguments.section & ".md";
+        return getDirectoryFromPath(getCurrentTemplatePath())
+             & "docs/" & arguments.section & ".md";
+    }
+
+    // CFC-relative anchor — expandPath('/cli/lucli/...') uses the running app's mapping root and breaks in a generated user app (mirrors JarLoader.cfc). Public so the regression spec can assert path math directly. See #2658.
+    public string function $cliInstallDir() {
+        var here = getDirectoryFromPath(getCurrentTemplatePath());
+        var root = getCanonicalPath(here & "../../../");
+        if (right(root, 1) != "/" && right(root, 1) != "\") root &= "/";
+        return root;
     }
 
     public string function init_stub(required struct opts) {
@@ -317,11 +331,19 @@ component {
         var force = arguments.opts.force ?: false;
         var deployYmlPath = cwd & "config/deploy.yml";
         var secretsPath = cwd & ".kamal/secrets";
+        var dockerfilePath = cwd & "Dockerfile";
+        var dockerignorePath = cwd & ".dockerignore";
 
         if (!force && fileExists(deployYmlPath)) {
             throw(
                 type = "DeployMainCli.InitAlreadyExists",
                 message = "config/deploy.yml already exists at " & deployYmlPath & "; pass --force to overwrite"
+            );
+        }
+        if (!force && fileExists(dockerfilePath)) {
+            throw(
+                type = "DeployMainCli.InitAlreadyExists",
+                message = "Dockerfile already exists at " & dockerfilePath & "; pass --force to overwrite"
             );
         }
 
@@ -330,7 +352,7 @@ component {
         var registryUser = arguments.opts.registryUsername ?: "changeme";
 
         var mustache = new modules.wheels.services.deploy.lib.Mustache();
-        var tplDir = expandPath("/cli/lucli/templates/deploy/init");
+        var tplDir = $cliInstallDir() & "templates/deploy/init";
         var ctx = {
             service_name: serviceName,
             image_name: imageName,
@@ -343,11 +365,23 @@ component {
         if (!directoryExists(cwd & ".kamal/hooks")) directoryCreate(cwd & ".kamal/hooks", true, true);
         fileWrite(secretsPath, mustache.render(fileRead(tplDir & "/secrets.mustache"), ctx));
 
-        return "Created config/deploy.yml and .kamal/secrets." & chr(10)
+        fileWrite(dockerfilePath, mustache.render(fileRead(tplDir & "/Dockerfile.mustache"), ctx));
+        // .dockerignore source filename is `dockerignore.mustache` so the
+        // template doesn't itself get hidden by tooling that ignores dotfiles.
+        var dockerignoreWritten = (force || !fileExists(dockerignorePath));
+        if (dockerignoreWritten) {
+            fileWrite(dockerignorePath, mustache.render(fileRead(tplDir & "/dockerignore.mustache"), ctx));
+        }
+
+        var summary = dockerignoreWritten
+            ? "Created config/deploy.yml, .kamal/secrets, Dockerfile, and .dockerignore."
+            : "Created config/deploy.yml, .kamal/secrets, and Dockerfile (preserved existing .dockerignore).";
+        return summary & chr(10)
              & "Next steps:" & chr(10)
              & "  1. Edit config/deploy.yml — update servers, proxy host, registry username." & chr(10)
-             & "  2. Populate .kamal/secrets with real values (or $(cmd) substitutions)." & chr(10)
-             & "  3. wheels deploy setup";
+             & "  2. Review the generated Dockerfile — adjust COPY paths and the Lucee/CFML base if your app needs it." & chr(10)
+             & "  3. Populate .kamal/secrets with real values (or $(cmd) substitutions)." & chr(10)
+             & "  4. wheels deploy setup";
     }
 
     private string function $basename(required string path) {
@@ -375,7 +409,8 @@ component {
     private void function $dispatch(
         required array hosts,
         required string cmd,
-        required boolean dryRun
+        required boolean dryRun,
+        boolean allowFail = false
     ) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) {
@@ -383,11 +418,14 @@ component {
             }
             return;
         }
-        // Capture cmd into a local so the closure sees a stable reference
-        // (Adobe CF argument-scope closures can be flaky otherwise).
+        // Capture cmd + raise flag into locals so the closure sees stable
+        // references (Adobe CF argument-scope closures can be flaky otherwise).
+        // raise=true is the default — see #2696 for why discarding nonzero
+        // remote exit codes was the silent-success bug.
         var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
-            ssh.run(c);
+            ssh.run(c, {raise: doRaise});
         });
     }
 
@@ -399,7 +437,8 @@ component {
     private void function $dispatchAny(
         required array hosts,
         required string cmd,
-        required boolean dryRun
+        required boolean dryRun,
+        boolean allowFail = false
     ) {
         if (arguments.dryRun) {
             arrayAppend(variables.dryRunBuffer, "[any] " & arguments.cmd);
@@ -407,15 +446,16 @@ component {
         }
         if (arrayLen(arguments.hosts) == 0) return;
         var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
         // Prefer onAny when available (both real SshPool and FakeSshPool
         // expose it). Fall back to onEach with a single host otherwise.
         if (structKeyExists(variables.sshPool, "onAny")) {
             variables.sshPool.onAny(arguments.hosts, function(ssh, host) {
-                ssh.run(c);
+                ssh.run(c, {raise: doRaise});
             });
         } else {
             variables.sshPool.onEach([arguments.hosts[1]], function(ssh, host) {
-                ssh.run(c);
+                ssh.run(c, {raise: doRaise});
             });
         }
     }
@@ -492,13 +532,16 @@ component {
         return out;
     }
 
-    private string function $gitShortSha() {
+    // Stderr is drained but discarded on non-zero exit so git's "fatal: not a git repository..." doesn't surface as the version string.
+    public string function $gitShortSha(string workingDir = "") {
         try {
             var pb = createObject("java", "java.lang.ProcessBuilder")
                 .init(["git", "rev-parse", "--short", "HEAD"]);
+            if (len(arguments.workingDir)) {
+                pb.directory(createObject("java", "java.io.File").init(arguments.workingDir));
+            }
             pb.redirectErrorStream(true);
             var proc = pb.start();
-            proc.waitFor();
             var reader = createObject("java", "java.io.BufferedReader").init(
                 createObject("java", "java.io.InputStreamReader").init(
                     proc.getInputStream(), "UTF-8"
@@ -510,6 +553,8 @@ component {
                 sb.append(line);
                 line = reader.readLine();
             }
+            var exitCode = proc.waitFor();
+            if (exitCode != 0) return "unknown";
             return trim(sb.toString());
         } catch (any e) {
             return "unknown";

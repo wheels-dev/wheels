@@ -1,0 +1,325 @@
+---
+title: "Bonus: Style with wheels-basecoat"
+description: Replace simple.css with the wheels-basecoat package for shadcn/ui-quality components. Meet the Wheels package system end-to-end — install, configure, use — by upgrading the blog's UI.
+type: tutorial
+sidebar:
+  order: 8
+---
+
+import { Aside, Steps, FileTree } from '@astrojs/starlight/components';
+
+You'll install the [`wheels-basecoat`](https://github.com/wheels-dev/wheels-basecoat) package, swap simple.css for proper component CSS, and rewrite the post show view using `uiCard`, `uiField`, and `uiButton` helpers. By the end, the blog renders as a shadcn/ui-quality interface — without React, without a build step.
+
+**You'll learn:**
+
+- How to install a Wheels package via `wheels packages add`
+- What "activation" means in the Wheels package model — files in `vendor/` + manifest = the integration
+- How `package.json`'s `provides.mixins` injects helpers into controller scope (and therefore views)
+- Three core basecoat components: `uiCard`, `uiField`, `uiButton`
+- How to serve an external CSS asset alongside the framework's own static files
+
+Estimated time: 30 minutes.
+
+<Aside type="note">
+  This is an **optional** bonus chapter. Parts 1–7 build a complete, working blog. This chapter takes that blog and upgrades its appearance from "polished default" (simple.css) to "production component kit" (basecoat). Skip it if you're happy with the simple.css default — the rest of the framework is unaffected either way.
+</Aside>
+
+## Why basecoat over simple.css
+
+simple.css is a 6 KB classless stylesheet — it styles raw `<input>`, `<button>`, `<form>` tags via type and tag selectors. That's perfect for the main tutorial because zero markup changes are needed: every form helper Wheels emits gets styled automatically.
+
+basecoat goes further. It ships **CFML view helpers** (`uiCard`, `uiField`, `uiButton`, etc.) that emit semantic HTML pre-tagged with [Basecoat UI](https://basecoatui.com/) Tailwind classes. The output is shadcn/ui-quality components: real buttons with variants (primary/secondary/destructive/outline), cards with header/content/footer, form fields with label/input/error wrapping, alerts, badges, dropdowns. No React. No build step. Just helpers in your views and a CSS file in your `<head>`.
+
+| | simple.css (default) | wheels-basecoat |
+|---|---|---|
+| Distribution | CDN `<link>` | Wheels package + CSS asset |
+| Markup changes | None — works on plain HTML | Helper-driven (`#uiButton(...)#`) |
+| Component vocabulary | Browser defaults (h1, button, form, table) | Buttons, cards, fields, alerts, dropdowns, badges, navs |
+| Visual register | Modern editorial | Shadcn/ui dashboard-grade |
+| Best for | Tutorials, docs, content-heavy sites | App UIs, dashboards, forms-heavy sites |
+
+For a tutorial blog, simple.css is the right default. For a real product, you'll want basecoat or something like it. This chapter is the bridge.
+
+## Where we left off
+
+You finished Part 7 with the full blog working: posts, comments, authentication, three test specs. The layout uses simple.css from a CDN. Every form renders with the framework's built-in helpers (`#textField()#`, `#textArea()#`, `#submitTag()#`).
+
+You'll undo the simple.css link, add the basecoat asset, and rewrite the post show view in this chapter. The other views stay on simple.css until you decide to convert them — that's a follow-on exercise, not part of this chapter's scope.
+
+## Install the package
+
+The canonical way to install a Wheels package is `wheels packages add <name>`. The CLI talks to the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry, downloads a verified tarball, checks the SHA-256, and extracts to `vendor/<name>/`. From that moment on, the package is active — the framework's `PackageLoader` auto-discovers it on the next app start.
+
+<Aside type="caution">
+  The verb is `add`, not `install`. Typing `wheels packages install <name>` reaches LuCLI's built-in extension installer instead of the Wheels package handler — you'll get a confusing `[INFO] No git or extension dependencies to install` and nothing actually installs. See [`wheels packages` CLI reference](/v4-0-1-snapshot/digging-deeper/packages/) for why.
+</Aside>
+
+<Steps>
+
+1. From your blog directory, install basecoat:
+
+   ```bash title="your shell"
+   wheels packages add wheels-basecoat
+   ```
+
+   Expected output (version may differ — the registry serves the latest compatible version):
+
+   ```text title="expected output"
+   Installed wheels-basecoat@<version> → /your/path/blog/vendor/wheels-basecoat
+   Run `wheels stop && wheels start` to activate it.
+   ```
+
+2. Verify the install:
+
+   ```bash title="your shell"
+   ls vendor/wheels-basecoat
+   ```
+
+   You should see `Basecoat.cfc`, `package.json`, `README.md`, and a `tests/` directory.
+
+3. Restart the server so `onApplicationStart` re-fires and `PackageLoader` discovers the new package:
+
+   ```bash title="your shell"
+   wheels stop && wheels start
+   ```
+
+   `wheels reload` alone won't do — the package loader runs from `onApplicationStart`, which only fires on a full server boot.
+
+</Steps>
+
+## Anatomy of an installed package
+
+Look at `vendor/wheels-basecoat/package.json`:
+
+```json title="vendor/wheels-basecoat/package.json (version may differ)"
+{
+  "name": "wheels-basecoat",
+  "version": "3.0.0",
+  "description": "Basecoat UI component helpers for Wheels...",
+  "wheelsVersion": ">=4.0",
+  "provides": {
+    "mixins": "controller",
+    "services": [],
+    "middleware": []
+  },
+  "dependencies": {}
+}
+```
+
+Three fields matter for activation:
+
+- **`wheelsVersion`** — declares which Wheels versions this package is compatible with. The framework refuses to load a package whose constraint doesn't match the running runtime version.
+- **`provides.mixins`** — comma-separated mixin targets. `controller` means "inject this package's public methods into every controller's variables scope". Because Wheels views render in their controller's variables scope, controller-scoped mixins are also automatically available in views.
+- **`dependencies`** — other packages this one needs. Empty for basecoat.
+
+The `Basecoat.cfc` file alongside the manifest is the package's entry point. PackageLoader instantiates it once at app start and harvests all its `public` methods as mixins.
+
+<Aside type="note">
+  No `register-this-package` step. No `set("plugins", "...")` in `config/`. The filesystem layout *is* the activation: a directory under `vendor/` containing a valid `package.json` is the registration. Remove the directory, the package is gone. This is a deliberate departure from the Wheels 3.x `app/plugins/` model.
+</Aside>
+
+## Publish the basecoat assets
+
+The package ships its CSS+JS bundle at `vendor/wheels-basecoat/assets/basecoat/`. PackageLoader activates the CFML helpers automatically, but it doesn't expose `vendor/` at any URL — so you publish the static assets to `public/` once and the dev server takes care of the rest. This is the same copy-or-symlink pattern Rails, Django, and Phoenix use for npm-distributed frontend packages.
+
+<Steps>
+
+1. Copy the bundled assets into `public/`:
+
+   ```bash title="your shell"
+   cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat
+   ```
+
+   This is a one-shot operation. If you upgrade the package later (`wheels packages update wheels-basecoat`), re-run the copy to refresh the bundled CSS+JS.
+
+2. Confirm the copy:
+
+   ```bash title="your shell"
+   ls public/assets/basecoat/basecoat.min.css
+   ```
+
+</Steps>
+
+`public/` is served by the dev server at the root URL, so the CSS is now available at `http://localhost:8080/assets/basecoat/basecoat.min.css`.
+
+<Aside type="tip">
+  In production you'd serve these assets from a CDN (Cloudflare, Bunny, S3+CloudFront) instead of from your app's `public/` directory. For a tutorial, local-serve is fine.
+</Aside>
+
+<Aside type="note">
+  Always check `vendor/wheels-basecoat/INSTALL.md` after installing — the package's own install instructions are the source of truth for whichever version you have. Future major versions may change the asset layout.
+</Aside>
+
+## Wire basecoat into your layout
+
+`app/views/layout.cfm` currently links simple.css. Replace that with the basecoat helper, which emits the CSS link and Alpine.js script tags (Alpine.js powers basecoat's interactive components — dropdowns, dialogs, tabs).
+
+<Steps>
+
+1. Open `app/views/layout.cfm`. Find the simple.css `<link>` (added by `wheels new` in Part 1):
+
+   ```cfm title="app/views/layout.cfm — current state"
+   <head>
+       <meta charset="utf-8">
+       <meta name="viewport" content="width=device-width, initial-scale=1">
+       <title>blog</title>
+       <cfoutput>#csrfMetaTags()#</cfoutput>
+       <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+   </head>
+   ```
+
+2. Replace the simple.css link with `#basecoatIncludes()#`:
+
+   ```cfm title="app/views/layout.cfm — after"
+   <head>
+       <meta charset="utf-8">
+       <meta name="viewport" content="width=device-width, initial-scale=1">
+       <title>blog</title>
+       <cfoutput>
+           #csrfMetaTags()#
+           #basecoatIncludes()#
+       </cfoutput>
+   </head>
+   ```
+
+   `basecoatIncludes()` reads bundled defaults and emits the `<link>` for the CSS you just published, plus the `<script>` tags that power basecoat's interactive components (dropdowns, dialogs, tabs) and the Turbo cache-control hint that prevents stale previews of those widgets. If you publish to a non-default path, pass `basecoatCSSPath="/your/path/basecoat.min.css"` to override.
+
+3. Reload the server (full restart isn't needed for a view-only change):
+
+   ```bash title="your shell"
+   wheels reload
+   ```
+
+4. Visit `http://localhost:8080` — the appearance changes from simple.css editorial to basecoat dashboard styling.
+
+</Steps>
+
+## Rewrite the post show view
+
+`app/views/posts/show.cfm` currently uses plain HTML for the post body and a hand-rolled comment form. Convert it to basecoat's component helpers.
+
+<Steps>
+
+1. Replace `app/views/posts/show.cfm` entirely:
+
+   ```cfm title="app/views/posts/show.cfm" {test:compile}
+   <cfparam name="post" default="">
+   <cfoutput>
+   #uiCard()#
+       #uiCardHeader(
+           title=post.title,
+           description="status: " & post.status & " · published " & DateFormat(post.publishedAt, "mmm d, yyyy")
+       )#
+       #uiCardContent()#
+           <p>#post.body#</p>
+       #uiCardContentEnd()#
+       #uiCardFooter()#
+           #linkTo(route="editPost", key=post.id, text="Edit", class="btn btn-secondary")#
+           #buttonTo(route="post", key=post.id, text="Delete", method="delete", class="btn btn-destructive")#
+           #linkTo(route="posts", text="← all posts", class="btn btn-ghost")#
+       #uiCardFooterEnd()#
+   #uiCardEnd()#
+
+   #uiCard()#
+       #uiCardHeader(title="Comments")#
+       #uiCardContent()#
+           <section id="comments">
+               <cfset comments = post.comments()>
+               <cfloop query="comments">
+                   <article style="margin-bottom: 1em;">
+                       <strong>#comments.author#</strong>
+                       <span style="color: var(--bc-muted-foreground);">· #DateFormat(comments.createdAt, "mmm d")#</span>
+                       <p>#comments.body#</p>
+                   </article>
+               </cfloop>
+           </section>
+       #uiCardContentEnd()#
+   #uiCardEnd()#
+
+   <turbo-frame id="new_comment">
+       #startFormTag(route="postComments", postKey=post.id)#
+           #uiField(label="Your name", name="comment[author]", type="text", required=true)#
+           #uiField(label="Your comment", name="comment[body]", type="textarea", required=true, rows=4)#
+           #uiButton(text="Post comment", variant="primary", type="submit")#
+       #endFormTag()#
+   </turbo-frame>
+   </cfoutput>
+   ```
+
+2. Visit a post: `http://localhost:8080/posts/1`. You should see the post wrapped in a card, the comment form using basecoat field helpers, and a primary-styled "Post comment" button.
+
+</Steps>
+
+What changed:
+
+- **`uiCard / uiCardHeader / uiCardContent / uiCardFooter`** wrap content into a styled card with proper border, padding, and section spacing. The `*End()` helpers close the corresponding open tags — basecoat's block components are explicit about their closing markers (no implicit close-on-newline).
+
+- **`uiField`** wraps `label + input + error display` in one helper call. Pass `type="textarea"` for multi-line, `type="select"` with an `options` arg for dropdowns. The helper handles all the basecoat-specific class names you'd otherwise type by hand.
+
+- **`uiButton`** emits a styled button. Variants: `primary`, `secondary`, `destructive`, `outline`, `ghost`, `link`. Sizes: `sm`, `md`, `lg`.
+
+The comment form keeps the `<turbo-frame id="new_comment">` wrapper from Part 5 so Turbo Stream replies still work — basecoat is purely presentational, it doesn't replace Turbo's behaviour.
+
+## Checkpoint
+
+Three things to verify:
+
+<Steps>
+
+1. The show page renders as a basecoat card:
+
+   ```bash title="your shell"
+   curl -s http://localhost:8080/posts/1 | grep -oE 'class="card[^"]*"' | head -3
+   ```
+
+   Expected: at least one `class="card"` match in the output.
+
+2. The comment field renders with basecoat's input class:
+
+   ```bash title="your shell"
+   curl -s http://localhost:8080/posts/1 | grep -oE 'class="input[^"]*"' | head -3
+   ```
+
+   Expected: matches for the basecoat input class on the comment author + body fields.
+
+3. The "Post comment" button is the primary variant:
+
+   ```bash title="your shell"
+   curl -s http://localhost:8080/posts/1 | grep -oE '<button[^>]*class="btn[^"]*"[^>]*>Post comment</button>'
+   ```
+
+   Expected: a button tag with `class="btn btn-primary"` (or similar) wrapping `Post comment`.
+
+</Steps>
+
+## Troubleshooting
+
+**`No matching function [UIBUTTON] found`** — the package didn't activate. Most common cause: you ran `wheels reload` instead of `wheels stop && wheels start`. PackageLoader runs in `onApplicationStart` which a full restart triggers; reload doesn't.
+
+**`No matching function [$UIBUILDID] found`** (or `[$UILUCIDEICON]`) — the package activated but its internal helpers can't be found. Fixed in `wheels-basecoat 1.0.3`. Older versions declared the `$`-prefixed helpers `private`, but Wheels' `PackageLoader` only carries PUBLIC methods across the mixin boundary, so public callers like `uiField` couldn't reach them. Run `wheels packages update wheels-basecoat --yes && wheels stop && wheels start`.
+
+**`No version of 'wheels-basecoat' satisfies runtime '0.0.0-dev'`** — the framework can't read its own version. Likely on a Wheels release older than `4.0.0-SNAPSHOT+1670` (the snapshot that includes the runtime-detection fix). Upgrade with `brew upgrade wheels` or `choco upgrade wheels` and re-run.
+
+**Page renders unstyled** — the bundled CSS isn't being served. Check `public/assets/basecoat/basecoat.min.css` exists (re-run the `cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat` step if not) and `curl -I http://localhost:8080/assets/basecoat/basecoat.min.css` returns 200.
+
+**Card content is wrapped in a frame but no styling** — basecoat's JS bundle is failing to load. Check `public/assets/basecoat/basecoat.min.js` exists and look in the browser console for a network error on `/assets/basecoat/`.
+
+## What's next
+
+This chapter converted one view. The other views (`index.cfm`, `new.cfm`, `edit.cfm`, the comment partials, the auth screens from Part 6) are still on simple.css. Converting them is a mechanical exercise — the helpers are documented in the [wheels-basecoat README](https://github.com/wheels-dev/wheels-basecoat#component-reference).
+
+You've now seen the full Wheels package model end-to-end:
+
+- **Install** via `wheels packages add` (talks to the registry, verifies SHA-256, extracts to `vendor/`)
+- **Activate** automatically on app boot via `PackageLoader` (no registration step, no config edit)
+- **Use** the package's helpers as if they were core framework methods
+- **Update** via `wheels packages update <name> --yes`
+- **Remove** via `wheels packages remove <name>` (deletes `vendor/<name>/`)
+
+The same pattern applies to every other package in the registry: `wheels-hotwire`, `wheels-i18n`, `wheels-sentry`, `wheels-seo-suite`, `wheels-legacy-adapter`. Browse them with `wheels packages list`.
+
+Reference docs:
+
+- [Packages](/v4-0-1-snapshot/digging-deeper/packages/) — the full lifecycle, the manifest schema, writing your own package, publishing to the registry.
+- [wheels-basecoat README](https://github.com/wheels-dev/wheels-basecoat) — the complete component reference (alerts, badges, dropdowns, dialogs, tables, navs).
+- [Basecoat UI](https://basecoatui.com/) — the underlying CSS library, including the design tokens you can override.

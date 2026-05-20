@@ -1,0 +1,41 @@
+---
+title: Configuration
+description: "36 Configuration functions in Wheels 4.0.0."
+---
+
+- [`addFormat()`](/v4-0-0/configuration/addformat/) — Adds a new MIME type to your Wheels application for use with responding to multiple formats.
+- [`api()`](/v4-0-0/configuration/api/) — Scope routes under an API path prefix. Shorthand for <code>.group(path="api", name="api", ...)</code>. Typically used in
+- [`collection()`](/v4-0-0/configuration/collection/) — A collection route doesn't require an id because it acts on a collection of objects.
+- [`constraints()`](/v4-0-0/configuration/constraints/) — Set variable patterns to use for matching.
+- [`controller()`](/v4-0-0/configuration/controller/) — Considered deprecated as this doesn't conform to RESTful routing principles; Try not to use this.
+- [`delete()`](/v4-0-0/configuration/delete/) — Create a route that matches a URL requiring an HTTP <code>DELETE</code> method. We recommend using this matcher to expos
+- [`end()`](/v4-0-0/configuration/end/) — Call this to end a nested routing block or the entire route configuration. This method is chained on a sequence of routi
+- [`env()`](/v4-0-0/configuration/env/) — Returns the value of an environment variable. Checks application.env (loaded from .env files) first, then falls back to 
+- [`get()`](/v4-0-0/configuration/get/) — Returns the current setting for the supplied Wheels setting or the current default for the supplied Wheels function argu
+- [`get()`](/v4-0-0/configuration/get/) — Create a route that matches a URL requiring an HTTP <code>GET</code> method. We recommend only using this matcher to exp
+- [`group()`](/v4-0-0/configuration/group/) — Group routes together with shared attributes like path prefix, name prefix, and constraints without implying a controlle
+- [`health()`](/v4-0-0/configuration/health/) — Register a health check route at <code>/health</code> (or a custom path). Returns a JSON response with status and timest
+- [`mapper()`](/v4-0-0/configuration/mapper/) — Returns the mapper object used to configure your application's routes. Usually you will use this method in <code>config/
+- [`member()`](/v4-0-0/configuration/member/) — Scope routes within a nested resource which require use of the primary key as part of the URL pattern;
+- [`namespace()`](/v4-0-0/configuration/namespace/) — Scopes any the controllers for any routes configured within this block to a subfolder (package) and also adds the packag
+- [`package()`](/v4-0-0/configuration/package/) — Scopes any the controllers for any routes configured within this block to a subfolder (package) without adding the packa
+- [`patch()`](/v4-0-0/configuration/patch/) — Create a route that matches a URL requiring an HTTP <code>PATCH</code> method. We recommend using this matcher to expose
+- [`post()`](/v4-0-0/configuration/post/) — Create a route that matches a URL requiring an HTTP <code>POST</code> method. We recommend using this matcher to expose 
+- [`put()`](/v4-0-0/configuration/put/) — Create a route that matches a URL requiring an HTTP <code>PUT</code> method. We recommend using this matcher to expose a
+- [`registerOnError()`](/v4-0-0/configuration/registeronerror/) — Registers a callback function to be invoked when an unhandled error occurs.
+- [`resource()`](/v4-0-0/configuration/resource/) — Create a group of routes that exposes actions for manipulating a singular resource. A singular resource exposes URL patt
+- [`resources()`](/v4-0-0/configuration/resources/) — Create a group of routes that exposes actions for manipulating a collection of resources. A plural resource exposes URL 
+- [`root()`](/v4-0-0/configuration/root/) — Create a route that matches the root of its current context. This mapper can be used for the application's web root (or 
+- [`scope()`](/v4-0-0/configuration/scope/) — Set any number of parameters to be inherited by mappers called within this matcher's block. For example, set a package o
+- [`set()`](/v4-0-0/configuration/set/) — Use to configure a global setting or set a default for a function.
+- [`switchTenant()`](/v4-0-0/configuration/switchtenant/) — Switches the active tenant mid-request. Throws if the current tenant is locked
+- [`tenant()`](/v4-0-0/configuration/tenant/) — Returns the current tenant struct, or an empty struct if no tenant is active.
+- [`version()`](/v4-0-0/configuration/version/) — Scope routes under a version prefix within an API group. Creates a URL path prefix of <code>v{number}</code> (e.g., <cod
+- [`whereAlpha()`](/v4-0-0/configuration/wherealpha/) — Constrain a route variable to only match alphabetic characters (a-zA-Z). Similar to Laravel's <code>whereAlpha()</code> 
+- [`whereAlphaNumeric()`](/v4-0-0/configuration/wherealphanumeric/) — Constrain a route variable to only match alphanumeric characters (a-zA-Z0-9). Similar to Laravel's <code>whereAlphaNumer
+- [`whereIn()`](/v4-0-0/configuration/wherein/) — Constrain a route variable to only match one of a set of allowed values. Similar to an enum constraint.
+- [`whereMatch()`](/v4-0-0/configuration/wherematch/) — Constrain a route variable with a custom regex pattern.
+- [`whereNumber()`](/v4-0-0/configuration/wherenumber/) — Constrain a route variable to only match numeric values (digits). Similar to Laravel's <code>whereNumber()</code> or ASP
+- [`whereSlug()`](/v4-0-0/configuration/whereslug/) — Constrain a route variable to only match URL-friendly slug values (lowercase alphanumeric and hyphens).
+- [`whereUuid()`](/v4-0-0/configuration/whereuuid/) — Constrain a route variable to only match UUID values. Similar to ASP.NET's <code>:guid</code> constraint.
+- [`wildcard()`](/v4-0-0/configuration/wildcard/) — Special wildcard matching generates routes with `

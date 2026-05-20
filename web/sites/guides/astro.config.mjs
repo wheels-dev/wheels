@@ -65,19 +65,30 @@ function buildSidebarForVersion(version) {
 export default defineConfig({
 	site: 'https://guides.wheels.dev',
 	redirects: {
+		// v4.0.0 GA (2026-05-12) renamed the URL slug `v4-0-0-snapshot` to `v4-0-0`.
+		// Astro's static `redirects` map doesn't support [...spread] sources
+		// without a backing page that can supply getStaticPaths, so a full
+		// catch-all for `/v4-0-0-snapshot/*` → `/v4-0-0/*` isn't possible at this
+		// layer. The high-traffic landing pages get explicit redirects here; deep
+		// links fall through to the site's 404 page. (Cloudflare-side rewrite
+		// rules could provide a full wildcard if SEO equity from deep-link
+		// backlinks turns out to matter — out of scope for the GA-day rename.)
+		'/v4-0-0-snapshot': '/v4-0-0/',
+		'/v4-0-0-snapshot/': '/v4-0-0/',
+		'/v4-0-0-snapshot/start-here/installing': '/v4-0-0/start-here/installing/',
+		'/v4-0-0-snapshot/start-here/tutorial': '/v4-0-0/start-here/tutorial/',
+		'/v4-0-0-snapshot/start-here/first-15-minutes': '/v4-0-0/start-here/first-15-minutes/',
+		'/v4-0-0-snapshot/start-here/release-channels': '/v4-0-0/start-here/release-channels/',
+		'/v4-0-0-snapshot/start-here/cfml-engines': '/v4-0-0/start-here/cfml-engines/',
+		'/v4-0-0-snapshot/command-line-tools/installation': '/v4-0-0/command-line-tools/installation/',
 		// Phase 0 preview at /v4-0-0-snapshot/cli-reference/ was retired in
-		// PR #2169 and replaced by the 103-page tree at
-		// /v4-0-0-snapshot/command-line-tools/. Preserve any external
-		// bookmarks or backlinks accumulated during the preview window.
+		// PR #2169 and replaced by the 103-page tree at /command-line-tools/.
+		// Preserve any external bookmarks or backlinks from the preview window.
 		// See issue #2179.
-		//
-		// Note: Astro's static `redirects` map does not support [...spread]
-		// sources without a backing page that can supply getStaticPaths,
-		// so deep-link catch-alls (e.g. /cli-reference/foo/bar) fall through
-		// to the site's 404 page rather than redirecting. Only the two
-		// documented Phase 0 URLs are redirected.
-		'/v4-0-0-snapshot/cli-reference': '/v4-0-0-snapshot/command-line-tools/',
-		'/v4-0-0-snapshot/cli-reference/info': '/v4-0-0-snapshot/command-line-tools/',
+		'/v4-0-0-snapshot/cli-reference': '/v4-0-0/command-line-tools/',
+		'/v4-0-0-snapshot/cli-reference/info': '/v4-0-0/command-line-tools/',
+		'/v4-0-0/cli-reference': '/v4-0-0/command-line-tools/',
+		'/v4-0-0/cli-reference/info': '/v4-0-0/command-line-tools/',
 		// Astro/Starlight slugs the dotted filename `3.0.0-config-migration.md`
 		// down to `300-config-migration` (github-slugger strips dots). The file
 		// was renamed to `3-0-0-config-migration.md` so the URL matches every

@@ -214,6 +214,11 @@ jobs:
       FORGEBOX_API_TOKEN: ${{ secrets.FORGEBOX_API_TOKEN }}
       FORGEBOX_PASS: ${{ secrets.FORGEBOX_PASS }}
       DOWNSTREAM_DISPATCH_TOKEN: ${{ secrets.DOWNSTREAM_DISPATCH_TOKEN }}
+      # Optional: when present, the build job's "Dispatch Linux repo buckets"
+      # step fires repository_dispatch on apt-wheels-dev / yum-wheels-dev so
+      # the bleeding-edge channel of apt.wheels.dev / yum.wheels.dev tracks
+      # every develop push. When absent, the step skips silently. See #2605.
+      LINUX_REPO_DISPATCH_TOKEN: ${{ secrets.LINUX_REPO_DISPATCH_TOKEN }}
       # Required: the snapshot-publish step in release.yml writes the GitHub
       # Release to wheels-dev/wheels-snapshots, which needs a PAT with
       # Contents:write on that repo. Stable (main) builds don't use this and

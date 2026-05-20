@@ -1,0 +1,50 @@
+---
+title: Model Configuration
+description: "45 Model Configuration functions in Wheels 4.0.0."
+---
+
+- [`accessibleProperties()`](/v4-0-0/model-configuration/accessibleproperties/) — Use this method to specify which properties can be set through mass assignment.
+- [`afterCreate()`](/v4-0-0/model-configuration/aftercreate/) — Registers method(s) that should be called after a new object is created.
+- [`afterDelete()`](/v4-0-0/model-configuration/afterdelete/) — Registers method(s) that should be called after an object is deleted.
+- [`afterFind()`](/v4-0-0/model-configuration/afterfind/) — Registers method(s) that should be called after an existing object has been initialized (which is usually done with the 
+- [`afterInitialization()`](/v4-0-0/model-configuration/afterinitialization/) — Registers method(s) that should be called after an object has been initialized.
+- [`afterNew()`](/v4-0-0/model-configuration/afternew/) — Registers method(s) that should be called after a new object has been initialized (which is usually done with the <code>
+- [`afterSave()`](/v4-0-0/model-configuration/aftersave/) — Registers method(s) that should be called after an object is saved.
+- [`afterUpdate()`](/v4-0-0/model-configuration/afterupdate/) — Registers method(s) that should be called after an existing object is updated.
+- [`afterValidation()`](/v4-0-0/model-configuration/aftervalidation/) — Registers method(s) that should be called after an object is validated.
+- [`afterValidationOnCreate()`](/v4-0-0/model-configuration/aftervalidationoncreate/) — Registers method(s) that should be called after a new object is validated.
+- [`afterValidationOnUpdate()`](/v4-0-0/model-configuration/aftervalidationonupdate/) — Registers method(s) that should be called after an existing object is validated.
+- [`automaticValidations()`](/v4-0-0/model-configuration/automaticvalidations/) — Whether or not to enable default validations for this model.
+- [`beforeCreate()`](/v4-0-0/model-configuration/beforecreate/) — Registers method(s) that should be called before a new object is created.
+- [`beforeDelete()`](/v4-0-0/model-configuration/beforedelete/) — Registers method(s) that should be called before an object is deleted.
+- [`beforeSave()`](/v4-0-0/model-configuration/beforesave/) — Registers method(s) that should be called before an object is saved.
+- [`beforeUpdate()`](/v4-0-0/model-configuration/beforeupdate/) — Registers method(s) that should be called before an existing object is updated.
+- [`beforeValidation()`](/v4-0-0/model-configuration/beforevalidation/) — Registers method(s) that should be called before an object is validated.
+- [`beforeValidationOnCreate()`](/v4-0-0/model-configuration/beforevalidationoncreate/) — Registers method(s) that should be called before a new object is validated.
+- [`beforeValidationOnUpdate()`](/v4-0-0/model-configuration/beforevalidationonupdate/) — Registers method(s) that should be called before an existing object is validated.
+- [`belongsTo()`](/v4-0-0/model-configuration/belongsto/) — Sets up a <code>belongsTo</code> association between this model and the specified one.
+- [`dataSource()`](/v4-0-0/model-configuration/datasource/) — Use this method to override the data source connection information for this model.
+- [`enum()`](/v4-0-0/model-configuration/enum/) — Maps a property to a set of named values (like Rails enums).
+- [`hasMany()`](/v4-0-0/model-configuration/hasmany/) — Sets up a <code>hasMany</code> association between this model and the specified one.
+- [`hasOne()`](/v4-0-0/model-configuration/hasone/) — Sets up a <code>hasOne</code> association between this model and the specified one.
+- [`ignoredColumns()`](/v4-0-0/model-configuration/ignoredcolumns/) — Use this method to specify which columns cannot be used by the wheels ORM.
+- [`nestedProperties()`](/v4-0-0/model-configuration/nestedproperties/) — Allows for nested objects, structs, and arrays to be set from params and other generated data.
+- [`property()`](/v4-0-0/model-configuration/property/) — Use this method to map an object property to either a table column with a different name than the property or to a SQL e
+- [`protectedProperties()`](/v4-0-0/model-configuration/protectedproperties/) — Use this method to specify which properties cannot be set through mass assignment.
+- [`scope()`](/v4-0-0/model-configuration/scope/) — Defines a named query scope that can be chained onto finders.
+- [`setPrimaryKey()`](/v4-0-0/model-configuration/setprimarykey/) — Allows you to pass in the name(s) of the property(s) that should be used as the primary key(s).
+- [`setPrimaryKeys()`](/v4-0-0/model-configuration/setprimarykeys/) — Alias for <code>setPrimaryKey()</code>.
+- [`setTableNamePrefix()`](/v4-0-0/model-configuration/settablenameprefix/) — Sets a prefix to prepend to the table name when this model runs SQL queries.
+- [`sharedModel()`](/v4-0-0/model-configuration/sharedmodel/) — Marks this model as shared — it will always use the default application datasource
+- [`table()`](/v4-0-0/model-configuration/table/) — Use this method to tell Wheels what database table to connect to for this model.
+- [`validate()`](/v4-0-0/model-configuration/validate/) — Registers method(s) that should be called to validate objects before they are saved.
+- [`validateOnCreate()`](/v4-0-0/model-configuration/validateoncreate/) — Registers method(s) that should be called to validate new objects before they are inserted.
+- [`validateOnUpdate()`](/v4-0-0/model-configuration/validateonupdate/) — Registers method(s) that should be called to validate existing objects before they are updated.
+- [`validatesConfirmationOf()`](/v4-0-0/model-configuration/validatesconfirmationof/) — Validates that the value of the specified property also has an identical confirmation value.
+- [`validatesExclusionOf()`](/v4-0-0/model-configuration/validatesexclusionof/) — Validates that the value of the specified property does not exist in the supplied list.
+- [`validatesFormatOf()`](/v4-0-0/model-configuration/validatesformatof/) — Validates that the value of the specified property is formatted correctly by matching it against a regular expression us
+- [`validatesInclusionOf()`](/v4-0-0/model-configuration/validatesinclusionof/) — Validates that the value of the specified property exists in the supplied list.
+- [`validatesLengthOf()`](/v4-0-0/model-configuration/validateslengthof/) — Validates that the value of the specified property matches the length requirements supplied.
+- [`validatesNumericalityOf()`](/v4-0-0/model-configuration/validatesnumericalityof/) — Validates that the value of the specified property is numeric.
+- [`validatesPresenceOf()`](/v4-0-0/model-configuration/validatespresenceof/) — Validates that the specified property exists and that its value is not blank.
+- [`validatesUniquenessOf()`](/v4-0-0/model-configuration/validatesuniquenessof/) — Validates that the value of the specified property is unique in the database table.

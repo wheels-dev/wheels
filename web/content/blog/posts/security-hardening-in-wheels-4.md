@@ -154,8 +154,8 @@ Across these forty-plus PRs, no single change stands out as dramatic. That is th
 ## Where to go next
 
 - [Full audit § Security hardening](https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-4.0-audit.md) — per-PR receipts for every hardening change in this post, plus the ones that did not fit.
-- [Upgrading from Wheels 3.x](https://guides.wheels.dev/v4-0-0-snapshot/upgrading/3x-to-4x/) — detect / fix / opt-out guidance for each of the seven breaking defaults.
-- [Security documentation](https://guides.wheels.dev/v4-0-0-snapshot/deployment/security-hardening/) — the user-facing reference for middleware, headers, and session hardening.
+- [Upgrading from Wheels 3.x](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) — detect / fix / opt-out guidance for each of the seven breaking defaults.
+- [Security documentation](https://guides.wheels.dev/v4-0-0/deployment/security-hardening/) — the user-facing reference for middleware, headers, and session hardening.
 - [SECURITY.md](https://github.com/wheels-dev/wheels/blob/develop/SECURITY.md) — responsible-disclosure process. That channel is read.
 
 The framework cannot make your application secure. It can refuse to make it easy to be insecure. That is what 4.0 does.

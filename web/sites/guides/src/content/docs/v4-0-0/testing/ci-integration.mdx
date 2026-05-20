@@ -1,0 +1,267 @@
+---
+title: CI Integration
+description: Running Wheels tests in GitHub Actions — cross-engine matrix, reporters, browser gating, soft-fail databases.
+type: howto
+sidebar:
+  order: 10
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The pattern that works for Wheels in CI is the same pattern that works locally — Lucee 7 + SQLite for the fast gate, Docker-driven matrix for the thorough one — wrapped in YAML. The framework's own `.github/workflows/` is the reference implementation: `pr.yml` boots LuCLI on a single runner for the fast path, and `compat-matrix.yml` runs the full engine x database grid on a schedule. This page walks the pieces you'd copy into your own application's workflow: the minimum viable run, the cross-engine matrix, the browser-test gate, soft-fail databases, caching, and the failure modes that eat CI minutes.
+
+**You'll learn:**
+
+- A minimum-viable GitHub Actions workflow for running `wheels test` in CI
+- Which reporter names the CLI accepts today and how CI consumes the output
+- How to drive the cross-engine matrix via Docker Compose
+- How to opt browser specs in or out with `WHEELS_CI` and `WHEELS_BROWSER_CI_ENABLE`
+- How to mark a flaky database as soft-fail so it can't block a PR
+- Common CI failures and what they actually mean
+
+<Aside type="note">
+  You should already know how to run tests locally. See [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) for `wheels test`, `tools/test-local.sh`, and the Docker Compose map of ports and databases.
+</Aside>
+
+## GitHub Actions — minimum viable
+
+The smallest workflow that runs the suite on every pull request: check out the code, install Java 21, install LuCLI, create the SQLite database files, start the server, and run the tests. Everything else on this page is additions to this shape.
+
+```yaml title=".github/workflows/tests.yml"
+name: tests
+on: [pull_request, push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      WHEELS_CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v0.3.3/lucli-0.3.3-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+
+      - name: Create SQLite test databases
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
+          sqlite3 wheelstestdb.db "SELECT 1;"
+          sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+
+      - name: Start Lucee and run tests
+        run: bash tools/test-local.sh
+```
+
+Three details to notice:
+
+- **`actions/setup-java@v4` sets `JAVA_HOME` for you.** The LuCLI preflight refuses to start if `JAVA_HOME` is unset, and it is the single most common first-CI failure. The official `setup-java` action exports `JAVA_HOME` into the subsequent steps' environment, so you never have to set it by hand.
+- **`WHEELS_CI=true`** is a signal for the test harness — most visibly, it gates browser specs (covered below). You want it on every CI job.
+- **`tools/test-local.sh`** is the bundled shell script. It boots a LuCLI server, waits for it, warms the app, runs the suite, and prints a pass/fail summary with a non-zero exit code on failure. For most app repos, calling it is simpler than re-implementing the dance inline.
+
+If you want the raw CLI instead of the bash wrapper, the equivalent is `wheels start` followed by `wheels test --ci`.
+
+## Reporter output for CI
+
+The `wheels test` command accepts a `--reporter=<name>` flag, but understanding what it does today avoids a surprise: the LuCLI implementation always requests JSON from the test endpoint and then prints a human-readable summary on success or failure details on failure. The flag is parsed but does not currently select between output formats — you get the same output regardless of `--reporter` value.
+
+| Flag | Behaviour today |
+| --- | --- |
+| `--reporter=simple` (default) | Human-readable summary: `N passed (Xs)` on green, plus failure details on red |
+| `--reporter=<anything else>` | Accepted, currently no-op — same human-readable output |
+| `--ci` | Accepted, reserved for CI-specific behaviour — currently a no-op in the output path |
+| `--verbose` / `-v` | Adds the full bundle/suite/spec tree to the output |
+
+For machine-readable results, call the test runner URL directly and post-process the JSON. That is exactly what `tools/ci/run-tests.sh` does in this repo: it `curl`s `/wheels/core/tests?db=sqlite&format=json`, parses the totals in Python, and emits a JUnit XML file that `actions/upload-artifact` ingests for the GitHub summary.
+
+```bash title="tools/ci/run-tests.sh (excerpt)"
+curl -s -o "$RESULT_FILE" --max-time 600 \
+  "http://localhost:${PORT}/wheels/core/tests?db=sqlite&format=json"
+
+# Parse totals with Python, then emit JUnit XML
+python3 -c "import json; d=json.load(open('$RESULT_FILE')); \
+  print(f\"{d['totalPass']} pass, {d['totalFail']} fail, {d['totalError']} error\")"
+```
+
+<Aside type="tip">
+  If you want PR annotations on the "Files changed" tab, emit JUnit XML from the JSON results and feed it to `EnricoMi/publish-unit-test-result-action`. The pattern is copy-paste from `.github/workflows/pr.yml` in the Wheels repo.
+</Aside>
+
+## Browser test gating in CI
+
+Browser specs are expensive to run in CI — they need the Playwright JARs (~370MB) and a Chromium install — so the framework ships an opt-in gate. Two environment variables decide whether `BrowserTest` specs execute or skip gracefully:
+
+- **`WHEELS_CI=true`** — mark the environment as CI
+- **`WHEELS_BROWSER_CI_ENABLE=true`** (or `1` or `yes`) — opt browser specs in
+
+If `WHEELS_CI` is set and `WHEELS_BROWSER_CI_ENABLE` is not one of `true,1,yes`, `BrowserTest.cfc` sets `this.browserTestSkipped = true` in `beforeAll`. Every `it` block in a browser spec that begins with `if (this.browserTestSkipped) return;` then exits without running. The suite stays green; the browser tests simply don't count.
+
+```yaml title=".github/workflows/tests.yml (fragment)"
+env:
+  WHEELS_CI: "true"
+  # Uncomment to run browser specs in CI:
+  # WHEELS_BROWSER_CI_ENABLE: "true"
+```
+
+When you do opt in, cache the Playwright install — it's the slowest single step in the workflow.
+
+```yaml title=".github/workflows/tests.yml (fragment)"
+- name: Cache Playwright
+  uses: actions/cache@v4
+  with:
+    path: |
+      ~/.wheels/browser/lib
+      ~/.cache/ms-playwright
+    key: playwright-${{ hashFiles('vendor/wheels/browser-manifest.json') }}
+    restore-keys: |
+      playwright-
+
+- name: Install Playwright
+  if: steps.playwright-cache.outputs.cache-hit != 'true'
+  run: wheels browser install
+```
+
+The cache key hashes `browser-manifest.json` so a Playwright version bump invalidates the cache automatically.
+
+## Cross-engine matrix via Docker
+
+`pr.yml` covers Lucee 7 + SQLite. For the full cross-engine story, you run Docker Compose from the repo root and hit each engine's port directly — the same pattern documented in [Running Tests Locally](/v4-0-0/testing/running-tests-locally/). Wrapped in a GitHub Actions matrix, every cell is an independent runner:
+
+```yaml title=".github/workflows/compat-matrix.yml"
+jobs:
+  matrix-tests:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [lucee6, lucee7, adobe2023, adobe2025, boxlang]
+        database: [sqlite, mysql, postgres]
+    env:
+      PORT_lucee6: 60006
+      PORT_lucee7: 60007
+      PORT_adobe2023: 62023
+      PORT_adobe2025: 62025
+      PORT_boxlang: 60001
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start engine
+        run: docker compose up -d ${{ matrix.engine }}
+
+      - name: Wait for engine
+        run: |
+          PORT_VAR="PORT_${{ matrix.engine }}"
+          PORT="${!PORT_VAR}"
+          for i in $(seq 1 60); do
+            if curl -sf "http://localhost:${PORT}/" > /dev/null; then break; fi
+            sleep 2
+          done
+
+      - name: Run tests
+        run: |
+          PORT_VAR="PORT_${{ matrix.engine }}"
+          PORT="${!PORT_VAR}"
+          curl -sf "http://localhost:${PORT}/wheels/core/tests?db=${{ matrix.database }}&format=json" \
+            > results.json
+          python3 -c "import json; d=json.load(open('results.json')); \
+            exit(0 if d['totalFail']==0 and d['totalError']==0 else 1)"
+```
+
+Three things worth knowing:
+
+- **`compose.yml` lives at the repo root.** Older docs sometimes pointed at `rig/compose.yml`; that location is gone. Run `docker compose ...` from the checkout root.
+- **`fail-fast: false`** lets the other cells finish when one fails. Without it, a single Adobe CF failure kills Lucee before you see whether Lucee was green.
+- **External databases are additional `docker compose up` targets.** `mysql`, `postgres`, `sqlserver`, and `cockroachdb` have their own service definitions; `docker compose up -d postgres` brings Postgres up alongside the engine container.
+
+## Soft-fail databases
+
+Some database engines have known-failing tests that aren't worth blocking a PR over while the fix is in flight. The pattern is a combination of `continue-on-error: true` on the matrix cell and an explicit `include:` entry that marks the cell as expected-to-fail.
+
+```yaml title=".github/workflows/compat-matrix.yml (fragment)"
+strategy:
+  fail-fast: false
+  matrix:
+    database: [sqlite, mysql, postgres, cockroachdb]
+    include:
+      - database: cockroachdb
+        soft_fail: true
+steps:
+  - name: Run tests
+    continue-on-error: ${{ matrix.soft_fail == true }}
+    run: bash tools/ci/run-tests.sh
+```
+
+The framework's `compat-matrix.yml` uses a `SOFT_FAIL_DBS` shell variable instead of a matrix flag — same idea. Once the underlying tests are fixed, drop the database from the soft-fail list so failures start blocking again.
+
+## Caching dependencies
+
+`actions/setup-java@v4` caches the JDK for you. The things worth caching explicitly are the LuCLI Lucee Express install (downloads ~60MB on first run), the Maven cache if any step resolves JARs, and the Playwright install if you run browser specs.
+
+```yaml title=".github/workflows/tests.yml (fragment)"
+- name: Cache LuCLI Lucee Express
+  uses: actions/cache@v4
+  with:
+    path: |
+      ~/.lucli
+      ~/.m2
+    key: lucli-${{ runner.os }}-${{ hashFiles('box.json') }}
+    restore-keys: |
+      lucli-${{ runner.os }}-
+```
+
+The key hashes `box.json` so a version bump invalidates the cache, but the `restore-keys` fallback lets PRs without version changes reuse the most recent cache.
+
+## Parallel execution
+
+The only parallelism the framework ships today is matrix parallelism — every cell of `strategy.matrix` runs on its own runner in GitHub Actions. There is no `--parallel` flag on `wheels test` and no in-process parallel runner exposed through the CLI. If you need more throughput, split your matrix further (by engine, by database, by directory filter) rather than trying to parallelise a single suite.
+
+```yaml title=".github/workflows/tests.yml (fragment)"
+strategy:
+  fail-fast: false
+  matrix:
+    directory:
+      - tests.specs.model
+      - tests.specs.controller
+      - tests.specs.view
+      - tests.specs.dispatch
+      - tests.specs.migrator
+steps:
+  - name: Run filtered suite
+    run: wheels test --filter=${{ matrix.directory }}
+```
+
+Each cell runs independently on its own runner with its own LuCLI server — the suites don't share state and can't collide.
+
+## Common CI failures
+
+The handful of failures that eat the most CI minutes, with the one-line diagnosis for each:
+
+- **`JAVA_HOME is not set`** — LuCLI's preflight fires an actionable error. Use `actions/setup-java@v4`; it exports `JAVA_HOME` for you. Never set it by hand in a later step.
+- **Playwright JARs missing, browser specs silently skip** — expected when you haven't installed Playwright. If you want browser specs to run, add a `wheels browser install` step and the `actions/cache@v4` block above.
+- **`docker compose` not found** — the `ubuntu-latest` runner includes Docker, but some self-hosted runners don't. Add `docker/setup-buildx-action@v3` if you hit it.
+- **Lucee starts but the test request times out** — the first hit to `/` pays the full Wheels bootstrap cost. Warm the app with `curl -s "http://localhost:PORT/?reload=true&password=..."` before you curl the test endpoint, and raise `--max-time` on the test curl to 600.
+- **Tests pass locally but fail in CI** — almost always a cross-engine gotcha (Adobe's `application` scope, Lucee's struct member functions, closure `this` capture). Reproduce by running the same engine locally via Docker Compose before you debug CI logs.
+- **Flaky `wheels new` in parallel runs** — a known LuCLI race when multiple cells scaffold apps into the same shared cache. Reduce matrix parallelism or add a retry step.
+- **Test job green, PR still red** — check the reporter job. `EnricoMi/publish-unit-test-result-action` reports failures independently of the test step's exit code.
+
+## Other CI systems
+
+GitLab CI, CircleCI, Jenkins, Buildkite — the shape is identical. Install Java 21, install the `wheels` CLI, create the SQLite databases, start a server, run the tests, collect results. The shell commands don't change; only the surrounding YAML or DSL does. There is no Wheels-specific CI integration beyond the JSON endpoint (`/wheels/core/tests?format=json`) for machine-readable results and the `WHEELS_CI` / `WHEELS_BROWSER_CI_ENABLE` environment variables for browser-spec gating.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Running Tests Locally" href="/v4-0-0/testing/running-tests-locally/" description="The fast path with wheels test and tools/test-local.sh, plus the Docker cross-engine matrix." />
+  <LinkCard title="Browser Tests" href="/v4-0-0/testing/browser-tests/" description="Installing Playwright, writing browser specs, and the beforeEach/afterEach lifecycle." />
+  <LinkCard title="Testing Overview" href="/v4-0-0/testing/" description="The shape of the test suite and when to reach for each test type." />
+  <LinkCard title="Fixtures & Test Data" href="/v4-0-0/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle, test models, and per-spec isolation." />
+</CardGrid>

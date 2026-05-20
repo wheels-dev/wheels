@@ -567,6 +567,23 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Reports whether this adapter supports standalone advisory locks — i.e.,
+	 * `$acquireAdvisoryLock` / `$releaseAdvisoryLock` can be invoked directly
+	 * (no enclosing transaction or extension setup required) and will succeed.
+	 *
+	 * Adapters that throw `Wheels.AdvisoryLockNotSupported` from the lock
+	 * methods, or that require additional context (transaction wrapper,
+	 * DBMS package setup) should leave this default in place. Adapters that
+	 * accept a direct call override to return `true`. Used by the test suite
+	 * to skip lock specs on adapters where the primitive isn't standalone
+	 * callable; callers in application code can also consult it before
+	 * dispatching to `withAdvisoryLock`.
+	 */
+	public boolean function $supportsAdvisoryLocks() {
+		return false;
+	}
+
+	/**
 	 * Returns the SQL clause for pessimistic row locking (e.g., "FOR UPDATE").
 	 * Individual database adapters override this when the default is not appropriate.
 	 */
@@ -718,6 +735,59 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Generates a multi-row INSERT statement as an array compatible with `$querySetup()`.
+	 * Default shape is `INSERT INTO ... VALUES (?,?), (?,?), ...` (SQL standard table value
+	 * constructor) — used by every adapter except Oracle, which overrides this method to
+	 * emit `INSERT ALL ... SELECT 1 FROM dual` because Oracle 23 rejects multi-row VALUES
+	 * combined with the JDBC driver's implicit RETURNING (RETURN_GENERATED_KEYS) handling
+	 * with `ORA: returning clause is not allowed with INSERT and Table Value Constructor`.
+	 */
+	public array function $bulkInsertSQL(
+		required string tableName,
+		required array columns,
+		required array validProperties,
+		required array records,
+		required numeric batchStart,
+		required numeric batchEnd,
+		required struct propertyInfo
+	) {
+		local.sql = [];
+
+		local.colList = "";
+		for (local.col in arguments.columns) {
+			if (Len(local.colList)) {
+				local.colList &= ", ";
+			}
+			local.colList &= $quoteIdentifier(local.col);
+		}
+
+		ArrayAppend(local.sql, "INSERT INTO #arguments.tableName# (#local.colList#) VALUES ");
+
+		local.propCount = ArrayLen(arguments.validProperties);
+		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
+			if (local.r > arguments.batchStart) {
+				ArrayAppend(local.sql, ", ");
+			}
+			ArrayAppend(local.sql, "(");
+			for (local.p = 1; local.p <= local.propCount; local.p++) {
+				if (local.p > 1) {
+					ArrayAppend(local.sql, ", ");
+				}
+				local.propName = arguments.validProperties[local.p];
+				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
+				ArrayAppend(local.sql, $buildBulkParam(
+					value = local.val,
+					propName = local.propName,
+					propertyInfo = arguments.propertyInfo
+				));
+			}
+			ArrayAppend(local.sql, ")");
+		}
+
+		return local.sql;
+	}
+
+	/**
 	 * Generates database-specific UPSERT SQL as an array compatible with `$querySetup()`.
 	 * Base implementation throws an error — each adapter must override with its own syntax.
 	 *
@@ -751,7 +821,7 @@ component output=false extends="wheels.Global"{
 
 	/**
 	 * Builds parameter struct for a single value in a bulk operation.
-	 * Used by adapter upsert implementations.
+	 * Used by adapter bulk insert and upsert implementations.
 	 */
 	public struct function $buildBulkParam(
 		required string value,

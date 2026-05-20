@@ -1,0 +1,249 @@
+---
+title: Controller Tests
+description: Testing controller actions — response status, redirects, flash messages, filters, and params — without booting an HTTP server.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Controller tests exercise the full request pipeline: routing, filters, action dispatch, rendering. Wheels ships **`TestClient`** — a fluent HTTP client that drives your running app with `cfhttp` under the hood — so controller specs are real end-to-end integration tests against real HTTP responses, not abstract dispatch stubs. This page walks the canonical patterns: asserting status and body, following redirects, exercising filters indirectly, maintaining a session across requests, and testing JSON responses.
+
+**You'll learn:**
+
+- The `TestClient` API — constructor, HTTP verbs, request config, assertions, response accessors
+- How to assert response status, body content, redirects, and headers
+- How to test the create / update flow — redirect on success, re-render on validation failure
+- How to exercise filters indirectly — through the responses they produce
+- How cookies (including session) persist across requests on a single client
+- How to test JSON responses with `assertJson` and `assertJsonPath`
+
+<Aside type="note">
+  You should already know how controller actions and filters work. See [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) and [Authorization & Filters](/v4-0-0/digging-deeper/authorization-and-filters/). For the BDD basics — `describe`, `it`, `expect` — see [Model Tests](/v4-0-0/testing/model-tests/).
+</Aside>
+
+## Minimal spec shape
+
+Every controller spec is a CFC under `tests/specs/controllers/` that extends `wheels.WheelsTest`. The base class provides `$testClient()` — a helper that builds a `TestClient` pre-configured with the running server's base URL — and a `visit(path)` shortcut that makes an HTTP GET in one call.
+
+```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts", () => {
+            it("shows the index page", () => {
+                var client = $testClient();
+                client.get("/posts");
+                expect(client.statusCode()).toBe(200);
+                client.assertSee("Posts");
+            });
+        });
+    }
+}
+```
+
+Three things worth knowing:
+
+- `$testClient()` returns a fresh client per call. The base URL is auto-detected from `CGI.SERVER_PORT` — no setup is needed when you run the suite against the built-in test server.
+- `visit("/posts")` is shorthand for `$testClient().get("/posts")` — useful for one-liner assertions. Construct a client directly when you need to reuse cookies, set headers, or chain multiple requests.
+- `TestClient` assertions (`assertSee`, `assertRedirect`, `assertJson`, ...) throw `TestBox.AssertionFailed` on failure. They return `this`, so they chain: `client.assertOk().assertSee("Welcome")`.
+
+## The response accessors
+
+`TestClient` tracks the last response internally. After any HTTP call, read the data back through these accessors rather than the raw `cfhttp` struct — they normalize across CFML engines.
+
+| Accessor | Returns | Notes |
+|----------|---------|-------|
+| `statusCode()` | Numeric status | Extracts the integer from `"200 OK"` style strings. |
+| `content()` | Response body as string | Empty string when no body. |
+| `headers()` | Struct of response headers | Keyed by header name. Cookies are in `Set-Cookie`. |
+| `json()` | Deserialized JSON body | Throws `TestBox.AssertionFailed` if the body isn't parseable JSON. |
+| `response()` | Full raw `cfhttp` result | Escape hatch for details the helpers don't expose. |
+
+Use the assertion shortcuts (`assertStatus`, `assertOk`, `assertNotFound`, `assertRedirect`, `assertSee`, `assertDontSee`, `assertJson`, `assertHeader`, `assertCookie`) when possible — their failure messages are more descriptive than a bare `expect(client.statusCode()).toBe(...)`.
+
+## Testing action dispatch
+
+Start with the three basic shapes: a GET that returns content, a GET for a missing record, and a GET that redirects because a filter blocked access.
+
+```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
+describe("Posts index", () => {
+    it("returns 200 and lists posts", () => {
+        var client = $testClient();
+        client.get("/posts");
+        expect(client.statusCode()).toBe(200);
+        client.assertSee("Posts");
+    });
+
+    it("returns 404 for a missing post", () => {
+        var client = $testClient();
+        client.get("/posts/999999");
+        expect(client.statusCode()).toBe(404);
+    });
+
+    it("redirects to login when the action requires authentication", () => {
+        var client = $testClient();
+        client.get("/posts/1/edit");
+        client.assertRedirect(to="/login");
+    });
+});
+```
+
+`assertRedirect(to="...")` checks for a 3xx status **and** confirms the `Location` header contains the expected path. Drop the `to` argument to assert a redirect without pinning the target.
+
+<Aside type="caution">
+  `TestClient` sets `redirect = false` on the underlying `cfhttp` — the client never follows 3xx responses automatically. That's intentional: you want to assert on the redirect itself, not on the page it landed on. To follow through, issue a second request to the `Location` header.
+</Aside>
+
+## Testing POST and the create flow
+
+Creating a record has two outcomes to assert: a successful save redirects (typically 302 to the show page), and a validation failure re-renders the form (typically 200 with error messages in the body). Pass form fields as a struct to `post()` — the controller sees them on `params`, including nested keys like `params.post.title`.
+
+```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
+describe("Posts create", () => {
+    it("redirects to the show page after a successful create", () => {
+        var client = $testClient();
+        client.post("/posts", {"post[title]": "New", "post[body]": "Body text"});
+        expect(client.statusCode()).toBe(302);
+        client.assertRedirect(to="/posts/");
+    });
+
+    it("re-renders the new template when validation fails", () => {
+        var client = $testClient();
+        client.post("/posts", {"post[title]": "", "post[body]": "Body text"});
+        expect(client.statusCode()).toBe(200);
+        client.assertSee("Title can't be empty");
+    });
+});
+```
+
+The distinction matters: a 302 confirms the save succeeded and the controller called `redirectTo`; a 200 with the error message in the body confirms the validation caught a bad input and the action re-rendered `new`. If you ever see a 302 on invalid input, you know the validation isn't running — or the controller isn't branching on `.save()`'s return value.
+
+## Testing filter behavior
+
+Filters declared with `filter(through="authenticate")` run before the action. They're `private` functions, so you can't call them directly from a spec. Instead, assert their effect through the response: an unauthenticated request should redirect to login; an unauthorized request should redirect with a flash message; an authenticated request should land on 200.
+
+```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
+describe("Authentication filter", () => {
+    it("redirects anonymous users from the edit page", () => {
+        var client = $testClient();
+        client.get("/posts/1/edit");
+        client.assertRedirect(to="/login");
+    });
+
+    it("lets a logged-in user edit a post", () => {
+        var client = $testClient();
+        // POST to the login action — the client captures the session cookie
+        client.post("/login", {email: "alice@example.com", password: "secret"});
+        client.get("/posts/1/edit");
+        expect(client.statusCode()).toBe(200);
+    });
+});
+```
+
+Session state lives in the HTTP session cookie on the server. `TestClient` reads `Set-Cookie` headers after every request and includes the captured cookies on the next request, so a login in step one carries through to step two automatically — no manual session manipulation. A fresh `$testClient()` starts with an empty cookie jar.
+
+## Testing authorization — ownership filters
+
+When a `before` filter checks record ownership (for example, "you can only edit your own posts"), the same pattern applies: log in as one user, try to edit another user's record, assert the redirect. The fixture setup in `populate.cfm` seeds the users and posts.
+
+```cfm {test:compile} title="tests/specs/controllers/PostsSpec.cfc"
+describe("Ownership filter", () => {
+    it("lets alice edit her own post", () => {
+        var client = $testClient();
+        client.post("/login", {email: "alice@example.com", password: "secret"});
+        client.get("/posts/1/edit");
+        expect(client.statusCode()).toBe(200);
+    });
+
+    it("blocks alice from editing bob's post", () => {
+        var client = $testClient();
+        client.post("/login", {email: "alice@example.com", password: "secret"});
+        client.get("/posts/2/edit");
+        client.assertRedirect(to="/posts");
+    });
+});
+```
+
+One spec per actor × path combination: authorized succeeds, unauthorized redirects. When the filter grows a third case ("admins can edit anyone's posts"), you add a third `it`; the first two don't move.
+
+## Mocking params
+
+`TestClient.post(path, body)` and `put(path, body)` take a struct whose keys become form fields on the request. Wheels' request parser maps square-bracket keys into nested `params` structs — `"post[title]"` lands at `params.post.title`, matching how a real `<form>` submits. When a key has no brackets, it lands at the top level: `{email: "x@y.com"}` becomes `params.email`.
+
+Send JSON instead by chaining `.asJson()` before the call:
+
+```cfm {test:compile} title="tests/specs/controllers/PostsApiSpec.cfc"
+it("accepts a JSON body", () => {
+    var client = $testClient();
+    client.asJson().post("/api/posts", {title: "From JSON", body: "B"});
+    expect(client.statusCode()).toBe(201);
+});
+```
+
+`.asJson()` sets `Content-Type: application/json`, sets `Accept: application/json`, and tells the client to serialize the body struct with `SerializeJSON` rather than sending it as form fields.
+
+## Testing JSON responses
+
+When the controller uses content negotiation (`provides("html", "json")` plus `renderWith(data=...)`), the same endpoint returns HTML by default and JSON when the client asks for it. Assert JSON responses with `assertJson` (full or partial struct match) and `assertJsonPath` (dot-notation lookup).
+
+```cfm {test:compile} title="tests/specs/controllers/PostsApiSpec.cfc"
+describe("Posts API", () => {
+    it("returns JSON when Accept header requests it", () => {
+        var client = $testClient();
+        client.asJson().get("/posts/1");
+        expect(client.statusCode()).toBe(200);
+        client.assertHeader("Content-Type");
+        client.assertJson({title: "First post"});
+    });
+
+    it("resolves nested paths in the JSON response", () => {
+        var client = $testClient();
+        client.asJson().get("/posts/1");
+        client.assertJsonPath("post.title", "First post");
+        client.assertJsonPath("post.comments.1.author", "Alice");
+    });
+});
+```
+
+`assertJson` with no argument just checks the body parses as JSON. Pass a struct and it asserts every key matches the parsed response. `assertJsonPath` takes a dot-notation path — array indices are 1-based, matching CFML convention, so `items.1` is the first element.
+
+Set individual headers when you need finer control than `.asJson()` gives:
+
+```cfm title="illustrative — do not type"
+client.withHeader("Authorization", "Bearer " & token)
+      .withHeader("Accept", "application/json")
+      .get("/api/posts/1");
+```
+
+`withHeader(name, value)` and `withHeaders(struct)` persist on the client — every subsequent request on that client sends them until you build a new client.
+
+## Test isolation
+
+`TestClient` runs against your real database through real HTTP requests. Two concerns:
+
+- **State carries across specs.** WheelsTest does not wrap each `it` in a transaction — the default `transactionMode` is `none`. A `POST /posts` in one spec creates a row the next spec will see. `tests/populate.cfm` runs once at the start of the suite to DROP + CREATE + seed; it does not run between specs. If a spec must not leak state, wrap the action call in a manual transaction and roll back at the end.
+- **A fresh client has an empty cookie jar.** Build a new `$testClient()` at the top of each `it` (or in `beforeEach`) when you want to start logged out. Reuse one client when you want to chain logged-in requests.
+
+```cfm title="illustrative — do not type"
+it("creates a post inside a rollback", () => {
+    transaction {
+        var client = $testClient();
+        client.post("/login", {email: "alice@example.com", password: "secret"});
+        client.post("/posts", {"post[title]": "T", "post[body]": "B"});
+        expect(client.statusCode()).toBe(302);
+        transaction action="rollback";
+    }
+});
+```
+
+The [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) guide covers the full `populate.cfm` pattern and strategies for keeping specs independent when the suite grows.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Model Tests" href="/v4-0-0/testing/model-tests/" description="Validations, callbacks, custom methods, associations, and scopes — the bulk of a healthy suite." />
+  <LinkCard title="Authorization & Filters" href="/v4-0-0/digging-deeper/authorization-and-filters/" description="Declaring before filters, role checks, and ownership guards — the behavior your controller specs assert." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="How actions map to routes, how params are parsed, how rendering and redirects work." />
+  <LinkCard title="Testing Overview" href="/v4-0-0/testing/" description="Test categories, where specs live, how the runner boots, and setup files that matter." />
+</CardGrid>

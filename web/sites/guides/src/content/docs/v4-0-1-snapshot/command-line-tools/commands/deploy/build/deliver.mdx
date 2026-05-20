@@ -1,0 +1,38 @@
+---
+title: "wheels deploy build deliver"
+description: Build, push, and pull a new image. Combines push and pull in one command.
+type: reference
+sidebar:
+  label: "deliver"
+  order: 1
+---
+
+Build, push, and pull a new image. Equivalent to `push` followed by `pull`. Skips the rolling traffic switch that [`wheels deploy`](/v4-0-1-snapshot/command-line-tools/commands/deploy/deploy/) would add.
+
+## Synopsis
+
+``` title="Synopsis"
+wheels deploy build deliver [--version=<v>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | Version label. Defaults to `git rev-parse --short HEAD`. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print both local + remote commands without executing. |
+
+## Behavior
+
+1. Runs locally: `docker build` → `docker push`.
+2. Runs remotely on every host: `docker pull`.
+
+No container is started — use [`wheels deploy`](/v4-0-1-snapshot/command-line-tools/commands/deploy/deploy/) for a full rollout.
+
+## Example
+
+```bash title="Example"
+wheels deploy build deliver
+wheels deploy build deliver --version=v1.2.3
+```

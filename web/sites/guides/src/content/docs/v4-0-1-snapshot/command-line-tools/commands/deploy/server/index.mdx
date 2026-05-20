@@ -1,0 +1,21 @@
+---
+title: "wheels deploy server"
+description: Host-level operations — exec arbitrary commands, bootstrap Docker on a fresh host.
+type: reference
+sidebar:
+  label: "server"
+  order: 70
+---
+
+Host-level operations that don't fit in the app/proxy/accessory model.
+
+## Verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`exec`](/v4-0-1-snapshot/command-line-tools/commands/deploy/server/exec/) | Run a command on every host (optionally filtered). |
+| [`bootstrap`](/v4-0-1-snapshot/command-line-tools/commands/deploy/server/bootstrap/) | Install Docker on a fresh host (idempotent). |
+
+:::caution[Use the flat aliases at the shell]
+The wheels CLI's underlying runtime registers `server` as a top-level command (for managing the local Lucee dev server). When you type `wheels deploy server <verb>` at the shell, the runtime grabs `server` before the deploy dispatcher sees it, and you'll get the Lucee server help instead of the deploy verb. The flat aliases [`wheels deploy bootstrap`](/v4-0-1-snapshot/command-line-tools/commands/deploy/bootstrap/) and [`wheels deploy exec`](/v4-0-1-snapshot/command-line-tools/commands/deploy/exec/) sidestep the collision and are the canonical CLI form. See [issue #2677](https://github.com/wheels-dev/wheels/issues/2677).
+:::

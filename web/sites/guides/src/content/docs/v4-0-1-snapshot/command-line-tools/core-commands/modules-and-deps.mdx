@@ -1,0 +1,335 @@
+---
+title: "Modules & Deps"
+description: wheels modules and wheels deps — two LuCLI command groups. modules manages LuCLI's plugin registry (the wheels binary itself is a module); deps manages per-project CFML, extension, Java, and ForgeBox dependencies declared in lucee.json.
+type: reference
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`wheels modules` and `wheels deps` are two LuCLI command groups that sit side-by-side but serve very different purposes. `modules` manages LuCLI's own plugin registry — the mechanism that adds commands to the CLI itself (wheels is registered this way). `deps` manages the dependencies of whatever project you're standing in — the CFML modules, Lucee extensions, and ForgeBox packages declared in its `lucee.json`.
+
+**You'll use this for:**
+
+- Installing, updating, and listing LuCLI modules that extend the CLI itself.
+- Adding and installing per-project dependencies declared in `lucee.json`.
+- Understanding how the `wheels` command group is registered as a LuCLI module.
+
+## Overview
+
+The two surfaces are easy to confuse because both talk about "installing things." Keep the distinction in mind:
+
+- **Modules** are LuCLI plugins. They live in the CLI's home directory (`~/.wheels/modules/` for the `wheels` binary, `~/.lucli/modules/` for standalone LuCLI). Each module is a `Module.cfc` that registers new top-level commands. `wheels modules list` shows what's registered.
+- **Deps** are per-project CFML libraries. They live in your project's `lucee.json` file and, once installed, under the project's `lib/` (or configured install path). They can come from git, the Lucee extension registry, ForgeBox, or a local file/JAR.
+
+Modules affect the CLI; deps affect the app you're building with it. The same project can use both independently.
+
+## `wheels modules`
+
+Manage the LuCLI module registry. Aliased as `wheels module` (singular).
+
+### Synopsis
+
+```bash title="synopsis"
+wheels modules <subcommand> [flags]
+```
+
+Calling `wheels modules` with no subcommand prints help and exits. The subcommands are `list`, `init`, `run`, `add`, `install`, `uninstall`, `update`, and `help`.
+
+### `list`
+
+Print every module installed under the active profile's modules directory, alongside modules known from the bundled repository index.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules list
+```
+
+Takes no flags. Output is a table with `NAME`, `INSTALLED`, `STATUS`, `VERSION`, and `DESCRIPTION` columns, plus the resolved modules directory at the top so you can see exactly where LuCLI is looking.
+
+#### Example
+
+```bash {test:cli cmd="wheels modules list"}
+wheels modules list
+```
+
+Sample output:
+
+```
+Wheels Modules
+Module directory: /Users/you/.wheels/modules
+
+NAME       INSTALLED   STATUS   VERSION   DESCRIPTION
+wheels     yes         ok       4.0.0     Wheels framework CLI module
+```
+
+### `install`
+
+Install a module from the bundled repository index (by name) or directly from a git URL.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules install [MODULE_NAME] [flags]
+```
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `-u, --url=<url>` | Git URL to install from (e.g. `https://github.com/user/repo.git[#ref]`). |
+| `-r, --ref, --rev=<ref>` | Git ref to install — a branch, tag, or commit SHA. |
+| `-n, --name=<alias>` | Install alias/name to use locally (overrides `module.json` name). |
+| `-f, --force` | Overwrite an existing module of the same name; also auto-approves module permissions. |
+
+#### Example
+
+```bash title="install a module from a git URL"
+wheels modules install my-module --url=https://github.com/acme/my-module.git --ref=main
+```
+
+### `add`
+
+Alias for `install` with an explicit focus on `--ref`. Takes the same arguments and flags as `install`.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules add [MODULE_NAME] [flags]
+```
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `-u, --url=<url>` | Git URL to add from. |
+| `-r, --ref, --rev=<ref>` | Git ref to install. |
+| `-n, --name=<alias>` | Install alias/name to use locally. |
+| `-f, --force` | Overwrite existing module if it already exists; also auto-approves module permissions. |
+
+### `update`
+
+Update a previously-installed git-sourced module to a newer ref.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules update <MODULE_NAME> [flags]
+```
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `-u, --url=<url>` | Git URL to update from. |
+| `-r, --ref, --rev=<ref>` | Git ref to update to. |
+| `-f, --force` | Auto-approve module permissions (useful for non-interactive runs). |
+
+### `uninstall`
+
+Remove an installed module by deleting its directory under the active profile's modules directory.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules uninstall <MODULE_NAME>
+```
+
+Takes no flags beyond the required module name.
+
+### `init`
+
+Scaffold a new module in the active profile's modules directory. Creates the directory, a starter `Module.cfc`, a `module.json` manifest, and a `README.md`.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules init [MODULE_NAME] [flags]
+```
+
+If you omit `MODULE_NAME`, `init` prompts for one interactively.
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `--git` | Initialize a git repository in the new module directory. |
+| `--no-git` | Do not initialize git and do not prompt. |
+
+### `run`
+
+Invoke a module's `Module.cfc` directly with arguments, bypassing the normal top-level subcommand routing. Useful for testing modules during development.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules run <MODULE_NAME> [ARGS...] [flags]
+```
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `-h, --help` | Show the module's own help output (invokes its `showHelp` entry point). |
+
+Any unmatched trailing arguments are forwarded verbatim to the module.
+
+### `help`
+
+Print help for a module or a specific command within a module.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels modules help --module=<MODULE_NAME> [--command=<COMMAND>]
+```
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `-m, --module=<name>` | Module to show help for (required). |
+| `-c, --command=<name>` | Specific command within that module. |
+
+## `wheels deps`
+
+Manage per-project dependencies declared in `lucee.json`. Aliased as `wheels dependencies`.
+
+### Synopsis
+
+```bash title="synopsis"
+wheels deps <subcommand> [flags]
+```
+
+Calling `wheels deps` with no subcommand prints help and exits. The subcommands are `install`, `add`, and `prune`.
+
+`wheels deps` reads and writes `lucee.json` — specifically the `dependencies` and `devDependencies` blocks — and maintains a `lucee-lock.json` lock file alongside it when `dependencySettings.useLockFile` is enabled.
+
+### `install`
+
+Read `lucee.json`, resolve every dependency, and install supported sources (git, Lucee extensions, ForgeBox) into the project. Writes `lucee-lock.json` on success unless the lock file is disabled.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels deps install [flags]
+```
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `--env=<env>` | Environment to apply (e.g. `prod`, `dev`, `staging`) — merges that environment's overrides on top of the base config. |
+| `--production` | Install only `dependencies`, skipping `devDependencies`. |
+| `--force` | Reinstall every dependency even if it already matches the lock file. |
+| `--dry-run` | Show what would be installed without writing anything. |
+| `--include-nested-deps` | In `--dry-run`, also introspect nested projects found under already-installed dependencies and show what they would install. |
+
+Unsupported sources (currently anything other than git, extension, or ForgeBox) are skipped with a warning.
+
+#### Example
+
+```bash title="examples — run in a project with a lucee.json"
+wheels deps install
+wheels deps install --dry-run --include-nested-deps
+wheels deps install --env=prod --production
+```
+
+### `add`
+
+Interactive wizard that appends a new dependency to `lucee.json`. Walks you through picking the scope (`dependencies` vs `devDependencies`), the kind of dependency (CFML/git, Lucee extension, Java/Maven, or raw JAR/file), and every required field for that kind.
+
+#### Synopsis
+
+```bash title="synopsis"
+wheels deps add
+```
+
+Takes no flags. The wizard handles everything interactively. For CFML/git deps it suggests modules from the bundled registry; for Lucee extensions it offers an interactive list from the Lucee extension registry including version selection.
+
+### `prune`
+
+Remove cached git dependency clones under LuCLI's git cache directory (e.g. `~/.wheels/deps/git-cache/`). The next `install` will re-clone on demand.
+
+#### Synopsis
+
+```bash {test:cli cmd="wheels deps prune"}
+wheels deps prune
+```
+
+Takes no flags. Prints the cache path, then deletes it.
+
+<Aside type="caution" title="Prune wipes the whole git cache">
+`prune` deletes every cloned git dependency in LuCLI's cache directory, not just unused ones. It does not touch your project's installed `lib/` — only the shared clone cache that `deps install` pulls from. Run it when you want to force clean re-clones.
+</Aside>
+
+## How wheels is registered
+
+The `wheels` command group — every subcommand you see when you run `wheels --help` — is itself a LuCLI module. It lives at `cli/lucli/Module.cfc` within the wheels framework repository and is wired into the CLI via the LuCLI module registry.
+
+At runtime, LuCLI scans `<home>/modules/*/Module.cfc` for modules to load, where `<home>` depends on the binary you invoked:
+
+- `~/.wheels/modules/` when the binary is `wheels` (the Wheels distribution).
+- `~/.lucli/modules/` when the binary is the standalone `lucli`.
+
+When you install Wheels via Homebrew, the Wheels module is already registered under `~/.wheels/modules/wheels/`, which is why `wheels modules list` shows it as `installed`. That single module registration is what makes `wheels generate`, `wheels migrate`, `wheels test`, and the rest of the Wheels surface available.
+
+<Aside type="note" title="Modules are LuCLI plugins, not Wheels packages">
+Don't confuse LuCLI modules with Wheels packages. Wheels packages (installed into `vendor/<name>/` from standalone repos like `wheels-dev/wheels-sentry` and `wheels-dev/wheels-hotwire`, indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) are optional first-party framework modules that live *inside* a Wheels project. LuCLI modules live *outside* any project, in LuCLI's home directory, and add commands to the CLI. They're fundamentally different mechanisms; this page covers only the CLI-level one.
+</Aside>
+
+## Common workflows
+
+### Install a LuCLI module
+
+```bash title="install and verify a LuCLI module"
+wheels modules install my-module --url=https://github.com/acme/my-module.git --ref=v1.0.0
+wheels modules list
+```
+
+The first command clones the repo into `~/.wheels/modules/my-module/` and registers it; the second verifies it's there. After this, `wheels my-module <whatever>` will route to the module's commands.
+
+### Add a dep to the current project
+
+```bash title="add a dependency interactively then install"
+wheels deps add
+wheels deps install
+```
+
+`add` walks you through the interactive wizard and writes the new entry into `lucee.json`. `install` then resolves every dependency in that file (including the one you just added) and drops them under the project's `lib/` directory, updating `lucee-lock.json` at the end.
+
+### Prune removed deps
+
+```bash title="prune cache and force reinstall"
+wheels deps prune
+wheels deps install --force
+```
+
+`prune` clears the git clone cache. `install --force` re-fetches every git-sourced dependency fresh. Reach for this when a cached clone has gone stale or you want to verify a clean install.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Installation"
+    href="../../installation/"
+    description="Install the wheels binary (Homebrew, Chocolatey, manual) — the step that registers the Wheels module."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../../configuration/"
+    description="The lucee.json schema, including the dependencies / devDependencies blocks that deps install reads."
+  />
+  <LinkCard
+    title="Server"
+    href="../server/"
+    description="wheels server — uses the extensions your deps install bring in via LUCEE_EXTENSIONS."
+  />
+  <LinkCard
+    title="Console & REPL"
+    href="../../wheels-commands/console-and-repl/"
+    description="The Wheels-aware console runs inside a project whose deps have been installed."
+  />
+</CardGrid>

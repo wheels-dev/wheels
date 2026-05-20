@@ -184,6 +184,24 @@
             <a class="item <cfif !testResults.ok and arraylen(failures) eq 0 and bundlesWithFailures eq 0 and (arraylen(errors) gt 0 or bundlesWithErrors gt 0)>active</cfif>" data-tab="errors">Errors (<cfif arraylen(errors) gt 0>#arraylen(errors)#<cfelse>#bundlesWithErrors#</cfif>)</a>
             <a class="item <cfif testResults.ok>active</cfif>" data-tab="passed">Passed (#arraylen(passes)#)</a>
         </div>
+        <!--- cfformat-ignore-start --->
+        <!---
+            Inline tab initializer. _footer.cfm also calls $('.menu .item').tab()
+            for every dev-tools page, but on the full-suite path that footer JS
+            doesn't always reach the browser, leaving the tabs as static markup.
+            Binding here — immediately after the menu — keeps tab switching
+            working regardless of what happens further down the response. See
+            issue ##2651.
+        --->
+        <script>
+            (function () {
+                if (window.jQuery && jQuery.fn && jQuery.fn.tab) {
+                    try { jQuery('.menu .item').tab(); } catch (e) {}
+                }
+            })();
+        </script>
+        <!--- cfformat-ignore-end --->
+
 
         #startTab(tab="failures", active=(!testResults.ok and (arraylen(failures) gt 0 or bundlesWithFailures gt 0)))#
         <table class="ui celled table searchable">

@@ -42,6 +42,14 @@ component output="false" {
 		variables.loadOrder = [];
 		variables.lazyPackages = {};
 		variables.mixinCollisions = [];
+		// Per-package CFML mapping registry: alias → absolute package directory.
+		// Populated during load so each installed package gets a static, identifier-
+		// safe alias usable in `new <alias>.Sibling()` even when the on-disk dir
+		// name contains hyphens (e.g. `wheels-sentry`). See GH#2712.
+		variables.packageMappings = {};
+		// Tracks which package first claimed each alias so a later collision can
+		// be reported instead of silently overwriting.
+		variables.$mappingProviders = {};
 		// Tracks which package first registered each method per target so a
 		// later registration can be flagged as an overwrite. Keyed by target,
 		// then by method name, holding the originating package dir name.
@@ -99,14 +107,31 @@ component output="false" {
 	}
 
 	/**
+	 * Returns the per-package CFML mapping registry built during load.
+	 * Keys are identifier-safe aliases (e.g. `wheelsSentry` derived from
+	 * `wheels-sentry`, or an explicit `mapping` value from package.json);
+	 * values are absolute paths to the package install directory. See GH#2712.
+	 *
+	 * Returns a copy: the internal registry is the source of truth, and a
+	 * caller mutating the returned struct must not silently corrupt it.
+	 */
+	public struct function getPackageMappings() {
+		return Duplicate(variables.packageMappings);
+	}
+
+	/**
 	 * Returns mixin collision records — cases where a package registered a
 	 * method name for a target that another package had already claimed.
 	 * Each entry: {target, method, firstProvider, secondProvider, acknowledged}.
 	 * An `acknowledged` true means the overwriting package declared the method
 	 * in its `provides.overrides` list, which suppresses the warning log.
+	 *
+	 * Returns a defensive copy: $rollbackPackage walks the internal array
+	 * with ArrayDeleteAt, so a caller mutating the returned reference (e.g.
+	 * sorting or appending) would corrupt that walk on a subsequent rollback.
 	 */
 	public array function getMixinCollisions() {
-		return variables.mixinCollisions;
+		return Duplicate(variables.mixinCollisions);
 	}
 
 	/**
@@ -219,6 +244,11 @@ component output="false" {
 					type = "error",
 					file = "wheels"
 				);
+				// Any partial state from $loadPackage / $instantiatePackage
+				// (packageMeta, instantiated CFC, collected mixins/services/
+				// middleware) gets cleaned up so failedPackages and the live
+				// registries never disagree about which packages loaded.
+				$rollbackPackage(local.dirName);
 			}
 		}
 	}
@@ -349,6 +379,16 @@ component output="false" {
 		local.canBeLazy = local.isLazy && local.mixinTargets == "none" && !local.hasMiddleware;
 
 		if (local.canBeLazy) {
+			// Log the lazy registration attempt before mapping registration so
+			// a reader scanning wheels.log on a failed-mapping outcome sees a
+			// "Loading package" entry symmetric with the eager path.
+			try {
+				WriteLog(
+					text = "[Wheels] Loading package '#arguments.dirName#' from #arguments.pkgDir# (lazy)",
+					type = "information",
+					file = "wheels"
+				);
+			} catch (any e) {}
 			// Store lazy package info — CFC will be instantiated on first access
 			variables.lazyPackages[arguments.dirName] = {
 				dirName = arguments.dirName,
@@ -356,6 +396,14 @@ component output="false" {
 				mixinTargets = local.mixinTargets,
 				manifest = local.manifest
 			};
+			// Register the CFML mapping for a lazy package up front so consumer
+			// code can reference siblings via the alias before first access.
+			// Return value intentionally discarded on the failure path:
+			// $tryRegisterPackageMapping records its own failedPackages entry
+			// and calls $rollbackPackage so lazyPackages is cleaned too.
+			if (!$tryRegisterPackageMapping(arguments.dirName, local.manifest, arguments.pkgDir)) {
+				return;
+			}
 			WriteLog(
 				text = "[Wheels] Package '#arguments.dirName#' v#variables.packageMeta[arguments.dirName].version# registered (lazy)",
 				type = "information",
@@ -366,14 +414,172 @@ component output="false" {
 
 		try {
 			WriteLog(
-				text = "[Wheels] Loading package '##arguments.dirName##' from ##arguments.pkgDir##",
+				text = "[Wheels] Loading package '#arguments.dirName#' from #arguments.pkgDir#",
 				type = "information",
-				file = "wheels_security"
+				file = "wheels"
 			);
 		} catch (any e) {}
 
 		// Eager loading: instantiate CFC now
 		$instantiatePackage(arguments.dirName, arguments.pkgDir, local.mixinTargets, local.provides);
+
+		// Register the per-package CFML mapping LAST so any earlier failure
+		// (validation, instantiation, mixin collection) doesn't leave a stale
+		// alias claiming the slot in variables.packageMappings or
+		// variables.$mappingProviders. A collision (two packages computing the
+		// same alias) is recorded as a failed package and the loaded package
+		// is rolled back so its services/mixins don't ship under an alias
+		// nobody can resolve. See GH#2712.
+		// Return value intentionally discarded: $tryRegisterPackageMapping
+		// records its own failedPackages entry and calls $rollbackPackage on
+		// the false path.
+		$tryRegisterPackageMapping(arguments.dirName, local.manifest, arguments.pkgDir);
+	}
+
+	/**
+	 * Registers a CFML mapping for a package and returns true on success. On
+	 * failure (invalid alias, duplicate alias) the package is rolled back —
+	 * packageMeta, the instantiated package, any collected mixins/service
+	 * providers/middleware, and the lazy-package entry are all removed — and
+	 * the failure is recorded in failedPackages. Centralises the rollback so
+	 * eager and lazy load paths share identical cleanup.
+	 */
+	private boolean function $tryRegisterPackageMapping(
+		required string dirName,
+		required struct manifest,
+		required string pkgDir
+	) {
+		local.aliasResult = $registerPackageMapping(arguments.dirName, arguments.manifest, arguments.pkgDir);
+		if (!local.aliasResult.ok) {
+			ArrayAppend(variables.failedPackages, {
+				name = arguments.dirName,
+				error = local.aliasResult.error,
+				detail = local.aliasResult.detail
+			});
+			WriteLog(
+				text = "[Wheels] Package '#arguments.dirName#' failed mapping registration: #local.aliasResult.error#",
+				type = "error",
+				file = "wheels"
+			);
+			$rollbackPackage(arguments.dirName);
+			return false;
+		}
+
+		// Plural `mappings` entries register after the singular alias so the
+		// singular slot is always claimed first. A plural failure unwinds any
+		// plural entries that did succeed AND the singular alias, then rolls
+		// the package back — leaves the mapping registries clean for the next
+		// load attempt.
+		local.pluralResult = $registerAdditionalMappings(arguments.dirName, arguments.manifest, arguments.pkgDir);
+		if (local.pluralResult.ok) {
+			return true;
+		}
+
+		$unregisterMappings(local.pluralResult.registered);
+		// Singular alias used Len() to validate, so it's always present here.
+		$unregisterMappings([local.aliasResult.alias]);
+		ArrayAppend(variables.failedPackages, {
+			name = arguments.dirName,
+			error = local.pluralResult.error,
+			detail = local.pluralResult.detail
+		});
+		WriteLog(
+			text = "[Wheels] Package '#arguments.dirName#' failed plural mapping registration: #local.pluralResult.error#",
+			type = "error",
+			file = "wheels"
+		);
+		$rollbackPackage(arguments.dirName);
+		return false;
+	}
+
+	/**
+	 * Removes the given mapping aliases from the in-process registry and
+	 * (best-effort) from `application.mappings`. Used to unwind partial
+	 * progress when a multi-entry plural-mapping registration fails midway.
+	 * Singular aliases store their identifier-form (e.g. `wheelsSentry`);
+	 * plural aliases store their dotted form (e.g. `plugins.sentry`).
+	 * `application.mappings` is keyed by slash-form (`/wheelsSentry`,
+	 * `/plugins/sentry`) so we translate at the unregister site too.
+	 */
+	private void function $unregisterMappings(required array aliases) {
+		for (local.alias in arguments.aliases) {
+			if (!Len(local.alias)) {
+				continue;
+			}
+			StructDelete(variables.packageMappings, local.alias);
+			StructDelete(variables.$mappingProviders, local.alias);
+			local.slashForm = "/" & Replace(local.alias, ".", "/", "all");
+			try {
+				if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
+					StructDelete(application.mappings, local.slashForm);
+				}
+			} catch (any e) {
+				// Engines without a writable application.mappings reach this
+				// path through the same try/catch shape as the register side;
+				// the in-process registries above remain authoritative.
+			}
+		}
+	}
+
+	/**
+	 * Removes every trace of a package that was partially loaded before a
+	 * post-instantiation failure (e.g. mapping collision). Keeps the loader's
+	 * public registries internally consistent: a package in failedPackages
+	 * never simultaneously appears in packages/packageMeta/lazyPackages or
+	 * contributes mixins/services/middleware/mixinCollisions.
+	 *
+	 * Intentionally does NOT clean variables.packageMappings or
+	 * variables.$mappingProviders: callers are responsible for unwinding
+	 * those registries before reaching here. From $discover's catch
+	 * (pre-mapping exception) nothing was ever written; from
+	 * $tryRegisterPackageMapping's false path, $unregisterMappings has
+	 * already cleaned both any partial plural entries and the singular
+	 * alias. Adding cleanup here would mask a future caller that forgets
+	 * to unwind.
+	 */
+	private void function $rollbackPackage(required string dirName) {
+		StructDelete(variables.packageMeta, arguments.dirName);
+		StructDelete(variables.packages, arguments.dirName);
+		StructDelete(variables.lazyPackages, arguments.dirName);
+		// Drop any mixins this package contributed to each target, plus the
+		// matching method-provider entries so a later package can register the
+		// same method without spurious collision warnings.
+		for (local.target in variables.mixableComponents) {
+			if (!StructKeyExists(variables.$methodProviders, local.target)) {
+				continue;
+			}
+			local.methodNames = StructKeyArray(variables.$methodProviders[local.target]);
+			for (local.methodName in local.methodNames) {
+				if (variables.$methodProviders[local.target][local.methodName] == arguments.dirName) {
+					StructDelete(variables.$methodProviders[local.target], local.methodName);
+					if (StructKeyExists(variables.mixins, local.target)) {
+						StructDelete(variables.mixins[local.target], local.methodName);
+					}
+				}
+			}
+		}
+		// Drop any service-provider registration and middleware entries.
+		local.svcIdx = ArrayFind(variables.serviceProviders, arguments.dirName);
+		if (local.svcIdx > 0) {
+			ArrayDeleteAt(variables.serviceProviders, local.svcIdx);
+		}
+		for (local.i = ArrayLen(variables.packageMiddleware); local.i >= 1; local.i--) {
+			if (variables.packageMiddleware[local.i].packageName == arguments.dirName) {
+				ArrayDeleteAt(variables.packageMiddleware, local.i);
+			}
+		}
+		// Drop any mixin-collision diagnostic records that reference this
+		// package — getMixinCollisions() is a public API and a stale entry
+		// describing a method collision against a package no longer loaded
+		// would mislead a consumer reading both getFailedPackages() and
+		// getMixinCollisions(). Walk in reverse so ArrayDeleteAt is safe.
+		for (local.i = ArrayLen(variables.mixinCollisions); local.i >= 1; local.i--) {
+			local.entry = variables.mixinCollisions[local.i];
+			if (local.entry.firstProvider == arguments.dirName
+				|| local.entry.secondProvider == arguments.dirName) {
+				ArrayDeleteAt(variables.mixinCollisions, local.i);
+			}
+		}
 	}
 
 	/**
@@ -700,6 +906,294 @@ component output="false" {
 				);
 			}
 		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Per-package CFML mapping (GH#2712)
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Derives a CFML-identifier-safe alias from a package manifest. If the
+	 * manifest declares an explicit `mapping` field — even an empty/whitespace
+	 * one — that field takes precedence and must satisfy the documented
+	 * `[A-Za-z_][A-Za-z0-9_]*` invariant. An empty string or whitespace-only
+	 * value is treated as an explicit (invalid) override rather than silently
+	 * falling through to `name`-based auto-derivation, matching the field's
+	 * documented contract. When `mapping` is absent the alias is built from
+	 * the manifest `name` by splitting on hyphens/underscores and
+	 * lower-camel-casing the segments (`wheels-sentry` → `wheelsSentry`,
+	 * `wheels_legacy_adapter` → `wheelsLegacyAdapter`). Returns an empty
+	 * string if no valid alias can be derived — caller treats that as failure.
+	 *
+	 * @manifest Parsed package.json struct
+	 * @dirName  Package directory name. Unreachable defensive fallback when
+	 *           $parseManifest's `name`-required check is bypassed (e.g. a
+	 *           direct caller of this private helper); kept so $deriveMapping
+	 *           never has to crash on a malformed struct in isolation.
+	 */
+	private string function $deriveMapping(required struct manifest, required string dirName) {
+		// Explicit override takes precedence. Presence of the field — even if
+		// empty or whitespace — signals the author's intent to set the alias
+		// directly, so we validate it against the documented regex and refuse
+		// to fall back to name-based auto-derivation on an invalid value.
+		if (StructKeyExists(arguments.manifest, "mapping") && IsSimpleValue(arguments.manifest.mapping)) {
+			local.override = Trim(arguments.manifest.mapping);
+			if (Len(local.override) && REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.override)) {
+				return local.override;
+			}
+			// Invalid override → return empty so caller records the failure
+			// with a specific error message.
+			return "";
+		}
+
+		local.source = StructKeyExists(arguments.manifest, "name") && IsSimpleValue(arguments.manifest.name) && Len(Trim(arguments.manifest.name))
+			? Trim(arguments.manifest.name)
+			: arguments.dirName;
+
+		local.segments = ListToArray(local.source, "-_");
+		if (!ArrayLen(local.segments)) {
+			return "";
+		}
+
+		local.alias = LCase(local.segments[1]);
+		for (local.i = 2; local.i <= ArrayLen(local.segments); local.i++) {
+			local.seg = local.segments[local.i];
+			if (!Len(local.seg)) {
+				continue;
+			}
+			local.alias &= UCase(Left(local.seg, 1)) & LCase(Mid(local.seg, 2, Len(local.seg)));
+		}
+
+		// Strip any character outside [A-Za-z0-9_] that snuck through (e.g.
+		// numeric-only segments are fine, but leading digit must be guarded).
+		if (!REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.alias)) {
+			return "";
+		}
+		return local.alias;
+	}
+
+	/**
+	 * Registers a per-package CFML mapping for the given package. Records
+	 * the alias → pkgDir entry in `variables.packageMappings`, tracks the
+	 * first claimant in `variables.$mappingProviders` for collision detection,
+	 * and (best-effort) reflects the entry into `application.mappings` so the
+	 * static `new <alias>.Sibling()` form resolves at runtime.
+	 *
+	 * Returns `{ok: boolean, error: string, detail: string, alias: string}`.
+	 * The caller records a failed package when `ok` is false.
+	 */
+	private struct function $registerPackageMapping(
+		required string dirName,
+		required struct manifest,
+		required string pkgDir
+	) {
+		local.alias = $deriveMapping(arguments.manifest, arguments.dirName);
+		if (!Len(local.alias)) {
+			local.declared = StructKeyExists(arguments.manifest, "mapping") && IsSimpleValue(arguments.manifest.mapping)
+				? Trim(arguments.manifest.mapping)
+				: "";
+			return {
+				ok = false,
+				error = "Invalid package mapping alias",
+				detail = "Package '#arguments.dirName#' did not yield a valid CFML identifier from manifest 'mapping' (#local.declared#) or 'name'. Aliases must match [A-Za-z_][A-Za-z0-9_]*.",
+				alias = ""
+			};
+		}
+
+		if (StructKeyExists(variables.$mappingProviders, local.alias)) {
+			local.firstProvider = variables.$mappingProviders[local.alias];
+			return {
+				ok = false,
+				error = "Duplicate package mapping alias",
+				detail = "Package '#arguments.dirName#' computes alias '#local.alias#' which is already claimed by package '#local.firstProvider#'. Set a unique 'mapping' value in package.json to resolve.",
+				alias = local.alias
+			};
+		}
+
+		variables.packageMappings[local.alias] = arguments.pkgDir;
+		variables.$mappingProviders[local.alias] = arguments.dirName;
+
+		// Reflect into application.mappings when available so packages can
+		// reference siblings as `new <alias>.Sibling()`. Wrapped defensively:
+		// not every embedding context has a writable application scope (e.g.
+		// some testing harnesses), and the in-process `packageMappings`
+		// registry is the authoritative record either way.
+		try {
+			if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
+				application.mappings["/" & local.alias] = arguments.pkgDir;
+			}
+		} catch (any e) {
+			WriteLog(
+				text = "[Wheels] Package '#arguments.dirName#' could not register application mapping '/#local.alias#': #e.message#",
+				type = "warning",
+				file = "wheels"
+			);
+		}
+
+		return {ok = true, error = "", detail = "", alias = local.alias};
+	}
+
+	/**
+	 * Registers the package's plural `mappings` block — a struct of
+	 * dotted-CFML-mapping-name → relative-path-from-pkgDir entries. Lets a
+	 * package author claim additional namespaces beyond the singular
+	 * identifier-form alias (e.g. `plugins.sentry` for legacy compatibility,
+	 * or namespaces pointing at internal subdirectories).
+	 *
+	 * Each key must be a dotted identifier where every segment matches
+	 * `[A-Za-z_][A-Za-z0-9_]*` so the resulting `application.mappings`
+	 * slash-form (`/plugins/sentry`) is resolvable by `new plugins.sentry.X()`
+	 * dotted lookups on every CFML engine.
+	 *
+	 * Each value is a relative path inside the package directory: `"."` or
+	 * `""` means the package root; `"subdir"` resolves to `pkgDir/subdir`.
+	 * Absolute paths and `..` traversal are rejected so a package can't
+	 * register a mapping pointing outside its own install tree.
+	 *
+	 * Returns `{ok, error, detail, registered}` where `registered` lists the
+	 * mapping names actually written so the caller can unwind on later
+	 * failure. The struct shape mirrors `$registerPackageMapping` so both
+	 * registration paths plug into the same failedPackages bookkeeping.
+	 */
+	private struct function $registerAdditionalMappings(
+		required string dirName,
+		required struct manifest,
+		required string pkgDir
+	) {
+		local.result = {ok = true, error = "", detail = "", registered = []};
+
+		if (!StructKeyExists(arguments.manifest, "mappings")) {
+			return local.result;
+		}
+		if (!IsStruct(arguments.manifest.mappings)) {
+			local.result.ok = false;
+			local.result.error = "Invalid package mappings block";
+			local.result.detail = "Package '#arguments.dirName#' declared a 'mappings' field that is not a struct. Expected a map of dotted mapping name to relative path.";
+			return local.result;
+		}
+
+		// StructKeyArray returns keys in iteration order; tests assert
+		// failure on the *first* invalid entry by author-declared name so a
+		// stable iteration is necessary. Lucee/Adobe/BoxLang all preserve
+		// insertion order for struct literals parsed from JSON.
+		local.entries = StructKeyArray(arguments.manifest.mappings);
+		for (local.name in local.entries) {
+			local.value = arguments.manifest.mappings[local.name];
+
+			if (!IsSimpleValue(local.value)) {
+				local.result.ok = false;
+				local.result.error = "Invalid package mapping path";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#' must be a string path relative to the package directory.";
+				return local.result;
+			}
+
+			local.validation = $validatePluralMappingName(local.name);
+			if (!local.validation.ok) {
+				local.result.ok = false;
+				local.result.error = "Invalid package mapping name";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#': #local.validation.detail#";
+				return local.result;
+			}
+
+			local.resolution = $resolvePluralMappingPath(arguments.pkgDir, Trim(local.value));
+			if (!local.resolution.ok) {
+				local.result.ok = false;
+				local.result.error = "Invalid package mapping path";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#' → '#local.value#': #local.resolution.detail#";
+				return local.result;
+			}
+
+			if (StructKeyExists(variables.$mappingProviders, local.name)) {
+				local.firstProvider = variables.$mappingProviders[local.name];
+				local.result.ok = false;
+				local.result.error = "Duplicate package mapping alias";
+				local.result.detail = "Package '#arguments.dirName#' mapping '#local.name#' is already claimed by package '#local.firstProvider#'. Choose a unique mapping name in package.json to resolve.";
+				return local.result;
+			}
+
+			variables.packageMappings[local.name] = local.resolution.path;
+			variables.$mappingProviders[local.name] = arguments.dirName;
+			ArrayAppend(local.result.registered, local.name);
+
+			local.slashForm = "/" & Replace(local.name, ".", "/", "all");
+			try {
+				if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
+					application.mappings[local.slashForm] = local.resolution.path;
+				}
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#arguments.dirName#' could not register application mapping '#local.slashForm#': #e.message#",
+					type = "warning",
+					file = "wheels"
+				);
+			}
+		}
+
+		return local.result;
+	}
+
+	/**
+	 * Validates a dotted plural-mapping name. Each segment must match the
+	 * CFML identifier regex so the resulting `/seg1/seg2/...` form resolves
+	 * cleanly via static-dotted `new` syntax. Leading/trailing dots and
+	 * consecutive dots produce empty segments which the segment regex
+	 * rejects. Returns `{ok, detail}`.
+	 */
+	private struct function $validatePluralMappingName(required string name) {
+		local.trimmed = Trim(arguments.name);
+		if (!Len(local.trimmed)) {
+			return {ok = false, detail = "mapping name must not be empty"};
+		}
+		if (Left(local.trimmed, 1) == "." || Right(local.trimmed, 1) == ".") {
+			return {ok = false, detail = "mapping name must not start or end with '.'"};
+		}
+		local.segments = ListToArray(local.trimmed, ".");
+		if (!ArrayLen(local.segments)) {
+			return {ok = false, detail = "mapping name produced no segments"};
+		}
+		for (local.seg in local.segments) {
+			if (!Len(local.seg) || !REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.seg)) {
+				return {ok = false, detail = "segment '#local.seg#' must match [A-Za-z_][A-Za-z0-9_]*"};
+			}
+		}
+		return {ok = true, detail = ""};
+	}
+
+	/**
+	 * Resolves a relative mapping path against the package directory.
+	 * `"."` and `""` resolve to the package directory itself. Subdirectory
+	 * paths are appended with a single separator. Absolute paths (`/foo`,
+	 * `C:\foo`) and any `..` traversal segment are rejected so a package
+	 * cannot register a mapping pointing outside its install tree.
+	 * Returns `{ok, path, detail}`.
+	 */
+	private struct function $resolvePluralMappingPath(required string pkgDir, required string relPath) {
+		local.norm = Replace(arguments.relPath, "\", "/", "all");
+		if (!Len(local.norm) || local.norm == ".") {
+			return {ok = true, path = arguments.pkgDir, detail = ""};
+		}
+		if (Left(local.norm, 1) == "/") {
+			return {ok = false, path = "", detail = "absolute paths are not allowed"};
+		}
+		if (REFind("^[A-Za-z]:", local.norm)) {
+			return {ok = false, path = "", detail = "absolute paths are not allowed"};
+		}
+		// Strip a leading "./" before scanning for traversal so authors can
+		// write `./subdir` interchangeably with `subdir`. A bare `./` collapses
+		// to the package root once the prefix is stripped.
+		if (Left(local.norm, 2) == "./") {
+			local.norm = Len(local.norm) > 2 ? Mid(local.norm, 3, Len(local.norm) - 2) : "";
+			if (!Len(local.norm)) {
+				return {ok = true, path = arguments.pkgDir, detail = ""};
+			}
+		}
+		local.segments = ListToArray(local.norm, "/");
+		for (local.seg in local.segments) {
+			if (local.seg == "..") {
+				return {ok = false, path = "", detail = "'..' traversal is not allowed"};
+			}
+		}
+		return {ok = true, path = arguments.pkgDir & "/" & local.norm, detail = ""};
 	}
 
 	// ---------------------------------------------------------------------------

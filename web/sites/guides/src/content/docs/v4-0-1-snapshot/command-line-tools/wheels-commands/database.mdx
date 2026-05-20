@@ -1,0 +1,218 @@
+---
+title: "Database"
+description: wheels migrate, wheels seed, and wheels db — apply schema changes, populate seed data, and run database utilities against a running Wheels server.
+type: reference
+sidebar:
+  order: 3
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Three commands cover day-to-day database work: `wheels migrate` applies migration files, `wheels seed` populates default records, and `wheels db` bundles utility subcommands for status, version, and reset. All three delegate to a running Wheels server over HTTP — start one with `wheels start` before running any of them.
+
+**You'll use this for:**
+
+- Applying pending migrations after generating a model or editing a migration file.
+- Seeding development or production data from `app/db/seeds.cfm` and its environment-specific siblings.
+- Inspecting which migrations have been applied, or rolling forward pending ones after pulling a branch.
+- Resetting an embedded development database to a known-good state during iteration.
+
+<Aside type="note" title="Server must be running">
+`wheels migrate`, `wheels seed`, and every `wheels db` subcommand dispatch to the dev server at `/wheels/cli`. If no server is detected, the command prints an error and exits without doing anything. Boot one with `wheels start` first.
+</Aside>
+
+### `wheels migrate`
+
+Apply or roll back migration files in `app/migrator/migrations/`.
+
+#### Synopsis
+
+``` title="synopsis"
+wheels migrate [latest|up|down|info]
+```
+
+Running `wheels migrate` with no subcommand defaults to `latest`. Unknown subcommands print `Unknown migration action: <name>` and exit without touching the schema.
+
+#### Subcommands
+
+##### `latest`
+
+Runs every pending migration in order until the database is caught up with the migrations directory. This is the command you reach for most often — after generating a model, after pulling a branch that added migrations, after writing a new migration by hand.
+
+##### `up`
+
+Runs the next pending migration and stops. Use this when you want to advance one step at a time rather than applying everything at once.
+
+##### `down`
+
+Rolls back the most recently applied migration by calling its `down()` method. Use this to undo a schema change you just applied, then edit the migration file and re-run `up`.
+
+##### `info`
+
+Prints a summary of applied and pending migrations without changing the schema. For the full tabular breakdown — version, description, status, applied-at timestamp — use [`wheels db status`](#wheels-db) instead.
+
+#### Example
+
+```bash title="example"
+wheels migrate latest
+```
+
+Prints `Running migration: latest...` in cyan, dispatches the run to the server, and reports completion with a message like `Migration latest completed.` in green. Migration errors are caught and reported as `Migration failed: <message>`.
+
+<Aside type="note" title="Generating migration files">
+`wheels migrate` only applies migrations — it does not create them. To stamp out a new migration file, use `wheels generate migration` (blank) or `wheels generate property` (add-column). See [Code Generation](../code-generation/).
+</Aside>
+
+### `wheels seed`
+
+Populate the database from `app/db/seeds.cfm` and any environment-specific seed file.
+
+#### Synopsis
+
+``` title="synopsis"
+wheels seed [--environment=<env>] [--mode=<mode>] [--generate]
+```
+
+The seeder runs `app/db/seeds.cfm` first (shared across every environment) and then `app/db/seeds/<environment>.cfm` if one exists. Both are wrapped in a single transaction. Seeds use the `seedOnce()` helper, which checks `uniqueProperties` before inserting — re-running is safe.
+
+#### Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--environment=<env>` | auto-detected | Load `app/db/seeds/<env>.cfm` after the shared seeds file. When omitted, the server uses the active Wheels environment. |
+| `--mode=<mode>` | `auto` | Seeder mode. `auto` runs the convention-based seed files. |
+| `--generate` | off | Legacy shortcut for `--mode=generate` — random test data. Kept for compatibility with the old CommandBox surface; convention-based seeds (`seedOnce()`) are preferred. |
+
+#### Example
+
+```bash title="example"
+wheels seed
+```
+
+Prints `Running database seeds...` and then a count like `Seeded: 12 created, 3 skipped` — the skipped count reflects rows that `seedOnce()` found already present.
+
+```bash title="example"
+wheels seed --environment=production
+```
+
+Runs `app/db/seeds.cfm` plus `app/db/seeds/production.cfm`. Useful for reference data (roles, statuses, lookup values) that must exist in production but shouldn't ship as dev fixtures.
+
+See the [Seeding guide](../../../basics/seeding/) for the full `seedOnce()` API and file-layout conventions.
+
+### `wheels db`
+
+Utility subcommands for migration status, schema version, and full-reset workflows.
+
+#### Synopsis
+
+``` title="synopsis"
+wheels db <command> [flags]
+```
+
+Running `wheels db` with no subcommand prints a usage banner. Unknown subcommands print `Unknown db command: <name>` and exit.
+
+#### Subcommands
+
+##### `reset`
+
+Runs pending migrations and reseeds the database in one shot. Destructive in the sense that it will apply every pending migration — but it does not drop existing tables. Requires `--force` to confirm; without it, the command prints a warning and exits without acting.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--force` | off | Required. Confirms you want to migrate and reseed. |
+| `--skip-seed` | off | Run migrations but skip the seeding step. |
+
+```bash title="example"
+wheels db reset --force
+```
+
+Prints `Running migrations...`, dispatches `wheels migrate latest`, then prints `Running seeds...` and dispatches `wheels seed`. Ends with `Database reset complete.` in green.
+
+##### `status`
+
+Prints a table of every migration — version, description, status (`applied` or `pending`), and applied-at timestamp.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--pending` | off | Show only migrations that have not yet been applied. |
+
+```bash title="example"
+wheels db status
+```
+
+Output is a formatted table with a totals line at the bottom (`Total: 14 | Applied: 12 | Pending: 2`). Applied rows are green; pending rows are yellow.
+
+##### `version`
+
+Prints the current schema version.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--detailed` | off | Also show the last applied migration, total migration count, pending count, and the next pending migration. |
+
+```bash title="example"
+wheels db version --detailed
+```
+
+Prints the current version followed by a summary block — last applied migration with timestamp, totals, and the next pending migration if one exists.
+
+## Common workflows
+
+### Fresh development setup
+
+```bash title="example"
+wheels migrate latest
+wheels seed
+```
+
+Apply all migrations, then load the shared and development seed files. Run this after cloning a repo or pulling a branch that added migrations or seed data.
+
+### Reset the dev database to a clean slate
+
+```bash title="example"
+wheels db reset --force
+```
+
+Runs pending migrations and reseeds in one command. Skip seeding with `wheels db reset --force --skip-seed` when you want the schema up to date but no data loaded.
+
+### Check what's pending before applying
+
+```bash title="example"
+wheels db status --pending
+wheels migrate latest
+```
+
+Print only the pending migrations first — useful for a quick sanity check on a branch switch — then apply them.
+
+### Seed production reference data
+
+```bash title="example"
+wheels seed --environment=production
+```
+
+Runs `app/db/seeds.cfm` (shared) followed by `app/db/seeds/production.cfm`. Because `seedOnce()` is idempotent, running this after a deploy is safe even if the records already exist.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Creating a Project"
+    href="../creating-a-project/"
+    description="wheels new — scaffolds an app with the embedded datasource these commands talk to."
+  />
+  <LinkCard
+    title="Code Generation"
+    href="../code-generation/"
+    description="wheels generate migration and wheels generate property — produce the files migrate applies."
+  />
+  <LinkCard
+    title="Seeding"
+    href="../../../basics/seeding/"
+    description="seedOnce() API, file layout, and environment-specific seed conventions."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../../configuration/"
+    description="Datasource settings and environment variables the server reads before migrating or seeding."
+  />
+</CardGrid>

@@ -1,8 +1,11 @@
 name: Wheels Bot — Write Docs
 
 # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing
-# `wheels-bot:docs-confidence:high` (the docs-request path's auto-fire
-# marker). workflow_dispatch is preserved for manual reruns.
+# `wheels-bot:docs-confidence:high` OR `wheels-bot:docs-confidence:medium`
+# (the docs-request path's auto-fire markers). Medium fires because
+# write-docs has its own step-4 safety net for structural docs-architecture
+# decisions (posts `wheels-bot:docs-held:<issue>` instead of opening a PR).
+# workflow_dispatch is preserved for manual reruns.
 on:
   issue_comment:
     types: [created]
@@ -25,7 +28,8 @@ jobs:
     name: Write docs
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Auto-fires from wheels-bot[bot] comments with docs-confidence:high.
+    # Auto-fires from wheels-bot[bot] comments with docs-confidence:high
+    # OR docs-confidence:medium. Low stays manual.
     # The bot-identity check is load-bearing: prevents humans from
     # triggering write-docs by quoting a marker in a reply.
     if: |
@@ -34,7 +38,8 @@ jobs:
         github.event_name == 'workflow_dispatch'
         || (github.event_name == 'issue_comment'
             && github.event.comment.user.login == 'wheels-bot[bot]'
-            && contains(github.event.comment.body, 'wheels-bot:docs-confidence:high'))
+            && (contains(github.event.comment.body, 'wheels-bot:docs-confidence:high')
+                || contains(github.event.comment.body, 'wheels-bot:docs-confidence:medium')))
       )
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue-number }}
@@ -90,9 +95,9 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
-          # Triggered by wheels-bot[bot] comments containing the
-          # docs-confidence:high marker. Allow the bot identity (and
-          # github-actions[bot] for consistency).
+          # Triggered by wheels-bot[bot] comments containing a
+          # docs-confidence:high or docs-confidence:medium marker.
+          # Allow the bot identity (and github-actions[bot] for consistency).
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}

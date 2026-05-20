@@ -124,6 +124,16 @@ component {
 	}
 
 	/**
+	 * Return a defensive copy of the resolved defaults. Exposes the seeded
+	 * `user/port/privateKey/...` struct without requiring a live SSH
+	 * connection — the copy guards against external mutation of internal
+	 * state.
+	 */
+	public struct function $defaults() {
+		return duplicate(variables.$defaults);
+	}
+
+	/**
 	 * Parse a host spec and return a cached or newly-opened SshClient.
 	 *
 	 * NOTE: The connection cache is a plain struct. Writes from submitting

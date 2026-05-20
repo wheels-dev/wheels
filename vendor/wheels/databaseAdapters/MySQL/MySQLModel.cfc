@@ -140,6 +140,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * MySQL implements advisory locks directly via GET_LOCK / RELEASE_LOCK
+	 * and does not require an enclosing transaction.
+	 */
+	public boolean function $supportsAdvisoryLocks() {
+		return true;
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 */
 	public string function $defaultValues() {

@@ -581,8 +581,9 @@ component {
 			(IsStruct(arguments.value) || IsArray(arguments.value))
 			&& StructKeyExists(variables.wheels.class, "properties")
 			&& StructKeyExists(variables.wheels.class.properties, arguments.property)
+			&& !(IsArray(arguments.value) && $propertyIsBinaryColumn(arguments.property))
 		) {
-			// Scoped to real DB columns so loaded hasMany arrays and control-param leakage still pass through. See #2412.
+			// Scoped to real DB columns; exempts array-on-binary so BoxLang / Lucee 6 byte uploads reach JDBC. See #2412, #2660.
 			Throw(
 				type = "Wheels.PropertyIsIncorrectType",
 				message = "Cannot assign a #(IsArray(arguments.value) ? 'array' : 'struct')# value to scalar column `#arguments.property#` on the `#variables.wheels.class.modelName#` model.",
@@ -598,6 +599,18 @@ component {
 	 */
 	public any function $resolveObjectValue(required any value) {
 		return $engineAdapter().coerceOracleObject(arguments.value);
+	}
+
+	// Returns true when the named property maps to a binary DB column. See #2660.
+	public boolean function $propertyIsBinaryColumn(required string property) {
+		if (
+			!StructKeyExists(variables.wheels.class, "properties")
+			|| !StructKeyExists(variables.wheels.class.properties, arguments.property)
+			|| !StructKeyExists(variables.wheels.class.properties[arguments.property], "validationtype")
+		) {
+			return false;
+		}
+		return variables.wheels.class.properties[arguments.property].validationtype == "binary";
 	}
 
 	/**

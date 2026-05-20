@@ -1,0 +1,47 @@
+{
+    "version": "1.5.0+43",
+    "validClassExtensions": ["bx", "cfc"],
+    "validTemplateExtensions": [],
+    "classGenerationDirectory": "${boxlang-home}/classes",
+    "debugMode": false,
+    "clearClassFilesOnStartup": false,
+    "classResolverCache": true,
+    "trustedCache": false,
+    "useHighPrecisionMath": false,
+    "applicationTimeout": "1,0,0,0",
+    "sessionTimeout": "0,0,30,0",
+    "requestTimeout": "0,0,5,0",
+    "sessionManagement": false,
+    "setClientCookies": false,
+    "setDomainCookies": false,
+    "sessionStorage": "memory",
+    "maxTrackedCompletedThreads": 1000,
+    "mappings": {
+        "/": "${user-dir}",
+        "/wheels": "${user-dir}/vendor/wheels"
+    },
+    "modulesDirectory": [
+        "${user-dir}/boxlang_modules",
+        "${boxlang-home}/modules"
+    ],
+    "customComponentsDirectory": ["${boxlang-home}/global/components"],
+    "classPaths": [
+        "${user-dir}/vendor",
+        "${boxlang-home}/global/classes"
+    ],
+    "javaLibraryPaths": ["${boxlang-home}/lib"],
+    "logging": {
+        "logsDirectory": "${boxlang-home}/logs",
+        "maxLogDays": 90,
+        "maxFileSize": "100MB",
+        "totalCapSize": "1GB",
+        "defaultEncoder": "text",
+        "rootLogger": "WARN"
+    },
+    "modules": {},
+    "experimental": {},
+    "security": {
+        "disabledImports": [],
+        "disallowedImports": []
+    }
+}

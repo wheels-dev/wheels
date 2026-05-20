@@ -50,8 +50,17 @@ git push origin main --tags
 
 The tag push triggers:
 - `release.yml` builds artifacts, publishes to `wheels-dev/wheels/releases`
-- `bump-develop-version.yml` opens a PR against develop bumping `box.json` to
-  next-patch
+- `release.yml`'s "Dispatch downstream package managers" step then fires
+  three `repository_dispatch` events via `DOWNSTREAM_DISPATCH_TOKEN` (a PAT):
+  - `wheels-released` → `wheels-dev/homebrew-wheels` (brew formula bump)
+  - `wheels-released` → `wheels-dev/chocolatey-wheels` (choco package bump)
+  - `bump-develop` → `wheels-dev/wheels` itself (this repo) — only for
+    `CHANNEL=stable` (snapshots and RCs don't bump develop)
+- `bump-develop-version.yml` fires on the `bump-develop` dispatch and opens
+  a PR against develop bumping `wheels.json` to next-patch. (We use
+  `repository_dispatch` rather than `release: published` because the
+  release-publish step uses the default `GITHUB_TOKEN`, which by design
+  cannot trigger downstream workflows. See [#2609](https://github.com/wheels-dev/wheels/issues/2609).)
 - The brew tap's `wheels-bump.yml` (parallel to `wheels-be-bump.yml`) opens a
   PR bumping `Formula/wheels.rb`
 - Same for scoop bucket and (eventually) the WinGet manifest PR
@@ -142,6 +151,7 @@ If any pin to `<X.Y.Z`, open issues on those repos to widen the constraint.
 | `release.yml` fails: "CHANGELOG contains TBD" | Forgot to update changelog | Add release date to `# [X.Y.Z]` line, push, re-run workflow |
 | `release.yml` fails: "version contains -SNAPSHOT" | `box.json` has `-SNAPSHOT` suffix on main | Strip suffix, push (release.yml asserts clean main versions) |
 | brew tap PR doesn't open after release | `DOWNSTREAM_DISPATCH_TOKEN` expired or unset | Rotate token in repo secrets; re-run `release.yml` workflow_dispatch |
+| develop-bump PR doesn't open after GA | `DOWNSTREAM_DISPATCH_TOKEN` expired/unset, OR the `bump-develop` dispatch step warned and exited 0 | Fire it manually: Actions → "Bump Develop Version" → "Run workflow" → enter the just-released version (e.g. `4.0.0`). The workflow has a `workflow_dispatch` fallback for exactly this case. |
 | `brew install wheels` post-release fails | Formula sha256 mismatch | Re-run the tap bump workflow with `workflow_dispatch` to recompute |
 | Snapshot publish fails: "tag already exists" | Re-run after partial success | Delete the orphaned tag in `wheels-dev/wheels-snapshots`, re-run |
 | Linux package URL 404s when version has `~snapshot.N` | GitHub Releases silently rewrites `~` to `.` in uploaded asset filenames | Use `.` in the URL: `wheels_4.0.0.snapshot.1787_amd64.deb`, NOT `wheels_4.0.0~snapshot.1787_amd64.deb`. The on-disk filename keeps `~` (so `dpkg --compare-versions` orders pre-releases correctly), but the uploaded URL gets mangled. Downstream consumers (apt repo metadata generator, install scripts) must compute the `.`-form. See `tools/distribution-drafts/linux-packages/build-linux-packages.sh`. |

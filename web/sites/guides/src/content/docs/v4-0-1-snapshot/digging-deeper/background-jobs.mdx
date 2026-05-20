@@ -1,0 +1,273 @@
+---
+title: Background Jobs
+description: Queue work for asynchronous processing — retries, priority queues, and the worker process.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to move slow work out of the request cycle. You'll define a job class, enqueue it from a controller, run a worker process to drain the queue, configure retries with exponential backoff, and route urgent work through a high-priority queue.
+
+**You'll learn:**
+
+- How to define a job by extending `wheels.Job` and implementing `perform()`
+- How to enqueue jobs immediately, after a delay, or at a specific time
+- How to run `wheels jobs work` as a long-lived worker
+- How retries and backoff work, and how to tune them
+- How priority queues let critical work jump the line
+- How to monitor, retry, and purge jobs in production
+- How to test `perform()` in isolation
+
+<Aside type="note">
+  You should already know how models work — see [Models and the ORM](/v4-0-1-snapshot/basics/models-and-the-orm/). Jobs persist to a `wheels_jobs` table; every enqueued job is a row. The table auto-creates on first use, so there's no migration to run.
+</Aside>
+
+## Define a job
+
+A job is a CFC in `app/jobs/` that extends `wheels.Job`. Override `config()` to set queue and retry options, and override `perform()` with the work itself. The base class handles enqueueing, locking, retries, and persistence.
+
+```cfm {test:compile} title="app/jobs/SendWelcomeEmailJob.cfc"
+component extends="wheels.Job" {
+    function config() {
+        super.config();
+        this.queue = "mailers";
+        this.maxRetries = 5;
+    }
+
+    public void function perform(required struct data) {
+        user = model("User").findByKey(arguments.data.userId);
+        sendEmail(
+            to=user.email,
+            subject="Welcome!",
+            from="app@example.com"
+        );
+    }
+}
+```
+
+Three rules:
+
+1. Extend `wheels.Job`. The base class in `vendor/wheels/Job.cfc` provides `enqueue`, `enqueueIn`, `enqueueAt`, `processQueue`, and the retry machinery.
+2. Override `perform(struct data)`. This is where the work happens. Read inputs from `arguments.data`. Return nothing — the framework inspects success by whether an exception was thrown.
+3. Call `super.config()` first, then set `this.queue`, `this.maxRetries`, `this.priority`, `this.baseDelay`, `this.maxDelay` as needed.
+
+Keep `data` small. Pass IDs, not whole model instances — the struct is serialized as JSON into a `TEXT` column, and a stale serialized snapshot is worse than a fresh `findByKey()` lookup at process time.
+
+## Enqueue a job
+
+Instantiate the job and call one of three enqueue methods. The typical call site is a controller action (after `create()` succeeds) or a model `afterCreate` callback.
+
+```cfm {test:compile} title="app/controllers/Users.cfc (fragment)"
+component extends="Controller" {
+    function create() {
+        user = model("User").new(params.user);
+        if (user.save()) {
+            // Immediate — runs on the next worker poll
+            job = new app.jobs.SendWelcomeEmailJob();
+            job.enqueue(data={userId: user.id});
+
+            // Delayed — a gentle follow-up five minutes later
+            followup = new app.jobs.SendFollowupEmailJob();
+            followup.enqueueIn(seconds=300, data={userId: user.id});
+
+            // Scheduled — onboarding drip at a specific time
+            drip = new app.jobs.SendDripEmailJob();
+            drip.enqueueAt(runAt=DateAdd("d", 1, Now()), data={userId: user.id});
+
+            redirectTo(route="user", key=user.id);
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+`enqueue()`, `enqueueIn()`, and `enqueueAt()` all return a struct with the persisted row's `id`. The controller keeps responding fast — the actual email send happens when a worker picks the row up.
+
+## Run the worker
+
+The worker is a long-lived process that polls the `wheels_jobs` table and runs any `pending` job whose `runAt` has arrived. Start it from the CLI:
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+The commands themselves need a running app and database, so they don't smoke-test in docs — here's the shape:
+
+- `wheels jobs work` — process all queues; loops until Ctrl-C.
+- `wheels jobs work --queue=mailers` — only drain the `mailers` queue.
+- `wheels jobs work --queue=mailers --interval=3` — poll every 3 seconds instead of the 5-second default.
+- `wheels jobs work --max-jobs=100` — stop after 100 jobs (useful for one-shot batches).
+- `wheels jobs work --quiet` — suppress per-job output, only log errors.
+
+In production, run the worker under a process supervisor (systemd, Docker's restart policy, Kamal's accessory containers) so it restarts if it crashes. Run multiple worker processes for parallelism — the base class uses optimistic row locking, so two workers won't process the same job twice.
+
+Check queue health without tailing logs:
+
+- `wheels jobs status` — table of pending / processing / completed / failed per queue.
+- `wheels jobs status --queue=mailers` — just one queue.
+- `wheels jobs status --format=json` — machine-readable output for CI smoke tests or scraping.
+
+## Retries and backoff
+
+When `perform()` throws, the framework reschedules the job with exponential backoff until `maxRetries` is exhausted, at which point the row moves to `status='failed'` and stops being picked up.
+
+```cfm {test:compile} title="app/jobs/ChargeCardJob.cfc"
+component extends="wheels.Job" {
+    function config() {
+        super.config();
+        this.queue = "payments";
+        this.maxRetries = 5;
+        this.baseDelay = 2;       // seconds
+        this.maxDelay = 3600;     // cap at one hour
+    }
+
+    public void function perform(required struct data) {
+        order = model("Order").findByKey(arguments.data.orderId);
+        order.chargeCard();  // may throw on transient network errors
+    }
+}
+```
+
+The backoff formula is `Min(this.baseDelay * 2^attempt, this.maxDelay)`. With the defaults (`baseDelay=2`, `maxDelay=3600`), you get retries at roughly 4s, 8s, 16s, 32s, 64s — small failures resolve quickly, while a stubborn outage stops hammering the external service once it hits the cap.
+
+Because retries are automatic, your `perform()` must be **idempotent**. If the first attempt charged the card but failed to record the success, the second attempt must notice and skip. Store an idempotency key on the model and check it at the top of `perform()`.
+
+To kick failed jobs back into the queue — after you've fixed the bug, say — use the retry command:
+
+```bash title="your shell"
+wheels jobs retry                       # retry every failed job
+wheels jobs retry --queue=mailers       # only the mailers queue
+wheels jobs retry --limit=10            # cap at 10 jobs
+```
+
+Retry resets `attempts` to zero and flips `status` back to `pending`.
+
+## Priority queues
+
+Different queues can run at different cadences. Give the worker a comma-separated list in priority order and it drains the first queue before falling through to the next:
+
+```bash title="your shell"
+wheels jobs work --queue=critical,default,low
+```
+
+The worker processes every `pending` job in `critical` first, then `default`, then `low`. Queues are just string labels on the `wheels_jobs.queue` column — create as many as you need. A typical split:
+
+- `critical` — payment retries, password resets, anything user-visible.
+- `default` — welcome emails, webhooks, routine follow-ups.
+- `low` — nightly analytics rollups, cleanup, anything that can wait.
+
+You can also bias ordering within a queue with `this.priority` in `config()` (higher first), but queue-based separation is simpler to reason about.
+
+## Monitoring in production
+
+For an interactive dashboard, run:
+
+```bash title="your shell"
+wheels jobs monitor                     # refresh every 3 seconds
+wheels jobs monitor --interval=5        # slower refresh
+wheels jobs monitor --queue=mailers     # one queue only
+```
+
+The dashboard shows per-queue counts, throughput over the last 60 minutes, error rate, and recent job activity. It also reports any jobs recovered from stuck `processing` state (worker crashed mid-job).
+
+For headless metrics, pipe `wheels jobs status --format=json` into whatever you already use — Prometheus, Datadog, a custom scrape:
+
+```bash title="your shell"
+wheels jobs status --format=json
+```
+
+## The jobs table
+
+Jobs persist to a `wheels_jobs` table keyed by UUID. The base class auto-creates it the first time `enqueue()` or `processQueue()` runs — no migration needed. Columns: `id`, `jobClass`, `queue`, `data` (JSON), `priority`, `status` (`pending`/`processing`/`completed`/`failed`), `attempts`, `maxRetries`, `lastError`, `runAt`, `completedAt`, `failedAt`, `createdAt`, `updatedAt`. See `vendor/wheels/Job.cfc` (`$ensureJobTable`) for the exact schema — it adapts column types per database (MySQL, PostgreSQL, SQL Server, H2, SQLite, Oracle).
+
+You never need to touch the table directly. Query it through the CLI commands or `queueStats()`:
+
+```cfm {test:compile} title="programmatic stats"
+component extends="Controller" {
+    function dashboard() {
+        job = new wheels.Job();
+        stats = job.queueStats();                  // all queues
+        mailerStats = job.queueStats(queue="mailers");
+    }
+}
+```
+
+`stats` is a struct with `pending`, `processing`, `completed`, `failed`, and `total`.
+
+## Testing jobs
+
+`perform()` is a plain public method that takes a struct. Don't exercise the queue in a test — instantiate the job, call `perform()` with fixture data, and assert on the side effects.
+
+```cfm {test:compile} title="tests/specs/jobs/SendWelcomeEmailJobSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("SendWelcomeEmailJob", () => {
+            it("sends a welcome email to the user", () => {
+                testUser = model("User").create(
+                    email="new@example.com",
+                    firstName="New"
+                );
+
+                job = new app.jobs.SendWelcomeEmailJob();
+                job.perform(data={userId: testUser.id});
+
+                // Assert your email spy or outbox captured the send.
+                // The pattern depends on how you stub sendEmail() —
+                // see the Testing guide for the email-fake approach.
+                expect(true).toBeTrue();
+            });
+        });
+    }
+}
+```
+
+Testing `perform()` in isolation keeps the spec fast and avoids the complexity of polling a live queue. The queue itself is framework code — trust it.
+
+## Purging old rows
+
+Completed and failed rows accumulate forever unless you prune them. The purge command takes days and status flags:
+
+```bash title="your shell"
+wheels jobs purge                                 # completed jobs older than 7 days
+wheels jobs purge --completed --older-than=30     # completed older than 30 days
+wheels jobs purge --failed --older-than=90        # failed jobs older than 90 days
+wheels jobs purge --completed --failed --queue=mailers
+```
+
+Run it from a cron or scheduled task. A weekly purge of completed rows older than 30 days keeps the table small without losing recent history for debugging.
+
+## Common patterns
+
+- **Enqueue from `afterCreate` callbacks** to keep the controller response fast. The model saves, the callback drops a row into `wheels_jobs`, the response ships.
+- **Use `enqueueIn` for rate limits.** If a third-party API caps you at one call per second, stagger calls with `enqueueIn(seconds=1)`, `enqueueIn(seconds=2)`, and so on — cheaper than a token-bucket middleware for low-volume cases.
+- **One job per side effect.** Don't bundle email + Slack + webhook into a single `perform()` — if Slack is down, you don't want to retry the email and the webhook. Enqueue three separate jobs.
+- **Make `perform()` idempotent.** Every job will, eventually, run twice. Plan for it: check-before-write, store idempotency keys, use unique database constraints.
+- **Pass IDs, not objects.** `data={userId: user.id}` beats `data={user: user}`. The fresh `findByKey()` in `perform()` sees the current state, not a snapshot from when you enqueued.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Models and the ORM"
+    description="Jobs persist as rows. Read this first if `model().findByKey()` and callbacks aren't second nature yet."
+    href="/v4-0-1-snapshot/basics/models-and-the-orm/"
+  />
+  <LinkCard
+    title="Authorization & Filters"
+    description="The previous page in Digging Deeper. Filters run before actions; jobs run after them."
+    href="/v4-0-1-snapshot/digging-deeper/authorization-and-filters/"
+  />
+  <LinkCard
+    title="Testing"
+    description="How to spec `perform()` in isolation, fake external services, and keep job tests fast."
+    href="/v4-0-1-snapshot/testing/"
+  />
+  <LinkCard
+    title="Environments and Configuration"
+    description="Where to tune worker intervals and retry caps per environment (dev, staging, production)."
+    href="/v4-0-1-snapshot/core-concepts/environments-and-configuration/"
+  />
+</CardGrid>

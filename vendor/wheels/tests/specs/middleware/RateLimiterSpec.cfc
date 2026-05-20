@@ -665,6 +665,82 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.RateLimiter.InvalidStorage");
 			});
 
+			it("throws on windowSeconds = 0 for fixedWindow", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0, strategy = "fixedWindow");
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on windowSeconds = 0 for slidingWindow", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0, strategy = "slidingWindow");
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on windowSeconds = 0 for tokenBucket", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0, strategy = "tokenBucket");
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on negative windowSeconds", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = -1);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("throws on negative maxRequests", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = -1, windowSeconds = 60);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("permits maxRequests = 0 as a kill-switch value", function() {
+				var mw = new wheels.middleware.RateLimiter(maxRequests = 0, windowSeconds = 60);
+				expect(mw).toBeInstanceOf("wheels.middleware.RateLimiter");
+			});
+
+			it("blocks every request when maxRequests = 0 with strategy = tokenBucket", function() {
+				var keyFn = function(req) { return "tb-killswitch-client"; };
+				var mw = new wheels.middleware.RateLimiter(
+					maxRequests = 0,
+					windowSeconds = 60,
+					strategy = "tokenBucket",
+					keyFunction = keyFn
+				);
+				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+				var shared = {callCount: 0};
+				var handler = function(required struct request) {
+					shared.callCount++;
+					return "ok";
+				};
+
+				var result = pipeline.run(request = {}, coreHandler = handler);
+				expect(result).toInclude("Rate limit exceeded");
+				expect(shared.callCount).toBe(0);
+			});
+
+			it("blocks the first request when maxRequests = 0 with strategy = fixedWindow and storage = database", function() {
+				var keyFn = function(req) { return "fw-db-killswitch-client"; };
+				var mw = new wheels.middleware.RateLimiter(
+					maxRequests = 0,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					storage = "database",
+					keyFunction = keyFn
+				);
+				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+				var shared = {callCount: 0};
+				var handler = function(required struct request) {
+					shared.callCount++;
+					return "ok";
+				};
+
+				var result = pipeline.run(request = {}, coreHandler = handler);
+				expect(result).toInclude("Rate limit exceeded");
+				expect(shared.callCount).toBe(0);
+			});
+
 			it("accepts a custom keyFunction", function() {
 				var keyFn = function(request) { return "custom-key"; };
 				var mw = new wheels.middleware.RateLimiter(
@@ -900,6 +976,37 @@ component extends="wheels.WheelsTest" {
 				var result = pipeline.run(request = {}, coreHandler = handler);
 				expect(result).toInclude("Rate limit exceeded");
 				expect(shared.coreReached).toBeFalse();
+			});
+
+		});
+
+		describe("RateLimiter input validation", function() {
+
+			it("rejects windowSeconds=0 with a framework-shaped configuration error (##2693)", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 0);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("rejects negative windowSeconds (##2693)", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = -10);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("rejects negative maxRequests (##2693)", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = -1, windowSeconds = 60);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("accepts maxRequests=0 (kill-switch — block every request)", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 0, windowSeconds = 60);
+				var result = limiter.handle(
+					request = {cgi: {remote_addr: "192.0.2.1"}},
+					next = function(req) { return "should-not-fire"; }
+				);
+				expect(result).toInclude("Rate limit exceeded");
 			});
 
 		});

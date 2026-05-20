@@ -1,0 +1,192 @@
+---
+title: View & Form Tests
+description: Testing rendered view output and form helpers — body assertions, the data-auto-id attribute for stable selectors.
+type: howto
+sidebar:
+  order: 4
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+View tests pin the HTML your app actually sends to the browser. A controller spec confirms the right action ran and returned the right status; a view test confirms the response body contains the right markup — a heading, an error message, a form field with a stable selector. Because `TestClient` is a real HTTP client, the view renders through the full controller-action-view pipeline, so view tests are integration tests against real output, not abstract render calls.
+
+**You'll learn:**
+
+- How to render a view inside a spec via `TestClient`
+- How to assert on rendered HTML with `assertSee`, `assertDontSee`, and `assertSeeInOrder`
+- The form-helper id conventions and the `data-auto-id` attribute for stable selectors
+- When to reach for `content()` and structural matchers versus substring assertions
+- When a string-based assertion is enough and when you want a browser test instead
+
+<Aside type="note">
+  You should already know how views and form helpers work. See [Views, Layouts, Partials](/v4-0-1-snapshot/basics/views-layouts-partials/) and [Forms and Form Helpers](/v4-0-1-snapshot/basics/forms-and-form-helpers/). For the testing runtime — `describe`, `it`, the `TestClient` API — see [Controller Tests](/v4-0-1-snapshot/testing/controller-tests/).
+</Aside>
+
+## Rendering a view inside a spec
+
+The primary approach is to drive a real request through `TestClient` and assert on the response body. Every controller spec that touches `assertSee` is already doing this — so is every view spec. The difference is intent: a controller spec pins status and redirects; a view spec pins rendered markup.
+
+```cfm {test:compile} title="tests/specs/views/PostsIndexSpec.cfc"
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts index view", () => {
+            it("renders the page header", () => {
+                $testClient().get("/posts").assertOk().assertSee("<h1>Posts</h1>");
+            });
+        });
+    }
+}
+```
+
+The call chain is tight: `$testClient()` builds a client pre-wired to the running server, `get("/posts")` dispatches the request, `assertOk()` confirms a 200, `assertSee("...")` confirms the substring appears in the response body. Every assertion returns `this`, so you can chain as far as the spec needs.
+
+## Asserting on rendered output
+
+`TestClient` ships three body assertions. Pick the one that expresses the smallest pin for the behavior you care about.
+
+```cfm {test:compile} title="tests/specs/views/PostsIndexSpec.cfc"
+it("shows expected content and hides drafts", () => {
+    $testClient().get("/posts")
+        .assertOk()
+        .assertSee("Latest Posts")
+        .assertSee("First post")
+        .assertDontSee("Unpublished draft");
+});
+```
+
+`assertSee` is a substring match — the text must appear somewhere in the body. `assertDontSee` confirms absence. Both are case-sensitive.
+
+```cfm {test:compile} title="tests/specs/views/PostsIndexSpec.cfc"
+it("renders posts in reverse chronological order", () => {
+    $testClient().get("/posts")
+        .assertOk()
+        .assertSeeInOrder(["Newest post", "Older post", "Oldest post"]);
+});
+```
+
+`assertSeeInOrder` checks that each string appears in the body **and** in the given order — useful for asserting sort order without parsing HTML. It walks the body forward; later items only need to appear after earlier matches.
+
+When the assertion you want isn't covered by the shortcuts, pull the body with `content()` and use the full `expect` matcher set:
+
+```cfm {test:compile} title="tests/specs/views/PostsIndexSpec.cfc"
+it("renders exactly five article tags", () => {
+    var client = $testClient();
+    client.get("/posts").assertOk();
+    var body = client.content();
+    expect(body).toInclude("<article");
+    expect(body).toMatch("<article[^>]*>.*?Newest post.*?<\/article>");
+});
+```
+
+`toInclude` is the `expect` version of `assertSee`. `toMatch` takes a regex — reach for it when a substring match would be too loose and parsing the HTML would be overkill.
+
+## Testing partials via controller actions
+
+`TestClient` is an HTTP client, not a view renderer — there's no `renderPartial()` call you make from a spec. You test partials through the action that renders them. For Turbo Frame responses, drive the request with a `Turbo-Frame` or `Accept` header and assert on the fragment:
+
+```cfm {test:compile} title="tests/specs/views/PostsTurboSpec.cfc"
+it("renders a turbo-frame response when validation fails", () => {
+    $testClient()
+        .withHeader("Accept", "text/vnd.turbo-stream.html")
+        .post("/posts", {"post[title]": "", "post[body]": "B"})
+        .assertOk()
+        .assertSee("turbo-frame");
+});
+```
+
+Same pattern for a shared `_form.cfm` partial rendered by both `new` and `edit`: drive through the actions, assert on the fields you expect both to render. One spec pair covers both code paths without coupling to the partial's internal structure.
+
+## Form helpers — the dual-id convention
+
+Object-bound form helpers (see [Forms and Form Helpers](/v4-0-1-snapshot/basics/forms-and-form-helpers/)) emit **two** identifiers on every field: a dashed `id="post-title"` for DOM labels and CSS, and an underscore `data-auto-id="post_title"` for test selectors. A call like `textField(objectName="post", property="title")` generates both:
+
+```html title="illustrative — rendered HTML"
+<input type="text" name="post[title]" id="post-title" data-auto-id="post_title">
+```
+
+The companion attribute exists because every other major framework — Rails, Django, Laravel — uses the underscore convention. Developers write browser tests targeting `#post_title`, then spend hours chasing a silent selector miss against Wheels' dashed id. The dual emission lets tests target either. It's controlled by `set(formHelperDataAutoId=true)` in `config/settings.cfm` — on by default, and tag-style helpers (`textFieldTag`, `selectTag`) don't emit it because their ids are already plain names.
+
+In a view spec, pinning `data-auto-id` is usually the better selector: the underscore form stays stable even if the form template gets renamed, and it matches whatever the browser-test suite targets.
+
+```cfm {test:compile} title="tests/specs/views/PostsFormSpec.cfc"
+it("emits both dash-id and data-auto-id on form fields", () => {
+    $testClient().get("/posts/new")
+        .assertOk()
+        .assertSee("id=""post-title""")
+        .assertSee("data-auto-id=""post_title""");
+});
+```
+
+The doubled quotes are CFML string-literal escapes — `""post_title""` renders as `"post_title"` in the sent assertion.
+
+## Snapshot-style matching — don't
+
+A common impulse is to snapshot the full rendered page and assert the body matches byte-for-byte. Don't. Full-page snapshots break on every template edit — adding a class, reordering a nav item, bumping a date all cause a diff that has nothing to do with the behavior the spec is supposed to pin. Maintenance cost dominates.
+
+The pattern every example on this page uses instead: pin the smallest meaningful substring. A heading, a field selector, an error message, the specific piece of content that proves the action did the right thing. Substrings survive style rewrites; snapshots don't.
+
+## Testing the form submission round-trip
+
+A useful single-spec pattern: render the form, submit it, follow the redirect, assert the show page renders the new record. Three requests on one client to cover the whole create flow — the route, the validation, and the render.
+
+```cfm {test:compile} title="tests/specs/views/PostsCreateSpec.cfc"
+it("round-trips through new → create → show", () => {
+    var client = $testClient();
+
+    // 1. Render the form — confirm the stable selector is present.
+    client.get("/posts/new")
+        .assertOk()
+        .assertSee("data-auto-id=""post_title""");
+
+    // 2. Submit — expect a redirect to the show page.
+    client.post("/posts", {"post[title]": "Hello", "post[body]": "World"})
+        .assertRedirect();
+
+    // 3. Follow the redirect manually — TestClient does not auto-follow.
+    var target = client.headers()["Location"] ?: "";
+    client.get(target).assertOk().assertSee("<h1>Hello</h1>");
+});
+```
+
+`assertRedirect()` with no argument asserts a 3xx response without pinning the target path. Read the `Location` header off `client.headers()` and request it explicitly — the spec is about what the user sees after the redirect, not the intermediate 302.
+
+## Testing inline validation errors
+
+When a form fails validation, the controller re-renders `new` with the model's error state. `errorMessagesFor()` writes the messages inline; your spec asserts they appear in the body and that the form still emits the stable `data-auto-id` selector so the user (and subsequent tests) can still interact with the fields.
+
+```cfm {test:compile} title="tests/specs/views/PostsCreateSpec.cfc"
+it("re-renders the form with inline validation errors", () => {
+    $testClient()
+        .post("/posts", {"post[title]": "", "post[body]": "Body text"})
+        .assertOk()
+        .assertSee("can&##39;t be empty")
+        .assertSee("data-auto-id=""post_title""");
+});
+```
+
+The `&##39;` is the HTML-encoded apostrophe Wheels emits in error messages — `"can't be empty"` becomes `"can&##39;t be empty"` after encoding. Assert on the encoded form, not the raw text, because that's what's in the response body.
+
+## Browser tests vs `assertSee`
+
+`assertSee` is fast, deterministic, and doesn't need a browser — it's the right tool for pinning the output of a server-rendered page. It's not the right tool for anything that requires JavaScript to run: Turbo Drive navigation across pages, Stimulus controller state, a rich-text editor, or a form that submits via `fetch`. For those, reach for a [Browser Test](/v4-0-1-snapshot/testing/browser-tests/) — they drive a real Chromium through Playwright and interact with the DOM after JavaScript has run.
+
+The split that tends to work in practice: view tests pin static HTML and form-helper conventions; browser tests cover the interactive flows. The two complement each other — a browser test confirms a Turbo Frame swaps correctly; a view test confirms the frame markup is present in the initial render.
+
+## When to skip view tests
+
+If you have a browser test that covers the same flow end-to-end, most view-output assertions become redundant. Keep view tests for:
+
+- **Static pages** — marketing copy, error pages, the login form. No JavaScript, no state; a substring assertion proves everything the spec needs to prove.
+- **Form-helper regression checks** — the `data-auto-id` attribute must keep emitting, the error-display partial must keep rendering errors. A view spec catches a helper refactor that breaks the convention in milliseconds; a browser spec would take seconds and obscure the root cause.
+- **Error-message presence** — `assertSee("can&##39;t be empty")` after a bad POST is faster than driving a browser through the form.
+
+Anything that requires a real DOM, real JavaScript, or real user interaction — Turbo Streams landing correctly, modal dialogs opening, a client-side validator firing — belongs in a browser test.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Views, Layouts, Partials" href="/v4-0-1-snapshot/basics/views-layouts-partials/" description="How views render, where partials live, and how layouts wrap the response body." />
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-1-snapshot/basics/forms-and-form-helpers/" description="Every form helper Wheels ships plus the data-auto-id attribute documented here." />
+  <LinkCard title="Controller Tests" href="/v4-0-1-snapshot/testing/controller-tests/" description="The TestClient API — HTTP verbs, request config, response assertions, and session handling." />
+  <LinkCard title="Browser Tests" href="/v4-0-1-snapshot/testing/browser-tests/" description="Playwright-driven specs for JavaScript-dependent flows — Turbo navigation, Stimulus, real user interaction." />
+</CardGrid>

@@ -35,8 +35,8 @@ cd "${BUILD_DIR}" && zip -r "../${EXPORT_DIR}/wheels-cli-${VERSION}.zip" wheels-
 # Generate checksums
 echo "Generating checksums..."
 cd "${EXPORT_DIR}"
-md5sum "wheels-cli-${VERSION}.zip" > "wheels-cli-${VERSION}.md5"
-sha512sum "wheels-cli-${VERSION}.zip" > "wheels-cli-${VERSION}.sha512"
+md5sum "wheels-cli-${VERSION}.zip" > "wheels-cli-${VERSION}.zip.md5"
+sha512sum "wheels-cli-${VERSION}.zip" > "wheels-cli-${VERSION}.zip.sha512"
 cd - > /dev/null
 
 # Copy bleeding edge version

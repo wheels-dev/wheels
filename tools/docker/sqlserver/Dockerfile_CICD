@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/mssql/server:2025-latest
+FROM mcr.microsoft.com/mssql/server:2025-CU4-ubuntu-22.04
 
 LABEL maintainer "Wheels Core Team"
 
