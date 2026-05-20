@@ -61,6 +61,11 @@ jobs:
         with:
           ref: develop
           fetch-depth: 1
+          # Don't persist GITHUB_TOKEN as a git extraheader — peter-evans/create-pull-request
+          # below sets its own Authorization, and two simultaneous extraheaders make GitHub
+          # reject git operations with "Duplicate header: Authorization" → HTTP 400.
+          # First hit on the v4.0.1 GA (run 26173817714); manual workaround was #2770.
+          persist-credentials: false
 
       - name: Compute next snapshot target
         run: |
