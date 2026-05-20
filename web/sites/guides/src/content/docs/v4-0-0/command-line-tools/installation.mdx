@@ -123,9 +123,6 @@ Wheels ships on Windows through [Scoop](https://scoop.sh) — a portable, sandbo
 # the Scoop installer, which is why this works from a totally fresh shell.
 scoop install git
 
-# The java bucket provides the openjdk21 dependency declared by both packages.
-# Scoop's `depends:` does not auto-add the dependency bucket.
-scoop bucket add java
 scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
 
 # Pick a channel:
@@ -135,7 +132,7 @@ scoop install wheels-be     # bleeding-edge - tracks every develop merge
 wheels --version
 ```
 
-Both packages install OpenJDK 21 as a Scoop dependency (`java/openjdk21`) — the `java` bucket added above is required. The `wheels.cmd` wrapper resolves `JAVA_HOME` from the installed dependency automatically, so no manual setup is needed. Both expose the same `wheels` PATH shim, so Scoop refuses to install both at once. To switch channels:
+Both packages bundle OpenJDK 21 inline — no separate `java` bucket, no `JAVA_HOME` setup. Both expose the same `wheels` PATH shim, so Scoop refuses to install both at once. To switch channels:
 
 ```powershell
 scoop uninstall wheels && scoop install wheels-be
