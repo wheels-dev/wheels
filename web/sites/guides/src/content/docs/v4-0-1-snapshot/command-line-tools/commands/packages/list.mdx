@@ -1,0 +1,35 @@
+---
+title: "wheels packages list"
+description: List every package in the registry, optionally filtered by tag.
+type: reference
+sidebar:
+  label: "list"
+  order: 1
+---
+
+Prints one line per package in the registry. Served from the 24h manifest cache when fresh; otherwise fetched live.
+
+## Synopsis
+
+``` title="synopsis — illustrative"
+wheels packages list [--tag=<tag>]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--tag=<tag>` | Only show packages whose manifest has `<tag>` in its `tags[]`. |
+
+## Example
+
+``` title="illustrative — example output"
+$ wheels packages list
+wheels-basecoat         UI component primitives for Wheels [ui, components]
+wheels-hotwire          Hotwire (Turbo + Stimulus) integration [frontend, spa]
+wheels-legacy-adapter   3.x → 4.x compatibility shims [migration]
+wheels-sentry           Sentry error tracking [monitoring, errors, observability]
+
+$ wheels packages list --tag=monitoring
+wheels-sentry           Sentry error tracking [monitoring, errors, observability]
+```

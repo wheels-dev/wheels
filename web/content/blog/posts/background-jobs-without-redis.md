@@ -140,9 +140,9 @@ One last note for anyone building interactive apps on top of the queue. Wheels 4
 
 Check your production dependency list. If Redis is in your stack only for the job queue, consider the one-less-service version. The framework now has an opinion about this layer, and the opinion is that for most apps, your database is already a perfectly good place to keep a queue.
 
-- [Background jobs guide](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/background-jobs/) — job definition, enqueueing, retries, worker operation.
-- [Multi-tenancy guide](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/multi-tenancy/) — how tenant-aware datasource switching interacts with jobs and the rest of the request lifecycle.
-- [SSE guide](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/server-sent-events/) — pub/sub channels, push from job completion to browser.
+- [Background jobs guide](https://guides.wheels.dev/v4-0-0/digging-deeper/background-jobs/) — job definition, enqueueing, retries, worker operation.
+- [Multi-tenancy guide](https://guides.wheels.dev/v4-0-0/digging-deeper/multi-tenancy/) — how tenant-aware datasource switching interacts with jobs and the rest of the request lifecycle.
+- [SSE guide](https://guides.wheels.dev/v4-0-0/digging-deeper/server-sent-events/) — pub/sub channels, push from job completion to browser.
 
 If you are currently running Wheels with an external queue service and think the DB-backed path might be a fit, we would love to hear how the migration goes. The surface is new, the edges are still being polished, and the feedback from the first wave of adopters is what shapes the 4.0.x series.
 

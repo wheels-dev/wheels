@@ -1,0 +1,194 @@
+---
+title: "CFML Execution"
+description: wheels cfml, wheels run, and wheels repl — three LuCLI commands for executing CFML outside the Wheels application context. Use them for one-off expression evaluation, script files, and an interactive CFML prompt.
+type: reference
+sidebar:
+  order: 2
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`wheels cfml`, `wheels run`, and `wheels repl` are three LuCLI-level entry points for executing CFML directly. None of them bootstrap a Wheels application — they give you a raw Lucee engine for quick experiments, script files, and interactive exploration. Because they ship with LuCLI itself, the `wheels` binary inherits them whether you installed LuCLI standalone or through the Wheels distribution.
+
+**You'll use this for:**
+
+- Evaluating a one-off CFML expression from the shell and piping the result elsewhere.
+- Running a reusable `.cfm`, `.cfs`, or `.lucli` script file with arguments.
+- Dropping into an interactive CFML prompt to explore language behavior without a project.
+
+## Overview
+
+These three commands all execute CFML *without* loading your Wheels app — no routes, no models, no ORM, no `config/settings.cfm`. They exist at the LuCLI layer, below the Wheels module. When you need to poke at models, services, or routes with the framework fully wired in, use the project-scoped [`wheels console`](../../wheels-commands/console-and-repl/) instead.
+
+### `wheels cfml`
+
+Execute a CFML expression (or short script fragment) supplied on the command line.
+
+#### Synopsis
+
+```bash title="synopsis — illustrative"
+wheels cfml <expression> [<expression> ...]
+```
+
+All positional arguments are joined with a single space and handed to the Lucee script engine as one expression.
+
+#### Description
+
+`cfml` takes one or more tokens on the command line, joins them, and runs the result through the Lucee script engine. The return value of the expression becomes the command's execution result but is **not** automatically printed to stdout — if you want visible output, wrap the expression in `writeOutput()` or `writeDump()`.
+
+#### Flags
+
+`wheels cfml` takes no command-specific flags. It accepts the global flags inherited from the root `wheels` command (for example, `--verbose`, `--debug`, `--timing`).
+
+#### Example
+
+```bash {test:cli cmd="wheels cfml now()"}
+wheels cfml 'now()'
+```
+
+The expression runs through the Lucee engine and the process exits with code 0. To see the value, emit it explicitly:
+
+```bash {test:cli cmd="wheels cfml writeOutput(1+2)" asserts-stdout="3"}
+wheels cfml 'writeOutput(1 + 2)'
+```
+
+Sample output:
+
+```text title="sample output"
+3
+```
+
+<Aside type="note" title="Quoting">
+The CFML expression is a single argument from LuCLI's perspective. Your shell still needs to protect parentheses, quotes, and operators — wrap the expression in single quotes whenever it contains anything the shell might interpret (`(`, `)`, `<`, `>`, `|`, `&`, `$`, `*`).
+</Aside>
+
+### `wheels run`
+
+Execute a CFML script file (`.cfm`, `.cfs`) or a LuCLI batch script (`.lucli`).
+
+#### Synopsis
+
+```bash title="synopsis — illustrative"
+wheels run <script> [<arg> ...]
+```
+
+#### Description
+
+`run` resolves the script path relative to the current working directory, dispatches on the file extension, and executes the file:
+
+- `.cfm` — executed as a CFML template via the Lucee engine.
+- `.cfs` — executed as a CFML script file via the Lucee engine.
+- `.lucli` — executed as a LuCLI batch script (LuCLI's own scripting DSL, not CFML).
+- `.cfc` — **not supported**. Use a module entry point instead (e.g. `wheels modules run <module>`).
+
+Any trailing arguments after the script path are passed through to the script. The root `wheels` command also accepts a bare script path as a shortcut: `wheels hello.cfm` behaves identically to `wheels run hello.cfm`.
+
+#### Flags
+
+`wheels run` takes no command-specific flags beyond the script path and its arguments. Global flags from the root `wheels` command (`--verbose`, `--debug`, `--timing`) still apply.
+
+#### Example
+
+```bash title="illustrative — multi-command example"
+wheels run hello.cfm
+wheels run script.cfs arg1 arg2
+wheels run deploy.lucli
+```
+
+The first invocation executes `hello.cfm` as a CFML template. The second runs `script.cfs` with two trailing arguments (available to the script). The third dispatches to the LuCLI batch runner for a `.lucli` file.
+
+<Aside type="caution" title="Unsupported extensions">
+Any file whose name does not end in `.cfm`, `.cfs`, or `.lucli` is rejected with an error. `run` will not guess the language from content.
+</Aside>
+
+### `wheels repl`
+
+Start an interactive CFML read-eval-print loop. No Wheels app, no project context — just a prompt attached to the Lucee engine.
+
+#### Synopsis
+
+```bash title="synopsis — illustrative"
+wheels repl [flags]
+```
+
+#### Description
+
+`repl` drops you into a line-edited CFML prompt (`cfml>` by default — the prefix reflects the active LuCLI profile). Each line you enter is handed to the Lucee script engine; non-null results print to the terminal. History persists to `~/.lucli/repl_history` (500 lines) so you can arrow-back through previous expressions across sessions.
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `-h, --help` | Show command help and exit. |
+| `-V, --version` | Print LuCLI version and exit. |
+
+`repl` inherits the global flags from the root `wheels` command as well (for example, `--verbose`, `--debug`).
+
+#### Special commands (inside the REPL)
+
+| Input | Behavior |
+|---|---|
+| `help` or `?` | Show REPL help. |
+| `exit` or `quit` | Exit the REPL. |
+| `Ctrl+C` | Cancel the current input line. |
+| `Ctrl+D` | Exit the REPL. |
+
+#### Example session
+
+```text title="example REPL session — illustrative"
+$ wheels repl
+🚀 CFML REPL - LuCLI 0.3.5
+ℹ  Type CFML expressions to evaluate. Type 'exit' or Ctrl+D to quit.
+
+cfml> 1 + 2
+3
+cfml> dateFormat(now(), 'yyyy-mm-dd')
+2026-04-20
+cfml> exit
+
+👋 Goodbye!
+```
+
+## Three modes compared
+
+| Command | Use when |
+|---|---|
+| `cfml '<expr>'` | One-off expression, pipe-friendly, no interactivity. |
+| `run script.cfm` | Reusable script on disk; accepts trailing arguments. |
+| `repl` | Interactive exploration, multiple expressions, history. |
+
+All three share the same execution surface (the Lucee script engine with no Wheels app bootstrapped). Pick the one that matches how you want to deliver input.
+
+## `cfml` / `run` / `repl` vs `wheels console`
+
+<Aside type="tip" title="Which one should I use?">
+- **`wheels cfml`, `wheels run`, `wheels repl`** — LuCLI-level CFML execution. No Wheels app is loaded. No `model()`, no routes, no filters, no services. Fast to start, ideal for language experiments, one-off scripts, and CFML debugging outside any particular project.
+- **`wheels console`** — Wheels-aware. Boots the framework, wires up models, the DI container, routes, and application settings. Reach for it when you need to inspect real data or drive the application interactively. See [Console & REPL](../../wheels-commands/console-and-repl/).
+
+If your question is about CFML the language, stay here. If your question is about your app's behavior, switch to `wheels console`.
+</Aside>
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Console & REPL"
+    href="../../wheels-commands/console-and-repl/"
+    description="wheels console — the Wheels-aware REPL with models, services, and routes loaded."
+  />
+  <LinkCard
+    title="Server"
+    href="../server/"
+    description="wheels server — LuCLI's native Lucee server manager for running full web apps."
+  />
+  <LinkCard
+    title="Modules & Deps"
+    href="../modules-and-deps/"
+    description="Manage LuCLI modules and CFML dependencies that back cfml, run, and repl."
+  />
+  <LinkCard
+    title="Configuration"
+    href="../../configuration/"
+    description="lucee.json, profiles, and the settings LuCLI reads when resolving the Lucee engine."
+  />
+</CardGrid>

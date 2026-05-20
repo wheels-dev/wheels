@@ -14,9 +14,23 @@ component extends="wheels.engineAdapters.Base" output="false" {
 
 	/**
 	 * BoxLang returns the response directly from GetPageContext().
+	 * Note: this returns the PageContext (not HttpServletResponse) so that
+	 * getContentType() can reach back to the request side. Methods that need
+	 * the real response object must override getResponse() locally — see
+	 * getStatusCode() below.
 	 */
 	public any function getResponse() {
 		return GetPageContext();
+	}
+
+	/**
+	 * BoxLang's PageContext does not expose a getStatus() method, so the
+	 * default Base.cfc::getStatusCode() (which resolves to
+	 * getResponse().getStatus()) throws against the PageContext override
+	 * above. Reach the underlying HttpServletResponse to read the status.
+	 */
+	public numeric function getStatusCode() {
+		return GetPageContext().getResponse().getStatus();
 	}
 
 	/**
@@ -183,12 +197,18 @@ component extends="wheels.engineAdapters.Base" output="false" {
 	// --- Method Invocation ---
 
 	/**
-	 * BoxLang requires extracting the method reference and calling directly
-	 * rather than using invoke().
+	 * BoxLang dispatch via direct bracket-call rather than invoke().
+	 *
+	 * The bracket-and-call MUST happen in a single expression. Splitting it
+	 * across two statements (local.method = obj[name]; local.method()) extracts
+	 * a bare function reference and loses the component receiver, so any
+	 * in-component call inside the invoked method (e.g. Public.cfc handlers
+	 * calling $blockInProduction()) fails with "Function [$...] not found".
+	 * Regression test: vendor/wheels/tests/specs/dispatch/InvokeMethodSpec.cfc.
+	 * Issue #2646.
 	 */
 	public void function invokeMethod(required any object, required string methodName) {
-		local.method = arguments.object[arguments.methodName];
-		local.method();
+		arguments.object[arguments.methodName]();
 	}
 
 	// --- Image Handling ---

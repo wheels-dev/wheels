@@ -51,6 +51,13 @@ component extends="wheels.WheelsTest" {
 				});
 			});
 
+			describe("$supportsAdvisoryLocks", () => {
+
+				it("returns false (CockroachDB has no pg_advisory_lock equivalent)", () => {
+					expect(adapter.$supportsAdvisoryLocks()).toBeFalse();
+				});
+			});
+
 			describe("$identitySelect", () => {
 
 				it("returns lastId from result.generatedKey", () => {

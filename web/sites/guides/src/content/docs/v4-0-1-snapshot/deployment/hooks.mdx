@@ -1,0 +1,151 @@
+---
+title: Hooks
+description: Local shell scripts under .kamal/hooks/ that run on the control machine around every deploy — the KAMAL_ env contract, the three events, and how they integrate with the deploy flow.
+type: howto
+sidebar:
+  order: 11
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Hooks are plain shell scripts in `.kamal/hooks/` that `wheels deploy` runs locally at specific points in a deploy. They're the escape hatch for "run this thing around every deploy" — Slack notifications, smoke tests, database backups, cache warms. Every hook is optional; if the file doesn't exist, `wheels deploy` skips it without a warning.
+
+**You'll learn:**
+
+- The three supported hook events
+- The `KAMAL_*` environment variables every hook receives
+- How to write and install a hook
+- What happens when a hook fails
+
+<Aside type="note" title="You should already know">
+You've read [Your First Deploy](/v4-0-1-snapshot/deployment/first-deploy/). Hooks are useful once you've shipped at least once.
+</Aside>
+
+## The three events
+
+| Hook | Fires | Aborts? |
+|------|-------|---------|
+| `pre-deploy` | Before any host work starts. | Yes — non-zero exit aborts the deploy before anything on the servers changes. |
+| `post-deploy` | After a successful deploy. | Yes — non-zero exit fails the deploy after-the-fact, useful for smoke tests. |
+| `post-deploy-failure` | After a deploy that threw an error. | No — this is already a failure path; the exit code is logged but doesn't change what happens. |
+
+All three live under `.kamal/hooks/` and must be executable (`chmod +x`). They run on the control machine — the same machine running `wheels deploy` — not on the target hosts.
+
+## Environment variables every hook receives
+
+`wheels deploy` fires every hook with a `KAMAL_*` env block that matches Ruby Kamal's contract exactly. Keeping the prefix `KAMAL_` (not `WHEELS_`) means any hook written for Ruby Kamal works unchanged — you can port hooks between the two tools without editing.
+
+| Variable | When available | Value |
+|----------|---------------|-------|
+| `KAMAL_VERSION` | all events | Version being deployed (git short sha by default). |
+| `KAMAL_HOSTS` | all events | Comma-separated list of hosts in the deploy. |
+| `KAMAL_PERFORMER` | all events | Local user running `wheels deploy` (`$USER`). |
+| `KAMAL_ROLE` | all events | Role being deployed, or empty when the deploy spans roles. |
+| `KAMAL_DESTINATION` | all events | Value of `--destination`, or empty. |
+| `KAMAL_RUNTIME` | `post-deploy`, `post-deploy-failure` | Seconds elapsed since the deploy started. |
+| `KAMAL_ERROR` | `post-deploy-failure` only | Error message that stopped the deploy. |
+
+## Example — Slack notification on success
+
+```bash title=".kamal/hooks/post-deploy (illustrative — do not type)"
+#!/usr/bin/env bash
+set -euo pipefail
+
+curl -sS -X POST "$SLACK_WEBHOOK_URL" \
+  -H 'Content-Type: application/json' \
+  -d "$(cat <<EOF
+{
+  "text": "Deployed \`${KAMAL_VERSION}\` to \`${KAMAL_HOSTS}\` in ${KAMAL_RUNTIME}s by ${KAMAL_PERFORMER}"
+}
+EOF
+)"
+```
+
+Remember to `chmod +x .kamal/hooks/post-deploy` before committing.
+
+## Example — Smoke test before deploy
+
+Abort the deploy if staging is broken:
+
+```bash title=".kamal/hooks/pre-deploy (illustrative — do not type)"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! curl -sf --max-time 5 https://staging.example.com/up > /dev/null; then
+  echo "Staging is down; refusing to deploy" >&2
+  exit 1
+fi
+```
+
+The non-zero exit stops `wheels deploy` before it touches production.
+
+## Example — Page on failure
+
+```bash title=".kamal/hooks/post-deploy-failure (illustrative — do not type)"
+#!/usr/bin/env bash
+set -euo pipefail
+
+curl -sS -X POST https://events.pagerduty.com/v2/enqueue \
+  -H 'Content-Type: application/json' \
+  -d "$(cat <<EOF
+{
+  "routing_key": "${PAGERDUTY_KEY}",
+  "event_action": "trigger",
+  "payload": {
+    "summary": "Deploy of ${KAMAL_VERSION} failed: ${KAMAL_ERROR}",
+    "severity": "error",
+    "source": "wheels deploy"
+  }
+}
+EOF
+)"
+```
+
+## Output
+
+Hook stdout and stderr are merged and prefixed with `[hook:<name>]` in the deploy log:
+
+```text title="deploy log output (illustrative)"
+[hook:pre-deploy] staging check passed
+[hook:post-deploy] slack notification sent
+```
+
+A non-zero exit from `pre-deploy` aborts the deploy before any server work. A non-zero exit from `post-deploy` marks the deploy as failed after-the-fact — the containers are already rolled over, so this is useful for integration smoke tests that gate "did the deploy actually work" rather than "can I start the new container."
+
+`post-deploy-failure` never changes the exit code; it runs best-effort on an already-failed path.
+
+## Debugging hooks
+
+Hooks run in the project root directory (where `deploy.yml` lives). `$USER` is the user who invoked `wheels deploy`. Everything else is your environment.
+
+To see exactly what env vars your hook receives, drop this in during development:
+
+```bash title=".kamal/hooks/post-deploy (illustrative — do not type)"
+#!/usr/bin/env bash
+env | grep ^KAMAL_
+```
+
+To run a hook manually with the expected env:
+
+```bash title="manual hook invocation (illustrative — do not type)"
+KAMAL_VERSION=abc1234 \
+KAMAL_HOSTS=192.0.2.10 \
+KAMAL_RUNTIME=42 \
+KAMAL_PERFORMER=$USER \
+./.kamal/hooks/post-deploy
+```
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Secrets"
+    href="/v4-0-1-snapshot/deployment/secrets/"
+    description="Hooks can shell out to wheels deploy fetch-secrets."
+  />
+  <LinkCard
+    title="Migrating from Kamal"
+    href="/v4-0-1-snapshot/deployment/migrating-from-kamal/"
+    description="Hook env stays KAMAL_* on purpose — keeps Ruby Kamal hooks portable."
+  />
+</CardGrid>

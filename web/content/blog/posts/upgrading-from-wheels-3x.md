@@ -1,0 +1,198 @@
+---
+title: Upgrading from Wheels 3.x
+slug: upgrading-from-wheels-3x
+publishedAt: '2026-05-13T14:00:00.000Z'
+updatedAt: '2026-05-13T15:21:48.000Z'
+author: Peter Amiri
+tags:
+  - wheels-4
+  - upgrade
+  - migration
+categories: []
+excerpt: >-
+  Wheels 4.0 lands with seven breaking changes and a Legacy Compatibility
+  Adapter for teams that cannot touch every call site this quarter. This post
+  is the honest map: what breaks, how to detect it, how to fix it, and when
+  the adapter is the right answer instead.
+coverImage: null
+---
+
+If you run a 3.x Wheels app in production, 4.0 is the first release in years with hard breaks. The [canonical upgrade guide](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) catalogs eleven; this post walks the seven that bite a real 3.x codebase first, plus a "things that bite at boot" section the canonical list does not cover. Pretending the breaks are not real does not help anyone.
+
+The good news: the breakers are concentrated. Most are renames or scope changes that `grep` will find for you in an afternoon. Two are security defaults that used to be permissive and are now strict, which is the direction you wanted them to go anyway. And for the team that inherited a 3.x monolith with spotty test coverage and no appetite for a sprint-long migration, there is the Legacy Compatibility Adapter — one flag that re-enables most of the old surface area while you migrate on your own schedule.
+
+This post is the map: what changed, how to detect each break, how to fix it, and where the adapter fits.
+
+## The two-path upgrade
+
+Pick one, then stick with it.
+
+**Path A — clean upgrade.** You fix the seven breakers directly, update your code, and run on 4.0 behavior. This is the recommended path for any app with reasonable test coverage. Most teams finish in an afternoon. Every new Wheels feature — middleware pipeline, chainable query builder, route model binding, WheelsTest BDD, `wheels deploy` — is available immediately and works as documented.
+
+**Path B — Legacy Compatibility Adapter.** You flip one setting ([#2015](https://github.com/wheels-dev/wheels/pull/2015)), and most 3.x code continues to work. The adapter is a bridge, not a permanent layer: it restores old defaults and re-registers removed aliases so the app boots, but it is not the long-term supported configuration. Use it when you need 4.0 in production now and cannot schedule the migration work yet. Plan to remove the flag before 4.x reaches end-of-life.
+
+```cfm
+// config/settings.cfm — one line, soft landing
+set(legacyCompatibilityAdapter=true);
+```
+
+Either way, start by reading the [full upgrade guide](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) and skimming the seven breakers below. Knowing what is in the blast radius is half the battle.
+
+## The seven breaking changes
+
+| # | Change | PR | Detection |
+|---|---|---|---|
+| 1 | `wheels snippets` renamed to `wheels generate snippets` | [#1852](https://github.com/wheels-dev/wheels/pull/1852) | Scripts calling bare `wheels snippets` |
+| 2 | `redirectTo()` is now controller-scoped; unresolvable from request-lifecycle events | Wheels 4.0 / Lucee 7 scope | `grep -rn "redirectTo(" app/events/ Application.cfc` |
+| 3 | `testbox` → `wheelstest` namespace | [#1889](https://github.com/wheels-dev/wheels/pull/1889) | Test imports and extends clauses |
+| 4 | `tests/specs/functions/` → `tests/specs/functional/` | [#1872](https://github.com/wheels-dev/wheels/pull/1872) | Directory name in your test tree |
+| 5 | Legacy RocketUnit removed from core | [#1925](https://github.com/wheels-dev/wheels/pull/1925) | New test runs still work; core shim gone |
+| 6 | CORS default flips from wildcard to deny-all | [#2039](https://github.com/wheels-dev/wheels/pull/2039) | Browser preflight failures from cross-origin clients |
+| 7 | `allowEnvironmentSwitchViaUrl` off in prod; reload password required | [#2076](https://github.com/wheels-dev/wheels/pull/2076), [#2082](https://github.com/wheels-dev/wheels/pull/2082) | `?reload=true` returns 403 in production |
+
+### 1. `wheels snippets` renamed
+
+The top-level `wheels snippets` command moved under the generator group and is now `wheels generate snippets`. This aligns it with the rest of the scaffolding surface (`wheels generate model`, `wheels generate controller`) and removes a one-off command at the CLI root.
+
+Detect it by searching your `Makefile`, `package.json` scripts, CI pipelines, and `.sh` files for `wheels snippets`. A build that ran yesterday fails with "unknown command" as the only signal. Fix by renaming the call site. The adapter re-registers the old alias if you need it.
+
+### 2. `redirectTo()` is now strictly controller-scoped
+
+Wheels 4.0 on Lucee 7 tightened function scope: `redirectTo()` is a controller method, not a globally-resolvable function. Calls from request-lifecycle event handlers (`app/events/onrequeststart.cfm`, `onapplicationstart.cfm`) throw `No matching function [REDIRECTTO] found` at runtime.
+
+This bites any app with logic in `onrequeststart.cfm` that detects a condition requiring the request to be interrupted and the user sent to the login form — a stale session, a re-auth requirement after a server-side state change, a forced logout when an app-version flag flips, a maintenance-mode redirect. The natural pattern in 3.x was a `redirectTo()` call inside that handler. On 4.0 the call no longer resolves from event scope. The branch typically only fires under specific conditions, so neither the test suite nor normal traffic exercises it — the regression surfaces in production the first time the branch hits.
+
+Detect with `grep -rn "redirectTo(" app/events/ Application.cfc`. Fix by replacing with plain `cflocation` (function-call form, portable across engines):
+
+```cfm
+// before
+redirectTo(controller="sessions", action="new");
+
+// after
+cflocation(url="/login", addToken=false);
+```
+
+### 3. `testbox` → `wheelstest` namespace rename
+
+The bundled test harness was historically called `testbox` to signal its TestBox-inspired BDD surface. It is now `wheelstest`, which is accurate (it is a Wheels-specific runner with TestBox-style syntax, not TestBox itself) and removes the brand ambiguity.
+
+Every test CFC has an `extends=` clause. If yours say `extends="testbox.system.BaseSpec"` or similar, change to `wheels.WheelsTest` for the standard BDD base, or to the specific base under `wheels.wheelstest.*` if you need a specialized runner (browser, system). The adapter re-aliases the old namespace.
+
+### 4. Tests directory rename
+
+`tests/specs/functions/` becomes `tests/specs/functional/`. The old name was a typo that stuck. Detect by filesystem inspection; fix by renaming the directory and updating any explicit `directory=tests.specs.functions` arguments in CI runner calls.
+
+### 5. Legacy RocketUnit removed from core
+
+The original Wheels test syntax — `test_` prefixed functions with `assert()` calls — was maintained in core through 3.x for the pre-TestBox test estate. In 4.0, the RocketUnit runner is no longer bundled with the core distribution. Existing `test_`-style specs still execute, because the runner lives in the `wheelstest` package and loads when specs that need it are present; the change is that it is no longer in the framework core path.
+
+Only relevant if you had custom tooling that depended on the core loader having RocketUnit loaded. Day-to-day test runs keep working. Write new specs in WheelsTest BDD; leave the old specs alone until you need to touch them.
+
+### 6. CORS default: wildcard to deny-all
+
+The `wheels.middleware.Cors` middleware used to default to `allowOrigins="*"` — any origin gets a permissive response. That was a footgun: apps that added the middleware without reading the reference ended up broadcasting CORS for any origin in production. The 4.0 default is deny-all: if you do not configure `allowOrigins`, no cross-origin requests pass.
+
+If you have a JS client, a mobile app, or a webhook source that talks to your API from a different origin, browser preflights will now fail with a CORS error visible in the browser console. Set `allowOrigins` explicitly to the list of origins that should be permitted:
+
+```cfm
+// config/settings.cfm — explicit allow-list
+set(middleware = [
+    new wheels.middleware.Cors(allowOrigins="https://myapp.com,https://admin.myapp.com")
+]);
+```
+
+### 7. URL environment switch off in prod; reload password required
+
+Two related production defaults flipped. `allowEnvironmentSwitchViaUrl` used to default `true`, which meant `?environment=design` would switch modes on a live production host. It now defaults `false` in production. At the same time, `?reload=true` requires a non-empty `reloadPassword` — the empty-string default was an all-access pass and has been removed.
+
+Production `?reload=true` requests return 403; automation that relied on URL-based env switching no longer switches. Set a non-empty `reloadPassword` in production config. If you genuinely need URL-based environment switching — most teams do not — flip `allowEnvironmentSwitchViaUrl` back on explicitly for the environments that need it.
+
+## The Legacy Compatibility Adapter
+
+The adapter is a single flag: `set(legacyCompatibilityAdapter=true)`. Turning it on restores the 3.x behavior for the items that can be restored — renamed aliases, permissive defaults on CORS and the reload password, legacy directory fallbacks. It cannot resurrect code that was deleted (the RocketUnit core shim is gone regardless), but it buys you time on everything else.
+
+Use it when: you inherited an app with ambiguous test coverage, you need 4.0 in production for a specific reason (a CVE fix, a dependency constraint, a feature your team is already depending on), and you cannot plan the migration work this quarter. Turn it on, ship, schedule the migration for the next planning cycle.
+
+Do not use it for: new apps, small apps, or apps where you are already touching the breakers to add a feature. The adapter exists to buy time, not to avoid work that is cheaper to do now.
+
+What the adapter does **not** cover: it cannot shim `application.wirebox` access or the `wirebox.system.ioc.Injector` class path. Apps that bootstrap WireBox directly in `Application.cfc` (the canonical 2.x pattern still common in older codebases) must rewrite that file before first boot, adapter or no adapter. The canonical breaker for this rename is `application.wirebox` → `application.wheelsdi`. If `grep -rn "application.wirebox\|new wirebox.system" app/ public/` finds anything, plan the bootstrap rewrite up front.
+
+## Security-hardening defaults to audit
+
+These are not on the canonical breaker list, but they change visible behavior. 4.0 shipped with more than forty security-hardening PRs; these three are the most likely to surface when you turn the app on in production.
+
+**HSTS default-on in production ([#2081](https://github.com/wheels-dev/wheels/pull/2081)).** Responses now carry `Strict-Transport-Security` by default when the app is in production mode. If you have a subdomain that serves plain HTTP, confirm the `includeSubDomains` and `max-age` defaults match your topology before real users see it.
+
+**RateLimiter `trustProxy=false` and proxy strategy `last` ([#2024](https://github.com/wheels-dev/wheels/pull/2024), [#2088](https://github.com/wheels-dev/wheels/pull/2088)).** The rate limiter no longer trusts `X-Forwarded-For` by default. If your app sits behind a reverse proxy or load balancer, set `trustProxy=true` and configure the strategy — otherwise every request appears to come from the proxy's IP and the limiter is effectively disabled per-client.
+
+**CSRF SameSite cookie default ([#2035](https://github.com/wheels-dev/wheels/pull/2035)).** The CSRF token cookie now sets `SameSite=Lax`. Cross-site form submissions that worked in 3.x will start failing; usually the fix is that they should have been same-origin all along.
+
+## Things that bite at boot (from the field)
+
+These are not on the canonical breaker list, but they are what eats your evening when you cut a real 3.x app over to 4.0. None of them show up in `wheels upgrade check`. All of them are recoverable in minutes once you know what to look for — but they will page someone at 2 AM if you don't.
+
+> **Heads up — most of this section is already being addressed in the forthcoming v4.0.1.** Between this post landing and now, the framework team has merged fixes that improve the CLI's default `rewrite.config` for 3.x apps, expand `wheels upgrade check` to scan more breakers, and clarify the canonical guide on `reloadPassword` wiring and the adapter's WireBox limits. A follow-up post will walk those changes when v4.0.1 ships and point back here. Until then, the workarounds below are what you need on 4.0.0.
+
+**The default `rewrite.config` 404s static assets in non-standard directories.** Lucee 7's bundled RewriteValve runs `rewrite.config` (mod_rewrite syntax), not the old `urlrewrite.xml` (Tuckey format) — the boot log warns about this but does not say how the default rules fail. The defaults only allow `images|css|js|fonts|assets|static` as static-asset directories. If your 3.x app keeps assets under `/miscellaneous/`, `/javascripts/`, `/stylesheets/`, `/files/`, or anywhere else, the catch-all rewrite routes them to `/index.cfm/...` and Wheels 404s every CSS and JS file. The site renders unstyled — login works but looks broken. Fix: drop a `rewrite.config` at your project root with explicit `[L]`-flagged pass-through rules for your asset directories before promoting the upgrade past staging.
+
+**`reloadPassword=...` in `.env` alone does not satisfy the framework's empty-check.** The fail-closed check reads `application.wheels.reloadPassword`, which is populated from `set(reloadPassword="...")` in `config/settings.cfm` — not from `.env` directly. Wire it through the `env()` helper so the value flows from `.env` into the framework setting:
+
+```cfm
+// config/settings.cfm
+set(reloadPassword = env("WHEELS_RELOAD_PASSWORD"));
+```
+
+Without this, boot logs a warning, `?reload=true` is silently disabled in production, and you find out by `tail`-ing the security log days later.
+
+**Classpath jars need a new home if you came from CommandBox.** CommandBox's `server.json` loaded application jars via `libDirs="public/miscellaneous/libs/server"`. The wheels CLI systemd unit has no equivalent. Symlink each `.jar` from your app's libs directory into Lucee Express's `lib/ext/` (the same drop-in path the wheels wrapper uses for `sqlite-jdbc`). Skip this and the first request that touches a custom JDBC driver — Universe, an older MSSQL build, anything bundled — throws `java.lang.ClassException: cannot load class …` the moment external traffic hits the upgraded host. Codify the symlink as a task in your provisioning role; do not leave it as a tribal-knowledge hotfix.
+
+**Lucee 6.x → 7 makes cross-version DB sessions into stuck cookies.** If your 3.x app stored sessions in a SQL store (Lucee's `sessionStorage="..."` pointing at CockroachDB / Postgres / MSSQL), every blob is serialized in Lucee 6 format. Lucee 7 throws `InvalidClassException` during session-load — **before** `onrequeststart.cfm` runs, so the AppSerial kill-switch can't fire. The user's cookie is stuck pointing at a blob that will never deserialize, and if your load balancer uses IP persistence, even a different browser tab on the same network won't recover (the cookie stays sticky to the same VM). One-time fix: truncate the session-storage table after cutover. Every active user gets a fresh Lucee 7 session on their next request. Plan this into the cutover playbook rather than discovering it from the first user-reported "I can't log in" the morning after.
+
+## Deprecations and recommended migrations
+
+Not breaking, but worth scheduling after the upgrade lands.
+
+- Legacy `plugins/` folder ([#1995](https://github.com/wheels-dev/wheels/pull/1995), [#2252](https://github.com/wheels-dev/wheels/pull/2252)) still loads in 4.x with a deprecation warning — scheduled for removal in v5.0. Migrate to the `packages/` → `vendor/` activation model before upgrading to 5.x.
+- Monolithic `paginationLinks()` ([#1930](https://github.com/wheels-dev/wheels/pull/1930)) still works; new code should use `paginationNav()` plus the individual helpers.
+- `wheels.Test` base class still works for existing specs; new tests extend `wheels.WheelsTest`.
+- Adopt the [middleware pipeline](https://guides.wheels.dev/v4-0-0/core-concepts/middleware-pipeline/) ([#1924](https://github.com/wheels-dev/wheels/pull/1924)) for cross-cutting concerns you currently do in `beforeFilter`.
+- Turn on [route model binding](https://guides.wheels.dev/v4-0-0/core-concepts/how-routing-works/) ([#1929](https://github.com/wheels-dev/wheels/pull/1929)) — it kills the first three lines of most show/edit/update actions.
+- Use the [chainable query builder](https://guides.wheels.dev/v4-0-0/basics/query-builder-and-scopes/) ([#1922](https://github.com/wheels-dev/wheels/pull/1922)) instead of raw `where` strings for anything user-supplied.
+- Replace Redis-backed job queues with the [built-in daemon](https://guides.wheels.dev/v4-0-0/digging-deeper/background-jobs/) ([#1934](https://github.com/wheels-dev/wheels/pull/1934)) if the dependency is more than you need.
+
+## Testing and deploying
+
+Before you declare the upgrade done, exercise it. Enable `TestClient` ([#2099](https://github.com/wheels-dev/wheels/pull/2099)) and write a smoke-test spec that hits every top-level route you care about. Turn on the parallel runner ([#2100](https://github.com/wheels-dev/wheels/pull/2100)). Write one browser test ([#2113](https://github.com/wheels-dev/wheels/pull/2113)) for your critical-path flow — login, do the main thing, log out.
+
+Before pushing 4.0 to production: set `allowOrigins` explicitly on every CORS middleware, set a non-empty CSRF encryption key, set a non-empty `reloadPassword`, configure RateLimiter `trustProxy` and proxy strategy intentionally if you are behind a proxy or load balancer, confirm HSTS settings match your subdomain topology, and decide explicitly whether the Legacy Compatibility Adapter is on and document why.
+
+Here is what a migrated spec looks like in 4.0:
+
+```cfm
+// tests/specs/models/UserSpec.cfc
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("User", () => {
+            it("validates email", () => {
+                expect(model("User").new(email="bad").valid()).toBeFalse();
+            });
+        });
+    }
+}
+```
+
+One extends change, one BDD block, one `expect` instead of `assert`. The old RocketUnit specs sitting next to it keep running until you come back for them.
+
+## The shape of the release
+
+For context as you plan timeline: 4.0 is roughly 260 pull requests over fifteen weeks, with more than forty dedicated to security hardening. Contributors include @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta, and Dependabot. Six of the PRs above are the breakers (plus one Lucee 7 scope change); the rest is additive.
+
+## Where to go next
+
+- [Upgrading to 4.0](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/) — the authoritative guide with every breaker, every default flip, and every adapter flag documented in one place.
+- [Middleware](https://guides.wheels.dev/v4-0-0/core-concepts/middleware-pipeline/), [route model binding](https://guides.wheels.dev/v4-0-0/core-concepts/how-routing-works/), [query builder](https://guides.wheels.dev/v4-0-0/basics/query-builder-and-scopes/) — the three adoptions that pay off fastest.
+- [Packages](https://guides.wheels.dev/v4-0-0/digging-deeper/packages/) — the replacement for the legacy `plugins/` folder.
+- [Wheels vs other frameworks](https://github.com/wheels-dev/wheels/blob/develop/docs/wheels-vs-frameworks.md) — context for what 4.0 now offers compared to Rails, Laravel, and the rest.
+
+Most upgrades take an afternoon, not a sprint. If yours takes longer, open an issue on [wheels-dev/wheels](https://github.com/wheels-dev/wheels/issues) with the `upgrade` label — 4.0 is the first release in a long time with real breaks, and the team wants to hear where the map does not match the terrain.
+

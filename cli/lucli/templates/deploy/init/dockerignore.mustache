@@ -1,0 +1,40 @@
+# Keep the build context lean. Anything matched here is invisible to
+# COPY . . in the Dockerfile — fewer bytes shipped, faster builds.
+
+# VCS / CI
+.git
+.gitignore
+.github
+
+# Secrets — never bake them into an image. Pass at runtime instead.
+.env
+.env.*
+.kamal/secrets
+.kamal/secrets.*
+
+# Local-only artifacts
+node_modules
+.CommandBox
+logs
+tmp
+*.log
+
+# Test suites — production doesn't need them.
+tests
+vendor/wheels/tests
+
+# Build / docs / IDE noise
+public/assets/*.map
+README.md
+docs
+.ai
+.claude
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Don't ship the Dockerfiles themselves.
+Dockerfile
+docker-compose*.yml
+.dockerignore

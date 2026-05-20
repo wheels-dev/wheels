@@ -220,8 +220,8 @@ component extends="modules.BaseModule" {
 		help &= "  stats               Project statistics (lines of code, model counts, etc.)" & nl;
 		help &= "  notes               Find TODO / FIXME / HACK / OPTIMIZE comments" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
-		help &= "  packages            Install, update, search Wheels packages" & nl;
-		help &= "  upgrade             Upgrade the Wheels framework version in your project" & nl;
+		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
+		help &= "  upgrade             Scan for breaking changes before upgrading Wheels (read-only)" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
@@ -635,6 +635,14 @@ component extends="modules.BaseModule" {
 		// start, below) covers the case where express was extracted by this
 		// very LuCLI invocation.
 		$ensureWheelsBundles();
+
+		// Drop a working rewrite.config at the project root if the project
+		// doesn't already ship one. LuCLI's bundled default uses a narrow
+		// allow-list and negated RewriteCond chains that 404 static assets
+		// for 3.x-conventional dirs (/miscellaneous/, /javascripts/, etc.);
+		// providing a project override sidesteps it. New apps get this file
+		// via `wheels new`; this catches 3.x → 4.0 upgrade paths. See GH #2626.
+		$ensureProjectRewriteConfig();
 
 		// Delegate to LuCLI's server start command. Forward only args we
 		// haven't consumed ourselves (--force is wheels-side, not LuCLI-side).
@@ -1729,6 +1737,8 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy config                   - print resolved config as YAML
 	 *   wheels deploy init                     - create config stub
 	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy bootstrap                - install Docker on every host
+	 *   wheels deploy exec "uname -a"          - run a command on every host
 	 *   wheels deploy version                  - show version pinning
 	 */
 	public string function deploy() {
@@ -1742,7 +1752,7 @@ component extends="modules.BaseModule" {
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
 
 		var dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
-			new modules.wheels.services.deploy.lib.SshPool()
+			$deployBuildSshPool(opts.configPath)
 		);
 
 		switch (sub) {
@@ -1780,7 +1790,7 @@ component extends="modules.BaseModule" {
 				}
 				var appVerb = positional[2];
 				var appCli = new modules.wheels.services.deploy.cli.DeployAppCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (appVerb) {
 					case "boot":
@@ -1803,7 +1813,7 @@ component extends="modules.BaseModule" {
 				}
 				var proxyVerb = positional[2];
 				var proxyCli = new modules.wheels.services.deploy.cli.DeployProxyCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (proxyVerb) {
 					case "boot":
@@ -1824,7 +1834,7 @@ component extends="modules.BaseModule" {
 				}
 				var registryVerb = positional[2];
 				var registryCli = new modules.wheels.services.deploy.cli.DeployRegistryCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (registryVerb) {
 					case "setup":
@@ -1841,7 +1851,7 @@ component extends="modules.BaseModule" {
 				}
 				var buildVerb = positional[2];
 				var buildCli = new modules.wheels.services.deploy.cli.DeployBuildCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (buildVerb) {
 					case "deliver":
@@ -1862,7 +1872,7 @@ component extends="modules.BaseModule" {
 				var accVerb = positional[2];
 				opts.name = arrayLen(positional) >= 3 ? positional[3] : "";
 				var accCli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (accVerb) {
 					case "boot":
@@ -1886,9 +1896,36 @@ component extends="modules.BaseModule" {
 					throw(message="Unknown wheels deploy prune verb: " & pruneVerb);
 				}
 				var pruneCli = new modules.wheels.services.deploy.cli.DeployPruneCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return invoke(pruneCli, pruneVerb, [opts]);
+			// `bootstrap` and `exec` are top-level aliases for `server bootstrap`
+			// and `server exec`. LuCLI's picocli root registers `server` as a
+			// top-level subcommand for Lucee instance management, so the nested
+			// `wheels deploy server <verb>` form gets shortcut into LuCLI's
+			// own server help before module dispatch — see #2677. These flat
+			// aliases sidestep the collision entirely. The original `server`
+			// branch below is retained for Kamal parity and direct callers
+			// (MCP, internal tests) that don't go through LuCLI's picocli root.
+			case "bootstrap":
+				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
+					new modules.wheels.services.deploy.lib.SshPool()
+				);
+				return bootstrapCli.bootstrap(opts);
+			case "exec":
+				if (arrayLen(positional) < 2) {
+					throw(message="wheels deploy exec requires a command");
+				}
+				// Preserve multi-token commands: join all positional args after `exec`.
+				var execCmdParts = [];
+				for (var ei = 2; ei <= arrayLen(positional); ei++) {
+					arrayAppend(execCmdParts, positional[ei]);
+				}
+				opts.cmd = arrayToList(execCmdParts, " ");
+				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
+					new modules.wheels.services.deploy.lib.SshPool()
+				);
+				return execCli.exec(opts);
 			case "server":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy server requires a verb (exec or bootstrap)");
@@ -1906,7 +1943,7 @@ component extends="modules.BaseModule" {
 					opts.cmd = arrayToList(cmdParts, " ");
 				}
 				var serverCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				switch (serverVerb) {
 					case "exec":
@@ -1923,9 +1960,32 @@ component extends="modules.BaseModule" {
 					throw(message="Unknown wheels deploy lock verb: " & lockVerb);
 				}
 				var lockCli = new modules.wheels.services.deploy.cli.DeployLockCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return invoke(lockCli, lockVerb, [opts]);
+			// `fetch-secrets`, `extract-secrets`, and `print-secrets` are
+			// top-level aliases for `secrets fetch`/`extract`/`print`. LuCLI's
+			// picocli root registers `secrets` as a top-level subcommand for
+			// the local secrets store (init/set/list/rm/get/provider), so the
+			// nested `wheels deploy secrets <verb>` form gets shortcut into
+			// LuCLI's own secrets help before module dispatch — see #2697.
+			// These flat aliases sidestep the collision entirely, mirroring
+			// the `bootstrap`/`exec` pattern from #2677. The original
+			// `secrets` branch below is retained for Kamal parity and direct
+			// callers (MCP, internal tests) that don't go through LuCLI's
+			// picocli root.
+			case "fetch-secrets":
+				opts.keys = [];
+				for (var fsi = 2; fsi <= arrayLen(positional); fsi++) arrayAppend(opts.keys, positional[fsi]);
+				var fetchSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
+				return fetchSecretsCli.fetch(opts);
+			case "extract-secrets":
+				opts.key = arrayLen(positional) >= 2 ? positional[2] : "";
+				var extractSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
+				return extractSecretsCli.extract(opts);
+			case "print-secrets":
+				var printSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
+				return printSecretsCli.print(opts);
 			case "secrets":
 				if (arrayLen(positional) < 2) {
 					throw(message="wheels deploy secrets requires a verb (fetch/extract/print)");
@@ -1948,87 +2008,22 @@ component extends="modules.BaseModule" {
 		}
 	}
 
+	/**
+	 * Build an SshPool seeded from the deploy.yml at `configPath`.
+	 * Delegates to `SshPoolFactory.fromConfigPath` — see that CFC for the
+	 * load, fallback, and tilde-expansion semantics.
+	 */
+	private any function $deployBuildSshPool(string configPath = "") {
+		return new modules.wheels.services.deploy.lib.SshPoolFactory()
+			.fromConfigPath(arguments.configPath);
+	}
+
 	private struct function $deployArgsToOptions(required array args) {
-		var opts = {};
-		var n = arrayLen(arguments.args);
-		var i = 1;
-		while (i <= n) {
-			var a = arguments.args[i];
-			if (a == "--dry-run") {
-				opts.dryRun = true;
-			} else if (left(a, 14) == "--destination=") {
-				opts.destination = mid(a, 15, 99999);
-			} else if (a == "--destination" && i < n) {
-				opts.destination = arguments.args[i+1];
-				i++;
-			} else if (left(a, 10) == "--version=") {
-				opts.version = mid(a, 11, 99999);
-			} else if (a == "--version" && i < n) {
-				opts.version = arguments.args[i+1];
-				i++;
-			} else if (left(a, 13) == "--configPath=") {
-				opts.configPath = mid(a, 14, 99999);
-			} else if (a == "--configPath" && i < n) {
-				opts.configPath = arguments.args[i+1];
-				i++;
-			} else if (a == "--force") {
-				opts.force = true;
-			} else if (left(a, 10) == "--service=") {
-				opts.service = mid(a, 11, 99999);
-			} else if (a == "--service" && i < n) {
-				opts.service = arguments.args[i+1];
-				i++;
-			} else if (left(a, 8) == "--image=") {
-				opts.image = mid(a, 9, 99999);
-			} else if (a == "--image" && i < n) {
-				opts.image = arguments.args[i+1];
-				i++;
-			} else if (left(a, 20) == "--registry-username=") {
-				opts.registryUsername = mid(a, 21, 99999);
-			} else if (a == "--registry-username" && i < n) {
-				opts.registryUsername = arguments.args[i+1];
-				i++;
-			} else if (left(a, 7) == "--host=") {
-				opts.host = mid(a, 8, 99999);
-			} else if (a == "--host" && i < n) {
-				opts.host = arguments.args[i+1];
-				i++;
-			} else if (left(a, 7) == "--keep=") {
-				opts.keep = mid(a, 8, 99999);
-			} else if (a == "--keep" && i < n) {
-				opts.keep = arguments.args[i+1];
-				i++;
-			} else if (left(a, 10) == "--message=") {
-				opts.message = mid(a, 11, 99999);
-			} else if (a == "--message" && i < n) {
-				opts.message = arguments.args[i+1];
-				i++;
-			} else if (left(a, 10) == "--adapter=") {
-				opts.adapter = mid(a, 11, 99999);
-			} else if (a == "--adapter" && i < n) {
-				opts.adapter = arguments.args[i+1];
-				i++;
-			} else if (left(a, 10) == "--account=") {
-				opts.account = mid(a, 11, 99999);
-			} else if (a == "--account" && i < n) {
-				opts.account = arguments.args[i+1];
-				i++;
-			} else if (left(a, 7) == "--from=") {
-				opts.from = mid(a, 8, 99999);
-			} else if (a == "--from" && i < n) {
-				opts.from = arguments.args[i+1];
-				i++;
-			} else if (a == "--confirm") {
-				opts.confirm = true;
-			} else if (left(a, 7) == "--tail=") {
-				opts.tail = mid(a, 8, 99999);
-			} else if (a == "--tail" && i < n) {
-				opts.tail = arguments.args[i+1];
-				i++;
-			}
-			i++;
-		}
-		return opts;
+		// Delegates to a standalone parser CFC so the logic can be unit-tested
+		// without instantiating Module.cfc (which requires the modules.BaseModule
+		// mapping that only exists inside the LuCLI runtime). See issue #2674
+		// and cli/lucli/services/deploy/cli/DeployArgsParser.cfc.
+		return new modules.wheels.services.deploy.cli.DeployArgsParser().parse(arguments.args);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2060,6 +2055,21 @@ component extends="modules.BaseModule" {
 		var opts = $packagesArgsToOptions(args);
 		var positional = $packagesStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
+
+		// `--help` / `-h` short-circuits to a deterministic help string the
+		// module owns directly. LuCLI's auto-introspected help previously
+		// drifted from the real CLI surface — advertising the dead `install`
+		// verb that LuCLI itself intercepts (#2713). Owning the text here
+		// guarantees `wheels packages help`, `wheels packages --help`, and
+		// `wheels packages -h` all reach $packagesHelp().
+		//
+		// Note: `-h` is consumed by $packagesArgsToOptions (sets opts.help =
+		// true) and stripped from positionals by $packagesStripFlags before
+		// `sub` is read, so it arrives here as opts.help — never as a
+		// positional. No `sub == "-h"` clause is needed.
+		if ((opts.help ?: false) || sub == "help") {
+			return $packagesHelp();
+		}
 
 		switch (sub) {
 			case "list":
@@ -2126,6 +2136,43 @@ component extends="modules.BaseModule" {
 		}
 	}
 
+	// Hand-written help for `wheels packages`. Owned by the module rather than
+	// auto-derived from picocli introspection because the auto-help drifted
+	// from the real CLI surface (#2713 — advertised `install <name> [--force]`
+	// even though LuCLI's built-in extension installer intercepts the literal
+	// `install` verb before dispatch reaches this module). Same trap that hit
+	// `wheels browser install` (renamed to `setup` in #2345).
+	private string function $packagesHelp() {
+		var nl = chr(10);
+		var help = "Usage: wheels packages <subcommand> [options]" & nl;
+		help &= "  Install, update, search, and list Wheels packages from the wheels-packages registry." & nl & nl;
+		help &= "Subcommands:" & nl;
+		help &= "  list [--tag=<tag>]                      List packages (optionally filtered by tag)" & nl;
+		help &= "  search <query>                          Search package names, descriptions, and tags" & nl;
+		help &= "  show <name>                             Show package details and compatible versions" & nl;
+		help &= "  add <name>[@<version>] [--force]        Install a package into vendor/<name>/ (canonical)" & nl;
+		help &= "  update <name> --yes                     Update an installed package" & nl;
+		help &= "  update --all --yes                      Update every installed package" & nl;
+		help &= "  remove <name>                           Delete an installed package from vendor/" & nl;
+		help &= "  registry refresh                        Bust the 24-hour registry cache" & nl;
+		help &= "  registry info                           Show the registry URL and cache state" & nl;
+		help &= "  help, --help, -h                        Show this help" & nl & nl;
+		help &= "Note: the install verb is `add`, NOT `install`." & nl;
+		help &= "  Typing `wheels packages install <name>` is intercepted by LuCLI's built-in" & nl;
+		help &= "  extension installer before dispatch reaches this module, and prints" & nl;
+		help &= "  '[INFO] No git or extension dependencies to install' without installing" & nl;
+		help &= "  anything. Use `wheels packages add <name>` instead. Same trap that bit" & nl;
+		help &= "  `wheels browser install` (renamed to `wheels browser setup` in ##2345)." & nl & nl;
+		help &= "Examples:" & nl;
+		help &= "  wheels packages list" & nl;
+		help &= "  wheels packages search ui" & nl;
+		help &= "  wheels packages add wheels-basecoat" & nl;
+		help &= "  wheels packages add wheels-basecoat@1.0.1" & nl;
+		help &= "  wheels packages update --all --yes" & nl;
+		help &= "  wheels packages remove wheels-basecoat" & nl;
+		return help;
+	}
+
 	private struct function $packagesArgsToOptions(required array args) {
 		var opts = {};
 		var n = arrayLen(arguments.args);
@@ -2138,6 +2185,8 @@ component extends="modules.BaseModule" {
 				opts.yes = true;
 			} else if (a == "--force") {
 				opts.force = true;
+			} else if (a == "--help" || a == "-h") {
+				opts.help = true;
 			} else if (left(a, 6) == "--tag=") {
 				opts.tag = mid(a, 7, 99999);
 			} else if (a == "--tag" && i < n) {
@@ -2156,10 +2205,14 @@ component extends="modules.BaseModule" {
 		while (i <= n) {
 			var a = arguments.args[i];
 			if (left(a, 2) == "--") {
-				var booleans = "--all,--yes,--force";
+				var booleans = "--all,--yes,--force,--help";
 				if (!find("=", a) && !listFindNoCase(booleans, a) && i < n && left(arguments.args[i+1], 2) != "--") {
 					i++;
 				}
+				i++;
+				continue;
+			}
+			if (a == "-h") {
 				i++;
 				continue;
 			}
@@ -2352,17 +2405,57 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Check for breaking changes before upgrading Wheels
+	 * hint: Scan your app for breaking changes before upgrading Wheels (read-only)
+	 *
+	 * This command does NOT perform the upgrade. It only scans the current app
+	 * for code paths that will break against a target framework version. The
+	 * actual framework swap is performed by your package manager
+	 * (`brew upgrade wheels`, `scoop update wheels`, or the equivalent).
+	 *
+	 * Despite occasional appearances in older help output, `--dry-run` is not
+	 * supported — the command is already read-only by design.
+	 *
+	 * Examples:
+	 *   wheels upgrade check                 - scan against the latest stable release
+	 *   wheels upgrade check --to=4.0.0      - scan against a specific target version
 	 */
 	public string function upgrade() {
 		var args = getArgs(arguments);
 
 		if (!arrayLen(args) || lCase(args[1]) != "check") {
-			out("Usage: wheels upgrade check [--to=<version>]", "yellow");
-			out("");
-			out("Scans your app for breaking changes between versions.");
-			out("Does not perform the upgrade — use 'brew upgrade wheels' for that.");
-			return "";
+			var nl = chr(10);
+			var help = "Usage: wheels upgrade check [--to=<version>]" & nl
+				& nl
+				& "Scans your app for breaking changes between Wheels versions." & nl
+				& "This command is read-only — it does not modify vendor/wheels/." & nl
+				& nl
+				& "Options:" & nl
+				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
+				& nl
+				& "Unsupported flags:" & nl
+				& "  --dry-run is not supported — the command is already read-only," & nl
+				& "                              so there is no dry-run mode to opt into." & nl
+				& nl
+				& "To actually install a new Wheels version, run:" & nl
+				& "  brew upgrade wheels       (macOS / Homebrew)" & nl
+				& "  scoop update wheels       (Windows / Scoop)" & nl;
+
+			// Detect the two common misfires from the legacy help text and
+			// nudge the user toward the right invocation explicitly.
+			var sawDryRun = false;
+			var sawTo = false;
+			for (var a in args) {
+				if (a == "--dry-run") sawDryRun = true;
+				else if (reFindNoCase("^--to(=|$)", a)) sawTo = true;
+			}
+			if (sawDryRun || sawTo) {
+				help &= nl & "Did you mean: wheels upgrade check"
+					& (sawTo ? " --to=<version>" : "")
+					& " ?" & nl;
+			}
+
+			out(help, "yellow");
+			return help;
 		}
 
 		var targetVersion = "";
@@ -3612,6 +3705,101 @@ component extends="modules.BaseModule" {
 				extensions: "cfc,cfm",
 				fix: "Use service() or inject() from the DI container instead"
 			});
+			// CORS default flip — wildcard "*" → deny-all (#2039). A bare
+			// `new wheels.middleware.Cors()` accepts no requests in 4.0.
+			arrayAppend(checks, {
+				description: "CORS middleware without allowOrigins (deny-all default in 4.0)",
+				pattern: "new\s+wheels\.middleware\.Cors\s*\(\s*\)",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: 'Pass allowOrigins explicitly: new wheels.middleware.Cors(allowOrigins="https://myapp.com")'
+			});
+			// RateLimiter hardened defaults (#2024 trustProxy=false, #2088
+			// proxyStrategy="last"). Advisory only: the scan flags every
+			// RateLimiter invocation regardless of current config, because
+			// multi-line argument parsing is out of scope. Users whose
+			// config already sets both flags should treat the hit as a
+			// reminder to re-verify, not a false positive.
+			arrayAppend(checks, {
+				description: "RateLimiter middleware — defaults changed in 4.0 (advisory: review config)",
+				pattern: "new\s+wheels\.middleware\.RateLimiter",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: 'Advisory check — fires on every RateLimiter usage regardless of current config. 4.0 defaults: trustProxy=false, proxyStrategy="last". If your app sits behind a proxy or load balancer, confirm both flags are set explicitly.'
+			});
+			// allowEnvironmentSwitchViaUrl defaults to false in production
+			// (#2076). Explicit `true` is now a security concern.
+			arrayAppend(checks, {
+				description: "allowEnvironmentSwitchViaUrl=true (default flipped to false in production)",
+				pattern: "allowEnvironmentSwitchViaUrl\s*=\s*true",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: "Re-enable only for controlled staging environments. The 4.0 default rejects ?environment=... in production."
+			});
+			// CSRF key auto-generates when empty (#2054) but cookies rotate
+			// on every deploy when that happens. Warn if config/ never sets
+			// csrfEncryptionKey.
+			arrayAppend(checks, {
+				description: "Missing csrfEncryptionKey (CSRF cookies rotate on every deploy)",
+				pattern: "csrfEncryptionKey",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				absent: true,
+				fix: 'Set a stable key: set(csrfEncryptionKey = env("WHEELS_CSRF_KEY")).'
+			});
+			// `wheels snippets` → `wheels generate snippets` rename (#1852).
+			// Scan build / CI scripts; the CLI command is invoked from
+			// outside the app's own .cfm/.cfc files.
+			arrayAppend(checks, {
+				description: "Legacy 'wheels snippets' invocation (renamed to 'wheels generate snippets')",
+				pattern: "\bwheels\s+snippets\b",
+				checkType: "grep",
+				scanTargets: [
+					{path: "Makefile"},
+					{path: "package.json"},
+					{path: ".github/workflows", extensions: "yml,yaml", recurse: true},
+					{path: ".", extensions: "sh", recurse: false}
+				],
+				fix: "Rename to 'wheels generate snippets' in scripts, CI jobs, and IDE integrations."
+			});
+			// tests/specs/functions/ → tests/specs/functional/ rename (#1872).
+			// `pattern` is intentionally empty — `checkType: "directory"` signals on
+			// path existence and never reaches the grep loop. Do NOT replace this
+			// with a benign regex: `reFindNoCase("", anyString)` matches every line,
+			// so a future refactor that unifies the directory and grep branches
+			// would silently false-positive on every scanned file otherwise.
+			arrayAppend(checks, {
+				description: "Legacy tests/specs/functions/ directory (renamed to functional/)",
+				pattern: "",
+				checkType: "directory",
+				path: "tests/specs/functions",
+				fix: "Rename to tests/specs/functional/. No code changes required."
+			});
+			// Vite manifest strictness — viteStrictManifest defaults to true
+			// in 4.0 (#2133). Missing manifest entries now throw in
+			// production; flag any view that references the helpers so the
+			// user knows the default has flipped.
+			arrayAppend(checks, {
+				description: "Vite asset helpers (viteStrictManifest defaults to true in 4.0)",
+				pattern: "viteScriptTag|viteStyleTag|vitePreloadTag",
+				checkType: "grep",
+				scanDir: "app/views",
+				extensions: "cfm,cfc",
+				fix: "Missing manifest entries throw Wheels.ViteAssetNotFound in production. Rebuild assets during deploy (npm run build) or set(viteStrictManifest=false) to restore 3.x silent fallback."
+			});
+			// paginationLinks() deprecation grep (#2714, replacement: paginationNav() per #1930).
+			arrayAppend(checks, {
+				description: "Deprecated paginationLinks() helper (renamed to paginationNav() in 4.0)",
+				pattern: "paginationLinks\s*\(",
+				checkType: "grep",
+				scanDir: "app/views",
+				extensions: "cfm,cfc",
+				fix: "Replace paginationLinks() with paginationNav() (the all-in-one nav helper) or compose firstPageLink/previousPageLink/pageNumberLinks/nextPageLink/lastPageLink directly. See https://github.com/wheels-dev/wheels/issues/1930."
+			});
 		}
 
 		// Run checks
@@ -3632,29 +3820,79 @@ component extends="modules.BaseModule" {
 					arrayAppend(passed, check.description);
 				}
 			} else if (check.checkType == "grep") {
-				var scanPath = variables.projectRoot & "/" & check.scanDir;
-				if (!directoryExists(scanPath)) {
-					arrayAppend(passed, check.description);
-					continue;
+				// Build the file set to scan. Checks may use `scanDir` +
+				// `extensions` (recursive scan of one directory) and/or
+				// `scanTargets` (mixed list of file paths and directory
+				// roots — needed by the `wheels snippets` rename check that
+				// has to look at Makefile, package.json, .github/workflows/,
+				// and top-level *.sh files in one shot).
+				var filesToScan = [];
+
+				if (structKeyExists(check, "scanDir") && len(check.scanDir)) {
+					var scanPath = variables.projectRoot & "/" & check.scanDir;
+					if (directoryExists(scanPath)) {
+						for (var ext in listToArray(check.extensions)) {
+							var dirFiles = directoryList(scanPath, true, "path", "*." & ext);
+							for (var f in dirFiles) arrayAppend(filesToScan, f);
+						}
+					}
 				}
-				var matches = [];
-				for (var ext in listToArray(check.extensions)) {
-					var files = directoryList(scanPath, true, "path", "*." & ext);
-					for (var filePath in files) {
-						var content = fileRead(filePath);
-						var lines = listToArray(content, chr(10), true);
-						for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
-							if (reFindNoCase(check.pattern, lines[lineNum])) {
-								var relPath = replace(filePath, variables.projectRoot & "/", "");
-								arrayAppend(matches, "#relPath#:#lineNum#");
+
+				if (structKeyExists(check, "scanTargets") && isArray(check.scanTargets)) {
+					for (var target in check.scanTargets) {
+						var targetPath = variables.projectRoot & "/" & target.path;
+						if (fileExists(targetPath)) {
+							arrayAppend(filesToScan, targetPath);
+						} else if (directoryExists(targetPath)) {
+							var recurse = structKeyExists(target, "recurse") ? target.recurse : true;
+							// Avoid Elvis `?:` on `check.extensions` — Adobe CF
+							// throws when the key is absent. The `wheels snippets`
+							// check has no top-level `extensions`, so this branch
+							// is reached on every Adobe CF run when a target is a
+							// directory without its own `extensions` key.
+							var exts = structKeyExists(target, "extensions") ? target.extensions
+								: (structKeyExists(check, "extensions") ? check.extensions : "");
+							for (var ext in listToArray(exts)) {
+								var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
+								for (var f in dirFiles2) arrayAppend(filesToScan, f);
 							}
 						}
 					}
 				}
-				if (arrayLen(matches)) {
-					arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
+
+				var matches = [];
+				for (var filePath in filesToScan) {
+					var content = fileRead(filePath);
+					var lines = listToArray(content, chr(10), true);
+					for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+						if (reFindNoCase(check.pattern, lines[lineNum])) {
+							var relPath = replace(filePath, variables.projectRoot & "/", "");
+							arrayAppend(matches, "#relPath#:#lineNum#");
+						}
+					}
+				}
+
+				// `absent: true` inverts the check — warn when the pattern
+				// is NOT found anywhere in the scanned set. Used for "you
+				// should be setting csrfEncryptionKey somewhere" style
+				// checks. If nothing was scannable (e.g. config/ missing),
+				// treat as pass to avoid noisy false positives.
+				var isAbsent = structKeyExists(check, "absent") && check.absent;
+				if (isAbsent) {
+					if (!arrayLen(filesToScan) || arrayLen(matches)) {
+						arrayAppend(passed, check.description);
+					} else {
+						var hint = structKeyExists(check, "scanDir") && len(check.scanDir)
+							? check.scanDir & "/ (no occurrences found)"
+							: "(no occurrences found)";
+						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [hint]});
+					}
 				} else {
-					arrayAppend(passed, check.description);
+					if (arrayLen(matches)) {
+						arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
+					} else {
+						arrayAppend(passed, check.description);
+					}
 				}
 			}
 		}
@@ -4115,14 +4353,15 @@ component extends="modules.BaseModule" {
 			);
 		}
 
-		// Template variable context — all config values flow through here
+		// datasourcesBlock: SQLite pair by default; "{}" when --no-sqlite (#2621)
 		var context = {
 			"appName": appName,
 			"datasourceName": opts.datasource,
 			"reloadPassword": opts.reloadPassword,
 			"port": opts.port,
 			"shutdownPort": opts.port + 1,
-			"openBrowser": opts.openBrowser ? "true" : "false"
+			"openBrowser": opts.openBrowser ? "true" : "false",
+			"datasourcesBlock": opts.noSQLite ? "{}" : buildSQLiteDatasourcesBlock(opts.datasource)
 		};
 
 		// Copy template directory tree to target, processing placeholders.
@@ -4309,6 +4548,33 @@ component extends="modules.BaseModule" {
 		}
 	}
 
+	private string function buildSQLiteDatasourcesBlock(required string datasourceName) {
+		var nl = chr(10);
+		var pad = "      ";
+		var inner = "        ";
+		var block = "{" & nl;
+		block &= pad & '"#datasourceName#": {' & nl;
+		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
+		block &= inner & '"database": "#datasourceName#",' & nl;
+		block &= inner & '"dbdriver": "Other",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/development.sqlite",' & nl;
+		block &= inner & '"host": "",' & nl;
+		block &= inner & '"password": "",' & nl;
+		block &= inner & '"username": ""' & nl;
+		block &= pad & "}," & nl;
+		block &= pad & '"#datasourceName#_test": {' & nl;
+		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
+		block &= inner & '"database": "#datasourceName#_test",' & nl;
+		block &= inner & '"dbdriver": "Other",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/test.sqlite",' & nl;
+		block &= inner & '"host": "",' & nl;
+		block &= inner & '"password": "",' & nl;
+		block &= inner & '"username": ""' & nl;
+		block &= pad & "}" & nl;
+		block &= "    }";
+		return block;
+	}
+
 	/**
 	 * Resolve the Wheels framework source or fail fast. Prints a diagnostic
 	 * listing every path tried plus a WHEELS_FRAMEWORK_PATH hint, then throws
@@ -4450,6 +4716,35 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			// Stay out of the way — let LuCLI's server start surface the real
 			// error if the bundle was actually needed and we couldn't stage.
+		}
+	}
+
+	/**
+	 * Drop the working rewrite.config template into the project root if the
+	 * project doesn't already ship one. Delegates to RewriteConfigInstaller
+	 * so the behavior can be unit-tested in isolation.
+	 *
+	 * Background: LuCLI's bundled-default rewrite.config 404s static assets
+	 * for 3.x-conventional directory names like `/miscellaneous/`,
+	 * `/javascripts/`, `/stylesheets/`, `/files/`. `wheels new` already
+	 * drops the working template; this closes the 3.x → 4.0 upgrade-path
+	 * gap. See GH #2626.
+	 *
+	 * Idempotent and best-effort: a project rewrite.config already in place
+	 * is left untouched, and any IO failure is swallowed silently so a
+	 * permissions hiccup doesn't block `wheels start`.
+	 */
+	private void function $ensureProjectRewriteConfig() {
+		try {
+			var installer = new services.RewriteConfigInstaller();
+			var template = variables.moduleRoot & "templates/app/rewrite.config";
+			installer.install(
+				projectRoot = variables.projectRoot,
+				sourceTemplate = template
+			);
+		} catch (any e) {
+			// Don't block `wheels start` on a rewrite.config provisioning
+			// hiccup — the user can always drop their own override later.
 		}
 	}
 

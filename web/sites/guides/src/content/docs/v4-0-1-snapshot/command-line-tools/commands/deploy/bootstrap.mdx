@@ -1,0 +1,41 @@
+---
+title: "wheels deploy bootstrap"
+description: Install Docker on every deploy host. Flat alias for `wheels deploy server bootstrap`.
+type: reference
+sidebar:
+  label: "bootstrap"
+  order: 71
+---
+
+Install Docker on every host. Idempotent — re-runs on already-installed hosts are no-ops.
+
+This is the **canonical CLI form** for the bootstrap operation. The Kamal-style nested `wheels deploy server bootstrap` is also accepted by the deploy dispatcher, but the CLI runtime registers `server` as a top-level command (for Lucee server lifecycle) and intercepts the three-token form before deploy can see it. The flat alias sidesteps the collision — see [issue #2677](https://github.com/wheels-dev/wheels/issues/2677).
+
+## Synopsis
+
+```txt title="synopsis"
+wheels deploy bootstrap [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Per host:
+
+```sh title="per-host behavior"
+which docker >/dev/null 2>&1 || curl -fsSL https://get.docker.com | sh
+```
+
+The convenience script runs as root (or via `sudo`). For production hardening, install Docker through your usual config management instead — this is a fast-start verb, not a production setup.
+
+## Example
+
+```bash title="example"
+wheels deploy bootstrap
+```

@@ -1,0 +1,314 @@
+---
+title: Associations
+description: Modeling relationships — hasMany, belongsTo, hasOne, nested creation, eager loading, and cascade deletes.
+type: howto
+sidebar:
+  order: 7
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Associations are how models reach each other. You declare the relationship once in `config()` and Wheels generates the dynamic methods — `post.comments()`, `comment.post()`, `post.createComment(...)` — that let you navigate it. This page walks the three kinds, the options that shape their behavior, and the patterns you'll reach for daily: eager loading, nested creation, and cascading deletes.
+
+**You'll learn:**
+
+- The three association kinds — `hasMany`, `belongsTo`, `hasOne` — and which foreign key each expects
+- The dynamic methods Wheels generates for each side of a relationship
+- How to cascade deletes with `dependent`
+- How to override model name and foreign key when convention doesn't match your schema
+- How to avoid N+1 queries with `include`
+
+<Aside type="note">
+  You should already know how to define a model. See [Models and the ORM](/v4-0-1-snapshot/basics/models-and-the-orm/).
+</Aside>
+
+## The three kinds
+
+Every relationship in Wheels is one of three declarations. You always declare both sides — the parent model names the child side with `hasMany` or `hasOne`, and the child model names the parent side with `belongsTo`. The foreign key always lives on the child table.
+
+| Association | Means | Foreign key lives on |
+|-------------|-------|----------------------|
+| `hasMany(name="comments")` | "I own many" | Child table (`comments.postId`) |
+| `belongsTo(name="post")` | "I reference one" | This table (`this.postId`) |
+| `hasOne(name="profile")` | "I own exactly one" | Child table (`profiles.userId`) |
+
+The pair `Post hasMany(name="comments")` + `Comment belongsTo(name="post")` is the most common shape in any Wheels app. You'll see it in the tutorial, and you'll write it dozens of times in your own code.
+
+<Aside type="caution">
+  Associations follow the same argument rule as every other `config()` call: either all positional or all named. `hasMany("comments", dependent="delete")` is **invalid** — it mixes styles. Write `hasMany(name="comments", dependent="delete")` instead. See [Models and the ORM](/v4-0-1-snapshot/basics/models-and-the-orm/) for why.
+</Aside>
+
+## hasMany + belongsTo (the most common pair)
+
+Declare the parent side on `Post.cfc`. The `name` argument names the association — it becomes the method name on every Post instance. `dependent="delete"` tells Wheels to clean up comments when a post is deleted (more on cascade options below).
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="comments", dependent="delete");
+        validatesPresenceOf(properties="title,body");
+    }
+}
+```
+
+Declare the child side on `Comment.cfc`. The `name` argument refers to the parent — `post` — and by convention Wheels looks for a `postId` column on the `comments` table to store the foreign key.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        belongsTo(name="post");
+        validatesPresenceOf(properties="author,body");
+    }
+}
+```
+
+Once the pair is declared, every Post instance carries a cluster of generated methods:
+
+- `post.comments()` — returns a **query** of comments for that post (not an array — loop it with `<cfloop query="...">`)
+- `post.comments(where="approved = 1", order="createdAt DESC")` — same query with extra filters
+- `post.createComment(author="Alice", body="...")` — instantiate, set `postId`, save, return the new Comment
+- `post.newComment(...)` — same but without saving (returns an unsaved instance for further edits)
+- `post.addComment(existingComment)` — link an existing Comment by setting its `postId`
+- `post.removeComment(existingComment)` — unlink or delete, per the `dependent` setting
+- `post.deleteComment(existingComment)` — delete the comment from the database
+- `post.hasComments()` — boolean, true when at least one row exists
+- `post.commentCount()` — integer count, cheaper than `post.comments().recordCount` for a quick check
+- `post.findOneComment(where="...")` — returns a single Comment or `false`
+
+And every Comment instance carries the other side:
+
+- `comment.post()` — the parent Post instance, or `false` if the foreign key doesn't resolve
+- `comment.hasPost()` — boolean
+
+The association methods read like English because they use the association name, not the model name. `post.createComment(...)` reads better than `model("Comment").create(postId=post.id, ...)` — and it means you never have to remember the foreign key column name.
+
+## `dependent` options
+
+`dependent` tells Wheels what to do with child records when the parent is deleted. Only `hasMany` and `hasOne` accept it — `belongsTo` can't cascade upward.
+
+- **`dependent="delete"`** — instantiate each child and call `delete()` on it. This runs the child's `beforeDelete` / `afterDelete` callbacks, so any cleanup logic on the child model (clearing related caches, sending notifications) still fires. Slower when there are many children.
+- **`dependent="deleteAll"`** — issue a single `DELETE FROM children WHERE parentId = ?` statement. Fast, but skips the child's callbacks.
+- **`dependent="remove"`** — instantiate each child and set its foreign key to `NULL`. Child's `beforeUpdate` / `afterUpdate` fire. Use when children can survive without a parent.
+- **`dependent="removeAll"`** — single `UPDATE children SET parentId = NULL WHERE parentId = ?`. Fast, skips callbacks.
+- **Default (not set)** — no cascade. Deleting the parent leaves orphaned child rows whose foreign key points at a row that no longer exists. You almost always want a `dependent` value, even on small associations.
+
+Choose `delete` (or `deleteAll` if the children don't have callbacks) for strict ownership — comments, line items, anything that can't outlive its parent. Choose `remove` or `removeAll` for looser links — employees who survive their department, posts that survive their author, and so on.
+
+## hasOne
+
+`hasOne` is `hasMany`'s one-to-one sibling. The relationship and the foreign key placement are identical — the child still carries the foreign key. The only difference is that the parent's association method returns a single instance (or `false`) instead of a query.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasOne(name="profile", dependent="delete");
+    }
+}
+```
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        belongsTo(name="user");
+    }
+}
+```
+
+The generated methods mirror `hasMany`, scaled to a single record:
+
+- `user.profile()` — returns the Profile instance or `false`
+- `user.hasProfile()` — boolean
+- `user.createProfile(bio="...", location="...")` — create and link
+- `user.newProfile(...)` — unsaved instance
+- `user.setProfile(existingProfile)` — link an existing Profile
+- `user.removeProfile()` — unlink (nullify foreign key)
+- `user.deleteProfile()` — delete the Profile row
+
+Use `hasOne` when the enforcement is "exactly one." A `User` has one `Profile`. An `Order` has one `ShippingAddress`. If the enforcement is fuzzier — "a user has one active subscription at a time, but historically several" — model the collection with `hasMany` and scope the query.
+
+## Foreign-key overrides
+
+Wheels infers the foreign key from the association name. `hasMany(name="comments")` on Post expects `comments.postId`. `belongsTo(name="author")` on Post expects `posts.authorId` (not `posts.userId`, even if Author is a `User` under the hood).
+
+When the column name doesn't match, override it with `foreignKey`:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="comments", foreignKey="blogPostId");
+    }
+}
+```
+
+When the association name doesn't singularize to the model name, combine `foreignKey` with `modelName`:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="authoredBooks", modelName="Book", foreignKey="authorId");
+        hasMany(name="editedBooks", modelName="Book", foreignKey="editorId");
+    }
+}
+```
+
+Now the same User model exposes two associations against the same `books` table, distinguished by foreign key. `user.authoredBooks()` and `user.editedBooks()` return different queries.
+
+`belongsTo` also accepts `modelName` — useful when the parent side is aliased:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        belongsTo(name="author", modelName="User", foreignKey="authorId");
+        belongsTo(name="editor", modelName="User", foreignKey="editorId");
+    }
+}
+```
+
+## Nested creation (create-through)
+
+When you already have a parent instance, use its association method to create children. The foreign key is set for you and the relationship is explicit at the call site.
+
+```cfm {test:compile}
+component extends="Controller" {
+    function create() {
+        post = model("Post").findByKey(params.postKey);
+        comment = post.createComment(params.comment);
+        if (!comment.hasErrors()) {
+            redirectTo(route="post", key=post.id);
+        } else {
+            renderView(action="show");
+        }
+    }
+}
+```
+
+Compare with the non-association form:
+
+```cfm title="Illustrative: non-association form (requires running app)"
+comment = model("Comment").create(
+    postId=params.postKey,
+    author=params.comment.author,
+    body=params.comment.body
+);
+```
+
+The first form is shorter, less error-prone (you can't forget the foreign key), and reads top-to-bottom like the relationship it's modeling. Prefer it whenever you have the parent in hand.
+
+## Eager loading with `include`
+
+The classic N+1 problem: you load a list of posts, then touch each post's comments inside the view. Each touch fires a new query, and the page crawls.
+
+```cfm title="Illustrative: N+1 problem (requires running app)"
+posts = model("Post").findAll();
+// in the view:
+<cfloop query="posts">
+    ##posts.commentCount()##  <!-- one query per post -->
+</cfloop>
+```
+
+`include` fixes this by joining the associated table into the finder's query. One SQL statement loads posts and their comments together.
+
+```cfm {test:compile}
+component extends="Controller" {
+    function index() {
+        posts = model("Post").findAll(
+            include="comments",
+            order="publishedAt DESC"
+        );
+    }
+}
+```
+
+Include multiple associations by comma-separating: `include="comments,author"`. Include nested associations with parentheses: `include="comments(author)"` — load comments for each post and the author for each comment, all in one query.
+
+`include` works with any finder that accepts a `where` clause — `findAll`, `findOne`, `count` — and it combines cleanly with scopes and the query builder. Use it whenever a view iterates an association on each row.
+
+<Aside type="note">
+  `include` builds a SQL `JOIN`. The returned query has all the columns of all the tables, and Wheels prefixes child columns with the association name on access. If you need to filter on the joined table, qualify the column: `where="comments.approved = 1"`.
+</Aside>
+
+## Many-to-many (through a join model)
+
+Wheels handles many-to-many through a real join model plus the `shortcut` argument on `hasMany`. If a User has many Roles via a UserRole join table, model the relationship as three classes:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="userRoles");
+        hasMany(name="userRoles", shortcut="roles");
+    }
+}
+```
+
+The first `hasMany` gives you direct access to the join rows — `user.userRoles()`. The second, with `shortcut="roles"`, generates `user.roles()` that returns the Roles on the far side of the join. Behind the scenes Wheels walks both association chains to build the query.
+
+The join model needs both `belongsTo` declarations:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        belongsTo(name="user");
+        belongsTo(name="role");
+    }
+}
+```
+
+And the Role side mirrors the User side:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="userRoles");
+        hasMany(name="userRoles", shortcut="users");
+    }
+}
+```
+
+The `through` argument is available for rare cases where the association names don't follow singular/plural convention — see the source comments in `vendor/wheels/model/associations.cfc` — but for the common case, `shortcut` alone is enough.
+
+## Polymorphic associations
+
+A polymorphic association lets the same child model belong to more than one parent type. The classic case is `Comment` belonging to either a `Post` or a `Photo` — the `comments` table carries both a `commentableId` foreign key and a `commentableType` string column that names the parent's model.
+
+Declare the child side with `polymorphic=true`:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        belongsTo(name="commentable", polymorphic=true);
+    }
+}
+```
+
+Declare each parent side with `as` naming the polymorphic interface:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="comments", as="commentable", dependent="delete");
+    }
+}
+```
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        hasMany(name="comments", as="commentable", dependent="delete");
+    }
+}
+```
+
+Wheels resolves the parent at runtime by reading `commentableType` on each row. `comment.commentable()` returns a Post or a Photo depending on the row's type column.
+
+<Aside type="caution">
+  One limitation: `findAll(include="commentable")` on the polymorphic side throws `Wheels.PolymorphicIncludeNotSupported`. A single JOIN can't span multiple target tables. Load the comments first, then load each parent type separately if you need eager loading.
+</Aside>
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Models and the ORM" href="/v4-0-1-snapshot/basics/models-and-the-orm/" description="The model surface associations build on — finders, persistence, callbacks." />
+  <LinkCard title="Query Builder and Scopes" href="/v4-0-1-snapshot/basics/query-builder-and-scopes/" description="Composing the where clauses and scopes that filter association queries." />
+  <LinkCard title="Migrations" href="/v4-0-1-snapshot/basics/migrations/" description="Defining the foreign-key columns associations depend on." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-1-snapshot/basics/controllers-and-actions/" description="Where nested creation and eager loading live in a typical request." />
+</CardGrid>

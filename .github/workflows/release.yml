@@ -15,10 +15,20 @@ on:
       FORGEBOX_PASS:
         required: true
       # Optional — when present, the build job's "Dispatch downstream package
-      # managers" step fires repository_dispatch on homebrew/chocolatey-wheels
-      # so their auto-update workflows pick up the new release in ~5min instead
-      # of waiting for the daily cron. When absent, the step warns and exits 0.
+      # managers" step fires repository_dispatch on homebrew-wheels and
+      # scoop-wheels so their auto-update workflows pick up the new release
+      # in ~5min instead of waiting for the daily cron. When absent, the step
+      # warns and exits 0. The chocolatey path was retired in favor of Scoop
+      # for the v4.x Windows install — see scoop-wheels#4.
       DOWNSTREAM_DISPATCH_TOKEN:
+        required: false
+      # Optional — when present, the build job's "Dispatch Linux repo buckets"
+      # step fires repository_dispatch on apt-wheels-dev / yum-wheels-dev so
+      # their metadata regen workflows pick up the new .deb/.rpm and republish
+      # apt.wheels.dev / yum.wheels.dev within minutes. When absent, the step
+      # skips silently — the bucket repos can be populated manually via each
+      # repo's workflow_dispatch backfill in the meantime. See issue #2605.
+      LINUX_REPO_DISPATCH_TOKEN:
         required: false
       # Required when this workflow is invoked from develop (snapshot context) so
       # the snapshot release can be published to wheels-dev/wheels-snapshots
@@ -259,6 +269,19 @@ jobs:
           # for the wheels-cli ForgeBox artifact. See #2326.
           find cli/lucli -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) -exec sed -i.bak "s/@build\.version@/${MODULE_VERSION}/g" {} \;
           find cli/lucli -name "*.bak" -delete
+          # Generate .module-version at build time with the canonical version.
+          # This file is read at runtime by the brew/scoop/.deb/.rpm wrappers
+          # for two purposes:
+          #   (1) `wheels --version` displays its contents verbatim
+          #   (2) The wrappers compare staged-module-version vs installed-version
+          #       to decide whether to re-sync the module on first run
+          # The substitution above only matches *.json *.md *.cfm *.cfc, so
+          # `.module-version` (no extension) was previously sourced from a stale
+          # source-tracked file and embedded into every artifact (snapshot AND
+          # GA). That made every release look like the same snapshot tag and
+          # broke channel-switch sync detection. Generating it here ensures
+          # both behaviors stay correct. See #2758 follow-up.
+          echo "${MODULE_VERSION}" > cli/lucli/.module-version
           tar czf "artifacts/wheels/${MODULE_VERSION}/wheels-module-${MODULE_VERSION}.tar.gz" -C cli/lucli .
           cd cli/lucli && zip -r "../../artifacts/wheels/${MODULE_VERSION}/wheels-module-${MODULE_VERSION}.zip" . && cd ../..
           cd artifacts/wheels/${{ env.WHEELS_VERSION }}
@@ -280,9 +303,16 @@ jobs:
           nfpm --version
 
       - name: Build Linux packages (.deb / .rpm)
+        # CHANNEL derives from the version so develop snapshots produce the
+        # `wheels-be` package (which the Phase 2 bleeding-edge receiver
+        # downloads) instead of `wheels`. Without this, the snapshot release
+        # ships `wheels_<v>_amd64.deb` and the apt-wheels-dev / yum-wheels-dev
+        # receiver workflow 404s on its `wheels-be_<v>_amd64.deb` fetch.
+        # RC builds keep CHANNEL=stable — RCs aren't fanned out to apt/yum
+        # (see release.yml § "Dispatch Linux repo buckets").
         env:
           WHEELS_VERSION: ${{ env.WHEELS_VERSION }}
-          CHANNEL: stable
+          CHANNEL: ${{ contains(env.WHEELS_VERSION, '-snapshot') && 'bleeding-edge' || 'stable' }}
           OUT_DIR: artifacts/wheels/${{ env.WHEELS_VERSION }}
         run: bash tools/distribution-drafts/linux-packages/build-linux-packages.sh
 
@@ -292,8 +322,8 @@ jobs:
           name: build-artifacts-base-template
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.sha512
             artifacts/wheels/wheels-base-template-be.zip
 
       - name: Upload Wheels Core Artifact
@@ -302,8 +332,8 @@ jobs:
           name: build-artifacts-core
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
             artifacts/wheels/wheels-core-be.zip
 
       - name: Upload Wheels CLI Artifact
@@ -312,8 +342,8 @@ jobs:
           name: build-artifacts-cli
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
             artifacts/wheels/wheels-cli-be.zip
       
       - name: Upload Wheels Starter App Artifact
@@ -322,8 +352,8 @@ jobs:
           name: build-artifacts-starter-app
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
             artifacts/wheels/wheels-starter-app-be.zip
 
       - name: Upload Wheels Module Artifact
@@ -403,25 +433,25 @@ jobs:
             overwrite_files: true
             files: |
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.x86_64.rpm
 
       #############################################
       # Create Snapshot Pre-Release (develop only)
@@ -462,36 +492,40 @@ jobs:
             token: ${{ secrets.WHEELS_SNAPSHOTS_TOKEN }}
             files: |
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.tar.gz.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels_*_amd64.deb
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.x86_64.rpm
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_amd64.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.x86_64.rpm
 
       #############################################
       # Dispatch downstream package managers
       #
       # Fires repository_dispatch on wheels-dev/homebrew-wheels and
-      # wheels-dev/chocolatey-wheels so their auto-update workflows pick
-      # up the new release within minutes instead of waiting up to 24h
-      # for their daily cron. Both repos have:
+      # wheels-dev/scoop-wheels so their auto-update workflows pick up
+      # the new release within minutes instead of waiting up to 24h for
+      # their daily cron. Both repos have:
       #   on:
       #     repository_dispatch:
       #       types: [wheels-released]
+      #
+      # Chocolatey was dropped — the v1.x chocolatey-wheels package is
+      # CommandBox-based and can't drive v4. Windows installs go through
+      # Scoop now. See scoop-wheels#4 for the bucket's autoupdate workflow.
       #
       # Requires DOWNSTREAM_DISPATCH_TOKEN — a fine-grained PAT (or app
       # token) with `metadata: read` + `actions: write` on the two
@@ -507,7 +541,7 @@ jobs:
           set -euo pipefail
 
           if [ -z "${GH_DISPATCH_TOKEN:-}" ]; then
-            echo "::warning::DOWNSTREAM_DISPATCH_TOKEN is not set on the repository — homebrew/chocolatey auto-update will fall back to the daily cron tick."
+            echo "::warning::DOWNSTREAM_DISPATCH_TOKEN is not set on the repository — homebrew-wheels and scoop-wheels auto-update will fall back to the daily cron tick."
             exit 0
           fi
 
@@ -531,7 +565,7 @@ jobs:
           # Static event type, fixed repo list — no untrusted input flows
           # into the curl arguments. WHEELS_RELEASE_VERSION is generated
           # earlier in the same workflow from wheels.json + run number.
-          for repo in homebrew-wheels chocolatey-wheels; do
+          for repo in homebrew-wheels scoop-wheels; do
             echo "Dispatching wheels-released to wheels-dev/${repo}..."
             http_status=$(curl -sS -o /tmp/dispatch-resp.txt -w "%{http_code}" \
               -X POST \
@@ -549,7 +583,123 @@ jobs:
             fi
           done
 
-          echo "Downstream package manager workflows dispatched (homebrew + chocolatey)."
+          echo "Downstream package manager workflows dispatched (homebrew + scoop)."
+
+      #############################################
+      # Dispatch Linux repo buckets (apt.wheels.dev / yum.wheels.dev)
+      #
+      # Fires repository_dispatch on wheels-dev/apt-wheels-dev and
+      # wheels-dev/yum-wheels-dev so their metadata-regen workflows pick up
+      # the new .deb / .rpm asset and republish apt.wheels.dev /
+      # yum.wheels.dev within minutes. See issue #2605.
+      #
+      # Requires LINUX_REPO_DISPATCH_TOKEN — a fine-grained PAT with
+      # `actions: write` on the two bucket repos. If the secret is unset
+      # (which it will be until the bucket repos are created), this step
+      # skips silently — releases continue to land on the GitHub Release
+      # artifact stream regardless.
+      #
+      # Templates for the bucket repos live in
+      # tools/distribution-drafts/apt-repo/ and tools/distribution-drafts/yum-repo/.
+      #############################################
+      - name: Dispatch Linux repo buckets
+        if: steps.gh-release-final.outcome == 'success' || steps.gh-release-snapshot.outcome == 'success'
+        env:
+          GH_DISPATCH_TOKEN: ${{ secrets.LINUX_REPO_DISPATCH_TOKEN }}
+          WHEELS_RELEASE_VERSION: ${{ env.WHEELS_VERSION }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_DISPATCH_TOKEN:-}" ]; then
+            echo "LINUX_REPO_DISPATCH_TOKEN is not set — skipping apt/yum bucket dispatch (Phase 2 prerequisites not in place yet)."
+            exit 0
+          fi
+
+          # Same channel derivation as the homebrew/scoop dispatch.
+          # apt-wheels-dev / yum-wheels-dev route on `channel` in the payload
+          # to slot the .deb/.rpm into the right pool (stable vs bleeding-edge).
+          # RC releases aren't currently published to apt/yum, so we skip them.
+          if echo "${WHEELS_RELEASE_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
+            CHANNEL="bleeding-edge"
+          elif echo "${WHEELS_RELEASE_VERSION}" | grep -qE '\-rc\.'; then
+            echo "Skipping apt/yum dispatch for release candidate (RCs aren't pushed to apt/yum)."
+            exit 0
+          else
+            CHANNEL="stable"
+          fi
+          echo "Channel: ${CHANNEL}"
+
+          # Static event type, fixed repo list — no untrusted input flows into
+          # the curl arguments. WHEELS_RELEASE_VERSION is generated earlier in
+          # the same workflow from wheels.json + run number.
+          for repo in apt-wheels-dev yum-wheels-dev; do
+            echo "Dispatching wheels-released to wheels-dev/${repo}..."
+            http_status=$(curl -sS -o /tmp/linux-dispatch-resp.txt -w "%{http_code}" \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_DISPATCH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/wheels-dev/${repo}/dispatches" \
+              -d "{\"event_type\":\"wheels-released\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\",\"channel\":\"${CHANNEL}\"}}" )
+
+            if [ "${http_status}" != "204" ]; then
+              echo "::warning::Dispatch to wheels-dev/${repo} returned HTTP ${http_status}: $(cat /tmp/linux-dispatch-resp.txt)"
+            else
+              echo "  ✓ ${repo} dispatched (channel=${CHANNEL})"
+            fi
+          done
+
+          echo "Linux repo bucket dispatch complete (apt + yum)."
+
+      - name: Bump develop after stable release
+        if: steps.gh-release-final.outcome == 'success' || steps.gh-release-snapshot.outcome == 'success'
+        env:
+          GH_DISPATCH_TOKEN: ${{ secrets.DOWNSTREAM_DISPATCH_TOKEN }}
+          WHEELS_RELEASE_VERSION: ${{ env.WHEELS_VERSION }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_DISPATCH_TOKEN:-}" ]; then
+            echo "DOWNSTREAM_DISPATCH_TOKEN is not set — skipping bump-develop dispatch."
+            exit 0
+          fi
+
+          # Reuse the same channel-derivation rule as the homebrew/scoop
+          # step so this stays in sync. Only stable GA releases bump develop.
+          if echo "${WHEELS_RELEASE_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
+            CHANNEL="bleeding-edge"
+          elif echo "${WHEELS_RELEASE_VERSION}" | grep -qE '\-rc\.'; then
+            CHANNEL="release-candidate"
+          else
+            CHANNEL="stable"
+          fi
+
+          # Fire bump-develop at this repo to open the develop-bump PR.
+          # Only stable GA releases bump develop; snapshots and RCs don't.
+          # Same workaround as the homebrew/scoop dispatches above:
+          # the release-publish step runs under the default workflow token,
+          # which cannot trigger downstream workflows. We dispatch from
+          # this step (which runs under DOWNSTREAM_DISPATCH_TOKEN, a PAT)
+          # instead. The bump-develop-version.yml workflow listens for
+          # repository_dispatch types=[bump-develop]. See issue #2609.
+          if [ "${CHANNEL}" = "stable" ]; then
+            echo "Dispatching bump-develop to wheels-dev/wheels..."
+            http_status=$(curl -sS -o /tmp/dispatch-resp.txt -w "%{http_code}" \
+              -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_DISPATCH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/wheels-dev/wheels/dispatches" \
+              -d "{\"event_type\":\"bump-develop\",\"client_payload\":{\"version\":\"${WHEELS_RELEASE_VERSION}\"}}" )
+
+            if [ "${http_status}" != "204" ]; then
+              echo "::warning::bump-develop dispatch returned HTTP ${http_status}: $(cat /tmp/dispatch-resp.txt)"
+            else
+              echo "  ✓ bump-develop dispatched to wheels-dev/wheels (version=${WHEELS_RELEASE_VERSION})"
+            fi
+          else
+            echo "Skipping bump-develop dispatch (channel=${CHANNEL}, not stable)."
+          fi
 
   #############################################
   # Smoke-test the built module against a clean install.

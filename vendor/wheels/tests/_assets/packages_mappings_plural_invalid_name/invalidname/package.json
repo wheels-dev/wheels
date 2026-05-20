@@ -1,0 +1,8 @@
+{
+	"name": "wheels-invalidname",
+	"version": "1.0.0",
+	"description": "Test fixture: plural mapping name with hyphen — segment fails identifier regex; package must land in failedPackages",
+	"mappings": {
+		"plugins.bad-name": "."
+	}
+}

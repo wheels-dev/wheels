@@ -1,0 +1,7 @@
+[wheels]
+name=Wheels CFML framework (stable)
+baseurl=https://yum.wheels.dev/stable
+enabled=1
+gpgcheck=1
+gpgkey=https://yum.wheels.dev/wheels.gpg
+repo_gpgcheck=1

@@ -1,0 +1,24 @@
+This file is a placeholder. The real `wheels.gpg` at the bucket-repo root must
+be the ASCII-armored *public* half of the signing key whose private half lives
+in 1Password at `op://Wheels/wheels-linux-repo-signing/private-key`.
+
+Once the key is minted:
+
+    op read 'op://Wheels/wheels-linux-repo-signing/public-key' > wheels.gpg
+    # or, from a host that has the secret key imported:
+    gpg --armor --export <KEY_ID> > wheels.gpg
+
+Commit `wheels.gpg` to the **root** of the bucket repo (not in `templates/`).
+Cloudflare Pages will serve it at `https://apt.wheels.dev/wheels.gpg`, which
+is the URL users `curl` during the one-time setup:
+
+    curl -fsSL https://apt.wheels.dev/wheels.gpg \
+      | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+
+Also commit the key fingerprint to `FINGERPRINT` at the bucket-repo root so
+anyone can verify it out-of-band:
+
+    gpg --fingerprint <KEY_ID> > FINGERPRINT
+
+The fingerprint should be cross-published in the wheels.dev guides so users
+have a second source to compare against.

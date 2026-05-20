@@ -1,0 +1,56 @@
+---
+title: Migrator
+description: "51 Migrator functions in Wheels 4.0.0."
+---
+
+- [`addColumn()`](/v4-0-0/migrator/addcolumn/) — adds a column to existing table
+- [`addForeignKey()`](/v4-0-0/migrator/addforeignkey/) — Add a foreign key constraint to the database, using the reference name that was used to create it
+- [`addIndex()`](/v4-0-0/migrator/addindex/) — Add database index on a table column
+- [`addRecord()`](/v4-0-0/migrator/addrecord/) — Adds a record to a table
+- [`addReference()`](/v4-0-0/migrator/addreference/) — Add a foreign key constraint to the database, using the reference name that was used to create it
+- [`announce()`](/v4-0-0/migrator/announce/) — Used internally by Migrator to provide feedback to the GUI and CLI about completed DB operations
+- [`bigInteger()`](/v4-0-0/migrator/biginteger/) — Adds integer columns to table definition.
+- [`binary()`](/v4-0-0/migrator/binary/) — Adds binary columns to table definition.
+- [`boolean()`](/v4-0-0/migrator/boolean/) — Adds boolean columns to table definition.
+- [`change()`](/v4-0-0/migrator/change/) — alters existing table in the database
+- [`changeColumn()`](/v4-0-0/migrator/changecolumn/) — changes a column definition
+- [`changeTable()`](/v4-0-0/migrator/changetable/) — Creates a table definition object to store modifications to table properties
+- [`char()`](/v4-0-0/migrator/char/) — adds char columns to table definition
+- [`column()`](/v4-0-0/migrator/column/) — Adds a column to table definition.
+- [`create()`](/v4-0-0/migrator/create/) — creates the table in the database
+- [`createMigration()`](/v4-0-0/migrator/createmigration/) — Creates a migration file. Whilst you can use this in your application, the recommended usage is via either the CLI or th
+- [`createTable()`](/v4-0-0/migrator/createtable/) — Creates a table definition object to store table properties
+- [`createView()`](/v4-0-0/migrator/createview/) — Creates a view definition object to store view properties
+- [`date()`](/v4-0-0/migrator/date/) — Adds date columns to table definition.
+- [`datetime()`](/v4-0-0/migrator/datetime/) — adds datetime columns to table definition
+- [`decimal()`](/v4-0-0/migrator/decimal/) — adds decimal columns to table definition
+- [`down()`](/v4-0-0/migrator/down/) — Migrates down: will be executed when migrating your schema backward
+- [`dropForeignKey()`](/v4-0-0/migrator/dropforeignkey/) — Drops a foreign key constraint from the database
+- [`dropReference()`](/v4-0-0/migrator/dropreference/) — Drop a foreign key constraint from the database, using the reference name that was used to create it
+- [`dropTable()`](/v4-0-0/migrator/droptable/) — Drops a table from the database
+- [`dropView()`](/v4-0-0/migrator/dropview/) — drops a view from the database
+- [`execute()`](/v4-0-0/migrator/execute/) — Executes a raw sql query
+- [`float()`](/v4-0-0/migrator/float/) — adds float columns to table definition
+- [`getAvailableMigrations()`](/v4-0-0/migrator/getavailablemigrations/) — Searches db/migrate folder for migrations. Whilst you can use this in your application, the recommended usage is via eit
+- [`getCurrentMigrationVersion()`](/v4-0-0/migrator/getcurrentmigrationversion/) — Returns current database version. Whilst you can use this in your application, the recommended usage is via either the C
+- [`integer()`](/v4-0-0/migrator/integer/) — adds integer columns to table definition
+- [`migrateIndividual()`](/v4-0-0/migrator/migrateindividual/) — Runs a single specific migration's up() regardless of sequence order.
+- [`migrateTo()`](/v4-0-0/migrator/migrateto/) — Migrates database to a specified version. Whilst you can use this in your application, the recommended usage is via eith
+- [`migrateToLatest()`](/v4-0-0/migrator/migratetolatest/) — Shortcut function to migrate to the latest version
+- [`primaryKey()`](/v4-0-0/migrator/primarykey/) — Adds a primary key definition to the table. this method also allows for multiple primary keys.
+- [`redoMigration()`](/v4-0-0/migrator/redomigration/) — Reruns the specified migration version. Whilst you can use this in your application, the recommended usage is via either
+- [`references()`](/v4-0-0/migrator/references/) — adds integer reference columns to table definition and creates foreign key constraints
+- [`removeColumn()`](/v4-0-0/migrator/removecolumn/) — Removes a column from a database table
+- [`removeIndex()`](/v4-0-0/migrator/removeindex/) — Remove a database index
+- [`removeRecord()`](/v4-0-0/migrator/removerecord/) — Removes existing records from a table
+- [`renameColumn()`](/v4-0-0/migrator/renamecolumn/) — Renames a table column
+- [`renameSystemTables()`](/v4-0-0/migrator/renamesystemtables/) — F15 Phase 2: rename legacy <code>c_o_r_e_*</code> system tables to <code>wheels_*</code>.
+- [`renameTable()`](/v4-0-0/migrator/renametable/) — Renames a table
+- [`string()`](/v4-0-0/migrator/string/) — adds string columns to table definition
+- [`text()`](/v4-0-0/migrator/text/) — Adds text columns to table definition.
+- [`time()`](/v4-0-0/migrator/time/) — adds time columns to table definition
+- [`timestamp()`](/v4-0-0/migrator/timestamp/) — adds timestamp columns to table definition
+- [`timestamps()`](/v4-0-0/migrator/timestamps/) — adds Wheels convention automatic timestamp and soft delete columns to table definition
+- [`uniqueidentifier()`](/v4-0-0/migrator/uniqueidentifier/) — adds UUID columns to table definition
+- [`up()`](/v4-0-0/migrator/up/) — Migrates up: will be executed when migrating your schema forward
+- [`updateRecord()`](/v4-0-0/migrator/updaterecord/) — Updates an existing record in a table

@@ -146,7 +146,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(findNoCase("hook post-deploy", joined)).toBe(0);
             });
 
-            it("init_stub writes config/deploy.yml and .kamal/secrets to the target cwd", () => {
+            it("init_stub writes config/deploy.yml, .kamal/secrets, Dockerfile, and .dockerignore to the target cwd", () => {
                 var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
                 directoryCreate(tmpCwd, true, true);
 
@@ -157,7 +157,32 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(fileExists(tmpCwd & "/config/deploy.yml")).toBeTrue();
                 expect(fileExists(tmpCwd & "/.kamal/secrets")).toBeTrue();
                 expect(directoryExists(tmpCwd & "/.kamal/hooks")).toBeTrue();
+                expect(fileExists(tmpCwd & "/Dockerfile")).toBeTrue();
+                expect(fileExists(tmpCwd & "/.dockerignore")).toBeTrue();
                 expect(msg).toInclude("config/deploy.yml");
+                expect(msg).toInclude("Dockerfile");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub renders a Lucee 7 multi-stage Dockerfile with the service name in the label", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                localCli.init_stub({cwd: tmpCwd, service: "myapp", image: "acme/myapp"});
+
+                var df = fileRead(tmpCwd & "/Dockerfile");
+                expect(df).toInclude("FROM lucee/lucee:7-tomcat10-jre21");
+                expect(df).toInclude("EXPOSE 8080");
+                expect(df).toInclude("HEALTHCHECK");
+                expect(df).toInclude("myapp");
+
+                var di = fileRead(tmpCwd & "/.dockerignore");
+                expect(di).toInclude(".kamal/secrets");
+                expect(di).toInclude("vendor/wheels/tests");
 
                 directoryDelete(tmpCwd, true);
             });
@@ -192,19 +217,80 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 directoryDelete(tmpCwd, true);
             });
 
-            it("init_stub overwrites when force=true", () => {
+            it("init_stub refuses to overwrite an existing Dockerfile without force", () => {
                 var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
-                directoryCreate(tmpCwd & "/config", true, true);
-                fileWrite(tmpCwd & "/config/deploy.yml", "old content");
+                directoryCreate(tmpCwd, true, true);
+                fileWrite(tmpCwd & "/Dockerfile", "FROM scratch");
 
                 var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
                     new cli.lucli.services.deploy.lib.FakeSshPool()
                 );
-                localCli.init_stub({cwd: tmpCwd, service: "new", image: "new/web", force: true});
-                var yml = fileRead(tmpCwd & "/config/deploy.yml");
-                expect(yml).toInclude("service: new");
+                expect(() => localCli.init_stub({cwd: tmpCwd, service: "x", image: "y/z"}))
+                    .toThrow();
+
+                // Existing Dockerfile must be untouched after the abort.
+                expect(fileRead(tmpCwd & "/Dockerfile")).toBe("FROM scratch");
 
                 directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub overwrites when force=true", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd & "/config", true, true);
+                fileWrite(tmpCwd & "/config/deploy.yml", "old content");
+                fileWrite(tmpCwd & "/Dockerfile", "FROM scratch");
+                fileWrite(tmpCwd & "/.dockerignore", "## sentinel — pre-existing dockerignore");
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var summary = localCli.init_stub({cwd: tmpCwd, service: "new", image: "new/web", force: true});
+                var yml = fileRead(tmpCwd & "/config/deploy.yml");
+                expect(yml).toInclude("service: new");
+                var df = fileRead(tmpCwd & "/Dockerfile");
+                expect(df).toInclude("FROM lucee/lucee");
+                // force=true exercises the `force ||` branch of the dockerignore guard.
+                var di = fileRead(tmpCwd & "/.dockerignore");
+                expect(di).notToInclude("sentinel");
+                expect(summary).toInclude(".dockerignore");
+                expect(summary).notToInclude("preserved");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            it("init_stub silently preserves an existing .dockerignore without force", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-init-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                var sentinel = "## sentinel — user's dockerignore must survive";
+                fileWrite(tmpCwd & "/.dockerignore", sentinel);
+
+                var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var summary = localCli.init_stub({cwd: tmpCwd, service: "x", image: "y/z"});
+
+                expect(fileRead(tmpCwd & "/.dockerignore")).toBe(sentinel);
+                expect(summary).toInclude("preserved existing .dockerignore");
+
+                directoryDelete(tmpCwd, true);
+            });
+
+            // Regression for #2658 — expandPath('/cli/lucli/...') resolved against the running app's mapping root, breaking init inside a generated user app.
+            it("$cliInstallDir() resolves to the CLI install root, not the running app mapping", () => {
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                    new cli.lucli.services.deploy.lib.FakeSshPool()
+                );
+                var root = dc.$cliInstallDir();
+
+                expect(root).toBeString();
+                var normalized = replace(root, "\", "/", "all");
+                if (right(normalized, 1) == "/") normalized = left(normalized, len(normalized) - 1);
+                expect(reFindNoCase("/cli/lucli$", normalized)).toBeGT(0);
+
+                expect(directoryExists(root & "templates/deploy/init")).toBeTrue();
+                expect(fileExists(root & "templates/deploy/init/deploy.yml.mustache")).toBeTrue();
+                expect(fileExists(root & "templates/deploy/init/Dockerfile.mustache")).toBeTrue();
+                expect(fileExists(root & "templates/deploy/init/dockerignore.mustache")).toBeTrue();
             });
 
             it("audit dispatches tail of audit log to every host", () => {
@@ -271,11 +357,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect($anyInclude(cmds, "docker logout")).toBeTrue();
             });
 
-            // Regression tests for issue #2230 — deploy verbs returned a blank
-            // string in real (non-dry-run) mode because Module.cfc wrapped the
-            // void methods with dryRunOutput(), which is only populated during
-            // dry-run. Real deploys must return a visible success summary;
-            // dry-run must continue to return the buffered command list.
+            // Regression tests for issue #2230 — deploy verbs returned a blank string in real (non-dry-run) mode because Module.cfc wrapped the void methods with dryRunOutput(), which is only populated during dry-run. Real deploys must return a visible success summary; dry-run must continue to return the buffered command list.
 
             it("deploy (real mode) returns a non-empty success summary", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
@@ -339,6 +421,134 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(len(out)).toBeGT(0);
                 expect(out).toInclude("Removed");
                 expect(out).toInclude("demo");
+            });
+
+            // Regression suite for #2696 — deploy verbs reported success even when the
+            // underlying SSH command on the remote exited nonzero. The fix has SshClient
+            // raise Wheels.Deploy.RemoteExecutionFailed on nonzero exits, and the
+            // deploy dispatchers opt-in to that strict mode for every non-teardown verb.
+
+            it("deploy throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails on the remote (##2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                // Use the same component the production deploy uses to compute the exact pull command.
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                var pullCmd = builder.pull("v1");
+                fake.expect("1.2.3.4", pullCmd, {
+                    exitCode: 1, stdout: "",
+                    stderr: "Error response from daemon: manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                expect(() => dc.deploy({configPath: variables.fixture, version: "v1"}))
+                    .toThrow(type="Wheels.Deploy.RemoteExecutionFailed", regex="exit 1");
+            });
+
+            it("setup throws Wheels.Deploy.RemoteExecutionFailed when docker pull fails (alias for deploy) (##2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                expect(() => dc.setup({configPath: variables.fixture, version: "v1"}))
+                    .toThrow(type="Wheels.Deploy.RemoteExecutionFailed");
+            });
+
+            it("the thrown Wheels.Deploy.RemoteExecutionFailed names the host, exit code, and a command summary (##2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 125, stdout: "",
+                    stderr: "denied: requested access to the resource is denied"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                try {
+                    dc.deploy({configPath: variables.fixture, version: "v1"});
+                    fail("expected deploy to throw");
+                } catch (any e) {
+                    expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                    expect(e.message).toInclude("1.2.3.4");
+                    expect(e.message).toInclude("125");
+                    expect(e.message).toInclude("docker pull");
+                    expect(e.detail).toInclude("denied");
+                }
+            });
+
+            it("rollback throws on a failing docker start (##2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                var startCmd = app.start(cfg.roles()[1], "v-old");
+                fake.expect("1.2.3.4", startCmd, {
+                    exitCode: 1, stdout: "", stderr: "No such container: demo-web-v-old"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                expect(() => dc.rollback({configPath: variables.fixture, version: "v-old"}))
+                    .toThrow(type="Wheels.Deploy.RemoteExecutionFailed");
+            });
+
+            it("remove --confirm tolerates a missing kamal-proxy and still dispatches the remaining teardown steps (##2696)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+                fake.expect("1.2.3.4", proxyCmds.remove(), {
+                    exitCode: 1, stdout: "", stderr: "Error: No such container: kamal-proxy"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.remove({configPath: variables.fixture, confirm: true});
+                expect(out).toInclude("Removed");
+                // After the tolerated proxy step, registry logout must still have been issued.
+                var cmds = [];
+                for (var c in fake.calls()) arrayAppend(cmds, c.cmd ?: "");
+                var sawLogout = false;
+                for (var s in cmds) if (findNoCase("docker logout", s)) sawLogout = true;
+                expect(sawLogout).toBeTrue();
+            });
+
+            it("a failing lock-release in the finally block does not mask the original deploy exception (##2696)", () => {
+                // lock.release() runs in the deploy() finally block and must never
+                // shadow the original deploy exception. Inject a release failure
+                // alongside a pull failure and assert the surfaced exception is the
+                // pull one (the original cause), not the release one.
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                fake.expect("1.2.3.4", lockCmds.release(), {
+                    exitCode: 1, stdout: "", stderr: "rm: cannot remove"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                try {
+                    dc.deploy({configPath: variables.fixture, version: "v1"});
+                    fail("expected deploy to throw");
+                } catch (any e) {
+                    // The surfaced error must be the pull failure, NOT the lock release failure.
+                    expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                    expect(e.message).toInclude("docker pull");
+                }
+            });
+
+            // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.
+            it("$gitShortSha() returns 'unknown' when run outside a git repo", () => {
+                var nonGitDir = getTempDirectory() & "/wheels-2671-main-" & createUUID();
+                directoryCreate(nonGitDir, true, true);
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var sha = dc.$gitShortSha(nonGitDir);
+                    expect(sha).toBe("unknown");
+                    // Belt-and-braces: explicit no-leak assertions documenting the original bug shape.
+                    expect(findNoCase("fatal", sha)).toBe(0);
+                    expect(findNoCase("not a git repository", sha)).toBe(0);
+                } finally {
+                    directoryDelete(nonGitDir, true);
+                }
             });
         });
     }

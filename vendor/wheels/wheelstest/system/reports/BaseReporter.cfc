@@ -50,8 +50,15 @@ component {
 				writeDump( var = "resetHTMLHead() not supported #e.message#", output = "console" );
 			}
 		}
-		// reset cfheader from integration tests
-		getPageContextResponse().reset();
+		// Best-effort reset — Undertow's HttpServletResponseImpl.reset() throws
+		// when the response buffer has committed; silently swallow so the
+		// reporter content still emits (appended) rather than the reporter
+		// failing with the swallowed underlying error.
+		try {
+			getPageContextResponse().reset();
+		} catch ( any e ) {
+			// Response already committed or reset unavailable — fall through.
+		}
 	}
 
 	/**

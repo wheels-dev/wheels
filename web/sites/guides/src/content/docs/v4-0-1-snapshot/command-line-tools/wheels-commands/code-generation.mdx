@@ -1,0 +1,440 @@
+---
+title: "Code Generation"
+description: wheels generate — models, controllers, scaffolds, migrations, routes, tests, properties, helpers, snippets, admin, and API resources, with attribute syntax and per-subcommand flags.
+type: reference
+sidebar:
+  order: 2
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+`wheels generate` is a dispatcher that routes to a family of generator subcommands. Each subcommand writes one or more files into your project: a model CFC, a controller with views, a migration, a full scaffold, a helper, a test spec, an admin interface, or a reusable code snippet. The dispatcher itself does no generation — it parses the first positional argument as a `<type>` and forwards the rest to the matching generator.
+
+**You'll use this for:**
+
+- Scaffolding a complete resource (model + controller + views + migration + tests + route) in one command.
+- Producing individual artifacts — a blank migration, a property-add migration, a single controller — without touching anything else.
+- Stamping out common patterns (authentication, soft delete, API controller) as starting-point code you edit in place.
+- Turning an existing model into a CRUD admin interface via runtime introspection.
+
+## Overview
+
+``` title="Synopsis"
+wheels generate <type> <name> [attributes...] [flags]
+```
+
+The `g` alias is supported for every form (`wheels g model User`). `wheels create <type>` exists as a forward-looking dispatcher but currently only accepts `type=app`, which forwards to `wheels new`; use `wheels generate` for everything else.
+
+Running `wheels generate` with no arguments prints the list of supported types and one-line examples. Unknown types print `Unknown generator type: <type>` and exit without writing anything.
+
+### Supported types
+
+| Type | Alias | Writes |
+|---|---|---|
+| `app` | `a` | New project directory (delegates to `wheels new`) |
+| `model` | `m` | Model CFC and, if properties given, a create-table migration |
+| `controller` | `c` | Controller CFC and a view file per non-mutation action |
+| `view` | `v` | Single view template |
+| `migration` | `migrate` | Blank migration CFC |
+| `scaffold` | `s` | Model + migration + controller + views + tests + resource route |
+| `api-resource` | `api` | Model + JSON controller + migration + tests + namespaced route (no views) |
+| `route` | `r` | Adds a `.resources()` line to `config/routes.cfm` |
+| `test` | — | Model or controller spec file |
+| `property` | `prop` | Add-column migration for an existing model |
+| `helper` | `h` | Helper CFC under `app/helpers/` |
+| `snippets` | — | Copies a named code pattern into the project |
+| `admin` | — | CRUD admin controller + views for an existing model (requires a running server) |
+
+## Attribute syntax
+
+Property-aware generators — `model`, `scaffold`, `api-resource`, and `property` — accept a trailing list of `name:type` property pairs after the resource name. They also recognise `--belongsTo=`, `--hasMany=`, and `--hasOne=` flags for associations. Type names are normalised to Wheels migration column types — unknown types fall back to `string`.
+
+The other generators (`controller`, `view`, `migration`, `route`, `test`, `helper`, `snippets`, `admin`) take their own positional arguments — see the per-subcommand Synopsis sections below for what each accepts.
+
+| You write | Column type | Notes |
+|---|---|---|
+| `name` | `string` | Type defaults to `string` when `:type` is omitted. |
+| `title:string` | `string` | Also: `varchar`. |
+| `body:text` | `text` | Also: `longtext`. |
+| `count:integer` | `integer` | Also: `int`. |
+| `views:biginteger` | `bigInteger` | Also: `bigint`. |
+| `price:decimal` | `decimal` | Also: `float`, `numeric`. |
+| `active:boolean` | `boolean` | Also: `bool`. |
+| `publishedAt:datetime` | `datetime` | Also: `timestamp`. |
+| `publishedOn:date` | `date` | |
+| `startsAt:time` | `time` | |
+| `payload:binary` | `binary` | |
+| `--belongsTo=author` | — | Adds `belongsTo(name="author")` and an `authorId` FK column. |
+| `--hasMany=comments` | — | Adds `hasMany(name="comments")`. Pass multiple names comma-separated. |
+| `--hasOne=profile` | — | Adds `hasOne(name="profile")`. |
+
+<Aside type="note" title="Type aliases land on the same column type">
+The mapper folds aliases together — `varchar` and `string` both emit `t.string(...)`, `int` and `integer` both emit `t.integer(...)`, and so on. Pick whichever reads best; the generated migration is identical.
+</Aside>
+
+### `wheels generate model`
+
+Generate a model CFC and, when properties are supplied, a matching create-table migration.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate model <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>] [--hasOne=<list>]
+```
+
+#### Description
+
+Writes `app/models/<Name>.cfc` with `belongsTo`/`hasMany`/`hasOne` associations inserted into `config()` based on the flags you passed. If any `property:type` arguments are present, the generator also stamps out a timestamped migration under `app/migrator/migrations/` that creates the table. No migration is written when you generate a model with no properties.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate model User name email:string active:boolean --hasMany=posts" step=1}
+wheels generate model User name email:string active:boolean --hasMany=posts
+```
+
+Writes `app/models/User.cfc` with `hasMany(name="posts")` in `config()`, plus a migration that creates the `users` table with `name`, `email`, and `active` columns (and the standard `timestamps()` trio).
+
+### `wheels generate controller`
+
+Generate a controller CFC and view files for each read-only action.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate controller <Name> [action ...]
+```
+
+#### Description
+
+Writes `app/controllers/<Name>.cfc` with a stub method per action name you pass. For each action that isn't `create`, `update`, `delete`, or `destroy`, the generator also writes `app/views/<name>/<action>.cfm`. Passing no actions creates an empty controller with no view files.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate controller Users index show new create" step=2}
+wheels generate controller Users index show new create
+```
+
+Writes `app/controllers/Users.cfc` with `index()`, `show()`, `new()`, and `create()` methods, plus `app/views/users/index.cfm`, `app/views/users/show.cfm`, and `app/views/users/new.cfm`. The `create` action does not get a view.
+
+### `wheels generate view`
+
+Generate a single view template.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate view <controller> <action>
+```
+
+#### Description
+
+Writes `app/views/<controller>/<action>.cfm`. Both arguments are required — unlike `generate controller`, this subcommand does not fall back to a default action.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate view products edit" step=3}
+wheels generate view products edit
+```
+
+Writes `app/views/products/edit.cfm`.
+
+### `wheels generate migration`
+
+Generate a blank migration file.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate migration <Name>
+```
+
+#### Description
+
+Writes `app/migrator/migrations/<timestamp>_<Name>.cfc` with empty `up()` and `down()` methods. The timestamp is generated at run time so sequential invocations produce a deterministic order. Use this when you want to hand-write schema changes that don't map to the property-based `model`/`scaffold`/`property` generators.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate migration AddIndexesToPosts" step=4}
+wheels generate migration AddIndexesToPosts
+```
+
+Writes a file such as `app/migrator/migrations/20260420120000_AddIndexesToPosts.cfc`.
+
+### `wheels generate scaffold`
+
+Generate a complete CRUD resource.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate scaffold <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>]
+```
+
+#### Description
+
+The most opinionated generator. It runs, in order: model, create-table migration, controller (pluralised from `<Name>`), views (`index`, `show`, `new`, `edit`, `_form`), a model spec and controller spec under `tests/specs/`, and a `.resources()` route in `config/routes.cfm`. If any step fails the whole batch is rolled back so you're not left with a half-generated resource.
+
+`belongsTo` associations automatically add a foreign-key column — `--belongsTo=author` adds an `authorId` integer column to the migration even if you didn't list it in the properties.
+
+After running, do `wheels migrate latest` to apply the migration, then `wheels start` to try the new resource.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate scaffold Post title body:text publishedAt:datetime --belongsTo=author" step=5}
+wheels generate scaffold Post title body:text publishedAt:datetime --belongsTo=author
+```
+
+Writes:
+
+- `app/models/Post.cfc` with `belongsTo(name="author")`
+- `app/migrator/migrations/<timestamp>_create_posts_table.cfc` with `title`, `body`, `publishedAt`, `authorId`, and the `timestamps()` trio
+- `app/controllers/Posts.cfc` with the seven CRUD actions
+- `app/views/posts/index.cfm`, `show.cfm`, `new.cfm`, `edit.cfm`, `_form.cfm`
+- `tests/specs/models/PostSpec.cfc`, `tests/specs/controllers/PostsControllerSpec.cfc`
+- `.resources("posts")` appended to `config/routes.cfm`
+
+See the [Database guide](../database/) for what to do with the generated migration.
+
+### `wheels generate api-resource`
+
+Generate a JSON-only resource — model, controller, migration, tests, and a namespaced route — without any views.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate api-resource <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>]
+```
+
+#### Description
+
+Same pipeline as `scaffold`, but the controller is generated in JSON-only mode (no view rendering), no view files are written, and the route is added under the `api` namespace using `.namespace("api").resources(name="<names>", except="new,edit")`. Use this when you're building a pure API — a separate front end, a mobile client, or a service-to-service endpoint.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate api-resource Product name price:decimal sku:string" step=6}
+wheels generate api-resource Product name price:decimal sku:string
+```
+
+Writes a JSON controller at `app/controllers/api/Products.cfc`, a create-table migration, and tests. After migrating and starting the server, `curl http://localhost:8080/api/products.json` returns an empty list.
+
+### `wheels generate route`
+
+Add a single resource route to `config/routes.cfm`.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate route <name>
+```
+
+#### Description
+
+Opens `config/routes.cfm`, checks that `.resources("<name>")` isn't already present, and inserts it into the mapper chain. Duplicate routes are detected by literal substring match — `generate route posts` is a no-op if `.resources("posts")` already appears in the file. If the mapper block can't be found, the command prints the line to add manually and exits.
+
+This is the one-line equivalent of the route step that `scaffold` and `api-resource` run for you.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate route comments" step=7}
+wheels generate route comments
+```
+
+Adds `.resources("comments")` to the `mapper()` chain in `config/routes.cfm`.
+
+### `wheels generate test`
+
+Generate a BDD test spec file.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate test <type> <Name>
+```
+
+`<type>` must be `model` or `controller`. Any other value is rejected.
+
+#### Description
+
+Writes `tests/specs/models/<Name>Spec.cfc` or `tests/specs/controllers/<Name>ControllerSpec.cfc`, extending `wheels.WheelsTest` with a `run()` method and one placeholder `it()` block. Use this when you want a spec file for a model or controller that wasn't scaffolded.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate test model User" step=8}
+wheels generate test model User
+```
+
+Writes `tests/specs/models/UserSpec.cfc`.
+
+### `wheels generate property`
+
+Generate an add-column migration for an existing model.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate property <ModelName> <property:type>
+```
+
+#### Description
+
+Writes a `Add<Property>To<Tables>` migration under `app/migrator/migrations/`. The migration calls `changeTable()` with the mapped column type in `up()` and `removeColumn()` in `down()`. Property type mapping follows the same table as the [attribute syntax](#attribute-syntax).
+
+The generator prints a reminder to add a matching `validatesPresenceOf()` call in the model's `config()` — it does not modify the model CFC for you.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate property User phoneNumber:string" step=9}
+wheels generate property User phoneNumber:string
+```
+
+Writes `app/migrator/migrations/<timestamp>_AddPhoneNumberToUsers.cfc` with `t.string(columnNames="phoneNumber")` in `up()`.
+
+### `wheels generate helper`
+
+Generate a helper CFC under `app/helpers/`.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate helper <name> [functionName ...] [--force]
+```
+
+#### Description
+
+Writes `app/helpers/<Name>Helper.cfc` (the `Helper` suffix is appended automatically) with a stub method per function name you pass. Without any function names, an empty helper is created. The `--force` flag overwrites an existing file; without it, the command exits with an error if the file already exists.
+
+#### Example
+
+```bash {test:cli cmd="wheels generate helper Formatting truncateText formatCurrency" step=10}
+wheels generate helper Formatting truncateText formatCurrency
+```
+
+Writes `app/helpers/FormattingHelper.cfc` with empty `truncateText()` and `formatCurrency()` methods.
+
+### `wheels generate snippets`
+
+Stamp out a named code pattern.
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate snippets [pattern] [--force]
+wheels generate snippets templates [--force]
+```
+
+#### Description
+
+Running with no arguments prints the registry of available patterns. Running with a pattern name writes one or more files into the project — exactly which files depends on the pattern. Re-running a pattern whose files already exist is a no-op; pass `--force` to overwrite.
+
+The special `templates` subcommand copies every raw generator template from the CLI's bundled directory into `app/snippets/` so you can customise them for your project. Regular named patterns write curated, opinionated starting code instead.
+
+#### Patterns
+
+| Pattern | What it writes |
+|---|---|
+| `auth` | `app/controllers/Sessions.cfc`, `app/views/sessions/new.cfm`, `app/snippets/auth-filter.cfm` |
+| `soft-delete` | `app/snippets/soft-delete.cfm`, `app/snippets/soft-delete-migration.cfc` |
+| `api-controller` | `app/snippets/api-controller.cfc` |
+| `crud-controller` | `app/snippets/crud-controller.cfc` |
+| `flash-messages` | `app/views/shared/_flash.cfm` |
+| `pagination` | `app/snippets/pagination-view.cfm` |
+| `seed-data` | `app/snippets/seeds.cfm`, `app/snippets/seeds-development.cfm` |
+| `mailer` | `app/snippets/user-mailer.cfc` |
+
+#### Example
+
+```bash {test:cli cmd="wheels generate snippets auth" step=11}
+wheels generate snippets auth
+```
+
+Writes a session controller, a login view, and an auth filter. Edit the filter and add `filters(through="authenticate")` to the controllers that need protection.
+
+### `wheels generate admin`
+
+Generate a CRUD admin interface for an existing model.
+
+#### Synopsis
+
+```
+wheels generate admin <ModelName> [--force] [--no-routes]
+```
+
+#### Description
+
+Unlike the other generators, this one requires a running dev server — it hits `http://localhost:<port>/wheels/cli?command=introspect&model=<ModelName>` to read the model's properties, associations, and validations, then generates a controller and views that reflect the live schema. Start the server with `wheels start` first.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--force` | off | Overwrite existing admin controller and view files. |
+| `--no-routes` | off | Skip adding the admin route to `config/routes.cfm`. |
+
+#### Example
+
+```bash
+wheels start
+wheels generate admin User
+```
+
+After reload, the admin interface is available at `/admin/users`.
+
+## Common workflows
+
+### Full CRUD resource from one command
+
+```bash
+wheels generate scaffold Post title body:text publishedAt:datetime
+wheels migrate latest
+wheels start
+```
+
+Generates the model, migration, controller, views, tests, and route; migrates the database; and boots the server. `/posts` is live.
+
+### Just the model (and its migration)
+
+```bash
+wheels generate model Comment body:text --belongsTo=post
+```
+
+Creates `Comment.cfc` with `belongsTo(name="post")`, plus a migration that includes a `postId` foreign-key column. Useful when you want the association wired up but don't need a controller or views yet.
+
+### A blank migration for a hand-written schema change
+
+```bash
+wheels generate migration AddUniqueIndexOnUsersEmail
+```
+
+Use this when the change is something the property-based generators can't express — adding a composite index, renaming a column, seeding reference data.
+
+### An API-only resource behind `/api`
+
+```bash
+wheels generate api-resource Product name price:decimal
+wheels migrate latest
+```
+
+No views, no HTML controllers — just a JSON endpoint mounted under `/api/products.json`.
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Quick Start"
+    href="../quick-start/"
+    description="End-to-end walkthrough from wheels new to a running CRUD resource."
+  />
+  <LinkCard
+    title="Creating a Project"
+    href="../creating-a-project/"
+    description="wheels new and wheels create app — scaffold a fresh Wheels application."
+  />
+  <LinkCard
+    title="Database"
+    href="../database/"
+    description="wheels migrate, wheels seed, wheels db — apply migrations and manage schema."
+  />
+  <LinkCard
+    title="Scaffold Cleanup"
+    href="../scaffold-cleanup/"
+    description="wheels destroy — remove artifacts created by wheels generate."
+  />
+</CardGrid>

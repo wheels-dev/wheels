@@ -1,0 +1,33 @@
+---
+title: "wheels deploy build remove"
+description: Tear down the docker buildx builder created by build create.
+type: reference
+sidebar:
+  label: "remove"
+  order: 5
+---
+
+Remove the `docker buildx` builder. Inverse of [`build create`](/v4-0-0/command-line-tools/commands/deploy/build/create/).
+
+## Synopsis
+
+``` title="Synopsis"
+wheels deploy build remove [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Emits `docker buildx rm <builder-name>` on the control machine. Re-creating is cheap; tear down when you've switched to a different build strategy or want a clean state.
+
+## Example
+
+```bash title="Example"
+wheels deploy build remove
+```

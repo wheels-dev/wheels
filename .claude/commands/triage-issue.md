@@ -102,14 +102,17 @@ below. Highlights for this command:
      existing structure under
      `web/sites/guides/src/content/docs/v4-0-0-snapshot/`, the work is
      mostly translation-of-code (not requiring deep design decisions).
-     High-confidence docs-requests trigger the auto-fire write-docs
-     workflow.
    - **`medium`**: the gap is real but the right page/path is ambiguous,
      OR a new top-level section is needed (a structural design decision),
      OR the docs require significant code investigation to write
      accurately.
    - **`low`**: the gap is vague, the scope is large (e.g. "rewrite the X
      chapter"), or it's not clear what concretely needs to exist.
+
+   **Auto-fire threshold:** both `high` and `medium` docs-requests trigger
+   the auto-fire write-docs workflow. Write-docs has its own safety net
+   for structural docs-architecture decisions (posts a `docs-held` marker
+   instead of opening a PR). Only `low` stays manual.
 
    Post the triage comment:
 
@@ -133,8 +136,11 @@ below. Highlights for this command:
 
    Where `<CONFIDENCE_MARKER>` is:
    - `<!-- wheels-bot:docs-confidence:high -->` if confidence is high
-     (triggers auto-fire of `bot-write-docs.yml`)
-   - omitted otherwise (medium/low confidence does not auto-trigger)
+   - `<!-- wheels-bot:docs-confidence:medium -->` if confidence is medium
+   - omitted if confidence is low (low does not auto-trigger)
+
+   Both `high` and `medium` markers trigger auto-fire of
+   `bot-write-docs.yml`.
 
    Then exit.
 
@@ -155,8 +161,7 @@ below. Highlights for this command:
 
    - **`high`**: the report has a clear "what happened / what I expected"
      description; the suspected layer is unambiguous; the fix sketch is
-     mechanical (one file, no design decisions). High-confidence bugs
-     trigger the auto-fire fix-PR workflow.
+     mechanical (one file, no design decisions).
    - **`medium`**: the report is clear but the fix has design trade-offs,
      OR cross-engine concerns may exist, OR more than one layer is
      plausibly involved.
@@ -164,7 +169,17 @@ below. Highlights for this command:
      environment-specific symptoms are suspected; the fix shape isn't
      obvious from the issue body alone.
 
-   **Auto-downgrade rules** (force at least one level lower):
+   **Auto-fire threshold:** both `high` and `medium` bugs trigger the
+   auto-fire propose-fix workflow. Propose-fix has its own step-4 safety
+   net for sensitive areas (security / middleware / migrations / deploy /
+   DI / cross-engine) — it posts a `fix-held` marker instead of opening a
+   PR. Reviewer A and B will critique whatever propose-fix produces. Only
+   `low` stays manual.
+
+   **Auto-downgrade rules** (force at least one level lower — these
+   downgrades are still informative for humans skimming the comment;
+   `medium` ratings still auto-fire, but propose-fix's safety net will
+   catch the sensitive-area cases):
    - The fix would touch `vendor/wheels/security/**`, auth flows, or any
      `vendor/wheels/middleware/**` → at most `medium`
    - Cross-engine concern detected (Lucee vs Adobe vs BoxLang behavior
@@ -199,7 +214,11 @@ below. Highlights for this command:
 
    Where `<CONFIDENCE_MARKER>` is:
    - `<!-- wheels-bot:triage-confidence:high -->` if confidence is high
-   - omitted otherwise (medium/low confidence does not auto-trigger fix-PR)
+   - `<!-- wheels-bot:triage-confidence:medium -->` if confidence is medium
+   - omitted if confidence is low (low does not auto-trigger fix-PR)
+
+   Both `high` and `medium` markers trigger auto-fire of
+   `bot-propose-fix.yml`.
 
 8. **Self-check before posting.**
    - Is the classification justified by quoted text from the issue?

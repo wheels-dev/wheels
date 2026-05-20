@@ -42,12 +42,14 @@ component {
 		for (local.batchStart = 1; local.batchStart <= local.totalRecords; local.batchStart += local.batchSize) {
 			local.batchEnd = Min(local.batchStart + local.batchSize - 1, local.totalRecords);
 
-			local.sql = $buildBulkInsertSQL(
+			local.sql = variables.wheels.class.adapter.$bulkInsertSQL(
+				tableName = $quotedTableName(),
 				columns = local.mapped.columns,
 				validProperties = local.mapped.validProperties,
 				records = arguments.records,
 				batchStart = local.batchStart,
-				batchEnd = local.batchEnd
+				batchEnd = local.batchEnd,
+				propertyInfo = variables.wheels.class.properties
 			);
 
 			variables.wheels.class.adapter.$querySetup(
@@ -194,53 +196,6 @@ component {
 		}
 
 		return {columns: local.columns, validProperties: local.validProperties};
-	}
-
-	/**
-	 * Builds the SQL array for a multi-row INSERT statement.
-	 * Returns an array compatible with the adapter's `$querySetup()`.
-	 */
-	public array function $buildBulkInsertSQL(
-		required array columns,
-		required array validProperties,
-		required array records,
-		required numeric batchStart,
-		required numeric batchEnd
-	) {
-		local.sql = [];
-
-		local.colList = "";
-		for (local.col in arguments.columns) {
-			if (Len(local.colList)) {
-				local.colList &= ", ";
-			}
-			local.colList &= $quoteColumn(local.col);
-		}
-
-		ArrayAppend(local.sql, "INSERT INTO #$quotedTableName()# (#local.colList#) VALUES ");
-
-		local.propCount = ArrayLen(arguments.validProperties);
-		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
-			if (local.r > arguments.batchStart) {
-				ArrayAppend(local.sql, ", ");
-			}
-			ArrayAppend(local.sql, "(");
-			for (local.p = 1; local.p <= local.propCount; local.p++) {
-				if (local.p > 1) {
-					ArrayAppend(local.sql, ", ");
-				}
-				local.propName = arguments.validProperties[local.p];
-				local.val = StructKeyExists(arguments.records[local.r], local.propName) ? arguments.records[local.r][local.propName] : "";
-				ArrayAppend(local.sql, variables.wheels.class.adapter.$buildBulkParam(
-					value = local.val,
-					propName = local.propName,
-					propertyInfo = variables.wheels.class.properties
-				));
-			}
-			ArrayAppend(local.sql, ")");
-		}
-
-		return local.sql;
 	}
 
 	/**

@@ -22,9 +22,12 @@ jobs:
     name: Propose fix
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing
-    # `wheels-bot:triage-confidence:high` (bug path) or
-    # `wheels-bot:research-confidence:high` (framework-design path).
+    # Phase 4 (auto-fire): runs from wheels-bot[bot] comments containing a
+    # high- OR medium-confidence triage marker (bug path) or research marker
+    # (framework-design path). Low-confidence stays manual.
+    # Medium fires because propose-fix's own step-4 safety net (sensitive
+    # areas: security / migrations / deploy / DI / cross-engine) aborts
+    # before any PR is opened — Reviewer A and B catch the rest.
     # workflow_dispatch is preserved for manual reruns.
     # The bot-identity check is load-bearing: prevents humans from
     # triggering propose-fix by quoting a marker in a comment reply.
@@ -35,7 +38,9 @@ jobs:
         || (github.event_name == 'issue_comment'
             && github.event.comment.user.login == 'wheels-bot[bot]'
             && (contains(github.event.comment.body, 'wheels-bot:triage-confidence:high')
-                || contains(github.event.comment.body, 'wheels-bot:research-confidence:high')))
+                || contains(github.event.comment.body, 'wheels-bot:triage-confidence:medium')
+                || contains(github.event.comment.body, 'wheels-bot:research-confidence:high')
+                || contains(github.event.comment.body, 'wheels-bot:research-confidence:medium')))
       )
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue-number }}
@@ -98,8 +103,8 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
-          # When un-gated at Phase 4a/4b, this workflow fires from wheels-bot[bot]
-          # comments containing high-confidence triage or research markers. Allow
+          # This workflow fires from wheels-bot[bot] comments containing
+          # high- or medium-confidence triage or research markers. Allow
           # that bot identity (and github-actions[bot] for consistency).
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}

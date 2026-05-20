@@ -64,6 +64,26 @@ var fn = obj["dynamicMethod"];
 var result = fn();
 ```
 
+### Method Reference Extraction Loses Receiver (BoxLang)
+
+BoxLang implements method dispatch with JavaScript-style semantics: pulling a method off an object into a local variable produces a bare function reference with no bound receiver. Calling that local then runs the function in an empty context, and any in-component call inside (helpers prefixed with `$`, `this.x()`, etc.) fails to resolve. The lookup-and-call **must** stay in a single expression for BoxLang to bind the receiver.
+
+```cfm
+// WRONG — drops the receiver on BoxLang, so $helper() throws
+//          "Function [$helper] not found" when publicMethod runs
+local.method = arguments.object[arguments.methodName];
+local.method();
+
+// RIGHT — single-expression bracket-call binds the receiver
+arguments.object[arguments.methodName]();
+```
+
+**Why**: BoxLang treats `obj["method"]` as a property access that returns a callable, not a bound method. Only an immediate invocation `obj["method"]()` lets BoxLang's call dispatcher know which object is the receiver. Lucee and Adobe CF preserve the receiver across both forms, so this trap only fires on BoxLang.
+
+**On `invoke()`**: The `invoke()` BIF is the Lucee/Adobe path via `Base.cfc` and preserves the receiver on those engines. Whether it preserves the receiver on BoxLang has **not** been verified — the `invokeMethod` override in `BoxLangAdapter.cfc` exists precisely because earlier BoxLang versions had `invoke()` parity gaps. Until a BoxLang run confirms the BIF binds the receiver, prefer the single-expression bracket-call on BoxLang. If a future audit confirms parity, the override can be deleted entirely.
+
+**Reference example**: `vendor/wheels/engineAdapters/BoxLang/BoxLangAdapter.cfc::invokeMethod`. The original two-statement form silently worked until #2241 added `$blockInProduction()` calls inside every `Public.cfc` handler — at which point every internal Wheels route (`/wheels/info`, `/wheels/routes`, ...) started 500-ing on BoxLang. Regression test: `vendor/wheels/tests/specs/dispatch/InvokeMethodSpec.cfc` (issue #2646).
+
 ### Inline Closure as Constructor Named Argument (Adobe CF)
 
 Passing a function literal directly as a named argument to a `new Component(...)` call crashes Adobe CF's bytecode generator with `java.lang.ArrayStoreException: coldfusion.compiler.ASTcffunction`. The compile error fires from `getComponentMetadata()` and crashes the **entire** TestBox bundle for the engine — not just the one spec — because Adobe CF eagerly compiles every CFC in the bundle directory before any test runs.
@@ -164,6 +184,82 @@ if (!DirectoryExists(path)) {
 
 **Why**: `java.io.File.mkdirs()` is part of the JDK on every CFML engine and recurses parents the same way on Lucee, Adobe CF, and BoxLang. Reach for it whenever a path's parents may be missing — relying on the BIF's `createPath` extension is a portability trap.
 
+### Binary Data Representation (BoxLang / Lucee 6 vs Lucee 7 / Adobe)
+
+`FileReadBinary()` and multipart-upload byte content are surfaced differently across engines:
+
+| Engine | `IsArray(bytes)` | `IsBinary(bytes)` | Shape |
+|--------|-----------------|-------------------|-------|
+| Lucee 7, Adobe CF | `false` | `true` | `byte[]` Java array |
+| BoxLang, Lucee 6 (some configs) | `true` | `false` | CFML array of integers |
+
+Both shapes are valid representations that the JDBC driver accepts when binding a `cf_sql_blob` / `cf_sql_varbinary` parameter. Wheels' model property setter (`$setProperty`) is aware of this: the scalar-column type guard exempts binary columns so the array shape passes through to the JDBC layer unchanged (fix: #2660).
+
+```cfm
+// Works on all engines — the model exempts blob/longblob/bytea columns from
+// the array-rejection guard regardless of which shape the engine produces.
+local.bytes = FileReadBinary(expandPath("/uploads/tmp/") & cffile.serverFile);
+local.photo = model("Photo").new(filename="avatar.png", fileData=local.bytes);
+local.photo.save();
+```
+
+**When this matters**: only for columns whose `cf_sql_*` type resolves to `validationtype == "binary"` — blob, longblob, bytea, varbinary, and clob. (Note: `clob` stores character data, not bytes — it's grouped here only because Wheels' internal `$getValidationType` maps `CF_SQL_CLOB` to `"binary"` for guard-exemption purposes.) All other scalar columns (varchar, integer, datetime, ...) still reject array/struct values; structs bound to *any* column, including binary ones, also still throw — the exemption is array-shape-only.
+
+### `getMetadata().type` Returns FQN on BoxLang
+
+`getMetadata(obj).type` returns the literal string `"component"` on Lucee and Adobe CF, but returns the fully-qualified class name (e.g. `wheels.tests._assets.models.BulkItem`) on BoxLang. Test assertions that hardcode the string `"component"` silently pass on Lucee/Adobe and silently fail on BoxLang.
+
+```cfm
+// WRONG — passes on Lucee/Adobe, fails on BoxLang
+expect(found).toBeInstanceOf("component");
+
+// RIGHT — asserts against the Model base class via IsInstanceOf (all engines)
+expect(found).toBeWheelsModel();
+```
+
+**Why**: `IsInstanceOf(obj, "Model")` walks the inheritance chain identically on Lucee, Adobe CF, and BoxLang. `toBeWheelsModel()` is a wrapper on `wheels.wheelstest.system.Expectation` that routes through `toBeInstanceOf("Model")`.
+
+**Reference**: `vendor/wheels/wheelstest/system/Expectation.cfc::toBeWheelsModel`, issue #2662.
+
+### `local.X = ...` Inside `catch` Doesn't Persist (BoxLang)
+
+Writes to the `local` scope inside a `catch` block don't survive past the block on BoxLang. The catch body apparently runs under a nested `local` that gets discarded when control leaves; on Lucee and Adobe CF the catch shares the enclosing function's `local`, so the assignment sticks.
+
+```cfm
+// WRONG — passes on Lucee/Adobe, fails on BoxLang
+local.caught = false;
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    local.caught = true;   // discarded when catch exits on BoxLang
+}
+expect(local.caught).toBeTrue();   // reads outer local — still false
+
+// RIGHT — struct field assignment targets a heap object (all engines)
+var state = {caught = false};
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    state.caught = true;
+}
+expect(state.caught).toBeTrue();
+
+// ALSO RIGHT — var-declared name without `local.` prefix
+var caught = false;
+try {
+    Throw(type = "TestException", message = "boom");
+} catch (TestException e) {
+    caught = true;
+}
+expect(caught).toBeTrue();
+```
+
+**Why the bare-`var` form survives**: BoxLang's catch-scoped local only shadows keys written via explicit `local.X = ...`; an unscoped write to a `var`-declared name appears to resolve through the var-declaration slot and escapes the catch-scope shadow. Prefer the struct-field form anyway — it's cleaner, mirrors the prior-art `TenantResolverSpec` pattern, and doesn't rely on this behaviour being preserved across BoxLang releases.
+
+**Why this fires only in specs**: production code rarely needs a catch to flip a boolean for a later read in the same function — typical catch blocks rethrow, log, or assign struct fields. Specs that use `try/catch` to *assert* exception propagation are the natural trap, since they need the post-catch flag.
+
+**Reference**: issue #2744, regression test `vendor/wheels/tests/specs/model/lockingSpec.cfc :: "releases lock even when callback throws an exception"`. The same pattern works in `vendor/wheels/tests/specs/middleware/TenantResolverSpec.cfc` because it tracks state via `var result = {threw = false}; result.threw = true`.
+
 ### Private View Helpers Not Integrated
 
 `$integrateComponents()` only copies `public` methods into controllers. Private helper functions in view CFCs are never available.
@@ -175,6 +271,53 @@ private string function myHelper() { ... }
 // RIGHT — use public access with $ prefix for internal helpers
 public string function $myHelper() { ... }
 ```
+
+### `attributeCollection` with the `arguments` Scope (Adobe CF 2023/2025)
+
+Adobe CF 2023 and 2025 reject the raw `arguments` scope when passed as `attributeCollection` to *any* built-in CFML tag, throwing engine-specific errors (`cfheader` reports `"Failed to add HTML header"`) and aborting the request. Lucee 6/7, BoxLang, and Adobe CF 2018/2021 all accept the `arguments` scope without complaint. Both the string-interpolated form (`attributeCollection = "#arguments#"`) and the CFScript direct-struct form (`attributeCollection = arguments`) are affected.
+
+```cfm
+// WRONG — crashes Adobe CF 2023 and 2025
+cfheader(attributeCollection = "#arguments#");
+cfimage(attributeCollection = arguments);
+
+// RIGHT — copy to a plain struct first; either invocation form works once
+// `local.args` is a plain struct (the engine's stricter check only objects
+// to the special `arguments` scope object, not to the form of the call).
+local.args = {};
+for (local.key in arguments) {
+    local.args[local.key] = arguments[local.key];
+}
+cfheader(attributeCollection = "#local.args#");
+cfimage(attributeCollection = local.args);
+```
+
+**Why**: Adobe CF 2023 and 2025 impose a stricter type check on `attributeCollection` and require a plain CFML struct, not the special `arguments` scope object. The struct-copy pattern is safe and idiomatic across all engines. `$header()` is the dispatch-path blocker (runs on every request) — the others surface as soon as the corresponding helper is called.
+
+**Reference fix**: [#2750](https://github.com/wheels-dev/wheels/pull/2750) (closes #2741) — patches all 13 affected wrappers in `vendor/wheels/Global.cfc` uniformly: `$header`, `$cache`, `$content`, `$mail`, `$directory`, `$file`, `$location`, `$htmlhead`, `$image`, `$dbinfo`, `$invoke`, `$wddx`, `$zip`. `$dbinfo()` rebuilds the local copy before each of its four `cfdbinfo` calls because the catch path mutates `arguments` between calls — a useful pattern when a helper writes through `arguments` between tag invocations.
+
+### `cfheader` / `cfcontent` on a Committed Response (Adobe CF 2023/2025)
+
+Adobe CF 2023/2025 throws `InvalidHeaderException: Failed to add HTML header` from `cfheader`, and a similar exception from `cfcontent`, once the servlet response has been committed (the output buffer flushed). This bites hardest inside `onError` handlers, where partial view output has typically already flushed before the handler runs — the secondary `cfheader` failure then replaces the original exception in the response. Lucee and BoxLang tolerate the same call as a no-op.
+
+Use the canonical `$responseCommitted()` probe — `public boolean function $responseCommitted()` in `vendor/wheels/Global.cfc` — to short-circuit defensively. Wrap the actual tag call in `try/catch` and re-probe in the catch to rethrow only when the response is still uncommitted (a genuine caller bug):
+
+```cfm
+public void function $myTagWrapper() {
+    local.args = {};
+    for (local.key in arguments) local.args[local.key] = arguments[local.key];
+    if ($responseCommitted()) return;
+    try {
+        cfheader(attributeCollection = "#local.args#");
+    } catch (any e) {
+        if (!$responseCommitted()) rethrow;
+    }
+}
+```
+
+`$header()` and `$content()` already adopt this shape. Future tag wrappers (`$location`, `$cache`, `$htmlhead`, `$mail`, …) should pick up `$responseCommitted()` rather than reinventing the probe.
+
+**Reference fix**: [#2756](https://github.com/wheels-dev/wheels/pull/2756) — adds `$responseCommitted()` and applies the defensive shape to `$header()` and `$content()`.
 
 ## Database-Specific Gotchas
 
@@ -210,9 +353,87 @@ execute(sql="INSERT INTO roles (name) VALUES (?)", parameters=[{value="admin"}])
 execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
 ```
 
+### PostgreSQL / CockroachDB — Migration DDL Differences
+
+`PostgreSQLMigrator.addColumnOptions` (shared by `CockroachDBMigrator`) diverges from `Abstract.addColumnOptions` in two intentional ways:
+
+- **Empty string defaults**: Abstract-based adapters (MySQL, SQLite, H2, Oracle, MSSQL) omit the `DEFAULT` clause entirely when `default=""` on string/text/char columns. The PostgreSQL family emits `DEFAULT ''` explicitly.
+- **Boolean literals**: Abstract-based adapters serialize `true` as `1` / `false` as `0`. The PostgreSQL family emits `DEFAULT true` / `DEFAULT false`.
+
+When writing migrator spec assertions that check generated DDL, branch on `adapter.adapterName()`:
+
+```cfm
+var name = adapter.adapterName();
+var isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
+if (isPostgresFamily) {
+    expect(sql).toInclude("DEFAULT true");
+} else {
+    // Abstract-based adapters (MySQL, SQLite, H2, Oracle, MSSQL)
+    expect(sql).toInclude("DEFAULT 1");
+}
+```
+
+See `vendor/wheels/tests/specs/migrator/addColumnOptionsSpec.cfc` and `migrationSpec.cfc` for working examples of this branching idiom.
+
+### MySQL — TEXT and FLOAT DEFAULT suppression
+
+`MySQLMigrator.optionsIncludeDefault` returns `false` for `text`, `mediumtext`, `longtext`, and `float` columns. The inherited `Abstract.addColumnOptions` short-circuits the entire `DEFAULT` clause when `optionsIncludeDefault` returns false — meaning a non-empty `default="long body"` on a `text` column is silently dropped in the emitted DDL on MySQL. Rationale: pre-8.0.13 MySQL rejects `DEFAULT` on `TEXT`/`BLOB` columns outright.
+
+When writing migrator spec assertions that involve TEXT-family columns with non-empty defaults, add an `isMySQLFamily` carve-out alongside the `isPostgresFamily` one:
+
+```cfm
+var name = adapter.adapterName();
+var isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
+var isMySQLFamily = (name == "MySQL");
+
+if (isMySQLFamily) {
+    // DEFAULT clause is suppressed entirely for text/float on MySQL
+    expect(sql).notToInclude("DEFAULT");
+} else {
+    expect(sql).toInclude("DEFAULT");
+    expect(sql).toInclude("'long body'");
+}
+```
+
 ### CockroachDB (Soft-Fail in CI)
 
 CockroachDB is in CI but marked as soft-fail — test failures are logged as warnings, not build failures. Controlled by `SOFT_FAIL_DBS` in `.github/workflows/tests.yml`.
+
+### Oracle — Multi-Row INSERT and RETURNING Incompatibility
+
+Oracle 23 rejects `INSERT INTO t (cols) VALUES (?,?), (?,?), ...` (the SQL-standard table value constructor) when the JDBC driver also requests `RETURN_GENERATED_KEYS`. The Oracle JDBC driver translates `RETURN_GENERATED_KEYS` into a `RETURNING ROWID INTO` clause, and Oracle 23 does not permit `RETURNING` combined with multi-row VALUES.
+
+`OracleModel` overrides `$bulkInsertSQL()` to emit `INSERT ALL INTO t (cols) VALUES (...) INTO t (cols) VALUES (...) SELECT 1 FROM dual` — Oracle's idiomatic multi-row form, which avoids both the table value constructor and the RETURNING expansion. This is transparent to framework users; `insertAll()` works the same on Oracle as on other databases.
+
+If you write code that generates raw bulk-insert SQL for Oracle (or adds a new adapter), use `INSERT ALL ... SELECT 1 FROM dual` rather than multi-row VALUES. The canonical implementation is `vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc::$bulkInsertSQL`.
+
+### Oracle — DDL Auto-Commit and Transaction Wrapper
+
+Oracle implicitly commits DDL statements (RENAME, CREATE, ALTER, DROP, …) and closes the JDBC statement as part of that commit. If the DDL is wrapped in `transaction action="begin" { ... commit }`, the subsequent `transaction action="commit"` runs against a closed statement and raises `ORA: Closed statement`. PostgreSQL and SQLite (via SAVEPOINT) honor the wrapper and will roll back DDL on error. MySQL DDL also causes an implicit commit (the wrapper is a no-op there), but MySQL's multi-rename form — `RENAME TABLE a TO a', b TO b'` — is itself a single atomic statement, so no partial-rename scenario arises. Oracle cannot use the wrapper at all.
+
+If you write code that runs DDL inside a transaction block, branch on the adapter and run the DDL bare on Oracle. The canonical implementation is `vendor/wheels/Migrator.cfc::renameSystemTables`:
+
+```cfm
+if (FindNoCase("Oracle", dbType)) {
+    for (var sql in rv.sql) {
+        $query(datasource = dsn, sql = sql);
+    }
+} else {
+    transaction action="begin" {
+        try {
+            for (var sql in rv.sql) {
+                $query(datasource = dsn, sql = sql);
+            }
+            transaction action="commit";
+        } catch (any e) {
+            transaction action="rollback";
+            rethrow;
+        }
+    }
+}
+```
+
+There is no rollback to forfeit on Oracle — the implicit commit makes each DDL atomic on its own.
 
 ## Testing Across Engines
 

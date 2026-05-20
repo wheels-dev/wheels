@@ -158,9 +158,9 @@ For local development, the canonical stack is LuCLI with SQLite — `bash tools/
 
 ## Where to go next
 
-- [Testing guide](https://guides.wheels.dev/v4-0-0-snapshot/testing/) — the user-facing walkthrough for WheelsTest, TestClient, and the spec layout.
+- [Testing guide](https://guides.wheels.dev/v4-0-0/testing/) — the user-facing walkthrough for WheelsTest, TestClient, and the spec layout.
 - [Browser testing deep reference](https://github.com/wheels-dev/wheels/blob/develop/.ai/wheels/testing/browser-testing.md) — the full DSL surface, every gotcha we hit during the port, and the classloader/Playwright internals.
-- [Running tests locally](https://guides.wheels.dev/v4-0-0-snapshot/testing/running-tests-locally/) — LuCLI and Docker paths.
+- [Running tests locally](https://guides.wheels.dev/v4-0-0/testing/running-tests-locally/) — LuCLI and Docker paths.
 
 If you have been treating testing as the part of the Wheels workflow you do not really do, 4.0 is the release where that calculus changes. First green unit spec in under five minutes. First green browser test in under 30. Feedback welcome on everything that is not yet obvious — contributors this cycle include @bpamiri, @zainforbjs, @chapmandu, @mlibbe, @MukundaKatta, and Dependabot, and the feedback loop that shaped the testing surface is exactly the one we want to keep open for 4.0.x.
 

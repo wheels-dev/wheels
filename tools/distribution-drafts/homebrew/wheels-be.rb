@@ -106,6 +106,24 @@ class WheelsBe < Formula
           ;;
       esac
 
+      # `wheels deploy …` arg rewrite (issue #2674). picocli absorbs --version
+      # as a root-level flag even when it appears after a subcommand, so the
+      # documented `wheels deploy --version=v1.2.3` form blows up before
+      # Module.cfc's deploy parser ever runs. Rewrite to --release here so
+      # picocli sees something it doesn't claim. Module.cfc accepts both forms.
+      if [ "${1:-}" = "deploy" ]; then
+        __wheels_rewritten=()
+        for __wheels_arg in "$@"; do
+          case "${__wheels_arg}" in
+            --version=*)   __wheels_rewritten+=("--release=${__wheels_arg##--version=}") ;;
+            --version)     __wheels_rewritten+=("--release") ;;
+            *)             __wheels_rewritten+=("${__wheels_arg}") ;;
+          esac
+        done
+        set -- "${__wheels_rewritten[@]}"
+        unset __wheels_rewritten __wheels_arg
+      fi
+
       # Module + framework + sqlite-jdbc sync. Fast-path skips when versions match.
       MODULE_DIR="${LUCLI_HOME}/modules/wheels"
       MODULE_VERSION_FILE="${MODULE_DIR}/.module-version"

@@ -233,6 +233,15 @@ component {
 		boolean pageNumberAsParam,
 		any encode
 	) {
+		// One-time per-request deprecation warning (#2714) — mirrors $checkPluginsDeprecation() in Plugins.cfc.
+		if (!StructKeyExists(request.wheels, "$paginationLinksDeprecationLogged")) {
+			request.wheels.$paginationLinksDeprecationLogged = true;
+			WriteLog(
+				type = "warning",
+				text = "[Wheels] paginationLinks() is deprecated and will be removed in a future release. Use paginationNav() instead (or compose the individual helpers: firstPageLink/previousPageLink/pageNumberLinks/nextPageLink/lastPageLink). See https://github.com/wheels-dev/wheels/issues/1930"
+			);
+		}
+
 		/* To fix the bug below:
 			https://github.com/wheels-dev/wheels/issues/942
 

@@ -91,10 +91,10 @@ component output="false" {
 	include "../config/app.cfm";
 
 	function onApplicationStart() {
-		injector = new wheels.Injector("wheels.Bindings");
+		application.wheelsdi = new wheels.Injector("wheels.Bindings");
 
 		/* wheels/global object */
-		application.wo = injector.getInstance("global");
+		application.wo = application.wheelsdi.getInstance("global");
 		initArgs.path="wheels";
 		initArgs.filename="onapplicationstart";
 		application.wheelsdi.getInstance(name = "wheels.events.onapplicationstart", initArguments = initArgs).$init(this);
@@ -261,8 +261,8 @@ component output="false" {
 	}
 
 	public void function onError( any Exception, string EventName ) {
-		injector = new wheels.Injector("wheels.Bindings");
-		application.wo = injector.getInstance("global");
+		application.wheelsdi = new wheels.Injector("wheels.Bindings");
+		application.wo = application.wheelsdi.getInstance("global");
 
 		// In case the error was caused by a timeout we have to add extra time for error handling.
 		// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.

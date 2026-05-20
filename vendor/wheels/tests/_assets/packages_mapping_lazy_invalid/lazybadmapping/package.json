@@ -1,0 +1,7 @@
+{
+	"name": "wheels-lazy-bad",
+	"version": "1.0.0",
+	"description": "Test fixture: lazy package with invalid `mapping` — verifies lazy-load path rolls back lazyPackages entry on mapping failure (no mixins, no middleware, so lazy is allowed)",
+	"lazy": true,
+	"mapping": "123badlazy"
+}

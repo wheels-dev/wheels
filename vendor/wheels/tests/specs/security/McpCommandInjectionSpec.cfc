@@ -102,7 +102,9 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("rejects wheels without a subcommand", () => {
-					expect(len(trim(mid("wheels ", 7))) > 0).toBeFalse();
+					// Adobe CF requires mid(string, start, count); Lucee/BoxLang accept 2 args.
+					// All MCP command-parsing call sites must pass three arguments.
+					expect(len(trim(mid("wheels ", 7, len("wheels ")))) > 0).toBeFalse();
 				});
 
 			});
@@ -114,7 +116,7 @@ component extends="wheels.WheelsTest" {
 
 					expect(reFind("^wheels\s", command) > 0).toBeTrue();
 
-					var stripped = trim(mid(command, 7));
+					var stripped = trim(mid(command, 7, len(command)));
 					var parts = ListToArray(stripped, " ");
 					expect(ListFindNoCase(allowedSubcommands, parts[1]) > 0).toBeTrue();
 
@@ -130,7 +132,7 @@ component extends="wheels.WheelsTest" {
 				it("rejects a command with injected subcommand and metacharacters", () => {
 					var command = "wheels exec;rm -rf /";
 
-					var stripped = trim(mid(command, 7));
+					var stripped = trim(mid(command, 7, len(command)));
 					var parts = ListToArray(stripped, " ");
 					var subcommandAllowed = ListFindNoCase(allowedSubcommands, parts[1]) > 0;
 
@@ -147,7 +149,7 @@ component extends="wheels.WheelsTest" {
 				it("rejects a valid subcommand with unsafe arguments", () => {
 					var command = "wheels test run;whoami";
 
-					var stripped = trim(mid(command, 7));
+					var stripped = trim(mid(command, 7, len(command)));
 					var parts = ListToArray(stripped, " ");
 					expect(ListFindNoCase(allowedSubcommands, parts[1]) > 0).toBeTrue();
 
@@ -158,6 +160,14 @@ component extends="wheels.WheelsTest" {
 						}
 					}
 					expect(argsSafe).toBeFalse();
+				});
+
+				it("strips wheels prefix using Adobe-safe 3-arg mid()", () => {
+					// Adobe CF requires mid(string, start, count); the 2-arg form causes a compile-time
+					// "Parameter validation error for the MID function" that crashes the entire test bundle.
+					var command = "wheels generate model User";
+					var stripped = trim(mid(command, 7, len(command)));
+					expect(stripped).toBe("generate model User");
 				});
 
 			});

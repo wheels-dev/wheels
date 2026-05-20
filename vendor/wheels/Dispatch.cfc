@@ -257,6 +257,43 @@ component output="false" extends="wheels.Global"{
 			$debugPoint("setup");
 		}
 
+		// CORS preflight short-circuit: when the global middleware pipeline contains
+		// a `wheels.middleware.Cors` instance, run OPTIONS through the pipeline
+		// before route matching so unmatched preflight verbs reach the CORS handler
+		// instead of 404ing in $findMatchingRoute. The legacy
+		// `set(allowCorsRequests=true)` path aborted OPTIONS in EventMethods.cfc
+		// before dispatch; this preserves that contract for middleware users.
+		// See issue #2703.
+		local.preflightMethod = "";
+		try {
+			local.preflightMethod = $getRequestMethod();
+		} catch (any e) {
+			// Swallow intentionally: when request.cgi is not yet populated
+			// (e.g. test contexts or unusual dispatch paths) we fail closed by
+			// leaving preflightMethod empty so the short-circuit guard below is
+			// skipped and normal routing proceeds.
+		}
+		if (UCase(local.preflightMethod) == "OPTIONS" && $hasPreflightCapableMiddleware()) {
+			request.wheels.params = {};
+			// Cors.handle() reads the verb from arguments.request.cgi.request_method
+			// rather than arguments.request.method, so we don't carry the method
+			// field on this context. Cors is the only middleware that gates on
+			// this path; once it short-circuits, middleware registered after it
+			// does not run. Middleware registered before Cors still executes.
+			local.preflightContext = {
+				params = {},
+				route = {},
+				pathInfo = arguments.pathInfo
+			};
+			local.preflightHandler = function(required struct request) {
+				return "";
+			};
+			return variables.$middlewarePipeline.run(
+				request = local.preflightContext,
+				coreHandler = local.preflightHandler
+			);
+		}
+
 		local.params = $paramParser(argumentCollection = arguments);
 
 		// Set params in the request scope as well so we can display it in the debug info outside of the controller context.
@@ -323,6 +360,21 @@ component output="false" extends="wheels.Global"{
 
 			return variables.$middlewarePipeline.run(request = local.requestContext, coreHandler = local.coreHandler);
 		}
+	}
+
+	/**
+	 * Returns true if the global middleware pipeline contains a CORS middleware
+	 * instance capable of handling an OPTIONS preflight short-circuit. Used to
+	 * preserve the legacy `allowCorsRequests=true` short-circuit semantics in
+	 * the new middleware pipeline. See issue #2703.
+	 */
+	private boolean function $hasPreflightCapableMiddleware() {
+		for (local.mw in variables.$middlewarePipeline.getMiddleware()) {
+			if (IsObject(local.mw) && IsInstanceOf(local.mw, "wheels.middleware.Cors")) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

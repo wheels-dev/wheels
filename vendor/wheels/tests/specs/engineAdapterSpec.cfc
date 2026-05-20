@@ -39,6 +39,21 @@ component extends="wheels.WheelsTest" {
 				expect(code).toBeNumeric();
 			});
 
+			it("returns a valid HTTP status code without throwing on any engine", function() {
+				// Regression for #2659: BoxLangAdapter overrides getResponse() to
+				// return GetPageContext() (for getContentType's benefit), so the
+				// inherited Base.cfc::getStatusCode() resolved to
+				// PageContext.getStatus() — which BoxPageContext does not expose,
+				// throwing "Error getting method [getStatus] for class
+				// [ortus.boxlang.servlet.BoxPageContext]" across ~600 test cases.
+				// The BoxLang adapter must override getStatusCode() to reach the
+				// underlying HttpServletResponse directly.
+				var code = application.wheels.engineAdapter.getStatusCode();
+				expect(code).toBeNumeric();
+				expect(code).toBeGTE(100);
+				expect(code).toBeLT(600);
+			});
+
 			it("returns content type as string", function() {
 				var ct = application.wheels.engineAdapter.getContentType();
 				expect(IsSimpleValue(ct)).toBeTrue();

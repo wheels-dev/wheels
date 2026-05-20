@@ -35,8 +35,8 @@ cd "${BUILD_DIR}" && zip -r "../${EXPORT_DIR}/wheels-base-template-${VERSION}.zi
 # Generate checksums
 echo "Generating checksums..."
 cd "${EXPORT_DIR}"
-md5sum "wheels-base-template-${VERSION}.zip" > "wheels-base-template-${VERSION}.md5"
-sha512sum "wheels-base-template-${VERSION}.zip" > "wheels-base-template-${VERSION}.sha512"
+md5sum "wheels-base-template-${VERSION}.zip" > "wheels-base-template-${VERSION}.zip.md5"
+sha512sum "wheels-base-template-${VERSION}.zip" > "wheels-base-template-${VERSION}.zip.sha512"
 cd - > /dev/null
 
 # Copy bleeding edge version

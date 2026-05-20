@@ -1,0 +1,8 @@
+{
+	"name": "wheels-traversal",
+	"version": "1.0.0",
+	"description": "Test fixture: plural mapping path contains '..' — rejected so a package can't reach a sibling's directory",
+	"mappings": {
+		"traversal.foo": "../sentrystyle"
+	}
+}

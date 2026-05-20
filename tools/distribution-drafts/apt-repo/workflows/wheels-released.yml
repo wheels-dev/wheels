@@ -1,0 +1,191 @@
+# Receiver workflow for `wheels-dev/apt-wheels-dev`.
+#
+# Listens for `repository_dispatch` from `wheels-dev/wheels`'s release workflow,
+# downloads the new `.deb` asset from the upstream GitHub Release, slots it
+# into `pool/<channel>/w/<pkg>/`, regenerates the apt metadata via
+# `apt-ftparchive`, signs `Release` + `InRelease` with GPG, and commits the
+# whole tree back to this repo. Cloudflare Pages auto-deploys on push.
+#
+# Trigger payload contract (sender: wheels-dev/wheels release.yml):
+#   event_type:    "wheels-released"
+#   client_payload:
+#     version: "<x.y.z>" or "<x.y.z>-snapshot.<n>"   # full SemVer, no leading v
+#     channel: "stable" | "bleeding-edge"             # routes into the pool
+#
+# Manual dispatch is also supported via `workflow_dispatch` for backfill /
+# disaster-recovery (re-add a missing version without waiting for a new release).
+
+name: Publish to apt.wheels.dev
+
+on:
+  repository_dispatch:
+    types: [wheels-released]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Wheels version (e.g. 4.0.1 or 4.0.1-snapshot.1700)'
+        required: true
+        type: string
+      channel:
+        description: 'Release channel'
+        required: true
+        default: stable
+        type: choice
+        options:
+          - stable
+          - bleeding-edge
+
+permissions:
+  contents: write   # the workflow commits the regenerated metadata back to this repo
+
+concurrency:
+  # Serialize across both channels — apt-ftparchive scans the whole pool, so
+  # parallel runs would race on Packages.gz / Release writes.
+  group: publish-apt
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ github.event.client_payload.version || inputs.version }} (${{ github.event.client_payload.channel || inputs.channel }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve inputs
+        id: inputs
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            CHANNEL="${{ github.event.client_payload.channel }}"
+          else
+            VERSION="${{ inputs.version }}"
+            CHANNEL="${{ inputs.channel }}"
+          fi
+          if [ -z "$VERSION" ] || [ -z "$CHANNEL" ]; then
+            echo "::error::Both version and channel are required."
+            exit 1
+          fi
+          # Reject "release-candidate" and other channels we don't yet plumb.
+          case "$CHANNEL" in
+            stable|bleeding-edge) ;;
+            *) echo "::error::Unsupported channel: $CHANNEL"; exit 1 ;;
+          esac
+          # Map channel → package name (mirrors nfpm-wheels.yaml / nfpm-wheels-be.yaml).
+          case "$CHANNEL" in
+            stable)        PKG="wheels" ;;
+            bleeding-edge) PKG="wheels-be" ;;
+          esac
+          # Map channel → upstream releases repo. Stable releases live in
+          # wheels-dev/wheels; snapshot/BE releases live in wheels-dev/wheels-snapshots.
+          case "$CHANNEL" in
+            stable)        UPSTREAM_REPO="wheels-dev/wheels" ;;
+            bleeding-edge) UPSTREAM_REPO="wheels-dev/wheels-snapshots" ;;
+          esac
+          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL"           >> "$GITHUB_OUTPUT"
+          echo "pkg=$PKG"                   >> "$GITHUB_OUTPUT"
+          echo "upstream_repo=$UPSTREAM_REPO" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout bucket repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          # Persist the workflow token so the trailing `git push` works.
+          persist-credentials: true
+
+      - name: Install apt-ftparchive + gpg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils gnupg
+          apt-ftparchive --version
+          gpg --version | head -1
+
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.WHEELS_REPO_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.WHEELS_REPO_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GPG_PRIVATE_KEY:-}" ]; then
+            echo "::error::WHEELS_REPO_GPG_PRIVATE_KEY is unset; cannot sign Release."
+            exit 1
+          fi
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
+          # Trust the imported key ultimately so subsequent sign operations don't prompt.
+          # `import-ownertrust` expects the 40-char fingerprint (`fpr:` line, field 10),
+          # NOT the 16-char key_id (`sec:` line, field 5). Using the key_id form emits
+          # a "gpg: error in '[stdin]': invalid fingerprint" warning that's non-fatal
+          # but noisy in CI logs.
+          FINGERPRINT=$(gpg --list-secret-keys --with-colons \
+            | awk -F: '/^fpr:/ { print $10; exit }')
+          KEY_ID=$(gpg --list-secret-keys --keyid-format=long --with-colons \
+            | awk -F: '/^sec:/ { print $5; exit }')
+          echo "Imported signing key: $KEY_ID (fpr $FINGERPRINT)"
+          echo "$FINGERPRINT:6:" | gpg --batch --yes --import-ownertrust
+          echo "GPG_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
+
+      - name: Download .deb from upstream Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.inputs.outputs.version }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+          PKG: ${{ steps.inputs.outputs.pkg }}
+          UPSTREAM_REPO: ${{ steps.inputs.outputs.upstream_repo }}
+        run: |
+          set -euo pipefail
+          mkdir -p incoming
+          # GitHub Release URLs rewrite `~` to `.` at upload time. The version
+          # passed in `client_payload.version` uses `-snapshot.N` (SemVer), but
+          # the on-URL filename uses `.snapshot.N`. Translate.
+          URL_VERSION="${VERSION/-snapshot./.snapshot.}"
+          ASSET="${PKG}_${URL_VERSION}_amd64.deb"
+          TAG="v${VERSION}"
+          echo "Fetching ${ASSET} from ${UPSTREAM_REPO}@${TAG}"
+          gh release download "$TAG" \
+            --repo "$UPSTREAM_REPO" \
+            --pattern "$ASSET" \
+            --dir incoming/
+          ls -l incoming/
+
+      - name: Slot .deb into pool/
+        env:
+          VERSION: ${{ steps.inputs.outputs.version }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+          PKG: ${{ steps.inputs.outputs.pkg }}
+        run: |
+          set -euo pipefail
+          # Canonical pool form uses `~` (SemVer pre-release separator).
+          POOL_DIR="pool/${CHANNEL}/${PKG:0:1}/${PKG}"
+          POOL_FILE="${POOL_DIR}/${PKG}_${VERSION}_amd64.deb"
+          mkdir -p "$POOL_DIR"
+          # The downloaded file uses `.` in the snapshot separator; rename to `~`.
+          URL_VERSION="${VERSION/-snapshot./.snapshot.}"
+          mv "incoming/${PKG}_${URL_VERSION}_amd64.deb" "$POOL_FILE"
+          echo "Placed: $POOL_FILE"
+          # Idempotency: if the pool already had this version, the mv overwrote
+          # it. Re-runs of the same dispatch are safe (last-writer-wins).
+
+      - name: Regenerate apt metadata + sign
+        env:
+          GPG_PASSPHRASE: ${{ secrets.WHEELS_REPO_GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ env.GPG_KEY_ID }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/regenerate-apt-metadata.sh
+          ./scripts/regenerate-apt-metadata.sh
+
+      - name: Commit + push
+        env:
+          VERSION: ${{ steps.inputs.outputs.version }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+          PKG: ${{ steps.inputs.outputs.pkg }}
+        run: |
+          set -euo pipefail
+          git config user.name  "wheels-release-bot"
+          git config user.email "hello@wheels.dev"
+          git add pool/ dists/
+          if git diff --cached --quiet; then
+            echo "No changes — dispatch must have been a no-op (same version re-published?)."
+            exit 0
+          fi
+          git commit -m "publish: ${PKG} ${VERSION} (${CHANNEL})"
+          git push origin HEAD:main

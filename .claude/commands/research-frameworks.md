@@ -166,7 +166,13 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 
    Where `<CONFIDENCE_MARKER>` is:
    - `<!-- wheels-bot:research-confidence:high -->` if confidence is high
-   - omitted otherwise
+   - `<!-- wheels-bot:research-confidence:medium -->` if confidence is medium
+   - omitted if confidence is low
+
+   Both `high` and `medium` markers trigger auto-fire of
+   `bot-propose-fix.yml`. Low stays manual — material framework
+   disagreement or new-infrastructure proposals warrant a human discussion
+   before any code is written.
 
 7. **Self-check before posting.**
    - Have you cited at least one URL per framework?

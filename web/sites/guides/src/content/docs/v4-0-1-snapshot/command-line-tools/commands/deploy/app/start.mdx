@@ -1,0 +1,37 @@
+---
+title: "wheels deploy app start"
+description: docker start existing app containers for the given version.
+type: reference
+sidebar:
+  label: "start"
+  order: 2
+---
+
+`docker start` existing containers for the given version. Useful after a `stop`, or to resurrect a previously-pruned container.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy app start --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | **Required.** Must match an existing container's version label. |
+| `--role=<name>` | Limit to one role. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Emits `docker start <service>-<role>-<version>` on every host in the targeted role(s). Fails per-host if the container doesn't exist.
+
+Does not touch the proxy. For traffic to flow to started containers, follow up with `wheels deploy rollback --version=<v>`.
+
+## Example
+
+```bash title="example"
+wheels deploy app start --version=abc1234
+```

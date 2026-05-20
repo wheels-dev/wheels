@@ -1,0 +1,36 @@
+---
+title: Upgrading from 2.x to 3.x
+description: Pointer to the frozen v3.0 guides, which remain the authoritative source for the 2.x to 3.x hop.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Wheels 3.0 is documented in its own frozen guide. If you are upgrading 2.x to 3.x, use that as your authoritative source — it covers the config directory move, renamed conventions, and every other breaking change in detail.
+
+<LinkCard
+  title="Wheels 3.0 Guides"
+  description="Frozen documentation for the 2.x to 3.x upgrade."
+  href="/v3-0-0/"
+/>
+
+<LinkCard
+  title="Config Directory Migration (3.0.0)"
+  description="The specific 2.x to 3.x breaking change most apps hit first."
+  href="/v3-0-0/upgrading/3-0-0-config-migration/"
+/>
+
+## If you are hopping 2.x to 4.x in one sitting
+
+Do it in two passes, not one:
+
+1. Upgrade 2.x to 3.x first, following the [v3.0 guides](/v3-0-0/). Get the app booting on 3.x before touching 4.x.
+2. Then read [Upgrading from 3.x to 4.x](/v4-0-0/upgrading/3x-to-4x/) and apply those changes.
+
+Skipping the 3.x landing creates a combinatorial upgrade. Many 2→3 breaking changes assume 3.x semantics once applied, and many 3→4 breaking changes assume the same. Debugging a failure that straddles both hops is painful. Landing on 3.x first gives you a known-good checkpoint.
+
+<Aside type="note" title="Why this page is short">
+The v3.0 guides already document the 2.x to 3.x upgrade in full. Copying that content here would drift out of sync. This page exists only to route you there and to flag the two-pass pattern for anyone jumping straight to 4.x.
+</Aside>

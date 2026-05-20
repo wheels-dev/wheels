@@ -41,11 +41,15 @@ posts a comment classifying it as one of:
 - **`other`** — non-actionable docs feedback, support, or general
   discussion. No further automation.
 
-For high-confidence `bug` triages the bot emits an additional marker
-(`<!-- wheels-bot:triage-confidence:high -->`) which is the trigger for
-the propose-fix stage. For high-confidence `docs-request` triages the
-bot emits `<!-- wheels-bot:docs-confidence:high -->`, which is the
-trigger for the write-docs stage.
+For `bug` triages rated `high` or `medium` the bot emits an additional
+marker (`<!-- wheels-bot:triage-confidence:high -->` or
+`<!-- wheels-bot:triage-confidence:medium -->`) which is the trigger for
+the propose-fix stage. For `docs-request` triages rated `high` or `medium`
+the bot emits `<!-- wheels-bot:docs-confidence:high -->` or
+`<!-- wheels-bot:docs-confidence:medium -->`, which is the trigger for
+the write-docs stage. Low-confidence triages emit no trigger marker and
+stay manual — the downstream stages can still be invoked via
+`workflow_dispatch` once a human reviews the triage.
 
 ### 2. Cross-framework research (`bot-research.yml`)
 
@@ -63,15 +67,23 @@ Fires when triage classifies as `framework-design`. The bot:
    rules: any conflict with a CLAUDE.md anti-pattern caps at `medium`;
    material framework disagreement caps at `low`.
 
-For high-confidence research the bot emits
-`<!-- wheels-bot:research-confidence:high -->`, which is the trigger for
-the propose-fix stage on the framework-design path.
+For research rated `high` or `medium` the bot emits
+`<!-- wheels-bot:research-confidence:high -->` or
+`<!-- wheels-bot:research-confidence:medium -->`, either of which is the
+trigger for the propose-fix stage on the framework-design path. Low
+confidence (material framework disagreement, or proposals that require
+new infrastructure) emits no marker — those warrant a human discussion
+before code is written.
 
 ### 3. Propose Fix (`bot-propose-fix.yml`)
 
-Fires on the high-confidence triage marker (bug path) or the high-confidence
-research marker (framework-design path). Also runnable manually via
-`workflow_dispatch`.
+Fires on the triage marker (bug path) or the research marker
+(framework-design path) when rated `high` or `medium`. Low-confidence
+triages and research stay manual. Sensitive-area fixes (security,
+middleware, migrations, deploy, DI, cross-engine) are caught by
+propose-fix's own step-4 safety net before any PR is opened — see the
+auto-downgrade list in `.claude/commands/propose-fix.md`. Also runnable
+manually via `workflow_dispatch`.
 
 The bot:
 
@@ -97,9 +109,11 @@ for docs-only bot PRs (`docs/bot-*` branches from the write-docs stage).
 ### 4. Write Docs (`bot-write-docs.yml`)
 
 The docs-path counterpart to propose-fix. Fires from triage's
-`wheels-bot:docs-confidence:high` marker on issues classified as
-`docs-request`. Sonnet, 30-turn budget — doc work is pattern-recognition,
-not reasoning-heavy. Also runnable manually via `workflow_dispatch`.
+`wheels-bot:docs-confidence:high` or `wheels-bot:docs-confidence:medium`
+marker on issues classified as `docs-request`. Low-confidence
+docs-requests stay manual. Sonnet, 30-turn budget — doc work is
+pattern-recognition, not reasoning-heavy. Also runnable manually via
+`workflow_dispatch`.
 
 The bot:
 
@@ -317,9 +331,12 @@ they make every workflow safely retryable.
 | `wheels-bot:triage:<issue>` | Triage stage processed this issue. |
 | `wheels-bot:triage-class:<bug\|framework-design\|docs-request\|other>` | Triage classification. |
 | `wheels-bot:triage-confidence:high` | Triggers propose-fix on the bug path. |
+| `wheels-bot:triage-confidence:medium` | Triggers propose-fix on the bug path. Sensitive areas are caught by propose-fix's step-4 safety net. |
 | `wheels-bot:docs-confidence:high` | Triggers write-docs on the docs-request path. |
+| `wheels-bot:docs-confidence:medium` | Triggers write-docs on the docs-request path. Structural docs decisions are caught by write-docs's step-4 safety net. |
 | `wheels-bot:research:<issue>` | Research stage processed this issue. |
 | `wheels-bot:research-confidence:high` | Triggers propose-fix on the framework-design path. |
+| `wheels-bot:research-confidence:medium` | Triggers propose-fix on the framework-design path. |
 | `wheels-bot:fix:<issue>` | Fix PR has been opened for this issue. |
 | `wheels-bot:fix-held:<issue>` | Fix would have been proposed but the safety net held it for a human. |
 | `wheels-bot:write-docs:<issue>` | Write Docs stage opened a docs PR for this issue. |
@@ -371,10 +388,10 @@ they make every workflow safely retryable.
   and Reviewer A verdicts; flip `WHEELS_BOT_ENABLED=false` if anything
   looks off.
 - **Auto-fire (Phase 4) is on.** propose-fix runs from
-  `wheels-bot:triage-confidence:high` and
-  `wheels-bot:research-confidence:high` markers; research runs from
+  `wheels-bot:triage-confidence:high|medium` and
+  `wheels-bot:research-confidence:high|medium` markers; research runs from
   `wheels-bot:triage-class:framework-design`; write-docs runs from
-  `wheels-bot:docs-confidence:high`; bot-update-docs runs on
+  `wheels-bot:docs-confidence:high|medium`; bot-update-docs runs on
   `pull_request: opened` for `wheels-bot[bot]` PRs (excluding
   `docs/bot-*` branches); **address-review runs on
   `wheels-bot:converged-changes:` markers from Reviewer B**;

@@ -122,13 +122,16 @@ component {
         }
     }
 
-    private void function $dispatchSsh(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatchSsh(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
         }
+        // #2696: raise defaults to true. Build/push failures (image not found,
+        // registry unreachable) must surface as errors, not silent success.
         var c = arguments.cmd;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 
     private array function $allHosts(required any cfg) {
@@ -139,10 +142,14 @@ component {
         return out;
     }
 
-    private string function $gitShortSha() {
+    // Stderr is drained but discarded on non-zero exit so git's "fatal: not a git repository..." doesn't surface as the version string.
+    public string function $gitShortSha(string workingDir = "") {
         try {
             var pb = createObject("java", "java.lang.ProcessBuilder")
                 .init(["git", "rev-parse", "--short", "HEAD"]);
+            if (len(arguments.workingDir)) {
+                pb.directory(createObject("java", "java.io.File").init(arguments.workingDir));
+            }
             pb.redirectErrorStream(true);
             var proc = pb.start();
             var reader = createObject("java", "java.io.BufferedReader").init(
@@ -154,7 +161,8 @@ component {
                 sb.append(line);
                 line = reader.readLine();
             }
-            proc.waitFor();
+            var exitCode = proc.waitFor();
+            if (exitCode != 0) return "unknown";
             return trim(sb.toString());
         } catch (any e) {
             return "unknown";

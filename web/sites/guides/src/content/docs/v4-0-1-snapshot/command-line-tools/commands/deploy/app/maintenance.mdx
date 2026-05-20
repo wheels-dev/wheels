@@ -1,0 +1,41 @@
+---
+title: "wheels deploy app maintenance"
+description: Write the server-side maintenance marker file so the app can return a maintenance response.
+type: reference
+sidebar:
+  label: "maintenance"
+  order: 9
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Write the server-side maintenance marker. Pair with [`app live`](/v4-0-1-snapshot/command-line-tools/commands/deploy/app/live/) to clear it.
+
+## Synopsis
+
+```  title="synopsis"
+wheels deploy app maintenance --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version=<v>` | **Required** by the same parser as the other app verbs. |
+| `--role=<name>` | Limit to one role. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Emits `touch /tmp/kamal-maintenance-<service>` on every host in the targeted role(s). Your app is responsible for checking for the marker and serving a maintenance response — this verb only writes the file.
+
+<Aside type="note" title="Phase 2 simplification">
+The Phase 2 port uses a marker-file convention rather than `kamal-proxy`'s native maintenance mode. A follow-up will swap in native proxy-level maintenance for true out-of-band blocking — the file-based approach here assumes app-level cooperation.
+</Aside>
+
+## Example
+
+```bash title="example"
+wheels deploy app maintenance --version=abc1234
+```

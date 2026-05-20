@@ -1,0 +1,6 @@
+{
+	"name": "wheels-notastruct",
+	"version": "1.0.0",
+	"description": "Test fixture: plural `mappings` field is a string, not a struct — fails the IsStruct guard in $registerAdditionalMappings",
+	"mappings": "not-a-struct"
+}

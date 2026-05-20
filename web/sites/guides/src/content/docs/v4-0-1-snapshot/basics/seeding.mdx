@@ -1,0 +1,150 @@
+---
+title: Seeding
+description: Populate development and production databases with default records — idempotently.
+type: howto
+sidebar:
+  order: 9
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Seeds are the records your app can't live without — system roles, feature flags, a "General" category, the default tenant. You describe them once in `app/db/seeds.cfm` using `seedOnce()`, then re-run the file any time without worrying about duplicates or errors. A fresh clone of your repo reaches a working baseline by applying migrations and then running seeds.
+
+**You'll learn:**
+
+- Why seeds live outside migrations and when to reach for each
+- How `seedOnce()` makes re-running safe by default
+- How to split shared seeds from environment-specific seeds
+- How to run seeds from the CLI and scaffold new seed files
+
+<Aside type="note">
+  You should already know how to define models and write migrations. See [Models and the ORM](/v4-0-1-snapshot/basics/models-and-the-orm/) and [Migrations](/v4-0-1-snapshot/basics/migrations/).
+</Aside>
+
+## Why seeds — and not migrations
+
+Seeds are idempotent. You can run them on a brand-new database, on a database that already has most of the records, or on one that has all of them — the outcome is the same and nothing breaks. Migrations are the opposite: each one runs exactly once per database, carries the schema forward, and lands a permanent row in `schema_migrations`. Edit a migration that's already been applied in production and the edit never runs.
+
+Mix those responsibilities and you get drift. A row inserted by a migration on Tuesday can't be updated by re-running the migration on Thursday; you need a second migration for that. A row inserted by `seedOnce()` in `seeds.cfm` can be changed by editing the seed file and re-running — or left alone if it's already there. Production data that should exist on every deployment (system roles, feature flags, tenant defaults, lookup tables) belongs in seeds. Schema changes belong in migrations.
+
+## The canonical seeds file
+
+Shared seeds — the ones that should run in every environment — live in `app/db/seeds.cfm`. The file is plain CFML script; each `seedOnce()` call describes one record.
+
+```cfm {test:compile}
+seedOnce(
+    modelName="Role",
+    uniqueProperties="name",
+    properties={
+        name: "admin",
+        description: "Administrator with full access"
+    }
+);
+seedOnce(
+    modelName="Role",
+    uniqueProperties="name",
+    properties={
+        name: "member",
+        description: "Regular user"
+    }
+);
+```
+
+Run it with `wheels seed`. The seeder opens a transaction, includes `app/db/seeds.cfm`, runs every `seedOnce()` call, and commits. If any call throws, the whole file rolls back — you never end up half-seeded.
+
+## How `seedOnce` stays idempotent
+
+`seedOnce()` takes three arguments: the model name, a comma-delimited list of `uniqueProperties`, and a struct of `properties` for the new record. The `uniqueProperties` must appear in the `properties` struct — those are the fields the seeder uses to decide whether a matching record already exists.
+
+Under the hood, it calls `model("<ModelName>").findOne(where="<uniqueProperty>='<value>'")` first. If the record exists, the call increments `totalSkipped` and returns silently. If not, it calls `model(...).new(properties).save()` and increments `totalCreated`. Re-running is always safe: no duplicates, no errors, no surprises.
+
+The `properties` struct is what gets persisted on creation, so include every non-nullable column the model needs — not just the unique ones. The `uniqueProperties` list is only the subset used for the lookup.
+
+## Environment-specific seeds
+
+Seeds that should only run in some environments live in `app/db/seeds/<environment>.cfm`. Common uses: dev-only test accounts, sample content for staging, production-only admin users wired to real email addresses.
+
+```cfm {test:compile}
+seedOnce(
+    modelName="User",
+    uniqueProperties="email",
+    properties={
+        firstName: "Dev",
+        lastName: "User",
+        email: "dev@example.com",
+        password: "hunter2"
+    }
+);
+```
+
+Save that as `app/db/seeds/development.cfm` and it runs after `seeds.cfm` whenever the current environment is `development`. The same pattern works for `testing.cfm` and `production.cfm`.
+
+Execution order is fixed: `app/db/seeds.cfm` runs first (always), then `app/db/seeds/<environment>.cfm` (if present). Both files share the same transaction — a failure in either rolls the whole run back.
+
+## Running seeds
+
+Seeds run against your app's datasource, so the server has to be up.
+
+```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+wheels --version
+```
+
+The commands you'll actually use day-to-day:
+
+- `wheels seed` — run convention seeds, auto-detecting the current environment
+- `wheels seed --environment=production` — run seeds for a specific environment regardless of where the app thinks it's running
+- `wheels generate seed` — scaffold `app/db/seeds.cfm` if it doesn't already exist
+- `wheels generate seed --all` — scaffold `seeds.cfm` plus `seeds/development.cfm` and `seeds/production.cfm` stubs
+
+There's also `wheels seed --generate`, which bypasses your seed files and generates random fake records for every model. It's legacy behaviour from before `seedOnce()` existed and rarely what you want — prefer explicit `seedOnce()` calls where you control the data.
+
+## Multiple `seedOnce` calls in one file
+
+Every `seedOnce()` call in a seed file runs inside the same transaction, so if any of them throws, nothing commits. That's the point: if the seventh call fails because of a typo, the first six don't leak into production.
+
+The common pattern is to seed parent records first, then look them up to wire children:
+
+```cfm {test:compile}
+seedOnce(
+    modelName="Category",
+    uniqueProperties="slug",
+    properties={ name: "Announcements", slug: "announcements" }
+);
+category = model("Category").findOne(where="slug='announcements'");
+seedOnce(
+    modelName="Post",
+    uniqueProperties="slug",
+    properties={
+        title: "Welcome",
+        slug: "welcome",
+        body: "...",
+        categoryId: category.id
+    }
+);
+```
+
+The `findOne()` in the middle works whether `seedOnce()` just created the category or found an existing one — the record is there either way by the time the next line runs.
+
+## What `seedOnce` can't do
+
+The `once` in `seedOnce()` is the whole point, so a few things are explicitly out of scope:
+
+- **Update existing records.** Re-running doesn't change already-seeded rows. If you edit the `description` in a `seedOnce()` block, the change only applies to databases where the record didn't exist yet.
+- **Delete records.** There's no "seedUnset". If you need to remove a seeded row, write a one-off migration.
+- **Manage many-to-many joins automatically.** You'd seed each side plus the join row manually.
+
+For any of those, write a one-off migration or a script under `app/lib/` that you invoke from a CLI command.
+
+## Testing with seeds
+
+Tests should not run production seeds. The test harness has its own fixture setup — `tests/populate.cfm` in the WheelsTest convention — that builds whatever records each spec needs and tears them down between runs. Pointing the seeder at a test database would couple your specs to whatever rows happen to live in `seeds.cfm`, which is the opposite of what fixtures are for.
+
+Testing content lands in Phase 2b; until then, see the stub at [Testing](/v4-0-1-snapshot/testing/).
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Models and the ORM" href="/v4-0-1-snapshot/basics/models-and-the-orm/" description="The finders and create() calls seedOnce() wraps for idempotency." />
+  <LinkCard title="Migrations" href="/v4-0-1-snapshot/basics/migrations/" description="Schema changes belong here, not in seeds — and vice versa." />
+  <LinkCard title="Database and Multiple Datasources" href="/v4-0-1-snapshot/basics/database-and-multiple-datasources/" description="Configuring the connection seeds run against." />
+</CardGrid>

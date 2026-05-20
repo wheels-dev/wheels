@@ -1,0 +1,6 @@
+{
+	"name": "wheels-overridden",
+	"version": "1.0.0",
+	"description": "Test fixture: explicit manifest `mapping` override",
+	"mapping": "customAlias"
+}

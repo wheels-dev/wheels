@@ -8,12 +8,14 @@ Wheels 3.x used this directory for the plugin system. For v4.0 and beyond, plugi
 
 Install a package into `vendor/<name>/`. First-party packages live under `wheels-dev/` on GitHub and are indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry.
 
-Wheels 4.1 will ship `wheels packages install wheels-hotwire`. Until then, the interim install is a manual clone:
+Add a package to your app:
 
 ```bash
-gh repo clone wheels-dev/wheels-hotwire vendor/wheels-hotwire
-wheels reload
+wheels packages add wheels-hotwire
+wheels stop && wheels start
 ```
+
+Note: the install verb is `add`, not `install`.
 
 See [Packages](https://wheels.dev/v4-0-0-snapshot/digging-deeper/) in the guides for details.
 

@@ -261,9 +261,7 @@ component extends="wheels.WheelsTest" {
             var artifactDir = this.browserArtifactPath
                 ?: expandPath("/tests/_output/browser");
 
-            if (!directoryExists(artifactDir)) {
-                directoryCreate(artifactDir, true);
-            }
+            $ensureArtifactDir(artifactDir);
 
             var rawName = arguments.spec.name ?: "unknown_spec";
             var safeName = reReplace(rawName, "[^a-zA-Z0-9_\-]", "_", "all");
@@ -276,6 +274,17 @@ component extends="wheels.WheelsTest" {
         } catch (any e) {
             // Best-effort: page may have crashed, context may be closed.
             // Swallow to avoid masking the real test failure.
+        }
+    }
+
+    // Adobe CF rejects directoryCreate(path, true) — see #2614. Use mkdirs() instead.
+    public void function $ensureArtifactDir(required string path) {
+        if (directoryExists(arguments.path)) {
+            return;
+        }
+        var created = createObject("java", "java.io.File").init(arguments.path).mkdirs();
+        if (!created && !directoryExists(arguments.path)) {
+            throw(type="Wheels.BrowserTest.ArtifactDir", message="Could not create artifact directory '#arguments.path#'.");
         }
     }
 

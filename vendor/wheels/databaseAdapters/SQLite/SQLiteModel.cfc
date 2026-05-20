@@ -143,6 +143,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * SQLite's lock methods are no-ops (file-level locking only) but they
+	 * never throw, so the `withAdvisoryLock` contract is honored: callback
+	 * runs and its return value flows through. Treated as supported for the
+	 * purposes of capability checks.
+	 */
+	public boolean function $supportsAdvisoryLocks() {
+		return true;
+	}
+
+	/**
 	 * SQLite does not support SELECT ... FOR UPDATE.
 	 * Returns empty string to no-op.
 	 */

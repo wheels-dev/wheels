@@ -1,0 +1,229 @@
+---
+title: File Uploads & Downloads
+description: Multipart uploads, storage backends, validation, and serving downloads safely.
+type: howto
+sidebar:
+  order: 6
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to accept file uploads, validate and store them, and serve downloads back. Wheels ships `sendFile()` for downloads and the `fileField` form helper on the upload side. It does not wrap multipart parsing — that path is Lucee's native `<cffile action="upload">`, and this guide is explicit about where you drop down to CFML.
+
+**You'll learn:**
+
+- How to render a multipart upload form with `fileField`
+- How to receive an upload in the controller with `<cffile action="upload">`
+- How to validate size, content type, and extension
+- How to store files safely on disk or object storage
+- How to serve downloads with `sendFile()`
+- How to stream large files and lock down who can fetch them
+
+<Aside type="note">
+  You should already know: Wheels controllers, the `params` struct, and form helpers. Finish the [tutorial](/v4-0-0/start-here/tutorial/) first. Skim [Forms and Form Helpers](/v4-0-0/basics/forms-and-form-helpers/) and [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) if either feels shaky.
+</Aside>
+
+## The upload form
+
+Browsers will not submit file content unless the form is encoded as `multipart/form-data`. `startFormTag()` flips the encoding for you when you pass `multipart=true`; pair it with `fileField` to render the object-bound `<input type="file">`:
+
+```cfm {test:compile} title="app/views/users/new.cfm"
+<cfoutput>
+    ##startFormTag(route="users", method="post", multipart=true)##
+        ##textField(objectName="user", property="firstName")##
+        ##fileField(objectName="user", property="avatar")##
+        <button type="submit">Upload</button>
+    ##endFormTag()##
+</cfoutput>
+```
+
+The rendered tag is `<form enctype="multipart/form-data" method="post" ...>` with a matching `<input type="file" name="user[avatar]">`. If you'd rather not bind to a model instance, use `fileFieldTag(name="avatar")`.
+
+## Receiving the upload
+
+Wheels does not unwrap the multipart body into a struct on `params`. The form field arrives as a server-side path to a temp file that Lucee parked for you; you take ownership of it with `<cffile action="upload">`. That tag populates a `cffile` struct with details about the uploaded file (server name, client name, size, content type, extension):
+
+```cfm {test:compile} title="app/controllers/Users.cfc"
+component extends="Controller" {
+    function create() {
+        user = model("User").new(params.user);
+
+        local.uploadDir = expandPath("/var/uploads/tmp/");
+        cffile(
+            action="upload",
+            fileField="user.avatar",
+            destination=local.uploadDir,
+            nameconflict="makeunique"
+        );
+
+        // cffile is the struct Lucee populates with the upload result.
+        user.avatarTempPath = local.uploadDir & cffile.serverFile;
+        user.avatarClientName = cffile.clientFile;
+        user.avatarSize = cffile.fileSize;
+        user.avatarContentType = cffile.contentType;
+
+        if (user.save()) {
+            redirectTo(route="user", key=user.id);
+        } else {
+            renderView(action="new");
+        }
+    }
+}
+```
+
+<Aside type="caution">
+  `<cffile action="upload">` writes the file to disk before you've had a chance to validate it. Always upload to a temp directory that is **outside your web root** and that your web server refuses to serve. Move the file to its final home only after validation.
+</Aside>
+
+## Validating the upload
+
+Lucee's `cffile` struct is the source of truth — everything you need to validate lives on it. Put the rules on the model so the controller stays thin:
+
+```cfm {test:compile} title="app/models/User.cfc"
+component extends="Model" {
+    function config() {
+        validate(methods="validateAvatarUpload");
+    }
+
+    private function validateAvatarUpload() {
+        if (!StructKeyExists(this, "avatarTempPath") || !Len(this.avatarTempPath)) {
+            return; // no upload this save — nothing to check
+        }
+
+        if (this.avatarSize > 5 * 1024 * 1024) {
+            addError(property="avatar", message="Avatar must be 5 MB or smaller.");
+        }
+
+        local.allowedTypes = "image/jpeg,image/png,image/gif";
+        if (!ListFindNoCase(local.allowedTypes, this.avatarContentType)) {
+            addError(property="avatar", message="Avatar must be a JPEG, PNG, or GIF.");
+        }
+
+        local.allowedExt = "jpg,jpeg,png,gif";
+        local.ext = LCase(ListLast(this.avatarClientName, "."));
+        if (!ListFindNoCase(local.allowedExt, local.ext)) {
+            addError(property="avatar", message="Avatar extension not allowed.");
+        }
+
+        if (!isImageFile(this.avatarTempPath)) {
+            addError(property="avatar", message="Avatar is not a valid image.");
+        }
+    }
+}
+```
+
+Defence in depth: the browser can lie about `contentType` and the user can rename `payload.exe` to `avatar.png`. Check size, content type, and extension, then re-verify the content server-side — `isImageFile()` opens the file and confirms it parses as an image. For PDFs, read the first four bytes and check for `%PDF`. For virus scanning, shell out to a ClamAV daemon with `cfexecute` on a call to `clamscan`.
+
+## Saving the file
+
+Once the upload validates, move it out of the temp directory to its permanent home. Namespace by the owner's primary key so two users uploading `avatar.jpg` don't collide, and store only the relative path (or an opaque key) on the record — absolute paths leak server layout and break when you change disks:
+
+```cfm {test:compile} title="app/controllers/Users.cfc"
+component extends="Controller" {
+    function create() {
+        user = model("User").new(params.user);
+
+        local.tmpDir = expandPath("/var/uploads/tmp/");
+        cffile(action="upload", fileField="user.avatar", destination=local.tmpDir, nameconflict="makeunique");
+        user.avatarTempPath = local.tmpDir & cffile.serverFile;
+        user.avatarClientName = cffile.clientFile;
+        user.avatarSize = cffile.fileSize;
+        user.avatarContentType = cffile.contentType;
+
+        if (!user.save()) {
+            fileDelete(user.avatarTempPath);
+            renderView(action="new");
+            return;
+        }
+
+        local.finalDir = expandPath("/var/uploads/avatars/##user.id##/");
+        if (!directoryExists(local.finalDir)) {
+            directoryCreate(local.finalDir);
+        }
+        local.ext = LCase(ListLast(user.avatarClientName, "."));
+        local.finalName = "avatar." & local.ext;
+        fileMove(user.avatarTempPath, local.finalDir & local.finalName);
+        user.update(avatarPath="avatars/##user.id##/##local.finalName##");
+
+        redirectTo(route="user", key=user.id);
+    }
+}
+```
+
+The stored path (`avatars/42/avatar.png`) is relative to a known root — a UUID or a hash of the contents is a safer stored filename than the client-supplied name, which can contain shell metacharacters, `..`, or Unicode lookalikes.
+
+## Storage backends
+
+The disk-writing code above works for a single-node app. The moment you add a second app server behind a load balancer, local disk stops being shared and uploads go missing half the time. Point at object storage instead:
+
+- **S3, R2, GCS, or any S3-compatible endpoint.** Wheels does not ship an S3 client. Use a community package such as [s3sdk](https://forgebox.io/view/s3sdk), call the REST API directly with `cfhttp` and `awssign`, or shell out to the `aws` CLI with `cfexecute`. Upload the temp file into a bucket, persist the object key on the record, and reach for the same key on read.
+- **Local disk** is still fine for single-node prod, dev, and CI. Keep the upload directory on its own volume so it survives deploys.
+
+Whichever you pick, the controller shape stays the same: validate, move out of temp, record the key on the model.
+
+## Serving downloads
+
+`sendFile()` is a thin wrapper around `cfheader` + `cfcontent` that picks a MIME type from the file extension, sets `Content-Disposition`, and streams the body:
+
+```cfm {test:compile} title="app/controllers/Invoices.cfc"
+component extends="Controller" {
+    function config() {
+        filters(through="requireLogin");
+        filters(through="loadInvoice", only="download");
+    }
+
+    function download() {
+        if (variables.invoice.userId != session.userId) {
+            renderText(text="Not found", status=404);
+            return;
+        }
+
+        sendFile(
+            file="invoices/##variables.invoice.id##.pdf",
+            name="invoice-##variables.invoice.number##.pdf"
+        );
+    }
+
+    private function loadInvoice() {
+        variables.invoice = model("Invoice").findByKey(key=params.key);
+        if (!IsObject(variables.invoice)) {
+            renderText(text="Not found", status=404);
+        }
+    }
+}
+```
+
+Signature: `sendFile(file, name, type, disposition, directory, deleteFile, deliver)`. Defaults worth knowing:
+
+- `file` is resolved relative to the `filePath` setting, which defaults to `files/` under the app root. Pass `directory="/var/uploads"` to serve from outside the app.
+- `name` overrides what the browser shows in the Save dialog. Use it to hide storage filenames from the client.
+- `type` overrides the auto-detected MIME type.
+- `disposition` is `"attachment"` by default (force download) — pass `"inline"` to render in-browser for PDFs and images.
+- `deleteFile=true` removes the file on disk after the response flushes. Handy for one-off report exports you generated into a temp dir.
+
+`sendFile()` writes to the response and does not return — no `abort` needed.
+
+## Streaming large files
+
+`cfcontent` streams through the servlet output buffer rather than reading the whole file into memory, so `sendFile()` handles multi-hundred-megabyte artifacts without blowing the heap. That said, the request thread is tied up for the entire transfer. For files in the gigabyte range — video, backups, big archives — offload to a CDN or a pre-signed S3 URL so your app server isn't the bottleneck.
+
+If you need range requests (HTTP 206, so browsers can resume a download or seek inside a video), `cfcontent` doesn't emit them. Drop to the raw servlet response via `getPageContext().getResponse()` and stream manually, or front the app with nginx and let it serve the file directly with `X-Accel-Redirect`.
+
+## Security
+
+Uploads and downloads are where apps leak the most. The short list:
+
+- **Sanitize filenames.** Strip `..`, path separators, null bytes, and shell metacharacters from anything the client sent. Better: don't use the client filename on disk at all — generate a UUID or content hash and keep the original only in a column for the download dialog.
+- **Verify content server-side.** Don't trust `contentType` from the browser. For images, `isImageFile()` parses the bytes. For PDFs, check magic bytes (`%PDF`). For anything else, a library that actually parses the format beats a string comparison on the header.
+- **Serve from a separate origin.** Put user uploads on `uploads.example.com`, not the main app domain. A malicious SVG uploaded to the app origin can run JavaScript in your users' sessions; on a separate origin, the same-origin policy contains it. Set `Content-Disposition: attachment` as belt-and-braces so the browser downloads rather than renders.
+- **Authorize every download.** Don't hand out predictable URLs like `/uploads/42/avatar.png` from the web root. Route downloads through a controller action that checks ownership, then emits `sendFile()`. Short-lived signed URLs are fine for object-storage backends.
+- **Rate limit.** Both sides. Upload endpoints invite abuse (disk fill, compute-heavy validation); download endpoints invite scraping. Pair with [Rate Limiting](/v4-0-0/digging-deeper/rate-limiting/) per IP and per user.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Forms and Form Helpers" href="/v4-0-0/basics/forms-and-form-helpers/" description="Where fileField and startFormTag come from." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="Filters, params, and the action lifecycle the upload flow sits inside." />
+  <LinkCard title="Background Jobs" href="/v4-0-0/digging-deeper/background-jobs/" description="Generate thumbnails, transcode video, or virus-scan uploads on a worker." />
+  <LinkCard title="Rate Limiting" href="/v4-0-0/digging-deeper/rate-limiting/" description="Throttle both upload and download endpoints per IP and per user." />
+</CardGrid>

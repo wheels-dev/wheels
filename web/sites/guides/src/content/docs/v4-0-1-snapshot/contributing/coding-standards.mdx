@@ -1,0 +1,216 @@
+---
+title: Coding standards
+description: Code style, cross-engine rules, and the test-before-push bar for Wheels framework contributors.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+These are the rules for code that ships in `vendor/wheels/`. They exist because Wheels runs on Lucee 5/6/7, Adobe CF 2018-2025, and BoxLang — and each engine will happily let you write code that passes on one and fails on another. Follow the patterns below and you stay on the green side of CI.
+
+**You'll learn:**
+
+- The naming and component conventions the framework uses throughout
+- The cross-engine traps that account for most CI failures
+- The minimum test bar you must clear before pushing
+- What the docs and review process expect of you
+
+<Aside type="note">
+  You should already be comfortable with CFML components and Wheels' model/controller basics. If you're about to edit `vendor/wheels/`, skim [Cross-engine compatibility](/v4-0-1-snapshot/troubleshooting/cross-engine-compatibility/) alongside this page.
+</Aside>
+
+## Naming
+
+- **camelCase everywhere.** Variables, arguments, function names, struct keys. `firstName`, not `first_name` or `FirstName`.
+- **Component files are PascalCase.** `Model.cfc`, `TableDefinition.cfc`. Models singular (`User.cfc`), controllers plural (`Users.cfc`), table names plural lowercase (`users`).
+- **Internal functions get a `$` prefix.** `$integrateComponents`, `$appKey`, `$initModelClass`. The `$` signals "framework internals — do not call from app code."
+- **Tests mirror the subject.** A spec for `BrowserClient.cfc` lives at `tests/specs/.../BrowserClientSpec.cfc`.
+
+## Component conventions
+
+Every framework component extends a framework base and initialises itself in `init()`. `Model.cfc` is the canonical shape:
+
+```cfm title="vendor/wheels/Model.cfc" {test:compile}
+component output="false" displayName="Model" extends="wheels.Global" {
+
+    function init() {
+        $integrateComponents("wheels.model");
+        return this;
+    }
+
+    public any function $initModelClass(required string name, required string path) {
+        variables.wheels = {};
+        variables.wheels.class = {};
+        variables.wheels.class.modelName = arguments.name;
+        return this;
+    }
+}
+```
+
+### The mixin `private` trap — use `public` with a `$` prefix
+
+`$integrateComponents()` only copies **public** methods from mixin CFCs (everything under `vendor/wheels/model/`, `vendor/wheels/controller/`, `vendor/wheels/view/`) into the target object. A helper declared `private` is silently skipped, and the method you expected to call simply does not exist on the integrated component.
+
+```cfm title="vendor/wheels/model/SomeMixin.cfc" {test:compile}
+component {
+
+    // WRONG — integration skips private methods. Caller sees "method not found."
+    private string function myInternalHelper() {
+        return "hi";
+    }
+
+    // RIGHT — public access, $ prefix signals "framework internal"
+    public string function $myInternalHelper() {
+        return "hi";
+    }
+}
+```
+
+BoxLang handles access differently and may make a `private` mixin work by accident — do not trust a BoxLang pass here. Lucee and Adobe will fail.
+
+## Cross-engine rules
+
+These come directly from `.ai/wheels/cross-engine-compatibility.md` and are the top causes of "works on my machine, red on CI" failures.
+
+### 1. `struct.map()` collision on Lucee and Adobe
+
+Both engines resolve `obj.map()` as the built-in struct member function, not your CFC's `map()` method. The DI container exposes `mapInstance()` as the engine-safe alias.
+
+```cfm title="illustrative — do not type" {test:compile}
+// WRONG — triggers struct.map(callback) on Lucee/Adobe
+arguments.container.map("myService").to("path").asSingleton();
+
+// RIGHT — use the alias that avoids the collision
+arguments.container.mapInstance("myService").to("path").asSingleton();
+```
+
+### 2. Adobe CF application scope does not store closures
+
+Adobe's `application` scope is Java-backed and loses function members across requests. Pass a plain struct context instead of mutating `application` directly.
+
+```cfm title="illustrative — do not type" {test:compile}
+// WRONG — works on Lucee, breaks on Adobe
+application.registerMiddleware = function() { return true; };
+
+// RIGHT — plain struct context
+var context = Duplicate(application);
+context.registerMiddleware = function() { return true; };
+```
+
+### 3. Closure `this` captures the declaring scope
+
+A closure binds `this` to where it is defined, not where it is assigned. Test code that dynamically attaches methods to a controller will call back into the spec, not the controller.
+
+```cfm title="illustrative — do not type" {test:compile}
+// WRONG — this.renderText() runs on the test spec
+_controller.myAction = function() {
+    this.renderText("hello");
+};
+
+// RIGHT — capture the reference in a shared struct
+var ctx = {ctrl: _controller};
+_controller.myAction = function() {
+    ctx.ctrl.renderText("hello");
+};
+```
+
+### 4. Bracket-notation calls crash Adobe 2021/2023 inside closures
+
+Split the lookup and the call.
+
+```cfm title="illustrative — do not type" {test:compile}
+// WRONG — crashes Adobe CF 2021/2023 parser inside closures
+var result = obj["dynamicMethod"]();
+
+// RIGHT — two statements
+var fn = obj["dynamicMethod"];
+var result = fn();
+```
+
+### 5. Adobe copies arrays by value inside struct literals
+
+`{arr: myArray}` duplicates the array on Adobe. Closures that append to the copy never touch the original. Reference through a parent struct.
+
+```cfm title="illustrative — do not type" {test:compile}
+// WRONG — Adobe copies myArray into the struct
+var config = {arr: myArray};
+
+// RIGHT — parent struct keeps the reference
+var parent = {arr: myArray};
+var config = {owner: parent};
+```
+
+### 6. `createDynamicProxy` requires a CFC on Lucee 7
+
+Lucee 6 accepted a struct with named function keys. Lucee 7 rejects it with `"Can't cast Complex Object Type Struct to String"`. Use a CFC. `vendor/wheels/wheelstest/DialogConsumer.cfc` is the reference pattern.
+
+### 7. `$appKey()` returns `"$wheels"` — set both scopes
+
+When test setup seeds defaults, set them on both `application.$wheels` and `application.wheels`. CI app reloads can break a single struct reference.
+
+## SQL and CFML string hygiene
+
+- **Never hardcode secrets.** Env vars, `.env` (never committed), or 1Password Connect lookups — never literals in `vendor/wheels/`.
+- **Parameterise queries** at every layer except migrations. In migrations, parameter binding through `execute()` is unreliable; use inline SQL with escaped literals (see the seed-data rule in the top-level project guide).
+- **Escape `#` in CFML string literals.** `#` is the expression delimiter, so HTML entities like `&#111;` in a string become a compile error. Write `&##111;`. One unescaped `#` in a spec file crashes the entire test suite, not just that file.
+- **Use `NOW()` in migration SQL** — it is the one timestamp function Wheels normalises across MySQL, PostgreSQL, SQL Server, H2, and SQLite.
+
+## Test before you push
+
+CI runs 20+ minutes across the full matrix. Do not use it as your inner loop. The minimum bar is **Lucee + Adobe** — they catch different bugs.
+
+### Fast loop — LuCLI + SQLite
+
+```bash title="your shell — from the wheels repo root"
+bash tools/test-local.sh            # full core suite on Lucee 7 + SQLite
+bash tools/test-local.sh model      # model specs only
+bash tools/test-local.sh security   # security specs only
+```
+
+The script starts a LuCLI server if one is not running, creates the SQLite DBs, runs the suite, and prints pass/fail counts. No Docker.
+
+### Pre-push minimum — two engines
+
+```bash title="your shell — from wheels/rig" {test:cli cmd="echo 'illustrative'"}
+cd rig
+docker compose up -d lucee6 adobe2025
+
+# Wait ~60s for startup
+curl -sf "http://localhost:60006/wheels/core/tests?db=sqlite&format=json" > /tmp/lucee6.json
+curl -sf "http://localhost:62025/wheels/core/tests?db=sqlite&format=json" > /tmp/adobe2025.json
+```
+
+If either returns HTTP 417 (test failures) or non-zero counts, fix before pushing. See [Running tests locally](/v4-0-1-snapshot/testing/running-tests-locally/) for the full engine-port table and database targets.
+
+<Aside type="caution">
+  Do not iterate on Adobe CF failures through CI. Run the Adobe container locally, reproduce, fix, re-run. Round-tripping through GitHub Actions burns ~20 minutes per attempt.
+</Aside>
+
+## Docs obligation
+
+Code changes that touch a public surface must update the guides in the same PR:
+
+- **New public API** (framework function, CLI command, middleware, package hook) — add a guide page under the matching section of `web/sites/guides/src/content/docs/v4-0-1-snapshot/`. Pick the Diátaxis type (`tutorial`, `howto`, `concept`, `reference`) and follow `web/sites/guides/STYLE.md`.
+- **Behaviour change to an existing API** — update the existing guide. Do not leave the old wording in place and patch only the release notes.
+- **Internal refactor with no surface change** — no docs update needed.
+
+The verify-docs harness checks every `{test:compile}` and `{test:cli}` block in the guides, so broken example code fails CI.
+
+## Code review expectations
+
+Maintainers flag issues; they do not rewrite your branch for you.
+
+- Expect review comments that point at specific lines with a required change. Push fixes as new commits, not force-pushed rewrites, until the review is approved.
+- A comment like "this needs a test" means add the test before re-requesting review. Do not argue the change is obvious.
+- A comment like "this breaks Adobe" means run the Adobe container locally and prove your fix works before replying.
+- Scope creep gets rejected. One PR, one concern. Open a follow-up for the adjacent cleanup you spotted.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Running tests locally" href="/v4-0-1-snapshot/testing/running-tests-locally/" description="The wheels test CLI, tools/test-local.sh, and the Docker cross-engine matrix." />
+  <LinkCard title="Conventions over configuration" href="/v4-0-1-snapshot/core-concepts/conventions-over-configuration/" description="Why Wheels names things the way it does, and when to override." />
+  <LinkCard title="Submitting pull requests" href="/v4-0-1-snapshot/contributing/pull-requests/" description="The fork-branch-test-submit flow and how to pass commitlint on the first try." />
+</CardGrid>

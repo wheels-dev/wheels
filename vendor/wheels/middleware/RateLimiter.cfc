@@ -62,6 +62,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
+		if (arguments.windowSeconds <= 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter windowSeconds: #arguments.windowSeconds#. Must be a positive number — every strategy treats this as a divisor or an interval, so zero or negative values would either divide by zero (fixedWindow, tokenBucket) or let every request through (slidingWindow)."
+			);
+		}
+
+		if (arguments.maxRequests < 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter maxRequests: #arguments.maxRequests#. Must be zero or positive. Use maxRequests=0 to block every request (kill-switch); negative values are meaningless."
+			);
+		}
+
 		if (!ListFindNoCase("memory,database", arguments.storage)) {
 			throw(
 				type = "Wheels.RateLimiter.InvalidStorage",
@@ -73,6 +87,22 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			throw(
 				type = "Wheels.RateLimiter.InvalidProxyStrategy",
 				message = "Invalid proxy strategy: #arguments.proxyStrategy#. Must be first or last."
+			);
+		}
+
+		// A non-positive window is nonsensical and divides by zero in the fixedWindow / tokenBucket math.
+		if (arguments.windowSeconds <= 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter windowSeconds: #arguments.windowSeconds#. Must be a positive number of seconds."
+			);
+		}
+
+		// maxRequests = 0 is a legitimate kill-switch (block everything); negative values are not.
+		if (arguments.maxRequests < 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter maxRequests: #arguments.maxRequests#. Must be zero or greater."
 			);
 		}
 
@@ -347,6 +377,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Token bucket: allows bursts up to capacity, refills at a steady rate.
 	 */
 	private struct function $checkTokenBucket(required string clientKey, required numeric now) {
+		// Kill-switch: maxRequests = 0 blocks every request. Short-circuit here so the
+		// refillRate (0 / windowSeconds = 0) and the subsequent 1 / refillRate division
+		// never execute. Without this guard tokenBucket would throw a generic
+		// "You cannot divide by zero." while fixedWindow and slidingWindow already block.
+		if (variables.maxRequests == 0) {
+			return {allowed: false, remaining: 0, resetAt: arguments.now + variables.windowSeconds};
+		}
+
 		local.refillRate = variables.maxRequests / variables.windowSeconds;
 		local.resetAt = arguments.now + (1 / local.refillRate);
 
@@ -571,6 +609,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 */
 	private struct function $dbIncrement(required string clientKey, required string storeKey, required numeric resetAt) {
 		$ensureTable();
+
+		// Kill-switch: maxRequests = 0 blocks every request. Short-circuit before the
+		// INSERT path, which would otherwise allow the first request per window through
+		// because local.allowed is initialised to true and the counter > maxRequests
+		// check (line below) only fires from the UPDATE branch on subsequent requests.
+		if (variables.maxRequests == 0) {
+			return {allowed: false, remaining: 0, resetAt: arguments.resetAt};
+		}
 
 		local.allowed = true;
 		local.remaining = variables.maxRequests;

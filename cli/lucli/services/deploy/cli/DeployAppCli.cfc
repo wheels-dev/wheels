@@ -109,7 +109,7 @@ component {
         var versionOptional = arguments.flags.versionOptional ?: false;
         if (!versionOptional && !len(version)) {
             throw(type="DeployAppCli.MissingVersion",
-                  message="This verb requires --version");
+                  message="This verb requires --version (e.g. --version=v1.2.3). On older wrappers that pre-date the picocli rewrite, pass --release instead.");
         }
         var dryRun = arguments.opts.dryRun ?: false;
         var appCmds = new modules.wheels.services.deploy.commands.AppCommands(cfg);
@@ -134,12 +134,15 @@ component {
         return arguments.summary;
     }
 
-    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
         }
+        // raise defaults to true so nonzero remote exits surface as
+        // Wheels.Deploy.RemoteExecutionFailed instead of silently passing — #2696.
         var c = arguments.cmd;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 }

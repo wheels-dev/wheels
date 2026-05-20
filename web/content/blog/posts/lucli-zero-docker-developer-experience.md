@@ -135,7 +135,7 @@ Thanks to the contributors who made this migration possible: [@bpamiri](https://
 - [Contributing guide](https://github.com/wheels-dev/wheels/blob/develop/CONTRIBUTING.md) — workflow, branch conventions, and the Definition of Done for a PR.
 - Wheels CLI installers — the [Homebrew tap](https://github.com/wheels-dev/homebrew-wheels) for macOS / Linux and the [`scoop-wheels`](https://github.com/wheels-dev/scoop-wheels) bucket for Windows. This is the install most contributors want.
 - [LuCLI repo](https://github.com/bpamiri/LuCLI) — the underlying binary, if you want to run it standalone outside of Wheels; engine-level issues and feature requests belong here, not on the Wheels tracker.
-- [Running tests locally](https://guides.wheels.dev/v4-0-0-snapshot/testing/running-tests-locally/) — LuCLI path and the Docker matrix fallback for cross-engine coverage.
+- [Running tests locally](https://guides.wheels.dev/v4-0-0/testing/running-tests-locally/) — LuCLI path and the Docker matrix fallback for cross-engine coverage.
 - [`wheels-cli-lucli`](https://github.com/wheels-dev/wheels-cli-lucli) — the distribution repo for the LuCLI module itself.
 
 If you have been holding off on a Wheels PR because the dev setup was too heavy, now is a good time to try again.

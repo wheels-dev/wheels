@@ -1,0 +1,59 @@
+---
+title: "wheels packages add"
+description: Download, verify sha256, extract into vendor/<name>/. Refuses to overwrite without --force.
+type: reference
+sidebar:
+  label: "add"
+  order: 4
+---
+
+Adds a package into `vendor/<name>/` from the registry. On the next `wheels reload`, `PackageLoader` auto-discovers the new `vendor/<name>/package.json` and activates the package.
+
+:::note[Why `add`, not `install`?]
+LuCLI's built-in extension installer intercepts the literal subcommand `install` across every module. Typing `wheels packages install <name>` runs LuCLI's own dependency resolver — it prints `No git or extension dependencies to install` and exits without touching `vendor/`. Use `add` instead. (The same rename happened to `wheels browser setup`, which was previously `wheels browser install`.)
+:::
+
+## Synopsis
+
+```sh title="synopsis"
+wheels packages add <name>[@<version>] [--force]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--force` | Overwrite `vendor/<name>/` if it already exists. |
+
+## Version selection
+
+Without a pin, picks the highest `versions[]` entry whose `wheelsVersion` constraint is satisfied by the running framework. With a pin:
+
+- `@1.2.3` — exact match.
+- `@^1.0.0` — caret (compatible-with): `>=1.0.0 <2.0.0`.
+- `@~1.2.0` — tilde (patch-level): `>=1.2.0 <1.3.0`.
+- `@>=1.0 <2.0` — space-separated range.
+
+The same `SemVer` matcher that `PackageLoader` uses at runtime.
+
+## Failure modes
+
+| Error | Cause |
+|-------|-------|
+| `Wheels.Packages.UnknownPackage` | Name not in the registry. |
+| `Wheels.Packages.NoCompatibleVersion` | No version satisfies both the runtime and the pin. |
+| `Wheels.Packages.ChecksumMismatch` | Tarball sha256 differs from the manifest's record. Refusing to install. |
+| `Wheels.Packages.AlreadyInstalled` | `vendor/<name>/` exists. Use `--force`. |
+| `Wheels.Packages.ManifestIncomplete` | Registry hasn't mirrored this version yet. Wait for the CI run to finish. |
+
+## Example
+
+```sh title="illustrative — terminal session"
+$ wheels packages add wheels-sentry
+Installed wheels-sentry@1.0.0 → /Users/me/app/vendor/wheels-sentry
+Run `wheels reload` to activate it.
+
+$ wheels packages add wheels-sentry@1.0.0 --force
+Installed wheels-sentry@1.0.0 → /Users/me/app/vendor/wheels-sentry
+Run `wheels reload` to activate it.
+```

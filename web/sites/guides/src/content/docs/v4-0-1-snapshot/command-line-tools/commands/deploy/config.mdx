@@ -1,0 +1,52 @@
+---
+title: "wheels deploy config"
+description: Print the resolved deploy.yml as YAML — useful for verifying env interpolation and destination overlays.
+type: reference
+sidebar:
+  label: "config"
+  order: 5
+---
+
+Print the fully-resolved `deploy.yml` config as YAML. Mustache interpolation is expanded; destination overlays are merged. Makes no network calls.
+
+## Synopsis
+
+``` title="synopsis"
+wheels deploy config [--destination=<name>] [--config=<path>]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay `deploy.<name>.yml` before printing. |
+| `--config=<path>` | Override `config/deploy.yml`. |
+
+## Output
+
+Prints a YAML dump with four keys that matter at deploy time:
+
+```yaml title="example output"
+service: myapp
+image: myorg/myapp
+servers:
+  web:
+    - 192.0.2.10
+registry:
+  server: ghcr.io
+  username: myorg
+```
+
+Full per-role options, env merging, and accessory blocks are not emitted in Phase 1 — `wheels deploy config` is a deliberate subset focused on what most users want to verify (which hosts, which image, which registry).
+
+## When to use
+
+- Verify `--destination` overlays apply the keys you expect.
+- Confirm `{{env.*}}` resolves to the right values.
+- Diff against `kamal config` during a migration from Ruby Kamal.
+
+## Example
+
+```bash title="illustrative"
+wheels deploy config --destination=staging
+```

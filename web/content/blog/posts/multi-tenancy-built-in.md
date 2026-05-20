@@ -118,9 +118,9 @@ If you've been thinking "we'll deal with multi-tenancy later," 4.0 makes "now" a
 
 ## Where to go next
 
-- [Multi-tenancy guide](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/multi-tenancy/) — the user-facing reference for tenant resolution, datasource switching, and migrations per tenant.
-- [Background jobs guide](https://guides.wheels.dev/v4-0-0-snapshot/digging-deeper/background-jobs/) — how the tenant context is restored when a worker picks up a job.
-- [Middleware pipeline](https://guides.wheels.dev/v4-0-0-snapshot/core-concepts/middleware-pipeline/) — where the tenant resolver lives.
+- [Multi-tenancy guide](https://guides.wheels.dev/v4-0-0/digging-deeper/multi-tenancy/) — the user-facing reference for tenant resolution, datasource switching, and migrations per tenant.
+- [Background jobs guide](https://guides.wheels.dev/v4-0-0/digging-deeper/background-jobs/) — how the tenant context is restored when a worker picks up a job.
+- [Middleware pipeline](https://guides.wheels.dev/v4-0-0/core-concepts/middleware-pipeline/) — where the tenant resolver lives.
 - [Full audit § Multi-tenancy](https://github.com/wheels-dev/wheels/blob/develop/docs/releases/wheels-4.0-audit.md) — the PR-level receipts.
 
 We'd love to hear from teams running production SaaS on this — especially the pattern of tenant identity source (subdomain vs. path vs. header vs. JWT claim) and how it interacts with your auth layer. That's the area where we expect the 4.0.x polish cycle to want the most feedback.

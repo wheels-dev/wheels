@@ -1,0 +1,8 @@
+{
+	"name": "wheels-relpath",
+	"version": "1.0.0",
+	"description": "Test fixture: plural mapping value is a subdirectory path; mapping resolves to pkgDir/sub",
+	"mappings": {
+		"relpath.sub": "sub"
+	}
+}

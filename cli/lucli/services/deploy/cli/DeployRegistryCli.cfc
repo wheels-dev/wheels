@@ -38,7 +38,8 @@ component {
         var cmd = arguments.isLogin
             ? regCmds.login({password: arguments.opts.password ?: $resolvePassword(cfg)})
             : regCmds.logout();
-        $dispatch(hosts, cmd, dryRun);
+        // #2696: login is strict (auth failure must surface); logout tolerates.
+        $dispatch(hosts, cmd, dryRun, !arguments.isLogin);
         var action = arguments.isLogin ? "Logged into" : "Logged out of";
         return $renderResult(
             arguments.opts,
@@ -73,12 +74,14 @@ component {
         return out;
     }
 
-    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun) {
+    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
         }
+        // #2696: registry login is strict; logout is tolerant.
         var c = arguments.cmd;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c); });
+        var doRaise = !arguments.allowFail;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 }

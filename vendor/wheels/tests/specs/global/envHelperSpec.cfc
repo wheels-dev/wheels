@@ -33,6 +33,12 @@ component extends="wheels.WheelsTest" {
 				expect(env("NONEXISTENT_KEY_12345", "custom_default")).toBe("custom_default");
 			})
 
+			// Regression guard for the legacy `default = "Y"` named-arg form.
+			it("accepts the legacy 'default' named arg for back-compat", () => {
+				application.env = {};
+				expect(env(name = "NONEXISTENT_KEY_12345", default = "legacy_default")).toBe("legacy_default");
+			})
+
 			it("prefers application.env over system environment", () => {
 				// If a key exists in both, application.env should win
 				application.env = {PATH: "app_path_override"};
