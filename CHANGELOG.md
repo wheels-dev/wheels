@@ -18,7 +18,9 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
-## [Unreleased]
+# [4.0.1](https://github.com/wheels-dev/wheels/releases/tag/v4.0.1) => 2026-05-20
+
+> **Wheels 4.0.1** — first patch on the 4.0 line. Hardens Adobe ColdFusion 2023/2025 compatibility (Adobe-specific `cfheader` attributeCollection rejection, `env()` reserved-word parameter, Vite asset-walk array-by-value), fixes the Windows Scoop install regressions (`wheels.cmd` cmd.exe pre-parser, `.zip.sha512` sidecar layout), and adds `viewStyle` framework presets to `paginationNav()` plus plural `mappings` aliases to `package.json`. ~100 PRs since the 4.0.0 GA (2026-05-12).
 
 ### Added
 
@@ -100,7 +102,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Document that `reloadPassword` must be wired through `config/settings.cfm` via `set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""))` — a value in `.env` alone is not wired into framework settings automatically, and the fail-closed boot warning will fire regardless (#2631)
 - Upgrade guide (v4-0-0 and v4-0-1-snapshot) item 4 now documents the `config/environment.cfm` load-order gap: `application.env.environment` is not reliably populated before that file runs, causing production servers to resolve `environment=""` and emit `environment=development` to Sentry and the debug bar. The canonical fix (`set(environment=env("environment", "production"))`) and its deliberate `"production"` fail-safe default are documented alongside the existing `reloadPassword` guidance. A matching "Common issues" entry is added for discoverability (#2709)
 
-----
+---
 
 # [4.0.0](https://github.com/wheels-dev/wheels/releases/tag/v4.0.0) => 2026-05-12
 
