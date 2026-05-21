@@ -38,7 +38,11 @@ component extends="wheels.WheelsTest" {
     this.browserEngine = "chromium";
     this.browserViewport = "";  // empty = Playwright default; "mobile"/"tablet"/"desktop" or {width:N, height:N}
     this.browserScreenshotOnFailure = true;
-    this.browser = "";
+    // Sentinel: any method call on this.browser before browserDescribe() wires
+    // a real BrowserClient throws Wheels.BrowserTest.NotWired with a helpful
+    // message naming browserDescribe(), instead of the misleading
+    // "function [X] does not exist in the String".
+    this.browser = new wheels.wheelstest.UnwiredBrowserGuard();
     this.browserTestSkipped = false;
 
     variables.$launcher = "";
@@ -178,7 +182,7 @@ component extends="wheels.WheelsTest" {
             }
             variables.$context = "";
             variables.$page = "";
-            this.browser = "";
+            this.browser = new wheels.wheelstest.UnwiredBrowserGuard();
         }
     }
 
@@ -256,6 +260,7 @@ component extends="wheels.WheelsTest" {
     public void function $captureFailureArtifacts(required any spec) {
         if (!(this.browserScreenshotOnFailure ?: true)) return;
         if (!isObject(this.browser) || this.browserTestSkipped) return;
+        if (structKeyExists(this.browser, "$isUnwiredBrowserGuard")) return;
 
         try {
             var artifactDir = this.browserArtifactPath
