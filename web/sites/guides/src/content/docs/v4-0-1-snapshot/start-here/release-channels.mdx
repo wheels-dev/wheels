@@ -101,15 +101,15 @@ WHEELS_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots
 # in the same slot because GitHub Releases rewrites the package's internal
 # ~snapshot.N form to . at upload time. So translate hyphen → dot for the URL.
 WHEELS_FILENAME_VER="${WHEELS_TAG//-/.}"
-curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels_${WHEELS_FILENAME_VER}_amd64.deb"
-sudo apt install "./wheels_${WHEELS_FILENAME_VER}_amd64.deb"
+curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels-be_${WHEELS_FILENAME_VER}_amd64.deb"
+sudo apt install "./wheels-be_${WHEELS_FILENAME_VER}_amd64.deb"
 ```
 
 ```bash title="Fedora / RHEL (bleeding-edge)"
 WHEELS_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
 WHEELS_FILENAME_VER="${WHEELS_TAG//-/.}"
-sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels-${WHEELS_FILENAME_VER}.x86_64.rpm"
+sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels-be-${WHEELS_FILENAME_VER}.x86_64.rpm"
 ```
 
 Apt and yum repos at `apt.wheels.dev` / `yum.wheels.dev` are coming — they'll let you `apt upgrade wheels` instead of re-downloading.
@@ -119,14 +119,14 @@ Apt and yum repos at `apt.wheels.dev` / `yum.wheels.dev` are coming — they'll 
 </Tabs>
 
 <Aside type="caution" title="Version string format on .deb / .rpm">
-GitHub Releases doesn't allow `~` in asset filenames, so the SemVer pre-release tilde gets normalized to a dot. The on-disk filename for snapshot 1787 is `wheels_4.0.0.snapshot.1787_amd64.deb`, not `wheels_4.0.0~snapshot.1787_amd64.deb`. The package's *internal* version (what `dpkg --info` reports) keeps the tilde for correct precedence.
+GitHub Releases doesn't allow `~` in asset filenames, so the SemVer pre-release tilde gets normalized to a dot. The on-disk filename for snapshot 1787 is `wheels-be_4.0.0.snapshot.1787_amd64.deb`, not `wheels-be_4.0.0~snapshot.1787_amd64.deb`. The package's *internal* version (what `dpkg --info` reports) keeps the tilde for correct precedence.
 </Aside>
 
 ## Switching channels
 
 On **macOS and Windows**, the channels publish two differently-named packages (`wheels` vs `wheels-be`) that both install a binary called `wheels`, so the package managers refuse to install both at once — Homebrew enforces this via `conflicts_with`, Scoop refuses outright.
 
-On **Linux**, only a single package name (`wheels`) is published per channel today; the channel distinction lives in the source repo (`wheels-dev/wheels` vs `wheels-dev/wheels-snapshots`). Switching = installing the package from the other repo. `apt`/`dnf` then treats the install as an upgrade or downgrade depending on the version comparison.
+On **Linux**, the two channels likewise publish differently-named packages: `wheels` (stable, from `wheels-dev/wheels`) and `wheels-be` (bleeding-edge, from `wheels-dev/wheels-snapshots`). Switching = installing the package from the other repo. The `wheels-be` `.deb` declares `Replaces: wheels` + `Conflicts: wheels`, so on Debian/Ubuntu `apt` handles the stable → bleeding-edge swap automatically. The `wheels-be` `.rpm` declares only `Conflicts:` (no `Obsoletes:`), and the stable `wheels` package doesn't declare either against `wheels-be`, so the `dnf` direction and the reverse (bleeding-edge → stable) both need an explicit `remove` step. Snippets below cover each case.
 
 ```bash title="macOS — stable → bleeding-edge"
 brew uninstall wheels
@@ -139,36 +139,47 @@ brew install wheels
 ```
 
 ```bash title="Linux — stable → bleeding-edge (Debian / Ubuntu)"
-# apt sees a newer version (e.g. 4.0.1~snapshot.500 sorts above the most
-# recent stable 4.0.0) and upgrades in place — no uninstall step needed.
+# wheels-be .deb declares Replaces: wheels + Conflicts: wheels, so apt
+# removes the stable wheels package and installs wheels-be in its place
+# without a separate `apt remove` step.
 SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
 SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
-sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
+sudo apt install "./wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
 ```
 
 ```bash title="Linux — stable → bleeding-edge (Fedora / RHEL)"
+# wheels-be .rpm declares Conflicts: wheels but no Obsoletes, so dnf
+# refuses to install while the stable wheels package is present. Remove
+# it first.
+sudo dnf remove wheels
 SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
 SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be-${SNAP_FILENAME_VER}.x86_64.rpm"
 ```
 
 ```bash title="Linux — bleeding-edge → stable (Debian / Ubuntu)"
-# apt treats this as a downgrade (4.0.0 sorts below 4.0.1~snapshot.500), so add
-# --allow-downgrades.
+# wheels-be declares Conflicts: wheels, so apt refuses to install wheels
+# while wheels-be is present. (Stable wheels .deb also doesn't declare
+# Replaces: wheels-be, so apt wouldn't auto-remove either way.) Remove
+# wheels-be first.
+sudo apt remove wheels-be
 WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
 curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
-sudo apt install --allow-downgrades "./wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
 ```
 
 ```bash title="Linux — bleeding-edge → stable (Fedora / RHEL)"
-# Use `dnf downgrade` — dnf handles the older-version transition transparently.
+# Same as Debian above — wheels-be declares Conflicts: wheels, so dnf
+# refuses to install wheels while wheels-be is present. Remove wheels-be
+# first.
+sudo dnf remove wheels-be
 WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-sudo dnf downgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
 ```
 
 ```powershell title="Windows (Scoop) — stable → bleeding-edge"

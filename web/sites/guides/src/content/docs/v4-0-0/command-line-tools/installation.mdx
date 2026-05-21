@@ -78,7 +78,7 @@ sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEE
 
 The package lays down `/usr/bin/wheels` (a shell wrapper), `/opt/wheels/wheels` (the LuCLI launcher, renamed at stage time so `basename(argv[0])` is `wheels` and module dispatch routes correctly), `/opt/wheels/module/` (the staged Wheels Module), `/opt/wheels/.version` and `/opt/wheels/.channel` (read by the wrapper for `wheels --version`), and `/opt/wheels/sqlite-jdbc.jar` (auto-staged into Lucee Express on first run). The wrapper mirrors the Homebrew flow: probes `/usr/lib/jvm/` for OpenJDK 21, exports `LUCLI_HOME=$HOME/.wheels`, syncs the staged module into `~/.wheels/modules/wheels/` on first run or version mismatch, then execs LuCLI.
 
-The bleeding-edge channel publishes `.deb`/`.rpm` to [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) on every merge to `develop`. Every release there is a GitHub *pre-release*, so `api.github.com/.../releases/latest` returns nothing — use `/releases` and take the first entry. The asset filename also differs: snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`) but the on-disk asset name uses a dot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. The substitution converts the tag's hyphen-form to the URL's dot-form:
+The bleeding-edge channel publishes `.deb`/`.rpm` to [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) on every merge to `develop`. Every release there is a GitHub *pre-release*, so `api.github.com/.../releases/latest` returns nothing — use `/releases` and take the first entry. The asset filename also differs: snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`) but the on-disk asset name uses a dot (`wheels-be_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. The substitution converts the tag's hyphen-form to the URL's dot-form:
 
 ```bash title="illustrative — Debian / Ubuntu (bleeding-edge)"
 SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
@@ -88,8 +88,8 @@ if [ -z "$SNAP_TAG" ] || [ "$SNAP_TAG" = "null" ]; then
   exit 1
 fi
 SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
-sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
+sudo apt install "./wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
 ```
 
 ```bash title="illustrative — Fedora / RHEL (bleeding-edge)"
@@ -100,7 +100,7 @@ if [ -z "$SNAP_TAG" ] || [ "$SNAP_TAG" = "null" ]; then
   exit 1
 fi
 SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be-${SNAP_FILENAME_VER}.x86_64.rpm"
 ```
 
 The version metadata *inside* the `.deb`/`.rpm` preserves the canonical `~snapshot.N` form, so `dpkg --compare-versions` and `rpmvercmp` order pre-releases below the next GA correctly.
