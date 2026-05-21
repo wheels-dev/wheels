@@ -40,6 +40,10 @@ component extends="wheels.WheelsTest" {
     this.browserScreenshotOnFailure = true;
     this.browser = "";
     this.browserTestSkipped = false;
+    // Per-spec base-URL override (issue #2779). Highest-precedence layer in
+    // $resolveBaseUrl(). Specs targeting a non-default port can set this in
+    // beforeAll() instead of relying on the JVM-cached env var.
+    this.baseUrl = "";
 
     variables.$launcher = "";
     variables.$browser = "";
@@ -228,24 +232,70 @@ component extends="wheels.WheelsTest" {
     }
 
     /**
-     * Base URL for `client.visit("/path")`. Defaults to localhost:8080
-     * (the default LuCLI port); override via WHEELS_BROWSER_TEST_BASE_URL env.
+     * Base URL for `client.visit("/path")`. Resolved through a layered lookup
+     * at instance time so post-launch overrides take effect (the JVM caches
+     * env vars at process start, so `export`-ing after `wheels start` is too
+     * late for the bare-env-var approach). Precedence, highest first:
+     *
+     *   1. this.baseUrl                       — per-spec override
+     *   2. get("browserTestBaseUrl")          — Wheels setting
+     *   3. -Dwheels.browserTest.baseUrl=...   — JVM system property
+     *   4. WHEELS_BROWSER_TEST_BASE_URL env   — CI / shell
+     *   5. $detectBaseUrlFromCgi(cgi)         — derived from the in-flight
+     *                                            test-runner request
+     *   6. "http://localhost:8080" default    — bare LuCLI port
+     *
      * For specs that use only `visitUrl(absolute)` (e.g. data:/file:), the
      * baseUrl is effectively unused.
      */
-    private string function $resolveBaseUrl() {
+    public string function $resolveBaseUrl() {
+        if (len(this.baseUrl ?: "")) return this.baseUrl;
+
         try {
-            var env = createObject("java", "java.lang.System")
-                .getenv("WHEELS_BROWSER_TEST_BASE_URL");
+            var setting = get(name="browserTestBaseUrl");
+            if (len(setting ?: "")) return setting;
+        } catch (any e) {
+            // Setting not registered — fall through to next layer.
+        }
+
+        try {
+            var sys = createObject("java", "java.lang.System");
+            var prop = sys.getProperty("wheels.browserTest.baseUrl");
+            if (!isNull(prop) && len(prop)) return prop;
+            var env = sys.getenv("WHEELS_BROWSER_TEST_BASE_URL");
             if (!isNull(env) && len(env)) return env;
         } catch (any e) {
-            // Best-effort: SecurityManager could deny env access. Falling
-            // back to the localhost default is correct — if the user actually
-            // configured a different URL but we can't read it, their tests
-            // will fail with connection-refused, surfacing the problem
-            // clearly rather than silently using the wrong URL.
+            // Best-effort: a SecurityManager could deny system access.
+            // Falling through to CGI detection / default is correct.
         }
+
+        try {
+            var detected = $detectBaseUrlFromCgi(cgi);
+            if (len(detected)) return detected;
+        } catch (any e) {
+            // cgi scope unavailable (rare; e.g. background thread) — fall
+            // through to the hardcoded default.
+        }
+
         return "http://localhost:8080";
+    }
+
+    /**
+     * Derive base URL from the in-flight test-runner request. The core test
+     * suite runs over HTTP at /wheels/core/tests, so the cgi scope already
+     * names the correct host:port for the running server. Returns "" when
+     * cgi looks like the bare LuCLI default (localhost:8080) so downstream
+     * layers can supply the real value.
+     */
+    public string function $detectBaseUrlFromCgi(required any cgiScope) {
+        if (!structKeyExists(arguments.cgiScope, "server_port") || !val(arguments.cgiScope.server_port ?: 0)) {
+            return "";
+        }
+        var port = val(arguments.cgiScope.server_port);
+        var host = len(arguments.cgiScope.server_name ?: "") ? arguments.cgiScope.server_name : "localhost";
+        var scheme = (arguments.cgiScope.https ?: "off") == "on" ? "https" : "http";
+        if (host == "localhost" && port == 8080) return "";
+        return scheme & "://" & host & ":" & port;
     }
 
     /**
