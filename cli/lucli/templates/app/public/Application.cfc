@@ -274,6 +274,34 @@ component output="false" {
 			// Must never break error handling
 		}
 
+		// If the Wheels global never came up (e.g. the /wheels mapping is
+		// stale or Injector.cfc can't be resolved), the original error is
+		// already lost — fall back to a minimal HTML response rather than
+		// cascading into "The key [WO] does not exist." (issue ##2773).
+		if (!StructKeyExists(application, "wo")) {
+			setting requestTimeout=30;
+			// Surface a real 5xx so monitoring tools and CDNs don't cache this
+			// failure as a successful response. Use a plain struct for
+			// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
+			// scope on built-in tags (CLAUDE.md cross-engine invariant ##10).
+			try {
+				local.statusArgs = {statusCode: 500, statusText: "Internal Server Error"};
+				cfheader(attributeCollection=local.statusArgs);
+			} catch (any headerErr) {
+				// Header may already have been written; the body still renders.
+			}
+			WriteOutput("<h1>Application Error</h1>");
+			WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
+			try {
+				if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
+					WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
+				}
+			} catch (any fallbackErr) {
+				// Last-ditch render must never throw.
+			}
+			return;
+		}
+
 		local.requestTimeout = application.wo.$getRequestTimeout() + 30;
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "onErrorRequestTimeout")) {
 			local.requestTimeout = application.wheels.onErrorRequestTimeout;
