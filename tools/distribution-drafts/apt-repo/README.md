@@ -1,6 +1,6 @@
-# `apt-wheels-dev` bucket repo template
+# `apt-wheels` bucket repo template
 
-This directory is the **template** for the standalone `wheels-dev/apt-wheels-dev`
+This directory is the **template** for the standalone `wheels-dev/apt-wheels`
 repository that backs `https://apt.wheels.dev`. The bucket repo holds the static
 apt metadata tree plus the pooled `.deb` artifacts, and is auto-deployed to
 Cloudflare Pages on every push.
@@ -105,7 +105,7 @@ Before this bucket repo will function:
    the apex domain `apt.wheels.dev`. The build command is empty (the repo
    *is* the static site); the output dir is `./`.
 3. **CI secrets** (set on the bucket repo at
-   `https://github.com/wheels-dev/apt-wheels-dev/settings/secrets/actions`):
+   `https://github.com/wheels-dev/apt-wheels/settings/secrets/actions`):
    - `WHEELS_REPO_GPG_PRIVATE_KEY` — ASCII-armored private key
    - `WHEELS_REPO_GPG_PASSPHRASE` — passphrase
 4. **Upstream dispatch** — the release workflow in `wheels-dev/wheels`

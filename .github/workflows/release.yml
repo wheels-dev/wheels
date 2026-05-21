@@ -23,7 +23,7 @@ on:
       DOWNSTREAM_DISPATCH_TOKEN:
         required: false
       # Optional — when present, the build job's "Dispatch Linux repo buckets"
-      # step fires repository_dispatch on apt-wheels-dev / yum-wheels-dev so
+      # step fires repository_dispatch on apt-wheels / yum-wheels so
       # their metadata regen workflows pick up the new .deb/.rpm and republish
       # apt.wheels.dev / yum.wheels.dev within minutes. When absent, the step
       # skips silently — the bucket repos can be populated manually via each
@@ -306,7 +306,7 @@ jobs:
         # CHANNEL derives from the version so develop snapshots produce the
         # `wheels-be` package (which the Phase 2 bleeding-edge receiver
         # downloads) instead of `wheels`. Without this, the snapshot release
-        # ships `wheels_<v>_amd64.deb` and the apt-wheels-dev / yum-wheels-dev
+        # ships `wheels_<v>_amd64.deb` and the apt-wheels / yum-wheels
         # receiver workflow 404s on its `wheels-be_<v>_amd64.deb` fetch.
         # RC builds keep CHANNEL=stable — RCs aren't fanned out to apt/yum
         # (see release.yml § "Dispatch Linux repo buckets").
@@ -588,8 +588,8 @@ jobs:
       #############################################
       # Dispatch Linux repo buckets (apt.wheels.dev / yum.wheels.dev)
       #
-      # Fires repository_dispatch on wheels-dev/apt-wheels-dev and
-      # wheels-dev/yum-wheels-dev so their metadata-regen workflows pick up
+      # Fires repository_dispatch on wheels-dev/apt-wheels and
+      # wheels-dev/yum-wheels so their metadata-regen workflows pick up
       # the new .deb / .rpm asset and republish apt.wheels.dev /
       # yum.wheels.dev within minutes. See issue #2605.
       #
@@ -616,7 +616,7 @@ jobs:
           fi
 
           # Same channel derivation as the homebrew/scoop dispatch.
-          # apt-wheels-dev / yum-wheels-dev route on `channel` in the payload
+          # apt-wheels / yum-wheels route on `channel` in the payload
           # to slot the .deb/.rpm into the right pool (stable vs bleeding-edge).
           # RC releases aren't currently published to apt/yum, so we skip them.
           if echo "${WHEELS_RELEASE_VERSION}" | grep -qiE '\-snapshot[\.\+]'; then
@@ -632,7 +632,7 @@ jobs:
           # Static event type, fixed repo list — no untrusted input flows into
           # the curl arguments. WHEELS_RELEASE_VERSION is generated earlier in
           # the same workflow from wheels.json + run number.
-          for repo in apt-wheels-dev yum-wheels-dev; do
+          for repo in apt-wheels yum-wheels; do
             echo "Dispatching wheels-released to wheels-dev/${repo}..."
             http_status=$(curl -sS -o /tmp/linux-dispatch-resp.txt -w "%{http_code}" \
               -X POST \
