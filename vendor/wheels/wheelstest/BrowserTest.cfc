@@ -295,7 +295,8 @@ component extends="wheels.WheelsTest" {
         var host = len(arguments.cgiScope.server_name ?: "") ? arguments.cgiScope.server_name : "localhost";
         var scheme = (arguments.cgiScope.https ?: "off") == "on" ? "https" : "http";
         if (host == "localhost" && port == 8080) return "";
-        return scheme & "://" & host & ":" & port;
+        var isCanonicalPort = (scheme == "http" && port == 80) || (scheme == "https" && port == 443);
+        return scheme & "://" & host & (isCanonicalPort ? "" : ":" & port);
     }
 
     /**

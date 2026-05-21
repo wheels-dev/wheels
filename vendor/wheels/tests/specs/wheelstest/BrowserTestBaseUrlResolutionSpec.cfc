@@ -26,11 +26,14 @@ component extends="wheels.WheelsTest" {
             });
 
             it("falls back through layers when this.baseUrl is empty", () => {
-                // With no per-spec override, no Wheels setting, and no JVM
-                // property, the env var set by test-local.sh ("http://localhost:8080")
-                // or the localhost:8080 default both resolve to a valid
-                // http(s):// URL — the bug was returning the wrong port, not
-                // an invalid value.
+                // Intentionally weak assertion: JVM env vars are read-only
+                // from CFML and the Wheels get() setting requires a live
+                // framework context, so we can't fully isolate which layer
+                // (2–6) fires here. The JVM-property test below and the
+                // direct $detectBaseUrlFromCgi tests cover layers 3 and 5
+                // in isolation. This case only verifies the chain
+                // terminates with a valid http(s):// URL — the original bug
+                // was returning the wrong port, not an invalid value.
                 var bt = new wheels.wheelstest.BrowserTest();
                 bt.baseUrl = "";
                 expect(bt.$resolveBaseUrl()).toMatch("^https?://");
@@ -51,7 +54,13 @@ component extends="wheels.WheelsTest" {
             it("$detectBaseUrlFromCgi honors the https scheme when cgi.https is on", () => {
                 var bt = new wheels.wheelstest.BrowserTest();
                 var fakeCgi = {server_port: "443", server_name: "staging.example.com", https: "on"};
-                expect(bt.$detectBaseUrlFromCgi(fakeCgi)).toBe("https://staging.example.com:443");
+                expect(bt.$detectBaseUrlFromCgi(fakeCgi)).toBe("https://staging.example.com");
+            });
+
+            it("$detectBaseUrlFromCgi omits canonical http port 80", () => {
+                var bt = new wheels.wheelstest.BrowserTest();
+                var fakeCgi = {server_port: "80", server_name: "example.com", https: "off"};
+                expect(bt.$detectBaseUrlFromCgi(fakeCgi)).toBe("http://example.com");
             });
 
             it("$detectBaseUrlFromCgi returns blank when server_port is missing or zero", () => {
