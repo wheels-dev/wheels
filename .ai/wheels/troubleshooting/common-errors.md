@@ -9,6 +9,26 @@ Frequent issues encountered when developing Wheels applications and their soluti
 - Association syntax has specific Wheels conventions
 - Migration parameter binding can be unreliable
 
+## Startup / Initialization Errors
+
+### "Application Error — Wheels failed to initialize"
+**Error (on-page):**
+```
+Application Error
+Wheels failed to initialize. Check the server log for details.
+<pre>could not find component or class with name [wheels.Injector]</pre>
+```
+
+**Cause:** `onApplicationStart` threw before `application.wo` was assigned — typically because the `/wheels` CFML mapping points to a directory that doesn't contain `Injector.cfc`. The `onError` handler now surfaces the original exception text instead of cascading into "The key [WO] does not exist" (fixed in [#2774](https://github.com/wheels-dev/wheels/pull/2774)).
+
+**Resolution:**
+1. Read the `<pre>` block — it contains the original error (missing class, path mismatch, etc.).
+2. Check the server log for the full stack trace from `onApplicationStart`.
+3. Verify the `/wheels` mapping resolves: on a fresh install, `vendor/wheels/Injector.cfc` must exist. If it doesn't, re-run `wheels new` or copy the framework files manually.
+4. Run `wheels reload` (or stop/start the server) to pick up the corrected mapping.
+
+**Note:** Before the #2774 fix, this failure cascaded into a second `[WO] does not exist` exception that hid the real cause. If you see the old cascade on a pre-4.0.2 app, the underlying cause is always a failed `onApplicationStart` — see above.
+
 ## Common Association Errors
 
 ### "Missing argument name" in hasMany()

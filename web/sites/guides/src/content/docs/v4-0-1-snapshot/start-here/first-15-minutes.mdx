@@ -47,6 +47,10 @@ You'll see log lines ending with something like `Server started successfully`. O
 
 The dev server stays running in the background. Leave the terminal open.
 
+<Aside type="caution" title="Seeing an Application Error page instead?">
+  If the browser shows `Application Error — Wheels failed to initialize` rather than the welcome page, the error message on screen includes the underlying cause. Check the server log for the full stack trace. The most common cause on a fresh install is a stale `/wheels` CFML mapping — try stopping the server, running `wheels reload`, and restarting. If the mapping issue persists, the server log will point to the specific file that failed to load.
+</Aside>
+
 ## 3. Add a page (5 min)
 
 <Steps>
