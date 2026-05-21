@@ -303,21 +303,20 @@ component {
 		}
 
 		// Interpret "to" as "controller##action".
+		local.fromTo = false;
+		local.originalTo = "";
 		if (StructKeyExists(arguments, "to")) {
+			local.fromTo = true;
+			local.originalTo = arguments.to;
 			arguments.controller = ListFirst(arguments.to, "##");
 			arguments.action = ListLast(arguments.to, "##");
 			StructDelete(arguments, "to");
 		}
 
-		// Guard against the redundant namespace prefix in `to=` / `controller=` (see #2791).
-		// Inside `.namespace("foo")` the scope already supplies `package = "foo"`; a
-		// `controller="foo/dashboard"` (often written via `to="foo/dashboard##index"`)
-		// then gets joined with the package to form `foo.foo/dashboard`, which downstream
-		// flattens to a `Foodashboard`-style class lookup with an opaque error. Reject at
-		// registration time with a message that names both the namespace and the offending
-		// value so the user can find the route definition rather than chase a symptom.
+		// Guard: reject redundant namespace prefix in to=/controller= (#2791).
 		if (
 			StructKeyExists(arguments, "package")
+			&& Len(arguments.package) > 0
 			&& StructKeyExists(arguments, "controller")
 			&& Find("/", arguments.controller)
 		) {
@@ -327,7 +326,11 @@ component {
 				local.stripped = Mid(arguments.controller, Len(local.prefix) + 1, Len(arguments.controller) - Len(local.prefix));
 				local.actionForMsg = StructKeyExists(arguments, "action") ? arguments.action : "action";
 				local.hh = "##";
-				local.detail = "Got controller=""" & arguments.controller & """ (likely from to=""" & arguments.controller & local.hh & local.actionForMsg & """). The namespace prefix is added automatically — use controller=""" & local.stripped & """ (or to=""" & local.stripped & local.hh & local.actionForMsg & """) instead.";
+				if (local.fromTo) {
+					local.detail = "Got controller=""" & arguments.controller & """ (from to=""" & local.originalTo & """). The namespace prefix is added automatically — use to=""" & local.stripped & local.hh & local.actionForMsg & """ instead.";
+				} else {
+					local.detail = "Got controller=""" & arguments.controller & """ (passed as controller=). The namespace prefix is added automatically — use controller=""" & local.stripped & """ (or to=""" & local.stripped & local.hh & local.actionForMsg & """) instead.";
+				}
 				Throw(
 					type = "Wheels.MapperArgumentInvalid",
 					message = "Route inside `.namespace('#arguments.package#')` (or equivalent `.scope()` / `.package()`) uses a redundant namespace prefix in its controller path.",

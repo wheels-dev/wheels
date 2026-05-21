@@ -198,10 +198,7 @@ component extends="wheels.WheelsTest" {
                 expect(r[5]).toHaveKey("redirect")
             });
 
-            // Guard against redundant namespace prefix in `to=` / `controller=`.
-            // See #2791: inside .namespace("foo"), writing to="foo/dashboard##index"
-            // silently produced a "foo.foo/dashboard" controller path which downstream
-            // got flattened to a Foodashboard class lookup with an opaque error.
+            // Guard against redundant namespace prefix in to=/controller= (#2791).
             it("Rejects to= with redundant namespace prefix", function(){
                 expect(function() {
                     m.$draw()
@@ -263,6 +260,14 @@ component extends="wheels.WheelsTest" {
                 expect(ArrayLen(r) >= 1).toBeTrue();
                 expect(r[1].controller).toBe("datapai.dashboard");
                 expect(r[1].action).toBe("index");
+            });
+            it("Does not falsely reject when package is empty", function(){
+                m.$draw()
+                    .$match(name = "edge", method = "get", pattern = "edge", controller = "/users", action = "index", package = "")
+                .end();
+                r = m.getRoutes();
+                expect(r).toBeArray();
+                expect(ArrayLen(r) >= 1).toBeTrue();
             });
         });
     }
