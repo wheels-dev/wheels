@@ -364,6 +364,10 @@ component {
 		// Create the dispatcher that will handle all incoming requests.
 		application.$wheels.dispatch = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
 
+		// Snapshot the app/global/*.cfm mtimes so the per-request soft-reload
+		// check (in $runOnRequestStart) has a baseline to compare against.
+		application.$wheels.globalIncludesSnapshot = application.wo.$snapshotGlobalIncludes();
+
 		// Assign it all to the application scope in one atomic call.
 		application.wheels = application.$wheels;
 		StructDelete(application, "$wheels");

@@ -3849,6 +3849,50 @@ return local.$wheels;
 		}
 	}
 
+	/**
+	 * Snapshot mtimes of all .cfm files under the app's global include directory.
+	 *
+	 * Used by the bare `?reload=true` path so a developer adding a helper to
+	 * `app/global/*.cfm` does not have to remember the password-gated full reload
+	 * (issue ##2792).
+	 */
+	public struct function $snapshotGlobalIncludes(string directory = ExpandPath("/app/global")) {
+		var snapshot = {};
+		if (!DirectoryExists(arguments.directory)) {
+			return snapshot;
+		}
+		var files = DirectoryList(arguments.directory, true, "query", "*.cfm");
+		for (var row in files) {
+			snapshot[row.directory & "/" & row.name] = row.dateLastModified;
+		}
+		return snapshot;
+	}
+
+	public boolean function $globalIncludesChanged(
+		required struct snapshot,
+		string directory = ExpandPath("/app/global")
+	) {
+		var current = $snapshotGlobalIncludes(directory = arguments.directory);
+		for (var key in current) {
+			if (!StructKeyExists(arguments.snapshot, key)) {
+				return true;
+			}
+			if (DateCompare(arguments.snapshot[key], current[key]) != 0) {
+				return true;
+			}
+		}
+		for (var key in arguments.snapshot) {
+			if (!StructKeyExists(current, key)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public void function $reincludeGlobals(string file = "/app/global/functions.cfm") {
+		include "#arguments.file#";
+	}
+
 	// User-defined global functions
 	include "/app/global/functions.cfm";
 
