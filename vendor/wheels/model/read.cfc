@@ -214,7 +214,12 @@ component {
 					list = arguments.select,
 					returnAs = arguments.returnAs
 				);
-				local.columns = ReReplace(local.columns, "[`""\[\]\w]*?\.([\w\s]*?)(,|$)", "\1\2", "all");
+				// Strip any identifier-quote characters first ($createSQLFieldList routes
+				// both table and column names through $quoteIdentifier, so this list arrives
+				// dialect-quoted on MSSQL/MySQL/PostgreSQL/SQLite/H2). The downstream
+				// strip-table-prefix regex only handles bare identifiers.
+				local.columns = variables.wheels.class.adapter.$stripIdentifierQuotes(local.columns);
+				local.columns = ReReplace(local.columns, "[\w]*?\.([\w\s]*?)(,|$)", "\1\2", "all");
 				local.columns = ReReplace(local.columns, "\(.*?\)\sAS\s([\w\s]*?)(,|$)", "\1\2", "all");
 				local.columns = ReReplace(local.columns, "\w*?\sAS\s([\w\s]*?)(,|$)", "\1\2", "all");
 				local.rv = QueryNew(local.columns);

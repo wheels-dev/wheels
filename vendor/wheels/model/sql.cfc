@@ -567,9 +567,9 @@ component {
 						if (StructKeyExists(local.classData.propertyStruct, local.iItem)) {
 							local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & ".";
 							if (StructKeyExists(local.classData.columnStruct, local.iItem)) {
-								local.toAppend &= local.iItem;
+								local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.iItem);
 							} else {
-								local.toAppend &= local.classData.properties[local.iItem].column;
+								local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.iItem].column);
 								if (arguments.clause == "select") {
 									local.toAppend &= " AS " & local.iItem;
 								}
@@ -631,6 +631,12 @@ component {
 					// get the property part, done by taking everything from the end of the string to a . or a space (which would be found when using " AS ")
 					local.property = Reverse(SpanExcluding(Reverse(local.iItem), ". "));
 
+					// $createSQLFieldList now routes column identifiers through $quoteIdentifier, so
+					// items without an AS alias arrive here as `"table"."col"` and the extraction above
+					// captures the quoted column. Strip quote chars so downstream concatenation produces
+					// a usable alias and the ReplaceNoCase below can match the unquoted ` AS <alias>` form.
+					local.property = variables.wheels.class.adapter.$stripIdentifierQuotes(local.property);
+
 					// check if this one has been flagged as a duplicate, we get the number of classes to skip and also remove the flagged info from the item
 					local.duplicateCount = 0;
 					local.matches = ReFind("^\[\[duplicate\]\](\d+)(.+)$", local.iItem, 1, true);
@@ -668,7 +674,7 @@ component {
 							local.newItem = ReplaceNoCase(local.iItem, " AS " & local.property, " AS " & local.newProperty);
 						} else {
 							if (local.aliasFound) {
-								local.newItem = local.alias & "." & local.property & " AS " & local.newProperty;
+								local.newItem = local.alias & "." & variables.wheels.class.adapter.$quoteIdentifier(local.property) & " AS " & local.newProperty;
 							} else {
 								local.newItem = local.iItem & " AS " & local.newProperty;
 							}
