@@ -12,10 +12,8 @@ component extends="wheels.WheelsTest" {
 				// name is a reserved word (e.g. `key` on MSSQL, `order` everywhere).
 				var m = g.model("city");
 				var actual = m.$selectClause(select = "id", include = "", returnAs = "objects");
-				var qTable = m.$quoteColumn("c_o_r_e_cities");
-				var qCol = m.$quoteColumn("countyid");
 
-				expect(actual).toInclude(qTable & "." & qCol);
+				expect(actual).toInclude(m.$quotedTableName() & "." & m.$quoteColumn("countyid"));
 			});
 
 			it("quotes the column when the property name matches the column name", () => {
@@ -24,10 +22,8 @@ component extends="wheels.WheelsTest" {
 				// like `order` or `key` survive the SELECT clause.
 				var m = g.model("author");
 				var actual = m.$selectClause(select = "firstName", include = "", returnAs = "objects");
-				var qTable = m.$quoteColumn("c_o_r_e_authors");
-				var qCol = m.$quoteColumn("firstName");
 
-				expect(actual).toInclude(qTable & "." & qCol);
+				expect(actual).toInclude(m.$quotedTableName() & "." & m.$quoteColumn("firstName"));
 			});
 
 			it("quotes column identifiers in the GROUP BY clause too", () => {
@@ -40,10 +36,23 @@ component extends="wheels.WheelsTest" {
 					distinct = false,
 					returnAs = "objects"
 				);
-				var qTable = m.$quoteColumn("c_o_r_e_cities");
-				var qCol = m.$quoteColumn("countyid");
 
-				expect(actual).toInclude(qTable & "." & qCol);
+				expect(actual).toInclude(m.$quotedTableName() & "." & m.$quoteColumn("countyid"));
+			});
+
+			it("returns a well-formed empty query when paginated findAll matches zero rows on an aliased column", () => {
+				// Exercises the read.cfc QueryNew(local.columns) branch: when the
+				// paginated count is zero, the column list is built from the SELECT
+				// clause (now identifier-quoted) and must be stripped back to bare
+				// property names before being handed to QueryNew. Without the
+				// adapter $stripIdentifierQuotes call, dialect quote chars would
+				// leak into QueryNew column names.
+				var m = g.model("city");
+				var rv = m.findAll(select = "id", where = "id = -1", page = 1, perPage = 25);
+
+				expect(IsQuery(rv)).toBeTrue();
+				expect(rv.recordCount).toBe(0);
+				expect(ListFindNoCase(rv.columnList, "id")).toBeGT(0);
 			});
 
 		});

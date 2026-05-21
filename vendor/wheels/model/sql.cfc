@@ -631,10 +631,7 @@ component {
 					// get the property part, done by taking everything from the end of the string to a . or a space (which would be found when using " AS ")
 					local.property = Reverse(SpanExcluding(Reverse(local.iItem), ". "));
 
-					// $createSQLFieldList now routes column identifiers through $quoteIdentifier, so
-					// items without an AS alias arrive here as `"table"."col"` and the extraction above
-					// captures the quoted column. Strip quote chars so downstream concatenation produces
-					// a usable alias and the ReplaceNoCase below can match the unquoted ` AS <alias>` form.
+					// Strip dialect quotes added above so alias matching and downstream concatenation work on bare identifiers.
 					local.property = variables.wheels.class.adapter.$stripIdentifierQuotes(local.property);
 
 					// check if this one has been flagged as a duplicate, we get the number of classes to skip and also remove the flagged info from the item
