@@ -18,6 +18,15 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+# [Unreleased]
+
+### Fixed
+
+- Linux `.deb` / `.rpm` packages double-nested the framework at `/opt/wheels/module/vendor/wheels/wheels/` instead of `/opt/wheels/module/vendor/wheels/`. `wheels-core-VER.zip` carries a top-level `wheels/` directory that `unzip` preserves; the nfpm `type: tree` rule then copied the entire `build/framework/` tree (wrapper and all) into the destination, leaving `Injector.cfc` one level too deep. Every fresh `wheels new` install on Ubuntu/Fedora then crashed on first request with `could not find component or class with name [wheels.Injector]`, cascading into the cryptic `The key [WO] does not exist.` error in `onError`. The brew formula handles this correctly via `(share/"wheels/framework/wheels").install Dir["*"]`; the Linux nfpm configs now pin `src` at `./build/framework/wheels/` to match. Regression spec at `vendor/wheels/tests/specs/cli/LinuxPackageStagingSpec.cfc` (#2773)
+- `onError` in the generated app template and demo `public/Application.cfc` now guards `application.wo` with `StructKeyExists(application, "wo")` after the recovery try/catch. When `new wheels.Injector(...)` fails during `onApplicationStart` (e.g. a stale `/wheels` mapping under Lucee Express 7), the original error is preserved via a minimal HTML fallback instead of cascading into the cryptic "The key [WO] does not exist" exception that hit "Your First 15 Minutes" tutorial users on fresh installs
+
+----
+
 # [4.0.1](https://github.com/wheels-dev/wheels/releases/tag/v4.0.1) => 2026-05-20
 
 > **Wheels 4.0.1** — first patch on the 4.0 line. Hardens Adobe ColdFusion 2023/2025 compatibility (Adobe-specific `cfheader` attributeCollection rejection, `env()` reserved-word parameter, Vite asset-walk array-by-value), fixes the Windows Scoop install regressions (`wheels.cmd` cmd.exe pre-parser, `.zip.sha512` sidecar layout), and adds `viewStyle` framework presets to `paginationNav()` plus plural `mappings` aliases to `package.json`. ~100 PRs since the 4.0.0 GA (2026-05-12).
