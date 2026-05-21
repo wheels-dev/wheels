@@ -288,6 +288,24 @@ component output="false" {
 			// Must never break error handling
 		}
 
+		// If the Wheels global never came up (e.g. the /wheels mapping is
+		// stale or Injector.cfc can't be resolved), the original error is
+		// already lost — fall back to a minimal HTML response rather than
+		// cascading into "The key [WO] does not exist." (issue ##2773).
+		if (!StructKeyExists(application, "wo")) {
+			setting requestTimeout=30;
+			WriteOutput("<h1>Application Error</h1>");
+			WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
+			try {
+				if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
+					WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
+				}
+			} catch (any fallbackErr) {
+				// Last-ditch render must never throw.
+			}
+			return;
+		}
+
 		// In case the error was caused by a timeout we have to add extra time for error handling.
 		// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.
 		local.requestTimeout = application.wo.$getRequestTimeout() + 30;
