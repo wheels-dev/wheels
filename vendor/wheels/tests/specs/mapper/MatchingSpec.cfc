@@ -197,6 +197,73 @@ component extends="wheels.WheelsTest" {
                 expect(r[4]).toHaveKey("redirect")
                 expect(r[5]).toHaveKey("redirect")
             });
+
+            // Guard against redundant namespace prefix in `to=` / `controller=`.
+            // See #2791: inside .namespace("foo"), writing to="foo/dashboard##index"
+            // silently produced a "foo.foo/dashboard" controller path which downstream
+            // got flattened to a Foodashboard class lookup with an opaque error.
+            it("Rejects to= with redundant namespace prefix", function(){
+                expect(function() {
+                    m.$draw()
+                    .namespace("datapai")
+                        .get(name = "datapaiDashboard", pattern = "dashboard", to = "datapai/dashboard##index")
+                    .end()
+                    .end();
+                }).toThrow(type = "Wheels.MapperArgumentInvalid");
+            });
+            it("Rejects controller= with redundant namespace prefix", function(){
+                expect(function() {
+                    m.$draw()
+                    .namespace("admin")
+                        .$match(name = "dashboard", method = "get", controller = "admin/dashboard", action = "index")
+                    .end()
+                    .end();
+                }).toThrow(type = "Wheels.MapperArgumentInvalid");
+            });
+            it("Rejects redundant prefix in nested namespaces", function(){
+                expect(function() {
+                    m.$draw()
+                    .namespace("admin")
+                        .namespace("users")
+                            .get(name = "edit", pattern = "edit", to = "admin/users/profile##edit")
+                        .end()
+                    .end()
+                    .end();
+                }).toThrow(type = "Wheels.MapperArgumentInvalid");
+            });
+            it("Rejects redundant prefix inside .package() too", function(){
+                expect(function() {
+                    m.$draw()
+                    .package("admin")
+                        .get(name = "users", pattern = "users", to = "admin/users##index")
+                    .end()
+                    .end();
+                }).toThrow(type = "Wheels.MapperArgumentInvalid");
+            });
+            it("Allows controllers whose name only happens to share a prefix with the namespace", function(){
+                // "foobar/dashboard" inside .namespace("foo") is NOT a redundant prefix
+                // — "foobar" != "foo". Must not be rejected.
+                m.$draw()
+                .namespace("foo")
+                    .get(name = "dashboard", pattern = "dashboard", to = "foobar/dashboard##index")
+                .end()
+                .end();
+                r = m.getRoutes();
+                expect(r).toBeArray();
+                expect(ArrayLen(r) >= 1).toBeTrue();
+            });
+            it("Accepts the correct (non-redundant) form inside a namespace", function(){
+                m.$draw()
+                .namespace("datapai")
+                    .get(name = "datapaiDashboard", pattern = "dashboard", to = "dashboard##index")
+                .end()
+                .end();
+                r = m.getRoutes();
+                expect(r).toBeArray();
+                expect(ArrayLen(r) >= 1).toBeTrue();
+                expect(r[1].controller).toBe("datapai.dashboard");
+                expect(r[1].action).toBe("index");
+            });
         });
     }
 
