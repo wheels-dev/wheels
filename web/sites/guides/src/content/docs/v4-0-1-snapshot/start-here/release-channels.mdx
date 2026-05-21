@@ -161,9 +161,10 @@ sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/downlo
 ```
 
 ```bash title="Linux — bleeding-edge → stable (Debian / Ubuntu)"
-# The stable wheels .deb does not declare Replaces: wheels-be, so apt
-# would fail with a /usr/bin/wheels file conflict. Remove wheels-be
-# first.
+# wheels-be declares Conflicts: wheels, so apt refuses to install wheels
+# while wheels-be is present. (Stable wheels .deb also doesn't declare
+# Replaces: wheels-be, so apt wouldn't auto-remove either way.) Remove
+# wheels-be first.
 sudo apt remove wheels-be
 WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
@@ -172,8 +173,9 @@ sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
 ```
 
 ```bash title="Linux — bleeding-edge → stable (Fedora / RHEL)"
-# Same asymmetry on the rpm side — remove wheels-be first since the
-# stable wheels .rpm doesn't declare Obsoletes against it.
+# Same as Debian above — wheels-be declares Conflicts: wheels, so dnf
+# refuses to install wheels while wheels-be is present. Remove wheels-be
+# first.
 sudo dnf remove wheels-be
 WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
   | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
