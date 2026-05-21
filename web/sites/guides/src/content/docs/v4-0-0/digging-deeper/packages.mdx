@@ -317,7 +317,7 @@ The install/update surface is covered by the commands shown earlier under [The a
 - `wheels packages add <name>@<version>` — pin a specific version; omit for the latest compatible.
 - `wheels packages add <name> --force` — overwrite an existing `vendor/<name>/`.
 
-The install verb is `add`, not `install`, because LuCLI's built-in extension installer intercepts `install` across all modules — typing `wheels packages install foo` runs LuCLI's own `lucee.json` dependency resolver and never reaches the Wheels package handler. (Same trap that earlier renamed `wheels browser install` to `wheels browser setup`.) `add` is the canonical verb across the docs.
+The canonical verb is `add`. On the shell surface, `wheels packages install foo` is intercepted by LuCLI's built-in extension installer before it reaches the Wheels package handler, so it silently no-ops (the same trap that renamed `wheels browser install` to `wheels browser setup`). Via the stdio MCP server (`wheels_packages`) and in-process callers, `install` is a transparent alias for `add` — both verbs share the same validation, error shape, and install behavior.
 - `wheels packages update --all --yes` — bulk-update every installed package, no prompt.
 - `wheels packages registry refresh | info` — manage the 24-hour registry cache.
 
