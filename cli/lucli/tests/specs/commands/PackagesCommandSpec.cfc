@@ -133,6 +133,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// — proving they reached the same registry-lookup code path
 				// rather than `install` being intercepted by a different branch.
 				expect(installResult.type).notToBe("");
+				// And both must throw the SAME exception type — a future
+				// regression that made `install` throw at argument validation
+				// (before the registry call) would still satisfy the non-empty
+				// check above, so pin the equivalence explicitly.
+				expect(installResult.type).toBe(addResult.type);
 			});
 		});
 	}
