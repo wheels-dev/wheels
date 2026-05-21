@@ -294,6 +294,16 @@ component output="false" {
 		// cascading into "The key [WO] does not exist." (issue ##2773).
 		if (!StructKeyExists(application, "wo")) {
 			setting requestTimeout=30;
+			// Surface a real 5xx so monitoring tools and CDNs don't cache this
+			// failure as a successful response. Use a plain struct for
+			// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
+			// scope on built-in tags (CLAUDE.md cross-engine invariant ##10).
+			try {
+				local.statusArgs = {statusCode: 500, statusText: "Internal Server Error"};
+				cfheader(attributeCollection=local.statusArgs);
+			} catch (any headerErr) {
+				// Header may already have been written; the body still renders.
+			}
 			WriteOutput("<h1>Application Error</h1>");
 			WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
 			try {

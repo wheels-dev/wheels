@@ -88,6 +88,18 @@ component extends="wheels.WheelsTest" {
 						//    application.wo.* dereference. Find the position of
 						//    the first such call after the catch block closes,
 						//    and assert the guard appears before it.
+						//
+						// Assumption: the outer catch body has no nested
+						// braces. `[^\}]*` only matches catch bodies whose
+						// contents (after comment stripping) contain no `{`
+						// or `}`. If a future edit introduces a conditional
+						// or nested try inside the outer catch, this regex
+						// will fail to match and `scanFrom` falls back to 1
+						// (top of onErrorBody) — the spec still passes as
+						// long as the guard exists, but the "scan after the
+						// catch" precision is lost. Widen the pattern (e.g.
+						// a brace-counter like the one above) if that
+						// becomes necessary.
 						var catchClosePattern = "catch\s*\(\s*any\s+\w+\s*\)\s*\{[^\}]*\}";
 						var catchMatch = reFindNoCase(catchClosePattern, onErrorBody, 1, true);
 

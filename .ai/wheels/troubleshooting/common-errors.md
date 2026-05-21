@@ -27,7 +27,7 @@ Wheels failed to initialize. Check the server log for details.
 3. Verify the `/wheels` mapping resolves: on a fresh install, `vendor/wheels/Injector.cfc` must exist. If it doesn't, re-run `wheels new` or copy the framework files manually.
 4. Run `wheels reload` (or stop/start the server) to pick up the corrected mapping.
 
-**Note:** Before the #2774 fix, this failure cascaded into a second `[WO] does not exist` exception that hid the real cause. If you see the old cascade on a pre-4.0.2 app, the underlying cause is always a failed `onApplicationStart` — see above.
+**Note:** Before the #2774 fix, this failure cascaded into a second `[WO] does not exist` exception that hid the real cause. If you see the old cascade on a version that predates this fix (i.e. 4.0.1 or earlier), the underlying cause is always a failed `onApplicationStart` — see above.
 
 ## Common Association Errors
 
