@@ -10,11 +10,23 @@
  * views / models but were invisible to test specs — every spec had to
  * manually rebind helpers in `beforeAll()`.
  *
- * These specs simulate the include path by assigning a UDF directly to
- * `application.wo` (which is exactly the shape an included function takes:
- * a struct key on the component, not a metadata-enumerable function), then
- * instantiate a fresh `wheels.WheelsTest` and assert the auto-bind loop
- * caught it.
+ * Cross-engine note: a bare `include` inside a CFC body lands UDFs in the
+ * component's `variables` scope, not `this`. Lucee's struct-iteration over
+ * a CFC instance surfaces both scopes, but Adobe CF's contract only
+ * reliably exposes `this`-scope members. To make the auto-bind path
+ * uniform across engines, `vendor/wheels/Global.cfc` promotes include-
+ * injected UDFs from `variables` to `this` immediately after the include
+ * runs. These specs simulate that post-promotion shape by assigning the
+ * probe UDF directly to `application.wo` (bracket-notation assignment
+ * from outside writes to `this`), then assert that:
+ *
+ * - The probe is invisible to `getMetaData(application.wo).functions`
+ *   (the bug precondition the old code missed).
+ * - The probe is enumerated by `for (key in application.wo)` — the
+ *   iteration mechanism the new auto-bind loop relies on. Failure here
+ *   on any engine means the auto-bind loop will silently miss the helper.
+ * - The probe lands on a fresh `wheels.WheelsTest` instance and is
+ *   callable.
  */
 component extends="wheels.WheelsTest" {
 
@@ -41,6 +53,30 @@ component extends="wheels.WheelsTest" {
 						expect(foundInMeta).toBeFalse();
 						expect(structKeyExists(application.wo, probeName)).toBeTrue();
 						expect(isCustomFunction(application.wo[probeName])).toBeTrue();
+					} finally {
+						structDelete(application.wo, probeName);
+					}
+				});
+
+				it("for-in iteration over application.wo enumerates the probe key", () => {
+					// Guards the iteration mechanism the auto-bind loop in
+					// WheelsTest.cfc relies on. If this fails on any engine
+					// (notably Adobe CF, where struct-iteration over a CFC
+					// only reliably exposes this-scope members), the bind
+					// case below will silently pass-but-not-test.
+					var probeName = "$bot2790IterProbe";
+					application.wo[probeName] = function() {
+						return "iter-probe";
+					};
+					try {
+						var seen = false;
+						for (var key in application.wo) {
+							if (key == probeName) {
+								seen = true;
+								break;
+							}
+						}
+						expect(seen).toBeTrue();
 					} finally {
 						structDelete(application.wo, probeName);
 					}

@@ -3852,4 +3852,20 @@ return local.$wheels;
 	// User-defined global functions
 	include "/app/global/functions.cfm";
 
+	// Promote include-injected UDFs from `variables` to `this` so they're
+	// discoverable via struct-iteration on engines (Adobe CF) where only
+	// `this`-scope members are reliably enumerable. Declared methods on
+	// Global.cfc are already in `this` via their `access` modifier and are
+	// not clobbered by the `structKeyExists(this, ...)` guard. See #2790
+	// and the auto-bind loop in `vendor/wheels/WheelsTest.cfc`.
+	for (local.varKey in variables) {
+		if (!isCustomFunction(variables[local.varKey])) {
+			continue;
+		}
+		if (structKeyExists(this, local.varKey)) {
+			continue;
+		}
+		this[local.varKey] = variables[local.varKey];
+	}
+
 }
