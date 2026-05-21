@@ -325,7 +325,7 @@ component {
 			if (Len(arguments.controller) > Len(local.prefix) && Left(arguments.controller, Len(local.prefix)) == local.prefix) {
 				local.stripped = Mid(arguments.controller, Len(local.prefix) + 1, Len(arguments.controller) - Len(local.prefix));
 				local.actionForMsg = StructKeyExists(arguments, "action") ? arguments.action : "action";
-				local.hh = "##";
+				local.hh = "####";
 				if (local.fromTo) {
 					local.detail = "Got controller=""" & arguments.controller & """ (from to=""" & local.originalTo & """). The namespace prefix is added automatically — use to=""" & local.stripped & local.hh & local.actionForMsg & """ instead.";
 				} else {

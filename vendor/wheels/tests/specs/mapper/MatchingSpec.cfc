@@ -238,8 +238,7 @@ component extends="wheels.WheelsTest" {
                 }).toThrow(type = "Wheels.MapperArgumentInvalid");
             });
             it("Allows controllers whose name only happens to share a prefix with the namespace", function(){
-                // "foobar/dashboard" inside .namespace("foo") is NOT a redundant prefix
-                // — "foobar" != "foo". Must not be rejected.
+                // "foobar/dashboard" inside .namespace("foo") is not a redundant prefix — "foobar" != "foo".
                 m.$draw()
                 .namespace("foo")
                     .get(name = "dashboard", pattern = "dashboard", to = "foobar/dashboard##index")
