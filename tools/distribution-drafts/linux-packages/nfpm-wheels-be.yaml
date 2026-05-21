@@ -34,7 +34,14 @@ contents:
   - src: ./build/module/
     dst: /opt/wheels/module/
     type: tree
-  - src: ./build/framework/
+  # Framework source — see nfpm-wheels.yaml for the full explainer of why src
+  # MUST be ./build/framework/wheels/ (with trailing /wheels/), not bare
+  # ./build/framework/. Short version: nfpm `type: tree` copies src contents
+  # into dst, and the wheels-core-VER.zip preserves a top-level wheels/ dir,
+  # so without the inner /wheels/ we get a double-nested
+  # /opt/wheels/module/vendor/wheels/wheels/ that breaks runtime resolution
+  # of `wheels.Injector`. See issue #2773.
+  - src: ./build/framework/wheels/
     dst: /opt/wheels/module/vendor/wheels/
     type: tree
   - src: ./build/sqlite-jdbc.jar

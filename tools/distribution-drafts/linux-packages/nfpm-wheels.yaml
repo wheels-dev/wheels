@@ -38,7 +38,16 @@ contents:
     dst: /opt/wheels/module/
     type: tree
   # Framework source — staged into vendor/wheels/ in scaffolded apps.
-  - src: ./build/framework/
+  # IMPORTANT: src points at ./build/framework/wheels/ (the inner directory),
+  # NOT ./build/framework/. wheels-core-VER.zip has a top-level wheels/ dir
+  # that `unzip` preserves, leaving the framework at ./build/framework/wheels/.
+  # nfpm's `type: tree` copies the *contents* of src into dst, so without the
+  # trailing /wheels/ on src, the framework double-nests as
+  # /opt/wheels/module/vendor/wheels/wheels/Injector.cfc and Lucee can't
+  # resolve `wheels.Injector` at app startup. See issue #2773. The brew
+  # formula handles this the equivalent way — see homebrew-wheels
+  # Formula/wheels.rb's `(share/"wheels/framework/wheels").install Dir["*"]`.
+  - src: ./build/framework/wheels/
     dst: /opt/wheels/module/vendor/wheels/
     type: tree
   # SQLite JDBC — required at first run by the wrapper script (cliff fix from
