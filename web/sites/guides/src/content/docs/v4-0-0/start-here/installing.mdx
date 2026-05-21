@@ -189,21 +189,21 @@ During Phase 1 (before `apt.wheels.dev` / `yum.wheels.dev` are live), download i
    ```
 
    <Aside type="note" title="Want bleeding-edge?">
-   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Because every release there is a GitHub *pre-release*, `api.github.com/.../releases/latest` returns nothing — use `/releases` and pick the first entry. Snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`); the on-disk asset filename uses a dot in the same slot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. Self-contained snippets:
+   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Because every release there is a GitHub *pre-release*, `api.github.com/.../releases/latest` returns nothing — use `/releases` and pick the first entry. Snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`); the on-disk asset filename uses a dot in the same slot (`wheels-be_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. Self-contained snippets:
 
    ```bash title="Debian / Ubuntu — bleeding-edge"
    SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
      | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
    SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-   curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
-   sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
+   sudo apt install "./wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
    ```
 
    ```bash title="Fedora / RHEL — bleeding-edge"
    SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
      | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
    SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-   sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+   sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be-${SNAP_FILENAME_VER}.x86_64.rpm"
    ```
 
    The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-0/start-here/release-channels/).
