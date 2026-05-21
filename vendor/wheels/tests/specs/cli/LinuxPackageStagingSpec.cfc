@@ -180,16 +180,39 @@ component extends="wheels.WheelsTest" {
 							// wheels/ wrapper at stage time — see homebrew-wheels Formula/wheels.rb:62
 							// — (share/"wheels/framework/wheels").install Dir["*"]. The .deb/.rpm
 							// equivalent is to point src at the inner wheels/ directory directly.
-							var pair = reFindNoCase(
+							//
+							// `[[:space:]]+` matches across the YAML line break between the src
+							// value and `dst:` — POSIX `[[:space:]]` resolves to Java's `\s` in
+							// both Lucee and Adobe CF, which includes `\n`.
+							var hasFixedPair = reFindNoCase(
 								"src:[[:space:]]+\./build/framework/wheels/[[:space:]]+dst:[[:space:]]+/opt/wheels/module/vendor/wheels/",
 								src
 							) > 0;
-							expect(pair).toBeTrue(
+							expect(hasFixedPair).toBeTrue(
 								t.label & " must declare `src: ./build/framework/wheels/` (with the "
 								& "trailing /wheels/) for the framework contents entry. Without the "
 								& "inner /wheels/ segment, nfpm's `type: tree` double-nests the "
 								& "framework at /opt/wheels/module/vendor/wheels/wheels/, and Lucee "
 								& "fails to resolve `wheels.Injector` at app startup. See issue ##2773."
+							);
+
+							// Negative guard: the buggy bare-framework form must not coexist
+							// with the fixed form. A future copy-paste could leave both entries
+							// in the file, and nfpm would happily stage both — the bare one
+							// reintroduces the double-nesting. Pairs with the toBeTrue above
+							// per the dual-assertion pattern already used by the wrapper-routing
+							// checks at lines 60-68 / 81-106.
+							var hasBuggyPair = reFindNoCase(
+								"src:[[:space:]]+\./build/framework/[[:space:]]+dst:[[:space:]]+/opt/wheels/module/vendor/wheels/",
+								src
+							) > 0;
+							expect(hasBuggyPair).toBeFalse(
+								t.label & " must NOT declare `src: ./build/framework/` (without "
+								& "the trailing /wheels/) for any contents entry targeting "
+								& "/opt/wheels/module/vendor/wheels/. If both the bare and the "
+								& "/wheels/-suffixed entries coexist, nfpm stages the inner "
+								& "wheels/ wrapper as a subdirectory and the framework "
+								& "double-nests. See issue ##2773."
 							);
 						});
 
