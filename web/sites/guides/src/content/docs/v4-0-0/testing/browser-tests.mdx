@@ -96,7 +96,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 
 `this.browser` is a `BrowserClient`. Every method that mutates state returns `this`, so calls chain fluently until you hit a terminal (a method that returns a value — `currentUrl()`, `text()`, etc.).
 
-- `visit(path)` — navigate to a path joined to the base URL (`http://localhost:8080` by default, or `WHEELS_BROWSER_TEST_BASE_URL`). Path must start with `/`.
+- `visit(path)` — navigate to a path joined to the base URL, resolved at instance time through a layered lookup: `this.baseUrl` (per-spec override) → `get("browserTestBaseUrl")` (Wheels setting) → JVM system property `wheels.browserTest.baseUrl` → `WHEELS_BROWSER_TEST_BASE_URL` env var → CGI auto-detect → `http://localhost:8080` default. Path must start with `/`.
 - `visitUrl(url)` — navigate to an absolute URL. Use for `data:`, `file:`, or cross-origin tests.
 - `visitRoute(route, key, params)` — resolve a named route via `URLFor()` and navigate there. Requires the Wheels app to be booted.
 - `back()` / `forward()` / `refresh()` — drive the browser history.
@@ -316,7 +316,19 @@ When a spec fails, the `aroundEach` hook captures a screenshot and HTML dump to 
 
 The CI workflow sets `WHEELS_CI=true`, which `BrowserTest.beforeAll` interprets as an opt-out from running browser specs (they're skipped via `this.browserTestSkipped = true`). To run browser specs in CI, also set `WHEELS_BROWSER_CI_ENABLE=true` and ensure Playwright is installed on the runner. CI caches the Playwright JARs and Chromium via the `browser-manifest.json` hash; first runs pay the download cost once.
 
-Set `WHEELS_BROWSER_TEST_BASE_URL` so `visit("/path")` resolves to the right origin on the CI runner. For local work, the default `http://localhost:8080` matches `wheels server run --port=8080`. See [CI Integration](/v4-0-0/testing/ci-integration/) for the full workflow.
+Set `WHEELS_BROWSER_TEST_BASE_URL`, set `this.baseUrl` in the component pseudo-constructor, or rely on CGI auto-detect so `visit("/path")` resolves to the right origin. The env var is the standard CI escape hatch; `this.baseUrl` takes priority and lets individual specs target a different port without touching the environment. Set it in the pseudo-constructor — outside any function — so it is in place before `super.beforeAll()` runs `$resolveBaseUrl()` and caches the value:
+
+```cfm
+component extends="wheels.wheelstest.BrowserTest" {
+    this.baseUrl = "http://staging:60050";   // pseudo-constructor — set before super.beforeAll()
+
+    function run() {
+        // specs ...
+    }
+}
+```
+
+For local work against a non-8080 server (Titan on 60050, `wheels new` scaffolds on 60080), CGI auto-detect picks up the correct host and port automatically. See [CI Integration](/v4-0-0/testing/ci-integration/) for the full workflow.
 
 ## When to skip browser tests
 

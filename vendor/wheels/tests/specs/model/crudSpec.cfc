@@ -573,7 +573,7 @@ component extends="wheels.WheelsTest" {
 				// trim extra whitespace
 				actual = Trim(actual)
 
-				expected = "SELECT #qi('c_o_r_e_authors')#.id FROM #qi('c_o_r_e_authors')#"
+				expected = "SELECT #qi('c_o_r_e_authors')#.#qi('id')# FROM #qi('c_o_r_e_authors')#"
 
 				expect(actual).toBe(expected)
 			})
@@ -1671,7 +1671,7 @@ component extends="wheels.WheelsTest" {
 
 				local.a = qi("c_o_r_e_authors");
 				local.p = qi("c_o_r_e_posts");
-				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating AS postaveragerating,#local.p#.body AS postbody,#local.p#.createdat AS postcreatedat,#local.p#.deletedat AS postdeletedat,#local.p#.id AS postid,#local.p#.status AS poststatus,#local.p#.title AS posttitle,#local.p#.updatedat AS postupdatedat,#local.p#.views AS postviews")
+				expect(columnList).toBe("#local.a#.#qi('firstname')#,#local.a#.#qi('id')#,#local.a#.#qi('id')# AS Authorid,#local.a#.#qi('lastname')#,#local.p#.#qi('averagerating')# AS postaveragerating,#local.p#.#qi('body')# AS postbody,#local.p#.#qi('createdat')# AS postcreatedat,#local.p#.#qi('deletedat')# AS postdeletedat,#local.p#.#qi('id')# AS postid,#local.p#.#qi('status')# AS poststatus,#local.p#.#qi('title')# AS posttitle,#local.p#.#qi('updatedat')# AS postupdatedat,#local.p#.#qi('views')# AS postviews")
 			})
 
 			it("works with association with expanded aliases disabled", () => {
@@ -1688,7 +1688,7 @@ component extends="wheels.WheelsTest" {
 
 				local.a = qi("c_o_r_e_authors");
 				local.p = qi("c_o_r_e_posts");
-				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating,#local.p#.body,#local.p#.createdat,#local.p#.deletedat,#local.p#.id AS postid,#local.p#.status,#local.p#.title,#local.p#.updatedat,#local.p#.views")
+				expect(columnList).toBe("#local.a#.#qi('firstname')#,#local.a#.#qi('id')#,#local.a#.#qi('id')# AS Authorid,#local.a#.#qi('lastname')#,#local.p#.#qi('averagerating')#,#local.p#.#qi('body')#,#local.p#.#qi('createdat')#,#local.p#.#qi('deletedat')#,#local.p#.#qi('id')# AS postid,#local.p#.#qi('status')#,#local.p#.#qi('title')#,#local.p#.#qi('updatedat')#,#local.p#.#qi('views')#")
 			})
 
 			it("works on calculated property", () => {
