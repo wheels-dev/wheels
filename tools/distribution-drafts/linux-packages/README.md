@@ -65,8 +65,8 @@ Practical impact for this directory:
 Two new repos (separate from the source monorepo, mirroring the snapshots-repo
 pattern):
 
-- `wheels-dev/apt-wheels-dev` — Cloudflare Pages site at `apt.wheels.dev`
-- `wheels-dev/yum-wheels-dev` — Cloudflare Pages site at `yum.wheels.dev`
+- `wheels-dev/apt-wheels` — Cloudflare Pages site at `apt.wheels.dev`
+- `wheels-dev/yum-wheels` — Cloudflare Pages site at `yum.wheels.dev`
 
 Each repo holds the static metadata tree (Packages.gz, repodata/, etc.) plus
 the `.deb` / `.rpm` files in a `pool/` directory. A CI workflow listens for
@@ -129,12 +129,12 @@ The remaining work is operational:
    `wheels.gpg` (template placeholders live at
    `<bucket>/templates/wheels.gpg.placeholder`).
 2. **Create the two bucket repos** under `wheels-dev`:
-   - `wheels-dev/apt-wheels-dev` — copy contents of `apt-repo/` template
-   - `wheels-dev/yum-wheels-dev` — copy contents of `yum-repo/` template
+   - `wheels-dev/apt-wheels` — copy contents of `apt-repo/` template
+   - `wheels-dev/yum-wheels` — copy contents of `yum-repo/` template
 3. **Create two CF Pages projects** pointing at the new repos, binding the
    apex domains:
-   - `wheels-dev/apt-wheels-dev` → `apt.wheels.dev`
-   - `wheels-dev/yum-wheels-dev` → `yum.wheels.dev`
+   - `wheels-dev/apt-wheels` → `apt.wheels.dev`
+   - `wheels-dev/yum-wheels` → `yum.wheels.dev`
 4. **Add CI secrets** to `wheels-dev/wheels` (for the dispatch sender) and to
    each bucket repo (for the signing receiver):
    - On `wheels-dev/wheels`:
@@ -142,14 +142,14 @@ The remaining work is operational:
        on both bucket repos. The dispatch step in `release.yml` skips
        silently when this secret is unset, so it's safe to land the wiring
        before the bucket repos exist.
-   - On each bucket repo (`apt-wheels-dev`, `yum-wheels-dev`):
+   - On each bucket repo (`apt-wheels`, `yum-wheels`):
      - `WHEELS_REPO_GPG_PRIVATE_KEY` — ASCII-armored private key
      - `WHEELS_REPO_GPG_PASSPHRASE` — passphrase
 5. **Smoke-test** by running the bucket-repo workflows manually (each
    supports `workflow_dispatch` for backfill). For the apt bucket:
    ```
    gh workflow run wheels-released.yml \
-     --repo wheels-dev/apt-wheels-dev \
+     --repo wheels-dev/apt-wheels \
      -f version=4.0.0 -f channel=stable
    ```
    then verify the published tree on a fresh Debian/Ubuntu host. Do the same
