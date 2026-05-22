@@ -303,10 +303,40 @@ component {
 		}
 
 		// Interpret "to" as "controller##action".
+		local.fromTo = false;
+		local.originalTo = "";
 		if (StructKeyExists(arguments, "to")) {
+			local.fromTo = true;
+			local.originalTo = arguments.to;
 			arguments.controller = ListFirst(arguments.to, "##");
 			arguments.action = ListLast(arguments.to, "##");
 			StructDelete(arguments, "to");
+		}
+
+		// Guard: reject redundant namespace prefix in to=/controller= (#2791).
+		if (
+			StructKeyExists(arguments, "package")
+			&& Len(arguments.package) > 0
+			&& StructKeyExists(arguments, "controller")
+			&& Find("/", arguments.controller)
+		) {
+			local.packageAsPath = Replace(arguments.package, ".", "/", "all");
+			local.prefix = local.packageAsPath & "/";
+			if (Len(arguments.controller) > Len(local.prefix) && Left(arguments.controller, Len(local.prefix)) == local.prefix) {
+				local.stripped = Mid(arguments.controller, Len(local.prefix) + 1, Len(arguments.controller) - Len(local.prefix));
+				local.actionForMsg = StructKeyExists(arguments, "action") ? arguments.action : "action";
+				local.hh = "####";
+				if (local.fromTo) {
+					local.detail = "Got controller=""" & arguments.controller & """ (from to=""" & local.originalTo & """). The namespace prefix is added automatically — use to=""" & local.stripped & local.hh & local.actionForMsg & """ instead.";
+				} else {
+					local.detail = "Got controller=""" & arguments.controller & """ (passed as controller=). The namespace prefix is added automatically — use controller=""" & local.stripped & """ (or to=""" & local.stripped & local.hh & local.actionForMsg & """) instead.";
+				}
+				Throw(
+					type = "Wheels.MapperArgumentInvalid",
+					message = "Route inside `.namespace('#arguments.package#')` (or equivalent `.scope()` / `.package()`) uses a redundant namespace prefix in its controller path.",
+					detail = local.detail
+				);
+			}
 		}
 
 		// Pull route name from arguments if it exists.
