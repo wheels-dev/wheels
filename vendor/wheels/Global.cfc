@@ -3908,12 +3908,15 @@ return local.$wheels;
 	 * and this so they remain callable on `application.wo` across requests.
 	 */
 	public void function $reincludeGlobals(string file = "/app/global/functions.cfm") {
-		var beforeVars = StructKeyArray(variables);
 		include "#arguments.file#";
 		// Lucee adds include-declared functions to local; Adobe adds them
 		// to variables. Walk both and lift any user-defined functions onto
 		// this (the application.wo facing scope) so callers can invoke them
-		// across requests.
+		// across requests. The second loop is unconditional: a snapshot-diff
+		// guard here would suppress *updates* on Adobe (where the function
+		// already lives in variables from a prior re-include), leaving this
+		// bound to the stale version on the second `?reload=true`. Re-lifting
+		// an existing function is idempotent and the path is development-only.
 		for (var key in local) {
 			if (IsCustomFunction(local[key])) {
 				variables[key] = local[key];
@@ -3921,7 +3924,7 @@ return local.$wheels;
 			}
 		}
 		for (var key in variables) {
-			if (!ArrayFind(beforeVars, key) && IsCustomFunction(variables[key])) {
+			if (IsCustomFunction(variables[key])) {
 				this[key] = variables[key];
 			}
 		}

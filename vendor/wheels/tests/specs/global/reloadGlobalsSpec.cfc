@@ -80,12 +80,14 @@ component extends="wheels.WheelsTest" {
 
 				// After overwriting the file, re-running the include should also
 				// succeed — covers the "developer just changed a helper" path
-				// that the bare ?reload=true workflow targets.
+				// that the bare ?reload=true workflow targets. Assert the
+				// *return value* changes so an Adobe-only silent no-op (the
+				// old version stays bound to `this`) can't slip past CI.
 				FileWrite(absPath, "<cfscript>function fxReinclude(){return 'second';}</cfscript>");
 				$assert.notThrows(function() {
 					application.wo.$reincludeGlobals(file = "/wheels/tests/_tmp/reloadGlobals/reinclude.cfm");
 				});
-				expect(IsDefined("application.wo.fxReinclude")).toBeTrue();
+				expect(application.wo.fxReinclude()).toBe("second");
 			});
 
 		});
