@@ -76,5 +76,69 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(out).toInclude("registry");
 			});
 		});
+
+		describe("wheels packages install — alias for add", () => {
+
+			// Issue #2785: prior implementation made `case "install":` in
+			// Module.cfc a friendly-redirect dead branch that printed a
+			// warning to stdout and returned "" without installing anything.
+			// That meant any caller that reached Module.cfc via a path that
+			// is not the user-facing CLI (MCP tools, scripted clients, specs)
+			// silently got nothing back when typing `install` — even though
+			// `PackagesMainCli.install()` itself has always been a true alias
+			// for `add()`. The alias must be wired through the dispatch
+			// layer too, so that the only place `install` ever no-ops is the
+			// LuCLI extension-installer intercept (which we cannot patch),
+			// and every in-process caller gets the same behavior as `add`.
+			it("throws the same BadInput error as `add` when name is missing", () => {
+				mod.__arguments = ["install"];
+				var threw = {flag: false, message: ""};
+				try {
+					mod.packages();
+				} catch (any e) {
+					threw.flag = true;
+					threw.message = e.message;
+				}
+				expect(threw.flag).toBeTrue();
+				// The error must point users at the canonical `add` verb so
+				// programmatic callers (MCP, scripts) see the right shape.
+				expect(threw.message).toInclude("add");
+			});
+
+			it("dispatches `install <name>` to the same code path as `add <name>`", () => {
+				// Both verbs must reach PackagesMainCli — meaning neither
+				// short-circuits with a warning before instantiation. A
+				// bogus package name still throws (registry lookup fails),
+				// but it must throw the SAME way for both verbs. The prior
+				// behavior was that `install` silently returned "" while
+				// `add` threw — a divergence that broke any caller that
+				// expected the alias to be transparent.
+				var captureThrow = (verb) => {
+					var localMod = new cli.lucli.Module(cwd = variables.tempRoot);
+					localMod.__arguments = [verb, "wheels-this-package-does-not-exist-#CreateUUID()#"];
+					var threw = {flag: false, type: ""};
+					try {
+						localMod.packages();
+					} catch (any e) {
+						threw.flag = true;
+						threw.type = e.type;
+					}
+					return threw;
+				};
+				var addResult = captureThrow("add");
+				var installResult = captureThrow("install");
+				expect(addResult.flag).toBeTrue();
+				expect(installResult.flag).toBeTrue();
+				// Both must throw, and both must throw with a non-empty type
+				// — proving they reached the same registry-lookup code path
+				// rather than `install` being intercepted by a different branch.
+				expect(installResult.type).notToBe("");
+				// And both must throw the SAME exception type — a future
+				// regression that made `install` throw at argument validation
+				// (before the registry call) would still satisfy the non-empty
+				// check above, so pin the equivalence explicitly.
+				expect(installResult.type).toBe(addResult.type);
+			});
+		});
 	}
 }

@@ -2089,6 +2089,20 @@ component extends="modules.BaseModule" {
 				opts.name = positional[2];
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.show(opts);
+			case "install":
+				// LuCLI's built-in extension installer intercepts the
+				// literal verb `install` on the user-facing CLI surface
+				// — same trap that bit `wheels browser install` (renamed
+				// to `wheels browser setup` in #2345). But every other
+				// caller path reaches this dispatch directly: the
+				// stdio MCP server (`wheels mcp wheels`), scripted
+				// in-process clients, and the bundle's own spec suite.
+				// `PackagesMainCli.install()` has been a transparent
+				// alias for `add()` since #2729, so the dispatch layer
+				// must match — otherwise `install <name>` silently
+				// no-ops on the only paths LuCLI does NOT intercept.
+				// Fall through to the `add` branch (same validation,
+				// same error shape, same install behavior).
 			case "add":
 				if (arrayLen(positional) < 2) {
 					throw(message="add requires a name: wheels packages add <name>[@<version>]");
@@ -2096,20 +2110,6 @@ component extends="modules.BaseModule" {
 				opts.target = positional[2];
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.add(opts);
-			case "install":
-				// Dead code on the CLI surface: LuCLI's built-in extension
-				// installer intercepts the literal verb `install` across
-				// all modules before dispatch reaches Module.cfc — the
-				// same trap that bit `wheels browser install` (renamed
-				// to `wheels browser setup` in #2345). Kept as a
-				// documentation marker for future maintainers; if LuCLI
-				// ever stops intercepting, this case keeps a friendly
-				// redirect for users still typing the historic verb.
-				out("'wheels packages install' is intercepted by LuCLI's", "yellow");
-				out("built-in extension installer and won't reach this module.", "yellow");
-				out("Use:", "yellow");
-				out("  wheels packages add " & (arrayLen(positional) >= 2 ? positional[2] : "<name>"), "bold");
-				return "";
 			case "update":
 				opts.target = arrayLen(positional) >= 2 ? positional[2] : "";
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();

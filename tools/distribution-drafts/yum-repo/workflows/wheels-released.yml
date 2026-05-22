@@ -1,4 +1,4 @@
-# Receiver workflow for `wheels-dev/yum-wheels-dev`.
+# Receiver workflow for `wheels-dev/yum-wheels`.
 #
 # Listens for `repository_dispatch` from `wheels-dev/wheels`'s release workflow,
 # downloads the new `.rpm` asset from the upstream GitHub Release, slots it
