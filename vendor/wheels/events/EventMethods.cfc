@@ -194,8 +194,10 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		) {
 			// Double-checked locking — two concurrent ?reload=true hits would
 			// otherwise both pass the outer check and race on $reincludeGlobals
-			// against the same application.wo instance.
-			lock type="exclusive" name="wheels_reload_globals" timeout="5" {
+			// against the same application.wo instance. Lock name is
+			// per-application so shared Adobe CF servers running multiple
+			// apps don't serialize on a single global lock.
+			lock type="exclusive" name="wheels_reload_globals_#application.applicationName#" timeout="5" {
 				if (application.wo.$globalIncludesChanged(snapshot = application.wheels.globalIncludesSnapshot)) {
 					application.wo.$reincludeGlobals();
 					application.wheels.globalIncludesSnapshot = application.wo.$snapshotGlobalIncludes();

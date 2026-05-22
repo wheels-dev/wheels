@@ -71,6 +71,20 @@ component extends="wheels.WheelsTest" {
 				expect(ctx.g.$globalIncludesChanged(snapshot = snapshot, directory = ctx.baseDir)).toBeTrue();
 			});
 
+			it("$globalIncludesChanged returns true when a tracked cfm file is modified", () => {
+				// Exercise the DateCompare != 0 branch — the "developer edited
+				// an existing helper" path the PR is designed to serve.
+				// Backdate the snapshot entry rather than sleeping for a fresh
+				// mtime, so the test is deterministic across filesystems with
+				// different mtime granularities (ext4 nanosecond vs APFS/HFS+
+				// 1-second).
+				FileWrite(ctx.baseDir & "/modified.cfm", "<cfscript>function fxV1(){return 1;}</cfscript>");
+				var snapshot = ctx.g.$snapshotGlobalIncludes(directory = ctx.baseDir);
+				var key = ListFirst(StructKeyList(snapshot));
+				snapshot[key] = DateAdd("s", -60, snapshot[key]);
+				expect(ctx.g.$globalIncludesChanged(snapshot = snapshot, directory = ctx.baseDir)).toBeTrue();
+			});
+
 			it("$reincludeGlobals re-evaluates the target cfm without throwing", () => {
 				// CFML's `include` resolves via mappings, not absolute filesystem
 				// paths — call $reincludeGlobals with the mapping-relative form.
