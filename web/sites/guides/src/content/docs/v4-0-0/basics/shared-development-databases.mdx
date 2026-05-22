@@ -36,17 +36,19 @@ Total migrations: 3
   orphan: 1
 
 Migrations (newest last):
-  [x] 20260520091823 create_users
-  [x] 20260521090300 add_email_to_users
-  [?] 20260521120100 ********** NO FILE **********
-  [ ] 20260521131000 add_phone_to_users
+  [x] 20260520091823 create_users (applied 2026-05-20 09:18:23)
+  [x] 20260521090300 add_email_to_users (applied 2026-05-21 09:03:00)
+  [?] 20260521120100 add_phone_to_users (applied 2026-05-21 12:01:00)
+  [ ] 20260521131000 add_address_to_users
 
 Orphan versions are recorded in the database but have no
 matching file in app/migrator/migrations/. This usually means
 a peer applied a migration whose file isn't yet in your branch.
 ```
 
-The `[?]` row is the orphan: tracked as applied in the DB, but the file isn't on disk in this checkout. The `[x]` and `[ ]` markers behave as usual — applied and pending respectively.
+The `[?]` row is the orphan: tracked as applied in the DB, but the file isn't on disk in this checkout. The migration name (`add_phone_to_users`) and apply timestamp come from the `name` and `applied_at` columns added to `wheels_migrator_versions` in 4.0.x — they let you see *what* the peer applied and *when*, even though the file isn't in your branch yet. The `[x]` and `[ ]` markers behave as usual — applied and pending respectively.
+
+Older installs that pre-date the schema enrichment will show orphan rows as `[?] <version> ********** NO FILE **********` (no name, no timestamp). The columns are added automatically on the first migrator call after upgrade; subsequent applies populate the name and timestamp without any further action.
 
 Running `wheels migrate latest`:
 

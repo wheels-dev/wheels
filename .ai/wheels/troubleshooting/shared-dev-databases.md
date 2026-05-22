@@ -37,6 +37,31 @@ If SOME DB versions > target are orphans and SOME have local files, the
 down branch runs as usual but emits a warning naming the orphans (they
 get skipped by the existing loop because it iterates files only).
 
+## Schema enrichment (Plan 3)
+
+`wheels_migrator_versions` carries two extra columns added in 4.0.x:
+`name VARCHAR(255) NULL` and `applied_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP`
+(`TEXT` on SQLite — DEFAULT not supported on existing-table ADD COLUMN).
+Added automatically on first migrator call via `$ensureTrackingColumns()`,
+gated by `application[appKey].$trackingColumnsEnsured` cache so the ALTER
+runs once per app process. Failure is non-fatal (legacy schema still works).
+
+Populated by `$setVersionAsMigrated(version, migrationName)` when:
+- The enriched columns flag is set, AND
+- The caller passes a non-empty `migrationName`
+
+Read by `$getOrphanVersionsWithMeta()` → array of `{version, name, appliedAt}`
+structs. Falls back to bare-version structs when columns aren't ensured
+or the SELECT fails (e.g. concurrent connection hasn't committed the ALTER).
+
+Display via `$buildInfoOutput()` and `cli.cfm`'s `doctor` case render:
+- `[x] <version> <name> (applied <timestamp>)` when populated
+- `[?] <version> ********** NO FILE **********` for legacy NULL orphans
+- `[?] <version> <name> (applied <timestamp>)` for enriched orphans
+
+Existing rows (pre-enrichment) get NULL for both columns. Going-forward-only;
+no backfill at bootstrap time.
+
 ## Reconciliation commands
 
 Three CLI subcommands for manual reconciliation against the tracking

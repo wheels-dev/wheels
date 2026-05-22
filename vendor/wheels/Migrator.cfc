@@ -166,7 +166,7 @@ component output="false" extends="wheels.Global"{
 								}
 								local.migration.cfc.up();
 								local.rv = local.rv & request.$wheelsMigrationOutput;
-								$setVersionAsMigrated(local.migration.version);
+								$setVersionAsMigrated(local.migration.version, local.migration.name);
 							} catch (any e) {
 								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 								transaction action="rollback";
@@ -227,7 +227,7 @@ component output="false" extends="wheels.Global"{
 				}
 				local.migration.cfc.up();
 				local.rv = local.rv & request.$wheelsMigrationOutput;
-				$setVersionAsMigrated(local.migration.version);
+				$setVersionAsMigrated(local.migration.version, local.migration.name);
 			} catch (any e) {
 				local.rv = local.rv & "Error migrating #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 				transaction action="rollback";
@@ -373,15 +373,59 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Inserts a record to flag a version as migrated.
+	 * Inserts a record to flag a version as migrated. When the enriched
+	 * tracking schema is in use (name + applied_at columns present, signaled
+	 * by application[appKey].$trackingColumnsEnsured), populates name with
+	 * the supplied migrationName and applied_at with NOW() (for SQLite,
+	 * which can't default a TIMESTAMP column on ADD; other engines use
+	 * their column DEFAULT and we omit applied_at from the INSERT).
+	 *
+	 * @migrationName Human-readable name of the migration (e.g. "create_users").
+	 *   Optional — when empty or when the enriched columns aren't present,
+	 *   only version + core_level are written, matching legacy behavior.
 	 */
-	private void function $setVersionAsMigrated(required string version) {
+	private void function $setVersionAsMigrated(required string version, string migrationName = "") {
 		local.appKey = $appKey();
-		if (!StructKeyExists(request, "$wheelsDebugSQL"))
-			$query(
+		if (StructKeyExists(request, "$wheelsDebugSQL")) {
+			return;
+		}
+		local.cleanVersion = $sanitiseVersion(arguments.version);
+		local.cols = "version, core_level";
+		local.vals = "'#local.cleanVersion#', #application[local.appKey].migrationLevel#";
+		// Only write the enriched columns when they exist on this app's
+		// schema. The $trackingColumnsEnsured flag is set by
+		// $maybeEnsureTrackingColumns() after a successful ALTER (or after
+		// it confirms the columns are already present).
+		if (
+			Len(arguments.migrationName)
+			&& StructKeyExists(application[local.appKey], "$trackingColumnsEnsured")
+		) {
+			// Single-quote escape (CFML standard SQL string literal) to defend
+			// against accidental quote chars in migration names. The names are
+			// derived from filenames, which Wheels' generator only allows
+			// alphanumeric + underscore in, but defending here costs nothing.
+			local.escapedName = Replace(arguments.migrationName, "'", "''", "all");
+			local.cols &= ", name";
+			local.vals &= ", '#local.escapedName#'";
+			// SQLite can't DEFAULT a TIMESTAMP on ADD COLUMN, so we set the
+			// value explicitly. Other engines rely on the column's
+			// CURRENT_TIMESTAMP default and we omit applied_at from the
+			// INSERT to avoid engine-specific date-literal syntax issues.
+			local.info = $dbinfo(
+				type = "version",
 				datasource = application[local.appKey].dataSourceName,
-				sql = "INSERT INTO #application[local.appKey].migratorTableName# (version, core_level) VALUES ('#$sanitiseVersion(arguments.version)#', #application[local.appKey].migrationLevel#)"
+				username = application.wheels.dataSourceUserName,
+				password = application.wheels.dataSourcePassword
 			);
+			if (FindNoCase("SQLite", local.info.database_productname)) {
+				local.cols &= ", applied_at";
+				local.vals &= ", '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'";
+			}
+		}
+		$query(
+			datasource = application[local.appKey].dataSourceName,
+			sql = "INSERT INTO #application[local.appKey].migratorTableName# (#local.cols#) VALUES (#local.vals#)"
+		);
 	}
 
 	/**
@@ -511,6 +555,10 @@ component output="false" extends="wheels.Global"{
 				datasource = application[local.appKey].dataSourceName,
 				sql = "SELECT version FROM #application[local.appKey].migratorTableName# WHERE core_level = #application[local.appKey].migrationLevel# ORDER BY version ASC"
 			);
+			// Table exists — ensure the enriched name + applied_at columns are
+			// present. Cached on app scope so this fires once per app process,
+			// not on every migrator call. See issue #2780 / Plan 3.
+			$maybeEnsureTrackingColumns(local.appKey);
 			if (!local.migratedVersions.recordcount) {
 				return 0;
 			} else {
@@ -585,7 +633,31 @@ component output="false" extends="wheels.Global"{
 					}
 				}
 			}
+			// Tracking table was just bootstrapped — add the enriched
+			// columns now so subsequent $setVersionAsMigrated calls can
+			// write the migration name + applied timestamp.
+			$maybeEnsureTrackingColumns(local.appKey);
 			return 0;
+		}
+	}
+
+	/**
+	 * App-scope-cached wrapper around $ensureTrackingColumns(). Runs the
+	 * ALTER once per app process. The probe inside $ensureTrackingColumns()
+	 * is a cheap column listing, but caching avoids it on every migrator
+	 * call. Non-fatal: if the ALTER fails, we just don't set the flag and
+	 * the legacy schema continues to work.
+	 */
+	private void function $maybeEnsureTrackingColumns(required string appKey) {
+		if (StructKeyExists(application[arguments.appKey], "$trackingColumnsEnsured")) {
+			return;
+		}
+		try {
+			$ensureTrackingColumns();
+			application[arguments.appKey].$trackingColumnsEnsured = true;
+		} catch (any e) {
+			// Stays uncached so a future call retries — but the legacy
+			// schema still works, so the migrator is not blocked.
 		}
 	}
 
@@ -620,6 +692,72 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Returns orphan versions enriched with the `name` and `applied_at`
+	 * columns from the tracking table — when those columns exist (the
+	 * Plan 3 schema enrichment). Falls back to bare-version structs when
+	 * the columns aren't present yet (older installs that haven't bootstrapped
+	 * via $maybeEnsureTrackingColumns).
+	 *
+	 * Each row: {version, name, appliedAt} where name and appliedAt are
+	 * empty strings for legacy rows that pre-date the schema enrichment.
+	 *
+	 * Result is sorted ascending by version, matching $getOrphanVersions().
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public array function $getOrphanVersionsWithMeta() {
+		local.bareOrphans = $getOrphanVersions();
+		local.rv = [];
+		if (!ArrayLen(local.bareOrphans)) {
+			return local.rv;
+		}
+		local.appKey = $appKey();
+		local.hasEnrichedColumns = StructKeyExists(application[local.appKey], "$trackingColumnsEnsured");
+		if (!local.hasEnrichedColumns) {
+			// Schema enrichment not active — return bare structs so callers
+			// can render version-only.
+			for (local.v in local.bareOrphans) {
+				ArrayAppend(local.rv, {version: local.v, name: "", appliedAt: ""});
+			}
+			return local.rv;
+		}
+		// Pull name + applied_at for the orphan versions in one query.
+		try {
+			local.versionsQuoted = "'" & ArrayToList(local.bareOrphans, "','") & "'";
+			local.rows = $query(
+				datasource = application[local.appKey].dataSourceName,
+				sql = "SELECT version, name, applied_at FROM #application[local.appKey].migratorTableName# "
+					& "WHERE version IN (#local.versionsQuoted#) "
+					& "AND core_level = #application[local.appKey].migrationLevel# "
+					& "ORDER BY version ASC"
+			);
+			local.metaByVersion = {};
+			for (local.row in local.rows) {
+				local.metaByVersion[local.row.version] = {
+					name: local.row.name ?: "",
+					appliedAt: IsDate(local.row.applied_at ?: "") ? DateTimeFormat(local.row.applied_at, "yyyy-mm-dd HH:nn:ss") : ""
+				};
+			}
+			for (local.v in local.bareOrphans) {
+				local.meta = local.metaByVersion[local.v] ?: {name: "", appliedAt: ""};
+				ArrayAppend(local.rv, {
+					version: local.v,
+					name: local.meta.name,
+					appliedAt: local.meta.appliedAt
+				});
+			}
+		} catch (any e) {
+			// If the enriched query fails (e.g. columns not yet committed on
+			// a different connection), fall back to bare structs.
+			for (local.v in local.bareOrphans) {
+				ArrayAppend(local.rv, {version: local.v, name: "", appliedAt: ""});
+			}
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Builds the human-readable info output for `wheels migrate info`.
 	 * Returns an array of lines (caller joins with newlines). Extracted
 	 * from cli.cfm's info handler so the rendering can be unit-tested
@@ -634,7 +772,7 @@ component output="false" extends="wheels.Global"{
 		local.lines = [];
 		local.migrations = getAvailableMigrations();
 		local.currentVersion = getCurrentMigrationVersion();
-		local.orphans = $getOrphanVersions();
+		local.orphansWithMeta = $getOrphanVersionsWithMeta();
 		local.applied = 0;
 		local.pending = 0;
 		for (local.m in local.migrations) {
@@ -646,28 +784,33 @@ component output="false" extends="wheels.Global"{
 		}
 		ArrayAppend(local.lines, "Current version: " & (Len(local.currentVersion) ? local.currentVersion : "0"));
 		ArrayAppend(local.lines, "Total migrations: " & ArrayLen(local.migrations));
-		if (ArrayLen(local.migrations) || ArrayLen(local.orphans)) {
+		if (ArrayLen(local.migrations) || ArrayLen(local.orphansWithMeta)) {
 			ArrayAppend(local.lines, "  applied: " & local.applied);
 			ArrayAppend(local.lines, "  pending: " & local.pending);
-			if (ArrayLen(local.orphans)) {
-				ArrayAppend(local.lines, "  orphan: " & ArrayLen(local.orphans));
+			if (ArrayLen(local.orphansWithMeta)) {
+				ArrayAppend(local.lines, "  orphan: " & ArrayLen(local.orphansWithMeta));
 			}
 			ArrayAppend(local.lines, "");
 			ArrayAppend(local.lines, "Migrations (newest last):");
 			// Merge file rows + orphan rows into one chronological list so
 			// orphans appear in the right position relative to local files.
+			// Orphans with enriched metadata (Plan 3) show the peer's
+			// migration name + apply timestamp; legacy orphans (no name
+			// column) fall back to the literal NO FILE marker.
 			local.combined = [];
 			for (local.m in local.migrations) {
 				ArrayAppend(local.combined, {
 					version: local.m.version,
 					name: local.m.name,
+					appliedAt: "",
 					marker: local.m.status == "migrated" ? "[x]" : "[ ]"
 				});
 			}
-			for (local.v in local.orphans) {
+			for (local.o in local.orphansWithMeta) {
 				ArrayAppend(local.combined, {
-					version: local.v,
-					name: "********** NO FILE **********",
+					version: local.o.version,
+					name: Len(local.o.name) ? local.o.name : "********** NO FILE **********",
+					appliedAt: local.o.appliedAt,
 					marker: "[?]"
 				});
 			}
@@ -675,9 +818,13 @@ component output="false" extends="wheels.Global"{
 				return Compare(a.version, b.version);
 			});
 			for (local.row in local.combined) {
-				ArrayAppend(local.lines, "  " & local.row.marker & " " & local.row.version & " " & local.row.name);
+				local.line = "  " & local.row.marker & " " & local.row.version & " " & local.row.name;
+				if (Len(local.row.appliedAt)) {
+					local.line &= " (applied " & local.row.appliedAt & ")";
+				}
+				ArrayAppend(local.lines, local.line);
 			}
-			if (ArrayLen(local.orphans)) {
+			if (ArrayLen(local.orphansWithMeta)) {
 				ArrayAppend(local.lines, "");
 				ArrayAppend(local.lines, "Orphan versions are recorded in the database but have no");
 				ArrayAppend(local.lines, "matching file in app/migrator/migrations/. This usually means");
@@ -708,6 +855,7 @@ component output="false" extends="wheels.Global"{
 	public struct function doctor() {
 		local.migrations = getAvailableMigrations();
 		local.orphans = $getOrphanVersions();
+		local.orphansWithMeta = $getOrphanVersionsWithMeta();
 		local.currentVersion = getCurrentMigrationVersion();
 		local.pending = [];
 		local.applied = 0;
@@ -723,6 +871,7 @@ component output="false" extends="wheels.Global"{
 			healthy: local.healthy,
 			currentVersion: local.currentVersion,
 			orphans: local.orphans,
+			orphansWithMeta: local.orphansWithMeta,
 			pending: local.pending,
 			summary: {
 				total: ArrayLen(local.migrations),
@@ -820,9 +969,11 @@ component output="false" extends="wheels.Global"{
 			return local.rv;
 		}
 		local.fileExists = false;
+		local.matchedName = "";
 		for (local.m in getAvailableMigrations()) {
 			if (local.m.version == local.cleanVersion) {
 				local.fileExists = true;
+				local.matchedName = local.m.name;
 				break;
 			}
 		}
@@ -832,7 +983,7 @@ component output="false" extends="wheels.Global"{
 				& "Create the migration file first, then pretend if it has already been applied externally.";
 			return local.rv;
 		}
-		$setVersionAsMigrated(local.cleanVersion);
+		$setVersionAsMigrated(local.cleanVersion, local.matchedName);
 		local.rv.success = true;
 		local.rv.recorded = local.cleanVersion;
 		local.rv.message = "Recorded version " & local.cleanVersion & " as applied (up() was not run).";
@@ -1056,6 +1207,110 @@ component output="false" extends="wheels.Global"{
 		} catch (any e) {
 			rv.success = false;
 			ArrayAppend(rv.errors, e.message);
+		}
+
+		return rv;
+	}
+
+	/**
+	 * Adds `name` (VARCHAR(255) NULL) and `applied_at` (TIMESTAMP NULL DEFAULT
+	 * CURRENT_TIMESTAMP) columns to `wheels_migrator_versions` if they don't
+	 * already exist. Enables `wheels migrate info` and `wheels migrate doctor`
+	 * to show the migration name and apply timestamp for each tracked version
+	 * — including orphan rows where the file isn't in the local checkout.
+	 *
+	 * Idempotent: skips ALTER when columns are already present. Cached on
+	 * `application[appKey].$trackingColumnsEnsured` to avoid repeating the
+	 * column probe on every migrator call within one app process.
+	 *
+	 * Per-engine SQL handled inline (matches the existing $detectSystemTables
+	 * / renameSystemTables patterns). SQLite skips DEFAULT on applied_at —
+	 * the column lands NULL and CFML writes Now() when $setVersionAsMigrated
+	 * is called with a name. Other engines use CURRENT_TIMESTAMP default.
+	 *
+	 * Result: {hasName, hasAppliedAt, added: array of column names, errors: array}.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function $ensureTrackingColumns() {
+		var rv = {hasName: false, hasAppliedAt: false, added: [], errors: []};
+		var appKey = $appKey();
+		var dsn = application[appKey].dataSourceName;
+		var tableName = application[appKey].migratorTableName;
+
+		try {
+			var cols = $dbinfo(
+				datasource = dsn,
+				type = "columns",
+				table = tableName
+			);
+		} catch (any e) {
+			// Table doesn't exist yet; nothing to do. The columns will be
+			// added the first time someone calls migrateTo() and the bootstrap
+			// path creates the table.
+			ArrayAppend(rv.errors, "Could not probe columns on " & tableName & ": " & e.message);
+			return rv;
+		}
+
+		var existingCols = ValueList(cols.column_name);
+		rv.hasName = ListFindNoCase(existingCols, "name") > 0;
+		rv.hasAppliedAt = ListFindNoCase(existingCols, "applied_at") > 0;
+
+		if (rv.hasName && rv.hasAppliedAt) {
+			return rv;
+		}
+
+		var info = $dbinfo(
+			type = "version",
+			datasource = dsn,
+			username = application.wheels.dataSourceUserName,
+			password = application.wheels.dataSourcePassword
+		);
+		var dbType = info.database_productname;
+
+		// Build per-engine ALTER statements for the missing columns.
+		// Each ALTER is its own statement so a partial-add state still
+		// completes on re-run (e.g. name added, applied_at failed → retry
+		// adds only applied_at).
+		var statements = [];
+		if (!rv.hasName) {
+			if (FindNoCase("Oracle", dbType)) {
+				ArrayAppend(statements, {col: "name", sql: "ALTER TABLE #tableName# ADD (name VARCHAR2(255))"});
+			} else if (FindNoCase("SQLServer", dbType) || FindNoCase("SQL Server", dbType)) {
+				ArrayAppend(statements, {col: "name", sql: "ALTER TABLE #tableName# ADD name VARCHAR(255) NULL"});
+			} else {
+				// MySQL, PostgreSQL, SQLite, H2, CockroachDB
+				ArrayAppend(statements, {col: "name", sql: "ALTER TABLE #tableName# ADD COLUMN name VARCHAR(255) NULL"});
+			}
+		}
+		if (!rv.hasAppliedAt) {
+			if (FindNoCase("Oracle", dbType)) {
+				ArrayAppend(statements, {col: "applied_at", sql: "ALTER TABLE #tableName# ADD (applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"});
+			} else if (FindNoCase("SQLServer", dbType) || FindNoCase("SQL Server", dbType)) {
+				ArrayAppend(statements, {col: "applied_at", sql: "ALTER TABLE #tableName# ADD applied_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP"});
+			} else if (FindNoCase("MySQL", dbType)) {
+				ArrayAppend(statements, {col: "applied_at", sql: "ALTER TABLE #tableName# ADD COLUMN applied_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP"});
+			} else if (FindNoCase("SQLite", dbType)) {
+				// SQLite cannot DEFAULT a TIMESTAMP on existing-table ADD COLUMN
+				// (only on CREATE TABLE). The column lands NULL; CFML supplies
+				// Now() at $setVersionAsMigrated time.
+				ArrayAppend(statements, {col: "applied_at", sql: "ALTER TABLE #tableName# ADD COLUMN applied_at TEXT"});
+			} else {
+				// PostgreSQL, H2, CockroachDB
+				ArrayAppend(statements, {col: "applied_at", sql: "ALTER TABLE #tableName# ADD COLUMN applied_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP"});
+			}
+		}
+
+		for (var stmt in statements) {
+			try {
+				$query(datasource = dsn, sql = stmt.sql);
+				ArrayAppend(rv.added, stmt.col);
+				if (stmt.col == "name") rv.hasName = true;
+				if (stmt.col == "applied_at") rv.hasAppliedAt = true;
+			} catch (any e) {
+				ArrayAppend(rv.errors, stmt.col & " ALTER failed: " & e.message);
+			}
 		}
 
 		return rv;
