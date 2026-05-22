@@ -2,66 +2,73 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		// Shared struct so nested describe / beforeEach / afterEach / it closures
+		// can read `g` and `baseDir` on Adobe CF 2023/2025. CFML closures cannot
+		// reach an enclosing function's `local` scope on Adobe CF (CLAUDE.md
+		// cross-engine invariant ##3); a struct is a reference type, so all
+		// closures share the same object via `variables.ctx`.
+		var ctx = {
+			g: application.wo,
+			baseDir: ExpandPath("/wheels/tests/_tmp/reloadGlobals")
+		};
+
 		describe("Reload — global includes mtime tracking (issue ##2792)", () => {
 
-			var g = application.wo;
-			var baseDir = ExpandPath("/wheels/tests/_tmp/reloadGlobals");
-
 			beforeEach(() => {
-				if (DirectoryExists(baseDir)) {
-					DirectoryDelete(baseDir, true);
+				if (DirectoryExists(ctx.baseDir)) {
+					DirectoryDelete(ctx.baseDir, true);
 				}
 				// DirectoryCreate(path, true) is Lucee-only (issue ##2567);
 				// java.io.File.mkdirs() recurses parents on every engine.
-				CreateObject("java", "java.io.File").init(baseDir).mkdirs();
+				CreateObject("java", "java.io.File").init(ctx.baseDir).mkdirs();
 			});
 
 			afterEach(() => {
-				if (DirectoryExists(baseDir)) {
-					DirectoryDelete(baseDir, true);
+				if (DirectoryExists(ctx.baseDir)) {
+					DirectoryDelete(ctx.baseDir, true);
 				}
 			});
 
 			it("$snapshotGlobalIncludes returns a struct keyed by cfm file paths", () => {
-				FileWrite(baseDir & "/fixtureA.cfm", "<cfscript>function fxA(){return 1;}</cfscript>");
-				FileWrite(baseDir & "/fixtureB.cfm", "<cfscript>function fxB(){return 2;}</cfscript>");
-				var snapshot = g.$snapshotGlobalIncludes(directory = baseDir);
+				FileWrite(ctx.baseDir & "/fixtureA.cfm", "<cfscript>function fxA(){return 1;}</cfscript>");
+				FileWrite(ctx.baseDir & "/fixtureB.cfm", "<cfscript>function fxB(){return 2;}</cfscript>");
+				var snapshot = ctx.g.$snapshotGlobalIncludes(directory = ctx.baseDir);
 				expect(snapshot).toBeStruct();
 				expect(StructCount(snapshot)).toBe(2);
 			});
 
 			it("$snapshotGlobalIncludes returns an empty struct when the directory does not exist", () => {
-				var missing = baseDir & "/does-not-exist";
-				var snapshot = g.$snapshotGlobalIncludes(directory = missing);
+				var missing = ctx.baseDir & "/does-not-exist";
+				var snapshot = ctx.g.$snapshotGlobalIncludes(directory = missing);
 				expect(snapshot).toBeStruct();
 				expect(StructCount(snapshot)).toBe(0);
 			});
 
 			it("$globalIncludesChanged returns false when no files changed", () => {
-				FileWrite(baseDir & "/stable.cfm", "<cfscript>function fxStable(){return 'stable';}</cfscript>");
-				var snapshot = g.$snapshotGlobalIncludes(directory = baseDir);
-				expect(g.$globalIncludesChanged(snapshot = snapshot, directory = baseDir)).toBeFalse();
+				FileWrite(ctx.baseDir & "/stable.cfm", "<cfscript>function fxStable(){return 'stable';}</cfscript>");
+				var snapshot = ctx.g.$snapshotGlobalIncludes(directory = ctx.baseDir);
+				expect(ctx.g.$globalIncludesChanged(snapshot = snapshot, directory = ctx.baseDir)).toBeFalse();
 			});
 
 			it("$globalIncludesChanged returns true when a new cfm file appears", () => {
-				FileWrite(baseDir & "/one.cfm", "<cfscript>function fxOne(){return 1;}</cfscript>");
-				var snapshot = g.$snapshotGlobalIncludes(directory = baseDir);
-				FileWrite(baseDir & "/two.cfm", "<cfscript>function fxTwo(){return 2;}</cfscript>");
-				expect(g.$globalIncludesChanged(snapshot = snapshot, directory = baseDir)).toBeTrue();
+				FileWrite(ctx.baseDir & "/one.cfm", "<cfscript>function fxOne(){return 1;}</cfscript>");
+				var snapshot = ctx.g.$snapshotGlobalIncludes(directory = ctx.baseDir);
+				FileWrite(ctx.baseDir & "/two.cfm", "<cfscript>function fxTwo(){return 2;}</cfscript>");
+				expect(ctx.g.$globalIncludesChanged(snapshot = snapshot, directory = ctx.baseDir)).toBeTrue();
 			});
 
 			it("$globalIncludesChanged returns true when a tracked cfm file is removed", () => {
-				FileWrite(baseDir & "/keep.cfm", "<cfscript>function fxKeep(){return 1;}</cfscript>");
-				FileWrite(baseDir & "/gone.cfm", "<cfscript>function fxGone(){return 2;}</cfscript>");
-				var snapshot = g.$snapshotGlobalIncludes(directory = baseDir);
-				FileDelete(baseDir & "/gone.cfm");
-				expect(g.$globalIncludesChanged(snapshot = snapshot, directory = baseDir)).toBeTrue();
+				FileWrite(ctx.baseDir & "/keep.cfm", "<cfscript>function fxKeep(){return 1;}</cfscript>");
+				FileWrite(ctx.baseDir & "/gone.cfm", "<cfscript>function fxGone(){return 2;}</cfscript>");
+				var snapshot = ctx.g.$snapshotGlobalIncludes(directory = ctx.baseDir);
+				FileDelete(ctx.baseDir & "/gone.cfm");
+				expect(ctx.g.$globalIncludesChanged(snapshot = snapshot, directory = ctx.baseDir)).toBeTrue();
 			});
 
 			it("$globalIncludesChanged tolerates an empty starting snapshot", () => {
 				var snapshot = {};
-				FileWrite(baseDir & "/added.cfm", "<cfscript>function fxAdded(){return 1;}</cfscript>");
-				expect(g.$globalIncludesChanged(snapshot = snapshot, directory = baseDir)).toBeTrue();
+				FileWrite(ctx.baseDir & "/added.cfm", "<cfscript>function fxAdded(){return 1;}</cfscript>");
+				expect(ctx.g.$globalIncludesChanged(snapshot = snapshot, directory = ctx.baseDir)).toBeTrue();
 			});
 
 			it("$reincludeGlobals re-evaluates the target cfm without throwing", () => {
