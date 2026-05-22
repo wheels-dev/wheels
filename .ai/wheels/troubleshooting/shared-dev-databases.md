@@ -55,7 +55,9 @@ structs. Falls back to bare-version structs when columns aren't ensured
 or the SELECT fails (e.g. concurrent connection hasn't committed the ALTER).
 
 Display via `$buildInfoOutput()` and `cli.cfm`'s `doctor` case render:
-- `[x] <version> <name> (applied <timestamp>)` when populated
+- `[x] <version> <name>` for applied local-file rows (timestamps are only
+  surfaced on orphan rows because `getAvailableMigrations()` doesn't
+  re-query the tracking table for applied_at on local files)
 - `[?] <version> ********** NO FILE **********` for legacy NULL orphans
 - `[?] <version> <name> (applied <timestamp>)` for enriched orphans
 
