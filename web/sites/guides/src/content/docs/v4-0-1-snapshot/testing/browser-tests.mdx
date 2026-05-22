@@ -67,7 +67,7 @@ Two things to note in every browser spec:
 
 ## `browserDescribe` vs `describe`
 
-Regular `describe()` works inside a `BrowserTest` subclass — but every `it` inside it would share the same browser state, because `beforeEach`/`afterEach` aren't automatically wired. `browserDescribe()` wraps `describe()` with hooks that create a fresh Playwright `BrowserContext` and `Page` per `it`, then tear them down afterwards. Each test gets its own cookies, localStorage, and navigation history.
+Regular `describe()` works inside a `BrowserTest` subclass — but `this.browser` is **not wired** inside a plain `describe()` block. Calling any DSL method on it (for example, `this.browser.visitUrl(...)`) throws `Wheels.BrowserTest.NotWired` with a message that names `browserDescribe()` as the fix. If you see that error, change `describe(...)` to `browserDescribe(...)`. `browserDescribe()` wraps `describe()` with hooks that create a fresh Playwright `BrowserContext` and `Page` per `it`, then tear them down afterwards. Each test gets its own cookies, localStorage, and navigation history.
 
 ```cfm {test:compile} title="tests/specs/browser/IsolationSpec.cfc"
 component extends="wheels.wheelstest.BrowserTest" {

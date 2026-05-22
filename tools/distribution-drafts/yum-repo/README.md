@@ -1,6 +1,6 @@
-# `yum-wheels-dev` bucket repo template
+# `yum-wheels` bucket repo template
 
-This directory is the **template** for the standalone `wheels-dev/yum-wheels-dev`
+This directory is the **template** for the standalone `wheels-dev/yum-wheels`
 repository that backs `https://yum.wheels.dev`. The bucket repo holds the
 static yum metadata tree plus the pooled `.rpm` artifacts, and is auto-deployed
 to Cloudflare Pages on every push.
@@ -79,7 +79,7 @@ so `rpmvercmp` orders snapshot releases below the next GA correctly.
 Same GPG key as the apt repo (one key for both, importable on both clients
 via `https://apt.wheels.dev/wheels.gpg` or `https://yum.wheels.dev/wheels.gpg`).
 
-CI secrets on `https://github.com/wheels-dev/yum-wheels-dev/settings/secrets/actions`:
+CI secrets on `https://github.com/wheels-dev/yum-wheels/settings/secrets/actions`:
 - `WHEELS_REPO_GPG_PRIVATE_KEY` — ASCII-armored private key
 - `WHEELS_REPO_GPG_PASSPHRASE` — passphrase
 

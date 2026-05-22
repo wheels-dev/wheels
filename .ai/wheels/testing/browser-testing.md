@@ -59,6 +59,7 @@ bash tools/test-local.sh                    # skips browser specs if JARs missin
 
 ## Key gotchas
 
+- **`this.browser` is not wired in plain `describe()` blocks.** Calling any DSL method on `this.browser` outside a `browserDescribe()` block throws `Wheels.BrowserTest.NotWired` (message names `browserDescribe()` as the fix; `detail` names the method that was called). The sentinel `UnwiredBrowserGuard` is installed at construction and after each `$endBrowserContext()` teardown.
 - **`##` in selectors** — CFML requires `##` to emit literal `#`. `"##email"` → `"#email"` at runtime.
 - **`client` is a Lucee reserved scope.** `var client = ...` in a closure throws "client scope is not enabled". Use `var c = ...` or `var bc = ...`. (Generalized rule: see CLAUDE.md anti-pattern #11.)
 - **Data URLs work for most tests** — no server needed for ~95% of DSL coverage. Full HTTP integration (cookies, form submits, redirects) needs a running fixture app; that wiring is the same as Wheels Web app bootstrap (separate server + baseUrl).
