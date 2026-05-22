@@ -103,18 +103,23 @@ component extends="wheels.WheelsTest" {
 				// and both app-scope caches are set.
 				migrator.migrateTo("001");
 				expect(StructKeyExists(application.wheels, "$trackingColumnsEnsured")).toBeTrue();
-				// Drop the tracking table without clearing the cache flag.
-				// Simulates the migratorSpec.cfc beforeEach pattern (drop +
-				// recreate via bootstrap) and any production scenario where
-				// the schema is rolled back externally. The bug was: the
-				// stale flag caused $maybeEnsureTrackingColumns to skip the
-				// ALTER, leaving the freshly-recreated table without the
+				// Drop both the tracking table AND the migration's target
+				// table so we can re-apply 001 from a clean schema.
+				// Cache flag stays set — that's the bug scenario: the stale
+				// flag caused $maybeEnsureTrackingColumns to skip the ALTER,
+				// leaving the freshly-recreated tracking table without the
 				// name/applied_at columns. $setVersionAsMigrated then tried
 				// to INSERT against missing columns → SQL error → migration
-				// transaction rolled back.
+				// transaction rolled back. Mirrors migratorSpec.cfc's
+				// beforeEach pattern and any production scenario where the
+				// schema is rolled back externally.
+				migration.dropTable("c_o_r_e_bunyips");
 				migration.dropTable(application.wheels.migratorTableName);
-				// Next migrator call must re-run $ensureTrackingColumns and
-				// detect the schema needs the ALTER again.
+				// Cache flag is intentionally NOT cleared — that's what
+				// triggered the bug. With the fix, $maybeEnsureTrackingColumns
+				// re-runs $ensureTrackingColumns on every call and refreshes
+				// the flag from the actual schema state.
+				expect(StructKeyExists(application.wheels, "$trackingColumnsEnsured")).toBeTrue();
 				migrator.migrateTo("001");
 				var rows = queryExecute(
 					"SELECT name FROM #application.wheels.migratorTableName# WHERE version = '001'",
