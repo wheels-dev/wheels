@@ -11,7 +11,9 @@ component extends="wheels.WheelsTest" {
 				if (DirectoryExists(baseDir)) {
 					DirectoryDelete(baseDir, true);
 				}
-				DirectoryCreate(baseDir, true);
+				// DirectoryCreate(path, true) is Lucee-only (issue ##2567);
+				// java.io.File.mkdirs() recurses parents on every engine.
+				CreateObject("java", "java.io.File").init(baseDir).mkdirs();
 			});
 
 			afterEach(() => {
@@ -71,6 +73,10 @@ component extends="wheels.WheelsTest" {
 				$assert.notThrows(function() {
 					application.wo.$reincludeGlobals(file = "/wheels/tests/_tmp/reloadGlobals/reinclude.cfm");
 				});
+				// The contract: re-including must make the function callable
+				// on application.wo. Without this assertion, a silent no-op
+				// on any engine would slip through.
+				expect(IsDefined("application.wo.fxReinclude")).toBeTrue();
 
 				// After overwriting the file, re-running the include should also
 				// succeed — covers the "developer just changed a helper" path
@@ -79,6 +85,7 @@ component extends="wheels.WheelsTest" {
 				$assert.notThrows(function() {
 					application.wo.$reincludeGlobals(file = "/wheels/tests/_tmp/reloadGlobals/reinclude.cfm");
 				});
+				expect(IsDefined("application.wo.fxReinclude")).toBeTrue();
 			});
 
 		});

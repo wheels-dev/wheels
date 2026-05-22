@@ -3868,6 +3868,14 @@ return local.$wheels;
 		return snapshot;
 	}
 
+	/**
+	 * Compare a prior `$snapshotGlobalIncludes` result against the current
+	 * filesystem state and return true if any tracked .cfm file was added,
+	 * removed, or modified.
+	 *
+	 * Paired with `$snapshotGlobalIncludes` to drive the bare `?reload=true`
+	 * soft-reload path in development (issue ##2792).
+	 */
 	public boolean function $globalIncludesChanged(
 		required struct snapshot,
 		string directory = ExpandPath("/app/global")
@@ -3889,8 +3897,34 @@ return local.$wheels;
 		return false;
 	}
 
+	/**
+	 * Re-evaluate the given global-includes file into `application.wo`'s
+	 * variables/this scope. Invoked from the bare `?reload=true` soft-reload
+	 * when `$globalIncludesChanged` reports drift (issue ##2792).
+	 *
+	 * `include` inside a method body adds function declarations to the
+	 * method's local scope, not the component's outer scope, so we walk
+	 * local for any user-defined functions and copy them onto variables
+	 * and this so they remain callable on `application.wo` across requests.
+	 */
 	public void function $reincludeGlobals(string file = "/app/global/functions.cfm") {
+		var beforeVars = StructKeyArray(variables);
 		include "#arguments.file#";
+		// Lucee adds include-declared functions to local; Adobe adds them
+		// to variables. Walk both and lift any user-defined functions onto
+		// this (the application.wo facing scope) so callers can invoke them
+		// across requests.
+		for (var key in local) {
+			if (IsCustomFunction(local[key])) {
+				variables[key] = local[key];
+				this[key] = local[key];
+			}
+		}
+		for (var key in variables) {
+			if (!ArrayFind(beforeVars, key) && IsCustomFunction(variables[key])) {
+				this[key] = variables[key];
+			}
+		}
 	}
 
 	// User-defined global functions
