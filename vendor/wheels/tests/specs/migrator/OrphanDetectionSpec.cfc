@@ -141,6 +141,18 @@ component extends="wheels.WheelsTest" {
 				expect(ListFindNoCase(ValueList(info.table_name), "c_o_r_e_dropbears")).toBeFalse();
 			});
 
+			it("warns about orphans and still runs the down branch when both are present above target", () => {
+				if (_isCockroachDB) return;
+				migrator.migrateTo("002");
+				insertOrphan("999");
+				var output = migrator.migrateTo("001");
+				expect(output).toInclude("999");
+				expect(output).toInclude("skipped during rollback");
+				expect(output).toInclude("down to 001");
+				var info = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_dropbears");
+				expect(ListFindNoCase(ValueList(info.table_name), "c_o_r_e_dropbears")).toBeFalse();
+			});
+
 		});
 
 	}

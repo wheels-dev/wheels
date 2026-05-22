@@ -75,9 +75,9 @@ component output="false" extends="wheels.Global"{
 					& "This usually means a peer applied a migration whose "
 					& "file isn't yet in your branch.#Chr(13) & Chr(10)#";
 				if (!local.hasPendingMigrations) {
-					local.rv &= "Nothing to do. Your latest local migration ("
+					local.rv &= "Nothing to do. Your target version ("
 						& arguments.version
-						& ") is older than the database's current version ("
+						& ") is below the database's current version ("
 						& local.currentVersion & ").#Chr(13) & Chr(10)#";
 					return local.rv;
 				}
