@@ -644,31 +644,38 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * App-scope-cached wrapper around $ensureTrackingColumns(). Runs the
-	 * ALTER once per app process. The probe inside $ensureTrackingColumns()
-	 * is a cheap column listing, but caching avoids it on every migrator
-	 * call. Non-fatal: if the ALTER fails, we just don't set the flag and
-	 * the legacy schema continues to work.
+	 * Refreshes the $trackingColumnsEnsured flag from the actual schema
+	 * state on every call. Calling $ensureTrackingColumns() unconditionally
+	 * (not skip-on-flag) is what makes this robust to tests that drop and
+	 * recreate the tracking table, and to manual SQL ops in production
+	 * that might invalidate the schema. $ensureTrackingColumns is itself
+	 * idempotent and cheap — one column probe per call — and short-circuits
+	 * when both columns are already present.
 	 *
-	 * Only sets the cache flag when BOTH columns are confirmed present
-	 * (rv.hasName && rv.hasAppliedAt). If the probe failed entirely (table
-	 * didn't exist yet) or only one ALTER succeeded, the flag stays unset
-	 * so subsequent calls retry. $setVersionAsMigrated() reads this flag
-	 * to decide whether to include the enriched columns in its INSERT;
-	 * setting it prematurely would cause INSERTs against missing columns.
+	 * The flag is set true when both columns are confirmed present, and
+	 * explicitly cleared otherwise (table was dropped/recreated, ALTER
+	 * partially failed, or probe errored entirely). $setVersionAsMigrated()
+	 * reads the flag to decide whether to include the enriched columns
+	 * in its INSERT; an out-of-date flag would cause INSERTs against
+	 * missing columns or skip the enriched path when columns are present.
 	 */
 	private void function $maybeEnsureTrackingColumns(required string appKey) {
-		if (StructKeyExists(application[arguments.appKey], "$trackingColumnsEnsured")) {
-			return;
-		}
 		try {
 			var rv = $ensureTrackingColumns();
 			if (rv.hasName && rv.hasAppliedAt) {
 				application[arguments.appKey].$trackingColumnsEnsured = true;
+			} else {
+				// Probe says columns aren't both present (table dropped +
+				// recreated, ALTER failed, or schema rolled back externally).
+				// Clear any stale cache so $setVersionAsMigrated falls back
+				// to the legacy two-column INSERT.
+				StructDelete(application[arguments.appKey], "$trackingColumnsEnsured");
 			}
 		} catch (any e) {
-			// Stays uncached so a future call retries — but the legacy
-			// schema still works, so the migrator is not blocked.
+			// Probe failed entirely (table might not exist yet, or
+			// permission issue). Clear cache and let the legacy schema
+			// continue to work — the migrator is not blocked.
+			StructDelete(application[arguments.appKey], "$trackingColumnsEnsured");
 		}
 	}
 

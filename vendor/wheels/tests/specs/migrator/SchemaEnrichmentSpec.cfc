@@ -97,6 +97,34 @@ component extends="wheels.WheelsTest" {
 				expect(IsDate(rows.applied_at)).toBeTrue();
 			});
 
+			it("re-runs ALTER when the tracking table is dropped+recreated (regression)", () => {
+				if (_isCockroachDB) return;
+				// First run: applies a migration, schema gets enriched,
+				// and both app-scope caches are set.
+				migrator.migrateTo("001");
+				expect(StructKeyExists(application.wheels, "$trackingColumnsEnsured")).toBeTrue();
+				// Drop the tracking table without clearing the cache flag.
+				// Simulates the migratorSpec.cfc beforeEach pattern (drop +
+				// recreate via bootstrap) and any production scenario where
+				// the schema is rolled back externally. The bug was: the
+				// stale flag caused $maybeEnsureTrackingColumns to skip the
+				// ALTER, leaving the freshly-recreated table without the
+				// name/applied_at columns. $setVersionAsMigrated then tried
+				// to INSERT against missing columns → SQL error → migration
+				// transaction rolled back.
+				migration.dropTable(application.wheels.migratorTableName);
+				// Next migrator call must re-run $ensureTrackingColumns and
+				// detect the schema needs the ALTER again.
+				migrator.migrateTo("001");
+				var rows = queryExecute(
+					"SELECT name FROM #application.wheels.migratorTableName# WHERE version = '001'",
+					{},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(1);
+				expect(rows.name).notToBeEmpty();
+			});
+
 			it("populates applied_at across app restarts (regression for round-2 C2)", () => {
 				if (_isCockroachDB) return;
 				// First "app run": migrate 001, which adds the enriched
