@@ -143,9 +143,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Allow-list APPROVED and CHANGES_REQUESTED only: those are the
+          # exclusive set of states that (a) GitHub's dismiss API accepts and
+          # (b) gate merging. Feeding the dismiss API any other state returns
+          # HTTP 422 — e.g. "Can not dismiss a commented pull request review"
+          # for COMMENTED, the same shape for PENDING — which would fail this
+          # step and red-X the check. Originally observed on PR #2795 commit
+          # 0db188a5 when a COMMENTED placeholder leaked through.
           reviews=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate \
             | jq -c --arg sha "$HEAD_SHA" \
-                '[.[] | select(.user.login == "wheels-bot[bot]") | select(.commit_id == $sha) | select(.state != "DISMISSED")]')
+                '[.[] | select(.user.login == "wheels-bot[bot]") | select(.commit_id == $sha) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")]')
 
           count=$(echo "$reviews" | jq 'length')
           if [[ "$count" == "0" ]]; then
