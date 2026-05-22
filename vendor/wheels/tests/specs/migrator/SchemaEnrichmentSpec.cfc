@@ -16,12 +16,19 @@ component extends="wheels.WheelsTest" {
 
 		describe("$ensureTrackingColumns", () => {
 
+			// CockroachDB skip mirrors the pattern in migratorSpec.cfc,
+			// OrphanDetectionSpec.cfc and MigratorInfoSpec.cfc. The
+			// numeric-version test fixtures (001/002/003) are exercised
+			// against CockroachDB in compat-matrix.yml only as soft-fail
+			// (SOFT_FAIL_DBS includes cockroachdb). Keep the guard so the
+			// suite stays consistent with the rest of the migrator specs.
 			beforeEach(() => {
 				for (local.table in ["c_o_r_e_bunyips", "c_o_r_e_dropbears", "c_o_r_e_hoopsnakes"]) {
 					try { migration.dropTable(local.table); } catch (any e) {}
 				}
 				// Wipe the tracking-columns cache so each test sees a fresh state
 				StructDelete(application.wheels, "$trackingColumnsEnsured");
+				StructDelete(application.wheels, "$migratorDbType");
 				deleteMigratorVersions(2);
 				$cleanSqlDirectory();
 			});
@@ -29,6 +36,7 @@ component extends="wheels.WheelsTest" {
 			afterEach(() => {
 				deleteMigratorVersions(2);
 				StructDelete(application.wheels, "$trackingColumnsEnsured");
+				StructDelete(application.wheels, "$migratorDbType");
 				$cleanSqlDirectory();
 			});
 
@@ -66,8 +74,27 @@ component extends="wheels.WheelsTest" {
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(rows.recordCount).toBe(1);
-				// The name should be populated — exact value depends on the test migration filename
-				expect(Len(rows.name) > 0).toBeTrue();
+				// Assert directly on the value so a failure shows the actual
+				// name in the message — not just "Expected [false] to be [true]"
+				// which would happen if we collapsed Len(...) > 0 to a boolean
+				// before the matcher saw it.
+				expect(rows.name).notToBeEmpty();
+			});
+
+			it("populates applied_at for newly applied migrations", () => {
+				if (_isCockroachDB) return;
+				migrator.migrateTo("001");
+				// applied_at is the column-DEFAULT CURRENT_TIMESTAMP on most
+				// engines; SQLite gets an explicit CFML-side Now() because it
+				// can't DEFAULT a column on ADD COLUMN. Either way the value
+				// should be a parseable date string after migration.
+				var rows = queryExecute(
+					"SELECT applied_at FROM #application.wheels.migratorTableName# WHERE version = '001'",
+					{},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(1);
+				expect(IsDate(rows.applied_at)).toBeTrue();
 			});
 
 		});
