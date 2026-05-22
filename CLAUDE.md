@@ -540,6 +540,18 @@ Specs extend `wheels.wheelstest.BrowserTest`. Install Playwright once: `wheels b
 
 ## Migrations & Seeding
 
+### Shared Dev DB Reconciliation
+
+`wheels_migrator_versions` can drift from on-disk files when several developers share a single dev database (peer applied a migration whose file isn't yet in your branch). Detected and surfaced automatically; reconciliation is explicit:
+
+- `wheels migrate latest` — when a peer's tracked version sits above your latest local file, it now applies pending local migrations with a warning instead of silently no-op'ing on a "down" branch.
+- `wheels migrate info` — orphan rows render as `[?] <version> ********** NO FILE **********` (Rails-style) with a footer explaining the cause.
+- `wheels migrate doctor` — single-command health report. Lists orphans + pending; pure read.
+- `wheels migrate forget <version> --yes` — delete a stale tracking row (refuses if a matching local file exists, refuses if version not in table).
+- `wheels migrate pretend <version> --yes` — record a version as applied without running `up()` (refuses if already applied or no matching file).
+
+Both `forget` and `pretend` are dry-run by default; `--yes` is required to mutate. Helpers live on `Migrator.cfc`: `$getOrphanVersions()`, `doctor()`, `forgetVersion()`, `pretendVersion()`, `$buildInfoOutput()`. Deep reference: [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md). User-facing guide: `web/sites/guides/src/content/docs/v4-0-0/basics/shared-development-databases.mdx`. Shipped in #2798 + #2799.
+
 ### Auto-Migration
 
 Generate migrations from model/DB schema diffs. Rename detection via explicit hints (authoritative) + heuristic suggestions (normalized-token + Levenshtein).
@@ -688,7 +700,8 @@ Prefer MCP tools when the Wheels MCP server is available. Fall back to CLI other
 | Task | MCP | CLI |
 |------|-----|-----|
 | Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
-| Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels migrate latest\|up\|down\|info` |
+| Migrate | `wheels_migrate(action="latest\|up\|down\|info\|doctor")` | `wheels migrate latest\|up\|down\|info\|doctor` |
+| Migrator reconciliation | — | `wheels migrate forget\|pretend <version> --yes` (shared dev DB orphan cleanup; see #2780) |
 | Test | `wheels_test()` | `wheels test run` |
 | Reload | `wheels_reload()` | `?reload=true&password=...` |
 | Server | `wheels_server(action="status")` | `wheels start\|stop\|status` |
@@ -711,6 +724,7 @@ Search `.ai/` for deeper documentation:
 - [.ai/wheels/channels/channels.md](.ai/wheels/channels/channels.md)
 - [.ai/wheels/snippets/model-snippets.md](.ai/wheels/snippets/model-snippets.md), [controller-snippets.md](.ai/wheels/snippets/controller-snippets.md)
 - [.ai/wheels/troubleshooting/common-errors.md](.ai/wheels/troubleshooting/common-errors.md), [form-helper-errors.md](.ai/wheels/troubleshooting/form-helper-errors.md)
+- [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md) — Orphan-version handling + `migrate doctor` / `forget` / `pretend` reconciliation commands (#2780)
 - [.ai/cfml/](.ai/cfml/) — CFML language reference (syntax, components, control flow)
 
 **External:** user-facing guides at `web/sites/guides/src/content/docs/v4-0-0/` (deployment, command-line-tools/mcp-integration, etc.) — these ship to guides.wheels.dev. Use when you need the version Wheels users read.
