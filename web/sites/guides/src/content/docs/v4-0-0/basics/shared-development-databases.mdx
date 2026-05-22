@@ -1,0 +1,115 @@
+---
+title: Shared Development Databases
+description: How Wheels handles the case where multiple developers share a single dev database and a peer's migration is recorded before their file lands in your branch.
+type: howto
+sidebar:
+  order: 81
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+When several developers share a single development database, the migration tracking table (`wheels_migrator_versions`) can record a version whose migration file is not yet in your branch — a teammate ran `wheels migrate latest` against the shared DB before their migration was merged. Wheels calls these **orphan versions** and handles them transparently.
+
+**You'll learn:**
+
+- What an orphan version is and how to spot it
+- What `wheels migrate latest` does when one is present
+- Three resolution paths and when to use each
+- Why we recommend per-developer schemas instead
+
+<Aside type="caution">
+  A shared dev database trades schema isolation for "less environment to set up". The symptoms tend to surface mid-feature when someone else's WIP is already applied. If you can avoid this setup, [the alternatives section below](#alternative-avoid-shared-dev-databases) lists three options that Wheels supports first-class.
+</Aside>
+
+## What you'll see
+
+Running `wheels migrate info`:
+
+```
+Datasource: wheels
+Database type: MySQL
+Current version: 20260521120100
+Total migrations: 3
+  applied: 2
+  pending: 1
+  orphan: 1
+
+Migrations (newest last):
+  [x] 20260520091823 create_users
+  [x] 20260521090300 add_email_to_users
+  [?] 20260521120100 ********** NO FILE **********
+  [ ] 20260521131000 add_phone_to_users
+
+Orphan versions are recorded in the database but have no
+matching file in app/migrator/migrations/. This usually means
+a peer applied a migration whose file isn't yet in your branch.
+```
+
+The `[?]` row is the orphan: tracked as applied in the DB, but the file isn't on disk in this checkout. The `[x]` and `[ ]` markers behave as usual — applied and pending respectively.
+
+Running `wheels migrate latest`:
+
+```
+Running migration: latest...
+Note: database tracks version(s) 20260521120100 with no matching file in
+app/migrator/migrations/. This usually means a peer applied a migration
+whose file isn't yet in your branch.
+Applying pending migration(s) up to 20260521131000.
+
+-------- 20260521131000_add_phone_to_users ----------------
+...
+```
+
+Your pending local migration still applies. The orphan row stays in the tracking table — Wheels has no way to know whether the peer's migration was rolled back, will land in your branch later, or was a manual hotfix.
+
+## Resolving an orphan
+
+Pick the option that matches what actually happened:
+
+### Option 1: The peer's migration is legitimate; pull their file
+
+This is the common case. Pull the latest from your shared branch and the file appears alongside its tracking row.
+
+```bash
+git pull
+wheels migrate info    # confirm the file is now present and marked [x]
+```
+
+The `[?]` row becomes `[x]` once the file lands. No DB change needed.
+
+### Option 2: The peer rolled back their migration
+
+If the peer reverted their work but the tracking row stayed (e.g., their `wheels migrate down` failed mid-flight, or they reverted via `git reset --hard` without running `down()`), you need to remove the stale row manually:
+
+```sql
+DELETE FROM wheels_migrator_versions WHERE version = '20260521120100';
+```
+
+<Aside type="note">
+  A future Wheels release will ship `wheels migrate forget &lt;version&gt;` for this workflow. Track [#2780](https://github.com/wheels-dev/wheels/issues/2780) for progress.
+</Aside>
+
+### Option 3: You need to add a new migration
+
+Just generate it. Wheels uses `Now()` for the timestamp prefix, so any migration you create today gets a timestamp newer than yesterday's orphan — your new file will run in the right order automatically.
+
+```bash
+wheels generate migration AddPhoneToUsers
+```
+
+If for some reason you've manually picked an older timestamp, rename the file to use a current timestamp before running `wheels migrate latest`.
+
+## Alternative: avoid shared dev databases
+
+A shared dev database trades schema isolation for "less environment to set up". When two developers diverge on schema, the symptoms surface exactly when you don't want them: mid-feature, with someone else's WIP already applied. Consider these alternatives, all supported by Wheels first-class:
+
+- **Per-developer schemas (MSSQL, PostgreSQL)** — same physical DB, one schema per developer. Switch via `config/environment.cfm`. Best when production-like data matters and you can pay the storage cost once.
+- **Per-developer databases (MySQL, PostgreSQL)** — separate logical DBs on the same instance. Each developer's migrations only affect their own DB.
+- **Local-only databases** — SQLite for dev, the shared instance only for staging and production. Wheels supports SQLite first-class via the bundled JDBC driver. Zero shared-state, zero conflicts.
+
+If a shared dev DB is unavoidable for organisational reasons (e.g., a team relying on production-grade data that can't be cheaply replicated), accept that orphan handling will fire periodically and design your workflow around regular `git pull` + `wheels migrate info` checks.
+
+## Related
+
+- [Migrations](/v4-0-0/basics/migrations/) — the day-to-day workflow
+- [Issue #2780](https://github.com/wheels-dev/wheels/issues/2780) — the original report that motivated this behavior

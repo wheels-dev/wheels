@@ -157,33 +157,17 @@ try {
 				data.message = migrator.redoMigration(local.redoVersion);
 				break;
 			case "info":
-				// Build a human-readable status block from the data already
-				// populated above (currentVersion, migrations, datasource).
-				// Without this, the CLI's `wheels migrate info` printed an
-				// empty success message (issue #2474).
+				// Build a human-readable status block. The migrations list
+				// is rendered by Migrator.$buildInfoOutput() so the logic
+				// is unit-testable without exercising the HTTP dispatcher.
+				// Issue #2780 surfaced orphan versions (DB rows with no
+				// matching file) — those are rendered with a [?] marker
+				// and an explanatory footer.
 				local.lines = [];
 				ArrayAppend(local.lines, "Datasource: " & data.datasource);
 				ArrayAppend(local.lines, "Database type: " & data.databaseType);
-				ArrayAppend(local.lines, "Current version: " & (Len(data.currentVersion) ? data.currentVersion : "0"));
-				ArrayAppend(local.lines, "Total migrations: " & ArrayLen(data.migrations));
-				if (ArrayLen(data.migrations)) {
-					local.applied = 0;
-					local.pending = 0;
-					for (local.m in data.migrations) {
-						if (local.m.status == "migrated") {
-							local.applied++;
-						} else {
-							local.pending++;
-						}
-					}
-					ArrayAppend(local.lines, "  applied: " & local.applied);
-					ArrayAppend(local.lines, "  pending: " & local.pending);
-					ArrayAppend(local.lines, "");
-					ArrayAppend(local.lines, "Migrations (newest last):");
-					for (local.m in data.migrations) {
-						local.marker = local.m.status == "migrated" ? "[x]" : "[ ]";
-						ArrayAppend(local.lines, "  " & local.marker & " " & local.m.version & " " & local.m.name);
-					}
+				for (local.line in migrator.$buildInfoOutput()) {
+					ArrayAppend(local.lines, local.line);
 				}
 				data.message = ArrayToList(local.lines, Chr(10));
 				break;
