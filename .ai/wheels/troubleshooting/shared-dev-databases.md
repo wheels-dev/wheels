@@ -37,14 +37,40 @@ If SOME DB versions > target are orphans and SOME have local files, the
 down branch runs as usual but emits a warning naming the orphans (they
 get skipped by the existing loop because it iterates files only).
 
+## Reconciliation commands
+
+Three CLI subcommands for manual reconciliation against the tracking
+table (Flyway `validate` / `repair` / `SkipExecutingMigrations`
+analogues):
+
+- `wheels migrate doctor` — comprehensive health report. Reads
+  `Migrator.doctor()`. Pure read; no mutation. Reports orphans,
+  pending, and applied counts with a human-readable summary.
+- `wheels migrate forget <version> --yes` — removes a single row
+  from `wheels_migrator_versions`. Requires `--yes`. Refuses if the
+  version has a matching local file (use `migrate down` instead) or
+  if it's not in the tracking table.
+- `wheels migrate pretend <version> --yes` — inserts a row without
+  running `up()`. Requires `--yes`. Refuses if already applied or
+  if no local file matches.
+
+Implementation:
+- `Migrator.cfc::doctor()`, `forgetVersion()`, `pretendVersion()`
+- `cli.cfm` cases: `doctor`, `forgetVersion`, `pretendVersion`
+- `Module.cfc::runForgetOrPretend()` handles `--yes` gating
+- Tests: `vendor/wheels/tests/specs/migrator/MigratorReconciliationSpec.cfc`
+
 ## Related
 
 - Issue #2780 (the original report)
-- PR #2798 (the fix)
+- PR #2798 (orphan detection + info display + docs, merged 2026-05-22)
 - `vendor/wheels/Migrator.cfc::$getOrphanVersions()`
 - `vendor/wheels/Migrator.cfc::$buildInfoOutput()`
+- `vendor/wheels/Migrator.cfc::doctor()`
+- `vendor/wheels/Migrator.cfc::forgetVersion()`
+- `vendor/wheels/Migrator.cfc::pretendVersion()`
 - `vendor/wheels/tests/specs/migrator/OrphanDetectionSpec.cfc`
 - `vendor/wheels/tests/specs/migrator/MigratorInfoSpec.cfc`
-- Follow-up work (separate PRs):
-  - `wheels migrate doctor` / `forget` / `pretend` for manual reconciliation
+- `vendor/wheels/tests/specs/migrator/MigratorReconciliationSpec.cfc`
+- Follow-up work (separate PR):
   - Schema enrichment of `wheels_migrator_versions` (add `name` and `applied_at` columns)

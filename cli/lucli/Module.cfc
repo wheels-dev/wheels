@@ -347,6 +347,17 @@ component extends="modules.BaseModule" {
 					out("Migration failed: #e.message#", "red");
 					return "";
 				}
+			case "doctor":
+				try {
+					return runMigration("doctor");
+				} catch (MigrationError e) {
+					out("Doctor failed: #e.message#", "red");
+					return "";
+				}
+			case "forget":
+				return runForgetOrPretend("forgetVersion", args);
+			case "pretend":
+				return runForgetOrPretend("pretendVersion", args);
 			case "rename-system-tables":
 				// F15 Phase 2: opt-in one-shot rename of legacy c_o_r_e_*
 				// system tables to wheels_*. Idempotent (no-op when nothing
@@ -363,7 +374,7 @@ component extends="modules.BaseModule" {
 				}
 			default:
 				out("Unknown migration action: #action#", "red");
-				out("Usage: wheels migrate [latest|up|down|info|rename-system-tables]");
+				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]");
 				return "";
 		}
 	}
@@ -3336,6 +3347,7 @@ component extends="modules.BaseModule" {
 			case "up":     command = "migrateUp"; break;
 			case "down":   command = "migrateDown"; break;
 			case "info":   command = "info"; break;
+			case "doctor": command = "doctor"; break;
 		}
 
 		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
@@ -3355,12 +3367,88 @@ component extends="modules.BaseModule" {
 		// the previous code silently treated it as success. See issue #2315.
 		var result = parseCliResponse(httpResult, "Migration #action#");
 
-		if (structKeyExists(result, "message") && len(result.message)) {
-			out(result.message, "green");
-		} else {
-			out("Migration #action# completed.", "green");
+		// For `doctor`, switch the output color to yellow when the report
+		// signals unhealthy state (orphans or pending migrations). Green
+		// on an unhealthy result reads as "everything's fine" when it
+		// isn't. Other actions stay green on success.
+		var color = "green";
+		if (arguments.action == "doctor" && structKeyExists(result, "healthy") && !result.healthy) {
+			color = "yellow";
 		}
 
+		if (structKeyExists(result, "message") && len(result.message)) {
+			out(result.message, color);
+		} else {
+			out("Migration #action# completed.", color);
+		}
+
+		return "";
+	}
+
+	private string function runForgetOrPretend(required string command, required array args) {
+		// `forget` and `pretend` require an explicit <version> arg plus
+		// `--yes` to confirm. Default behavior is to print what would
+		// happen and refuse without the flag. See issue #2780.
+		var version = "";
+		var yes = false;
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			var a = arguments.args[i];
+			if (a == "--yes" || a == "-y") {
+				yes = true;
+			} else if (!a.startsWith("--")) {
+				version = a;
+			}
+		}
+
+		var verb = arguments.command == "forgetVersion" ? "forget" : "pretend";
+
+		if (!Len(version)) {
+			out("Missing required argument: <version>", "red");
+			out("Usage:");
+			out("  wheels migrate #verb# <version> --yes");
+			return "";
+		}
+
+		if (!yes) {
+			out("This will modify wheels_migrator_versions.", "yellow");
+			out("Re-run with --yes to confirm:", "yellow");
+			out("  wheels migrate #verb# #version# --yes");
+			return "";
+		}
+
+		var serverPort = $requireRunningServer([
+			"Migration reconciliation requires a running server.",
+			"Start one with: wheels start"
+		]);
+
+		out("Running #verb# for version #version#...", "cyan");
+
+		// URL-encode version: $sanitiseVersion() on the server side strips
+		// non-digits before SQL use (no injection path), but raw URL-special
+		// characters (&, =, %) in the CLI argument could still inject
+		// spurious query parameters before reaching that point.
+		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
+
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest(reconcileUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "MigrationError",
+				message = "#verb# failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response"};
+		var success = parsed.success ?: false;
+		var msg = parsed.message ?: "";
+
+		if (success) {
+			out(msg, "green");
+		} else {
+			out(msg, "red");
+		}
 		return "";
 	}
 

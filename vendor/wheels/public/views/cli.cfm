@@ -171,7 +171,75 @@ try {
 				}
 				data.message = ArrayToList(local.lines, Chr(10));
 				break;
-			
+			case "doctor":
+				// Comprehensive migrator health diagnostic. Returns a struct
+				// describing orphans, pending, and applied counts. See #2780.
+				local.report = migrator.doctor();
+				data.healthy = local.report.healthy;
+				data.currentVersion = local.report.currentVersion;
+				data.orphans = local.report.orphans;
+				data.pending = local.report.pending;
+				data.summary = local.report.summary;
+				local.docLines = [];
+				ArrayAppend(local.docLines, local.report.message);
+				ArrayAppend(local.docLines, "");
+				ArrayAppend(local.docLines, "  Datasource: " & data.datasource);
+				ArrayAppend(local.docLines, "  Database type: " & data.databaseType);
+				ArrayAppend(local.docLines, "  Current version: " & (Len(local.report.currentVersion) ? local.report.currentVersion : "0"));
+				ArrayAppend(local.docLines, "  Total migrations: " & local.report.summary.total);
+				ArrayAppend(local.docLines, "    applied: " & local.report.summary.applied);
+				ArrayAppend(local.docLines, "    pending: " & local.report.summary.pending);
+				if (local.report.summary.orphan > 0) {
+					ArrayAppend(local.docLines, "    orphan:  " & local.report.summary.orphan & " (" & ArrayToList(local.report.orphans, ", ") & ")");
+				}
+				if (ArrayLen(local.report.pending) > 0) {
+					ArrayAppend(local.docLines, "");
+					ArrayAppend(local.docLines, "Pending local migrations:");
+					for (local.v in local.report.pending) {
+						ArrayAppend(local.docLines, "  [ ] " & local.v);
+					}
+				}
+				if (ArrayLen(local.report.orphans) > 0) {
+					ArrayAppend(local.docLines, "");
+					ArrayAppend(local.docLines, "Orphan versions (no matching file):");
+					for (local.v in local.report.orphans) {
+						ArrayAppend(local.docLines, "  [?] " & local.v);
+					}
+					ArrayAppend(local.docLines, "");
+					ArrayAppend(local.docLines, "Resolve: `wheels migrate forget <version> --yes` to remove an orphan row,");
+					ArrayAppend(local.docLines, "         or pull the peer's migration file via git.");
+				}
+				data.message = ArrayToList(local.docLines, Chr(10));
+				break;
+			case "forgetVersion":
+				// Remove a row from wheels_migrator_versions without running
+				// down(). Refuses if the version has a matching local file.
+				local.versionArg = request.wheels.params.version ?: "";
+				if (!Len(local.versionArg)) {
+					data.success = false;
+					data.message = "Missing required argument: version. Usage: wheels migrate forget <version>";
+					break;
+				}
+				local.forgetResult = migrator.forgetVersion(local.versionArg);
+				data.success = local.forgetResult.success;
+				data.removed = local.forgetResult.removed;
+				data.message = local.forgetResult.message;
+				break;
+			case "pretendVersion":
+				// Record a version as applied without running up(). Refuses
+				// if already applied or if no local file matches.
+				local.pretendArg = request.wheels.params.version ?: "";
+				if (!Len(local.pretendArg)) {
+					data.success = false;
+					data.message = "Missing required argument: version. Usage: wheels migrate pretend <version>";
+					break;
+				}
+				local.pretendResult = migrator.pretendVersion(local.pretendArg);
+				data.success = local.pretendResult.success;
+				data.recorded = local.pretendResult.recorded;
+				data.message = local.pretendResult.message;
+				break;
+
 			// Database commands
 			case "dbStatus":
 				// Return migration status

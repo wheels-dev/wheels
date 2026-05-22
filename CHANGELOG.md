@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 # [Unreleased]
 
+### Added
+
+- Three new `wheels migrate` subcommands for manual reconciliation against the tracking table — Flyway `validate` / `repair` / `SkipExecutingMigrations` analogues. `wheels migrate doctor` prints a single-command health report covering applied/pending/orphan versions plus a human-readable summary; pure read, never mutates. `wheels migrate forget <version> --yes` removes a single orphan row from `wheels_migrator_versions` (refuses if a matching local file exists — use `migrate down` for legitimate rollbacks — and refuses if the version isn't in the table). `wheels migrate pretend <version> --yes` records a version as applied without running its `up()` (refuses if already applied or if no local file matches, so future `down()` calls still work). Both `forget` and `pretend` require explicit `--yes` to mutate; without it they print what would happen and exit. Implementation lives in `Migrator.cfc::doctor()`, `forgetVersion()`, `pretendVersion()`. Covers the shared-dev-DB pattern surfaced in #2780 beyond what the orphan auto-detection in #2798 could resolve automatically.
+
 ### Fixed
 
 - `wheels migrate latest` no longer takes a misleading "down" branch and silently no-ops when `wheels_migrator_versions` records a version whose migration file isn't in the current checkout (shared dev DB / peer migration not yet pulled). `Migrator.migrateTo()` now diffs the tracking table against `app/migrator/migrations/` via the new `$getOrphanVersions()` helper and branches on orphan-at-top before the existing direction check — applying pending local migrations with a clear warning when all DB versions above target are orphans, emitting "Nothing to do" naming target vs current when none are pending, and warning + letting the existing down loop continue in mixed cases (orphan rows skip naturally because the loop iterates files). `wheels migrate info` also now shows orphan rows with `[?] <version> ********** NO FILE **********` (Rails-style) and a footer explaining the cause (#2780)

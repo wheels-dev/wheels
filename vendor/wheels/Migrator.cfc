@@ -688,6 +688,158 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Returns a comprehensive health report on the migrator state. Pure
+	 * read — no mutation. Used by `wheels migrate doctor` to surface
+	 * orphans, gaps, and pending migrations in one pass.
+	 *
+	 * Result struct:
+	 *   - healthy: boolean — true iff no orphans AND no pending
+	 *   - currentVersion: string — highest applied version (may be orphan)
+	 *   - orphans: array — DB versions with no matching file
+	 *   - pending: array — local files not yet applied
+	 *   - summary: struct with .total, .applied, .pending, .orphan counts
+	 *   - message: human-readable one-paragraph summary
+	 *
+	 * See issue #2780 / PR #2798 for the orphan detection foundation.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function doctor() {
+		local.migrations = getAvailableMigrations();
+		local.orphans = $getOrphanVersions();
+		local.currentVersion = getCurrentMigrationVersion();
+		local.pending = [];
+		local.applied = 0;
+		for (local.m in local.migrations) {
+			if (local.m.status == "migrated") {
+				local.applied++;
+			} else {
+				ArrayAppend(local.pending, local.m.version);
+			}
+		}
+		local.healthy = ArrayLen(local.orphans) == 0 && ArrayLen(local.pending) == 0;
+		local.rv = {
+			healthy: local.healthy,
+			currentVersion: local.currentVersion,
+			orphans: local.orphans,
+			pending: local.pending,
+			summary: {
+				total: ArrayLen(local.migrations),
+				applied: local.applied,
+				pending: ArrayLen(local.pending),
+				orphan: ArrayLen(local.orphans)
+			}
+		};
+		if (local.healthy) {
+			local.rv.message = "Migrator is healthy. " & local.applied & " migration(s) applied, none pending.";
+		} else {
+			local.parts = [];
+			if (ArrayLen(local.pending)) {
+				ArrayAppend(local.parts, ArrayLen(local.pending) & " pending");
+			}
+			if (ArrayLen(local.orphans)) {
+				ArrayAppend(local.parts, ArrayLen(local.orphans) & " orphan");
+			}
+			local.rv.message = "Migrator needs attention: " & ArrayToList(local.parts, ", ") & ".";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Removes a row from `wheels_migrator_versions` without running
+	 * down(). Only orphan versions (those with no matching local file)
+	 * can be forgotten — for legitimate rollbacks, use `migrate down`.
+	 *
+	 * Returns: {success, removed, message}
+	 *
+	 * @version The version string to forget (digits only after sanitisation).
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function forgetVersion(required string version) {
+		local.rv = {success: false, removed: "", message: ""};
+		local.cleanVersion = $sanitiseVersion(arguments.version);
+		if (!Len(local.cleanVersion)) {
+			local.rv.message = "Invalid version: must contain at least one digit.";
+			return local.rv;
+		}
+		local.appliedList = ListToArray($getVersionsPreviouslyMigrated());
+		if (!ArrayFind(local.appliedList, local.cleanVersion)) {
+			local.rv.message = "Version " & local.cleanVersion & " was not found in the tracking table.";
+			return local.rv;
+		}
+		// Refuse to forget a version that has a matching local file. The
+		// user almost certainly wants `migrate down` instead; forgetting
+		// would leave the schema mutated but the row gone, hiding state.
+		for (local.m in getAvailableMigrations()) {
+			if (local.m.version == local.cleanVersion) {
+				local.rv.message = "Refusing to forget version " & local.cleanVersion
+					& " because a matching local file exists "
+					& "(app/migrator/migrations/" & local.m.cfcfile & ".cfc). "
+					& "Use `wheels migrate down` to roll it back properly.";
+				return local.rv;
+			}
+		}
+		// Delegate the actual delete to the existing private helper so
+		// the request.$wheelsDebugSQL guard fires uniformly — matches
+		// what pretendVersion() does via $setVersionAsMigrated().
+		$removeVersionAsMigrated(local.cleanVersion);
+		local.rv.success = true;
+		local.rv.removed = local.cleanVersion;
+		local.rv.message = "Removed version " & local.cleanVersion & " from the tracking table.";
+		return local.rv;
+	}
+
+	/**
+	 * Records a version as applied in `wheels_migrator_versions` without
+	 * running its up() method. Useful when a peer applied the migration
+	 * via direct SQL or a different tool and you need the tracking
+	 * table to reflect that. Refuses if the version is already applied,
+	 * or if no local file matches (only known versions can be pretended).
+	 *
+	 * Returns: {success, recorded, message}
+	 *
+	 * @version The version string to record (digits only after sanitisation).
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public struct function pretendVersion(required string version) {
+		local.rv = {success: false, recorded: "", message: ""};
+		local.cleanVersion = $sanitiseVersion(arguments.version);
+		if (!Len(local.cleanVersion)) {
+			local.rv.message = "Invalid version: must contain at least one digit.";
+			return local.rv;
+		}
+		local.appliedList = ListToArray($getVersionsPreviouslyMigrated());
+		if (ArrayFind(local.appliedList, local.cleanVersion)) {
+			local.rv.message = "Version " & local.cleanVersion & " is already applied. "
+				& "Use `wheels migrate forget` if you need to remove the tracking row.";
+			return local.rv;
+		}
+		local.fileExists = false;
+		for (local.m in getAvailableMigrations()) {
+			if (local.m.version == local.cleanVersion) {
+				local.fileExists = true;
+				break;
+			}
+		}
+		if (!local.fileExists) {
+			local.rv.message = "Refusing to pretend version " & local.cleanVersion
+				& " — no matching file in app/migrator/migrations/. "
+				& "Create the migration file first, then pretend if it has already been applied externally.";
+			return local.rv;
+		}
+		$setVersionAsMigrated(local.cleanVersion);
+		local.rv.success = true;
+		local.rv.recorded = local.cleanVersion;
+		local.rv.message = "Recorded version " & local.cleanVersion & " as applied (up() was not run).";
+		return local.rv;
+	}
+
+	/**
 	 * F15 Phase 1: detect which system-table naming family this app's database
 	 * already uses, and flip the configured names if needed.
 	 *

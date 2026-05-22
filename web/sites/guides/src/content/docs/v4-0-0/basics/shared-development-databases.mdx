@@ -14,7 +14,8 @@ When several developers share a single development database, the migration track
 
 - What an orphan version is and how to spot it
 - What `wheels migrate latest` does when one is present
-- Three resolution paths and when to use each
+- Four resolution paths and when to use each
+- How `wheels migrate doctor` gives a one-command health view
 - Why we recommend per-developer schemas instead
 
 <Aside type="caution">
@@ -79,15 +80,26 @@ The `[?]` row becomes `[x]` once the file lands. No DB change needed.
 
 ### Option 2: The peer rolled back their migration
 
-If the peer reverted their work but the tracking row stayed (e.g., their `wheels migrate down` failed mid-flight, or they reverted via `git reset --hard` without running `down()`), you need to remove the stale row manually:
+If the peer reverted their work but the tracking row stayed (e.g., their `wheels migrate down` failed mid-flight, or they reverted via `git reset --hard` without running `down()`), use `wheels migrate forget` to remove the stale row:
 
-```sql
-DELETE FROM wheels_migrator_versions WHERE version = '20260521120100';
+```bash
+wheels migrate forget 20260521120100         # prints what would happen
+wheels migrate forget 20260521120100 --yes   # actually removes the row
 ```
 
-<Aside type="note">
-  A future Wheels release will ship `wheels migrate forget &lt;version&gt;` for this workflow. Track [#2780](https://github.com/wheels-dev/wheels/issues/2780) for progress.
-</Aside>
+The command refuses to forget a version that has a matching local file — for legitimate rollbacks, use `wheels migrate down` instead. It also refuses if the version isn't in the tracking table (idempotent).
+
+### Option 2b: The migration was applied via direct SQL
+
+If a teammate applied the migration outside of Wheels (e.g., via a SQL client during incident response), the schema is changed but `wheels_migrator_versions` doesn't know. Use `wheels migrate pretend` once the file lands in your branch:
+
+```bash
+git pull                                       # pull the peer's migration file
+wheels migrate pretend 20260521120100          # prints what would happen
+wheels migrate pretend 20260521120100 --yes    # records the version
+```
+
+The command refuses if the version is already applied (idempotent) or if no local file matches — the file must exist so future operations can roll the version back via `down()`.
 
 ### Option 3: You need to add a new migration
 
@@ -98,6 +110,45 @@ wheels generate migration AddPhoneToUsers
 ```
 
 If for some reason you've manually picked an older timestamp, rename the file to use a current timestamp before running `wheels migrate latest`.
+
+## Comprehensive diagnostic
+
+For a single-command view of migrator health, run:
+
+```bash
+wheels migrate doctor
+```
+
+Sample output when something needs attention:
+
+```
+Migrator needs attention: 1 pending, 1 orphan.
+
+  Datasource: wheels
+  Database type: MySQL
+  Current version: 20260521120100
+  Total migrations: 3
+    applied: 2
+    pending: 1
+    orphan:  1 (20260521120100)
+
+Pending local migrations:
+  [ ] 20260521131000
+
+Orphan versions (no matching file):
+  [?] 20260521120100
+
+Resolve: `wheels migrate forget <version> --yes` to remove an orphan row,
+         or pull the peer's migration file via git.
+```
+
+Healthy output is a single line:
+
+```
+Migrator is healthy. 3 migration(s) applied, none pending.
+```
+
+`doctor` is read-only — it never mutates the tracking table or runs migrations.
 
 ## Alternative: avoid shared dev databases
 

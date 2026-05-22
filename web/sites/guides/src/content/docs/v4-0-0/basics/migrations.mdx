@@ -12,7 +12,7 @@ Migrations are versioned CFCs that carry your schema forward and back. Each one 
 
 **You'll learn:**
 
-- The four `wheels migrate` commands and when to reach for each
+- The seven `wheels migrate` subcommands — four for the day-to-day workflow, three for reconciliation when something's off
 - How to generate a migration file and what the timestamped filename means
 - The column builder methods on `createTable` — `string`, `integer`, `datetime`, `references`, `timestamps`
 - How to add and remove indexes and foreign keys without dropping a table
@@ -25,7 +25,7 @@ Migrations are versioned CFCs that carry your schema forward and back. Each one 
 
 ## Running migrations
 
-Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `schema_migrations`, so the app has to be running (or at least reachable) for them to work — see [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
+Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `wheels_migrator_versions`, so the app has to be running (or at least reachable) for them to work — see [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
 wheels --version
@@ -33,10 +33,20 @@ wheels --version
 
 - `wheels migrate latest` — apply every pending migration in order. The most common command; you'll run it after pulling someone else's changes.
 - `wheels migrate up` — apply exactly one pending migration. Useful when you want to watch the effect of a single file.
-- `wheels migrate down` — roll back the most recently applied migration. Runs the `down()` method of the newest row in `schema_migrations`.
-- `wheels migrate info` — show which migrations have run and which are still pending. Read-only; safe any time.
+- `wheels migrate down` — roll back the most recently applied migration. Runs the `down()` method of the newest row in `wheels_migrator_versions`.
+- `wheels migrate info` — show which migrations have run and which are still pending. Read-only; safe any time. Orphan versions (rows in the tracking table with no matching file in `app/migrator/migrations/`) are flagged with `[?] <version> ********** NO FILE **********` so you can spot when a peer's migration has been applied to a shared DB before the file lands in your branch.
 
 The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly — the schema either moves fully or not at all.
+
+## Reconciliation subcommands
+
+Three additional subcommands cover the cases where the tracking table and the on-disk files have drifted — most commonly when several developers share a single dev database. Read more in [Shared development databases](/v4-0-0/basics/shared-development-databases/).
+
+- `wheels migrate doctor` — single-command health report. Lists orphans, pending local migrations, and the applied count with a human-readable summary. Read-only; never mutates.
+- `wheels migrate forget <version> --yes` — removes a single row from `wheels_migrator_versions` without running `down()`. Use this only when a peer rolled back their migration but the tracking row stayed. Refuses if the version has a matching local file (use `migrate down` instead) or if the version isn't in the table.
+- `wheels migrate pretend <version> --yes` — records a version as applied without running `up()`. Use this when a peer applied the migration via direct SQL or a different tool and you need the tracking table to reflect that. Refuses if the version is already applied or if no local file matches.
+
+Both `forget` and `pretend` print what they would do and exit if `--yes` is omitted; the flag is required to mutate the tracking table.
 
 ## Generating a migration
 
@@ -46,7 +56,7 @@ The generator scaffolds a CFC with `up()` and `down()` stubs and drops it in `ap
 wheels generate migration CreatePosts
 ```
 
-That produces a file named like `20260420143000_create_posts_table.cfc`. The prefix is `YYYYMMDDHHMMSS` — generated from the clock at creation time — and the runner applies migrations in filename order, so the timestamp is what puts your change after everyone else's. Never rename or reorder migration files after they've been committed: the history in `schema_migrations` keys on the filename, and a renamed file looks like a brand-new migration to the runner.
+That produces a file named like `20260420143000_create_posts_table.cfc`. The prefix is `YYYYMMDDHHMMSS` — generated from the clock at creation time — and the runner applies migrations in filename order, so the timestamp is what puts your change after everyone else's. Never rename or reorder migration files after they've been committed: the history in `wheels_migrator_versions` keys on the timestamp prefix, and a renamed file looks like a brand-new migration to the runner.
 
 ## Writing a migration — full example
 
