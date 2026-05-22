@@ -40,11 +40,11 @@ get skipped by the existing loop because it iterates files only).
 ## Related
 
 - Issue #2780 (the original report)
+- PR #2798 (the fix)
 - `vendor/wheels/Migrator.cfc::$getOrphanVersions()`
 - `vendor/wheels/Migrator.cfc::$buildInfoOutput()`
 - `vendor/wheels/tests/specs/migrator/OrphanDetectionSpec.cfc`
 - `vendor/wheels/tests/specs/migrator/MigratorInfoSpec.cfc`
-- Plan: `docs/superpowers/plans/2026-05-22-orphan-migration-detection.md`
-- Follow-up plans (separate PRs):
-  - Plan 2: `wheels migrate doctor` / `forget` / `pretend`
-  - Plan 3: schema enrichment of `wheels_migrator_versions`
+- Follow-up work (separate PRs):
+  - `wheels migrate doctor` / `forget` / `pretend` for manual reconciliation
+  - Schema enrichment of `wheels_migrator_versions` (add `name` and `applied_at` columns)
