@@ -1,4 +1,4 @@
-# Receiver workflow for `wheels-dev/apt-wheels-dev`.
+# Receiver workflow for `wheels-dev/apt-wheels`.
 #
 # Listens for `repository_dispatch` from `wheels-dev/wheels`'s release workflow,
 # downloads the new `.deb` asset from the upstream GitHub Release, slots it
