@@ -3367,10 +3367,19 @@ component extends="modules.BaseModule" {
 		// the previous code silently treated it as success. See issue #2315.
 		var result = parseCliResponse(httpResult, "Migration #action#");
 
+		// For `doctor`, switch the output color to yellow when the report
+		// signals unhealthy state (orphans or pending migrations). Green
+		// on an unhealthy result reads as "everything's fine" when it
+		// isn't. Other actions stay green on success.
+		var color = "green";
+		if (arguments.action == "doctor" && structKeyExists(result, "healthy") && !result.healthy) {
+			color = "yellow";
+		}
+
 		if (structKeyExists(result, "message") && len(result.message)) {
-			out(result.message, "green");
+			out(result.message, color);
 		} else {
-			out("Migration #action# completed.", "green");
+			out("Migration #action# completed.", color);
 		}
 
 		return "";
