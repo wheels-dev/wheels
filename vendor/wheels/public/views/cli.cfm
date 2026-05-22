@@ -174,10 +174,13 @@ try {
 			case "doctor":
 				// Comprehensive migrator health diagnostic. Returns a struct
 				// describing orphans, pending, and applied counts. See #2780.
+				// Plan 3: orphansWithMeta exposes the peer's migration name
+				// + apply timestamp when the schema is enriched.
 				local.report = migrator.doctor();
 				data.healthy = local.report.healthy;
 				data.currentVersion = local.report.currentVersion;
 				data.orphans = local.report.orphans;
+				data.orphansWithMeta = local.report.orphansWithMeta;
 				data.pending = local.report.pending;
 				data.summary = local.report.summary;
 				local.docLines = [];
@@ -199,11 +202,18 @@ try {
 						ArrayAppend(local.docLines, "  [ ] " & local.v);
 					}
 				}
-				if (ArrayLen(local.report.orphans) > 0) {
+				if (ArrayLen(local.report.orphansWithMeta) > 0) {
 					ArrayAppend(local.docLines, "");
 					ArrayAppend(local.docLines, "Orphan versions (no matching file):");
-					for (local.v in local.report.orphans) {
-						ArrayAppend(local.docLines, "  [?] " & local.v);
+					for (local.o in local.report.orphansWithMeta) {
+						local.orphanLine = "  [?] " & local.o.version;
+						if (Len(local.o.name)) {
+							local.orphanLine &= " " & local.o.name;
+						}
+						if (Len(local.o.appliedAt)) {
+							local.orphanLine &= " (applied " & local.o.appliedAt & ")";
+						}
+						ArrayAppend(local.docLines, local.orphanLine);
 					}
 					ArrayAppend(local.docLines, "");
 					ArrayAppend(local.docLines, "Resolve: `wheels migrate forget <version> --yes` to remove an orphan row,");
