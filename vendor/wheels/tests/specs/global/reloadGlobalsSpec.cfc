@@ -74,8 +74,7 @@ component extends="wheels.WheelsTest" {
 			it("$reincludeGlobals re-evaluates the target cfm without throwing", () => {
 				// CFML's `include` resolves via mappings, not absolute filesystem
 				// paths — call $reincludeGlobals with the mapping-relative form.
-				var mappingPath = "/wheels/tests/_tmp/reloadGlobals/reinclude.cfm";
-				var absPath = ExpandPath(mappingPath);
+				var absPath = ExpandPath("/wheels/tests/_tmp/reloadGlobals/reinclude.cfm");
 				FileWrite(absPath, "<cfscript>function fxReinclude(){return 'first';}</cfscript>");
 				$assert.notThrows(function() {
 					application.wo.$reincludeGlobals(file = "/wheels/tests/_tmp/reloadGlobals/reinclude.cfm");
