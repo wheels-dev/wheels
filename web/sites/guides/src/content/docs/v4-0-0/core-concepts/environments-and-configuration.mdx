@@ -51,6 +51,8 @@ set(environment = application.wo.env("WHEELS_ENV", "development"));
 
 Settings cascade: framework defaults load first, then `config/settings.cfm`, then `config/<environment>/settings.cfm`. Later writes win. A value you set in the shared file is the default for every environment; the environment-specific file only needs to name the keys it changes.
 
+One development-only default worth noting: `reloadOnGlobalChange` (defaults `true` in development) makes bare `?reload=true` re-include `app/global/*.cfm` when any tracked file's mtime changes, so new helpers added to `app/global/functions.cfm` are picked up immediately without the password-gated full reload. Opt out with `set(reloadOnGlobalChange=false)` in `config/settings.cfm`. The setting defaults to `false` in all other environments, so there is no `DirectoryList` overhead in production.
+
 ## Environment detection
 
 The active environment is set by `config/environment.cfm`, which typically reads `WHEELS_ENV` from the environment variables with a default of `development`. The `wheels` CLI respects the same variable, and `.env` files loaded at boot get merged into the lookup. Override in CI or production by exporting `WHEELS_ENV=production` before the app starts — a deploy script, a Dockerfile `ENV`, or a systemd unit is the usual place.

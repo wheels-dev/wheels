@@ -24,6 +24,10 @@
 		application.$wheels.suppressRouteBindingWarnings = false;
 		application.$wheels.reloadPassword = "";
 		application.$wheels.redirectAfterReload = false;
+		// Soft-reload of app/global/*.cfm on ?reload=true when files change.
+		// Defaults true in development so adding a helper to app/global is picked
+		// up without the password-gated applicationStop() path (issue 2792).
+		application.$wheels.reloadOnGlobalChange = (application.$wheels.environment == "development");
 		application.$wheels.softDeleteProperty = "deletedAt";
 		application.$wheels.timeStampOnCreateProperty = "createdAt";
 		application.$wheels.timeStampOnUpdateProperty = "updatedAt";

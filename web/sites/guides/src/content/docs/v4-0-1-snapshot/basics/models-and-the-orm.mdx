@@ -51,7 +51,7 @@ When the table, key, or column names don't match the defaults, override them in 
 - `tableName("old_blog_entries")` — non-convention table name.
 - `setPrimaryKey("entryId")` — non-`id` primary key.
 - `dataSource("legacy_db")` — non-default datasource. See [Database and Multiple Datasources](/v4-0-1-snapshot/basics/database-and-multiple-datasources/) when this lands for the wider multi-database story.
-- `property(name="publishedAt", column="pub_date")` — the property on the model is `publishedAt`, the column in the table is `pub_date`. The view and controller never see the column name.
+- `property(name="publishedAt", column="pub_date")` — the property on the model is `publishedAt`, the column in the table is `pub_date`. The view and controller never see the column name. This is also the correct pattern when a column name is a SQL reserved word (`key`, `order`, `group`, etc.) — Wheels quotes all column identifiers in SELECT, GROUP BY, and ORDER BY clauses, so the alias stays clean while the generated SQL brackets the underlying column name for the target dialect.
 
 ```cfm {test:compile}
 component extends="Model" {
