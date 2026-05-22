@@ -782,11 +782,10 @@ component output="false" extends="wheels.Global"{
 				return local.rv;
 			}
 		}
-		local.appKey = $appKey();
-		$query(
-			datasource = application[local.appKey].dataSourceName,
-			sql = "DELETE FROM #application[local.appKey].migratorTableName# WHERE version = '#local.cleanVersion#'"
-		);
+		// Delegate the actual delete to the existing private helper so
+		// the request.$wheelsDebugSQL guard fires uniformly — matches
+		// what pretendVersion() does via $setVersionAsMigrated().
+		$removeVersionAsMigrated(local.cleanVersion);
 		local.rv.success = true;
 		local.rv.removed = local.cleanVersion;
 		local.rv.message = "Removed version " & local.cleanVersion & " from the tracking table.";

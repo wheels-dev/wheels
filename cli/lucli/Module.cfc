@@ -3414,7 +3414,11 @@ component extends="modules.BaseModule" {
 
 		out("Running #verb# for version #version#...", "cyan");
 
-		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#version#&format=json";
+		// URL-encode version: $sanitiseVersion() on the server side strips
+		// non-digits before SQL use (no injection path), but raw URL-special
+		// characters (&, =, %) in the CLI argument could still inject
+		// spurious query parameters before reaching that point.
+		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
 
 		var httpResult = "";
 		try {
