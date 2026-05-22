@@ -1268,22 +1268,32 @@ component output="false" extends="wheels.Global"{
 		rv.hasName = ListFindNoCase(existingCols, "name") > 0;
 		rv.hasAppliedAt = ListFindNoCase(existingCols, "applied_at") > 0;
 
+		// Cache the engine type on app scope so $setVersionAsMigrated can
+		// detect SQLite without a $dbinfo round-trip (which would break
+		// inside the migrator's open transaction). Populate BEFORE the
+		// hasName/hasAppliedAt early-return below, so the cache is
+		// available on every app restart — not just the first start
+		// after upgrade. Without this, SQLite would write NULL into
+		// applied_at on every restart because the cache lookup in
+		// $setVersionAsMigrated would miss and skip the CFML-side Now()
+		// injection (the column has no DEFAULT on SQLite since SQLite
+		// can't DEFAULT a TIMESTAMP on ALTER ADD COLUMN). Guarded so it
+		// fires at most once per app process.
+		if (!StructKeyExists(application[appKey], "$migratorDbType")) {
+			var info = $dbinfo(
+				type = "version",
+				datasource = dsn,
+				username = application.wheels.dataSourceUserName,
+				password = application.wheels.dataSourcePassword
+			);
+			application[appKey].$migratorDbType = info.database_productname;
+		}
+
 		if (rv.hasName && rv.hasAppliedAt) {
 			return rv;
 		}
 
-		var info = $dbinfo(
-			type = "version",
-			datasource = dsn,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
-		);
-		var dbType = info.database_productname;
-		// Cache the engine type so $setVersionAsMigrated doesn't need to
-		// call $dbinfo on every insert. Running $dbinfo inside an open
-		// JDBC transaction breaks on SQLite ("SQL error or missing
-		// database") and is wasted work on other engines too.
-		application[appKey].$migratorDbType = dbType;
+		var dbType = application[appKey].$migratorDbType;
 
 		// Build per-engine ALTER statements for the missing columns.
 		// Each ALTER is its own statement so a partial-add state still

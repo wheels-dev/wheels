@@ -97,6 +97,30 @@ component extends="wheels.WheelsTest" {
 				expect(IsDate(rows.applied_at)).toBeTrue();
 			});
 
+			it("populates applied_at across app restarts (regression for round-2 C2)", () => {
+				if (_isCockroachDB) return;
+				// First "app run": migrate 001, which adds the enriched
+				// columns and caches $migratorDbType + $trackingColumnsEnsured.
+				migrator.migrateTo("001");
+				// Simulate an app restart: wipe both app-scope caches but
+				// leave the schema in place. The columns are already present
+				// in the DB; the next $ensureTrackingColumns() call must
+				// repopulate $migratorDbType BEFORE the early-return fires,
+				// otherwise SQLite would write NULL into applied_at on the
+				// next $setVersionAsMigrated insert (no DEFAULT on SQLite).
+				StructDelete(application.wheels, "$trackingColumnsEnsured");
+				StructDelete(application.wheels, "$migratorDbType");
+				// Second "app run": apply another migration.
+				migrator.migrateTo("002");
+				var rows = queryExecute(
+					"SELECT applied_at FROM #application.wheels.migratorTableName# WHERE version = '002'",
+					{},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(1);
+				expect(IsDate(rows.applied_at)).toBeTrue();
+			});
+
 		});
 
 	}
