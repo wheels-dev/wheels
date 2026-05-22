@@ -39,14 +39,71 @@ component output="false" extends="wheels.Global"{
 			}
 		}
 
+		// Issue #2780: detect orphan versions (DB rows whose timestamp has no
+		// matching local file). Common in shared dev DBs when a peer applied
+		// a migration whose file isn't yet in this branch. Without this
+		// check, the directional logic below silently took the "down" branch
+		// and emitted a misleading "Migrating from X down to Y" output.
+		local.orphans = $getOrphanVersions();
+		local.orphansAboveTarget = [];
+		for (local.v in local.orphans) {
+			if (local.v > arguments.version) {
+				ArrayAppend(local.orphansAboveTarget, local.v);
+			}
+		}
+		local.isOrphanAtTop = (
+			local.currentVersion > arguments.version
+			&& ArrayLen(local.orphansAboveTarget)
+			&& !arguments.missingMigFlag
+		);
+		if (local.isOrphanAtTop) {
+			// Check whether EVERY DB version above target is an orphan. If
+			// some have local files, the down branch is legitimate (the user
+			// has files to run down() on) — we still emit a warning naming
+			// the orphans but otherwise proceed as before.
+			local.dbVersionsAboveTarget = [];
+			for (local.v in ListToArray($getVersionsPreviouslyMigrated())) {
+				if (Len(local.v) && local.v != "0" && local.v > arguments.version) {
+					ArrayAppend(local.dbVersionsAboveTarget, local.v);
+				}
+			}
+			local.allOrphans = ArrayLen(local.dbVersionsAboveTarget) == ArrayLen(local.orphansAboveTarget);
+			if (local.allOrphans) {
+				local.rv = "Note: database tracks version(s) "
+					& ArrayToList(local.orphansAboveTarget, ", ")
+					& " with no matching file in app/migrator/migrations/. "
+					& "This usually means a peer applied a migration whose "
+					& "file isn't yet in your branch.#Chr(13) & Chr(10)#";
+				if (!local.hasPendingMigrations) {
+					local.rv &= "Nothing to do. Your latest local migration ("
+						& arguments.version
+						& ") is older than the database's current version ("
+						& local.currentVersion & ").#Chr(13) & Chr(10)#";
+					return local.rv;
+				}
+				// Suppress the down branch: rewrite currentVersion so the
+				// outer conditional falls through to the up branch, which
+				// applies any actually-pending local migrations.
+				local.currentVersion = arguments.version;
+			} else {
+				// Mixed case: some legitimate down candidates, some orphans.
+				// Warn but let the existing down branch handle the rest;
+				// orphan rows are skipped naturally because the loop only
+				// iterates local files.
+				local.rv = "Note: database tracks version(s) "
+					& ArrayToList(local.orphansAboveTarget, ", ")
+					& " with no matching file. These will be skipped during rollback.#Chr(13) & Chr(10)#";
+			}
+		}
+
 		if (local.currentVersion == arguments.version && !local.hasPendingMigrations) {
-			local.rv = "Database is currently at version #arguments.version#. No migration required.#Chr(13) & Chr(10)#";
+			local.rv &= "Database is currently at version #arguments.version#. No migration required.#Chr(13) & Chr(10)#";
 		} else {
 			if (!DirectoryExists(this.paths.sql) && application[local.appKey].writeMigratorSQLFiles) {
 				DirectoryCreate(this.paths.sql);
 			}
 			if (local.currentVersion > arguments.version && arguments.missingMigFlag == false) {
-				local.rv = "Migrating from #local.currentVersion# down to #arguments.version#.#Chr(13) & Chr(10)#";
+				local.rv &= "Migrating from #local.currentVersion# down to #arguments.version#.#Chr(13) & Chr(10)#";
 				for (local.i = ArrayLen(local.migrations); local.i >= 1; local.i--) {
 					local.migration = local.migrations[local.i];
 					if (local.migration.version <= arguments.version) {
@@ -79,7 +136,7 @@ component output="false" extends="wheels.Global"{
 				}
 			} else {
 				if(arguments.missingMigFlag){
-					local.rv = "Migrating remaining migrations till #arguments.version#.#Chr(13) & Chr(10)#";
+					local.rv &= "Migrating remaining migrations till #arguments.version#.#Chr(13) & Chr(10)#";
 					$removeVersionAsMigrated(local.currentVersion);
 				} else if (local.currentVersion gte arguments.version && local.hasPendingMigrations) {
 					// Out-of-order pending migrations: a migration with a
@@ -89,9 +146,9 @@ component output="false" extends="wheels.Global"{
 					// generator's current-day timestamp). The "from N up to N"
 					// framing reads as a no-op even though new migrations are
 					// about to run, so emit a clearer message. Onboarding F16.
-					local.rv = "Applying pending migration(s) up to #arguments.version#.#Chr(13) & Chr(10)#";
+					local.rv &= "Applying pending migration(s) up to #arguments.version#.#Chr(13) & Chr(10)#";
 				} else {
-					local.rv = "Migrating from #local.currentVersion# up to #arguments.version#.#Chr(13) & Chr(10)#";
+					local.rv &= "Migrating from #local.currentVersion# up to #arguments.version#.#Chr(13) & Chr(10)#";
 				}
 				for (local.migration in local.migrations) {
 					if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
@@ -530,6 +587,104 @@ component output="false" extends="wheels.Global"{
 			}
 			return 0;
 		}
+	}
+
+	/**
+	 * Returns versions recorded in the tracking table that have no matching
+	 * migration file in the current checkout. Used to detect the "shared dev
+	 * database" case where a peer has applied a migration whose file isn't
+	 * yet in the local branch. See issue #2780.
+	 *
+	 * Result is sorted ascending. The sentinel "0" returned by
+	 * $getVersionsPreviouslyMigrated() on an empty tracking table is excluded.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public array function $getOrphanVersions() {
+		local.appliedList = ListToArray($getVersionsPreviouslyMigrated());
+		local.fileVersions = [];
+		for (local.m in getAvailableMigrations()) {
+			ArrayAppend(local.fileVersions, local.m.version);
+		}
+		local.orphans = [];
+		for (local.v in local.appliedList) {
+			if (Len(local.v) && local.v != "0" && !ArrayFind(local.fileVersions, local.v)) {
+				ArrayAppend(local.orphans, local.v);
+			}
+		}
+		ArraySort(local.orphans, function(a, b) {
+			return Compare(a, b);
+		});
+		return local.orphans;
+	}
+
+	/**
+	 * Builds the human-readable info output for `wheels migrate info`.
+	 * Returns an array of lines (caller joins with newlines). Extracted
+	 * from cli.cfm's info handler so the rendering can be unit-tested
+	 * without exercising the HTTP dispatcher. Orphan rows (DB versions
+	 * with no matching local file — see issue #2780) are marked with
+	 * [?] and the literal "********** NO FILE **********", Rails-style.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public array function $buildInfoOutput() {
+		local.lines = [];
+		local.migrations = getAvailableMigrations();
+		local.currentVersion = getCurrentMigrationVersion();
+		local.orphans = $getOrphanVersions();
+		local.applied = 0;
+		local.pending = 0;
+		for (local.m in local.migrations) {
+			if (local.m.status == "migrated") {
+				local.applied++;
+			} else {
+				local.pending++;
+			}
+		}
+		ArrayAppend(local.lines, "Current version: " & (Len(local.currentVersion) ? local.currentVersion : "0"));
+		ArrayAppend(local.lines, "Total migrations: " & ArrayLen(local.migrations));
+		if (ArrayLen(local.migrations) || ArrayLen(local.orphans)) {
+			ArrayAppend(local.lines, "  applied: " & local.applied);
+			ArrayAppend(local.lines, "  pending: " & local.pending);
+			if (ArrayLen(local.orphans)) {
+				ArrayAppend(local.lines, "  orphan: " & ArrayLen(local.orphans));
+			}
+			ArrayAppend(local.lines, "");
+			ArrayAppend(local.lines, "Migrations (newest last):");
+			// Merge file rows + orphan rows into one chronological list so
+			// orphans appear in the right position relative to local files.
+			local.combined = [];
+			for (local.m in local.migrations) {
+				ArrayAppend(local.combined, {
+					version: local.m.version,
+					name: local.m.name,
+					marker: local.m.status == "migrated" ? "[x]" : "[ ]"
+				});
+			}
+			for (local.v in local.orphans) {
+				ArrayAppend(local.combined, {
+					version: local.v,
+					name: "********** NO FILE **********",
+					marker: "[?]"
+				});
+			}
+			ArraySort(local.combined, function(a, b) {
+				return Compare(a.version, b.version);
+			});
+			for (local.row in local.combined) {
+				ArrayAppend(local.lines, "  " & local.row.marker & " " & local.row.version & " " & local.row.name);
+			}
+			if (ArrayLen(local.orphans)) {
+				ArrayAppend(local.lines, "");
+				ArrayAppend(local.lines, "Orphan versions are recorded in the database but have no");
+				ArrayAppend(local.lines, "matching file in app/migrator/migrations/. This usually means");
+				ArrayAppend(local.lines, "a peer applied a migration whose file isn't yet in your branch.");
+			}
+		}
+		return local.lines;
 	}
 
 	/**
