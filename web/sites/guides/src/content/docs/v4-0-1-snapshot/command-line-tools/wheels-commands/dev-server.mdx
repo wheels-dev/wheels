@@ -114,7 +114,7 @@ wheels reload
 On success: `Application reloaded successfully.` in green. On failure — most often a password mismatch — it prints `Failed to reload: <message>` and hints at setting `RELOAD_PASSWORD` in `.env` or `config/settings.cfm`.
 
 <Aside type="note" title="When you need reload">
-Most CFML source changes are picked up on the next request without a reload. You need `wheels reload` when you change config that's only read at bootstrap — routes, settings, DI bindings, package manifests — or when you want to force every per-request cache to clear.
+Most CFML source changes are picked up on the next request without a reload. In development, changes to `app/global/functions.cfm` (and any files it `<cfinclude>`s) are also auto-detected on bare `?reload=true` (the `reloadOnGlobalChange` setting). You need `wheels reload` when you change config that's only read at bootstrap — routes, settings, DI bindings, package manifests — or when you want to force every per-request cache to clear.
 </Aside>
 
 ## Dev loop example

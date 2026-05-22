@@ -3849,6 +3849,87 @@ return local.$wheels;
 		}
 	}
 
+	/**
+	 * Snapshot mtimes of all .cfm files under the app's global include directory.
+	 *
+	 * Used by the bare `?reload=true` path so a developer adding a helper to
+	 * `app/global/*.cfm` does not have to remember the password-gated full reload
+	 * (issue ##2792).
+	 */
+	public struct function $snapshotGlobalIncludes(string directory = ExpandPath("/app/global")) {
+		var snapshot = {};
+		if (!DirectoryExists(arguments.directory)) {
+			return snapshot;
+		}
+		var files = DirectoryList(arguments.directory, true, "query", "*.cfm");
+		for (var row in files) {
+			snapshot[row.directory & "/" & row.name] = row.dateLastModified;
+		}
+		return snapshot;
+	}
+
+	/**
+	 * Compare a prior `$snapshotGlobalIncludes` result against the current
+	 * filesystem state and return true if any tracked .cfm file was added,
+	 * removed, or modified.
+	 *
+	 * Paired with `$snapshotGlobalIncludes` to drive the bare `?reload=true`
+	 * soft-reload path in development (issue ##2792).
+	 */
+	public boolean function $globalIncludesChanged(
+		required struct snapshot,
+		string directory = ExpandPath("/app/global")
+	) {
+		var current = $snapshotGlobalIncludes(directory = arguments.directory);
+		for (var key in current) {
+			if (!StructKeyExists(arguments.snapshot, key)) {
+				return true;
+			}
+			if (DateCompare(arguments.snapshot[key], current[key]) != 0) {
+				return true;
+			}
+		}
+		for (var key in arguments.snapshot) {
+			if (!StructKeyExists(current, key)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Re-evaluate the given global-includes file into `application.wo`'s
+	 * variables/this scope. Invoked from the bare `?reload=true` soft-reload
+	 * when `$globalIncludesChanged` reports drift (issue ##2792).
+	 *
+	 * `include` inside a method body adds function declarations to the
+	 * method's local scope, not the component's outer scope, so we walk
+	 * local for any user-defined functions and copy them onto variables
+	 * and this so they remain callable on `application.wo` across requests.
+	 */
+	public void function $reincludeGlobals(string file = "/app/global/functions.cfm") {
+		include "#arguments.file#";
+		// Lucee adds include-declared functions to local; Adobe adds them
+		// to variables. Walk both and lift any user-defined functions onto
+		// this (the application.wo facing scope) so callers can invoke them
+		// across requests. The second loop is unconditional: a snapshot-diff
+		// guard here would suppress *updates* on Adobe (where the function
+		// already lives in variables from a prior re-include), leaving this
+		// bound to the stale version on the second `?reload=true`. Re-lifting
+		// an existing function is idempotent and the path is development-only.
+		for (var key in local) {
+			if (IsCustomFunction(local[key])) {
+				variables[key] = local[key];
+				this[key] = local[key];
+			}
+		}
+		for (var key in variables) {
+			if (IsCustomFunction(variables[key])) {
+				this[key] = variables[key];
+			}
+		}
+	}
+
 	// User-defined global functions
 	include "/app/global/functions.cfm";
 
