@@ -3852,4 +3852,27 @@ return local.$wheels;
 	// User-defined global functions
 	include "/app/global/functions.cfm";
 
+	// Promote include-injected UDFs from `variables` to `this` so they're
+	// discoverable via struct-iteration on engines (Adobe CF) where only
+	// `this`-scope members are reliably enumerable. Declared methods on
+	// Global.cfc are already in `this` via their `access` modifier and are
+	// not clobbered by the `structKeyExists(this, ...)` guard. See #2790
+	// and the auto-bind loop in `vendor/wheels/WheelsTest.cfc`.
+	//
+	// The leading `local.varKey = ""` seeds the `local` scope: Lucee 7's
+	// pseudo-constructor doesn't auto-create `local` for the iterator
+	// target of `for (local.X in Y)`, throwing "variable [local] doesn't
+	// exist" without a prior assignment. The same pattern is used in
+	// `WheelsTest.cfc` (which seeds `local.metaIndex = {}` before its loop).
+	local.varKey = "";
+	for (local.varKey in variables) {
+		if (!isCustomFunction(variables[local.varKey])) {
+			continue;
+		}
+		if (structKeyExists(this, local.varKey)) {
+			continue;
+		}
+		this[local.varKey] = variables[local.varKey];
+	}
+
 }
