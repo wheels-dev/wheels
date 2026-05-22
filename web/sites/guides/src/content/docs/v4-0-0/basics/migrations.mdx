@@ -34,7 +34,7 @@ wheels --version
 - `wheels migrate latest` — apply every pending migration in order. The most common command; you'll run it after pulling someone else's changes.
 - `wheels migrate up` — apply exactly one pending migration. Useful when you want to watch the effect of a single file.
 - `wheels migrate down` — roll back the most recently applied migration. Runs the `down()` method of the newest row in `wheels_migrator_versions`.
-- `wheels migrate info` — show which migrations have run and which are still pending. Read-only; safe any time. Orphan versions (rows in the tracking table with no matching file in `app/migrator/migrations/`) are flagged with `[?] <version> ********** NO FILE **********` so you can spot when a peer's migration has been applied to a shared DB before the file lands in your branch.
+- `wheels migrate info` — show which migrations have run and which are still pending. Read-only; safe any time. Orphan versions (rows in the tracking table with no matching file in `app/migrator/migrations/`) are flagged with `[?] <version> <name> (applied <timestamp>)` when the enriched `wheels_migrator_versions.name` / `.applied_at` columns are populated, or `[?] <version> ********** NO FILE **********` (Rails-style) for legacy rows that pre-date the schema enrichment.
 
 The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly — the schema either moves fully or not at all.
 
