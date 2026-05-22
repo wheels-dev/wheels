@@ -411,13 +411,15 @@ component output="false" extends="wheels.Global"{
 			// value explicitly. Other engines rely on the column's
 			// CURRENT_TIMESTAMP default and we omit applied_at from the
 			// INSERT to avoid engine-specific date-literal syntax issues.
-			local.info = $dbinfo(
-				type = "version",
-				datasource = application[local.appKey].dataSourceName,
-				username = application.wheels.dataSourceUserName,
-				password = application.wheels.dataSourcePassword
-			);
-			if (FindNoCase("SQLite", local.info.database_productname)) {
+			//
+			// IMPORTANT: read engine type from the cached value that
+			// $ensureTrackingColumns set on app scope. Calling $dbinfo here
+			// would run JDBC metadata inside the migrator's open transaction,
+			// which breaks SQLite ("[SQLITE_ERROR] SQL error or missing
+			// database") and would silently corrupt other engines under
+			// concurrent load.
+			local.cachedDbType = application[local.appKey].$migratorDbType ?: "";
+			if (FindNoCase("SQLite", local.cachedDbType)) {
 				local.cols &= ", applied_at";
 				local.vals &= ", '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'";
 			}
@@ -647,14 +649,23 @@ component output="false" extends="wheels.Global"{
 	 * is a cheap column listing, but caching avoids it on every migrator
 	 * call. Non-fatal: if the ALTER fails, we just don't set the flag and
 	 * the legacy schema continues to work.
+	 *
+	 * Only sets the cache flag when BOTH columns are confirmed present
+	 * (rv.hasName && rv.hasAppliedAt). If the probe failed entirely (table
+	 * didn't exist yet) or only one ALTER succeeded, the flag stays unset
+	 * so subsequent calls retry. $setVersionAsMigrated() reads this flag
+	 * to decide whether to include the enriched columns in its INSERT;
+	 * setting it prematurely would cause INSERTs against missing columns.
 	 */
 	private void function $maybeEnsureTrackingColumns(required string appKey) {
 		if (StructKeyExists(application[arguments.appKey], "$trackingColumnsEnsured")) {
 			return;
 		}
 		try {
-			$ensureTrackingColumns();
-			application[arguments.appKey].$trackingColumnsEnsured = true;
+			var rv = $ensureTrackingColumns();
+			if (rv.hasName && rv.hasAppliedAt) {
+				application[arguments.appKey].$trackingColumnsEnsured = true;
+			}
 		} catch (any e) {
 			// Stays uncached so a future call retries — but the legacy
 			// schema still works, so the migrator is not blocked.
@@ -1268,6 +1279,11 @@ component output="false" extends="wheels.Global"{
 			password = application.wheels.dataSourcePassword
 		);
 		var dbType = info.database_productname;
+		// Cache the engine type so $setVersionAsMigrated doesn't need to
+		// call $dbinfo on every insert. Running $dbinfo inside an open
+		// JDBC transaction breaks on SQLite ("SQL error or missing
+		// database") and is wasted work on other engines too.
+		application[appKey].$migratorDbType = dbType;
 
 		// Build per-engine ALTER statements for the missing columns.
 		// Each ALTER is its own statement so a partial-add state still
