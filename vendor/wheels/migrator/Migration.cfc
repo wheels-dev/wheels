@@ -153,7 +153,8 @@ component extends="Base" {
 	 * @table The Name of the table to add the column to
 	 * @columnType The type of the new column
 	 * @afterColumn The name of the column which this column should be inserted after
-	 * @columnName THe name of the new column
+	 * @columnName The name of the new column
+	 * @columnNames Modern alias for `columnName` (matches the plural form every TableDefinition column helper accepts). Pass one or the other — not both.
 	 * @referenceName Name for new reference column, see documentation for references function, required if columnType is 'reference'
 	 * @default Default value for this column
 	 * @allowNull Whether to allow NULL values
@@ -174,6 +175,10 @@ component extends="Base" {
 		numeric precision,
 		numeric scale
 	) {
+		// Resolve the alias here so addColumn is self-contained — a future
+		// refactor that stops delegating to changeColumn won't silently lose
+		// the columnNames alias path.
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = false);
 		arguments.addColumns = true;
 		changeColumn(argumentCollection = arguments);
 	}
@@ -261,13 +266,17 @@ component extends="Base" {
 	 */
 	public void function removeColumn(
 		required string table,
-		string columnName = "",
-		string columnNames = "",
+		string columnName,
+		string columnNames,
 		string referenceName = ""
 	) {
-		// Accept columnNames as alias for columnName.
-		if (!Len(arguments.columnName) && Len(arguments.columnNames)) {
-			arguments.columnName = arguments.columnNames;
+		// Accept columnNames as alias for columnName via the standard helper —
+		// matches every other site in this file. If both are passed, the alias
+		// (columnNames) wins, consistent with $combineArguments precedence
+		// across the framework.
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = false);
+		if (!StructKeyExists(arguments, "columnName")) {
+			arguments.columnName = "";
 		}
 		if (arguments.referenceName != "") {
 			local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
@@ -294,6 +303,9 @@ component extends="Base" {
 		string columnNames
 	) {
 		// Accept columnName / columnNames as aliases for referenceName.
+		// Precedence (per $combineArguments semantics): the alias wins. If a
+		// caller passes both `referenceName` and `columnName`/`columnNames`,
+		// the alias overwrites — same shape every other helper here uses.
 		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
 		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
 		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
@@ -353,6 +365,8 @@ component extends="Base" {
 		string columnNames
 	) {
 		// Accept columnName / columnNames as aliases for referenceName.
+		// Precedence (per $combineArguments semantics): the alias wins. See
+		// addReference for the same pattern.
 		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
 		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
 		dropForeignKey(arguments.table, "FK_#arguments.table#_#pluralize(arguments.referenceName)#");
