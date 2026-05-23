@@ -717,6 +717,74 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests addReference", () => {
+
+			it("creates a FK on <name>id when useUnderscoreReferenceColumns is false (legacy)", () => {
+				local.info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+				local.db = LCase(Replace(local.info.database_productname, " ", "", "all"))
+				if (local.db eq 'sqlite') {
+					skip("SQLite does not allow altering CONSTRAINTS.")
+				}
+
+				application.wheels.useUnderscoreReferenceColumns = false
+
+				targetTableName = "dbm_arl_owners"
+				sourceTableName = "dbm_arl_pets"
+
+				t = migration.createTable(name = targetTableName, force = true)
+				t.integer(columnNames = "integercolumn")
+				t.create()
+
+				t = migration.createTable(name = sourceTableName, force = true)
+				t.integer(columnNames = "dbm_arl_ownerid")
+				t.create()
+
+				migration.addReference(table = sourceTableName, referenceName = "dbm_arl_owner")
+
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = targetTableName, type = "foreignkeys")
+
+				migration.dropTable(sourceTableName)
+				migration.dropTable(targetTableName)
+
+				sql = "SELECT * FROM query WHERE LOWER(fkcolumn_name) = 'dbm_arl_ownerid' AND LOWER(fktable_name) = '#sourceTableName#'"
+				actual = g.$query(query = info, dbtype = "query", sql = sql)
+				expect(actual.recordcount).toBe(1)
+			})
+
+			it("creates a FK on <name>_id when useUnderscoreReferenceColumns is true", () => {
+				local.info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+				local.db = LCase(Replace(local.info.database_productname, " ", "", "all"))
+				if (local.db eq 'sqlite') {
+					skip("SQLite does not allow altering CONSTRAINTS.")
+				}
+
+				application.wheels.useUnderscoreReferenceColumns = true
+
+				targetTableName = "dbm_aru_owners"
+				sourceTableName = "dbm_aru_pets"
+
+				t = migration.createTable(name = targetTableName, force = true)
+				t.integer(columnNames = "integercolumn")
+				t.create()
+
+				t = migration.createTable(name = sourceTableName, force = true)
+				t.integer(columnNames = "dbm_aru_owner_id")
+				t.create()
+
+				migration.addReference(table = sourceTableName, referenceName = "dbm_aru_owner")
+
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = targetTableName, type = "foreignkeys")
+
+				migration.dropTable(sourceTableName)
+				migration.dropTable(targetTableName)
+				application.wheels.useUnderscoreReferenceColumns = false
+
+				sql = "SELECT * FROM query WHERE LOWER(fkcolumn_name) = 'dbm_aru_owner_id' AND LOWER(fktable_name) = '#sourceTableName#'"
+				actual = g.$query(query = info, dbtype = "query", sql = sql)
+				expect(actual.recordcount).toBe(1)
+			})
+		})
+
 		describe("Tests addIndex", () => {
 
 			beforeEach(() => {

@@ -48,6 +48,8 @@ The flag is read via `$get("useUnderscoreReferenceColumns")` inside `references(
 
 ## Tests
 
-Specs live in `vendor/wheels/tests/specs/migrator/`. The `referencesSpec.cfc` and `migrationSpec.cfc` files exercise both `t.references()` and the broader column-adding helpers. Tests at the `TableDefinition` layer (inspect `t.columns` / `t.foreignKeys` directly without calling `t.create()`) are preferred over DB-roundtrip tests when verifying argument plumbing — they're adapter-independent.
+Specs live in `vendor/wheels/tests/specs/migrator/`. `referencesSpec.cfc` exercises `TableDefinition::references()` (the `columnNames` alias plus the suffix flag) at the unit layer — inspecting `t.columns` / `t.foreignKeys` directly without `t.create()` so the assertions are adapter-independent. `migrationSpec.cfc` covers Migration.cfc command-version helpers via real DDL roundtrips — its "Tests addReference" describe block guards the `useUnderscoreReferenceColumns` path on `Migration.cfc::addReference()`. Most FK-related tests in `migrationSpec.cfc` skip on SQLite (which doesn't support altering CONSTRAINTS) but run on every other engine in CI.
+
+Prefer TableDefinition-layer tests for argument plumbing and reach for `migrationSpec.cfc` patterns only when the assertion requires a real database (FK constraints, column existence after ALTER, etc.).
 
 Smoke-test cross-adapter SQL via `bash tools/test-local.sh migrator` (Lucee 7 + SQLite) and the full matrix via `tools/test-matrix.sh` when touching the suffix flag or `$combineArguments` calls.
