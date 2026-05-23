@@ -255,7 +255,8 @@ component extends="Base" {
 	 */
 	public void function removeColumn(required string table, string columnName = "", string referenceName = "") {
 		if (arguments.referenceName != "") {
-			arguments.columnName = arguments.referenceName & "id";
+			local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
+			arguments.columnName = arguments.referenceName & local.idSuffix;
 		}
 		$execute(this.adapter.dropColumnFromTable(name = arguments.table, columnName = arguments.columnName));
 		announce("Removed column #arguments.columnName# from #arguments.table#");
@@ -272,10 +273,11 @@ component extends="Base" {
 	 * @referenceName The reference table name to perform the operation on
 	 */
 	public void function addReference(required string table, required string referenceName) {
+		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
 		addForeignKey(
 			table = arguments.table,
 			referenceTable = pluralize(arguments.referenceName),
-			column = "#arguments.referenceName#id",
+			column = arguments.referenceName & local.idSuffix,
 			referenceColumn = "id"
 		);
 	}

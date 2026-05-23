@@ -1,6 +1,10 @@
 /**
- * Coverage for vendor/wheels/migrator/TableDefinition.cfc::references() and the
- * matching Migration.cfc::addReference / dropReference / removeColumn helpers.
+ * Coverage for vendor/wheels/migrator/TableDefinition.cfc::references() — the
+ * `columnNames` alias and the `useUnderscoreReferenceColumns` suffix flag.
+ *
+ * Sibling Migration.cfc helpers (`addReference`, `removeColumn(referenceName=)`)
+ * also honor the same flag; their DB-roundtrip coverage lives in
+ * migrationSpec.cfc rather than here.
  *
  * Issue #2781 surfaced two long-standing quirks in `t.references()`:
  *   1. The argument is `referenceNames` — every sibling column helper accepts
@@ -32,8 +36,17 @@ component extends="wheels.WheelsTest" {
 		describe("TableDefinition.references() — argument aliases", () => {
 
 			it("accepts columnNames as an alias for referenceNames", () => {
+				application.wheels.useUnderscoreReferenceColumns = false;
 				var t = variables.migration.createTable(name = "dbm_refs_alias_test", force = true);
 				t.references(columnNames = "user");
+				expect(ArrayLen(t.columns)).toBe(1);
+				expect(t.columns[1].name).toBe("userid");
+			});
+
+			it("still accepts the legacy referenceNames parameter", () => {
+				application.wheels.useUnderscoreReferenceColumns = false;
+				var t = variables.migration.createTable(name = "dbm_refs_legacy_param_test", force = true);
+				t.references(referenceNames = "user");
 				expect(ArrayLen(t.columns)).toBe(1);
 				expect(t.columns[1].name).toBe("userid");
 			});

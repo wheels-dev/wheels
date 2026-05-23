@@ -43,7 +43,7 @@ The flag is read via `$get("useUnderscoreReferenceColumns")` inside `references(
 ## Anti-patterns to watch for in this directory
 
 1. **Mixing helper-style and standalone-style argument names.** `t.references(columnNames=...)` (helper inside `createTable`) and `addReference(table=..., columnName=...)` (standalone Migration.cfc method) currently use slightly different parameter shapes — see [#2781](https://github.com/wheels-dev/wheels/issues/2781) for the open consistency follow-up. When in doubt, match what's already in the file.
-2. **Hard-coding `& "id"` or `& "type"` concatenations.** `TableDefinition.cfc::references()` resolves these through `$get("useUnderscoreReferenceColumns")` ([#2781](https://github.com/wheels-dev/wheels/issues/2781)). Two sibling sites in `Migration.cfc` (lines 258, 278 — `removeColumn` and `addReference`) still hard-code `& "id"` and will produce wrong column names when an app has opted into the flag. That gap is tracked for the migrator-consistency follow-up PR. If you add new code that builds a reference column name, route it through `$get` too.
+2. **Hard-coding `& "id"` or `& "type"` concatenations.** `TableDefinition.cfc::references()`, `Migration.cfc::removeColumn(referenceName=...)`, and `Migration.cfc::addReference()` all resolve the suffix through `$get("useUnderscoreReferenceColumns")` ([#2781](https://github.com/wheels-dev/wheels/issues/2781)). If you add new code that builds a reference column name, route it through `$get` too.
 3. **`required` on column-name parameters.** Use `$combineArguments(... required=true)` instead. Declaring CFML-level `required` blocks the alias path because validation runs before the function body.
 
 ## Tests
