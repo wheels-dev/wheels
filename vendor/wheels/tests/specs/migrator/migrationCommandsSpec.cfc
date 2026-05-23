@@ -117,6 +117,57 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("Migration.cfc — required-arg regression guards", () => {
+
+			it("addColumn throws Wheels.IncorrectArguments when neither columnName nor columnNames is provided (non-reference)", () => {
+				// Prior to PR2 the original `required string columnName = ""`
+				// signature enforced param presence at the CFML level. The
+				// widened signature uses $combineArguments(required=true) to
+				// restore equivalent enforcement for non-reference column types.
+				var threwIncorrectArgs = false;
+				try {
+					variables.migration.addColumn(
+						table = "dbm_cmd_reqcheck_test",
+						columnType = "integer"
+					);
+				} catch (Wheels.IncorrectArguments e) {
+					threwIncorrectArgs = true;
+				} catch (any e) {}
+				expect(threwIncorrectArgs).toBeTrue();
+			});
+
+			it("changeColumn throws Wheels.IncorrectArguments when neither columnName nor columnNames is provided (non-reference)", () => {
+				var threwIncorrectArgs = false;
+				try {
+					variables.migration.changeColumn(
+						table = "dbm_cmd_reqcheck_test",
+						columnType = "integer"
+					);
+				} catch (Wheels.IncorrectArguments e) {
+					threwIncorrectArgs = true;
+				} catch (any e) {}
+				expect(threwIncorrectArgs).toBeTrue();
+			});
+
+			it("addColumn does NOT require columnName for columnType='reference' (referenceName takes its place)", () => {
+				// Reference-type column construction relies on referenceName,
+				// not columnName. The conditional required check must skip
+				// this branch.
+				var threwIncorrectArgs = false;
+				try {
+					variables.migration.addColumn(
+						table = "dbm_cmd_refcheck_test",
+						columnType = "reference",
+						referenceName = "user"
+					);
+				} catch (Wheels.IncorrectArguments e) {
+					threwIncorrectArgs = true;
+				} catch (any e) {}
+				expect(threwIncorrectArgs).toBeFalse();
+			});
+
+		});
+
 	}
 
 }

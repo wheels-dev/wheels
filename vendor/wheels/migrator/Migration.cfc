@@ -177,8 +177,10 @@ component extends="Base" {
 	) {
 		// Resolve the alias here so addColumn is self-contained — a future
 		// refactor that stops delegating to changeColumn won't silently lose
-		// the columnNames alias path.
-		$combineArguments(args = arguments, combine = "columnName,columnNames", required = false);
+		// the columnNames alias path. Required unless columnType="reference"
+		// (in that branch the column name is computed from referenceName, so
+		// columnName/columnNames are not needed).
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = (arguments.columnType != "reference"));
 		arguments.addColumns = true;
 		changeColumn(argumentCollection = arguments);
 	}
@@ -218,8 +220,12 @@ component extends="Base" {
 		boolean addColumns = "false"
 	) {
 		// Accept columnNames as alias for columnName (consistency with
-		// TableDefinition column helpers — #2781 follow-up).
-		$combineArguments(args = arguments, combine = "columnName,columnNames", required = false);
+		// TableDefinition column helpers — #2781 follow-up). Required unless
+		// columnType="reference" — that branch ignores columnName and uses
+		// referenceName instead. Restores the missing-arg enforcement the
+		// original `required string columnName` parameter provided before
+		// this PR widened the signature to accept the alias.
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = (arguments.columnType != "reference"));
 
 		var t = changeTable(arguments.table);
 		if (arguments.columnType == "reference") {
