@@ -263,6 +263,7 @@ component extends="Base" {
 	 *
 	 * @table The table containing the column to remove
 	 * @columnName The column name to remove
+	 * @columnNames Modern alias for `columnName` (matches the plural form every TableDefinition column helper accepts). Pass one or the other — not both.
 	 * @referenceName optional reference name
 	 */
 	public void function removeColumn(
@@ -296,6 +297,8 @@ component extends="Base" {
 	 *
 	 * @table The table name to perform the operation on
 	 * @referenceName The reference table name to perform the operation on
+	 * @columnName Alias for `referenceName` (consistent with the modern migrator surface — `columnName` / `columnNames` are accepted alongside the legacy form).
+	 * @columnNames Plural alias for `referenceName`. When both `columnName` and `columnNames` are supplied, `columnNames` wins.
 	 */
 	public void function addReference(
 		required string table,
@@ -328,6 +331,7 @@ component extends="Base" {
 	 * @table The table name to perform the operation on
 	 * @referenceTable The reference table name to perform the operation on
 	 * @column The column name to perform the operation on
+	 * @columnName Modern alias for `column` (consistent with the rest of the migrator surface).
 	 * @referenceColumn The reference column name to perform the operation on
 	 */
 	public void function addForeignKey(
@@ -357,6 +361,8 @@ component extends="Base" {
 	 *
 	 * @table The table name to perform the operation on
 	 * @referenceName the name of the reference to drop
+	 * @columnName Alias for `referenceName` (consistent with the modern migrator surface — `columnName` / `columnNames` are accepted alongside the legacy form).
+	 * @columnNames Plural alias for `referenceName`. When both `columnName` and `columnNames` are supplied, `columnNames` wins.
 	 *
 	 */
 	public void function dropReference(
