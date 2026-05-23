@@ -191,7 +191,8 @@ component extends="Base" {
 	 * [category: Migration Functions]
 	 *
 	 * @table The Name of the table where the column is
-	 * @columnName THe name of the column
+	 * @columnName The name of the column
+	 * @columnNames Modern alias for `columnName` (matches the plural form every TableDefinition column helper accepts). Pass one or the other — not both.
 	 * @columnType The type of the column
 	 * @afterColumn The name of the column which this column should be inserted after
 	 * @referenceName Name for reference column, see documentation for references function, required if columnType is 'reference'
