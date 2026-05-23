@@ -3815,6 +3815,7 @@ component extends="modules.BaseModule" {
 			// reminder to re-verify, not a false positive.
 			arrayAppend(checks, {
 				description: "RateLimiter middleware — defaults changed in 4.0 (advisory: review config)",
+				severity: "advisory",
 				pattern: "new\s+wheels\.middleware\.RateLimiter",
 				checkType: "grep",
 				scanDir: "config",
@@ -4022,6 +4023,10 @@ component extends="modules.BaseModule" {
 				for (var match in advisory.matches) {
 					out("    #match#");
 				}
+				// Advisory fix lines are intentionally uncolored so the
+				// section header and description carry the cyan accent and
+				// opt-in items read lighter than breaking-change fixes
+				// (which use cyan on the fix line for stronger emphasis).
 				out("    -> #advisory.fix#");
 				out("");
 			}
