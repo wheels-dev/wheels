@@ -164,7 +164,8 @@ component extends="Base" {
 	public void function addColumn(
 		required string table,
 		required string columnType,
-		required string columnName = "",
+		string columnName,
+		string columnNames,
 		string afterColumn = "",
 		string referenceName = "",
 		string default,
@@ -198,7 +199,8 @@ component extends="Base" {
 	 */
 	public void function changeColumn(
 		required string table,
-		required string columnName,
+		string columnName,
+		string columnNames,
 		required string columnType,
 		string afterColumn = "",
 		string referenceName = "",
@@ -209,12 +211,16 @@ component extends="Base" {
 		numeric scale,
 		boolean addColumns = "false"
 	) {
+		// Accept columnNames as alias for columnName (consistency with
+		// TableDefinition column helpers — #2781 follow-up).
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = false);
+
 		var t = changeTable(arguments.table);
 		if (arguments.columnType == "reference") {
 			arguments.columnType = "references";
 			arguments.referenceNames = arguments.referenceName;
 		} else {
-			arguments.columnNames = arguments.columnName;
+			arguments.columnNames = arguments.columnName ?: "";
 		}
 		invoke(t, arguments.columnType, arguments);
 		t.change(addColumns = arguments.addColumns);
@@ -253,7 +259,16 @@ component extends="Base" {
 	 * @columnName The column name to remove
 	 * @referenceName optional reference name
 	 */
-	public void function removeColumn(required string table, string columnName = "", string referenceName = "") {
+	public void function removeColumn(
+		required string table,
+		string columnName = "",
+		string columnNames = "",
+		string referenceName = ""
+	) {
+		// Accept columnNames as alias for columnName.
+		if (!Len(arguments.columnName) && Len(arguments.columnNames)) {
+			arguments.columnName = arguments.columnNames;
+		}
 		if (arguments.referenceName != "") {
 			local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
 			arguments.columnName = arguments.referenceName & local.idSuffix;
@@ -272,7 +287,15 @@ component extends="Base" {
 	 * @table The table name to perform the operation on
 	 * @referenceName The reference table name to perform the operation on
 	 */
-	public void function addReference(required string table, required string referenceName) {
+	public void function addReference(
+		required string table,
+		string referenceName,
+		string columnName,
+		string columnNames
+	) {
+		// Accept columnName / columnNames as aliases for referenceName.
+		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
+		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
 		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
 		addForeignKey(
 			table = arguments.table,
@@ -297,9 +320,13 @@ component extends="Base" {
 	public void function addForeignKey(
 		required string table,
 		required string referenceTable,
-		required string column,
+		string column,
+		string columnName,
 		required string referenceColumn
 	) {
+		// Accept columnName as alias for column (consistency with the rest
+		// of the migrator surface).
+		$combineArguments(args = arguments, combine = "column,columnName", required = true);
 		var foreignKey = CreateObject("component", "ForeignKeyDefinition").init(
 			adapter = this.adapter,
 			argumentCollection = arguments
@@ -319,7 +346,15 @@ component extends="Base" {
 	 * @referenceName the name of the reference to drop
 	 *
 	 */
-	public void function dropReference(required string table, required string referenceName) {
+	public void function dropReference(
+		required string table,
+		string referenceName,
+		string columnName,
+		string columnNames
+	) {
+		// Accept columnName / columnNames as aliases for referenceName.
+		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
+		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
 		dropForeignKey(arguments.table, "FK_#arguments.table#_#pluralize(arguments.referenceName)#");
 	}
 
