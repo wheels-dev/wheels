@@ -1200,17 +1200,20 @@ component extends="wheels.WheelsTest" {
 				t.references(columnNames = "dbm_rmref_legacy_owner", foreignKey = false)
 				t.create()
 
-				// Sanity: column is named <name>id under flag=false
+				// Capture before/after column lists with no mid-test asserts —
+				// matches the addReference + addForeignKey pattern so cleanup
+				// runs regardless of which assertion fails.
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
-				expect(ListFindNoCase(ValueList(info.column_name), "dbm_rmref_legacy_ownerid")).toBeGT(0)
+				before = ValueList(info.column_name)
 
-				// Exercise: removeColumn(referenceName=) must compute "dbm_rmref_legacy_ownerid"
 				migration.removeColumn(table = tableName, referenceName = "dbm_rmref_legacy_owner")
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
-				actual = ValueList(info.column_name)
+				after = ValueList(info.column_name)
 				migration.dropTable(tableName)
 
-				expect(ListFindNoCase(actual, "dbm_rmref_legacy_ownerid")).toBe(0)
+				// Sanity + exercise asserts both after cleanup.
+				expect(ListFindNoCase(before, "dbm_rmref_legacy_ownerid")).toBeGT(0)
+				expect(ListFindNoCase(after, "dbm_rmref_legacy_ownerid")).toBe(0)
 			})
 
 			it("drops <name>_id column when referenceName= is used and useUnderscoreReferenceColumns is true", () => {
@@ -1220,18 +1223,19 @@ component extends="wheels.WheelsTest" {
 				t.references(columnNames = "dbm_rmref_under_owner", foreignKey = false)
 				t.create()
 
-				// Sanity: column is named <name>_id under flag=true
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
-				expect(ListFindNoCase(ValueList(info.column_name), "dbm_rmref_under_owner_id")).toBeGT(0)
+				before = ValueList(info.column_name)
 
-				// Exercise: removeColumn(referenceName=) must compute "dbm_rmref_under_owner_id"
 				migration.removeColumn(table = tableName, referenceName = "dbm_rmref_under_owner")
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
-				actual = ValueList(info.column_name)
+				after = ValueList(info.column_name)
 				migration.dropTable(tableName)
+				// In-test reset stays as belt-and-suspenders; afterAll() is the
+				// guarantee that survives an exception above this line.
 				application.wheels.useUnderscoreReferenceColumns = false
 
-				expect(ListFindNoCase(actual, "dbm_rmref_under_owner_id")).toBe(0)
+				expect(ListFindNoCase(before, "dbm_rmref_under_owner_id")).toBeGT(0)
+				expect(ListFindNoCase(after, "dbm_rmref_under_owner_id")).toBe(0)
 			})
 		})
 
