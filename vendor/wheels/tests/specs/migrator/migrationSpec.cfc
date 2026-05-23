@@ -5,10 +5,16 @@ component extends="wheels.WheelsTest" {
 	function beforeAll() {
 		migration = CreateObject("component", "wheels.migrator.Migration").init()
 		originalMigratorObjectCase = Duplicate(application.wheels.migratorObjectCase)
+		// The addReference / removeColumn(referenceName=) flag tests below
+		// flip useUnderscoreReferenceColumns. Snapshot the original here so
+		// afterAll can restore it even if an in-test reset is skipped by an
+		// exception between set and cleanup.
+		originalUseUnderscoreReferenceColumns = application.wheels.useUnderscoreReferenceColumns ?: false
 	}
 
 	function afterAll() {
 		application.wheels.migratorObjectCase = originalMigratorObjectCase
+		application.wheels.useUnderscoreReferenceColumns = originalUseUnderscoreReferenceColumns
 	}
 
 	function run() {
