@@ -2427,7 +2427,25 @@ return local.$wheels;
 	}
 
 	/**
-	 * Internal function.
+	 * Internal function. Wheels's canonical plural-or-singular argument alias
+	 * helper. If `args.<second>` is set, copy it to `args.<first>` and delete
+	 * the original — so the function body can read `args.<first>` uniformly
+	 * regardless of which name the caller used. With `required=true`, throws
+	 * `Wheels.IncorrectArguments` when neither name is provided.
+	 *
+	 * Canonical examples:
+	 *   - `combine = "columnNames,columnName"` — migrator column helpers in
+	 *     vendor/wheels/migrator/TableDefinition.cfc
+	 *   - `combine = "properties,property"` — model validations in
+	 *     vendor/wheels/model/validations.cfc
+	 *   - `combine = "formats,format"` — controller provides() in
+	 *     vendor/wheels/controller/provides.cfc
+	 *   - `combine = "referenceNames,columnNames"` — t.references() per #2781
+	 *
+	 * When adding a new helper that takes a list-or-single argument, follow
+	 * this pattern: declare the plural form on the signature (NOT required),
+	 * then call $combineArguments(required=true) at the top of the body so the
+	 * alias works AND the required-ness is enforced at runtime.
 	 */
 	public void function $combineArguments(
 		required struct args,

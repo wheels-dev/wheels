@@ -5,10 +5,16 @@ component extends="wheels.WheelsTest" {
 	function beforeAll() {
 		migration = CreateObject("component", "wheels.migrator.Migration").init()
 		originalMigratorObjectCase = Duplicate(application.wheels.migratorObjectCase)
+		// The addReference / removeColumn(referenceName=) flag tests below
+		// flip useUnderscoreReferenceColumns. Snapshot the original here so
+		// afterAll can restore it even if an in-test reset is skipped by an
+		// exception between set and cleanup.
+		originalUseUnderscoreReferenceColumns = application.wheels.useUnderscoreReferenceColumns ?: false
 	}
 
 	function afterAll() {
 		application.wheels.migratorObjectCase = originalMigratorObjectCase
+		application.wheels.useUnderscoreReferenceColumns = originalUseUnderscoreReferenceColumns
 	}
 
 	function run() {
@@ -717,6 +723,74 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests addReference", () => {
+
+			it("creates a FK on <name>id when useUnderscoreReferenceColumns is false (legacy)", () => {
+				local.info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+				local.db = LCase(Replace(local.info.database_productname, " ", "", "all"))
+				if (local.db eq 'sqlite') {
+					skip("SQLite does not allow altering CONSTRAINTS.")
+				}
+
+				application.wheels.useUnderscoreReferenceColumns = false
+
+				targetTableName = "dbm_arl_owners"
+				sourceTableName = "dbm_arl_pets"
+
+				t = migration.createTable(name = targetTableName, force = true)
+				t.integer(columnNames = "integercolumn")
+				t.create()
+
+				t = migration.createTable(name = sourceTableName, force = true)
+				t.integer(columnNames = "dbm_arl_ownerid")
+				t.create()
+
+				migration.addReference(table = sourceTableName, referenceName = "dbm_arl_owner")
+
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = targetTableName, type = "foreignkeys")
+
+				migration.dropTable(sourceTableName)
+				migration.dropTable(targetTableName)
+
+				sql = "SELECT * FROM query WHERE LOWER(fkcolumn_name) = 'dbm_arl_ownerid' AND LOWER(fktable_name) = '#sourceTableName#'"
+				actual = g.$query(query = info, dbtype = "query", sql = sql)
+				expect(actual.recordcount).toBe(1)
+			})
+
+			it("creates a FK on <name>_id when useUnderscoreReferenceColumns is true", () => {
+				local.info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+				local.db = LCase(Replace(local.info.database_productname, " ", "", "all"))
+				if (local.db eq 'sqlite') {
+					skip("SQLite does not allow altering CONSTRAINTS.")
+				}
+
+				application.wheels.useUnderscoreReferenceColumns = true
+
+				targetTableName = "dbm_aru_owners"
+				sourceTableName = "dbm_aru_pets"
+
+				t = migration.createTable(name = targetTableName, force = true)
+				t.integer(columnNames = "integercolumn")
+				t.create()
+
+				t = migration.createTable(name = sourceTableName, force = true)
+				t.integer(columnNames = "dbm_aru_owner_id")
+				t.create()
+
+				migration.addReference(table = sourceTableName, referenceName = "dbm_aru_owner")
+
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = targetTableName, type = "foreignkeys")
+
+				migration.dropTable(sourceTableName)
+				migration.dropTable(targetTableName)
+				application.wheels.useUnderscoreReferenceColumns = false
+
+				sql = "SELECT * FROM query WHERE LOWER(fkcolumn_name) = 'dbm_aru_owner_id' AND LOWER(fktable_name) = '#sourceTableName#'"
+				actual = g.$query(query = info, dbtype = "query", sql = sql)
+				expect(actual.recordcount).toBe(1)
+			})
+		})
+
 		describe("Tests addIndex", () => {
 
 			beforeEach(() => {
@@ -1117,6 +1191,51 @@ component extends="wheels.WheelsTest" {
 				migration.dropTable(tableName)
 
 				expect(ListFindNoCase(actual, expected)).toBeFalse()
+			})
+
+			it("drops <name>id column when referenceName= is used and useUnderscoreReferenceColumns is false (legacy)", () => {
+				application.wheels.useUnderscoreReferenceColumns = false
+				tableName = "dbm_rmref_legacy_tests"
+				t = migration.createTable(name = tableName, force = true)
+				t.references(columnNames = "dbm_rmref_legacy_owner", foreignKey = false)
+				t.create()
+
+				// Capture before/after column lists with no mid-test asserts —
+				// matches the addReference + addForeignKey pattern so cleanup
+				// runs regardless of which assertion fails.
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				before = ValueList(info.column_name)
+
+				migration.removeColumn(table = tableName, referenceName = "dbm_rmref_legacy_owner")
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				after = ValueList(info.column_name)
+				migration.dropTable(tableName)
+
+				// Sanity + exercise asserts both after cleanup.
+				expect(ListFindNoCase(before, "dbm_rmref_legacy_ownerid")).toBeGT(0)
+				expect(ListFindNoCase(after, "dbm_rmref_legacy_ownerid")).toBe(0)
+			})
+
+			it("drops <name>_id column when referenceName= is used and useUnderscoreReferenceColumns is true", () => {
+				application.wheels.useUnderscoreReferenceColumns = true
+				tableName = "dbm_rmref_under_tests"
+				t = migration.createTable(name = tableName, force = true)
+				t.references(columnNames = "dbm_rmref_under_owner", foreignKey = false)
+				t.create()
+
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				before = ValueList(info.column_name)
+
+				migration.removeColumn(table = tableName, referenceName = "dbm_rmref_under_owner")
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				after = ValueList(info.column_name)
+				migration.dropTable(tableName)
+				// In-test reset stays as belt-and-suspenders; afterAll() is the
+				// guarantee that survives an exception above this line.
+				application.wheels.useUnderscoreReferenceColumns = false
+
+				expect(ListFindNoCase(before, "dbm_rmref_under_owner_id")).toBeGT(0)
+				expect(ListFindNoCase(after, "dbm_rmref_under_owner_id")).toBe(0)
 			})
 		})
 

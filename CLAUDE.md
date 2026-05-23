@@ -221,6 +221,23 @@ Any validator, analyzer, scanner, or upgrade-check that does substring-matching 
 - `cli/lucli/Module.cfc::stripCfmlComments()`
 - `cli/lucli/services/Doctor.cfc::$stripCfmlBlockComments()`
 
+### 15. Migrator helpers accept singular AND plural column names — prefer the plural
+**Source:** [#2781](https://github.com/wheels-dev/wheels/issues/2781) — `t.references()` historically required `referenceNames` (and only that), while every sibling helper accepted `columnNames` / `columnName` via `$combineArguments`. AI agents and humans both kept reaching for the consistent form and hitting "argument required" errors. Now resolved: `t.references()` accepts `columnNames` as an alias, and that's the preferred form going forward.
+
+```cfm
+// RIGHT — modern, matches every other column helper
+t.string(columnNames="name");
+t.integer(columnNames="age");
+t.references(columnNames="user");
+
+// LEGACY — still works, but the new code path uses columnNames
+t.references(referenceNames="user");
+```
+
+For new migrator helpers or anywhere you accept a column-name argument: declare `string columnNames` (NOT `required`), and call `$combineArguments(args=arguments, combine="columnNames,columnName", required=true)` at the top of the body. The pattern is documented in [vendor/wheels/migrator/CLAUDE.md](vendor/wheels/migrator/CLAUDE.md). Boolean nullable flag is `allowNull` everywhere — never `null`.
+
+`t.references()` also respects `useUnderscoreReferenceColumns` (boolean, framework default `false`, `wheels new` template default `true`) — when true it produces `<name>_id` / `<name>_type` columns matching Wheels model `belongsTo` defaults.
+
 ## Wheels Conventions
 
 - **config()**: All model associations/validations/callbacks and controller filters/verifies go in `config()`.
