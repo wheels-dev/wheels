@@ -1186,6 +1186,47 @@ component extends="wheels.WheelsTest" {
 
 				expect(ListFindNoCase(actual, expected)).toBeFalse()
 			})
+
+			it("drops <name>id column when referenceName= is used and useUnderscoreReferenceColumns is false (legacy)", () => {
+				application.wheels.useUnderscoreReferenceColumns = false
+				tableName = "dbm_rmref_legacy_tests"
+				t = migration.createTable(name = tableName, force = true)
+				t.references(columnNames = "dbm_rmref_legacy_owner", foreignKey = false)
+				t.create()
+
+				// Sanity: column is named <name>id under flag=false
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				expect(ListFindNoCase(ValueList(info.column_name), "dbm_rmref_legacy_ownerid")).toBeGT(0)
+
+				// Exercise: removeColumn(referenceName=) must compute "dbm_rmref_legacy_ownerid"
+				migration.removeColumn(table = tableName, referenceName = "dbm_rmref_legacy_owner")
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				actual = ValueList(info.column_name)
+				migration.dropTable(tableName)
+
+				expect(ListFindNoCase(actual, "dbm_rmref_legacy_ownerid")).toBe(0)
+			})
+
+			it("drops <name>_id column when referenceName= is used and useUnderscoreReferenceColumns is true", () => {
+				application.wheels.useUnderscoreReferenceColumns = true
+				tableName = "dbm_rmref_under_tests"
+				t = migration.createTable(name = tableName, force = true)
+				t.references(columnNames = "dbm_rmref_under_owner", foreignKey = false)
+				t.create()
+
+				// Sanity: column is named <name>_id under flag=true
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				expect(ListFindNoCase(ValueList(info.column_name), "dbm_rmref_under_owner_id")).toBeGT(0)
+
+				// Exercise: removeColumn(referenceName=) must compute "dbm_rmref_under_owner_id"
+				migration.removeColumn(table = tableName, referenceName = "dbm_rmref_under_owner")
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
+				actual = ValueList(info.column_name)
+				migration.dropTable(tableName)
+				application.wheels.useUnderscoreReferenceColumns = false
+
+				expect(ListFindNoCase(actual, "dbm_rmref_under_owner_id")).toBe(0)
+			})
 		})
 
 		describe("Tests removeIndex", () => {

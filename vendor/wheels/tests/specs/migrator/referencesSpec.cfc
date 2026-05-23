@@ -2,12 +2,10 @@
  * Coverage for vendor/wheels/migrator/TableDefinition.cfc::references() — the
  * `columnNames` alias and the `useUnderscoreReferenceColumns` suffix flag.
  *
- * The sibling `Migration.cfc::addReference()` helper also honors the same
- * flag; its DB-roundtrip tests live in migrationSpec.cfc under the
- * "Tests addReference" describe block (added alongside this PR).
- * `Migration.cfc::removeColumn(referenceName=)` shares the flag but has no
- * direct DB-roundtrip coverage yet — TableDefinition-layer coverage here
- * exercises the same `$get()` lookup logic.
+ * Sibling Migration.cfc helpers (`addReference`, `removeColumn(referenceName=)`)
+ * also honor the same flag; their DB-roundtrip coverage lives in
+ * migrationSpec.cfc under the "Tests addReference" and "Tests removeColumn"
+ * describe blocks (added alongside this PR).
  *
  * Issue #2781 surfaced two long-standing quirks in `t.references()`:
  *   1. The argument is `referenceNames` — every sibling column helper accepts
