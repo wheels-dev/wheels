@@ -122,13 +122,7 @@ component output="false" extends="wheels.Global"{
 								if (application[local.appKey].writeMigratorSQLFiles) {
 									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
 								}
-								// Issue #2789: signal to Model.invokeWithTransaction
-								// that this migration's outer cftransaction owns
-								// commit/rollback. Without this, model().update()
-								// / .deleteAll() inside down() open a nested
-								// cftransaction whose adapter-specific commit
-								// semantics silently roll the row back on MSSQL
-								// (and risk similar surprises on other engines).
+								// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
 								request.$wheelsTransactionWrapper = true;
 								local.migration.cfc.down();
 								local.rv = local.rv & request.$wheelsMigrationOutput;
@@ -139,11 +133,6 @@ component output="false" extends="wheels.Global"{
 								StructDelete(request, "$wheelsTransactionWrapper");
 								break;
 							}
-							// Clear the signal once the outer transaction is
-							// about to commit. Done on the success path before
-							// the commit so any work performed by code that
-							// runs AFTER this block (none today, but defensive)
-							// sees normal model-transaction semantics.
 							StructDelete(request, "$wheelsTransactionWrapper");
 							transaction action="commit";
 						}
@@ -179,14 +168,7 @@ component output="false" extends="wheels.Global"{
 								if (application[local.appKey].writeMigratorSQLFiles) {
 									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
 								}
-								// Issue #2789: signal to Model.invokeWithTransaction
-								// that this migration's outer cftransaction owns
-								// commit/rollback. Without this, model().create()
-								// / .update() / .deleteAll() inside up() open a
-								// nested cftransaction whose adapter-specific
-								// commit semantics silently roll the row back
-								// on MSSQL (and risk similar surprises on other
-								// engines).
+								// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
 								request.$wheelsTransactionWrapper = true;
 								local.migration.cfc.up();
 								local.rv = local.rv & request.$wheelsMigrationOutput;
@@ -197,11 +179,6 @@ component output="false" extends="wheels.Global"{
 								StructDelete(request, "$wheelsTransactionWrapper");
 								break;
 							}
-							// Clear the signal once the outer transaction is
-							// about to commit. Subsequent migrations re-set the
-							// flag on their next iteration; code that runs
-							// outside the migrator scope sees normal
-							// model-transaction semantics.
 							StructDelete(request, "$wheelsTransactionWrapper");
 							transaction action="commit";
 						}
@@ -256,8 +233,7 @@ component output="false" extends="wheels.Global"{
 				if (application[local.appKey].writeMigratorSQLFiles) {
 					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
 				}
-				// Issue #2789: signal to Model.invokeWithTransaction that this
-				// migration's outer cftransaction owns commit/rollback.
+				// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
 				request.$wheelsTransactionWrapper = true;
 				local.migration.cfc.up();
 				local.rv = local.rv & request.$wheelsMigrationOutput;
