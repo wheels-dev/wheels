@@ -3739,14 +3739,18 @@ component extends="modules.BaseModule" {
 		// Compare major versions
 		var currentMajor = val(listFirst(currentVersion, "."));
 		var targetMajor = val(listFirst(target, "."));
+		var sameMajor = (currentMajor == targetMajor);
 
-		if (currentMajor == targetMajor) {
+		if (sameMajor) {
 			out("Same major version — no known breaking changes.", "green");
-			out("Upgrade with: brew upgrade wheels");
-			return "";
+			out("Scanning for opt-in recommendations...", "green");
+			out("");
 		}
 
-		// Breaking changes database
+		// Check database. Each entry may set `severity` to either "breaking"
+		// (the default — flagged in red, gated by major-version-bump scenarios)
+		// or "advisory" (cyan, runs regardless of version-jump — for opt-in
+		// convention changes the user can adopt at their convenience).
 		var checks = [];
 
 		// 2.x -> 3.x
@@ -3811,6 +3815,7 @@ component extends="modules.BaseModule" {
 			// reminder to re-verify, not a false positive.
 			arrayAppend(checks, {
 				description: "RateLimiter middleware — defaults changed in 4.0 (advisory: review config)",
+				severity: "advisory",
 				pattern: "new\s+wheels\.middleware\.RateLimiter",
 				checkType: "grep",
 				scanDir: "config",
@@ -3890,22 +3895,25 @@ component extends="modules.BaseModule" {
 			});
 		}
 
-		// Run checks
+		// Run checks. Matched checks land in `issues` (severity=breaking) or
+		// `advisories` (severity=advisory); unmatched land in `passed`.
 		var issues = [];
+		var advisories = [];
 		var passed = [];
 
 		for (var check in checks) {
+			var severity = structKeyExists(check, "severity") ? check.severity : "breaking";
+			var matched = false;
+			var matchEntry = {};
+
 			if (check.checkType == "directory") {
 				var dirPath = variables.projectRoot & "/" & check.path;
 				if (directoryExists(dirPath)) {
 					var contents = directoryList(dirPath, false, "name");
 					if (arrayLen(contents)) {
-						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [check.path & "/"]});
-					} else {
-						arrayAppend(passed, check.description);
+						matched = true;
+						matchEntry = {description: check.description, fix: check.fix, matches: [check.path & "/"]};
 					}
-				} else {
-					arrayAppend(passed, check.description);
 				}
 			} else if (check.checkType == "grep") {
 				// Build the file set to scan. Checks may use `scanDir` +
@@ -3967,25 +3975,35 @@ component extends="modules.BaseModule" {
 				// treat as pass to avoid noisy false positives.
 				var isAbsent = structKeyExists(check, "absent") && check.absent;
 				if (isAbsent) {
-					if (!arrayLen(filesToScan) || arrayLen(matches)) {
-						arrayAppend(passed, check.description);
-					} else {
+					if (arrayLen(filesToScan) && !arrayLen(matches)) {
+						matched = true;
 						var hint = structKeyExists(check, "scanDir") && len(check.scanDir)
 							? check.scanDir & "/ (no occurrences found)"
 							: "(no occurrences found)";
-						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [hint]});
+						matchEntry = {description: check.description, fix: check.fix, matches: [hint]};
 					}
 				} else {
 					if (arrayLen(matches)) {
-						arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
-					} else {
-						arrayAppend(passed, check.description);
+						matched = true;
+						matchEntry = {description: check.description, fix: check.fix, matches: matches};
 					}
 				}
 			}
+
+			// Bucket the result by severity. Advisories surface as opt-in
+			// recommendations alongside (but distinct from) breaking changes.
+			if (matched) {
+				if (severity == "advisory") {
+					arrayAppend(advisories, matchEntry);
+				} else {
+					arrayAppend(issues, matchEntry);
+				}
+			} else {
+				arrayAppend(passed, check.description);
+			}
 		}
 
-		// Output
+		// Output — three sections in priority order: Breaking → Recommended → All Clear
 		if (arrayLen(issues)) {
 			out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
 			for (var issue in issues) {
@@ -3994,6 +4012,22 @@ component extends="modules.BaseModule" {
 					out("    #match#");
 				}
 				out("    -> #issue.fix#", "cyan");
+				out("");
+			}
+		}
+
+		if (arrayLen(advisories)) {
+			out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
+			for (var advisory in advisories) {
+				out("  ~ #advisory.description#", "cyan");
+				for (var match in advisory.matches) {
+					out("    #match#");
+				}
+				// Advisory fix lines are intentionally uncolored so the
+				// section header and description carry the cyan accent and
+				// opt-in items read lighter than breaking-change fixes
+				// (which use cyan on the fix line for stronger emphasis).
+				out("    -> #advisory.fix#");
 				out("");
 			}
 		}
