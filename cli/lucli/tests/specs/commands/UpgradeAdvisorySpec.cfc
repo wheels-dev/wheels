@@ -67,11 +67,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(variables.moduleSource).toInclude("stripCfmlComments(fileRead(filePath))");
 			});
 
-			it("uses stripCfmlComments on the settings-file pre-check for the guard", () => {
-				// The flag-already-set guard must also strip comments so a
+			it("scans config/ recursively for the underscore flag pre-check (matches advisory ##2 scope)", () => {
+				// Fix for ##2808: the pre-check originally read only
+				// `config/settings.cfm`, but advisory ##2 below scans all of
+				// `config/` recursively. If a user sets the flag in an
+				// environment override file (e.g.
+				// `config/production/settings.cfm`), the pre-check missed it
+				// and both advisories fired contradicting each other.
+				// Scope-symmetry: walk the same tree the warning scans.
+				expect(variables.moduleSource).toInclude("directoryExists(configDir)");
+				expect(variables.moduleSource).toInclude("directoryList(configDir, true");
+			});
+
+			it("strips CFML comments on every config/ file scanned by the guard", () => {
+				// The flag-already-set guard must still strip comments so a
 				// commented-out `// set(useUnderscoreReferenceColumns=true);`
-				// doesn't satisfy the guard and suppress a real advisory.
-				expect(variables.moduleSource).toInclude("stripCfmlComments(fileRead(settingsFile))");
+				// in any env-override file doesn't satisfy the guard and
+				// suppress a real advisory (Anti-Pattern ##14).
+				expect(variables.moduleSource).toInclude("stripCfmlComments(fileRead(configFile))");
 			});
 
 			it("does not wrap reFindNoCase with len() — that pattern is always truthy", () => {
