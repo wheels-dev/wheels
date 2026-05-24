@@ -17,7 +17,18 @@ public any function string(string columnNames, any limit, string default, boolea
 
 Callers can pass either `t.string(columnNames = "a,b,c")` or `t.string(columnName = "a")` — both resolve to `arguments.columnNames` for the function body. Drop the `required` keyword from the parameter declaration; `$combineArguments(required=true)` enforces it at runtime.
 
-**`references()` carries a back-compat exception.** Its legacy parameter is `referenceNames`, with `columnNames` accepted as a synonym since the [#2781](https://github.com/wheels-dev/wheels/issues/2781) fix:
+**`references()` and its command-version siblings carry back-compat aliases.** The legacy parameter names predate the `$combineArguments` convention; the modern ones are accepted as synonyms via the same helper. Each of these accepts the modern form going forward:
+
+| Function | Legacy param | Modern alias(es) |
+|---|---|---|
+| `TableDefinition::references()` | `referenceNames` | `columnNames` |
+| `Migration::addReference()` | `referenceName` | `columnName`, `columnNames` |
+| `Migration::dropReference()` | `referenceName` | `columnName`, `columnNames` |
+| `Migration::addColumn()` / `changeColumn()` | `columnName` | `columnNames` |
+| `Migration::removeColumn()` | `columnName` | `columnNames` |
+| `Migration::addForeignKey()` | `column` | `columnName` |
+
+Example (the `references()` form, [#2781](https://github.com/wheels-dev/wheels/issues/2781)):
 
 ```cfm
 $combineArguments(args = arguments, combine = "referenceNames,columnNames", required = true);
@@ -42,8 +53,8 @@ The flag is read via `$get("useUnderscoreReferenceColumns")` inside `references(
 
 ## Anti-patterns to watch for in this directory
 
-1. **Mixing helper-style and standalone-style argument names.** `t.references(columnNames=...)` (helper inside `createTable`) and `addReference(table=..., columnName=...)` (standalone Migration.cfc method) currently use slightly different parameter shapes — see [#2781](https://github.com/wheels-dev/wheels/issues/2781) for the open consistency follow-up. When in doubt, match what's already in the file.
-2. **Hard-coding `& "id"` or `& "type"` concatenations.** `TableDefinition.cfc::references()`, `Migration.cfc::removeColumn(referenceName=...)`, and `Migration.cfc::addReference()` all resolve the suffix through `$get("useUnderscoreReferenceColumns")` ([#2781](https://github.com/wheels-dev/wheels/issues/2781)). If you add new code that builds a reference column name, route it through `$get` too.
+1. **Mixing helper-style and standalone-style argument names.** Both `t.references(columnNames=...)` (helper inside `createTable`) and `addReference(table=..., columnName=...)` (standalone Migration.cfc method) now accept the modern `columnNames` / `columnName` aliases via `$combineArguments`, alongside their legacy `referenceNames` / `referenceName` originals. Prefer the modern form in new code; the legacy names keep working.
+2. **Hard-coding `& "id"` or `& "type"` concatenations.** All four sites in this directory resolve the reference-column suffix through `$get("useUnderscoreReferenceColumns")` — `TableDefinition.cfc::references()` (id + polymorphic type), `Migration.cfc::removeColumn` (referenceName branch), and `Migration.cfc::addReference`. If you add new code that builds a reference column name, route it through `$get` too rather than hard-coding `& "id"`.
 3. **`required` on column-name parameters.** Use `$combineArguments(... required=true)` instead. Declaring CFML-level `required` blocks the alias path because validation runs before the function body.
 
 ## Tests
