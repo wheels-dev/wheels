@@ -49,7 +49,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("wheels upgrade — false-positive guards", () => {
 
-			it("suppresses the opt-in advisory when the flag is already set in config/settings.cfm", () => {
+			it("suppresses the opt-in advisory when the flag is already set anywhere in config/", () => {
 				// Source-level assertion on the guard variable: the t.references()
 				// advisory must only fire when the flag isn't already set, else
 				// new apps (which ship with the flag on by default) would see
