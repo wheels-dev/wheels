@@ -3915,10 +3915,14 @@ component extends="modules.BaseModule" {
 		var underscoreFlagAlreadySet = false;
 		var settingsFile = variables.projectRoot & "/config/settings.cfm";
 		if (fileExists(settingsFile)) {
-			underscoreFlagAlreadySet = len(reFindNoCase(
+			// `reFindNoCase()` returns the 1-based match position (0 = no
+			// match). DO NOT wrap with `len()` — len() coerces the int to a
+			// string and measures digit count, so len(0)=1 and len(25)=2 are
+			// both truthy. Use `> 0` for an unambiguous boolean.
+			underscoreFlagAlreadySet = reFindNoCase(
 				"useUnderscoreReferenceColumns\s*=\s*true",
 				stripCfmlComments(fileRead(settingsFile))
-			));
+			) > 0;
 		}
 		if (!underscoreFlagAlreadySet) {
 			arrayAppend(checks, {

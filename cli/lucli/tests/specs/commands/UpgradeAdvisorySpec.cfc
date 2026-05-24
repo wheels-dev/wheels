@@ -74,6 +74,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(variables.moduleSource).toInclude("stripCfmlComments(fileRead(settingsFile))");
 			});
 
+			it("does not wrap reFindNoCase with len() — that pattern is always truthy", () => {
+				// `reFindNoCase()` returns an integer position (0 = no match).
+				// `len(0)` returns 1 (digit count of "0"), `len(25)` returns 2,
+				// so any reFindNoCase result wrapped in len() is truthy. The
+				// guard would be dead in every app whose config/settings.cfm
+				// exists. Use direct `> 0` comparison instead.
+				expect(variables.moduleSource).notToInclude("len(reFindNoCase");
+			});
+
 		});
 
 	}
