@@ -47,6 +47,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("wheels upgrade — false-positive guards", () => {
+
+			it("suppresses the opt-in advisory when the flag is already set in config/settings.cfm", () => {
+				// Source-level assertion on the guard variable: the t.references()
+				// advisory must only fire when the flag isn't already set, else
+				// new apps (which ship with the flag on by default) would see
+				// advisory #1 contradicting advisory #2.
+				expect(variables.moduleSource).toInclude("underscoreFlagAlreadySet");
+				expect(variables.moduleSource).toInclude("if (!underscoreFlagAlreadySet)");
+			});
+
+			it("strips CFML comments before grepping (Anti-Pattern ##14)", () => {
+				// The grep loop must run input through stripCfmlComments so a
+				// commented-out `// t.references(...)` or
+				// `// set(useUnderscoreReferenceColumns=true);` doesn't trip
+				// the advisory. The fix lives in the shared grep loop, so this
+				// is also a framework-wide benefit for every check struct.
+				expect(variables.moduleSource).toInclude("stripCfmlComments(fileRead(filePath))");
+			});
+
+			it("uses stripCfmlComments on the settings-file pre-check for the guard", () => {
+				// The flag-already-set guard must also strip comments so a
+				// commented-out `// set(useUnderscoreReferenceColumns=true);`
+				// doesn't satisfy the guard and suppress a real advisory.
+				expect(variables.moduleSource).toInclude("stripCfmlComments(fileRead(settingsFile))");
+			});
+
+		});
+
 	}
 
 }
