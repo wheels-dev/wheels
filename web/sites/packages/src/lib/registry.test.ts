@@ -59,6 +59,43 @@ describe('registry', () => {
       const { listPackageNames } = await import('./registry');
       await expect(listPackageNames()).rejects.toThrow(/Registry fetch failed: 403/);
     });
+
+    it('sends an Authorization header when GITHUB_TOKEN is set', async () => {
+      vi.stubEnv('GITHUB_TOKEN', 'ghs_test-token-abc');
+      vi.resetModules();
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify([{ name: 'foo', type: 'dir' }]), { status: 200 }),
+      );
+
+      const { listPackageNames } = await import('./registry');
+      await listPackageNames();
+
+      const [, init] = fetchSpy.mock.calls[0];
+      const sentHeaders = (init as RequestInit | undefined)?.headers as
+        | Record<string, string>
+        | undefined;
+      expect(sentHeaders?.Authorization).toBe('Bearer ghs_test-token-abc');
+    });
+
+    it('omits Authorization when no token env var is set', async () => {
+      vi.stubEnv('GITHUB_TOKEN', '');
+      vi.stubEnv('GH_TOKEN', '');
+      vi.resetModules();
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify([{ name: 'foo', type: 'dir' }]), { status: 200 }),
+      );
+
+      const { listPackageNames } = await import('./registry');
+      await listPackageNames();
+
+      const [, init] = fetchSpy.mock.calls[0];
+      const sentHeaders = (init as RequestInit | undefined)?.headers as
+        | Record<string, string>
+        | undefined;
+      expect(sentHeaders?.Authorization).toBeUndefined();
+    });
   });
 
   describe('fetchManifest', () => {

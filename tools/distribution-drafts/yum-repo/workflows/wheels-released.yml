@@ -1,18 +1,19 @@
-# Receiver workflow for `wheels-dev/yum-wheels`.
+# Receiver workflow for `wheels-dev/yum-wheels` (R2-backed architecture).
 #
 # Listens for `repository_dispatch` from `wheels-dev/wheels`'s release workflow,
-# downloads the new `.rpm` asset from the upstream GitHub Release, slots it
-# into `<channel>/packages/`, regenerates the repodata via `createrepo_c`,
-# signs `repomd.xml` with GPG (detached → repomd.xml.asc), and commits the
-# whole tree back to this repo. Cloudflare Pages auto-deploys on push.
+# downloads the new `.rpm` asset from the upstream GitHub Release, syncs the
+# existing yum tree from R2 (so createrepo_c can re-scan prior versions),
+# signs each .rpm with `rpm --addsign`, regenerates the channel's repodata
+# via `createrepo_c`, gpg-signs `repomd.xml`, and uploads the changes to the
+# `wheels-yum` R2 bucket (served at https://yum.wheels.dev).
+#
+# This repo no longer commits stable/ or bleeding-edge/ — those are R2-only.
 #
 # Trigger payload contract (sender: wheels-dev/wheels release.yml):
 #   event_type:    "wheels-released"
 #   client_payload:
-#     version: "<x.y.z>" or "<x.y.z>-snapshot.<n>"   # full SemVer, no leading v
-#     channel: "stable" | "bleeding-edge"             # routes into the pool
-#
-# Manual dispatch is also supported via `workflow_dispatch`.
+#     version: "<x.y.z>" or "<x.y.z>-snapshot.<n>"
+#     channel: "stable" | "bleeding-edge"
 
 name: Publish to yum.wheels.dev
 
@@ -35,11 +36,20 @@ on:
           - bleeding-edge
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: publish-yum
   cancel-in-progress: false
+
+env:
+  R2_BUCKET: wheels-yum
+  # Cloudflare account ID is not a secret (no auth power on its own), but
+  # keep it as a repo-level Actions variable so the workflow template stays
+  # account-agnostic and so harvesting a public template doesn't hand an
+  # attacker a ready-made API target. Set on the bucket repo:
+  #   gh variable set CLOUDFLARE_ACCOUNT_ID --body '<id>' --repo wheels-dev/yum-wheels
+  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
   publish:
@@ -49,13 +59,19 @@ jobs:
     steps:
       - name: Resolve inputs
         id: inputs
+        env:
+          CLIENT_VERSION: ${{ github.event.client_payload.version }}
+          CLIENT_CHANNEL: ${{ github.event.client_payload.channel }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            VERSION="${{ github.event.client_payload.version }}"
-            CHANNEL="${{ github.event.client_payload.channel }}"
+            VERSION="$CLIENT_VERSION"
+            CHANNEL="$CLIENT_CHANNEL"
           else
-            VERSION="${{ inputs.version }}"
-            CHANNEL="${{ inputs.channel }}"
+            VERSION="$INPUT_VERSION"
+            CHANNEL="$INPUT_CHANNEL"
           fi
           if [ -z "$VERSION" ] || [ -z "$CHANNEL" ]; then
             echo "::error::Both version and channel are required."
@@ -66,35 +82,30 @@ jobs:
             *) echo "::error::Unsupported channel: $CHANNEL"; exit 1 ;;
           esac
           case "$CHANNEL" in
-            stable)        PKG="wheels" ;;
-            bleeding-edge) PKG="wheels-be" ;;
+            stable)        PKG="wheels"; UPSTREAM_REPO="wheels-dev/wheels" ;;
+            bleeding-edge) PKG="wheels-be"; UPSTREAM_REPO="wheels-dev/wheels-snapshots" ;;
           esac
-          case "$CHANNEL" in
-            stable)        UPSTREAM_REPO="wheels-dev/wheels" ;;
-            bleeding-edge) UPSTREAM_REPO="wheels-dev/wheels-snapshots" ;;
-          esac
-          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
-          echo "channel=$CHANNEL"           >> "$GITHUB_OUTPUT"
-          echo "pkg=$PKG"                   >> "$GITHUB_OUTPUT"
-          echo "upstream_repo=$UPSTREAM_REPO" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$VERSION"
+            echo "channel=$CHANNEL"
+            echo "pkg=$PKG"
+            echo "upstream_repo=$UPSTREAM_REPO"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout bucket repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          persist-credentials: true
 
-      - name: Install createrepo_c + gpg + rpm
-        # `rpm` brings the `rpm --addsign` tool, used by
-        # regenerate-yum-metadata.sh to sign each .rpm before createrepo_c
-        # records the hash chain. Without it, dnf clients refuse to install
-        # because the wheels.repo files set gpgcheck=1.
+      - name: Install createrepo_c + gpg + rpm + wrangler
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends createrepo-c gnupg rpm
+          sudo apt-get install -y --no-install-recommends createrepo-c gnupg rpm jq
           createrepo_c --version
           gpg --version | head -1
           rpm --version
+          sudo npm install -g wrangler@4.95.0
+          wrangler --version
 
       - name: Import GPG signing key
         env:
@@ -107,9 +118,6 @@ jobs:
             exit 1
           fi
           echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
-          # See apt-repo/workflows/wheels-released.yml for the fingerprint-vs-key_id
-          # rationale — import-ownertrust needs the 40-char fingerprint, not the
-          # 16-char key_id (otherwise: "gpg: error in '[stdin]': invalid fingerprint").
           FINGERPRINT=$(gpg --list-secret-keys --with-colons \
             | awk -F: '/^fpr:/ { print $10; exit }')
           KEY_ID=$(gpg --list-secret-keys --keyid-format=long --with-colons \
@@ -118,11 +126,55 @@ jobs:
           echo "$FINGERPRINT:6:" | gpg --batch --yes --import-ownertrust
           echo "GPG_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
 
-      - name: Download .rpm from upstream Release
+      - name: Sync existing channel from R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+        run: |
+          set -euo pipefail
+          # createrepo_c rescans <channel>/packages/ on each run, so we need
+          # ALL previously-published .rpm files locally to keep them in the
+          # repodata. Pull the whole channel down before adding the new one.
+          mkdir -p "${CHANNEL}/packages"
+          PREFIX="${CHANNEL}/"
+          CURSOR=""
+          while :; do
+            URL="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects?prefix=${PREFIX}&per_page=1000"
+            [ -n "$CURSOR" ] && URL="${URL}&cursor=${CURSOR}"
+            RESP=$(curl -sS "$URL" -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
+            # Guard against silent failures: when the token is invalid/expired
+            # or the API rate-limits, success=false comes back with an empty
+            # result array. Without this check, jq emits nothing, the loop
+            # never runs, createrepo_c regenerates over a single-package
+            # channel, and the upload step overwrites repomd.xml on R2 with
+            # that trimmed metadata. Every dnf update afterward sees the
+            # historical packages vanish. Fail loud here instead.
+            if ! echo "$RESP" | jq -e '.success == true' >/dev/null; then
+              echo "::error::Cloudflare R2 list API returned success=false (or invalid JSON). Response:"
+              echo "$RESP"
+              exit 1
+            fi
+            # Process substitution (not a pipe) so the while body runs in the
+            # parent shell — pipe-RHS runs in a subshell where set -e in the
+            # parent does not see wrangler's non-zero exit, masking download
+            # failures. Same reasoning: wrangler's stderr is NOT suppressed
+            # so a real failure surfaces in the CI log.
+            while IFS= read -r key; do
+              [ -z "$key" ] && continue
+              mkdir -p "$(dirname "$key")"
+              echo "  pulling $key"
+              wrangler r2 object get "${R2_BUCKET}/${key}" --file="$key" --remote
+            done < <(echo "$RESP" | jq -r '.result[].key')
+            CURSOR=$(echo "$RESP" | jq -r '.result_info.cursor // empty')
+            [ -z "$CURSOR" ] && break
+          done
+          echo "Local ${CHANNEL}/ contents after sync:"
+          find "${CHANNEL}/" -type f | head -20
+
+      - name: Download new .rpm from upstream Release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.inputs.outputs.version }}
-          CHANNEL: ${{ steps.inputs.outputs.channel }}
           PKG: ${{ steps.inputs.outputs.pkg }}
           UPSTREAM_REPO: ${{ steps.inputs.outputs.upstream_repo }}
         run: |
@@ -136,9 +188,9 @@ jobs:
             --repo "$UPSTREAM_REPO" \
             --pattern "$ASSET" \
             --dir incoming/
-          ls -l incoming/
+          ls -lh incoming/
 
-      - name: Slot .rpm into packages/
+      - name: Slot new .rpm into local channel
         env:
           VERSION: ${{ steps.inputs.outputs.version }}
           CHANNEL: ${{ steps.inputs.outputs.channel }}
@@ -148,7 +200,6 @@ jobs:
           PKG_DIR="${CHANNEL}/packages"
           mkdir -p "$PKG_DIR"
           URL_VERSION="${VERSION/-snapshot./.snapshot.}"
-          # Rename to the canonical `~`-form for pool storage.
           mv "incoming/${PKG}-${URL_VERSION}.x86_64.rpm" \
              "${PKG_DIR}/${PKG}-${VERSION}.x86_64.rpm"
           echo "Placed: ${PKG_DIR}/${PKG}-${VERSION}.x86_64.rpm"
@@ -163,19 +214,37 @@ jobs:
           chmod +x scripts/regenerate-yum-metadata.sh
           ./scripts/regenerate-yum-metadata.sh
 
-      - name: Commit + push
+      - name: Upload channel tree to R2
         env:
-          VERSION: ${{ steps.inputs.outputs.version }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CHANNEL: ${{ steps.inputs.outputs.channel }}
-          PKG: ${{ steps.inputs.outputs.pkg }}
         run: |
           set -euo pipefail
-          git config user.name  "wheels-release-bot"
-          git config user.email "hello@wheels.dev"
-          git add stable/ bleeding-edge/
-          if git diff --cached --quiet; then
-            echo "No changes — dispatch must have been a no-op."
-            exit 0
-          fi
-          git commit -m "publish: ${PKG} ${VERSION} (${CHANNEL})"
-          git push origin HEAD:main
+          upload_one() {
+            local local_path="$1"
+            local ct="$2"
+            local key="$local_path"
+            echo "  uploading $key (ct=${ct})"
+            # Do not suppress wrangler output — a silent upload failure would
+            # leave R2 with stale repomd.xml / repodata while the job exits
+            # green.
+            wrangler r2 object put "${R2_BUCKET}/${key}" --file="$local_path" --content-type="$ct" --remote
+          }
+          # Walk the channel tree and upload every file. createrepo_c is
+          # idempotent — files unchanged from prior runs will overwrite
+          # with the same bytes. New .rpm + regenerated repodata/ are the
+          # only meaningful diffs.
+          # Process substitution (not pipe) so set -e fires on upload_one
+          # failures — pipe-RHS subshell semantics would swallow them.
+          while read -r f; do
+            case "$f" in
+              *.rpm)        ct="application/x-rpm" ;;
+              *.xml)        ct="application/xml" ;;
+              *.xml.gz)     ct="application/gzip" ;;
+              *.asc)        ct="application/pgp-signature" ;;
+              *.key)        ct="application/pgp-keys" ;;
+              *)            ct="application/octet-stream" ;;
+            esac
+            upload_one "$f" "$ct"
+          done < <(find "${CHANNEL}" -type f)
+          echo "R2 upload complete for channel=${CHANNEL}."

@@ -62,17 +62,24 @@ Practical impact for this directory:
 
 ## Phase 2: apt.wheels.dev / yum.wheels.dev (post-Tuesday)
 
-Two new repos (separate from the source monorepo, mirroring the snapshots-repo
-pattern):
+Two-repo pattern (one bucket-control repo per package format):
 
-- `wheels-dev/apt-wheels` — Cloudflare Pages site at `apt.wheels.dev`
-- `wheels-dev/yum-wheels` — Cloudflare Pages site at `yum.wheels.dev`
+- `wheels-dev/apt-wheels` — workflow + scripts + signing key + landing page;
+  the apt metadata + `.deb` pool live in **Cloudflare R2 bucket `wheels-apt`**,
+  served at `apt.wheels.dev` via R2's custom-domain feature.
+- `wheels-dev/yum-wheels` — same pattern; R2 bucket `wheels-yum` serves
+  `yum.wheels.dev`.
 
-Each repo holds the static metadata tree (Packages.gz, repodata/, etc.) plus
-the `.deb` / `.rpm` files in a `pool/` directory. A CI workflow listens for
-`repository_dispatch` from the source repo's release workflows, fetches new
-artifacts, regenerates metadata, signs with GPG, commits and pushes — CF Pages
-auto-deploys on push.
+A CI workflow on each bucket repo listens for `repository_dispatch` from
+the source repo's release workflows, fetches new artifacts, syncs the
+existing pool from R2, regenerates metadata, signs with GPG, and uploads
+the changes back to R2. R2's edge serves the new files within seconds.
+
+> **Why R2 and not Pages:** Cloudflare Pages enforces a hard 25 MiB
+> per-file limit. The Wheels `.deb` and `.rpm` are ~80 MB each. The
+> original Phase 2 sketch used Pages; the architecture pivoted to R2
+> during rollout. End-user URLs are unchanged — both `apt.wheels.dev`
+> and `yum.wheels.dev` still serve at the same paths.
 
 **Filename gotcha for the metadata generator**: when fetching snapshot
 artifacts from the source repo's GitHub Release, the URL filenames have `.`
@@ -131,12 +138,14 @@ The remaining work is operational:
 2. **Create the two bucket repos** under `wheels-dev`:
    - `wheels-dev/apt-wheels` — copy contents of `apt-repo/` template
    - `wheels-dev/yum-wheels` — copy contents of `yum-repo/` template
-3. **Create two CF Pages projects** pointing at the new repos, binding the
-   apex domains:
-   - `wheels-dev/apt-wheels` → `apt.wheels.dev`
-   - `wheels-dev/yum-wheels` → `yum.wheels.dev`
+3. **Create two Cloudflare R2 buckets** and attach apex domain bindings:
+   - bucket `wheels-apt` → custom domain `apt.wheels.dev`
+   - bucket `wheels-yum` → custom domain `yum.wheels.dev`
+
+   R2 has no per-object size limit (unlike Pages' 25 MiB) which is why we
+   serve from R2. End-user URLs are identical.
 4. **Add CI secrets** to `wheels-dev/wheels` (for the dispatch sender) and to
-   each bucket repo (for the signing receiver):
+   each bucket repo (for the signing receiver + R2 upload):
    - On `wheels-dev/wheels`:
      - `LINUX_REPO_DISPATCH_TOKEN` — fine-grained PAT with `actions: write`
        on both bucket repos. The dispatch step in `release.yml` skips
@@ -145,6 +154,8 @@ The remaining work is operational:
    - On each bucket repo (`apt-wheels`, `yum-wheels`):
      - `WHEELS_REPO_GPG_PRIVATE_KEY` — ASCII-armored private key
      - `WHEELS_REPO_GPG_PASSPHRASE` — passphrase
+     - `CLOUDFLARE_API_TOKEN` — token with `Workers R2 Storage:Edit` on the
+       account that owns the bucket
 5. **Smoke-test** by running the bucket-repo workflows manually (each
    supports `workflow_dispatch` for backfill). For the apt bucket:
    ```
