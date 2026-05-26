@@ -28,11 +28,23 @@ component extends="Base" {
 	/**
 	 * Adds a primary key definition to the table. this method also allows for multiple primary keys.
 	 *
+	 * Accepts `columnName` / `columnNames` as aliases for `name` (per #2803) so the
+	 * PK helper matches the argument-naming convention every other column helper
+	 * in this file uses. The legacy `name` parameter keeps working — it is still
+	 * what the body reads and what `init()` passes when adding the conventional
+	 * `id` primary key.
+	 *
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
+	 *
+	 * @name Legacy parameter for the primary-key column name. New code should prefer `columnName`.
+	 * @columnName Modern singular alias for `name` (matches sibling column helpers).
+	 * @columnNames Modern plural alias for `name`. Accepted for muscle-memory parity with `t.integer(columnNames=...)` etc.; the primary key is still inherently a single column here.
 	 */
 	public any function primaryKey(
-		required string name,
+		string name,
+		string columnName,
+		string columnNames,
 		string type = "integer",
 		boolean autoIncrement = "false",
 		numeric limit,
@@ -42,6 +54,12 @@ component extends="Base" {
 		string onUpdate = "",
 		string onDelete = ""
 	) {
+		// Accept columnName / columnNames as aliases for name (#2803). Precedence
+		// (per $combineArguments semantics): the later call wins, so when both
+		// columnName and columnNames are supplied, columnNames takes priority —
+		// matching addReference() / dropReference() in Migration.cfc.
+		$combineArguments(args = arguments, combine = "name,columnName", required = false);
+		$combineArguments(args = arguments, combine = "name,columnNames", required = true);
 		arguments.allowNull = false;
 		arguments.adapter = this.adapter;
 
