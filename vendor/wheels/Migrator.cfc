@@ -242,9 +242,9 @@ component output="false" extends="wheels.Global"{
 				local.rv = local.rv & "Error migrating #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 				transaction action="rollback";
 				StructDelete(request, "$wheelsTransactionWrapper");
-				// Issue #2811: skip the commit below — rollback already closed
-				// the transaction. Mirrors the `break` in migrateTo()'s catch
-				// (no enclosing loop here, so we return instead).
+				// Skip the commit below — rollback already closed the transaction.
+				// Mirrors the `break` in migrateTo()'s catch (no enclosing loop
+				// here, so we return instead).
 				return local.rv;
 			}
 			StructDelete(request, "$wheelsTransactionWrapper");

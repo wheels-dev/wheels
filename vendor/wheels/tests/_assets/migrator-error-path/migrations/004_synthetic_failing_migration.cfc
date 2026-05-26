@@ -1,4 +1,4 @@
-component extends="wheels.migrator.Migration" hint="Synthetic migration whose up() throws — exercises the migrateIndividual() rollback path. Issue ##2811." {
+component extends="wheels.migrator.Migration" hint="Synthetic migration whose up() throws — exercises the migrateIndividual() rollback path." {
 
 	function up() {
 		throw(

@@ -14,27 +14,15 @@ component extends="wheels.WheelsTest" {
 
 		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
-		// Issue #2811: when migrateIndividual()'s up() throws, the catch block must
-		// not fall through to `transaction action="commit"` after the rollback.
-		// On Lucee the spurious commit is a silent no-op; on Adobe CF 2023/2025
-		// (and potentially BoxLang) it can throw a JDBC "transaction not active"
+		// When migrateIndividual()'s up() throws, the catch block must not fall
+		// through to `transaction action="commit"` after the rollback. On Lucee
+		// the spurious commit is a silent no-op; on Adobe CF 2023/2025 (and
+		// potentially BoxLang) it can throw a JDBC "transaction not active"
 		// error that masks the real migration failure. This spec asserts the
 		// post-fix contract on every engine.
-		describe("migrateIndividual() error path (issue ##2811)", () => {
+		describe("migrateIndividual() error path", () => {
 
 			beforeEach(() => {
-				deleteMigratorVersions(2);
-				try {
-					queryExecute(
-						"DELETE FROM #application.wheels.migratorTableName# WHERE version = '004'",
-						{},
-						{ datasource = application.wheels.dataSourceName }
-					);
-				} catch (any e) {}
-				$cleanSqlDirectory();
-			});
-
-			afterEach(() => {
 				deleteMigratorVersions(2);
 				try {
 					queryExecute(
