@@ -122,14 +122,18 @@ component output="false" extends="wheels.Global"{
 								if (application[local.appKey].writeMigratorSQLFiles) {
 									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
 								}
+								// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
+								request.$wheelsTransactionWrapper = true;
 								local.migration.cfc.down();
 								local.rv = local.rv & request.$wheelsMigrationOutput;
 								$removeVersionAsMigrated(local.migration.version);
 							} catch (any e) {
 								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 								transaction action="rollback";
+								StructDelete(request, "$wheelsTransactionWrapper");
 								break;
 							}
+							StructDelete(request, "$wheelsTransactionWrapper");
 							transaction action="commit";
 						}
 					}
@@ -164,14 +168,18 @@ component output="false" extends="wheels.Global"{
 								if (application[local.appKey].writeMigratorSQLFiles) {
 									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
 								}
+								// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
+								request.$wheelsTransactionWrapper = true;
 								local.migration.cfc.up();
 								local.rv = local.rv & request.$wheelsMigrationOutput;
 								$setVersionAsMigrated(local.migration.version, local.migration.name);
 							} catch (any e) {
 								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 								transaction action="rollback";
+								StructDelete(request, "$wheelsTransactionWrapper");
 								break;
 							}
+							StructDelete(request, "$wheelsTransactionWrapper");
 							transaction action="commit";
 						}
 					} else if (local.migration.version > arguments.version) {
@@ -225,13 +233,17 @@ component output="false" extends="wheels.Global"{
 				if (application[local.appKey].writeMigratorSQLFiles) {
 					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
 				}
+				// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
+				request.$wheelsTransactionWrapper = true;
 				local.migration.cfc.up();
 				local.rv = local.rv & request.$wheelsMigrationOutput;
 				$setVersionAsMigrated(local.migration.version, local.migration.name);
 			} catch (any e) {
 				local.rv = local.rv & "Error migrating #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
 				transaction action="rollback";
+				StructDelete(request, "$wheelsTransactionWrapper");
 			}
+			StructDelete(request, "$wheelsTransactionWrapper");
 			transaction action="commit";
 		}
 		return local.rv;
