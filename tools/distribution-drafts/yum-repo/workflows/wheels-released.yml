@@ -44,7 +44,12 @@ concurrency:
 
 env:
   R2_BUCKET: wheels-yum
-  CLOUDFLARE_ACCOUNT_ID: "511d04f367103ec276d875ab41a24dea"
+  # Cloudflare account ID is not a secret (no auth power on its own), but
+  # keep it as a repo-level Actions variable so the workflow template stays
+  # account-agnostic and so harvesting a public template doesn't hand an
+  # attacker a ready-made API target. Set on the bucket repo:
+  #   gh variable set CLOUDFLARE_ACCOUNT_ID --body '<id>' --repo wheels-dev/yum-wheels
+  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
   publish:
@@ -137,12 +142,29 @@ jobs:
             URL="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects?prefix=${PREFIX}&per_page=1000"
             [ -n "$CURSOR" ] && URL="${URL}&cursor=${CURSOR}"
             RESP=$(curl -sS "$URL" -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
-            echo "$RESP" | jq -r '.result[].key' | while IFS= read -r key; do
+            # Guard against silent failures: when the token is invalid/expired
+            # or the API rate-limits, success=false comes back with an empty
+            # result array. Without this check, jq emits nothing, the loop
+            # never runs, createrepo_c regenerates over a single-package
+            # channel, and the upload step overwrites repomd.xml on R2 with
+            # that trimmed metadata. Every dnf update afterward sees the
+            # historical packages vanish. Fail loud here instead.
+            if ! echo "$RESP" | jq -e '.success == true' >/dev/null; then
+              echo "::error::Cloudflare R2 list API returned success=false (or invalid JSON). Response:"
+              echo "$RESP"
+              exit 1
+            fi
+            # Process substitution (not a pipe) so the while body runs in the
+            # parent shell — pipe-RHS runs in a subshell where set -e in the
+            # parent does not see wrangler's non-zero exit, masking download
+            # failures. Same reasoning: wrangler's stderr is NOT suppressed
+            # so a real failure surfaces in the CI log.
+            while IFS= read -r key; do
               [ -z "$key" ] && continue
               mkdir -p "$(dirname "$key")"
               echo "  pulling $key"
-              wrangler r2 object get "${R2_BUCKET}/${key}" --file="$key" --remote >/dev/null 2>&1
-            done
+              wrangler r2 object get "${R2_BUCKET}/${key}" --file="$key" --remote
+            done < <(echo "$RESP" | jq -r '.result[].key')
             CURSOR=$(echo "$RESP" | jq -r '.result_info.cursor // empty')
             [ -z "$CURSOR" ] && break
           done
@@ -203,13 +225,18 @@ jobs:
             local ct="$2"
             local key="$local_path"
             echo "  uploading $key (ct=${ct})"
-            wrangler r2 object put "${R2_BUCKET}/${key}" --file="$local_path" --content-type="$ct" --remote >/dev/null 2>&1
+            # Do not suppress wrangler output — a silent upload failure would
+            # leave R2 with stale repomd.xml / repodata while the job exits
+            # green.
+            wrangler r2 object put "${R2_BUCKET}/${key}" --file="$local_path" --content-type="$ct" --remote
           }
           # Walk the channel tree and upload every file. createrepo_c is
           # idempotent — files unchanged from prior runs will overwrite
           # with the same bytes. New .rpm + regenerated repodata/ are the
           # only meaningful diffs.
-          find "${CHANNEL}" -type f | while read -r f; do
+          # Process substitution (not pipe) so set -e fires on upload_one
+          # failures — pipe-RHS subshell semantics would swallow them.
+          while read -r f; do
             case "$f" in
               *.rpm)        ct="application/x-rpm" ;;
               *.xml)        ct="application/xml" ;;
@@ -219,5 +246,5 @@ jobs:
               *)            ct="application/octet-stream" ;;
             esac
             upload_one "$f" "$ct"
-          done
+          done < <(find "${CHANNEL}" -type f)
           echo "R2 upload complete for channel=${CHANNEL}."
