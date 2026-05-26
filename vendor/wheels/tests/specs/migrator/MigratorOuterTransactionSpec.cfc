@@ -3,9 +3,9 @@ component extends="wheels.WheelsTest" {
 	include "helperFunctions.cfm";
 
 	function beforeAll() {
+		// Required by helperFunctions.cfm engine-detection helpers (e.g. isDbCompatible's adapter probe).
 		migration = CreateObject("component", "wheels.migrator.Migration").init();
-		// Separate migrations directory so this spec's synthetic 001_ file
-		// doesn't collide with the reconciliation spec's 001/002/003 fixtures.
+		// Separate migrations dir avoids collision with reconciliation spec's 001/002/003 fixtures.
 		migrator = CreateObject("component", "wheels.Migrator").init(
 			migratePath = "/wheels/tests/_assets/migrator/migrations_2789/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql_2789/"
