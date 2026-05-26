@@ -30,8 +30,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("control: model.create(transaction='rollback') without the flag rolls the row back", () => {
-				// Establishes the baseline that the rollback path actually works
-				// in this environment, so the inverse assertion below is meaningful.
+				// Baseline: proves the rollback path actually fires in this environment.
 				var beforeCount = g.model("tag").count();
 				g.model("tag").create(name = "outerSig_control", transaction = "rollback");
 				var afterCount = g.model("tag").count();
@@ -39,15 +38,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("treats invokeWithTransaction as 'alreadyopen' when request.$wheelsTransactionWrapper is set", () => {
-				// With the outer-transaction signal set, the model must NOT open
-				// its own cftransaction — even when the caller explicitly passes
-				// transaction='rollback'. The save is treated as alreadyopen, so
-				// no cftransaction is begun and no rollback is issued; the INSERT
-				// runs in the ambient (auto-commit) connection state and persists.
-				// This is the surrogate observable for the original MSSQL bug
-				// (#2789): inside a migrator's outer cftransaction, the model's
-				// nested cftransaction silently rolled the row back. Bypassing the
-				// model's wrapper eliminates the nested-transaction entirely.
+				// Issue #2789: signal set → model bypasses its own wrapper; INSERT persists despite transaction='rollback'.
 				var beforeCount = g.model("tag").count();
 				request.$wheelsTransactionWrapper = true;
 				try {
@@ -60,9 +51,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("also bypasses the wrapper for update via save()", () => {
-				// Same semantics for the update path: save() with
-				// transaction='rollback' would normally roll the UPDATE back, but
-				// with the signal set, the wrapper is bypassed.
+				// Issue #2789: same bypass applies to save()'s UPDATE path.
 				var tag = g.model("tag").create(name = "outerSig_signal_update");
 				request.$wheelsTransactionWrapper = true;
 				try {
@@ -73,7 +62,7 @@ component extends="wheels.WheelsTest" {
 				}
 				var refetched = g.model("tag").findByKey(tag.id);
 				expect(refetched.name).toBe("outerSig_signal_update_modified");
-				// Cleanup explicit because the name no longer matches the afterEach pattern.
+				// Cleanup: row name no longer matches the afterEach pattern.
 				queryExecute(
 					"DELETE FROM c_o_r_e_tags WHERE id = :id",
 					{ id = { value = tag.id, cfsqltype = "cf_sql_integer" } },
@@ -82,9 +71,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("also bypasses the wrapper for deleteAll", () => {
-				// Same semantics for deleteAll: transaction='rollback' would
-				// normally roll the DELETE back, but with the signal set the
-				// wrapper is bypassed, so the DELETE persists.
+				// Issue #2789: same bypass applies to deleteAll's DELETE path.
 				g.model("tag").create(name = "outerSig_signal_delete");
 				request.$wheelsTransactionWrapper = true;
 				try {

@@ -12,8 +12,7 @@ component extends="wheels.migrator.Migration" hint="issue ##2789 repro — seed 
 	}
 
 	function down() {
-		// removeRecord uses raw queryExecute (no nested transaction), safe for
-		// every adapter regardless of whether the fix is in place.
+		// Issue #2789: raw queryExecute avoids nested transaction; safe across all adapters.
 		removeRecord(table = "c_o_r_e_tags", where = "name = 'issue2789_via_model_create'");
 	}
 
