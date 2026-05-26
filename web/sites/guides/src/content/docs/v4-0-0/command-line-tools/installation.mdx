@@ -51,7 +51,7 @@ On upgrades (`brew upgrade wheels`), the staged module version bumps; the next `
 
 ## Linux (apt / yum)
 
-Wheels publishes signed native `apt` and `yum` repositories at **<https://apt.wheels.dev>** and **<https://yum.wheels.dev>**. The packages are built by `nfpm` on the release workflow, signed with the Wheels Distribution GPG key, and served from a Cloudflare R2 bucket per format. Add the source once; `apt`/`dnf` watches the repo and upgrades automatically.
+Wheels publishes signed native `apt` and `yum` repositories at **[https://apt.wheels.dev](https://apt.wheels.dev)** and **[https://yum.wheels.dev](https://yum.wheels.dev)**. The packages are built by `nfpm` on the release workflow, signed with the Wheels Distribution GPG key, and served from a Cloudflare R2 bucket per format. Add the source once; `apt`/`dnf` watches the repo and upgrades automatically.
 
 ```bash title="Debian / Ubuntu — stable"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
@@ -88,7 +88,7 @@ Each `.deb`/`.rpm` carries its full SemVer version internally (e.g. `4.0.1~snaps
 <Aside type="note" title="GPG signing">
 Both repositories are signed with the Wheels Distribution key — fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`. The public key is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` (byte-identical files). `apt update` verifies the `InRelease` / `Release.gpg` signature on every refresh; `dnf` verifies `repomd.xml.asc` and each per-package signature. The sources.list / `.repo` snippets above wire all of that in automatically.
 
-For users who want to verify the fingerprint out-of-band before trusting the key, the same fingerprint is committed to <https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT> and <https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT>.
+For users who want to verify the fingerprint out-of-band before trusting the key, the same fingerprint is committed to [https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT) and [https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT).
 </Aside>
 
 <Aside type="tip" title="Need a one-off download?">

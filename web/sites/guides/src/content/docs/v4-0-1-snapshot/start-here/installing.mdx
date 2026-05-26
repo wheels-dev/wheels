@@ -165,7 +165,7 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
 
 <TabItem label="Linux" icon="linux">
 
-Wheels publishes signed native apt and yum repositories at **<https://apt.wheels.dev>** and **<https://yum.wheels.dev>**. Add the source once, then `apt upgrade wheels` / `dnf upgrade wheels` picks up new versions automatically. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
+Wheels publishes signed native apt and yum repositories at **[https://apt.wheels.dev](https://apt.wheels.dev)** and **[https://yum.wheels.dev](https://yum.wheels.dev)**. Add the source once, then `apt upgrade wheels` / `dnf upgrade wheels` picks up new versions automatically. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
 
 <Aside type="note" title="GPG signing">
 The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`). `apt`/`dnf` verify the signature on every update, so a network-level attacker can't substitute the package contents. The public half is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` — both files are byte-identical. The sources.list / `.repo` snippets below wire the signature check in automatically.
