@@ -52,7 +52,7 @@ Upgrade with `brew upgrade wheels`, `scoop update wheels`, `apt upgrade wheels`,
 
 ## Slack / Discord — `slackCopy`
 
-*Wheels 4.0.2 is out* :tada:  (second patch on the 4.0 line — no breaking changes)
+*Wheels 4.0.2 is out*  (second patch on the 4.0 line — no breaking changes)
 
 The theme this time is *migrations on a shared dev database*. If a teammate's migration ever got recorded in your tracking table without the file being on your branch — an _orphan version_ — `wheels migrate latest` used to silently do nothing. Now it warns you and applies your pending migrations instead.
 
@@ -69,7 +69,7 @@ Also in 4.0.2:
 Upgrade: `brew upgrade wheels` / `scoop update wheels` / `apt upgrade wheels` / `dnf upgrade wheels`
 Full write-up: RELEASE_URL
 
-<!-- Note: Slack uses mrkdwn (*single* asterisks for bold, <url|label> for links). The :tada: emoji is optional — drop it if you'd rather keep emoji out. Discord renders **double-asterisk** bold, so if you post the same copy to Discord, switch *bold* -> **bold**. -->
+<!-- Note: Slack uses mrkdwn (*single* asterisks for bold, <url|label> for links). Discord renders **double-asterisk** bold, so if you post the same copy to Discord, switch *bold* -> **bold**. Add channel-appropriate emoji on the way out if you want them. -->
 
 ---
 
