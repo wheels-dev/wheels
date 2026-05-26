@@ -75,8 +75,12 @@ for CHANNEL in $CHANNELS; do
   echo "── Signing .rpm files in ${PKG_DIR}/ ──"
   for rpm_file in "${PKG_DIR}"/*.rpm; do
     [ -f "$rpm_file" ] || continue
-    # --addsign with the macro setup above. Passphrase via env (rpm reads
-    # $GNUPGHOME/gpg.conf which sets pinentry-mode loopback).
+    # --addsign with the macro setup above. The passphrase comes from the
+    # --passphrase-file we wrote earlier (via %__gpg_sign_cmd in ~/.rpmmacros).
+    # The `>/dev/null` only suppresses rpm's stdout progress chatter; stderr
+    # is intentionally left open so a signing failure (bad passphrase, missing
+    # macro, gpg error) still surfaces in the CI log. Do NOT broaden this to
+    # `>/dev/null 2>&1` — silent signing failures would corrupt the repo.
     rpm --addsign "$rpm_file" >/dev/null
     echo "  ✓ signed $(basename "$rpm_file")"
   done
