@@ -75,44 +75,38 @@ The rest of the install steps are identical — see [Installing Wheels → Windo
 
 <TabItem label="Linux" icon="linux">
 
-Each channel ships `.deb` and `.rpm` packages on its respective releases page:
+Each channel ships from a signed native repository — distinct package names (`wheels` vs `wheels-be`) so both channels can coexist on the same host:
 
-- **Stable**: [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases)
-- **Bleeding-edge**: [github.com/wheels-dev/wheels-snapshots/releases](https://github.com/wheels-dev/wheels-snapshots/releases)
+- **Stable**: `https://apt.wheels.dev stable main` / `https://yum.wheels.dev/wheels.repo` → package `wheels`
+- **Bleeding-edge**: `https://apt.wheels.dev bleeding-edge main` / `https://yum.wheels.dev/wheels-be.repo` → package `wheels-be`
 
 ```bash title="Debian / Ubuntu (stable)"
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
-sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+curl -fsSL https://apt.wheels.dev/wheels.gpg \
+  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
+  | sudo tee /etc/apt/sources.list.d/wheels.list
+sudo apt update && sudo apt install wheels
 ```
 
 ```bash title="Fedora / RHEL (stable)"
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels.repo
+sudo dnf install wheels
 ```
 
 ```bash title="Debian / Ubuntu (bleeding-edge)"
-# The bleeding-edge channel publishes only pre-releases, so use /releases (not /releases/latest).
-WHEELS_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
-# Tag uses a SemVer hyphen (4.0.0-snapshot.N). The on-disk asset name uses a dot
-# in the same slot because GitHub Releases rewrites the package's internal
-# ~snapshot.N form to . at upload time. So translate hyphen → dot for the URL.
-WHEELS_FILENAME_VER="${WHEELS_TAG//-/.}"
-curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels-be_${WHEELS_FILENAME_VER}_amd64.deb"
-sudo apt install "./wheels-be_${WHEELS_FILENAME_VER}_amd64.deb"
+curl -fsSL https://apt.wheels.dev/wheels.gpg \
+  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
+  | sudo tee /etc/apt/sources.list.d/wheels-be.list
+sudo apt update && sudo apt install wheels-be
 ```
 
 ```bash title="Fedora / RHEL (bleeding-edge)"
-WHEELS_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
-WHEELS_FILENAME_VER="${WHEELS_TAG//-/.}"
-sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${WHEELS_TAG}/wheels-be-${WHEELS_FILENAME_VER}.x86_64.rpm"
+sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels-be.repo
+sudo dnf install wheels-be
 ```
 
-Apt and yum repos at `apt.wheels.dev` / `yum.wheels.dev` are coming — they'll let you `apt upgrade wheels` instead of re-downloading.
+Both repos are GPG-signed (fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`); `apt update` / `dnf check-update` verifies the signature on every refresh. The raw `.deb`/`.rpm` are also uploaded to each GitHub Release as a fallback for air-gapped installs (see [CLI Installation](/v4-0-1-snapshot/command-line-tools/installation/)).
 
 </TabItem>
 
@@ -139,47 +133,41 @@ brew install wheels
 ```
 
 ```bash title="Linux — stable → bleeding-edge (Debian / Ubuntu)"
-# wheels-be .deb declares Replaces: wheels + Conflicts: wheels, so apt
-# removes the stable wheels package and installs wheels-be in its place
-# without a separate `apt remove` step.
-SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
-SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
-sudo apt install "./wheels-be_${SNAP_FILENAME_VER}_amd64.deb"
+# Add the bleeding-edge source (uses the same key already imported for stable).
+# wheels-be .deb declares Replaces: wheels + Conflicts: wheels, so apt removes
+# the stable wheels package and installs wheels-be in its place — no separate
+# `apt remove` needed.
+echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
+  | sudo tee /etc/apt/sources.list.d/wheels-be.list
+sudo apt update && sudo apt install wheels-be
 ```
 
 ```bash title="Linux — stable → bleeding-edge (Fedora / RHEL)"
 # wheels-be .rpm declares Conflicts: wheels but no Obsoletes, so dnf
 # refuses to install while the stable wheels package is present. Remove
-# it first.
+# it first, then add the bleeding-edge .repo source and install.
 sudo dnf remove wheels
-SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
-SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-be-${SNAP_FILENAME_VER}.x86_64.rpm"
+sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels-be.repo
+sudo dnf install wheels-be
 ```
 
 ```bash title="Linux — bleeding-edge → stable (Debian / Ubuntu)"
 # wheels-be declares Conflicts: wheels, so apt refuses to install wheels
 # while wheels-be is present. (Stable wheels .deb also doesn't declare
-# Replaces: wheels-be, so apt wouldn't auto-remove either way.) Remove
-# wheels-be first.
+# Replaces: wheels-be.) Remove wheels-be, then install wheels — both
+# come from the same apt.wheels.dev source list, so no extra setup needed.
 sudo apt remove wheels-be
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
-sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install wheels
 ```
 
 ```bash title="Linux — bleeding-edge → stable (Fedora / RHEL)"
 # Same as Debian above — wheels-be declares Conflicts: wheels, so dnf
 # refuses to install wheels while wheels-be is present. Remove wheels-be
-# first.
+# first, then install wheels. Both come from yum.wheels.dev (stable lives
+# at wheels.repo, bleeding-edge at wheels-be.repo); the stable .repo file
+# is left in place from the original install so no extra setup is needed.
 sudo dnf remove wheels-be
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+sudo dnf install wheels
 ```
 
 ```powershell title="Windows (Scoop) — stable → bleeding-edge"
