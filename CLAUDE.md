@@ -222,16 +222,18 @@ Any validator, analyzer, scanner, or upgrade-check that does substring-matching 
 - `cli/lucli/services/Doctor.cfc::$stripCfmlBlockComments()`
 
 ### 15. Migrator helpers accept singular AND plural column names — prefer the plural
-**Source:** [#2781](https://github.com/wheels-dev/wheels/issues/2781) — `t.references()` historically required `referenceNames` (and only that), while every sibling helper accepted `columnNames` / `columnName` via `$combineArguments`. AI agents and humans both kept reaching for the consistent form and hitting "argument required" errors. Now resolved: `t.references()` accepts `columnNames` as an alias, and that's the preferred form going forward.
+**Source:** [#2781](https://github.com/wheels-dev/wheels/issues/2781) (`t.references()`) + [#2803](https://github.com/wheels-dev/wheels/issues/2803) (`t.primaryKey()`) — these two helpers were the last outliers in `TableDefinition.cfc`. Every sibling helper accepted `columnNames` / `columnName` via `$combineArguments`, but `references` required `referenceNames` and `primaryKey` required `name`. AI agents and humans both kept reaching for the consistent form and hitting "argument required" errors. Now resolved: both accept `columnNames` as an alias, and that's the preferred form going forward.
 
 ```cfm
 // RIGHT — modern, matches every other column helper
 t.string(columnNames="name");
 t.integer(columnNames="age");
 t.references(columnNames="user");
+t.primaryKey(columnNames="userId", autoIncrement=true);
 
 // LEGACY — still works, but the new code path uses columnNames
 t.references(referenceNames="user");
+t.primaryKey(name="userId", autoIncrement=true);
 ```
 
 For new migrator helpers or anywhere you accept a column-name argument: declare `string columnNames` (NOT `required`), and call `$combineArguments(args=arguments, combine="columnNames,columnName", required=true)` at the top of the body. The pattern is documented in [vendor/wheels/migrator/CLAUDE.md](vendor/wheels/migrator/CLAUDE.md). Boolean nullable flag is `allowNull` everywhere — never `null`.

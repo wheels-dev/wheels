@@ -107,6 +107,7 @@ These are the column-builder methods defined on `TableDefinition`. Every one tak
 | `t.binary(columnNames=)` | BLOB / VARBINARY | |
 | `t.uniqueidentifier(columnNames=)` | UNIQUEIDENTIFIER / UUID | defaults to `newid()` |
 | `t.references(columnNames=, foreignKey=, onDelete=)` | INT + FK | creates `<name>id` (or `<name>_id`, see below) and a FK constraint |
+| `t.primaryKey(columnNames=, type=, autoIncrement=)` | PK column | `type` defaults to `integer`; call multiple times for composite PKs (no comma-list — `columnNames="a,b"` is treated as a single literal column name) |
 | `t.timestamps()` | creates `createdAt`, `updatedAt`, `deletedAt` | no arguments |
 
 `t.references(columnNames="user")` is the shortcut for the common case of a foreign key: it adds an integer column plus a FK constraint pointing at `users.id`. The legacy argument name `referenceNames` is still accepted; `columnNames` is the preferred modern form so the call site reads the same as every other column helper. Pass `polymorphic=true` to also create a type column for [polymorphic associations](/v4-0-0/basics/associations/#polymorphic-associations). Pass `foreignKey=false` to skip the constraint and leave only the column — useful when the referenced table lives in another datasource.
