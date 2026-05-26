@@ -52,6 +52,14 @@ jobs:
 
       - name: Build ${{ matrix.site }}
         working-directory: web
+        env:
+          # `sites/packages` calls the GitHub REST API at build time to
+          # enumerate the package registry. Without auth that's capped at
+          # 60 req/hour per runner IP, and rapid CI activity on a single
+          # branch trips the limit (failure mode: 403 from the contents API,
+          # build aborts mid-prerender). Passing GITHUB_TOKEN raises the cap
+          # to 5000/hour. Other site builds ignore the var.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm --filter @wheels-dev/site-${{ matrix.site }} build
 
       - name: Deploy to Cloudflare Pages
