@@ -39,7 +39,7 @@ component extends="Base" {
 	 *
 	 * @name Legacy parameter for the primary-key column name. New code should prefer `columnName`.
 	 * @columnName Modern singular alias for `name` (matches sibling column helpers).
-	 * @columnNames Modern plural alias for `name`. Accepted for muscle-memory parity with `t.integer(columnNames=...)` etc.; the primary key is still inherently a single column here.
+	 * @columnNames Modern plural alias for `name`. Accepted for muscle-memory parity with `t.integer(columnNames=...)` etc. NOTE: unlike sibling helpers, this does NOT accept a comma-separated list — `primaryKey()` always creates one PK column, so `columnNames="a,b"` produces a single column literally named `a,b` (not two PKs). For composite PKs call `t.primaryKey()` multiple times.
 	 */
 	public any function primaryKey(
 		string name,

@@ -48,6 +48,18 @@ component extends="wheels.WheelsTest" {
 				expect(t.primaryKeys[1].name).toBe("userId");
 			});
 
+			it("does not iterate a comma-separated columnNames — PK name is the literal string", () => {
+				// Unlike sibling helpers (t.string, t.integer, …) that ListToArray
+				// the plural argument and create one column per entry, primaryKey()
+				// always creates exactly one PK column. A comma-separated value is
+				// passed through as the literal column name. For composite PKs,
+				// call t.primaryKey() once per column.
+				var t = variables.migration.createTable(name = "dbm_pk_no_list_test", id = false, force = true);
+				t.primaryKey(columnNames = "a,b");
+				expect(ArrayLen(t.primaryKeys)).toBe(1);
+				expect(t.primaryKeys[1].name).toBe("a,b");
+			});
+
 		});
 
 		describe("TableDefinition.primaryKey() — alias precedence", () => {
