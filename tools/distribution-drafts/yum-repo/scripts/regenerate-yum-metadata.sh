@@ -29,15 +29,29 @@ CHANNELS="stable bleeding-edge"
 # any existing signature).
 #
 # Requires rpm-sign (Fedora/RHEL) for the rpm command itself.
+#
+# Why a custom %__gpg_sign_cmd: in CI there is no TTY, so the default
+# rpm-build sign command (`gpg ... --pinentry-mode loopback --passphrase-fd 3 ...`)
+# either fails to open /dev/tty or has no fd 3 wired up. Override with an
+# explicit `--passphrase-file` pointing at a chmod-600 file we control. The
+# file lives under $RUNNER_TEMP (or /tmp as a fallback), is unreadable by
+# other users, and is wiped at the end of the script.
+PASS_FILE="${RUNNER_TEMP:-/tmp}/wheels-rpm-pass.$$"
+umask 077
+printf '%s' "${GPG_PASSPHRASE:-}" > "$PASS_FILE"
+trap 'rm -f "$PASS_FILE"' EXIT
+
 cat > ~/.rpmmacros <<RPMMACROS
 %_signature gpg
 %_gpg_name ${GPG_KEY_ID}
 %_gpg_path ${GNUPGHOME:-${HOME}/.gnupg}
 %__gpg $(command -v gpg)
+%__gpg_sign_cmd %{__gpg} --batch --no-armor --no-secmem-warning --pinentry-mode loopback --passphrase-file ${PASS_FILE} --local-user "%{_gpg_name}" --sign --detach-sign --output %{__signature_filename} %{__plaintext_filename}
 RPMMACROS
 
-# rpm --addsign drives gpg via the agent; force loopback so the passphrase
-# can come from the env var without a TTY.
+# Also configure gpg-agent to allow loopback (belt-and-braces — the macro
+# above is the load-bearing piece, but other gpg invocations later in the
+# script — repomd.xml signing, public-key export — still rely on the agent).
 mkdir -p "${GNUPGHOME:-${HOME}/.gnupg}"
 cat > "${GNUPGHOME:-${HOME}/.gnupg}/gpg-agent.conf" <<GPGAGENT
 allow-loopback-pinentry

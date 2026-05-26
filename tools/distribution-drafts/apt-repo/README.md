@@ -1,9 +1,15 @@
 # `apt-wheels` bucket repo template
 
 This directory is the **template** for the standalone `wheels-dev/apt-wheels`
-repository that backs `https://apt.wheels.dev`. The bucket repo holds the static
-apt metadata tree plus the pooled `.deb` artifacts, and is auto-deployed to
-Cloudflare Pages on every push.
+repository that backs `https://apt.wheels.dev`. The bucket repo holds the
+**workflow + scripts + landing page + signing key**. The apt metadata tree
+(`dists/`) and the `.deb` pool (`pool/`) live in **Cloudflare R2** (bucket
+`wheels-apt`) and are served via R2's custom-domain feature.
+
+> **Note on Pages vs R2:** The original Phase 2 design called for Cloudflare
+> Pages serving the bucket repo directly. Pages has a hard **25 MiB per-file**
+> limit; the `.deb` is ~80 MB. The architecture pivoted to R2 (no per-object
+> size limit) during initial rollout.
 
 Copy these files into the new repo when it's created — they are designed to
 work out of the box once the Phase 2 operational prerequisites (GPG key,
@@ -101,13 +107,15 @@ Before this bucket repo will function:
    into 1Password under `op://Wheels/wheels-linux-repo-signing/` (Wheels
    project vault on `my.1password.com`).
    Public key (ASCII-armored) overwrites `wheels.gpg` at the bucket-repo root.
-2. **Cloudflare Pages** — create a Pages project pointing at this repo, bind
-   the apex domain `apt.wheels.dev`. The build command is empty (the repo
-   *is* the static site); the output dir is `./`.
+2. **R2 bucket** — create a Cloudflare R2 bucket named `wheels-apt` and
+   attach the `apt.wheels.dev` custom domain. R2 has no per-object size
+   limit (unlike Pages' 25 MiB), which is why binaries are stored here.
 3. **CI secrets** (set on the bucket repo at
    `https://github.com/wheels-dev/apt-wheels/settings/secrets/actions`):
    - `WHEELS_REPO_GPG_PRIVATE_KEY` — ASCII-armored private key
    - `WHEELS_REPO_GPG_PASSPHRASE` — passphrase
+   - `CLOUDFLARE_API_TOKEN` — token with `Workers R2 Storage:Edit` on the
+     account that owns the `wheels-apt` bucket
 4. **Upstream dispatch** — the release workflow in `wheels-dev/wheels`
    fires a `repository_dispatch` (`wheels-released`) at this repo when a
    new `.deb` is published to the GitHub Release. The token used by the

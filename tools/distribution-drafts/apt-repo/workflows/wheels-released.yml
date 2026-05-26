@@ -1,19 +1,23 @@
-# Receiver workflow for `wheels-dev/apt-wheels`.
+# Receiver workflow for `wheels-dev/apt-wheels` (R2-backed architecture).
 #
 # Listens for `repository_dispatch` from `wheels-dev/wheels`'s release workflow,
-# downloads the new `.deb` asset from the upstream GitHub Release, slots it
-# into `pool/<channel>/w/<pkg>/`, regenerates the apt metadata via
-# `apt-ftparchive`, signs `Release` + `InRelease` with GPG, and commits the
-# whole tree back to this repo. Cloudflare Pages auto-deploys on push.
+# downloads the new `.deb` asset from the upstream GitHub Release, syncs the
+# existing apt repo state from R2 (so apt-ftparchive can see prior versions),
+# regenerates `Packages.gz` / `Release` / `InRelease` via `apt-ftparchive`,
+# signs with GPG, and uploads the changed tree to the `wheels-apt` R2 bucket
+# (which is served at https://apt.wheels.dev via R2 custom-domain).
+#
+# This repo no longer commits pool/ or dists/ — those are R2-resident only.
+# The repo's job is to hold the WORKFLOW + REGEN SCRIPT + LANDING + GPG KEY.
 #
 # Trigger payload contract (sender: wheels-dev/wheels release.yml):
 #   event_type:    "wheels-released"
 #   client_payload:
-#     version: "<x.y.z>" or "<x.y.z>-snapshot.<n>"   # full SemVer, no leading v
-#     channel: "stable" | "bleeding-edge"             # routes into the pool
+#     version: "<x.y.z>" or "<x.y.z>-snapshot.<n>"
+#     channel: "stable" | "bleeding-edge"
 #
-# Manual dispatch is also supported via `workflow_dispatch` for backfill /
-# disaster-recovery (re-add a missing version without waiting for a new release).
+# Manual dispatch is supported via `workflow_dispatch` for backfill /
+# disaster-recovery.
 
 name: Publish to apt.wheels.dev
 
@@ -36,13 +40,17 @@ on:
           - bleeding-edge
 
 permissions:
-  contents: write   # the workflow commits the regenerated metadata back to this repo
+  contents: read
 
 concurrency:
-  # Serialize across both channels — apt-ftparchive scans the whole pool, so
-  # parallel runs would race on Packages.gz / Release writes.
+  # Serialize across channels — apt-ftparchive scans the whole pool, so
+  # parallel runs would race on the regenerated Packages.gz / Release uploads.
   group: publish-apt
   cancel-in-progress: false
+
+env:
+  R2_BUCKET: wheels-apt
+  CLOUDFLARE_ACCOUNT_ID: "511d04f367103ec276d875ab41a24dea"
 
 jobs:
   publish:
@@ -52,52 +60,53 @@ jobs:
     steps:
       - name: Resolve inputs
         id: inputs
+        env:
+          CLIENT_VERSION: ${{ github.event.client_payload.version }}
+          CLIENT_CHANNEL: ${{ github.event.client_payload.channel }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            VERSION="${{ github.event.client_payload.version }}"
-            CHANNEL="${{ github.event.client_payload.channel }}"
+            VERSION="$CLIENT_VERSION"
+            CHANNEL="$CLIENT_CHANNEL"
           else
-            VERSION="${{ inputs.version }}"
-            CHANNEL="${{ inputs.channel }}"
+            VERSION="$INPUT_VERSION"
+            CHANNEL="$INPUT_CHANNEL"
           fi
           if [ -z "$VERSION" ] || [ -z "$CHANNEL" ]; then
             echo "::error::Both version and channel are required."
             exit 1
           fi
-          # Reject "release-candidate" and other channels we don't yet plumb.
           case "$CHANNEL" in
             stable|bleeding-edge) ;;
             *) echo "::error::Unsupported channel: $CHANNEL"; exit 1 ;;
           esac
-          # Map channel → package name (mirrors nfpm-wheels.yaml / nfpm-wheels-be.yaml).
           case "$CHANNEL" in
-            stable)        PKG="wheels" ;;
-            bleeding-edge) PKG="wheels-be" ;;
+            stable)        PKG="wheels"; UPSTREAM_REPO="wheels-dev/wheels" ;;
+            bleeding-edge) PKG="wheels-be"; UPSTREAM_REPO="wheels-dev/wheels-snapshots" ;;
           esac
-          # Map channel → upstream releases repo. Stable releases live in
-          # wheels-dev/wheels; snapshot/BE releases live in wheels-dev/wheels-snapshots.
-          case "$CHANNEL" in
-            stable)        UPSTREAM_REPO="wheels-dev/wheels" ;;
-            bleeding-edge) UPSTREAM_REPO="wheels-dev/wheels-snapshots" ;;
-          esac
-          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
-          echo "channel=$CHANNEL"           >> "$GITHUB_OUTPUT"
-          echo "pkg=$PKG"                   >> "$GITHUB_OUTPUT"
-          echo "upstream_repo=$UPSTREAM_REPO" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$VERSION"
+            echo "channel=$CHANNEL"
+            echo "pkg=$PKG"
+            echo "upstream_repo=$UPSTREAM_REPO"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout bucket repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          # Persist the workflow token so the trailing `git push` works.
-          persist-credentials: true
 
-      - name: Install apt-ftparchive + gpg
+      - name: Install apt-ftparchive + gpg + wrangler
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends apt-utils gnupg
+          sudo apt-get install -y --no-install-recommends apt-utils gnupg jq
           apt-ftparchive --version
           gpg --version | head -1
+          # wrangler ships with Node — runner has it. Pin to a known-good version.
+          sudo npm install -g wrangler@4.95.0
+          wrangler --version
 
       - name: Import GPG signing key
         env:
@@ -110,11 +119,9 @@ jobs:
             exit 1
           fi
           echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
-          # Trust the imported key ultimately so subsequent sign operations don't prompt.
-          # `import-ownertrust` expects the 40-char fingerprint (`fpr:` line, field 10),
-          # NOT the 16-char key_id (`sec:` line, field 5). Using the key_id form emits
-          # a "gpg: error in '[stdin]': invalid fingerprint" warning that's non-fatal
-          # but noisy in CI logs.
+          # import-ownertrust needs the 40-char fingerprint (fpr: field 10),
+          # NOT the 16-char key_id (sec: field 5). Using key_id emits a
+          # non-fatal "invalid fingerprint" warning that's noisy in CI logs.
           FINGERPRINT=$(gpg --list-secret-keys --with-colons \
             | awk -F: '/^fpr:/ { print $10; exit }')
           KEY_ID=$(gpg --list-secret-keys --keyid-format=long --with-colons \
@@ -123,19 +130,46 @@ jobs:
           echo "$FINGERPRINT:6:" | gpg --batch --yes --import-ownertrust
           echo "GPG_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
 
-      - name: Download .deb from upstream Release
+      - name: Sync existing pool from R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CHANNEL: ${{ steps.inputs.outputs.channel }}
+        run: |
+          set -euo pipefail
+          # List all R2 objects under pool/<channel>/ and download each.
+          # apt-ftparchive needs the actual .deb files locally so it can compute
+          # size + sha256 + read package metadata for the Packages index.
+          mkdir -p pool/${CHANNEL}
+          PREFIX="pool/${CHANNEL}/"
+          CURSOR=""
+          while :; do
+            URL="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects?prefix=${PREFIX}&per_page=1000"
+            [ -n "$CURSOR" ] && URL="${URL}&cursor=${CURSOR}"
+            RESP=$(curl -sS "$URL" -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
+            echo "$RESP" | jq -r '.result[].key' | while IFS= read -r key; do
+              [ -z "$key" ] && continue
+              mkdir -p "$(dirname "$key")"
+              echo "  pulling $key"
+              wrangler r2 object get "${R2_BUCKET}/${key}" --file="$key" --remote >/dev/null 2>&1
+            done
+            CURSOR=$(echo "$RESP" | jq -r '.result_info.cursor // empty')
+            [ -z "$CURSOR" ] && break
+          done
+          echo "Local pool/${CHANNEL}/ contents after sync:"
+          find pool/${CHANNEL}/ -type f | head -20
+
+      - name: Download new .deb from upstream Release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.inputs.outputs.version }}
-          CHANNEL: ${{ steps.inputs.outputs.channel }}
           PKG: ${{ steps.inputs.outputs.pkg }}
           UPSTREAM_REPO: ${{ steps.inputs.outputs.upstream_repo }}
         run: |
           set -euo pipefail
           mkdir -p incoming
           # GitHub Release URLs rewrite `~` to `.` at upload time. The version
-          # passed in `client_payload.version` uses `-snapshot.N` (SemVer), but
-          # the on-URL filename uses `.snapshot.N`. Translate.
+          # in client_payload uses SemVer hyphen (-snapshot.N); the on-URL form
+          # uses dot (.snapshot.N). Translate before fetch.
           URL_VERSION="${VERSION/-snapshot./.snapshot.}"
           ASSET="${PKG}_${URL_VERSION}_amd64.deb"
           TAG="v${VERSION}"
@@ -144,25 +178,22 @@ jobs:
             --repo "$UPSTREAM_REPO" \
             --pattern "$ASSET" \
             --dir incoming/
-          ls -l incoming/
+          ls -lh incoming/
 
-      - name: Slot .deb into pool/
+      - name: Slot new .deb into local pool
         env:
           VERSION: ${{ steps.inputs.outputs.version }}
           CHANNEL: ${{ steps.inputs.outputs.channel }}
           PKG: ${{ steps.inputs.outputs.pkg }}
         run: |
           set -euo pipefail
-          # Canonical pool form uses `~` (SemVer pre-release separator).
+          # Canonical pool path uses ~-form (SemVer pre-release separator).
           POOL_DIR="pool/${CHANNEL}/${PKG:0:1}/${PKG}"
           POOL_FILE="${POOL_DIR}/${PKG}_${VERSION}_amd64.deb"
           mkdir -p "$POOL_DIR"
-          # The downloaded file uses `.` in the snapshot separator; rename to `~`.
           URL_VERSION="${VERSION/-snapshot./.snapshot.}"
           mv "incoming/${PKG}_${URL_VERSION}_amd64.deb" "$POOL_FILE"
-          echo "Placed: $POOL_FILE"
-          # Idempotency: if the pool already had this version, the mv overwrote
-          # it. Re-runs of the same dispatch are safe (last-writer-wins).
+          echo "Placed: $POOL_FILE ($(du -h "$POOL_FILE" | cut -f1))"
 
       - name: Regenerate apt metadata + sign
         env:
@@ -173,19 +204,35 @@ jobs:
           chmod +x scripts/regenerate-apt-metadata.sh
           ./scripts/regenerate-apt-metadata.sh
 
-      - name: Commit + push
+      - name: Upload pool + dists to R2
         env:
-          VERSION: ${{ steps.inputs.outputs.version }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CHANNEL: ${{ steps.inputs.outputs.channel }}
-          PKG: ${{ steps.inputs.outputs.pkg }}
         run: |
           set -euo pipefail
-          git config user.name  "wheels-release-bot"
-          git config user.email "hello@wheels.dev"
-          git add pool/ dists/
-          if git diff --cached --quiet; then
-            echo "No changes — dispatch must have been a no-op (same version re-published?)."
-            exit 0
-          fi
-          git commit -m "publish: ${PKG} ${VERSION} (${CHANNEL})"
-          git push origin HEAD:main
+          upload_one() {
+            local local_path="$1"
+            local ct="$2"
+            local key="$local_path"
+            echo "  uploading $key (ct=${ct})"
+            wrangler r2 object put "${R2_BUCKET}/${key}" --file="$local_path" --content-type="$ct" --remote >/dev/null 2>&1
+          }
+          # Upload pool files (.deb). Only the one we just added is new, but
+          # uploading all is idempotent (overwrites with same content).
+          find pool/${CHANNEL} -type f -name '*.deb' | while read -r f; do
+            upload_one "$f" "application/vnd.debian.binary-package"
+          done
+          # Upload regenerated dists tree. apt-ftparchive rewrites these on
+          # every run; upload all files in dists/ regardless of channel.
+          find dists -type f | while read -r f; do
+            # Pick a sensible content-type per file
+            case "$f" in
+              *.gz)             ct="application/gzip" ;;
+              *.gpg)            ct="application/pgp-signature" ;;
+              *InRelease|*Release) ct="text/plain" ;;
+              *Packages)        ct="text/plain" ;;
+              *)                ct="application/octet-stream" ;;
+            esac
+            upload_one "$f" "$ct"
+          done
+          echo "R2 upload complete for channel=${CHANNEL}."
