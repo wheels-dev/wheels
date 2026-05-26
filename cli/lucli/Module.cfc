@@ -3905,24 +3905,38 @@ component extends="modules.BaseModule" {
 		// the suffix produced by t.references() from `<x>id` to `<x>_id`,
 		// matching Wheels model `belongsTo` defaults. See #2781 + #2802.
 		//
-		// Pre-check the flag on config/settings.cfm before appending — the
+		// Pre-check the flag across all of config/ before appending — the
 		// check-struct schema doesn't support multi-condition AND logic, so
 		// emitting the advisory unconditionally would fire on every app that
 		// has already opted in (where advisory #2 is the relevant one) and
-		// contradict reality. Comment-strip the file content first so a
-		// commented-out `// set(useUnderscoreReferenceColumns=true);` doesn't
-		// satisfy the guard (Anti-Pattern #14 — same shape as line 970).
+		// contradict reality. Walk config/ recursively to match advisory #2's
+		// `scanDir: "config"` scope — users may set the flag in an
+		// environment override file (e.g. config/production/settings.cfm) and
+		// reading only config/settings.cfm would miss it (#2808). Comment-
+		// strip each file first so a commented-out
+		// `// set(useUnderscoreReferenceColumns=true);` doesn't satisfy the
+		// guard (Anti-Pattern #14 — same shape as line 970).
 		var underscoreFlagAlreadySet = false;
-		var settingsFile = variables.projectRoot & "/config/settings.cfm";
-		if (fileExists(settingsFile)) {
-			// `reFindNoCase()` returns the 1-based match position (0 = no
-			// match). DO NOT wrap with `len()` — len() coerces the int to a
-			// string and measures digit count, so len(0)=1 and len(25)=2 are
-			// both truthy. Use `> 0` for an unambiguous boolean.
-			underscoreFlagAlreadySet = reFindNoCase(
-				"useUnderscoreReferenceColumns\s*=\s*true",
-				stripCfmlComments(fileRead(settingsFile))
-			) > 0;
+		var configDir = variables.projectRoot & "/config";
+		if (directoryExists(configDir)) {
+			var configFiles = [];
+			for (var ext in ["cfm", "cfc"]) {
+				var found = directoryList(configDir, true, "path", "*." & ext);
+				for (var f in found) arrayAppend(configFiles, f);
+			}
+			for (var configFile in configFiles) {
+				// `reFindNoCase()` returns the 1-based match position (0 = no
+				// match). DO NOT wrap with `len()` — len() coerces the int to
+				// a string and measures digit count, so len(0)=1 and len(25)=2
+				// are both truthy. Use `> 0` for an unambiguous boolean.
+				if (reFindNoCase(
+					"useUnderscoreReferenceColumns\s*=\s*true",
+					stripCfmlComments(fileRead(configFile))
+				) > 0) {
+					underscoreFlagAlreadySet = true;
+					break;
+				}
+			}
 		}
 		if (!underscoreFlagAlreadySet) {
 			arrayAppend(checks, {
