@@ -6,6 +6,12 @@ on:
   push:
     branches:
       - main
+  # Manual re-trigger for a stuck or failed release without needing a fresh
+  # push to main. Version + channel are derived from the dispatched ref's
+  # wheels.json (main -> stable, develop -> snapshot), identical to the
+  # push / workflow_call paths since channel selection keys on GITHUB_REF.
+  # See #2819.
+  workflow_dispatch:
   workflow_call:
     secrets:
       SLACK_WEBHOOK_URL:
@@ -41,6 +47,13 @@ on:
 env:
   WHEELS_PRERELEASE: false
   LUCLI_VERSION: "0.3.7"
+  # Route JS actions through Node 24 instead of the deprecated Node 20 runtime.
+  # The lone Node 20 action here — Wandalen/wretry.action@v3, which wraps
+  # softprops/action-gh-release — began failing its pre/post hooks with
+  # "Argument list too long" once GitHub's forced Node 20 -> 24 migration
+  # reached the runners (forced default 2026-06-02). Node 24 is backward
+  # compatible for JS actions. See #2819.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   #############################################
@@ -545,7 +558,7 @@ jobs:
       # Scoop now. See scoop-wheels#4 for the bucket's autoupdate workflow.
       #
       # Requires DOWNSTREAM_DISPATCH_TOKEN — a fine-grained PAT (or app
-      # token) with `metadata: read` + `actions: write` on the two
+      # token) with `metadata: read` + `contents: write` on the two
       # downstream repos. If the secret is unset, this step warns and
       # exits 0 so the release itself isn't blocked; cron will catch up.
       #############################################
@@ -611,7 +624,7 @@ jobs:
       # yum.wheels.dev within minutes. See issue #2605.
       #
       # Requires LINUX_REPO_DISPATCH_TOKEN — a fine-grained PAT with
-      # `actions: write` on the two bucket repos. If the secret is unset
+      # `contents: write` on the two bucket repos. If the secret is unset
       # (which it will be until the bucket repos are created), this step
       # skips silently — releases continue to land on the GitHub Release
       # artifact stream regardless.
