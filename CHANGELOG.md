@@ -18,7 +18,9 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
-# [Unreleased]
+# [4.0.2](https://github.com/wheels-dev/wheels/releases/tag/v4.0.2) => 2026-05-27
+
+> **Wheels 4.0.2** — second patch on the 4.0 line. Adds shared-development-database migrator reconciliation (`wheels migrate doctor` / `forget` / `pretend`, orphan-version auto-detection, and `name` / `applied_at` enrichment of the `wheels_migrator_versions` tracking table) plus `columnNames` aliases across `t.references()`, `t.primaryKey()`, and the `Migration.cfc` command helpers; ships native GPG-signed Linux package repositories at `apt.wheels.dev` and `yum.wheels.dev` (Cloudflare R2); resolves `BrowserTest` base URLs through a layered instance-time lookup; and greens the compatibility matrix across BoxLang and Adobe ColdFusion 2023/2025. ~30 PRs since the 4.0.1 GA (2026-05-20).
 
 ### Added
 
