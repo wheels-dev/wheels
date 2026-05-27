@@ -105,6 +105,23 @@ jobs:
             exit 1
           fi
 
+          # Check that the CHANGELOG separator below this version is exactly
+          # '---' (3 dashes). The release-notes extraction step below uses the
+          # awk range /^# \[VERSION\]/,/^---$/, which terminates ONLY on a line
+          # of exactly three dashes; a '----' (4-dash) separator silently
+          # extends the range into the PREVIOUS version's notes. We mirror that
+          # exact awk here and fail if the extracted range pulls in another
+          # version heading. (Recurring footgun — see #2606, #2768.)
+          VERSION_PATTERN=$(echo "${WHEELS_VERSION%+*}" | sed 's/\./\\./g')
+          BLED=$(awk '/^# \['"${VERSION_PATTERN}"'\]/,/^---$/ {print}' CHANGELOG.md \
+            | tail -n +2 | grep -cE '^# \[' || true)
+          if [ "${BLED}" -ne 0 ]; then
+            echo "ERROR: CHANGELOG release-notes range for [${WHEELS_VERSION%+*}] bleeds into a later version section."
+            echo "The separator directly below the [${WHEELS_VERSION%+*}] block must be exactly '---' (3 dashes), not '----'."
+            echo "This check mirrors the awk extraction used to build the GitHub Release notes."
+            exit 1
+          fi
+
           # Check that source version in wheels.json is clean (no -snapshot suffix).
           # The workflow injects -snapshot.N for develop builds automatically.
           BASE_VERSION=$(jq -r '.version' wheels.json)
