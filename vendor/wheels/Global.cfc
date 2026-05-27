@@ -2427,7 +2427,25 @@ return local.$wheels;
 	}
 
 	/**
-	 * Internal function.
+	 * Internal function. Wheels's canonical plural-or-singular argument alias
+	 * helper. If `args.<second>` is set, copy it to `args.<first>` and delete
+	 * the original — so the function body can read `args.<first>` uniformly
+	 * regardless of which name the caller used. With `required=true`, throws
+	 * `Wheels.IncorrectArguments` when neither name is provided.
+	 *
+	 * Canonical examples:
+	 *   - `combine = "columnNames,columnName"` — migrator column helpers in
+	 *     vendor/wheels/migrator/TableDefinition.cfc
+	 *   - `combine = "properties,property"` — model validations in
+	 *     vendor/wheels/model/validations.cfc
+	 *   - `combine = "formats,format"` — controller provides() in
+	 *     vendor/wheels/controller/provides.cfc
+	 *   - `combine = "referenceNames,columnNames"` — t.references() per #2781
+	 *
+	 * When adding a new helper that takes a list-or-single argument, follow
+	 * this pattern: declare the plural form on the signature (NOT required),
+	 * then call $combineArguments(required=true) at the top of the body so the
+	 * alias works AND the required-ness is enforced at runtime.
 	 */
 	public void function $combineArguments(
 		required struct args,
@@ -3849,7 +3867,116 @@ return local.$wheels;
 		}
 	}
 
+	/**
+	 * Snapshot mtimes of all .cfm files under the app's global include directory.
+	 *
+	 * Used by the bare `?reload=true` path so a developer adding a helper to
+	 * `app/global/*.cfm` does not have to remember the password-gated full reload
+	 * (issue ##2792).
+	 */
+	public struct function $snapshotGlobalIncludes(string directory = ExpandPath("/app/global")) {
+		var snapshot = {};
+		if (!DirectoryExists(arguments.directory)) {
+			return snapshot;
+		}
+		var files = DirectoryList(arguments.directory, true, "query", "*.cfm");
+		for (var row in files) {
+			snapshot[row.directory & "/" & row.name] = row.dateLastModified;
+		}
+		return snapshot;
+	}
+
+	/**
+	 * Compare a prior `$snapshotGlobalIncludes` result against the current
+	 * filesystem state and return true if any tracked .cfm file was added,
+	 * removed, or modified.
+	 *
+	 * Paired with `$snapshotGlobalIncludes` to drive the bare `?reload=true`
+	 * soft-reload path in development (issue ##2792).
+	 */
+	public boolean function $globalIncludesChanged(
+		required struct snapshot,
+		string directory = ExpandPath("/app/global")
+	) {
+		var current = $snapshotGlobalIncludes(directory = arguments.directory);
+		for (var key in current) {
+			if (!StructKeyExists(arguments.snapshot, key)) {
+				return true;
+			}
+			if (DateCompare(arguments.snapshot[key], current[key]) != 0) {
+				return true;
+			}
+		}
+		for (var key in arguments.snapshot) {
+			if (!StructKeyExists(current, key)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Re-evaluate the given global-includes file into `application.wo`'s
+	 * variables/this scope. Invoked from the bare `?reload=true` soft-reload
+	 * when `$globalIncludesChanged` reports drift (issue ##2792).
+	 *
+	 * `include` inside a method body adds function declarations to the
+	 * method's local scope, not the component's outer scope, so we walk
+	 * local for any user-defined functions and copy them onto variables
+	 * and this so they remain callable on `application.wo` across requests.
+	 */
+	public void function $reincludeGlobals(string file = "/app/global/functions.cfm") {
+		// Evaluate the file in a throwaway instance and bind the functions it
+		// declares onto variables + this. Done via a separate instance (not a
+		// bare `include` here) because Adobe CF throws "Routines cannot be
+		// declared more than once" when a `?reload=true` re-includes a file
+		// whose UDFs are already bound to application.wo — the prior copy in
+		// our own scope collides with the re-declaration. A fresh scope per
+		// call sidesteps that; rebinding here is a plain struct assignment, so
+		// the updated version replaces the old one on every engine.
+		var reloaded = new wheels.GlobalIncludeLoader().loadFunctions(arguments.file);
+		for (var key in reloaded) {
+			variables[key] = reloaded[key];
+			this[key] = reloaded[key];
+		}
+	}
+
 	// User-defined global functions
 	include "/app/global/functions.cfm";
+
+	// Promote include-injected UDFs from `variables` to `this` so they're
+	// discoverable via struct-iteration on engines (Adobe CF) where only
+	// `this`-scope members are reliably enumerable. Declared methods on
+	// Global.cfc are already in `this` via their `access` modifier and are
+	// not clobbered by the `structKeyExists(this, ...)` guard. See #2790
+	// and the auto-bind loop in `vendor/wheels/WheelsTest.cfc`.
+	//
+	// Delegated to `$promoteIncludedGlobalsToThis()` so the loop iterator
+	// lives in a real function-local scope. Inlining a `local.X` iterator in
+	// the pseudo-constructor materializes `variables.local` on the Global
+	// instance — harmless on Lucee/Adobe (where `local` is reserved to the
+	// function scope) but on BoxLang it shadows the method-local `local` of
+	// every mixed-in `$`-helper (Migrator/Model `local.appKey`, …), throwing
+	// "The key [...] was not found in the struct. Valid keys are ([VARKEY])".
+	$promoteIncludedGlobalsToThis();
+
+	/**
+	 * Copy include-injected user functions from `variables` onto `this` so
+	 * they remain enumerable on engines (Adobe CF) where struct-iteration
+	 * only reliably surfaces `this`-scope members. Must stay a function: an
+	 * inline `local.X` iterator in the pseudo-constructor materializes
+	 * `variables.local` and shadows method-local `local` on BoxLang.
+	 */
+	public void function $promoteIncludedGlobalsToThis() {
+		for (var promoteKey in variables) {
+			if (!isCustomFunction(variables[promoteKey])) {
+				continue;
+			}
+			if (structKeyExists(this, promoteKey)) {
+				continue;
+			}
+			this[promoteKey] = variables[promoteKey];
+		}
+	}
 
 }

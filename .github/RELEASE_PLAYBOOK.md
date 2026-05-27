@@ -29,24 +29,44 @@ on them is green. ~5 minutes/day max.
 
 1. **Cherry-pick or merge stabilization commits to `release/X.Y.Z`** if using a
    release-branch workflow. Skip this if cutting directly from develop.
-2. **Update `CHANGELOG.md`** with the release date (replace `=> TBD` for the
-   target version). `release.yml` will refuse to publish if it sees TBD on the
-   target version.
-3. **Verify `box.json` version** matches what you want to release. After the
-   last GA, the `bump-develop-version.yml` workflow set it to next-patch; if
-   you're shipping a bigger bump, update it manually.
+2. **Update `CHANGELOG.md`**: rename `# [Unreleased]` to
+   `# [X.Y.Z](...) => YYYY-MM-DD` with the real release date (replace any
+   `=> TBD`). Then confirm the separator line directly below the renamed
+   section is exactly `---` (three dashes), NOT `----`. `release.yml` refuses
+   to publish if it sees TBD on the target version, and also fails if a `----`
+   separator would make the release-notes awk bleed into the previous version's
+   notes (recurring footgun — see #2606, #2768; now guarded in `release.yml`).
+3. **Verify `wheels.json` version** matches what you want to release.
+   `wheels.json` is the canonical version source since the 4.0 rebrand (the
+   workflows read it; `box.json` is legacy and may be absent or empty). After
+   the last GA, the `bump-develop-version.yml` workflow set it to next-patch;
+   if you're shipping a bigger bump, update it manually.
 
 ### Release day
 
-```bash
-# 1. On main, fast-forward from the release branch.
-git checkout main
-git merge --ff-only release/X.Y.Z   # (or develop, if no release branch)
+`main` has a **"PRs only" ruleset** — `git push origin main` is rejected with
+`GH013`. You also never tag manually: `release.yml` auto-creates the tag via
+`softprops/action-gh-release` once the merge lands on main.
 
-# 2. Tag and push. release.yml fires automatically.
-git tag -a vX.Y.Z -m "Release X.Y.Z"
-git push origin main --tags
+```bash
+# 1. Open a PR into main from a release branch. (Cutting from develop directly
+#    is fine — just branch off develop so the PR has a head ref to merge.)
+git checkout develop && git pull
+git checkout -b release/X.Y.Z-to-main
+git push -u origin release/X.Y.Z-to-main
+gh pr create --base main --head release/X.Y.Z-to-main \
+  --title "Release X.Y.Z" --body "Cut X.Y.Z. See CHANGELOG."
+
+# 2. Merge with "Create a merge commit" (NOT squash — preserves develop
+#    history on main).
+gh pr merge --merge --delete-branch
 ```
+
+The push-to-main from that merge triggers `release.yml`, which builds the
+artifacts and calls `softprops/action-gh-release` with `tag_name: vX.Y.Z`,
+creating the tag at main HEAD automatically. Do **not** run `git tag` /
+`git push --tags` — the legacy `git push origin main --tags` flow is rejected
+by the ruleset anyway.
 
 The tag push triggers:
 - `release.yml` builds artifacts, publishes to `wheels-dev/wheels/releases`
@@ -149,7 +169,8 @@ If any pin to `<X.Y.Z`, open issues on those repos to widen the constraint.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `release.yml` fails: "CHANGELOG contains TBD" | Forgot to update changelog | Add release date to `# [X.Y.Z]` line, push, re-run workflow |
-| `release.yml` fails: "version contains -SNAPSHOT" | `box.json` has `-SNAPSHOT` suffix on main | Strip suffix, push (release.yml asserts clean main versions) |
+| `release.yml` fails: "release-notes range … bleeds into a later version section" | Separator below the target version is `----` (4 dashes), not `---` — the awk extraction overruns into the previous version | Change that separator line to exactly `---`, push, re-run |
+| `release.yml` fails: "version contains -SNAPSHOT" | `wheels.json` has a `-snapshot` suffix on main | Strip the suffix in `wheels.json`, push (release.yml asserts clean main versions) |
 | brew tap PR doesn't open after release | `DOWNSTREAM_DISPATCH_TOKEN` expired or unset | Rotate token in repo secrets; re-run `release.yml` workflow_dispatch |
 | develop-bump PR doesn't open after GA | `DOWNSTREAM_DISPATCH_TOKEN` expired/unset, OR the `bump-develop` dispatch step warned and exited 0 | Fire it manually: Actions → "Bump Develop Version" → "Run workflow" → enter the just-released version (e.g. `4.0.0`). The workflow has a `workflow_dispatch` fallback for exactly this case. |
 | `brew install wheels` post-release fails | Formula sha256 mismatch | Re-run the tap bump workflow with `workflow_dispatch` to recompute |

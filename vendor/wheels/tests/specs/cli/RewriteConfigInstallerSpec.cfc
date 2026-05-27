@@ -58,6 +58,12 @@ component extends="wheels.WheelsTest" {
 				directoryCreate(projectRoot);
 				try {
 					fileWrite(projectRoot & "/rewrite.config", "## user-customized rules");
+					// Baseline read AFTER write: Adobe CF 2025's fileWrite/fileRead
+					// round-trip appends a trailing newline, so compare the
+					// post-install content to this normalized baseline rather than
+					// to the literal write string. The intent is "install() left the
+					// file untouched", not "the engine round-trips bytes identically".
+					var before = fileRead(projectRoot & "/rewrite.config");
 
 					var result = installer.install(projectRoot=projectRoot, sourceTemplate=ctx.templatePath);
 
@@ -66,7 +72,7 @@ component extends="wheels.WheelsTest" {
 					);
 					var preserved = fileRead(projectRoot & "/rewrite.config");
 					expect(preserved).toBe(
-						"## user-customized rules",
+						before,
 						"Existing rewrite.config content must be preserved untouched"
 					);
 				} finally {

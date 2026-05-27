@@ -60,7 +60,16 @@ component extends="wheels.WheelsTest" {
 				var receiverLossMessage = "";
 
 				try {
-					adapter.invokeMethod(publicCfc, "index");
+					// index() renders the congratulations welcome page via
+					// cfinclude. Capture that output so it doesn't leak into the
+					// test-runner response buffer: on Adobe CF the leaked HTML
+					// commits the servlet response (HTTP 404 + ~1MB prefix),
+					// corrupting the JSON result for the ENTIRE suite. We only
+					// care that the dispatch invocation survives without a
+					// receiver-loss error, not what index() prints.
+					cfsavecontent(variable = "local.discardedIndexOutput") {
+						adapter.invokeMethod(publicCfc, "index");
+					}
 				} catch (any e) {
 					// index() doesn't call $blockInProduction so this should
 					// never throw a "Function [$...] not found" error. Any

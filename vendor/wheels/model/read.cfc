@@ -214,7 +214,9 @@ component {
 					list = arguments.select,
 					returnAs = arguments.returnAs
 				);
-				local.columns = ReReplace(local.columns, "[`""\[\]\w]*?\.([\w\s]*?)(,|$)", "\1\2", "all");
+				// Strip dialect quotes: $createSQLFieldList now quotes identifiers; the bare-identifier regex below requires unquoted input.
+				local.columns = variables.wheels.class.adapter.$stripIdentifierQuotes(local.columns);
+				local.columns = ReReplace(local.columns, "[\w]*?\.([\w\s]*?)(,|$)", "\1\2", "all");
 				local.columns = ReReplace(local.columns, "\(.*?\)\sAS\s([\w\s]*?)(,|$)", "\1\2", "all");
 				local.columns = ReReplace(local.columns, "\w*?\sAS\s([\w\s]*?)(,|$)", "\1\2", "all");
 				local.rv = QueryNew(local.columns);

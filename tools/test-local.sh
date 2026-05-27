@@ -6,8 +6,8 @@
 #     Wheels is built on the LuCLI runtime; we ship the runtime under the
 #     `wheels` brand. There is no separate `lucli` binary on a normal install.
 #   - Java 21+ installed
-#   - SQLite JDBC driver in ~/.wheels/express/*/lib/ext/ (auto-installed by recent
-#     Wheels CLI releases; older releases may use ~/.lucli/express/*/lib/ext/)
+#   - SQLite JDBC driver in ~/.wheels/express/*/lib/ext/ (auto-installed by
+#     recent Wheels CLI releases)
 #
 # Usage:
 #   bash tools/test-local.sh              # run all core tests
@@ -75,10 +75,11 @@ if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${POR
 else
   echo "Starting Wheels CLI server on port ${PORT}..."
 
-  # Ensure SQLite JDBC is installed. Recent Wheels CLI releases extract
-  # Lucee Express to ~/.wheels/express/; older releases used ~/.lucli/express/.
-  # Search both so this script keeps working through the rename.
-  LUCEE_LIB=$(find ~/.wheels/express ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
+  # Locate Lucee Express's lib/ext so we can drop the SQLite JDBC there.
+  # `|| true` keeps `set -e` from killing the script when the directory is
+  # missing — `find` exits non-zero on missing path args (stderr suppressed
+  # via 2>/dev/null but the exit status survives pipefail).
+  LUCEE_LIB=$(find ~/.wheels/express -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)
   if [ -n "$LUCEE_LIB" ] && ! ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
     echo "Downloading SQLite JDBC driver..."
     curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \

@@ -1,9 +1,15 @@
-# `yum-wheels-dev` bucket repo template
+# `yum-wheels` bucket repo template
 
-This directory is the **template** for the standalone `wheels-dev/yum-wheels-dev`
+This directory is the **template** for the standalone `wheels-dev/yum-wheels`
 repository that backs `https://yum.wheels.dev`. The bucket repo holds the
-static yum metadata tree plus the pooled `.rpm` artifacts, and is auto-deployed
-to Cloudflare Pages on every push.
+**workflow + scripts + landing page + .repo files + signing key**. The yum
+metadata (`<channel>/repodata/`) and `.rpm` pool (`<channel>/packages/`)
+live in **Cloudflare R2** (bucket `wheels-yum`) and are served via R2's
+custom-domain feature.
+
+> **Note on Pages vs R2:** The original Phase 2 design called for Cloudflare
+> Pages. Pages has a hard 25 MiB per-file limit; the `.rpm` is ~81 MB.
+> Architecture pivoted to R2 during initial rollout.
 
 Copy these files into the new repo when it's created — they are designed to
 work out of the box once the Phase 2 operational prerequisites (GPG key,
@@ -79,9 +85,12 @@ so `rpmvercmp` orders snapshot releases below the next GA correctly.
 Same GPG key as the apt repo (one key for both, importable on both clients
 via `https://apt.wheels.dev/wheels.gpg` or `https://yum.wheels.dev/wheels.gpg`).
 
-CI secrets on `https://github.com/wheels-dev/yum-wheels-dev/settings/secrets/actions`:
+R2 bucket: create `wheels-yum`, attach `yum.wheels.dev` as a custom domain.
+
+CI secrets on `https://github.com/wheels-dev/yum-wheels/settings/secrets/actions`:
 - `WHEELS_REPO_GPG_PRIVATE_KEY` — ASCII-armored private key
 - `WHEELS_REPO_GPG_PASSPHRASE` — passphrase
+- `CLOUDFLARE_API_TOKEN` — token with `Workers R2 Storage:Edit` on the account
 
 The upstream dispatch token (`LINUX_REPO_DISPATCH_TOKEN` on
 `wheels-dev/wheels`) must have `actions: write` on this repo.

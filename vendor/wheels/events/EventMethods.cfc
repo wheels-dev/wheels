@@ -174,6 +174,37 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			request.$wheelsHeaders = GetHTTPRequestData().headers;
 		}
 
+		// Soft-reload of app/global/*.cfm when bare ?reload=true is hit in dev
+		// and any tracked include has a newer mtime. The password-gated
+		// applicationStop() path already does a full re-init, so we skip the
+		// check when url.password is present (issue 2792).
+		//
+		// The environment guard is intentional: this soft-reload is a
+		// development-only convenience. Use the password-gated reload for
+		// non-dev environments — setting reloadOnGlobalChange=true outside
+		// development is a deliberate no-op.
+		if (
+			StructKeyExists(url, "reload")
+			&& !StructKeyExists(url, "password")
+			&& StructKeyExists(application.wheels, "reloadOnGlobalChange")
+			&& application.wheels.reloadOnGlobalChange
+			&& application.wheels.environment == "development"
+			&& StructKeyExists(application.wheels, "globalIncludesSnapshot")
+			&& application.wo.$globalIncludesChanged(snapshot = application.wheels.globalIncludesSnapshot)
+		) {
+			// Double-checked locking — two concurrent ?reload=true hits would
+			// otherwise both pass the outer check and race on $reincludeGlobals
+			// against the same application.wo instance. Lock name is
+			// per-application so shared Adobe CF servers running multiple
+			// apps don't serialize on a single global lock.
+			lock type="exclusive" name="wheels_reload_globals_#application.applicationName#" timeout="5" {
+				if (application.wo.$globalIncludesChanged(snapshot = application.wheels.globalIncludesSnapshot)) {
+					application.wo.$reincludeGlobals();
+					application.wheels.globalIncludesSnapshot = application.wo.$snapshotGlobalIncludes();
+				}
+			}
+		}
+
 		// Reload the plugins on each request if cachePlugins is set to false.
 		if (!application.wheels.cachePlugins) {
 			$loadPlugins();

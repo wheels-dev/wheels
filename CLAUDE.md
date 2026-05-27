@@ -221,6 +221,25 @@ Any validator, analyzer, scanner, or upgrade-check that does substring-matching 
 - `cli/lucli/Module.cfc::stripCfmlComments()`
 - `cli/lucli/services/Doctor.cfc::$stripCfmlBlockComments()`
 
+### 15. Migrator helpers accept singular AND plural column names — prefer the plural
+**Source:** [#2781](https://github.com/wheels-dev/wheels/issues/2781) (`t.references()`) + [#2803](https://github.com/wheels-dev/wheels/issues/2803) (`t.primaryKey()`) — these two helpers were the last outliers in `TableDefinition.cfc`. Every sibling helper accepted `columnNames` / `columnName` via `$combineArguments`, but `references` required `referenceNames` and `primaryKey` required `name`. AI agents and humans both kept reaching for the consistent form and hitting "argument required" errors. Now resolved: both accept `columnNames` as an alias, and that's the preferred form going forward.
+
+```cfm
+// RIGHT — modern, matches every other column helper
+t.string(columnNames="name");
+t.integer(columnNames="age");
+t.references(columnNames="user");
+t.primaryKey(columnNames="userId", autoIncrement=true);
+
+// LEGACY — still works, but the new code path uses columnNames
+t.references(referenceNames="user");
+t.primaryKey(name="userId", autoIncrement=true);
+```
+
+For new migrator helpers or anywhere you accept a column-name argument: declare `string columnNames` (NOT `required`), and call `$combineArguments(args=arguments, combine="columnNames,columnName", required=true)` at the top of the body. The pattern is documented in [vendor/wheels/migrator/CLAUDE.md](vendor/wheels/migrator/CLAUDE.md). Boolean nullable flag is `allowNull` everywhere — never `null`.
+
+`t.references()` also respects `useUnderscoreReferenceColumns` (boolean, framework default `false`, `wheels new` template default `true`) — when true it produces `<name>_id` / `<name>_type` columns matching Wheels model `belongsTo` defaults.
+
 ## Wheels Conventions
 
 - **config()**: All model associations/validations/callbacks and controller filters/verifies go in `config()`.
@@ -540,6 +559,20 @@ Specs extend `wheels.wheelstest.BrowserTest`. Install Playwright once: `wheels b
 
 ## Migrations & Seeding
 
+### Shared Dev DB Reconciliation
+
+`wheels_migrator_versions` can drift from on-disk files when several developers share a single dev database (peer applied a migration whose file isn't yet in your branch). Detected and surfaced automatically; reconciliation is explicit:
+
+- `wheels migrate latest` — when a peer's tracked version sits above your latest local file, it now applies pending local migrations with a warning instead of silently no-op'ing on a "down" branch.
+- `wheels migrate info` — orphan rows render as `[?] <version> <name> (applied <timestamp>)` when the enriched `wheels_migrator_versions.name` / `.applied_at` columns are populated, or `[?] <version> ********** NO FILE **********` (Rails-style) for legacy rows.
+- `wheels migrate doctor` — single-command health report. Lists orphans + pending; pure read.
+- `wheels migrate forget <version> --yes` — delete a stale tracking row (refuses if a matching local file exists, refuses if version not in table).
+- `wheels migrate pretend <version> --yes` — record a version as applied without running `up()` (refuses if already applied or no matching file).
+
+Tracking-table schema: `wheels_migrator_versions(version, core_level, name, applied_at)`. The `name` and `applied_at` columns are additive (NULL for legacy rows) and added automatically via `$ensureTrackingColumns()` on first migrator call after upgrade. Both columns are populated by `$setVersionAsMigrated(version, migrationName)` going forward; existing rows stay NULL and display version-only.
+
+Both `forget` and `pretend` are dry-run by default; `--yes` is required to mutate. Helpers live on `Migrator.cfc`: `$getOrphanVersions()`, `$getOrphanVersionsWithMeta()`, `doctor()`, `forgetVersion()`, `pretendVersion()`, `$buildInfoOutput()`, `$ensureTrackingColumns()`. Deep reference: [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md). User-facing guide: `web/sites/guides/src/content/docs/v4-0-0/basics/shared-development-databases.mdx`. Shipped across #2798, #2799, and the schema enrichment PR.
+
 ### Auto-Migration
 
 Generate migrations from model/DB schema diffs. Rename detection via explicit hints (authoritative) + heuristic suggestions (normalized-token + Levenshtein).
@@ -688,7 +721,8 @@ Prefer MCP tools when the Wheels MCP server is available. Fall back to CLI other
 | Task | MCP | CLI |
 |------|-----|-----|
 | Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
-| Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels migrate latest\|up\|down\|info` |
+| Migrate | `wheels_migrate(action="latest\|up\|down\|info\|doctor")` | `wheels migrate latest\|up\|down\|info\|doctor` |
+| Migrator reconciliation | — | `wheels migrate forget\|pretend <version> --yes` (shared dev DB orphan cleanup; see #2780) |
 | Test | `wheels_test()` | `wheels test run` |
 | Reload | `wheels_reload()` | `?reload=true&password=...` |
 | Server | `wheels_server(action="status")` | `wheels start\|stop\|status` |
@@ -711,6 +745,7 @@ Search `.ai/` for deeper documentation:
 - [.ai/wheels/channels/channels.md](.ai/wheels/channels/channels.md)
 - [.ai/wheels/snippets/model-snippets.md](.ai/wheels/snippets/model-snippets.md), [controller-snippets.md](.ai/wheels/snippets/controller-snippets.md)
 - [.ai/wheels/troubleshooting/common-errors.md](.ai/wheels/troubleshooting/common-errors.md), [form-helper-errors.md](.ai/wheels/troubleshooting/form-helper-errors.md)
+- [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md) — Orphan-version handling + `migrate doctor` / `forget` / `pretend` reconciliation commands (#2780)
 - [.ai/cfml/](.ai/cfml/) — CFML language reference (syntax, components, control flow)
 
 **External:** user-facing guides at `web/sites/guides/src/content/docs/v4-0-0/` (deployment, command-line-tools/mcp-integration, etc.) — these ship to guides.wheels.dev. Use when you need the version Wheels users read.

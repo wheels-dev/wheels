@@ -165,48 +165,46 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
 
 <TabItem label="Linux" icon="linux">
 
-Wheels ships `.deb` and `.rpm` packages for x86_64 hosts. A native apt/yum repository at `apt.wheels.dev` / `yum.wheels.dev` is on the v4.0.x roadmap — until then, install the package directly from a GitHub Release. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
+Wheels publishes signed native apt and yum repositories at **[https://apt.wheels.dev](https://apt.wheels.dev)** and **[https://yum.wheels.dev](https://yum.wheels.dev)**. Add the source once, then `apt upgrade wheels` / `dnf upgrade wheels` picks up new versions automatically. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
 
-<Aside type="caution" title="Trust model during Phase 1">
-During Phase 1 (before `apt.wheels.dev` / `yum.wheels.dev` are live), download integrity relies on GitHub's HTTPS transport — the `.deb`/`.rpm` artifacts ship without detached GPG signatures, so there's nothing for `apt-key` / `rpm --checksig` to verify against. Phase 2 adds GPG-signed apt/yum repositories. For now, `wheels-dev/wheels/releases` is the trust root.
+<Aside type="note" title="GPG signing">
+The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`). `apt`/`dnf` verify the signature on every update, so a network-level attacker can't substitute the package contents. The public half is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` — both files are byte-identical. The sources.list / `.repo` snippets below wire the signature check in automatically.
 </Aside>
 
 <Steps>
 
-1. Download and install the latest Wheels release:
+1. Add the Wheels apt/yum source:
 
    ```bash title="Debian / Ubuntu — stable"
-   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-   curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
-   sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+   curl -fsSL https://apt.wheels.dev/wheels.gpg \
+     | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+   echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
+     | sudo tee /etc/apt/sources.list.d/wheels.list
+   sudo apt update && sudo apt install wheels
    ```
 
    ```bash title="Fedora / RHEL — stable"
-   WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-   sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+   sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels.repo
+   sudo dnf install wheels
    ```
 
    <Aside type="note" title="Want bleeding-edge?">
-   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`, in the [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) repo. Because every release there is a GitHub *pre-release*, `api.github.com/.../releases/latest` returns nothing — use `/releases` and pick the first entry. Snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`); the on-disk asset filename uses a dot in the same slot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. Self-contained snippets:
+   The bleeding-edge channel publishes a fresh `.deb`/`.rpm` on every merge to `develop`. It's served from the same apt.wheels.dev / yum.wheels.dev hosts but under a separate `bleeding-edge` distribution name, with a distinct package name (`wheels-be`) so it can coexist with the stable `wheels` install on the same host:
 
    ```bash title="Debian / Ubuntu — bleeding-edge"
-   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
-   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-   curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
-   sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+   curl -fsSL https://apt.wheels.dev/wheels.gpg \
+     | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+   echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
+     | sudo tee /etc/apt/sources.list.d/wheels-be.list
+   sudo apt update && sudo apt install wheels-be
    ```
 
    ```bash title="Fedora / RHEL — bleeding-edge"
-   SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-     | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p' | head -1)
-   SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-   sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+   sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels-be.repo
+   sudo dnf install wheels-be
    ```
 
-   The metadata inside the package keeps the canonical `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-1-snapshot/start-here/release-channels/).
+   Snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`) and the package's internal version preserves the `~snapshot.N` form so `apt`/`dnf` order the version correctly relative to GA. See [Release Channels](/v4-0-1-snapshot/start-here/release-channels/).
    </Aside>
 
 2. Verify:
@@ -254,22 +252,15 @@ scoop update wheels-be
 
 <TabItem label="Linux" icon="linux">
 
-Re-run the install command for your distro — `apt`/`dnf` upgrades the package in place when it sees a newer version:
+Once the apt or yum source from the install step is in place, upgrades are a single command — `apt`/`dnf` watches the repo and pulls the latest signed package on every refresh:
 
 ```bash title="Debian / Ubuntu"
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
-sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt update && sudo apt upgrade wheels        # or `wheels-be` for bleeding-edge
 ```
 
 ```bash title="Fedora / RHEL"
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | sed -nE 's/.*"tag_name": *"v([^"]+)".*/\1/p')
-sudo dnf upgrade "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+sudo dnf upgrade wheels                            # or `wheels-be` for bleeding-edge
 ```
-
-For the bleeding-edge channel, run the install snippet from the [bleeding-edge Aside](#install-the-cli) — it points at `wheels-dev/wheels-snapshots` and `apt`/`dnf` will treat each new snapshot as an upgrade.
 
 The first `wheels` invocation after upgrade syncs the new framework module into `~/.wheels/modules/wheels/` automatically.
 

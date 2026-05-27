@@ -49,68 +49,59 @@ The first time you invoke `wheels`, the wrapper:
 
 On upgrades (`brew upgrade wheels`), the staged module version bumps; the next `wheels` invocation notices the mismatch and refreshes `~/.wheels/modules/wheels/` in place.
 
-## Linux (`.deb` / `.rpm`)
+## Linux (apt / yum)
 
-Wheels ships native packages for x86_64 Debian/Ubuntu (`.deb`) and Fedora/RHEL (`.rpm`) hosts on every release. Both are built by `nfpm` on the release workflow and uploaded to the GitHub Release alongside the zip/tar artifacts. The package declares an OpenJDK 21 runtime dependency so `apt`/`dnf` pulls a JDK in automatically when needed.
+Wheels publishes signed native `apt` and `yum` repositories at **[https://apt.wheels.dev](https://apt.wheels.dev)** and **[https://yum.wheels.dev](https://yum.wheels.dev)**. The packages are built by `nfpm` on the release workflow, signed with the Wheels Distribution GPG key, and served from a Cloudflare R2 bucket per format. Add the source once; `apt`/`dnf` watches the repo and upgrades automatically.
 
-Install the latest stable release:
-
-```bash title="illustrative — Debian / Ubuntu"
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | jq -r '.tag_name | sub("^v"; "")')
-if [ -z "$WHEELS_VERSION" ] || [ "$WHEELS_VERSION" = "null" ]; then
-  echo "Error: could not resolve release tag. Check your network, GitHub API rate limit, or set WHEELS_VERSION manually." >&2
-  exit 1
-fi
-curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
-sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+```bash title="Debian / Ubuntu — stable"
+curl -fsSL https://apt.wheels.dev/wheels.gpg \
+  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
+  | sudo tee /etc/apt/sources.list.d/wheels.list
+sudo apt update && sudo apt install wheels
 ```
 
-```bash title="illustrative — Fedora / RHEL"
-WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
-  | jq -r '.tag_name | sub("^v"; "")')
-if [ -z "$WHEELS_VERSION" ] || [ "$WHEELS_VERSION" = "null" ]; then
-  echo "Error: could not resolve release tag. Check your network, GitHub API rate limit, or set WHEELS_VERSION manually." >&2
-  exit 1
-fi
-sudo dnf install "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels-${WHEELS_VERSION}.x86_64.rpm"
+```bash title="Fedora / RHEL — stable"
+sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels.repo
+sudo dnf install wheels
 ```
 
 The package lays down `/usr/bin/wheels` (a shell wrapper), `/opt/wheels/wheels` (the LuCLI launcher, renamed at stage time so `basename(argv[0])` is `wheels` and module dispatch routes correctly), `/opt/wheels/module/` (the staged Wheels Module), `/opt/wheels/.version` and `/opt/wheels/.channel` (read by the wrapper for `wheels --version`), and `/opt/wheels/sqlite-jdbc.jar` (auto-staged into Lucee Express on first run). The wrapper mirrors the Homebrew flow: probes `/usr/lib/jvm/` for OpenJDK 21, exports `LUCLI_HOME=$HOME/.wheels`, syncs the staged module into `~/.wheels/modules/wheels/` on first run or version mismatch, then execs LuCLI.
 
-The bleeding-edge channel publishes `.deb`/`.rpm` to [`wheels-dev/wheels-snapshots`](https://github.com/wheels-dev/wheels-snapshots/releases) on every merge to `develop`. Every release there is a GitHub *pre-release*, so `api.github.com/.../releases/latest` returns nothing — use `/releases` and take the first entry. The asset filename also differs: snapshot tags use a SemVer hyphen (`v4.0.0-snapshot.1825`) but the on-disk asset name uses a dot (`wheels_4.0.0.snapshot.1825_amd64.deb`) because GitHub Releases rewrites the package's internal `~snapshot.N` form to `.` at upload time. The substitution converts the tag's hyphen-form to the URL's dot-form:
+The bleeding-edge channel publishes a new package on every merge to `develop`, with a distinct package name (`wheels-be`) so it can coexist with stable on the same host:
 
-```bash title="illustrative — Debian / Ubuntu (bleeding-edge)"
-SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | jq -r '.[0].tag_name | sub("^v"; "")')
-if [ -z "$SNAP_TAG" ] || [ "$SNAP_TAG" = "null" ]; then
-  echo "Error: could not resolve snapshot tag. Check your network, GitHub API rate limit, or set SNAP_TAG manually." >&2
-  exit 1
-fi
-SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-curl -fsSLO "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels_${SNAP_FILENAME_VER}_amd64.deb"
-sudo apt install "./wheels_${SNAP_FILENAME_VER}_amd64.deb"
+```bash title="Debian / Ubuntu — bleeding-edge"
+curl -fsSL https://apt.wheels.dev/wheels.gpg \
+  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
+  | sudo tee /etc/apt/sources.list.d/wheels-be.list
+sudo apt update && sudo apt install wheels-be
 ```
 
-```bash title="illustrative — Fedora / RHEL (bleeding-edge)"
-SNAP_TAG=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels-snapshots/releases \
-  | jq -r '.[0].tag_name | sub("^v"; "")')
-if [ -z "$SNAP_TAG" ] || [ "$SNAP_TAG" = "null" ]; then
-  echo "Error: could not resolve snapshot tag. Check your network, GitHub API rate limit, or set SNAP_TAG manually." >&2
-  exit 1
-fi
-SNAP_FILENAME_VER="${SNAP_TAG//-/.}"
-sudo dnf install "https://github.com/wheels-dev/wheels-snapshots/releases/download/v${SNAP_TAG}/wheels-${SNAP_FILENAME_VER}.x86_64.rpm"
+```bash title="Fedora / RHEL — bleeding-edge"
+sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels-be.repo
+sudo dnf install wheels-be
 ```
 
-The version metadata *inside* the `.deb`/`.rpm` preserves the canonical `~snapshot.N` form, so `dpkg --compare-versions` and `rpmvercmp` order pre-releases below the next GA correctly.
+Each `.deb`/`.rpm` carries its full SemVer version internally (e.g. `4.0.1~snapshot.1700` for snapshots), so `dpkg --compare-versions` and `rpmvercmp` correctly order pre-releases below the next GA. (GitHub Releases rewrites `~` to `.` in uploaded asset filenames, but the URLs you actually fetch from the apt/yum repos already use the canonical `~`-form.)
 
-<Aside type="note" title="Native apt/yum repositories">
-The download-and-install flow above is the v4.0 GA story. Native `apt`/`yum` repositories at `apt.wheels.dev` and `yum.wheels.dev` are on the v4.0.x roadmap — once they're live, you'll be able to add a sources list once and `sudo apt install wheels` / `sudo dnf install wheels` will pull new versions automatically via `apt update`. The package format on disk doesn't change.
+<Aside type="note" title="GPG signing">
+Both repositories are signed with the Wheels Distribution key — fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`. The public key is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` (byte-identical files). `apt update` verifies the `InRelease` / `Release.gpg` signature on every refresh; `dnf` verifies `repomd.xml.asc` and each per-package signature. The sources.list / `.repo` snippets above wire all of that in automatically.
+
+For users who want to verify the fingerprint out-of-band before trusting the key, the same fingerprint is committed to [https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT) and [https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT).
 </Aside>
 
-<Aside type="caution" title="Trust model during Phase 1">
-Until the native repos are live, download integrity relies on GitHub's HTTPS transport — the `.deb`/`.rpm` artifacts ship without detached GPG signatures, so neither `apt-key` nor `rpm --checksig` has anything to verify against. Phase 2 introduces a GPG-signed apt/yum repository (the signing key will live in 1Password and be published at `apt.wheels.dev/wheels.gpg`), which will add cryptographic provenance on top of TLS. For now, treat `wheels-dev/wheels/releases` as the trust root.
+<Aside type="tip" title="Need a one-off download?">
+The raw `.deb`/`.rpm` are still uploaded to each GitHub Release as asset attachments — useful if you need to install on a host that can't reach `apt.wheels.dev` (air-gapped CI runners, etc.). Snippet:
+
+```bash
+WHEELS_VERSION=$(curl -fsSL https://api.github.com/repos/wheels-dev/wheels/releases/latest \
+  | jq -r '.tag_name | sub("^v"; "")')
+curl -fsSLO "https://github.com/wheels-dev/wheels/releases/download/v${WHEELS_VERSION}/wheels_${WHEELS_VERSION}_amd64.deb"
+sudo apt install "./wheels_${WHEELS_VERSION}_amd64.deb"
+```
+
+The asset-attached `.deb`/`.rpm` ships without a detached GPG signature (only the apt/yum repo metadata is signed), so the trust root for direct downloads is GitHub's HTTPS transport.
 </Aside>
 
 ## Windows (Scoop)

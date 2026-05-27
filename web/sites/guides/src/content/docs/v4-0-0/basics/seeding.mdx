@@ -23,7 +23,7 @@ Seeds are the records your app can't live without — system roles, feature flag
 
 ## Why seeds — and not migrations
 
-Seeds are idempotent. You can run them on a brand-new database, on a database that already has most of the records, or on one that has all of them — the outcome is the same and nothing breaks. Migrations are the opposite: each one runs exactly once per database, carries the schema forward, and lands a permanent row in `schema_migrations`. Edit a migration that's already been applied in production and the edit never runs.
+Seeds are idempotent. You can run them on a brand-new database, on a database that already has most of the records, or on one that has all of them — the outcome is the same and nothing breaks. Migrations are the opposite: each one runs exactly once per database, carries the schema forward, and lands a permanent row in `wheels_migrator_versions`. Edit a migration that's already been applied in production and the edit never runs.
 
 Mix those responsibilities and you get drift. A row inserted by a migration on Tuesday can't be updated by re-running the migration on Thursday; you need a second migration for that. A row inserted by `seedOnce()` in `seeds.cfm` can be changed by editing the seed file and re-running — or left alone if it's already there. Production data that should exist on every deployment (system roles, feature flags, tenant defaults, lookup tables) belongs in seeds. Schema changes belong in migrations.
 

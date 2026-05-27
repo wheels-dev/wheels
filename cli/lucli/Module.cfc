@@ -347,6 +347,17 @@ component extends="modules.BaseModule" {
 					out("Migration failed: #e.message#", "red");
 					return "";
 				}
+			case "doctor":
+				try {
+					return runMigration("doctor");
+				} catch (MigrationError e) {
+					out("Doctor failed: #e.message#", "red");
+					return "";
+				}
+			case "forget":
+				return runForgetOrPretend("forgetVersion", args);
+			case "pretend":
+				return runForgetOrPretend("pretendVersion", args);
 			case "rename-system-tables":
 				// F15 Phase 2: opt-in one-shot rename of legacy c_o_r_e_*
 				// system tables to wheels_*. Idempotent (no-op when nothing
@@ -363,7 +374,7 @@ component extends="modules.BaseModule" {
 				}
 			default:
 				out("Unknown migration action: #action#", "red");
-				out("Usage: wheels migrate [latest|up|down|info|rename-system-tables]");
+				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]");
 				return "";
 		}
 	}
@@ -2089,6 +2100,20 @@ component extends="modules.BaseModule" {
 				opts.name = positional[2];
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.show(opts);
+			case "install":
+				// LuCLI's built-in extension installer intercepts the
+				// literal verb `install` on the user-facing CLI surface
+				// — same trap that bit `wheels browser install` (renamed
+				// to `wheels browser setup` in #2345). But every other
+				// caller path reaches this dispatch directly: the
+				// stdio MCP server (`wheels mcp wheels`), scripted
+				// in-process clients, and the bundle's own spec suite.
+				// `PackagesMainCli.install()` has been a transparent
+				// alias for `add()` since #2729, so the dispatch layer
+				// must match — otherwise `install <name>` silently
+				// no-ops on the only paths LuCLI does NOT intercept.
+				// Fall through to the `add` branch (same validation,
+				// same error shape, same install behavior).
 			case "add":
 				if (arrayLen(positional) < 2) {
 					throw(message="add requires a name: wheels packages add <name>[@<version>]");
@@ -2096,20 +2121,6 @@ component extends="modules.BaseModule" {
 				opts.target = positional[2];
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
 				return mainCli.add(opts);
-			case "install":
-				// Dead code on the CLI surface: LuCLI's built-in extension
-				// installer intercepts the literal verb `install` across
-				// all modules before dispatch reaches Module.cfc — the
-				// same trap that bit `wheels browser install` (renamed
-				// to `wheels browser setup` in #2345). Kept as a
-				// documentation marker for future maintainers; if LuCLI
-				// ever stops intercepting, this case keeps a friendly
-				// redirect for users still typing the historic verb.
-				out("'wheels packages install' is intercepted by LuCLI's", "yellow");
-				out("built-in extension installer and won't reach this module.", "yellow");
-				out("Use:", "yellow");
-				out("  wheels packages add " & (arrayLen(positional) >= 2 ? positional[2] : "<name>"), "bold");
-				return "";
 			case "update":
 				opts.target = arrayLen(positional) >= 2 ? positional[2] : "";
 				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
@@ -3336,6 +3347,7 @@ component extends="modules.BaseModule" {
 			case "up":     command = "migrateUp"; break;
 			case "down":   command = "migrateDown"; break;
 			case "info":   command = "info"; break;
+			case "doctor": command = "doctor"; break;
 		}
 
 		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
@@ -3355,12 +3367,88 @@ component extends="modules.BaseModule" {
 		// the previous code silently treated it as success. See issue #2315.
 		var result = parseCliResponse(httpResult, "Migration #action#");
 
-		if (structKeyExists(result, "message") && len(result.message)) {
-			out(result.message, "green");
-		} else {
-			out("Migration #action# completed.", "green");
+		// For `doctor`, switch the output color to yellow when the report
+		// signals unhealthy state (orphans or pending migrations). Green
+		// on an unhealthy result reads as "everything's fine" when it
+		// isn't. Other actions stay green on success.
+		var color = "green";
+		if (arguments.action == "doctor" && structKeyExists(result, "healthy") && !result.healthy) {
+			color = "yellow";
 		}
 
+		if (structKeyExists(result, "message") && len(result.message)) {
+			out(result.message, color);
+		} else {
+			out("Migration #action# completed.", color);
+		}
+
+		return "";
+	}
+
+	private string function runForgetOrPretend(required string command, required array args) {
+		// `forget` and `pretend` require an explicit <version> arg plus
+		// `--yes` to confirm. Default behavior is to print what would
+		// happen and refuse without the flag. See issue #2780.
+		var version = "";
+		var yes = false;
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			var a = arguments.args[i];
+			if (a == "--yes" || a == "-y") {
+				yes = true;
+			} else if (!a.startsWith("--")) {
+				version = a;
+			}
+		}
+
+		var verb = arguments.command == "forgetVersion" ? "forget" : "pretend";
+
+		if (!Len(version)) {
+			out("Missing required argument: <version>", "red");
+			out("Usage:");
+			out("  wheels migrate #verb# <version> --yes");
+			return "";
+		}
+
+		if (!yes) {
+			out("This will modify wheels_migrator_versions.", "yellow");
+			out("Re-run with --yes to confirm:", "yellow");
+			out("  wheels migrate #verb# #version# --yes");
+			return "";
+		}
+
+		var serverPort = $requireRunningServer([
+			"Migration reconciliation requires a running server.",
+			"Start one with: wheels start"
+		]);
+
+		out("Running #verb# for version #version#...", "cyan");
+
+		// URL-encode version: $sanitiseVersion() on the server side strips
+		// non-digits before SQL use (no injection path), but raw URL-special
+		// characters (&, =, %) in the CLI argument could still inject
+		// spurious query parameters before reaching that point.
+		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
+
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest(reconcileUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "MigrationError",
+				message = "#verb# failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response"};
+		var success = parsed.success ?: false;
+		var msg = parsed.message ?: "";
+
+		if (success) {
+			out(msg, "green");
+		} else {
+			out(msg, "red");
+		}
 		return "";
 	}
 
@@ -3651,14 +3739,18 @@ component extends="modules.BaseModule" {
 		// Compare major versions
 		var currentMajor = val(listFirst(currentVersion, "."));
 		var targetMajor = val(listFirst(target, "."));
+		var sameMajor = (currentMajor == targetMajor);
 
-		if (currentMajor == targetMajor) {
+		if (sameMajor) {
 			out("Same major version — no known breaking changes.", "green");
-			out("Upgrade with: brew upgrade wheels");
-			return "";
+			out("Scanning for opt-in recommendations...", "green");
+			out("");
 		}
 
-		// Breaking changes database
+		// Check database. Each entry may set `severity` to either "breaking"
+		// (the default — flagged in red, gated by major-version-bump scenarios)
+		// or "advisory" (cyan, runs regardless of version-jump — for opt-in
+		// convention changes the user can adopt at their convenience).
 		var checks = [];
 
 		// 2.x -> 3.x
@@ -3723,6 +3815,7 @@ component extends="modules.BaseModule" {
 			// reminder to re-verify, not a false positive.
 			arrayAppend(checks, {
 				description: "RateLimiter middleware — defaults changed in 4.0 (advisory: review config)",
+				severity: "advisory",
 				pattern: "new\s+wheels\.middleware\.RateLimiter",
 				checkType: "grep",
 				scanDir: "config",
@@ -3802,22 +3895,95 @@ component extends="modules.BaseModule" {
 			});
 		}
 
-		// Run checks
+		// ─── Advisory entries — run regardless of version-jump ──────────
+		// These are opt-in convention recommendations, not breaking changes.
+		// They appear in the "Recommended Improvements" section of the
+		// scanner output and never fail CI (exit code 0).
+
+		// Suggest opt-in to <name>_id reference columns when t.references()
+		// is used and the underscore flag is not yet set. The flag flips
+		// the suffix produced by t.references() from `<x>id` to `<x>_id`,
+		// matching Wheels model `belongsTo` defaults. See #2781 + #2802.
+		//
+		// Pre-check the flag across all of config/ before appending — the
+		// check-struct schema doesn't support multi-condition AND logic, so
+		// emitting the advisory unconditionally would fire on every app that
+		// has already opted in (where advisory #2 is the relevant one) and
+		// contradict reality. Walk config/ recursively to match advisory #2's
+		// `scanDir: "config"` scope — users may set the flag in an
+		// environment override file (e.g. config/production/settings.cfm) and
+		// reading only config/settings.cfm would miss it (#2808). Comment-
+		// strip each file first so a commented-out
+		// `// set(useUnderscoreReferenceColumns=true);` doesn't satisfy the
+		// guard (Anti-Pattern #14 — same shape as line 970).
+		var underscoreFlagAlreadySet = false;
+		var configDir = variables.projectRoot & "/config";
+		if (directoryExists(configDir)) {
+			var configFiles = [];
+			for (var ext in ["cfm", "cfc"]) {
+				var found = directoryList(configDir, true, "path", "*." & ext);
+				for (var f in found) arrayAppend(configFiles, f);
+			}
+			for (var configFile in configFiles) {
+				// `reFindNoCase()` returns the 1-based match position (0 = no
+				// match). DO NOT wrap with `len()` — len() coerces the int to
+				// a string and measures digit count, so len(0)=1 and len(25)=2
+				// are both truthy. Use `> 0` for an unambiguous boolean.
+				if (reFindNoCase(
+					"useUnderscoreReferenceColumns\s*=\s*true",
+					stripCfmlComments(fileRead(configFile))
+				) > 0) {
+					underscoreFlagAlreadySet = true;
+					break;
+				}
+			}
+		}
+		if (!underscoreFlagAlreadySet) {
+			arrayAppend(checks, {
+				description: "t.references() produces legacy `<name>id` columns (opt in to `<name>_id` for `belongsTo` defaults)",
+				severity: "advisory",
+				pattern: "t\.references\s*\(",
+				checkType: "grep",
+				scanDir: "app/migrator/migrations",
+				extensions: "cfc",
+				fix: "Opt into <name>_id naming via `set(useUnderscoreReferenceColumns=true)` in config/settings.cfm. Existing applied migrations are unaffected — only NEW migrations get the new suffix. Apps generated by `wheels new` already opt in by default. See ##2781."
+			});
+		}
+
+		// Mixed-convention warning: fires when the flag is set, alerting
+		// users that legacy migrations (pre-flag) may have left `<x>id`
+		// columns in the DB while new migrations will produce `<x>_id`.
+		// Informational — the user reads it once and decides if a data
+		// migration is needed.
+		arrayAppend(checks, {
+			description: "useUnderscoreReferenceColumns=true is set — confirm legacy migrations don't conflict",
+			severity: "advisory",
+			pattern: "useUnderscoreReferenceColumns\s*=\s*true",
+			checkType: "grep",
+			scanDir: "config",
+			extensions: "cfm,cfc",
+			fix: "If migrations under app/migrator/migrations/ were applied before this flag was set, the database still has `<name>id` columns. New migrations will create `<name>_id`. For full consistency, write a data migration to rename old reference columns."
+		});
+
+		// Run checks. Matched checks land in `issues` (severity=breaking) or
+		// `advisories` (severity=advisory); unmatched land in `passed`.
 		var issues = [];
+		var advisories = [];
 		var passed = [];
 
 		for (var check in checks) {
+			var severity = structKeyExists(check, "severity") ? check.severity : "breaking";
+			var matched = false;
+			var matchEntry = {};
+
 			if (check.checkType == "directory") {
 				var dirPath = variables.projectRoot & "/" & check.path;
 				if (directoryExists(dirPath)) {
 					var contents = directoryList(dirPath, false, "name");
 					if (arrayLen(contents)) {
-						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [check.path & "/"]});
-					} else {
-						arrayAppend(passed, check.description);
+						matched = true;
+						matchEntry = {description: check.description, fix: check.fix, matches: [check.path & "/"]};
 					}
-				} else {
-					arrayAppend(passed, check.description);
 				}
 			} else if (check.checkType == "grep") {
 				// Build the file set to scan. Checks may use `scanDir` +
@@ -3862,7 +4028,13 @@ component extends="modules.BaseModule" {
 
 				var matches = [];
 				for (var filePath in filesToScan) {
-					var content = fileRead(filePath);
+					// Strip CFML comments before grepping (Anti-Pattern #14):
+					// a commented-out `// t.references(...)` or
+					// `/* set(...) */` must not satisfy the pattern. Multi-line
+					// block comments collapse and may shift reported line
+					// numbers — same tradeoff `stripCfmlComments` callers at
+					// lines 970 and 5532 already accept.
+					var content = stripCfmlComments(fileRead(filePath));
 					var lines = listToArray(content, chr(10), true);
 					for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
 						if (reFindNoCase(check.pattern, lines[lineNum])) {
@@ -3879,25 +4051,35 @@ component extends="modules.BaseModule" {
 				// treat as pass to avoid noisy false positives.
 				var isAbsent = structKeyExists(check, "absent") && check.absent;
 				if (isAbsent) {
-					if (!arrayLen(filesToScan) || arrayLen(matches)) {
-						arrayAppend(passed, check.description);
-					} else {
+					if (arrayLen(filesToScan) && !arrayLen(matches)) {
+						matched = true;
 						var hint = structKeyExists(check, "scanDir") && len(check.scanDir)
 							? check.scanDir & "/ (no occurrences found)"
 							: "(no occurrences found)";
-						arrayAppend(issues, {description: check.description, fix: check.fix, matches: [hint]});
+						matchEntry = {description: check.description, fix: check.fix, matches: [hint]};
 					}
 				} else {
 					if (arrayLen(matches)) {
-						arrayAppend(issues, {description: check.description, fix: check.fix, matches: matches});
-					} else {
-						arrayAppend(passed, check.description);
+						matched = true;
+						matchEntry = {description: check.description, fix: check.fix, matches: matches};
 					}
 				}
 			}
+
+			// Bucket the result by severity. Advisories surface as opt-in
+			// recommendations alongside (but distinct from) breaking changes.
+			if (matched) {
+				if (severity == "advisory") {
+					arrayAppend(advisories, matchEntry);
+				} else {
+					arrayAppend(issues, matchEntry);
+				}
+			} else {
+				arrayAppend(passed, check.description);
+			}
 		}
 
-		// Output
+		// Output — three sections in priority order: Breaking → Recommended → All Clear
 		if (arrayLen(issues)) {
 			out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
 			for (var issue in issues) {
@@ -3906,6 +4088,22 @@ component extends="modules.BaseModule" {
 					out("    #match#");
 				}
 				out("    -> #issue.fix#", "cyan");
+				out("");
+			}
+		}
+
+		if (arrayLen(advisories)) {
+			out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
+			for (var advisory in advisories) {
+				out("  ~ #advisory.description#", "cyan");
+				for (var match in advisory.matches) {
+					out("    #match#");
+				}
+				// Advisory fix lines are intentionally uncolored so the
+				// section header and description carry the cyan accent and
+				// opt-in items read lighter than breaking-change fixes
+				// (which use cyan on the fix line for stronger emphasis).
+				out("    -> #advisory.fix#");
 				out("");
 			}
 		}

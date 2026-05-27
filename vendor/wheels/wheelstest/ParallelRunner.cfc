@@ -270,13 +270,18 @@ component {
 					for (var bs in d.bundleStats) {
 						arrayAppend(aggregated.bundleStats, bs);
 
-						// Collect failures from bundle suiteStats
+						// Collect failures from bundle suiteStats. $collectFailures
+						// returns the list (Adobe CF passes arrays to functions by
+						// value, so it can't append into aggregated.failures through
+						// an argument — the merge happens here in the caller scope).
 						if (structKeyExists(bs, "suiteStats") && isArray(bs.suiteStats)) {
-							$collectFailures(
+							var bundleFailures = $collectFailures(
 								suiteStats = bs.suiteStats,
-								bundleName = structKeyExists(bs, "name") ? bs.name : "unknown",
-								failures = aggregated.failures
+								bundleName = structKeyExists(bs, "name") ? bs.name : "unknown"
 							);
+							if (!arrayIsEmpty(bundleFailures)) {
+								arrayAppend(aggregated.failures, bundleFailures, true);
+							}
 						}
 					}
 				}
@@ -348,19 +353,24 @@ component {
 	}
 
 	/**
-	 * Recursively collect failure/error specs from suiteStats.
+	 * Recursively collect failure/error specs from suiteStats and RETURN them.
+	 *
+	 * Returns the failures rather than mutating a passed-in array: Adobe CF
+	 * passes arrays to functions by value (Lucee/BoxLang pass by reference),
+	 * so an `arrayAppend(arguments.failures, …)` here would never reach the
+	 * caller's array on Adobe — the aggregated failure list came back empty.
 	 */
-	private void function $collectFailures(
+	private array function $collectFailures(
 		required array suiteStats,
-		required string bundleName,
-		required array failures
+		required string bundleName
 	) {
+		var collected = [];
 		for (var suite in arguments.suiteStats) {
 			if (structKeyExists(suite, "specStats") && isArray(suite.specStats)) {
 				for (var spec in suite.specStats) {
 					var status = structKeyExists(spec, "status") ? spec.status : "";
 					if (status == "Failed" || status == "Error") {
-						arrayAppend(arguments.failures, {
+						arrayAppend(collected, {
 							bundle = arguments.bundleName,
 							spec = structKeyExists(spec, "name") ? spec.name : "unknown",
 							status = status,
@@ -369,15 +379,18 @@ component {
 					}
 				}
 			}
-			// Recurse into nested suites
+			// Recurse into nested suites and merge their failures in.
 			if (structKeyExists(suite, "suiteStats") && isArray(suite.suiteStats)) {
-				$collectFailures(
+				var nested = $collectFailures(
 					suiteStats = suite.suiteStats,
-					bundleName = arguments.bundleName,
-					failures = arguments.failures
+					bundleName = arguments.bundleName
 				);
+				if (!arrayIsEmpty(nested)) {
+					arrayAppend(collected, nested, true);
+				}
 			}
 		}
+		return collected;
 	}
 
 }

@@ -153,7 +153,8 @@ component extends="Base" {
 	 * @table The Name of the table to add the column to
 	 * @columnType The type of the new column
 	 * @afterColumn The name of the column which this column should be inserted after
-	 * @columnName THe name of the new column
+	 * @columnName The name of the new column
+	 * @columnNames Modern alias for `columnName` (matches the plural form every TableDefinition column helper accepts). Pass one or the other — not both.
 	 * @referenceName Name for new reference column, see documentation for references function, required if columnType is 'reference'
 	 * @default Default value for this column
 	 * @allowNull Whether to allow NULL values
@@ -164,7 +165,8 @@ component extends="Base" {
 	public void function addColumn(
 		required string table,
 		required string columnType,
-		required string columnName = "",
+		string columnName,
+		string columnNames,
 		string afterColumn = "",
 		string referenceName = "",
 		string default,
@@ -173,6 +175,12 @@ component extends="Base" {
 		numeric precision,
 		numeric scale
 	) {
+		// Resolve the alias here so addColumn is self-contained — a future
+		// refactor that stops delegating to changeColumn won't silently lose
+		// the columnNames alias path. Required unless columnType="reference"
+		// (in that branch the column name is computed from referenceName, so
+		// columnName/columnNames are not needed).
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = (arguments.columnType != "reference"));
 		arguments.addColumns = true;
 		changeColumn(argumentCollection = arguments);
 	}
@@ -185,7 +193,8 @@ component extends="Base" {
 	 * [category: Migration Functions]
 	 *
 	 * @table The Name of the table where the column is
-	 * @columnName THe name of the column
+	 * @columnName The name of the column
+	 * @columnNames Modern alias for `columnName` (matches the plural form every TableDefinition column helper accepts). Pass one or the other — not both.
 	 * @columnType The type of the column
 	 * @afterColumn The name of the column which this column should be inserted after
 	 * @referenceName Name for reference column, see documentation for references function, required if columnType is 'reference'
@@ -198,7 +207,8 @@ component extends="Base" {
 	 */
 	public void function changeColumn(
 		required string table,
-		required string columnName,
+		string columnName,
+		string columnNames,
 		required string columnType,
 		string afterColumn = "",
 		string referenceName = "",
@@ -209,12 +219,20 @@ component extends="Base" {
 		numeric scale,
 		boolean addColumns = "false"
 	) {
+		// Accept columnNames as alias for columnName (consistency with
+		// TableDefinition column helpers — #2781 follow-up). Required unless
+		// columnType="reference" — that branch ignores columnName and uses
+		// referenceName instead. Restores the missing-arg enforcement the
+		// original `required string columnName` parameter provided before
+		// this PR widened the signature to accept the alias.
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = (arguments.columnType != "reference"));
+
 		var t = changeTable(arguments.table);
 		if (arguments.columnType == "reference") {
 			arguments.columnType = "references";
 			arguments.referenceNames = arguments.referenceName;
 		} else {
-			arguments.columnNames = arguments.columnName;
+			arguments.columnNames = arguments.columnName ?: "";
 		}
 		invoke(t, arguments.columnType, arguments);
 		t.change(addColumns = arguments.addColumns);
@@ -251,11 +269,26 @@ component extends="Base" {
 	 *
 	 * @table The table containing the column to remove
 	 * @columnName The column name to remove
+	 * @columnNames Modern alias for `columnName` (matches the plural form every TableDefinition column helper accepts). Pass one or the other — not both.
 	 * @referenceName optional reference name
 	 */
-	public void function removeColumn(required string table, string columnName = "", string referenceName = "") {
+	public void function removeColumn(
+		required string table,
+		string columnName,
+		string columnNames,
+		string referenceName = ""
+	) {
+		// Accept columnNames as alias for columnName via the standard helper —
+		// matches every other site in this file. If both are passed, the alias
+		// (columnNames) wins, consistent with $combineArguments precedence
+		// across the framework.
+		$combineArguments(args = arguments, combine = "columnName,columnNames", required = false);
+		if (!StructKeyExists(arguments, "columnName")) {
+			arguments.columnName = "";
+		}
 		if (arguments.referenceName != "") {
-			arguments.columnName = arguments.referenceName & "id";
+			local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
+			arguments.columnName = arguments.referenceName & local.idSuffix;
 		}
 		$execute(this.adapter.dropColumnFromTable(name = arguments.table, columnName = arguments.columnName));
 		announce("Removed column #arguments.columnName# from #arguments.table#");
@@ -270,12 +303,26 @@ component extends="Base" {
 	 *
 	 * @table The table name to perform the operation on
 	 * @referenceName The reference table name to perform the operation on
+	 * @columnName Alias for `referenceName` (consistent with the modern migrator surface — `columnName` / `columnNames` are accepted alongside the legacy form).
+	 * @columnNames Plural alias for `referenceName`. When both `columnName` and `columnNames` are supplied, `columnNames` wins.
 	 */
-	public void function addReference(required string table, required string referenceName) {
+	public void function addReference(
+		required string table,
+		string referenceName,
+		string columnName,
+		string columnNames
+	) {
+		// Accept columnName / columnNames as aliases for referenceName.
+		// Precedence (per $combineArguments semantics): the alias wins. If a
+		// caller passes both `referenceName` and `columnName`/`columnNames`,
+		// the alias overwrites — same shape every other helper here uses.
+		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
+		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
+		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
 		addForeignKey(
 			table = arguments.table,
 			referenceTable = pluralize(arguments.referenceName),
-			column = "#arguments.referenceName#id",
+			column = arguments.referenceName & local.idSuffix,
 			referenceColumn = "id"
 		);
 	}
@@ -290,14 +337,19 @@ component extends="Base" {
 	 * @table The table name to perform the operation on
 	 * @referenceTable The reference table name to perform the operation on
 	 * @column The column name to perform the operation on
+	 * @columnName Modern alias for `column` (consistent with the rest of the migrator surface).
 	 * @referenceColumn The reference column name to perform the operation on
 	 */
 	public void function addForeignKey(
 		required string table,
 		required string referenceTable,
-		required string column,
+		string column,
+		string columnName,
 		required string referenceColumn
 	) {
+		// Accept columnName as alias for column (consistency with the rest
+		// of the migrator surface).
+		$combineArguments(args = arguments, combine = "column,columnName", required = true);
 		var foreignKey = CreateObject("component", "ForeignKeyDefinition").init(
 			adapter = this.adapter,
 			argumentCollection = arguments
@@ -315,9 +367,21 @@ component extends="Base" {
 	 *
 	 * @table The table name to perform the operation on
 	 * @referenceName the name of the reference to drop
+	 * @columnName Alias for `referenceName` (consistent with the modern migrator surface — `columnName` / `columnNames` are accepted alongside the legacy form).
+	 * @columnNames Plural alias for `referenceName`. When both `columnName` and `columnNames` are supplied, `columnNames` wins.
 	 *
 	 */
-	public void function dropReference(required string table, required string referenceName) {
+	public void function dropReference(
+		required string table,
+		string referenceName,
+		string columnName,
+		string columnNames
+	) {
+		// Accept columnName / columnNames as aliases for referenceName.
+		// Precedence (per $combineArguments semantics): the alias wins. See
+		// addReference for the same pattern.
+		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
+		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
 		dropForeignKey(arguments.table, "FK_#arguments.table#_#pluralize(arguments.referenceName)#");
 	}
 

@@ -28,8 +28,24 @@ const REPO = process.env.WHEELS_PACKAGES_REGISTRY ?? 'wheels-dev/wheels-packages
 const BRANCH = 'main';
 const UA = 'wheels-dev/packages-site (https://packages.wheels.dev)';
 
+// Build the request headers for each registry fetch. When a GitHub token is
+// available (CI: `GITHUB_TOKEN` is auto-provided to every workflow), include
+// an Authorization header. This raises the GitHub REST API rate limit from
+// 60 req/hour (unauthenticated, per-IP) to 5000 req/hour (per-token). The
+// build hit the 60/hour cap during rapid CI activity on PR #2814, failing
+// with a 403 and trashing the deploy. Locally / in offline preview builds
+// the variable is unset and we fall back to unauthenticated requests.
+function headers(): HeadersInit {
+  const h: Record<string, string> = { 'User-Agent': UA };
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  if (token) {
+    h.Authorization = `Bearer ${token}`;
+  }
+  return h;
+}
+
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  const res = await fetch(url, { headers: headers() });
   if (!res.ok) {
     throw new Error(`Registry fetch failed: ${res.status} ${res.statusText} — ${url}`);
   }
@@ -37,7 +53,7 @@ async function getJson(url: string): Promise<unknown> {
 }
 
 async function getText(url: string): Promise<string> {
-  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  const res = await fetch(url, { headers: headers() });
   if (!res.ok) {
     throw new Error(`Registry fetch failed: ${res.status} ${res.statusText} — ${url}`);
   }

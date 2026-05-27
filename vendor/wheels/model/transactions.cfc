@@ -36,8 +36,15 @@ component {
 			request.wheels.transactions[local.connectionArgs] = false;
 		}
 
+		// Issue #2789: skip model-level cftransaction when an outer owner (e.g. migrator) wraps this call.
+		local.outerTransactionActive = (
+			StructKeyExists(request, "$wheelsTransactionWrapper")
+			&& IsBoolean(request.$wheelsTransactionWrapper)
+			&& request.$wheelsTransactionWrapper
+		);
+
 		// If a transaction is already marked as open, change the mode to "alreadyopen", otherwise open one.
-		if (request.wheels.transactions[local.connectionArgs]) {
+		if (local.outerTransactionActive || request.wheels.transactions[local.connectionArgs]) {
 			arguments.transaction = "alreadyopen";
 			local.closeTransaction = false;
 		} else {

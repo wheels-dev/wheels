@@ -10,18 +10,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
     // Pseudo-constructor (runs automatically)
     if (structKeyExists(application, "wo")) {
-        local.methods = getMetaData(application.wo).functions;
+        // Iterate struct keys on application.wo and bind every UDF. This
+        // catches both methods declared on Global.cfc (visible to
+        // getMetaData) AND helpers merged in via cfinclude (e.g.
+        // app/global/functions.cfm), which getMetaData(application.wo).functions
+        // does NOT enumerate — see #2790.
+        local.metaIndex = {};
+        for (local.fn in getMetaData(application.wo).functions) {
+            local.metaIndex[local.fn.name] = local.fn.access;
+        }
 
-        for (local.method in local.methods) {
-            // Only add public, non-inherited methods
-            if (local.method.access eq "public") {
-                local.methodExists = structKeyExists(variables, local.method.name) || structKeyExists(this, local.method.name);
-
-                if (!local.methodExists) {
-                    variables[local.method.name] = application.wo[local.method.name];
-                    this[local.method.name]      = application.wo[local.method.name];
-                }
+        for (local.key in application.wo) {
+            if (!isCustomFunction(application.wo[local.key])) {
+                continue;
             }
+            // For methods present in CFC metadata, keep the existing
+            // public-only filter; include-injected helpers have no
+            // access modifier so they're treated as public.
+            if (structKeyExists(local.metaIndex, local.key) && local.metaIndex[local.key] neq "public") {
+                continue;
+            }
+            if (structKeyExists(variables, local.key) || structKeyExists(this, local.key)) {
+                continue;
+            }
+            variables[local.key] = application.wo[local.key];
+            this[local.key]      = application.wo[local.key];
         }
     }
 
