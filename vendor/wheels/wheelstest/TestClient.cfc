@@ -502,14 +502,18 @@ component {
 				cfhttpparam(type = "cookie", name = cName, value = variables.cookies[cName]);
 			}
 
-			// Add body for POST/PUT/PATCH
-			if (ListFindNoCase("POST,PUT,PATCH", arguments.method) && !StructIsEmpty(arguments.body)) {
-				if (variables.sendAsJson) {
-					cfhttpparam(type = "body", value = SerializeJSON(arguments.body));
-				} else {
+			// Add body for POST/PUT/PATCH. Adobe CF rejects a POST/PUT/PATCH
+			// cfhttp with zero cfhttpparam tags ("requires at least one
+			// cfhttpparam tag for a POST operation"), so always emit a body
+			// param for these methods — an empty body is valid — instead of
+			// skipping when the body struct is empty.
+			if (ListFindNoCase("POST,PUT,PATCH", arguments.method)) {
+				if (!StructIsEmpty(arguments.body) && !variables.sendAsJson) {
 					for (var fName in arguments.body) {
 						cfhttpparam(type = "formfield", name = fName, value = arguments.body[fName]);
 					}
+				} else {
+					cfhttpparam(type = "body", value = StructIsEmpty(arguments.body) ? "" : SerializeJSON(arguments.body));
 				}
 			}
 		}

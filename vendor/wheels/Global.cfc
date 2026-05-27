@@ -3926,25 +3926,18 @@ return local.$wheels;
 	 * and this so they remain callable on `application.wo` across requests.
 	 */
 	public void function $reincludeGlobals(string file = "/app/global/functions.cfm") {
-		include "#arguments.file#";
-		// Lucee adds include-declared functions to local; Adobe adds them
-		// to variables. Walk both and lift any user-defined functions onto
-		// this (the application.wo facing scope) so callers can invoke them
-		// across requests. The second loop is unconditional: a snapshot-diff
-		// guard here would suppress *updates* on Adobe (where the function
-		// already lives in variables from a prior re-include), leaving this
-		// bound to the stale version on the second `?reload=true`. Re-lifting
-		// an existing function is idempotent and the path is development-only.
-		for (var key in local) {
-			if (IsCustomFunction(local[key])) {
-				variables[key] = local[key];
-				this[key] = local[key];
-			}
-		}
-		for (var key in variables) {
-			if (IsCustomFunction(variables[key])) {
-				this[key] = variables[key];
-			}
+		// Evaluate the file in a throwaway instance and bind the functions it
+		// declares onto variables + this. Done via a separate instance (not a
+		// bare `include` here) because Adobe CF throws "Routines cannot be
+		// declared more than once" when a `?reload=true` re-includes a file
+		// whose UDFs are already bound to application.wo — the prior copy in
+		// our own scope collides with the re-declaration. A fresh scope per
+		// call sidesteps that; rebinding here is a plain struct assignment, so
+		// the updated version replaces the old one on every engine.
+		var reloaded = new wheels.GlobalIncludeLoader().loadFunctions(arguments.file);
+		for (var key in reloaded) {
+			variables[key] = reloaded[key];
+			this[key] = reloaded[key];
 		}
 	}
 
@@ -3958,20 +3951,32 @@ return local.$wheels;
 	// not clobbered by the `structKeyExists(this, ...)` guard. See #2790
 	// and the auto-bind loop in `vendor/wheels/WheelsTest.cfc`.
 	//
-	// The leading `local.varKey = ""` seeds the `local` scope: Lucee 7's
-	// pseudo-constructor doesn't auto-create `local` for the iterator
-	// target of `for (local.X in Y)`, throwing "variable [local] doesn't
-	// exist" without a prior assignment. The same pattern is used in
-	// `WheelsTest.cfc` (which seeds `local.metaIndex = {}` before its loop).
-	local.varKey = "";
-	for (local.varKey in variables) {
-		if (!isCustomFunction(variables[local.varKey])) {
-			continue;
+	// Delegated to `$promoteIncludedGlobalsToThis()` so the loop iterator
+	// lives in a real function-local scope. Inlining a `local.X` iterator in
+	// the pseudo-constructor materializes `variables.local` on the Global
+	// instance — harmless on Lucee/Adobe (where `local` is reserved to the
+	// function scope) but on BoxLang it shadows the method-local `local` of
+	// every mixed-in `$`-helper (Migrator/Model `local.appKey`, …), throwing
+	// "The key [...] was not found in the struct. Valid keys are ([VARKEY])".
+	$promoteIncludedGlobalsToThis();
+
+	/**
+	 * Copy include-injected user functions from `variables` onto `this` so
+	 * they remain enumerable on engines (Adobe CF) where struct-iteration
+	 * only reliably surfaces `this`-scope members. Must stay a function: an
+	 * inline `local.X` iterator in the pseudo-constructor materializes
+	 * `variables.local` and shadows method-local `local` on BoxLang.
+	 */
+	public void function $promoteIncludedGlobalsToThis() {
+		for (var promoteKey in variables) {
+			if (!isCustomFunction(variables[promoteKey])) {
+				continue;
+			}
+			if (structKeyExists(this, promoteKey)) {
+				continue;
+			}
+			this[promoteKey] = variables[promoteKey];
 		}
-		if (structKeyExists(this, local.varKey)) {
-			continue;
-		}
-		this[local.varKey] = variables[local.varKey];
 	}
 
 }
