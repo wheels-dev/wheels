@@ -513,6 +513,9 @@ component {
 						cfhttpparam(type = "formfield", name = fName, value = arguments.body[fName]);
 					}
 				} else {
+					// This branch covers both JSON posts (any body) and empty-body
+					// form posts — the latter still needs a body param so the POST
+					// isn't left with zero cfhttpparam tags.
 					cfhttpparam(type = "body", value = StructIsEmpty(arguments.body) ? "" : SerializeJSON(arguments.body));
 				}
 			}

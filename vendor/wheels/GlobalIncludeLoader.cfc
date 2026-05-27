@@ -22,18 +22,24 @@ component output="false" {
 	 * @file Mapping-relative path to the `.cfm` to evaluate (e.g. "/app/global/functions.cfm").
 	 */
 	public struct function loadFunctions(required string file) {
+		// Snapshot the component's own `variables` members BEFORE the include so
+		// the post-include diff captures only what the file declared. Robust to
+		// this component gaining more methods later — a by-name exclusion of
+		// `loadFunctions` would silently start leaking any new sibling method.
+		var beforeVarKeys = StructKeyList(variables);
 		include "#arguments.file#";
 
 		var fns = {};
 		// Lucee adds include-declared functions to `local`; Adobe CF adds them
-		// to `variables`. Collect from both. Skip this component's own method.
+		// to `variables`. Collect from both; on the `variables` side keep only
+		// keys that appeared after the include (i.e. the file's own functions).
 		for (var localKey in local) {
 			if (IsCustomFunction(local[localKey])) {
 				fns[localKey] = local[localKey];
 			}
 		}
 		for (var varKey in variables) {
-			if (varKey != "loadFunctions" && IsCustomFunction(variables[varKey])) {
+			if (!ListFindNoCase(beforeVarKeys, varKey) && IsCustomFunction(variables[varKey])) {
 				fns[varKey] = variables[varKey];
 			}
 		}
