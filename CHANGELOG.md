@@ -54,7 +54,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - The documented Linux bleeding-edge install commands in the guides 404'd after #2759 renamed the snapshot artifacts from `wheels_*` to `wheels-be_*` (deb) / `wheels-be-*` (rpm) to differentiate the channel by package name. All six affected pages — three unique (`start-here/installing`, `start-here/release-channels`, `command-line-tools/installation`) mirrored across the v4-0-0 and v4-0-1-snapshot doc versions — now point at the correct `wheels-be_*` assets, and the "switching channels" snippets reflect the real `Conflicts: wheels` package metadata instead of assuming same-package-name `--allow-downgrades` / `dnf downgrade` transitions (#2777)
 - Stale `schema_migrations` table-name references in the v4 migration and seeding guides (`v4-0-0/basics/seeding`, `v4-0-1-snapshot/basics/migrations`, `v4-0-1-snapshot/basics/seeding`) now read `wheels_migrator_versions`, matching the on-disk table name since the `c_o_r_e_*` → `wheels_*` rename — no `schema_migrations` table exists anywhere in `vendor/wheels/`, `cli/`, or `app/`. Carryover from #2799 (#2801)
 
-----
+---
 
 # [4.0.1](https://github.com/wheels-dev/wheels/releases/tag/v4.0.1) => 2026-05-20
 
