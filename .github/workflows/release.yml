@@ -6,6 +6,12 @@ on:
   push:
     branches:
       - main
+  # Manual re-trigger for a stuck or failed release without needing a fresh
+  # push to main. Version + channel are derived from the dispatched ref's
+  # wheels.json (main -> stable, develop -> snapshot), identical to the
+  # push / workflow_call paths since channel selection keys on GITHUB_REF.
+  # See #2819.
+  workflow_dispatch:
   workflow_call:
     secrets:
       SLACK_WEBHOOK_URL:
@@ -41,6 +47,13 @@ on:
 env:
   WHEELS_PRERELEASE: false
   LUCLI_VERSION: "0.3.7"
+  # Route JS actions through Node 24 instead of the deprecated Node 20 runtime.
+  # The lone Node 20 action here — Wandalen/wretry.action@v3, which wraps
+  # softprops/action-gh-release — began failing its pre/post hooks with
+  # "Argument list too long" once GitHub's forced Node 20 -> 24 migration
+  # reached the runners (forced default 2026-06-02). Node 24 is backward
+  # compatible for JS actions. See #2819.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   #############################################
