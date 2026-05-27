@@ -65,7 +65,11 @@ component extends="wheels.WheelsTest" {
 				// Cleanup: row name no longer matches the afterEach pattern.
 				queryExecute(
 					"DELETE FROM c_o_r_e_tags WHERE id = :id",
-					{ id = { value = tag.id, cfsqltype = "cf_sql_integer" } },
+					// cf_sql_bigint, not cf_sql_integer: CockroachDB's default
+					// unique_rowid() PK is a ~60-bit value that overflows a 32-bit
+					// CF_SQL_INTEGER on Adobe CF ("Invalid data <id> for CFSQLTYPE
+					// CF_SQL_INTEGER"). bigint binds correctly on every engine/DB.
+					{ id = { value = tag.id, cfsqltype = "cf_sql_bigint" } },
 					{ datasource = application.wheels.dataSourceName }
 				);
 			});
