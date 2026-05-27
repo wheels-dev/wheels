@@ -1,32 +1,32 @@
 {
-    "$schema": "https://wheels.dev/schema/wheels.json/v1.json",
-    "name": "Wheels.fw",
-    "version": "4.0.2",
-    "description": "Wheels — CFML MVC framework",
-    "homepage": "https://wheels.dev",
-    "documentation": "https://wheels.dev/guides/",
-    "license": "Apache-2.0",
-    "author": "Wheels Core Team and Community",
-    "contributors": [
-        "Peter Amiri <peter@alurium.com>"
-    ],
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/wheels-dev/wheels"
-    },
-    "bugs": "https://github.com/wheels-dev/wheels/issues",
-    "changelog": "https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md",
-    "keywords": [
-        "mvc",
-        "framework",
-        "cfml",
-        "rails",
-        "wheels"
-    ],
-    "engines": {
-        "lucee": ">=6.0",
-        "adobe": ">=2023",
-        "boxlang": ">=1.0",
-        "java": ">=21"
-    }
+  "$schema": "https://wheels.dev/schema/wheels.json/v1.json",
+  "name": "Wheels.fw",
+  "version": "4.0.3",
+  "description": "Wheels — CFML MVC framework",
+  "homepage": "https://wheels.dev",
+  "documentation": "https://wheels.dev/guides/",
+  "license": "Apache-2.0",
+  "author": "Wheels Core Team and Community",
+  "contributors": [
+    "Peter Amiri <peter@alurium.com>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wheels-dev/wheels"
+  },
+  "bugs": "https://github.com/wheels-dev/wheels/issues",
+  "changelog": "https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md",
+  "keywords": [
+    "mvc",
+    "framework",
+    "cfml",
+    "rails",
+    "wheels"
+  ],
+  "engines": {
+    "lucee": ">=6.0",
+    "adobe": ">=2023",
+    "boxlang": ">=1.0",
+    "java": ">=21"
+  }
 }
