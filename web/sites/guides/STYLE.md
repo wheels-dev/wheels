@@ -1,6 +1,6 @@
 # Wheels Guides — Writing Style Guide
 
-Governs every page in `src/content/docs/v4-0-1-snapshot/`. Contributors writing or reviewing docs treat it as enforceable.
+Governs every page in `src/content/docs/v4-0-0/`. Contributors writing or reviewing docs treat it as enforceable.
 
 ## Voice & tone
 
@@ -53,7 +53,7 @@ Every page frontmatter carries `type: tutorial | howto | concept | reference`. A
 
 ## Linking discipline
 
-- Internal links relative to site root: `/v4-0-1-snapshot/core-concepts/request-lifecycle/`.
+- Internal links relative to site root: `/v4-0-0/core-concepts/request-lifecycle/`.
 - External links checked by the link checker in CI.
 - Every CLI command links to its reference page the first time it appears in a page.
 

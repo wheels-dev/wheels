@@ -31,15 +31,14 @@ export interface VersionMeta {
 
 /** Wheels Guides — the narrative docs at guides.wheels.dev. */
 export const GUIDES_VERSIONS: VersionMeta[] = [
-	{ slug: 'v4-0-1-snapshot', label: 'v4.0.1-SNAPSHOT', sidebarLabel: 'v4.0.1-SNAPSHOT (dev)', collapsed: false, status: 'snapshot' },
-	{ slug: 'v4-0-0', label: 'v4.0.0', sidebarLabel: 'v4.0.0 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0 (current)', collapsed: false, status: 'current' },
 	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true, status: 'archived' },
 ];
 
 /** Wheels API Reference — function-level docs at api.wheels.dev. */
 export const API_VERSIONS: VersionMeta[] = [
-	{ slug: 'v4-0-0', label: 'v4.0.0', sidebarLabel: 'v4.0.0 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0 (current)', collapsed: false, status: 'current' },
 	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-4-0', label: 'v2.4.0', collapsed: true, status: 'archived' },
@@ -127,7 +126,7 @@ interface CollectionEntry {
  *
  * Caller provides `entries` from `await getCollection('docs')` so this
  * function stays framework-agnostic and testable. `entryId` is the
- * current route's entry id (e.g., 'v4-0-1-snapshot/start-here/installing/
+ * current route's entry id (e.g., 'v4-0-0/start-here/installing/
  * beginner-tutorial-hello-world').
  *
  * Returns { options, currentVersion } or null if we couldn't resolve

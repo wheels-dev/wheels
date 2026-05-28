@@ -8,7 +8,7 @@ import { runCompile } from './drivers/compile.mjs';
 import { TutorialSession } from './drivers/tutorial.mjs';
 import { enrichWithSidebarOrder, partitionAndOrder } from './lib/orchestrator.mjs';
 
-const DEFAULT_TARGET = 'src/content/docs/v4-0-1-snapshot';
+const DEFAULT_TARGET = 'src/content/docs/v4-0-0';
 
 async function collectMdx(target) {
   const s = await stat(target);
