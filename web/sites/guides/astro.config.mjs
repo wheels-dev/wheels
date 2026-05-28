@@ -98,8 +98,12 @@ export default defineConfig({
 		'/v4-0-1-snapshot': '/v4-0-0/',
 		'/v4-0-1-snapshot/': '/v4-0-0/',
 		'/v4-0-1-snapshot/start-here/installing': '/v4-0-0/start-here/installing/',
+		'/v4-0-1-snapshot/start-here/first-15-minutes': '/v4-0-0/start-here/first-15-minutes/',
 		'/v4-0-1-snapshot/start-here/tutorial': '/v4-0-0/start-here/tutorial/',
+		'/v4-0-1-snapshot/start-here/release-channels': '/v4-0-0/start-here/release-channels/',
+		'/v4-0-1-snapshot/start-here/cfml-engines': '/v4-0-0/start-here/cfml-engines/',
 		'/v4-0-1-snapshot/command-line-tools': '/v4-0-0/command-line-tools/',
+		'/v4-0-1-snapshot/command-line-tools/installation': '/v4-0-0/command-line-tools/installation/',
 		// Astro/Starlight slugs the dotted filename `3.0.0-config-migration.md`
 		// down to `300-config-migration` (github-slugger strips dots). The file
 		// was renamed to `3-0-0-config-migration.md` so the URL matches every

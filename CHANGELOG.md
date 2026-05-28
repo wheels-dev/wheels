@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+# [Unreleased]
+
+### Changed
+
+- Version switcher now labels the 4.0 stable docs "v4.0 (current)" (was "v4.0.0"); the vestigial pre-GA `v4-0-1-snapshot` guides tree is removed and its one unique page, "Reading the Changelog", is salvaged into `v4-0-0/upgrading/`. Both sites deploy from `develop`, so in-progress patch docs already live in the `v4-0-0` tree; a separate `*-snapshot` tree is only warranted when a different minor/major (e.g. `v4-1-snapshot`) is under development. Courtesy redirects cover the high-traffic `/v4-0-1-snapshot/*` paths (#2827)
+
+----
+
 # [4.0.2](https://github.com/wheels-dev/wheels/releases/tag/v4.0.2) => 2026-05-27
 
 > **Wheels 4.0.2** — second patch on the 4.0 line. Adds shared-development-database migrator reconciliation (`wheels migrate doctor` / `forget` / `pretend`, orphan-version auto-detection, and `name` / `applied_at` enrichment of the `wheels_migrator_versions` tracking table) plus `columnNames` aliases across `t.references()`, `t.primaryKey()`, and the `Migration.cfc` command helpers; ships native GPG-signed Linux package repositories at `apt.wheels.dev` and `yum.wheels.dev` (Cloudflare R2); resolves `BrowserTest` base URLs through a layered instance-time lookup; and greens the compatibility matrix across BoxLang and Adobe ColdFusion 2023/2025. ~30 PRs since the 4.0.1 GA (2026-05-20).
