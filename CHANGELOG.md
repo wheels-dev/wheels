@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 # [Unreleased]
 
+### Added
+
+- The built-in `/_browser/login-as` browser-test fixture (mounted by `set(loadBrowserTestFixtures = true)`) now honors an `application.wheels.browserLoginAsHandler` override. Set it in `config/settings.cfm` — `set(browserLoginAsHandler = "AuthFixture##loginAs")` — and the framework dispatches `/_browser/login-as` to that controller##action instead of the default `BrowserTestLogin##create`, letting apps with richer session shapes (e.g. `session.member = { id, email, firstName, lastName }`) drive the fixture without forking the vendor tree or duplicating the route + env-gate boilerplate. Env-gating moves to a new `wheels.middleware.BrowserTestFixtureGuard` middleware attached to the `/_browser` scope so the gate still applies under override. The setting falls back to `BrowserTestLogin##create` when unset or empty (#2830)
+
 ### Changed
 
 - Version switcher now labels the 4.0 stable docs "v4.0 (current)" (was "v4.0.0"); the vestigial pre-GA `v4-0-1-snapshot` guides tree is removed and its one unique page, "Reading the Changelog", is salvaged into `v4-0-0/upgrading/`. Both sites deploy from `develop`, so in-progress patch docs already live in the `v4-0-0` tree; a separate `*-snapshot` tree is only warranted when a different minor/major (e.g. `v4-1-snapshot`) is under development. Courtesy redirects cover the high-traffic `/v4-0-1-snapshot/*` paths (#2827)
