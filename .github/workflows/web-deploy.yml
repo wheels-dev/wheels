@@ -284,6 +284,7 @@ jobs:
       # the non-blog regression is fixed.
       - name: Commit pre-refreshed blog baseline
         if: |
+          github.event_name == 'push' &&
           needs.detect-scope.outputs.blog_content_changed == 'true' &&
           steps.regress.outcome == 'success'
         run: |
