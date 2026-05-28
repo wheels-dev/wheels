@@ -36,10 +36,10 @@ component extends="wheels.WheelsTest" {
                     bundles = ["wheels.tests.resources.wheelstest.BeforeAllErrorFixture"]
                 );
                 var results = testBox.runRaw();
-                expect(results.getTotalError()).toBeGT(0);
+                expect(results.getTotalError()).toBe(1);
                 var bs = results.getBundleStats();
                 expect(arrayLen(bs)).toBeGT(0);
-                expect(bs[1].totalError).toBeGT(0);
+                expect(bs[1].totalError).toBe(1);
                 expect(bs[1].path).toInclude("BeforeAllErrorFixture");
                 expect(isStruct(bs[1].globalException) || isObject(bs[1].globalException)).toBeTrue();
             });
