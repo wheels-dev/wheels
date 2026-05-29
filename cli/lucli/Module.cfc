@@ -24,16 +24,71 @@ component extends="modules.BaseModule" {
 	) {
 		super.init(argumentCollection = arguments);
 
+		// Normalize cwd to forward slashes. Lucee 7 on Windows fails to
+		// distinguish a drive-letter path (e.g. `C:\Users\cy/blog`, where
+		// the backslash came from `user.dir` and the forward slash from
+		// `cwd & "/" & appName`) from a URI like `http:/...`. The mixed-
+		// slash form trips ResourceUtil's scheme-detection regex, which
+		// extracts "c" as the scheme and throws "no Resource provider
+		// available with the name [c]" before any module code runs. All-
+		// forward-slash paths are accepted by both Lucee and the JDK on
+		// every platform, so we normalize once here and again on every
+		// canonical-path concatenation downstream.
+		variables.cwd = $normalizePath(variables.cwd);
+
 		// Resolve project root (where lucee.json / vendor/wheels lives)
-		variables.projectRoot = resolveProjectRoot(arguments.cwd);
+		variables.projectRoot = resolveProjectRoot(variables.cwd);
 
 		// Module root for template resolution
-		variables.moduleRoot = getDirectoryFromPath(getCurrentTemplatePath());
+		variables.moduleRoot = $normalizePath(getDirectoryFromPath(getCurrentTemplatePath()));
 
 		// Lazy-init service instances
 		variables.services = {};
 
 		return this;
+	}
+
+	/**
+	 * Normalize a filesystem path for safe handoff to Lucee file APIs on
+	 * Windows. Replaces all backslashes with forward slashes — Lucee
+	 * accepts both on Windows, but mixed-slash strings can trip
+	 * ResourceUtil's URI scheme detection (see init() comment).
+	 *
+	 * No-op on a path that already uses forward slashes (Mac/Linux,
+	 * already-normalized Windows paths).
+	 */
+	private string function $normalizePath(required string p) {
+		return replace(arguments.p, "\", "/", "all");
+	}
+
+	/**
+	 * Java-backed directoryExists() — bypasses Lucee's path resolver so
+	 * paths starting with a Windows drive letter (`C:\…`) never reach
+	 * ResourceUtil's scheme detection. The defensive `try/catch` honors
+	 * Lucee's built-in first (in case mappings or symlinks matter) and
+	 * only falls back to `java.io.File.isDirectory()` when Lucee throws.
+	 *
+	 * Use this in any path-existence check that runs early in `wheels
+	 * new` (before the framework source is located) or in any code that
+	 * constructs paths from `variables.cwd` / `File.getCanonicalPath()`.
+	 */
+	private boolean function $safeDirExists(required string p) {
+		try {
+			return directoryExists(arguments.p);
+		} catch (any e) {
+			return createObject("java", "java.io.File").init(arguments.p).isDirectory();
+		}
+	}
+
+	/**
+	 * Java-backed fileExists() — same rationale as $safeDirExists.
+	 */
+	private boolean function $safeFileExists(required string p) {
+		try {
+			return fileExists(arguments.p);
+		} catch (any e) {
+			return createObject("java", "java.io.File").init(arguments.p).isFile();
+		}
 	}
 
 	/**
@@ -4493,9 +4548,12 @@ component extends="modules.BaseModule" {
 	// ── New App Scaffolding ──────────────────────────
 
 	private string function scaffoldNewApp(required string appName, struct options = {}) {
+		// variables.cwd is already forward-slash-normalized by init(); the
+		// concat below stays clean on Windows. $safeDirExists is a final
+		// safety net against any cwd that bypasses normalization.
 		var targetDir = variables.cwd & "/" & appName;
 
-		if (directoryExists(targetDir)) {
+		if ($safeDirExists(targetDir)) {
 			out("Directory already exists: #appName#", "red");
 			// Throw so LuCLI exits non-zero instead of silently succeeding and
 			// fooling automation (GH #2214). Done before any files are written.
@@ -5210,8 +5268,8 @@ component extends="modules.BaseModule" {
 		}
 		if (len(trim(override))) {
 			arrayAppend(variables.frameworkSearchPaths, override & "  (from $WHEELS_FRAMEWORK_PATH)");
-			if (directoryExists(override)) {
-				return override;
+			if ($safeDirExists(override)) {
+				return $normalizePath(override);
 			}
 			throw(
 				type="Wheels.FrameworkPathInvalid",
@@ -5224,21 +5282,24 @@ component extends="modules.BaseModule" {
 		if (len(variables.projectRoot)) {
 			var projectCandidate = variables.projectRoot & "/vendor/wheels";
 			arrayAppend(variables.frameworkSearchPaths, projectCandidate);
-			if (directoryExists(projectCandidate)) {
+			if ($safeDirExists(projectCandidate)) {
 				return projectCandidate;
 			}
 		}
 
 		// 3. Module root — if the LuCLI module itself lives inside a wheels
 		//    repo checkout (cli/lucli/), walk up to find vendor/wheels/.
+		//    Normalize each canonical path (Windows: backslashes) to
+		//    forward slashes so concatenation with "/vendor/wheels" stays
+		//    URI-safe — see init().
 		if (len(variables.moduleRoot)) {
 			var File = createObject("java", "java.io.File");
 			var dir = variables.moduleRoot;
 			for (var i = 0; i < 6; i++) {
-				var candidate = File.init(dir).getCanonicalPath();
+				var candidate = $normalizePath(File.init(dir).getCanonicalPath());
 				var frameworkCandidate = candidate & "/vendor/wheels";
 				arrayAppend(variables.frameworkSearchPaths, frameworkCandidate);
-				if (directoryExists(frameworkCandidate)) {
+				if ($safeDirExists(frameworkCandidate)) {
 					return frameworkCandidate;
 				}
 				var parent = File.init(candidate).getParent();
@@ -5429,10 +5490,13 @@ component extends="modules.BaseModule" {
 		var dir = len(trim(cwd)) ? cwd : ".";
 		var File = createObject("java", "java.io.File");
 
-		// Walk up at most 5 levels
+		// Walk up at most 5 levels. Normalize each canonical path to
+		// forward slashes before concatenation — see init() for why mixed
+		// slashes break Lucee 7 on Windows. $safeDirExists guards against
+		// any path that still slips through with a drive-letter scheme.
 		for (var i = 0; i < 5; i++) {
-			var candidate = File.init(dir).getCanonicalPath();
-			if (directoryExists(candidate & "/vendor/wheels")) {
+			var candidate = $normalizePath(File.init(dir).getCanonicalPath());
+			if ($safeDirExists(candidate & "/vendor/wheels")) {
 				return candidate;
 			}
 			// Go up one level
@@ -5442,7 +5506,9 @@ component extends="modules.BaseModule" {
 		}
 
 		// Fallback: use cwd as-is
-		return len(trim(cwd)) ? File.init(cwd).getCanonicalPath() : File.init(".").getCanonicalPath();
+		return $normalizePath(
+			len(trim(cwd)) ? File.init(cwd).getCanonicalPath() : File.init(".").getCanonicalPath()
+		);
 	}
 
 	/**
