@@ -254,7 +254,7 @@ CFML reserves a set of identifiers as scope names. Declaring a local `var` with 
 
 **Identifiers to avoid as local variables, `var` declarations, or function parameters:**
 
-`client`, `url`, `form`, `session`, `cgi`, `request`, `application`, `cookie`, `server`, `arguments`, `variables`
+`client`, `url`, `form`, `session`, `cgi`, `request`, `application`, `cookie`, `server`, `arguments`, `variables`, `local`, `this`
 
 The `client` collision is the most confusing in practice. On Lucee 7, `clientManagement` is off by default. When you write `client.someMethod()` and `client` is also a local variable, Lucee resolves the identifier to the disabled `client` scope and throws:
 
