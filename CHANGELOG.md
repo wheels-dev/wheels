@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 # [Unreleased]
 
+### Fixed
+
+- Running the `wheels` CLI with no arguments no longer errors out with `Component [modules.wheels.Module] has no function with name [main]`. LuCLI dispatches a bare `wheels` invocation to a `main()` subcommand on the module; previously `cli/lucli/Module.cfc` only defined `showHelp()`, so picocli's routing surfaced the missing-method exception. `Module.cfc` now defines `main()` as a thin delegate to `showHelp()` (and the function is added to `mcpHiddenTools()` so it doesn't appear as an MCP tool), restoring the expected behavior of printing the help banner when no subcommand is supplied (#2840)
+
 ### Added
 
 - RustCFML is now recognized as a first-class engine in the engine-adapter layer. Wheels detects it via `server.coldfusion.productName == "RustCFML"` (it exposes no `server.lucee`/`server.boxlang`), instantiates a `RustCFMLAdapter` (extends `Base`, whose defaults are Lucee-shaped, matching RustCFML's semantics) ordered before the Adobe ColdFusion fallback, and accepts any version in `$checkMinimumVersion` (RustCFML is pre-1.0 and rapidly evolving, so the usual minimum-version guard doesn't apply). Because RustCFML does not yet implement the `cfcache` built-in, the framework's cfcache-backed template/static cache degrades gracefully to a no-op when the adapter reports `supportsCfcache() = false`, so requests still render (cacheless-but-working). The new `supportsCfcache()` capability defaults to `true` on Lucee/Adobe/BoxLang, leaving their behavior unchanged. Support is best-effort: RustCFML is a young, JVM-free CFML interpreter and is not yet part of the CI matrix (#2837)
