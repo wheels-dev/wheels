@@ -24,11 +24,19 @@ component extends="modules.BaseModule" {
 	) {
 		super.init(argumentCollection = arguments);
 
+		// Normalise cwd to forward slashes before anything downstream
+		// concatenates it with `/...` and feeds the result to Lucee's
+		// Resource API. On Windows, mixed-slash paths like
+		// `C:\Users\tim/Projects` cause Lucee to parse `c:` as a URI
+		// scheme and throw `there is no Resource provider available with
+		// the name [c]` — see GH #2841.
+		variables.cwd = $normalizePath(variables.cwd ?: arguments.cwd);
+
 		// Resolve project root (where lucee.json / vendor/wheels lives)
-		variables.projectRoot = resolveProjectRoot(arguments.cwd);
+		variables.projectRoot = resolveProjectRoot(variables.cwd);
 
 		// Module root for template resolution
-		variables.moduleRoot = getDirectoryFromPath(getCurrentTemplatePath());
+		variables.moduleRoot = $normalizePath(getDirectoryFromPath(getCurrentTemplatePath()));
 
 		// Lazy-init service instances
 		variables.services = {};
@@ -4493,7 +4501,10 @@ component extends="modules.BaseModule" {
 	// ── New App Scaffolding ──────────────────────────
 
 	private string function scaffoldNewApp(required string appName, struct options = {}) {
-		var targetDir = variables.cwd & "/" & appName;
+		// `variables.cwd` is normalised in init() (GH #2841), but belt-and-
+		// braces it here too in case scaffoldNewApp is invoked from a test
+		// harness that constructed Module without going through init().
+		var targetDir = $normalizePath(variables.cwd & "/" & appName);
 
 		if (directoryExists(targetDir)) {
 			out("Directory already exists: #appName#", "red");
@@ -5424,6 +5435,13 @@ component extends="modules.BaseModule" {
 	/**
 	 * Resolve the Wheels project root from the current working directory.
 	 * Walks up from cwd looking for vendor/wheels/ as the marker.
+	 *
+	 * Every returned path (and every interim `candidate` passed to
+	 * `directoryExists()`) is run through `$normalizePath()` to collapse
+	 * Windows backslashes to forward slashes. `java.io.File.getCanonicalPath()`
+	 * on Windows returns `C:\Users\...` form, which combined with the
+	 * `& "/vendor/wheels"` suffix produces a mixed-slash string that
+	 * Lucee's Resource API mis-parses as a `c:` scheme URI (GH #2841).
 	 */
 	private string function resolveProjectRoot(required string cwd) {
 		var dir = len(trim(cwd)) ? cwd : ".";
@@ -5431,7 +5449,7 @@ component extends="modules.BaseModule" {
 
 		// Walk up at most 5 levels
 		for (var i = 0; i < 5; i++) {
-			var candidate = File.init(dir).getCanonicalPath();
+			var candidate = $normalizePath(File.init(dir).getCanonicalPath());
 			if (directoryExists(candidate & "/vendor/wheels")) {
 				return candidate;
 			}
@@ -5442,7 +5460,25 @@ component extends="modules.BaseModule" {
 		}
 
 		// Fallback: use cwd as-is
-		return len(trim(cwd)) ? File.init(cwd).getCanonicalPath() : File.init(".").getCanonicalPath();
+		return len(trim(cwd))
+			? $normalizePath(File.init(cwd).getCanonicalPath())
+			: $normalizePath(File.init(".").getCanonicalPath());
+	}
+
+	/**
+	 * Bootstrap-safe path normaliser. Mirrors `Helpers.normalizePath()` so
+	 * we don't have to instantiate the Helpers service before the project
+	 * root is resolved (it depends on `variables.projectRoot` via other
+	 * services down the lazy-load chain). Tested via Helpers.normalizePath
+	 * in HelpersSpec.cfc — the two MUST stay in lock-step.
+	 */
+	private string function $normalizePath(string path = "") {
+		if (!len(arguments.path)) return "";
+		var rv = replace(arguments.path, "\", "/", "all");
+		var leading = left(rv, 2) == "//" ? "//" : "";
+		var body = len(leading) ? mid(rv, 3, len(rv) - 2) : rv;
+		body = reReplace(body, "/{2,}", "/", "all");
+		return leading & body;
 	}
 
 	/**

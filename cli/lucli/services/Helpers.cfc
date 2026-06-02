@@ -112,4 +112,28 @@ component {
 		return dateFormat(n, "yyyymmdd") & timeFormat(n, "HHmmss");
 	}
 
+	/**
+	 * Convert any path string to a single-slash, forward-slash form.
+	 *
+	 * Regression: GH #2841 — `wheels new` / `wheels start` on Windows blew
+	 * up with `lucee.runtime.exp.NativeException: there is no Resource
+	 * provider available with the name [c]`. The bootstrap was handing
+	 * `java.io.File.getCanonicalPath()` output (e.g. `C:\Users\tim\Projects`)
+	 * to `directoryExists(... & "/vendor/wheels")`, producing the
+	 * mixed-slash string `C:\Users\tim\Projects/vendor/wheels`. Lucee's
+	 * Resource API parsed `c:` as a URI scheme and bailed because no `c`
+	 * provider is registered. Normalising to pure forward slashes keeps
+	 * the path unambiguous on Windows while being a no-op on POSIX.
+	 */
+	public string function normalizePath(required string path) {
+		if (!len(arguments.path)) return "";
+		var rv = replace(arguments.path, "\", "/", "all");
+		// Collapse any doubled slashes from naïve concatenation, but
+		// preserve a leading `//` (UNC / network share prefix on Windows).
+		var leading = left(rv, 2) == "//" ? "//" : "";
+		var body = len(leading) ? mid(rv, 3, len(rv) - 2) : rv;
+		body = reReplace(body, "/{2,}", "/", "all");
+		return leading & body;
+	}
+
 }
