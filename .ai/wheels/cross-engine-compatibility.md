@@ -2,6 +2,8 @@
 
 Wheels runs on multiple CFML engines (Lucee 5/6/7, Adobe CF 2018-2025, BoxLang) and databases (H2, MySQL, PostgreSQL, SQL Server, CockroachDB). Each engine has runtime differences that can cause code to pass on one engine but fail on another. This guide documents the known gotchas.
 
+**RustCFML (best-effort, experimental):** [RustCFML](https://github.com/RustCFML/RustCFML) — a young, JVM-free CFML interpreter written in Rust — is recognized as a first-class engine in the adapter layer (`server.coldfusion.productName == "RustCFML"` → `RustCFMLAdapter`), but it is NOT yet part of the CI matrix and cannot fully boot the framework today. The confirmed divergence handled in-framework is the **missing `cfcache` built-in** (the cfcache-backed cache degrades to a no-op via the adapter's `supportsCfcache()=false`). Remaining blockers are tracked upstream — chiefly an argument-scope-fidelity gap (undeclared/`argumentCollection`-forwarded named args lose their names) and no Query-of-Queries — so treat RustCFML support as in-progress.
+
 ## Engine-Specific Gotchas
 
 ### struct.map() Collision (Lucee + Adobe)
