@@ -213,6 +213,8 @@ Java 21.0.8
 
 The three-line format tells you the Wheels Module version, the underlying LuCLI version, and the JVM the wrapper picked up. If any of those lines is missing or reports an unexpected value, jump to troubleshooting below.
 
+Running `wheels` with no arguments is also a quick sanity check — it prints the same help banner as `wheels --help` and `wheels help`. If you see a `Component [modules.wheels.Module] has no function with name [main]` error instead, you are running a pre-4.0.x build; upgrade to restore the expected behavior.
+
 Once the version check passes, `wheels info` inside a Wheels project gives you a deeper sanity check against a real app — datasource connection, environment, route count. See [App Inspection](../wheels-commands/app-inspection/) for the full output and how to read it.
 
 ## Troubleshooting
