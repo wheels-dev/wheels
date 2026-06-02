@@ -137,6 +137,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(find("\", normalized)).toBe(0);
 				});
 
+				it("preserves a UNC network-share prefix", () => {
+					expect(helpers.normalizePath("//server/share/path"))
+						.toBe("//server/share/path");
+				});
+
+				it("collapses doubled slashes inside a UNC path without eating the prefix", () => {
+					expect(helpers.normalizePath("//server//share"))
+						.toBe("//server/share");
+				});
+
 			});
 
 		});
