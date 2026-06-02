@@ -186,9 +186,9 @@ component extends="modules.BaseModule" {
 	// LuCLI dispatches a bare `wheels` invocation (no subcommand) to a
 	// `main()` function on the module. Without it, picocli surfaces:
 	//   Component [modules.wheels.Module] has no function with name [main]
-	// (#2840). Delegate to showHelp() so the no-args entry point is friendly.
+	// Delegate to showHelp() so the no-args entry point lands on something useful.
 	/**
-	 * hint: Default entry point — shown when `wheels` is run with no arguments
+	 * hint: No-args dispatch target — delegates to showHelp()
 	 */
 	public string function main() {
 		return showHelp();
