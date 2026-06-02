@@ -24,6 +24,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 - RustCFML is now recognized as a first-class engine in the engine-adapter layer. Wheels detects it via `server.coldfusion.productName == "RustCFML"` (it exposes no `server.lucee`/`server.boxlang`), instantiates a `RustCFMLAdapter` (extends `Base`, whose defaults are Lucee-shaped, matching RustCFML's semantics) ordered before the Adobe ColdFusion fallback, and accepts any version in `$checkMinimumVersion` (RustCFML is pre-1.0 and rapidly evolving, so the usual minimum-version guard doesn't apply). Because RustCFML does not yet implement the `cfcache` built-in, the framework's cfcache-backed template/static cache degrades gracefully to a no-op when the adapter reports `supportsCfcache() = false`, so requests still render (cacheless-but-working). The new `supportsCfcache()` capability defaults to `true` on Lucee/Adobe/BoxLang, leaving their behavior unchanged. Support is best-effort: RustCFML is a young, JVM-free CFML interpreter and is not yet part of the CI matrix (#2837)
 
+### Fixed
+
+- Linux install snippets now pipe the GPG key through `gpg --dearmor` before writing to `/usr/share/keyrings/`; apt requires binary format and previously rejected the ASCII-armored file with an "unsupported filetype" warning (#2838)
+
 ### Changed
 
 - Version switcher now labels the 4.0 stable docs "v4.0 (current)" (was "v4.0.0"); the vestigial pre-GA `v4-0-1-snapshot` guides tree is removed and its one unique page, "Reading the Changelog", is salvaged into `v4-0-0/upgrading/`. Both sites deploy from `develop`, so in-progress patch docs already live in the `v4-0-0` tree; a separate `*-snapshot` tree is only warranted when a different minor/major (e.g. `v4-1-snapshot`) is under development. Courtesy redirects cover the high-traffic `/v4-0-1-snapshot/*` paths (#2827)

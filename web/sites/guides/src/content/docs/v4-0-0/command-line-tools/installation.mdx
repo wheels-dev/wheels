@@ -55,7 +55,7 @@ Wheels publishes signed native `apt` and `yum` repositories at **[https://apt.wh
 
 ```bash title="Debian / Ubuntu — stable"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
   | sudo tee /etc/apt/sources.list.d/wheels.list
 sudo apt update && sudo apt install wheels
@@ -72,7 +72,7 @@ The bleeding-edge channel publishes a new package on every merge to `develop`, w
 
 ```bash title="Debian / Ubuntu — bleeding-edge"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
   | sudo tee /etc/apt/sources.list.d/wheels-be.list
 sudo apt update && sudo apt install wheels-be
@@ -86,7 +86,7 @@ sudo dnf install wheels-be
 Each `.deb`/`.rpm` carries its full SemVer version internally (e.g. `4.0.1~snapshot.1700` for snapshots), so `dpkg --compare-versions` and `rpmvercmp` correctly order pre-releases below the next GA. (GitHub Releases rewrites `~` to `.` in uploaded asset filenames, but the URLs you actually fetch from the apt/yum repos already use the canonical `~`-form.)
 
 <Aside type="note" title="GPG signing">
-Both repositories are signed with the Wheels Distribution key — fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`. The public key is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` (byte-identical files). `apt update` verifies the `InRelease` / `Release.gpg` signature on every refresh; `dnf` verifies `repomd.xml.asc` and each per-package signature. The sources.list / `.repo` snippets above wire all of that in automatically.
+Both repositories are signed with the Wheels Distribution key — fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`. The public key is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` (byte-identical files) in ASCII-armored format. The snippets above pipe the download through `gpg --dearmor` to convert it to binary before writing to `/usr/share/keyrings/` — apt requires binary format and rejects an ASCII-armored file with an "unsupported filetype" warning. `apt update` verifies the `InRelease` / `Release.gpg` signature on every refresh; `dnf` verifies `repomd.xml.asc` and each per-package signature. The sources.list / `.repo` snippets above wire all of that in automatically.
 
 For users who want to verify the fingerprint out-of-band before trusting the key, the same fingerprint is committed to [https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT) and [https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT).
 </Aside>

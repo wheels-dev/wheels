@@ -168,7 +168,7 @@ Pick LuCLI and Wheels Module versions that are known to be paired — see [CLI I
 Wheels publishes signed native apt and yum repositories at **[https://apt.wheels.dev](https://apt.wheels.dev)** and **[https://yum.wheels.dev](https://yum.wheels.dev)**. Add the source once, then `apt upgrade wheels` / `dnf upgrade wheels` picks up new versions automatically. The package installs `/usr/bin/wheels`, declares OpenJDK 21 as a runtime dependency (so `apt`/`dnf` pulls a JDK in automatically), and on first run syncs the framework module into `~/.wheels/`.
 
 <Aside type="note" title="GPG signing">
-The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`). `apt`/`dnf` verify the signature on every update, so a network-level attacker can't substitute the package contents. The public half is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` — both files are byte-identical. The sources.list / `.repo` snippets below wire the signature check in automatically.
+The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`). `apt`/`dnf` verify the signature on every update, so a network-level attacker can't substitute the package contents. The public key is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` in ASCII-armored format. The snippets below convert it to binary with `gpg --dearmor` before writing to `/usr/share/keyrings/` — apt requires binary format and will reject an ASCII-armored file with an "unsupported filetype" warning otherwise. The sources.list / `.repo` snippets wire the signature check in automatically.
 </Aside>
 
 <Steps>
@@ -177,7 +177,7 @@ The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerpri
 
    ```bash title="Debian / Ubuntu — stable"
    curl -fsSL https://apt.wheels.dev/wheels.gpg \
-     | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+     | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
    echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
      | sudo tee /etc/apt/sources.list.d/wheels.list
    sudo apt update && sudo apt install wheels
@@ -193,7 +193,7 @@ The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerpri
 
    ```bash title="Debian / Ubuntu — bleeding-edge"
    curl -fsSL https://apt.wheels.dev/wheels.gpg \
-     | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+     | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
    echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
      | sudo tee /etc/apt/sources.list.d/wheels-be.list
    sudo apt update && sudo apt install wheels-be
