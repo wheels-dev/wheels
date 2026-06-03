@@ -78,6 +78,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: |
           set -euo pipefail
+          echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"   # PR head before merge
           git fetch origin develop
           if git merge --no-edit origin/develop; then
             echo "result=clean" >> "$GITHUB_OUTPUT"
@@ -138,6 +139,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'resolve'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE_SHA: ${{ steps.merge.outputs.base }}
         run: |
           set -euo pipefail
           # Success = a clean, committed merge to push. Failure = conflict markers
@@ -151,7 +153,7 @@ jobs:
           elif [ -f .git/MERGE_HEAD ]; then
             git commit --no-edit                          # resolved but uncommitted -> finish merge
           fi
-          if [ -n "$(git log @{u}..HEAD --oneline 2>/dev/null)" ]; then
+          if [ "$(git rev-parse HEAD)" != "$BASE_SHA" ]; then
             git push origin HEAD                          # resolved cleanly; PR checks re-validate
             exit 0
           fi
