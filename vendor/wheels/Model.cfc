@@ -125,14 +125,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.iEnd = local.columns.recordCount;
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				// set up properties and column mapping
-				//
-				// Preserve the database's reported column casing for the derived
-				// property name (so SQL Server / MySQL / SQLite keep `isHidden`),
-				// except on adapters whose database folds unquoted identifiers to
-				// a non-meaningful UPPERCASE default (Oracle, H2), where we
-				// lowercase to keep property names sane. Prior to 4.0 this was an
-				// unconditional lCase() that silently lowercased every
-				// auto-derived property on every engine.
+				// preserve the DB's reported column case; an unconditional lCase() here regressed non-Oracle engines in 3.0 (see $lowerCaseColumnNames)
 				local.columnName = local.columns["column_name"][local.i];
 				if (variables.wheels.class.adapter.$lowerCaseColumnNames()) {
 					local.columnName = lCase(local.columnName);
