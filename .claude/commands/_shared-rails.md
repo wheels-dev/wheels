@@ -41,7 +41,8 @@ they are honored. Violating them is a bug — fix the prompt, not the rails.
   `ci`, `chore`, `revert`. **Scope is optional and unrestricted** — pick a
   short noun that helps a reader skim history (e.g. `model`, `web/blog`),
   or omit it entirely. Don't agonize over which scope is "right."
-- **Subject ≤ 100 chars, not ALL-CAPS.** Sentence-case is fine.
+- **Header ≤ 100 chars, not ALL-CAPS.** commitlint measures the WHOLE header — `type(scope): subject` including the `type(scope): ` prefix — not just the subject. A 90-char subject under a `docs(web/guides): ` prefix is a 108-char header and FAILS. Count the prefix. Sentence-case is fine.
+- **The PR title is the linted gate.** Because the repo squash-merges, the PR title becomes the landing commit subject and is what CI validates — make the PR title itself a valid conventional-commit header ≤ 100 chars.
 - **DCO sign-off required.** Every commit you author MUST end with the
   trailer `Signed-off-by: wheels-bot[bot] <wheels-bot[bot]@users.noreply.github.com>`
   matching the configured git author identity. Use `git commit -s` (the
