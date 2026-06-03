@@ -57,7 +57,7 @@ User-facing setup post-Phase-2:
 ```bash
 # Stable
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
   | sudo tee /etc/apt/sources.list.d/wheels.list
 sudo apt update && sudo apt install wheels
@@ -127,7 +127,7 @@ Before this bucket repo will function:
 ```bash
 # From a fresh Debian/Ubuntu host:
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
   | sudo tee /etc/apt/sources.list.d/wheels.list
 sudo apt update
