@@ -118,13 +118,6 @@ jobs:
             "" \
             "Please merge \`develop\` and resolve manually. (Labelled \`conflict:needs-human\`; marker: wheels-bot:conflict-attempted:$PR_NUMBER)")"
 
-      - name: Set up Wheels test environment
-        if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'resolve'
-        uses: ./.github/actions/setup-wheels-test-env
-        with:
-          port: '60007'
-          install-playwright: 'false'
-
       - name: Resolve (content/docs only) via Claude
         if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'resolve'
         uses: anthropics/claude-code-action@v1

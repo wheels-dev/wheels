@@ -45,9 +45,13 @@ jobs:
         run: |
           set -euo pipefail
           decide=.github/scripts/freshen-decide.sh
+          # gh's author.login reports App authors as `app/<slug>` (verified: bot
+          # PRs show `app/wheels-bot` on the `gh pr list --json author` surface),
+          # while REST/webhook surfaces use `<slug>[bot]`. Match both forms so the
+          # filter is robust across gh versions / API surfaces.
           prs=$(gh pr list --repo "$REPO" --state open --base develop \
                   --json number,isDraft,author \
-                  --jq '.[] | select(.isDraft==false) | select(.author.login=="app/wheels-bot") | .number')
+                  --jq '.[] | select(.isDraft==false) | select(.author.login=="app/wheels-bot" or .author.login=="wheels-bot[bot]") | .number')
           if [ -z "$prs" ]; then echo "No open bot PRs."; exit 0; fi
           for n in $prs; do
             status=UNKNOWN
