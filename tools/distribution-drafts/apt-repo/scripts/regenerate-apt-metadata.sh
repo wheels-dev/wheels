@@ -1,15 +1,21 @@
 #!/bin/bash
-# Regenerates apt metadata for both `stable` and `bleeding-edge` distributions
-# under dists/, then signs Release with GPG (detached → Release.gpg, inline →
-# InRelease). Both signed forms are required: older apt clients read Release +
-# Release.gpg, newer clients prefer InRelease.
+# Regenerates apt metadata for the selected distributions (default: `stable` +
+# `bleeding-edge`) under dists/, then signs Release with GPG (detached →
+# Release.gpg, inline → InRelease). Both signed forms are required: older apt
+# clients read Release + Release.gpg, newer clients prefer InRelease.
 #
 # Inputs (env vars):
 #   GPG_PASSPHRASE  — passphrase for the imported signing key
 #   GPG_KEY_ID      — long-form key ID (set by the workflow after `gpg --import`)
+#   CHANNELS        — space-separated channels to (re)generate. Defaults to
+#                     "stable bleeding-edge". The release workflow sets this to
+#                     the single dispatched channel so a run only ever rewrites
+#                     the dist whose pool it actually synced (see wheels#2838).
 #
 # Idempotent: safe to run by hand against an existing tree to repair a torn
-# release. Re-reads everything in pool/ and rewrites dists/ from scratch.
+# release. Re-reads everything in pool/ for the selected CHANNELS and rewrites
+# their dists/ from scratch — so the pool for each selected channel MUST be
+# present locally first, otherwise that channel's index is emitted empty.
 
 set -euo pipefail
 
@@ -20,7 +26,12 @@ fi
 
 ARCHITECTURES="amd64"
 COMPONENTS="main"
-DISTRIBUTIONS="stable bleeding-edge"
+# Only regenerate the channels we were asked to. The workflow syncs just the
+# dispatched channel's pool (pool/<channel>/), so regenerating a channel whose
+# pool isn't present would scan an empty dir, emit an empty Packages, and the
+# upload would clobber that channel's index on R2. Defaulting to both preserves
+# the by-hand full-tree repair path (which must sync both pools first). #2838.
+DISTRIBUTIONS="${CHANNELS:-stable bleeding-edge}"
 
 # apt-ftparchive uses a config file to know where the pool lives. The same
 # config drives both distributions — only the dist-name and the scan path
