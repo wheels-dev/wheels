@@ -65,6 +65,21 @@ component extends="wheels.WheelsTest" {
 					_controller.$callAction(action = "$callAction")
 				}).toThrow("Wheels.ActionNotAllowed")
 			})
+
+			it("dispatches a legitimate user-defined action without throwing ActionNotAllowed", () => {
+				// Guards against future regressions in $buildProtectedControllerMethods()
+				// that would accidentally over-block by listing user actions like `test`.
+				var state = {thrown = false}
+				try {
+					_controller.$callAction(action = "test")
+				} catch (Wheels.ActionNotAllowed e) {
+					state.thrown = true
+				} catch (any e) {
+					// Other downstream errors (e.g. view rendering) are not what
+					// this spec is asserting against — only the protection gate.
+				}
+				expect(state.thrown).toBeFalse()
+			})
 		})
 	}
 }

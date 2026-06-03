@@ -3940,7 +3940,7 @@ return local.$wheels;
 	 * are already gated separately and are excluded here.
 	 */
 	public string function $buildProtectedControllerMethods() {
-		var protected = "";
+		var protectedMethods = "";
 		var sources = ["wheels.Global"];
 		var mixinPaths = ["wheels.controller", "wheels.view"];
 		for (var basePath in mixinPaths) {
@@ -3962,13 +3962,13 @@ return local.$wheels;
 				if (
 					StructKeyExists(fn, "access") && fn.access == "public"
 					&& Left(fn.name, 1) != "$"
-					&& !ListFindNoCase(protected, fn.name)
+					&& !ListFindNoCase(protectedMethods, fn.name)
 				) {
-					protected = ListAppend(protected, fn.name);
+					protectedMethods = ListAppend(protectedMethods, fn.name);
 				}
 			}
 		}
-		return protected;
+		return protectedMethods;
 	}
 
 	/**
