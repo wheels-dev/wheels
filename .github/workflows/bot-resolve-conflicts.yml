@@ -1,0 +1,157 @@
+name: Wheels Bot — Resolve Conflicts
+
+# Dispatched by bot-freshen.yml for an open bot PR whose mergeStateStatus is
+# DIRTY. A deterministic classifier decides: auto-resolve content/docs
+# conflicts (via /resolve-conflicts), or escalate anything touching code.
+on:
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR number to attempt conflict resolution on'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: wheels-bot-resolve-${{ inputs.pr-number }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve conflicts (tiered)
+    if: vars.WHEELS_BOT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PR_NUMBER: ${{ inputs.pr-number }}
+      REPO: wheels-dev/wheels
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Resolve PR head ref
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr-number must be numeric, got: $PR_NUMBER"; exit 1
+          fi
+          ref=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName -q '.headRefName')
+          if [ -z "$ref" ]; then echo "::error::no head ref for #$PR_NUMBER"; exit 1; fi
+          echo "head=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: pr
+          target-number: ${{ env.PR_NUMBER }}
+          marker-pattern: 'wheels-bot:conflict-attempted:${{ env.PR_NUMBER }}'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          git config user.name "wheels-bot[bot]"
+          git config user.email "wheels-bot[bot]@users.noreply.github.com"
+
+      - name: Merge develop to surface conflicts
+        id: merge
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          git fetch origin develop
+          if git merge --no-edit origin/develop; then
+            echo "result=clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: No conflicts (clean merge)
+        if: steps.gate.outputs.skip == 'false' && steps.merge.outputs.result == 'clean'
+        run: |
+          echo "::notice::PR #${PR_NUMBER} merged cleanly with develop; nothing to resolve. The freshen sweep will fast-forward it via update-branch."
+
+      - name: Classify conflicts
+        id: classify
+        if: steps.gate.outputs.skip == 'false' && steps.merge.outputs.result == 'conflict'
+        run: |
+          set -euo pipefail
+          files=$(git diff --name-only --diff-filter=U)
+          echo "Conflicted files:"; printf '%s\n' "$files"
+          decision=$(printf '%s\n' "$files" | bash .github/scripts/classify-conflicts.sh)
+          echo "decision=$decision" >> "$GITHUB_OUTPUT"
+          { echo 'CONFLICT_FILES<<EOF'; printf '%s\n' "$files"; echo 'EOF'; } >> "$GITHUB_ENV"
+
+      - name: Escalate (code conflict)
+        if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'escalate'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git merge --abort || true
+          gh label create conflict:needs-human --repo "$REPO" --color B60205 \
+            --description "Merge conflict touches code; needs manual resolution" 2>/dev/null || true
+          gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label conflict:needs-human
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$(printf '%s\n' \
+            "🛑 **Merge conflict needs a human.** The conflict touches code paths, which the bot will not auto-resolve." \
+            "" \
+            "Conflicted files:" '```' "$CONFLICT_FILES" '```' \
+            "" \
+            "Please merge \`develop\` and resolve manually. (Labelled \`conflict:needs-human\`; marker: wheels-bot:conflict-attempted:$PR_NUMBER)")"
+
+      - name: Set up Wheels test environment
+        if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'resolve'
+        uses: ./.github/actions/setup-wheels-test-env
+        with:
+          port: '60007'
+          install-playwright: 'false'
+
+      - name: Resolve (content/docs only) via Claude
+        if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'resolve'
+        uses: anthropics/claude-code-action@v1
+        with:
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /resolve-conflicts ${{ env.PR_NUMBER }}
+          claude_args: |
+            --model claude-opus-4-7
+            --max-turns 400
+            --allowedTools "Bash(gh:*),Bash(git:*),Read,Edit,Write,Grep,Glob"
+
+      - name: Verify no markers remain and push
+        if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'resolve'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "::error::conflict markers remain after /resolve-conflicts"
+            git merge --abort || true
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body \
+              "⚠️ Automated content-conflict resolution left unresolved markers; aborting and leaving for a human."
+            exit 1
+          fi
+          if [ -f .git/MERGE_HEAD ]; then git commit --no-edit; fi
+          git push origin HEAD
+          # The push triggers pr.yml / docs-verify, which validate the result.
