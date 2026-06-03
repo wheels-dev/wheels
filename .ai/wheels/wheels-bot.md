@@ -32,3 +32,23 @@ Flip the repo variable `WHEELS_BOT_ENABLED` to `false` to halt every bot workflo
 ## Auto-fire safety net
 
 The bot is permitted to chain stages (triage → research → propose-fix), and handoff fires on `*-confidence:high` OR `*-confidence:medium`. Low stays manual. Sensitive areas (security, middleware, migrations, deploy, DI, cross-engine) are caught by the propose-fix prompt's own step-4 safety net, which posts a `fix-held` marker instead of opening a PR. Reviewer A and B then critique whatever propose-fix produces, escalating to the Senior Advisor on deadlock. All bot PRs land as `--draft` and require a human approving review on `develop`.
+
+## PR-prep automation (release unblocking)
+
+- **Commit-message gate.** `pr.yml`'s `Validate Commit Messages` lints the
+  **PR title** (the squash subject), not every commit — because PRs are
+  squash-merged, intermediate commit headers don't land in `develop`; only the
+  PR title does. Edit the title to fix a failure; the `edited` trigger re-runs
+  the check (and `fast-test` is skipped on title-only edits). Local guard:
+  `tools/test-commit-title.sh`.
+- **Freshen (`bot-freshen.yml`).** On push to develop + a 30-min backstop:
+  behind-but-clean bot PRs are updated via non-destructive `update-branch`;
+  DIRTY ones are dispatched to the resolver. Decision logic:
+  `.github/scripts/freshen-decide.sh`.
+- **Conflict resolution (`bot-resolve-conflicts.yml` + `/resolve-conflicts`).**
+  A deterministic classifier (`.github/scripts/classify-conflicts.sh`)
+  auto-resolves content/docs conflicts (md/mdx, CHANGELOG, `.ai/`, `docs/`,
+  `web/sites/*/src/content/`) and pushes; any code conflict is escalated with
+  the `conflict:needs-human` label and a comment — never auto-resolved.
+- **Not automated:** merging. PRs are brought to a green, conflict-free,
+  ready state; the maintainer performs the final squash-merge.
