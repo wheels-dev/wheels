@@ -109,7 +109,7 @@ component extends="Controller" {
 }
 ```
 
-Filter methods **must** be declared `private`. A public function on a controller is a routable action — if you forget the keyword on `authenticate`, the router will happily accept `GET /posts/authenticate` and call it directly, which is not what you want. The `private` keyword keeps it off the action surface.
+Filter methods **must** be declared `private`. A public function on a controller is a routable action — if you forget the keyword on `authenticate`, the router will happily accept `GET /posts/authenticate` and call it directly, which is not what you want. The `private` keyword keeps it off the action surface. Framework helpers mixed onto every controller (`env()`, `model()`, `redirectTo()`, `linkTo()`, and their siblings) are automatically excluded from the routable surface — they resolve to a 404 regardless of how they are requested.
 
 ## Params
 
