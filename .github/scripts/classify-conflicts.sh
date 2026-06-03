@@ -10,7 +10,6 @@ is_low_risk() {
     CHANGELOG|CHANGELOG.*)      return 0 ;;
     .ai/*|*/.ai/*)              return 0 ;;
     docs/*|*/docs/*)            return 0 ;;
-    web/sites/*/src/content/*)  return 0 ;;  # content trees (any file; today md/mdx) — NOT web code
   esac
   return 1
 }

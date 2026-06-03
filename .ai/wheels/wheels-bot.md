@@ -47,8 +47,8 @@ The bot is permitted to chain stages (triage → research → propose-fix), and 
   `.github/scripts/freshen-decide.sh`.
 - **Conflict resolution (`bot-resolve-conflicts.yml` + `/resolve-conflicts`).**
   A deterministic classifier (`.github/scripts/classify-conflicts.sh`)
-  auto-resolves content/docs conflicts (md/mdx, CHANGELOG, `.ai/`, `docs/`,
-  `web/sites/*/src/content/`) and pushes; any code conflict is escalated with
+  auto-resolves content/docs conflicts (markdown/MDX anywhere, CHANGELOG,
+  `.ai/`, `docs/`) and pushes; any code conflict is escalated with
   the `conflict:needs-human` label and a comment — never auto-resolved.
 - **Not automated:** merging. PRs are brought to a green, conflict-free,
   ready state; the maintainer performs the final squash-merge.

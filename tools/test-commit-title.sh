@@ -2,7 +2,7 @@
 # Verifies the exact command pr.yml uses to lint a PR title.
 # Good titles pass; bad titles (no type, >100 chars, ALL-CAPS) fail.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 run() { echo "$1" | npx --no-install commitlint --verbose >/dev/null 2>&1; }
 

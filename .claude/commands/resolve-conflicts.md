@@ -21,8 +21,8 @@ below. Highlights for this command:
 
 You are running inside `bot-resolve-conflicts.yml`. The workflow has already
 merged `origin/develop` into the PR branch and a **deterministic classifier
-has confirmed every conflicted file is pure documentation/content** (markdown,
-MDX, CHANGELOG, `.ai/`, `docs/`, or `web/sites/*/src/content/`).
+has confirmed every conflicted file is pure documentation/content**
+(markdown/MDX at any path, CHANGELOG, or under `.ai/` or `docs/`).
 
 ## Hard safety rule
 
@@ -32,11 +32,13 @@ Run this first:
 git diff --name-only --diff-filter=U
 ```
 
-If ANY listed file is a code file (`.cfc`, `.cfm`, `.js`, `.ts`, `.py`, `.sh`,
-`.json`, `.yml`, `.yaml`, or anything under `vendor/`, `cli/`, `app/`,
-`config/`, `tests/` that is not under a `content/` tree), DO NOT resolve it.
-Instead run `git merge --abort`, post a comment saying the gate and the
-command disagreed (a bug), and stop. This should never happen, but never resolve a code conflict.
+Confirm EVERY listed file is in the low-risk set the upstream classifier
+admits — i.e. each file is a `*.md` or `*.mdx` (any path), a `CHANGELOG`
+file, or under `.ai/` or `docs/`. If ANY listed file falls OUTSIDE that set
+(any code file — `.cfc`, `.cfm`, `.js`, `.ts`, `.py`, `.sh`, `.json`, `.yml`,
+`.yaml` — or any other non-doc file), DO NOT resolve it. Run
+`git merge --abort`, post a comment saying the gate and the command disagreed
+(a bug), and stop. This should never happen, but never resolve a code conflict.
 
 ## Resolve
 
