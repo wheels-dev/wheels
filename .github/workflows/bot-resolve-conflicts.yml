@@ -116,7 +116,9 @@ jobs:
             "" \
             "Conflicted files:" '```' "$CONFLICT_FILES" '```' \
             "" \
-            "Please merge \`develop\` and resolve manually. (Labelled \`conflict:needs-human\`; marker: wheels-bot:conflict-attempted:$PR_NUMBER)")"
+            "Please merge \`develop\` and resolve manually. (Labelled \`conflict:needs-human\`.)" \
+            "" \
+            "<!-- wheels-bot:conflict-attempted:$PR_NUMBER -->")"
 
       - name: Resolve (content/docs only) via Claude
         if: steps.gate.outputs.skip == 'false' && steps.classify.outputs.decision == 'resolve'
