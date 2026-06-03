@@ -62,7 +62,7 @@
 
   <h2>Stable channel</h2>
   <pre><code>curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg &gt;/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
   | sudo tee /etc/apt/sources.list.d/wheels.list
 sudo apt update &amp;&amp; sudo apt install wheels</code></pre>
@@ -70,7 +70,7 @@ sudo apt update &amp;&amp; sudo apt install wheels</code></pre>
   <h2>Bleeding-edge channel</h2>
   <p>Published on every merge to <code>develop</code>. The package is named <code>wheels-be</code> so it can coexist with the stable <code>wheels</code> install on the same host.</p>
   <pre><code>curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg &gt;/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
   | sudo tee /etc/apt/sources.list.d/wheels-be.list
 sudo apt update &amp;&amp; sudo apt install wheels-be</code></pre>

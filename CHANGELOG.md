@@ -28,6 +28,11 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 - Version switcher now labels the 4.0 stable docs "v4.0 (current)" (was "v4.0.0"); the vestigial pre-GA `v4-0-1-snapshot` guides tree is removed and its one unique page, "Reading the Changelog", is salvaged into `v4-0-0/upgrading/`. Both sites deploy from `develop`, so in-progress patch docs already live in the `v4-0-0` tree; a separate `*-snapshot` tree is only warranted when a different minor/major (e.g. `v4-1-snapshot`) is under development. Courtesy redirects cover the high-traffic `/v4-0-1-snapshot/*` paths (#2827)
 
+### Fixed
+
+- The Debian/Ubuntu `apt` install instructions now pipe the distribution key through `sudo gpg --dearmor` before writing `/usr/share/keyrings/wheels.gpg` instead of `tee`-ing it verbatim. The key published at `apt.wheels.dev/wheels.gpg` is ASCII-armored, and modern `apt` rejects an armored key in a `signed-by=` keyring with an "unsupported filetype" warning followed by `NO_PUBKEY` — so `apt update` failed signature verification and the install never worked. Corrected across the install guide, the CLI installation reference, the release-channels guide, the `apt.wheels.dev` landing page, and the `tools/distribution-drafts/` repo templates (#2838)
+- The `apt.wheels.dev` publishing template (`tools/distribution-drafts/apt-repo/`) no longer wipes the `stable` package index when a `bleeding-edge` snapshot publishes. `regenerate-apt-metadata.sh` rebuilt *both* channels on every run while the workflow synced only the dispatched channel's pool into the runner, so a frequent bleeding-edge publish scanned an empty local `pool/stable/`, produced an empty `Packages`, and the unscoped upload overwrote the good stable index on R2 — leaving `apt install wheels` with "Unable to locate package wheels" even though the `.deb` was present in the pool. The regen now honors a `CHANNELS` env (the workflow passes only the dispatched channel) and the upload is scoped to that channel's `dists/` subtree, so the two channels can no longer clobber each other (#2838)
+
 ----
 
 # [4.0.2](https://github.com/wheels-dev/wheels/releases/tag/v4.0.2) => 2026-05-27
