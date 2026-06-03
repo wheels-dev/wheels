@@ -26,6 +26,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Changed
 
+- Reconcile bot pipeline unblock plan doc with shipped implementation: mark checkboxes as historically complete and align the allowlist note with the final `classify-conflicts.sh`
 - Version switcher now labels the 4.0 stable docs "v4.0 (current)" (was "v4.0.0"); the vestigial pre-GA `v4-0-1-snapshot` guides tree is removed and its one unique page, "Reading the Changelog", is salvaged into `v4-0-0/upgrading/`. Both sites deploy from `develop`, so in-progress patch docs already live in the `v4-0-0` tree; a separate `*-snapshot` tree is only warranted when a different minor/major (e.g. `v4-1-snapshot`) is under development. Courtesy redirects cover the high-traffic `/v4-0-1-snapshot/*` paths (#2827)
 
 ### Fixed
