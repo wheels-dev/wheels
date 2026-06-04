@@ -81,17 +81,6 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Java-backed fileExists() — same rationale as $safeDirExists.
-	 */
-	private boolean function $safeFileExists(required string p) {
-		try {
-			return fileExists(arguments.p);
-		} catch (any e) {
-			return createObject("java", "java.io.File").init(arguments.p).isFile();
-		}
-	}
-
-	/**
 	 * Extract positional arguments from LuCLI's argCollection or __arguments.
 	 *
 	 * LuCLI dispatches module subcommands as:
