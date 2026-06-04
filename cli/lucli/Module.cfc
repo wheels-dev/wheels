@@ -4604,7 +4604,8 @@ component extends="modules.BaseModule" {
 		out("Configuration:", "bold");
 		out("  Port:            #opts.port#");
 		out("  Datasource:      #opts.datasource#");
-		out("  Reload password: #opts.reloadPassword#");
+		out("  Reload password:      #opts.reloadPassword#");
+		out("  Lucee admin password: (see .env — WHEELS_LUCEE_ADMIN_PASSWORD)");
 		if (opts.setupH2) {
 			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {

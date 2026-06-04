@@ -156,6 +156,11 @@ component extends="testbox.system.BaseSpec" {
 					// .env carries the two secrets as separate keys
 					expect(env).toInclude("WHEELS_LUCEE_ADMIN_PASSWORD=");
 					expect(env).toInclude("WHEELS_RELOAD_PASSWORD=");
+					// Parsed values must be distinct — guards against a future regression
+					// where the scaffold collapses back to a single value for both.
+					var reloadVal = reReplaceNoCase(env, "(?s).*WHEELS_RELOAD_PASSWORD=([^\n]+).*", "\1");
+					var adminVal = reReplaceNoCase(env, "(?s).*WHEELS_LUCEE_ADMIN_PASSWORD=([^\n]+).*", "\1");
+					expect(reloadVal).notToBe(adminVal, "Reload and Lucee admin passwords must be distinct");
 				});
 
 				it("leaves no unreplaced {{}} placeholders in any config file", function() {
