@@ -168,7 +168,7 @@ component extends="testbox.system.BaseSpec" {
 				// Verify the detection order in source: .env first, then settings.cfm
 				var envPos = findNoCase("RELOAD_PASSWORD", variables.moduleSource);
 				var settingsPos = findNoCase("reloadPassword", variables.moduleSource, envPos + 1);
-				expect(envPos).toBeGT(0, "Should check .env for RELOAD_PASSWORD");
+				expect(envPos).toBeGT(0, "Should check .env for WHEELS_RELOAD_PASSWORD (or legacy RELOAD_PASSWORD)");
 				expect(settingsPos).toBeGT(envPos,
 					"Should check config/settings.cfm after .env"
 				);
