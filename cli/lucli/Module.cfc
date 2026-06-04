@@ -563,7 +563,7 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
 			if (!len(password)) {
-				out("Hint: Set RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
+				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
 			}
 		}
 		return "";
@@ -5509,11 +5509,13 @@ component extends="modules.BaseModule" {
 	 * Detect the reload password from .env or config/settings.cfm
 	 */
 	private string function detectReloadPassword() {
-		// 1. Check .env for RELOAD_PASSWORD
+		// 1. Check .env for WHEELS_RELOAD_PASSWORD (canonical scaffold name) or
+		//    the legacy unprefixed RELOAD_PASSWORD. The optional prefix keeps
+		//    apps generated before the rename working.
 		var envFile = variables.projectRoot & "/.env";
 		if (fileExists(envFile)) {
 			var envContent = fileRead(envFile);
-			var pwMatch = reFindNoCase("RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
+			var pwMatch = reFindNoCase("(?:WHEELS_)?RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
 			if (arrayLen(pwMatch.match) > 1 && len(trim(pwMatch.match[2]))) {
 				return trim(pwMatch.match[2]);
 			}

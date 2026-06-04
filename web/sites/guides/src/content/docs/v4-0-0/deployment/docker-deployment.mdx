@@ -58,7 +58,7 @@ LABEL org.opencontainers.image.source="https://github.com/your-org/your-app"
 # Wheels reads these at boot. Override per-environment at `docker run` time.
 ENV WHEELS_ENV=production \
     WHEELS_DATASOURCE=app \
-    RELOAD_PASSWORD=change-me \
+    WHEELS_RELOAD_PASSWORD=change-me \
     CATALINA_OPTS="-Xms256m -Xmx1g -XX:MaxMetaspaceSize=256m"
 
 WORKDIR /var/www
@@ -137,7 +137,7 @@ services:
     environment:
       WHEELS_ENV: production
       WHEELS_DATASOURCE: app
-      RELOAD_PASSWORD: ${RELOAD_PASSWORD:?required}
+      WHEELS_RELOAD_PASSWORD: ${WHEELS_RELOAD_PASSWORD:?required}
       DB_HOST: db.internal.example.com
       DB_NAME: myapp_prod
       DB_USER: myapp
@@ -173,7 +173,7 @@ volumes:
 Bring it up:
 
 ```bash title="your shell"
-export RELOAD_PASSWORD="$(openssl rand -hex 32)"
+export WHEELS_RELOAD_PASSWORD="$(openssl rand -hex 32)"
 export DB_PASSWORD="$(pbpaste)"
 docker compose up -d
 docker compose logs -f app
@@ -189,18 +189,16 @@ Wheels reads environment variables at boot through `config/settings.cfm` and `co
 |----------|----------------|---------------|
 | `WHEELS_ENV` | `config/environment.cfm` — selects the environment file | `production` |
 | `WHEELS_DATASOURCE` | `config/settings.cfm` — the datasource name your models use | `app` |
-| `RELOAD_PASSWORD` | `config/settings.cfm` — guards `?reload=true` | a 32-byte random string |
+| `WHEELS_RELOAD_PASSWORD` | `config/settings.cfm` — guards `?reload=true` | a 32-byte random string |
 | `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | `Application.cfc` or your custom datasource config | your DB credentials |
 
-Resolve these inside the app with `Server.System.getEnv("DB_HOST")`:
+Resolve these inside the app with `env("DB_HOST")` — the canonical accessor reads `.env` first, then the process environment, and takes a fail-closed default:
 
-```cfm {test:compile} title="config/environment.cfm"
-component {
-    function config() {
-        set(dataSourceName=Server.System.getEnv("WHEELS_DATASOURCE") ?: "app");
-        set(reloadPassword=Server.System.getEnv("RELOAD_PASSWORD") ?: "changeme");
-    }
-}
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(dataSourceName=env("WHEELS_DATASOURCE", "app"));
+set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
+</cfscript>
 ```
 
 Keep secrets **out** of the image. `docker compose` reads them from your shell's environment, from a `.env` file that's `.gitignore`'d, or from whatever secret store your host provides (Fly's `fly secrets set`, Render's dashboard, AWS Parameter Store).

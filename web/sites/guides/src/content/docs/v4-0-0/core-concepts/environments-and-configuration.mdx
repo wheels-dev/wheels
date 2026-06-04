@@ -45,8 +45,8 @@ Every framework setting is written with one function: `set(key=value)`. It write
 
 ```cfm title="illustrative — config/settings.cfm"
 set(dataSourceName = "myapp_dev");
-set(reloadPassword = application.wo.env("RELOAD_PASSWORD"));
-set(environment = application.wo.env("WHEELS_ENV", "development"));
+set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""));
+set(environment = env("WHEELS_ENV", "development"));
 ```
 
 Settings cascade: framework defaults load first, then `config/settings.cfm`, then `config/<environment>/settings.cfm`. Later writes win. A value you set in the shared file is the default for every environment; the environment-specific file only needs to name the keys it changes.
@@ -59,11 +59,11 @@ The active environment is set by `config/environment.cfm`, which typically reads
 
 ## Secrets handling
 
-Don't commit `.env`, credentials, or API keys. The scaffold ships a `.gitignore` that excludes `.env` for exactly this reason. Read secrets at boot with `application.wo.env("VAR_NAME")`, optionally passing a default for missing-but-not-fatal values:
+Don't commit `.env`, credentials, or API keys. The scaffold ships a `.gitignore` that excludes `.env` for exactly this reason. Read secrets at boot with `env("VAR_NAME")` — the canonical accessor, which checks your `.env` first, then OS environment variables — optionally passing a default for missing-but-not-fatal values:
 
 ```cfm title="illustrative — config/production/settings.cfm"
-set(dataSourcePassword = application.wo.env("DB_PASSWORD"));
-set(stripeApiKey = application.wo.env("STRIPE_API_KEY", ""));
+set(dataSourcePassword = env("DB_PASSWORD"));
+set(stripeApiKey = env("STRIPE_API_KEY", ""));
 ```
 
 Local development uses `.env` files; production uses a secrets manager (1Password Connect, AWS Secrets Manager, HashiCorp Vault) that injects the same variable names at deploy time. Your configuration code doesn't change between environments — only the source of the values does.
