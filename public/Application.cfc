@@ -30,12 +30,7 @@ component output="false" {
 	// symlink, brew bottle, choco package). See PR #2309 for context.
 	this.mappings["/modules/wheels"] = expandPath("../cli/lucli/");
 
-	// Test-only: cli/lucli/Module.cfc extends `modules.BaseModule`, a base class
-	// the LuCLI runtime supplies but the framework's own test server does not.
-	// Map it to a lightweight test double so CLI command specs can instantiate
-	// Module.cfc under /wheels/cli/tests. Longest-prefix resolution keeps the
-	// more specific /modules/wheels mapping above authoritative for the wheels
-	// module itself. See #2829 / PR #2831.
+	// Test double for LuCLI's modules.BaseModule under /wheels/cli/tests — see #2829 / PR #2831.
 	this.mappings["/modules"] = expandPath("../cli/lucli/tests/_modules");
 
 	// We turn on "sessionManagement" by default since the Flash uses it.
