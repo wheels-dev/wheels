@@ -125,7 +125,11 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.iEnd = local.columns.recordCount;
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				// set up properties and column mapping
-				local.columnName = lCase(local.columns["column_name"][local.i]);
+				// preserve the DB's reported column case; an unconditional lCase() here regressed non-Oracle engines in 3.0 (see $lowerCaseColumnNames)
+				local.columnName = local.columns["column_name"][local.i];
+				if (variables.wheels.class.adapter.$lowerCaseColumnNames()) {
+					local.columnName = lCase(local.columnName);
+				}
 
 				if (!StructKeyExists(local.processedColumns, local.columnName)) {
 					// default the column to map to a property with the same name
