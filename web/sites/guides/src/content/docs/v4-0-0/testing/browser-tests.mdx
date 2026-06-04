@@ -176,7 +176,13 @@ component extends="wheels.wheelstest.BrowserTest" {
 
 ## The DSL — auth fixtures
 
-`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode and sets `session.userId` and `session.userEmail` server-side — no real login form, no password hashing, no redirect handshake. Use it when the spec's intent is "what does an authenticated user see", not "what does the login form do". All `/_browser/*` fixture routes appear under the **Internal** tab in the Routes UI (`/wheels/routes`), not Application — they are framework-owned and do not correspond to files in your app.
+`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode. The default handler writes `session.userId = 1` and `session.userEmail = identifier` — enough for simple apps. If your app stores a richer session shape (e.g. `session.member = { id, email, firstName, lastName }`), add one line to `config/settings.cfm`:
+
+```cfm title="config/settings.cfm"
+set(browserLoginAsHandler = "AuthFixture##loginAs");
+```
+
+The framework dispatches `/_browser/login-as` to that controller##action instead of the built-in one. Your controller is a normal Wheels controller with full access to `params`, `session`, `model()`, and `inject()`. Env-gating is handled by `wheels.middleware.BrowserTestFixtureGuard` on the `/_browser` scope — your handler does not need to re-implement the guard. Remove the setting or set it to an empty string to fall back to the default. No real login form, no password hashing, no redirect handshake. Use `loginAs` when the spec's intent is "what does an authenticated user see", not "what does the login form do". All `/_browser/*` fixture routes appear under the **Internal** tab in the Routes UI (`/wheels/routes`), not Application — they are framework-owned and do not correspond to files in your app.
 
 ```cfm {test:compile} title="tests/specs/browser/AuthenticatedSpec.cfc"
 component extends="wheels.wheelstest.BrowserTest" {
