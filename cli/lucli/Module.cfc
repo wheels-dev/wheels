@@ -4510,6 +4510,7 @@ component extends="modules.BaseModule" {
 			port: structKeyExists(options, "port") ? options.port : 8080,
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
+			luceeAdminPassword: generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
@@ -4556,6 +4557,7 @@ component extends="modules.BaseModule" {
 			"appName": appName,
 			"datasourceName": opts.datasource,
 			"reloadPassword": opts.reloadPassword,
+			"luceeAdminPassword": opts.luceeAdminPassword,
 			"port": opts.port,
 			"shutdownPort": opts.port + 1,
 			"openBrowser": opts.openBrowser ? "true" : "false",

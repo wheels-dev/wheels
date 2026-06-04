@@ -4,3 +4,4 @@
 WHEELS_ENV=development
 WHEELS_DATASOURCE={{datasourceName}}
 WHEELS_RELOAD_PASSWORD={{reloadPassword}}
+WHEELS_LUCEE_ADMIN_PASSWORD={{luceeAdminPassword}}
