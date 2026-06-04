@@ -157,11 +157,11 @@ For an entire JSON API under `/api`, inherit from a controller that calls `prote
 ```cfm {test:compile} title="config/settings.cfm"
 <cfscript>
 set(dataSourceName="myapp");
-set(reloadPassword=application.wo.env("WHEELS_RELOAD_PASSWORD"));
+set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
 </cfscript>
 ```
 
-Rotate it in every environment. The scaffolded template uses `{{reloadPassword}}` as a placeholder the generator fills in (`cli/lucli/templates/app/config/settings.cfm` line 25); replace with an env-var lookup before you ship. Never commit the literal value.
+Rotate it in every environment. The scaffolded template already reads this from `.env` via `set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""))` (`cli/lucli/templates/app/config/settings.cfm`), so the random value the generator creates lives only in the git-ignored `.env`. Never commit the literal value.
 
 ### What it protects (and what it doesn't)
 
@@ -189,7 +189,7 @@ See issue [#2477](https://github.com/wheels-dev/wheels/issues/2477) for the full
 
 Keep every runtime secret out of source control:
 
-- **`.env` files in dev.** `application.wo.env("NAME")` reads from the process environment, which Wheels populates from `.env` at boot. Add `.env` to `.gitignore`; commit `.env.example` with the keys (no values).
+- **`.env` files in dev.** `env("NAME")` reads from the process environment, which Wheels populates from `.env` at boot. Add `.env` to `.gitignore`; commit `.env.example` with the keys (no values).
 - **Environment variables in prod.** Set secrets via the deploy tool (systemd `EnvironmentFile=`, Kubernetes `Secret`, Docker `--env-file`, 1Password Connect, AWS Parameter Store, etc.).
 - **Never bake secrets into an image.** A container image is a public artifact — treat it that way.
 
@@ -198,8 +198,8 @@ The datasource is a common miss. `set(dataSourcePassword="hunter2")` in `config/
 ```cfm {test:compile} title="config/settings.cfm"
 <cfscript>
 set(dataSourceName="myapp");
-set(dataSourceUserName=application.wo.env("DB_USER"));
-set(dataSourcePassword=application.wo.env("DB_PASSWORD"));
+set(dataSourceUserName=env("DB_USER"));
+set(dataSourcePassword=env("DB_PASSWORD"));
 </cfscript>
 ```
 

@@ -89,7 +89,7 @@ if (
 ) {
 	writeOutput(serializeJSON({
 		success: false,
-		error: "Console requires a reload password. Set RELOAD_PASSWORD in .env"
+		error: "Console requires a reload password. Set WHEELS_RELOAD_PASSWORD in .env"
 	}));
 	abort;
 }
@@ -120,7 +120,7 @@ if (!CreateObject("java", "java.security.MessageDigest").isEqual(local.inputByte
 	application.$consoleRateLimit[local.rateLimitKey].count++;
 	writeOutput(serializeJSON({
 		success: false,
-		error: "Invalid reload password. Set RELOAD_PASSWORD in .env or pass --password to wheels console"
+		error: "Invalid reload password. Set WHEELS_RELOAD_PASSWORD in .env or pass --password to wheels console"
 	}));
 	abort;
 }

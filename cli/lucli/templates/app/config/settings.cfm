@@ -21,8 +21,9 @@
 	*/
 	set(URLRewriting="On");
 
-	// Reload your application with ?reload=true&password={{reloadPassword}}
-	set(reloadPassword="{{reloadPassword}}");
+	// Reload your application with ?reload=true&password=<your WHEELS_RELOAD_PASSWORD>
+	// The secret is read from .env (git-ignored) so it never lands in version control.
+	set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
 
 	/*
 		Migrator: produce `<name>_id` columns from t.references() and friends

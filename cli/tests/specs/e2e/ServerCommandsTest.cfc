@@ -131,6 +131,13 @@ component extends="testbox.system.BaseSpec" {
 				expect(result).toBe("mysecret");
 			});
 
+			it("reads WHEELS_RELOAD_PASSWORD from .env (canonical scaffold name)", function() {
+				fileWrite(variables.testDir & "/.env", "WHEELS_RELOAD_PASSWORD=prefixed123#chr(10)#PORT=8080");
+
+				var result = detectReloadPasswordFromEnv(variables.testDir);
+				expect(result).toBe("prefixed123");
+			});
+
 			it("reads reloadPassword from config/settings.cfm", function() {
 				fileWrite(
 					variables.testDir & "/config/settings.cfm",
@@ -672,7 +679,7 @@ component extends="testbox.system.BaseSpec" {
 		var envFile = arguments.projectRoot & "/.env";
 		if (fileExists(envFile)) {
 			var envContent = fileRead(envFile);
-			var pwMatch = reFindNoCase("RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
+			var pwMatch = reFindNoCase("(?:WHEELS_)?RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
 			if (arrayLen(pwMatch.match) > 1 && len(trim(pwMatch.match[2]))) {
 				return trim(pwMatch.match[2]);
 			}
