@@ -85,7 +85,12 @@ component extends="modules.BaseModule" {
 				// Boolean flag: --key
 				arrayAppend(result, "--" & key);
 			} else if (isSimpleValue(value) && value == "false") {
-				// Negated flag: skip (--no-key was already converted)
+				// LuCLI converts the user's `--no-key` into key=false on the
+				// argCollection it hands modules. Re-emit `--no-key` so the
+				// downstream literal-token matchers (`wheels new --no-sqlite`,
+				// `wheels g admin --no-routes`, etc.) see the user's negation
+				// instead of silently dropping it. Issue #2855.
+				arrayAppend(result, "--no-" & key);
 			} else if (isSimpleValue(value)) {
 				arrayAppend(result, "--" & key & "=" & value);
 			}
