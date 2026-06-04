@@ -52,7 +52,7 @@ component extends="wheels.WheelsTest" {
 	}
 
 	function run() {
-		describe("browserLoginAsHandler — app-level override of /_browser/login-as fixture (#2830)", () => {
+		describe("browserLoginAsHandler — app-level override of /_browser/login-as fixture (##2830)", () => {
 
 			beforeEach(() => {
 				application.wheels.environment = "testing";
