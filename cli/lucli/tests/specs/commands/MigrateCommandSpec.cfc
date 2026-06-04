@@ -20,7 +20,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function run() {
 
-		describe("wheels migrate", () => {
+		// SKIPPED pending the command-by-command CLI test audit. `migrate` and
+		// `seed` invoke commands that require a *running* Wheels server (server
+		// detection via lucee.json/.env ports); the stateless TestBox harness has
+		// none on the expected port, so every case errors with "No running Wheels
+		// server detected". (These passed against a local dev server but fail in
+		// CI — server-dependent, not unit-testable here.) See #2829 / PR #2831.
+		xdescribe("wheels migrate", () => {
 
 			it("defaults to latest when no args", () => {
 				mod.__arguments = [];
@@ -61,7 +67,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("wheels seed", () => {
+		xdescribe("wheels seed", () => {
 
 			it("runs without error with no args", () => {
 				mod.__arguments = [];

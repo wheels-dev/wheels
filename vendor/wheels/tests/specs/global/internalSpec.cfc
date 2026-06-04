@@ -181,6 +181,13 @@ component extends="wheels.WheelsTest" {
 				expect(len(g.$checkMinimumVersion(version="11,0,3,282462", engine="Adobe ColdFusion"))).toBeGT(0)
 				expect(len(g.$checkMinimumVersion(version="11,0,12,302575", engine="Adobe ColdFusion"))).toBeGT(0)
 			})
+
+			it("checks rustcfml accepts any version", () => {
+				// RustCFML is pre-1.0 and rapidly evolving; the guard accepts any version.
+				expect(len(g.$checkMinimumVersion(version="0.41.0", engine="RustCFML"))).toBe(0)
+				expect(len(g.$checkMinimumVersion(version="0.50.0", engine="RustCFML"))).toBe(0)
+				expect(len(g.$checkMinimumVersion(version="1.0.0", engine="RustCFML"))).toBe(0)
+			})
 		})
 
 		describe("Tests that $fullDomainString", () => {

@@ -584,6 +584,23 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Reports whether auto-derived property names should be lowercased.
+	 *
+	 * When a model declares no property() mappings, Wheels derives its
+	 * properties from the database column metadata. Most databases either
+	 * preserve the declared identifier case (SQL Server, MySQL, SQLite) or
+	 * fold unquoted identifiers to lowercase (PostgreSQL, CockroachDB); in
+	 * both cases the reported column name is the correct property name as-is,
+	 * so the default preserves it. Databases that fold unquoted identifiers to
+	 * a non-meaningful UPPERCASE default (Oracle, H2) override this to return
+	 * `true`, so Wheels lowercases the derived property name instead of
+	 * exposing e.g. `FIRSTNAME`.
+	 */
+	public boolean function $lowerCaseColumnNames() {
+		return false;
+	}
+
+	/**
 	 * Returns the SQL clause for pessimistic row locking (e.g., "FOR UPDATE").
 	 * Individual database adapters override this when the default is not appropriate.
 	 */

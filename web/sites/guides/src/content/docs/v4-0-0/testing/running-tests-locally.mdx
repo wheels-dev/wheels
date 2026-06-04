@@ -202,6 +202,7 @@ These are the errors you'll actually hit. Fix-ups first, diagnosis second.
 - **Populate SQL errors** — read the error. "Table already exists" means a stale table from a previous engine-specific run; add a `DROP TABLE IF EXISTS` first. "Syntax error near CURRENT_TIMESTAMP" means cross-engine SQL drift; use `NOW()` — it works on every supported engine.
 - **Flaky `wheels new` in parallel harness runs** — a known LuCLI race (framework gap tracker #11). Retry once, or serialize the runs until the fix lands.
 - **Server not responding after `compose up`** — engines need 30–90 seconds to cold-start. `curl -I http://localhost:60007/` returns connection-refused until the engine is ready. If it stays down after two minutes, check `docker compose logs <service>`.
+- **"1 error(s)" with a bundle path but no failing assertion** — the BDD runner caught a load-time or setup error for that spec file. Two common causes: (1) `it()` called directly inside `run()` without an enclosing `describe()` block, or (2) `beforeAll()` throwing an exception. The runner captures both against the bundle and populates `globalException` — check the spec file at the path shown in the summary for the underlying throw.
 
 ## Cleanup
 
