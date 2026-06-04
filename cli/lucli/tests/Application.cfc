@@ -20,4 +20,10 @@ component {
 	// resolvable inside the test runner.
 	this.mappings["/modules/wheels"] = local.projectRoot & "cli/lucli/";
 
+	// Module.cfc extends `modules.BaseModule` (LuCLI's runtime base class).
+	// Map it to a test double so command specs that instantiate
+	// `new cli.lucli.Module()` load under TestBox. Longest-prefix resolution
+	// keeps /modules/wheels above authoritative for the wheels module. See #2829.
+	this.mappings["/modules"] = local.projectRoot & "cli/lucli/tests/_modules/";
+
 }
