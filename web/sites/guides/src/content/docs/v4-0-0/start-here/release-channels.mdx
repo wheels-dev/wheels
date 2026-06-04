@@ -64,12 +64,19 @@ The two formulas are mutually exclusive — both expose the `wheels` binary, so 
 
 <TabItem label="Windows" icon="seti:windows">
 
-A Scoop bucket is in the works. Until it lands, install manually from the corresponding releases page:
+Both channels are available via a [Scoop](https://scoop.sh) bucket:
 
-- **Stable**: download `wheels-module-<version>.zip` from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases).
-- **Bleeding-edge**: download `wheels-module-<version>.zip` from [github.com/wheels-dev/wheels-snapshots/releases](https://github.com/wheels-dev/wheels-snapshots/releases).
+```powershell title="PowerShell"
+scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
 
-The rest of the install steps are identical — see [Installing Wheels → Windows](/v4-0-0/start-here/installing/#install-the-cli) for the LuCLI launcher and module-extraction details.
+# Stable
+scoop install wheels
+
+# Bleeding-edge
+scoop install wheels-be
+```
+
+The two packages are mutually exclusive — both expose the `wheels` binary, so Scoop refuses to install both at once. To switch channels, uninstall one and install the other (see [Switching channels](#switching-channels) below). Both inline OpenJDK 21, so no separate Java setup is needed — see [Installing Wheels → Windows](/v4-0-0/start-here/installing/#install-the-cli) for the Scoop + git prerequisites.
 
 </TabItem>
 
