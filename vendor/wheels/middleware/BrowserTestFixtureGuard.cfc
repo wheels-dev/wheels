@@ -21,6 +21,16 @@
  */
 component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
+	/**
+	 * Required so the dispatcher can instantiate this middleware when it is
+	 * registered by component-path string on a route scope —
+	 * `Dispatch.cfc::$resolveMiddlewareInstance()` does
+	 * `CreateObject("component", name).init()`. Takes no configuration.
+	 */
+	public BrowserTestFixtureGuard function init() {
+		return this;
+	}
+
 	public string function handle(required struct request, required any next) {
 		if (
 			!StructKeyExists(application.wheels, "environment")
