@@ -20,7 +20,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function run() {
 
-		describe("wheels test", () => {
+		// SKIPPED pending the command-by-command CLI test audit: `wheels test`
+		// shells out to a *running* Wheels server (detected via lucee.json/.env
+		// ports), which the stateless TestBox harness doesn't provide — every
+		// case errors with "No running Wheels server detected". (Passed against a
+		// local dev server but fails in CI.) The $normalizeTestFilter and
+		// $resolveAppTestDataSource describes below are pure unit tests and keep
+		// running. See #2829 / PR #2831.
+		xdescribe("wheels test", () => {
 
 			it("runs without error with no args", () => {
 				mod.__arguments = [];
