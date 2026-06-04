@@ -169,7 +169,7 @@ items.each(function(i) { result.count++; });
 ### 11. CFML Reserved Scopes Shadow Function Parameters
 **Source:** [#2591](https://github.com/wheels-dev/wheels/pull/2591) — `consoleExec(url, body)` received the URL scope struct in place of the URL string, throwing `Cannot cast Object type [url] to a value of type [string]`.
 
-Reserved scope names in CFML: `url`, `form`, `cgi`, `client`, `session`, `application`, `cookie`, `request`, `server`, `arguments`, `variables`. Naming a function parameter, local var, or argument the same as a scope shadows it but the scope can also win depending on engine and context.
+Reserved scope names in CFML: `url`, `form`, `cgi`, `client`, `session`, `application`, `cookie`, `request`, `server`, `arguments`, `variables`, `local`, `this`. Naming a function parameter, local var, or argument the same as a scope shadows it but the scope can also win depending on engine and context.
 
 ```cfm
 // WRONG

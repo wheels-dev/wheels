@@ -248,6 +248,42 @@ component extends="Controller" {
 
 Wheels 4.0 also ships an allowlist mechanism on the model itself for the cases where the explicit form gets tedious. The [Security Hardening](/v4-0-0/digging-deeper/security-hardening/) page has the deep dive; until then, the explicit-pick pattern above is what every controller in the tutorial uses.
 
+## Reserved scope names
+
+CFML reserves a set of identifiers as scope names. Declaring a local `var` with the same name causes scope-precedence collisions — the engine may resolve the identifier to the scope struct instead of the value you declared, silently producing wrong behavior or a runtime error.
+
+**Identifiers to avoid as local variables, `var` declarations, or function parameters:**
+
+`client`, `url`, `form`, `session`, `cgi`, `request`, `application`, `cookie`, `server`, `arguments`, `variables`, `local`, `this`
+
+The `client` collision is the most confusing in practice. On Lucee 7, `clientManagement` is off by default. When you write `client.someMethod()` and `client` is also a local variable, Lucee resolves the identifier to the disabled `client` scope and throws:
+
+```
+lucee.runtime.exp.ExpressionException: client scope is not enabled
+```
+
+The error names the scope, not the variable — so the natural reading is "my app is misconfigured", not "I chose a bad variable name". The fix is a rename, not a config change.
+
+```cfm title="Wrong — client resolves to the disabled client scope on Lucee 7"
+function processOrder() {
+    var client = paymentService();       // tempting name for a service handle
+    var result = client.charge(amount);  // → "client scope is not enabled"
+}
+```
+
+```cfm title="Right — use a name that isn't a reserved scope identifier"
+function processOrder() {
+    var gateway = paymentService();
+    var result = gateway.charge(amount);
+}
+```
+
+`url`, `form`, and `request` are equally common as service-object handles ("the API request", "the form parser") and carry the same collision risk. Pick a domain-specific name instead.
+
+<Aside type="caution">
+  The same rule applies to test code. `var client = $testClient()` in controller specs is the most common place to encounter this — use `var httpClient` or `var testClient` instead.
+</Aside>
+
 ## Related guides
 
 <CardGrid>
