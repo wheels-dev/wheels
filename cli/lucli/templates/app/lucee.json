@@ -17,7 +17,7 @@
   },
   "admin": {
     "enabled": true,
-    "password": "#env:WHEELS_RELOAD_PASSWORD#"
+    "password": "#env:WHEELS_LUCEE_ADMIN_PASSWORD#"
   },
   "enableLucee": true,
   "enableREST": false,

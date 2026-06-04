@@ -4510,6 +4510,7 @@ component extends="modules.BaseModule" {
 			port: structKeyExists(options, "port") ? options.port : 8080,
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
+			luceeAdminPassword: generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
@@ -4556,6 +4557,7 @@ component extends="modules.BaseModule" {
 			"appName": appName,
 			"datasourceName": opts.datasource,
 			"reloadPassword": opts.reloadPassword,
+			"luceeAdminPassword": opts.luceeAdminPassword,
 			"port": opts.port,
 			"shutdownPort": opts.port + 1,
 			"openBrowser": opts.openBrowser ? "true" : "false",
@@ -4602,7 +4604,8 @@ component extends="modules.BaseModule" {
 		out("Configuration:", "bold");
 		out("  Port:            #opts.port#");
 		out("  Datasource:      #opts.datasource#");
-		out("  Reload password: #opts.reloadPassword#");
+		out("  Reload password:      #opts.reloadPassword#");
+		out("  Lucee admin password: (see .env — WHEELS_LUCEE_ADMIN_PASSWORD)");
 		if (opts.setupH2) {
 			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
