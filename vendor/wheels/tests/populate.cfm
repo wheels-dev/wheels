@@ -96,7 +96,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems">
+<cfset local.tables = "c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation">
 <!---
 	On Oracle, append CASCADE CONSTRAINTS so the drop removes incoming FK
 	references along with the table. PURGE skips the recycle bin so the
@@ -123,6 +123,21 @@ CREATE TABLE c_o_r_e_authors
 	id #local.identityColumnType#
 	,firstname varchar(100) NOT NULL
 	,lastname varchar(100) NOT NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<!---
+	Fixture for property-name case preservation (auto-derived properties).
+	The `isHidden` column is intentionally declared with mixed case and left
+	unquoted, so each engine folds it per its own rules; the spec asserts the
+	resulting property name matches the engine's reported column casing.
+--->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_casepreservation
+(
+	id #local.identityColumnType#
+	,isHidden #local.intColumnType# NULL
 	,PRIMARY KEY(id)
 ) #local.storageEngine#
 </cfquery>

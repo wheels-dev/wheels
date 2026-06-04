@@ -82,7 +82,7 @@ Each channel ships from a signed native repository — distinct package names (`
 
 ```bash title="Debian / Ubuntu (stable)"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
   | sudo tee /etc/apt/sources.list.d/wheels.list
 sudo apt update && sudo apt install wheels
@@ -95,7 +95,7 @@ sudo dnf install wheels
 
 ```bash title="Debian / Ubuntu (bleeding-edge)"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
   | sudo tee /etc/apt/sources.list.d/wheels-be.list
 sudo apt update && sudo apt install wheels-be
@@ -106,7 +106,7 @@ sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels-be.repo
 sudo dnf install wheels-be
 ```
 
-Both repos are GPG-signed (fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`); `apt update` / `dnf check-update` verifies the signature on every refresh. The raw `.deb`/`.rpm` are also uploaded to each GitHub Release as a fallback for air-gapped installs (see [CLI Installation](/v4-0-0/command-line-tools/installation/)).
+Both repos are GPG-signed (fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`); `apt update` / `dnf check-update` verifies the signature on every refresh. The published key is ASCII-armored, so the Debian/Ubuntu snippet pipes it through `sudo gpg --dearmor` — `apt` rejects an armored key written straight to a `signed-by=` keyring. The raw `.deb`/`.rpm` are also uploaded to each GitHub Release as a fallback for air-gapped installs (see [CLI Installation](/v4-0-0/command-line-tools/installation/)).
 
 </TabItem>
 

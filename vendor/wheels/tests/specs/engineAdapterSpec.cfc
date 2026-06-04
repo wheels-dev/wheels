@@ -10,7 +10,7 @@ component extends="wheels.WheelsTest" {
 
 			it("returns the correct engine name", function() {
 				var name = application.wheels.engineAdapter.getName();
-				expect(ListFind("Lucee,Adobe ColdFusion,BoxLang", name)).toBeGT(0);
+				expect(ListFind("Lucee,Adobe ColdFusion,BoxLang,RustCFML", name)).toBeGT(0);
 			});
 
 			it("returns a non-empty version string", function() {
@@ -18,7 +18,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns a valid major version", function() {
-				expect(application.wheels.engineAdapter.getMajorVersion()).toBeGT(0);
+				// Pre-1.0 engines (e.g. RustCFML 0.x) legitimately report major version 0.
+				if (application.wheels.engineAdapter.isRustCFML()) {
+					expect(application.wheels.engineAdapter.getMajorVersion()).toBeGTE(0);
+				} else {
+					expect(application.wheels.engineAdapter.getMajorVersion()).toBeGT(0);
+				}
 			});
 
 			it("matches the application serverName", function() {
@@ -79,6 +84,7 @@ component extends="wheels.WheelsTest" {
 				if (adapter.isLucee()) count++;
 				if (adapter.isAdobe()) count++;
 				if (adapter.isBoxLang()) count++;
+				if (adapter.isRustCFML()) count++;
 				expect(count).toBe(1);
 			});
 
@@ -107,6 +113,31 @@ component extends="wheels.WheelsTest" {
 					expect(adapter.isLucee()).toBeFalse();
 					expect(adapter.isAdobe()).toBeFalse();
 				}
+			});
+
+			it("identity matches engine name for RustCFML", function() {
+				var adapter = application.wheels.engineAdapter;
+				if (adapter.getName() == "RustCFML") {
+					expect(adapter.isRustCFML()).toBeTrue();
+					expect(adapter.isLucee()).toBeFalse();
+					expect(adapter.isAdobe()).toBeFalse();
+					expect(adapter.isBoxLang()).toBeFalse();
+				}
+			});
+
+		});
+
+		describe("Engine Adapter - Capabilities", function() {
+
+			it("supportsCfcache returns true on non-RustCFML engines (Base default)", function() {
+				var base = new wheels.engineAdapters.Base("7.0.0");
+				expect(base.supportsCfcache()).toBeTrue();
+			});
+
+			it("RustCFMLAdapter reports supportsCfcache false and isRustCFML true", function() {
+				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.50.0");
+				expect(rustAdapter.supportsCfcache()).toBeFalse();
+				expect(rustAdapter.isRustCFML()).toBeTrue();
 			});
 
 		});

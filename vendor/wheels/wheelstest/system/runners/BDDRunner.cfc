@@ -47,25 +47,33 @@ component
 			structKeyExists( tartetAnnotations, "displayName" ) ? tartetAnnotations.displayname : targetMD.name
 		);
 
-		// Execute the suite descriptors
-		arguments.target.run( testResults = arguments.testResults, testbox = variables.testbox );
-
-		// Discover the test suite data to use for testing
-		var testSuites      = getTestSuites( arguments.target, targetMD );
-		var testSuitesCount = arrayLen( testSuites );
-
-		// Start recording stats for this bundle
+		// Start recording stats for this bundle BEFORE invoking the target,
+		// so a throw from `target.run()` (e.g. `it()` called outside a
+		// `describe()` body — see issue #2829) can be recorded against this
+		// bundle instead of bubbling out anonymously as a
+		// `BundleRunnerMajorException` with no file context.
 		var bundleStats = arguments.testResults.startBundleStats( bundlePath = targetMD.name, name = bundleName );
 
-		// Verify we can run this bundle
-		if (
-			canRunBundle(
-				bundlePath  = targetMD.name,
-				testResults = arguments.testResults,
-				targetMD    = targetMD
-			)
-		) {
-			try {
+		// Wrap the suite-descriptor pass and bundle execution in a single
+		// try so both load-time errors (target.run, getTestSuites) and
+		// run-time errors (beforeAll/afterAll, suite iteration) land in the
+		// same catch and report the offending bundle.
+		try {
+			// Execute the suite descriptors
+			arguments.target.run( testResults = arguments.testResults, testbox = variables.testbox );
+
+			// Discover the test suite data to use for testing
+			var testSuites      = getTestSuites( arguments.target, targetMD );
+			var testSuitesCount = arrayLen( testSuites );
+
+			// Verify we can run this bundle
+			if (
+				canRunBundle(
+					bundlePath  = targetMD.name,
+					testResults = arguments.testResults,
+					targetMD    = targetMD
+				)
+			) {
 				// execute beforeAll() for this bundle, no matter how many suites they have.
 				if ( structKeyExists( arguments.target, "beforeAll" ) ) {
 					arguments.target.beforeAll();
@@ -142,26 +150,28 @@ component
 				for ( var afterAllMethod in afterAllAnnotationMethods ) {
 					invoke( arguments.target, "#afterAllMethod.name#" );
 				}
-			} catch ( Any e ) {
-				bundleStats.globalException = e;
-				// For a righteous man falls seven times, and rises (tests) again :)
-				// The amount doesn't matter, nothing can run at this point, failure with before/after aspects that need fixing
-				bundleStats.totalError      = -1;
-				arguments.testResults.incrementStat( type = "error", count = bundleStats.totalError );
-
-				// Module call backs
-				variables.testbox.announceToModules(
-					"onSuiteError",
-					[
-						e,
-						arguments.target,
-						arguments.testResults,
-						isNull( thisSuite ) ? {} : thisSuite
-					]
-				);
 			}
+			// end if we can run bundle
+		} catch ( Any e ) {
+			bundleStats.globalException = e;
+			// Use a positive count so the summary reports "1 error(s)" rather
+			// than the legacy "-1 error(s)" sentinel — issue #2829. The bundle's
+			// globalException still carries the underlying throw for tooling
+			// that wants the full detail.
+			bundleStats.totalError      = 1;
+			arguments.testResults.incrementStat( type = "error", count = 1 );
+
+			// Module call backs
+			variables.testbox.announceToModules(
+				"onSuiteError",
+				[
+					e,
+					arguments.target,
+					arguments.testResults,
+					isNull( thisSuite ) ? {} : thisSuite
+				]
+			);
 		}
-		// end if we can run bundle
 
 		// finalize the bundle stats
 		arguments.testResults.endStats( bundleStats );

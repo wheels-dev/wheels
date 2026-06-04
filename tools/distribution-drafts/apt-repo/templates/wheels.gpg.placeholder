@@ -13,7 +13,7 @@ Cloudflare Pages will serve it at `https://apt.wheels.dev/wheels.gpg`, which
 is the URL users `curl` during the one-time setup:
 
     curl -fsSL https://apt.wheels.dev/wheels.gpg \
-      | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+      | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 
 Also commit the key fingerprint to `FINGERPRINT` at the bucket-repo root so
 anyone can verify it out-of-band:

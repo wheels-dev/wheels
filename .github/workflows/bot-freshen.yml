@@ -1,0 +1,76 @@
+name: Wheels Bot — Freshen PRs
+
+# Keeps open bot PRs current with develop. On each push to develop (plus a
+# 30-min backstop), behind-but-clean branches are updated non-destructively
+# (merge develop in); DIRTY branches are handed to bot-resolve-conflicts.yml.
+on:
+  push:
+    branches: [develop]
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: wheels-bot-freshen
+  cancel-in-progress: false
+
+jobs:
+  freshen:
+    name: Freshen open bot PRs
+    if: vars.WHEELS_BOT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      REPO: wheels-dev/wheels
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Sweep
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          decide=.github/scripts/freshen-decide.sh
+          # gh's author.login reports App authors as `app/<slug>` (verified: bot
+          # PRs show `app/wheels-bot` on the `gh pr list --json author` surface),
+          # while REST/webhook surfaces use `<slug>[bot]`. Match both forms so the
+          # filter is robust across gh versions / API surfaces.
+          prs=$(gh pr list --repo "$REPO" --state open --base develop \
+                  --json number,isDraft,author \
+                  --jq '.[] | select(.isDraft==false) | select(.author.login=="app/wheels-bot" or .author.login=="wheels-bot[bot]") | .number')
+          if [ -z "$prs" ]; then echo "No open bot PRs."; exit 0; fi
+          for n in $prs; do
+            status=UNKNOWN
+            for _ in $(seq 1 9); do            # mergeStateStatus is async; poll ~45s
+              status=$(gh pr view "$n" --repo "$REPO" --json mergeStateStatus --jq '.mergeStateStatus' || echo "UNKNOWN")
+              [ "$status" != "UNKNOWN" ] && break
+              sleep 5
+            done
+            action=$(bash "$decide" "$status")
+            echo "PR #$n: status=$status -> $action"
+            case "$action" in
+              update)
+                gh api -X PUT "repos/$REPO/pulls/$n/update-branch" \
+                  && echo "  updated #$n" \
+                  || echo "  update-branch no-op/failed for #$n (already current or raced to DIRTY)";;
+              dispatch-resolver)
+                gh workflow run bot-resolve-conflicts.yml --repo "$REPO" -f pr-number="$n" \
+                  && echo "  dispatched resolver for #$n" \
+                  || echo "  failed to dispatch resolver for #$n";;
+              skip) echo "  nothing to do for #$n";;
+            esac
+          done
