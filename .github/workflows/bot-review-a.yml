@@ -60,6 +60,10 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_FROM_PR_EVENT: ${{ github.event.pull_request.number }}
           PR_FROM_COMMENT_EVENT: ${{ github.event.issue.number }}
+          # Body of the comment that triggered response mode (Reviewer B's
+          # critique). Passed through env — never interpolate event text
+          # straight into the script (injection). Empty on pull_request events.
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
@@ -73,7 +77,21 @@ jobs:
               echo "::error::Invalid PR number from issue context: $pr_num"
               exit 1
             fi
-            sha=$(gh pr view "$pr_num" --repo wheels-dev/wheels --json headRefOid -q '.headRefOid')
+            # Anchor the response to the exact commit Reviewer B critiqued — not
+            # the PR's (possibly newer) head. The triggering comment is B's
+            # critique, whose marker carries that SHA:
+            # `wheels-bot:review-b:<pr>:<sha>:<round>`. Re-deriving the head via
+            # `gh pr view` would float to the current head and diverge from B's
+            # commit_id-anchored marker once a push lands mid-loop, leaving the
+            # response unable to match B's round (#2848). COMMENT_BODY is read
+            # from env, never spliced into the script as a workflow expression.
+            sha=$(printf '%s\n' "$COMMENT_BODY" \
+              | grep -oiP "wheels-bot:review-b:${pr_num}:\K[0-9a-f]{7,40}" \
+              | head -1 || true)
+            if [ -z "$sha" ]; then
+              echo "::error::Could not extract the reviewed SHA from the triggering review-b comment"
+              exit 1
+            fi
             mode="response"
           fi
           echo "pr_num=$pr_num" >> "$GITHUB_OUTPUT"

@@ -81,6 +81,25 @@ component extends="wheels.WheelsTest" {
 					);
 				});
 
+				it("never re-derives a SHA via `gh pr view --json headRefOid`", () => {
+					expect(fileExists(reviewA)).toBeTrue("Missing file: " & reviewA);
+					var content = fileRead(reviewA);
+					// Response mode used to derive the SHA from `gh pr view --json
+					// headRefOid` (the current head), which floats while Reviewer B
+					// anchors its marker to github.event.review.commit_id — so once a
+					// push lands mid-loop the two diverge and the response can't find
+					// B's critique. The reviewed SHA must instead be read from the
+					// triggering review-b comment. Asserting headRefOid is absent
+					// keeps the floating derivation from creeping back (issue ##2848).
+					expect(reFindNoCase("headRefOid", content) > 0).toBeFalse(
+						"bot-review-a.yml must not derive a marker SHA from "
+						& "`gh pr view --json headRefOid` — in response mode it floats to the "
+						& "current head and diverges from Reviewer B's commit_id-anchored "
+						& "marker once a push lands mid-loop. Extract the reviewed SHA from "
+						& "the triggering review-b comment instead (issue ##2848)."
+					);
+				});
+
 			});
 
 			describe("bot-review-b.yml", () => {
