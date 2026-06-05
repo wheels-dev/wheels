@@ -49,16 +49,19 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Normalize a filesystem path for safe handoff to Lucee file APIs on
-	 * Windows. Replaces all backslashes with forward slashes — Lucee
-	 * accepts both on Windows, but mixed-slash strings can trip
-	 * ResourceUtil's URI scheme detection (see init() comment).
+	 * Bootstrap-safe wrapper around `Helpers.normalizePath()` — the single
+	 * source of truth for path normalisation (GH #2841). Collapses Windows
+	 * backslashes to forward slashes so a mixed-slash path like
+	 * `C:\Users\cy/blog` can't trip Lucee's Resource API into reading `c:`
+	 * as a URI scheme (see init() comment).
 	 *
-	 * No-op on a path that already uses forward slashes (Mac/Linux,
-	 * already-normalized Windows paths).
+	 * Helpers is instantiated directly rather than via `getService()`
+	 * because `$normalizePath()` runs inside `init()` before
+	 * `variables.services` exists. Helpers is a dependency-free leaf
+	 * utility, so constructing it at bootstrap is cheap and safe.
 	 */
 	private string function $normalizePath(required string p) {
-		return replace(arguments.p, "\", "/", "all");
+		return new services.Helpers().normalizePath(arguments.p);
 	}
 
 	/**

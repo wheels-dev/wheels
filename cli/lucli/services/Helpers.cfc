@@ -105,6 +105,35 @@ component {
 	}
 
 	/**
+	 * Convert any filesystem path to a single-slash, forward-slash form so
+	 * it is safe to hand to Lucee's file APIs on Windows.
+	 *
+	 * Regression: GH #2841 — `wheels new` / `wheels start` on Windows blew
+	 * up with `lucee.runtime.exp.NativeException: there is no Resource
+	 * provider available with the name [c]`. The bootstrap handed
+	 * `java.io.File.getCanonicalPath()` output (e.g. `C:\Users\tim\Projects`)
+	 * to `directoryExists(... & "/vendor/wheels")`, producing the mixed-slash
+	 * string `C:\Users\tim\Projects/vendor/wheels`. Lucee's Resource API
+	 * parsed `c:` as a URI scheme and bailed because no `c` provider is
+	 * registered. Normalising to pure forward slashes keeps the path
+	 * unambiguous on Windows while being a no-op on POSIX.
+	 *
+	 * `Module.$normalizePath()` delegates here so the bootstrap path and the
+	 * unit tests exercise one implementation (#2835 originally carried a
+	 * private copy inside Module.cfc).
+	 */
+	public string function normalizePath(required string path) {
+		if (!len(arguments.path)) return "";
+		var rv = replace(arguments.path, "\", "/", "all");
+		// Collapse doubled slashes from naïve concatenation, but preserve a
+		// leading `//` (UNC / network-share prefix on Windows).
+		var leading = left(rv, 2) == "//" ? "//" : "";
+		var body = len(leading) ? mid(rv, 3, len(rv) - 2) : rv;
+		body = reReplace(body, "/{2,}", "/", "all");
+		return leading & body;
+	}
+
+	/**
 	 * Generate a migration timestamp (YYYYMMDDHHMMSS)
 	 */
 	public string function generateMigrationTimestamp() {
