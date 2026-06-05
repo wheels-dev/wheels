@@ -233,6 +233,18 @@ On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be 
 
 The wheels formula deliberately isolates runtime state under `~/.wheels/` (via `LUCLI_HOME`) so a standalone `lucli` install — which uses `~/.lucli/` — stays out of the way. If you previously had LuCLI installed directly and see odd module-resolution errors, check that the wrapper set `LUCLI_HOME` correctly (`wheels system env` will dump the resolved environment) and that `~/.wheels/modules/wheels/` contains a current `Module.cfc` and `.module-version` file.
 
+### Windows: `there is no Resource provider available with the name [c]`
+
+On Windows, `wheels new`, `wheels start`, and most other subcommands crashed before any work could happen with:
+
+```
+lucee.runtime.exp.NativeException: there is no Resource provider available
+with the name [c], available resource providers are [ftp, zip, tar, tgz,
+http, https, ram, s3]
+```
+
+The cause was mixed-slash paths: `java.io.File.getCanonicalPath()` on Windows returns backslash form (`C:\Users\tim\Projects`), which — when concatenated with a forward-slash suffix — produced a string like `C:\Users\tim\Projects/vendor/wheels`. Lucee's Resource API parsed `c:` as a URI scheme and bailed because no `c` provider is registered. This is fixed in the release that includes #2841. Update to the latest version and the error will not recur — `scoop update wheels` for Scoop installs, or re-fetch the latest Wheels Module (see **Manual JAR install** above) if you wired it up by hand. `wheels --version` was unaffected because LuCLI handles that flag before dispatching to the module.
+
 ## Related commands
 
 <CardGrid>
