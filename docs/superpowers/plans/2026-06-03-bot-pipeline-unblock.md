@@ -10,6 +10,8 @@
 
 **Verification note:** CI YAML and Claude command prompts are not unit-testable in the classic red-green sense. The two pieces of *risky custom logic* (conflict classification, freshen decision) are extracted into standalone bash scripts with real TDD loops. Workflows are verified by YAML lint + a documented live-PR smoke test. This is called out per-task.
 
+> **Implementation complete as of [#2847](https://github.com/wheels-dev/wheels/pull/2847).** Task checkboxes below are left unchecked for historical fidelity — they tracked progress during the agentic implementation run and no longer reflect pending work.
+
 ---
 
 ## File Structure
@@ -34,7 +36,7 @@
 
 **Decisions carried from spec open-questions (defaults applied):**
 - Freshen scope: **bot-authored PRs only** (`author.login == "app/wheels-bot"` in `gh` JSON).
-- Low-risk allowlist (conservative v1): `*.md`, `*.mdx`, `CHANGELOG*`, anything under `.ai/` or `docs/`, and `web/sites/*/src/content/**`. **Everything else escalates** — including `web/**` code, `*.lock`, and version manifests (deliberately conservative; widen later).
+- Low-risk allowlist (conservative v1): `*.md`, `*.mdx`, `CHANGELOG*`, anything under `.ai/` or `docs/`, and `web/sites/*/src/content/**`. **Everything else escalates** — including `web/**` code, `*.lock`, and version manifests (deliberately conservative; widen later). _Final implementation note: the shipped `.github/scripts/classify-conflicts.sh` drops the `web/sites/*/src/content/**` arm — `*.md`/`*.mdx` matching any path already covers MDX content files, and non-markdown files under content trees now correctly escalate. See the shipped script for the authoritative allowlist._
 - Freshen cadence: `push:[develop]` + a 30-min scheduled backstop.
 - Resolver attempt cap: idempotency marker keyed on PR (one attempt per surfaced conflict state).
 - Low-risk resolution re-verification: rely on the existing `docs-verify` PR check post-push (don't duplicate the build inside the resolver).

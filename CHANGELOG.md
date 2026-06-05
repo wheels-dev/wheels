@@ -28,6 +28,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Changed
 
+- Reconcile bot pipeline unblock plan doc with shipped implementation: mark checkboxes as historically complete and align the allowlist note with the final `classify-conflicts.sh`
 - Version switcher now labels the 4.0 stable docs "v4.0 (current)" (was "v4.0.0"); the vestigial pre-GA `v4-0-1-snapshot` guides tree is removed and its one unique page, "Reading the Changelog", is salvaged into `v4-0-0/upgrading/`. Both sites deploy from `develop`, so in-progress patch docs already live in the `v4-0-0` tree; a separate `*-snapshot` tree is only warranted when a different minor/major (e.g. `v4-1-snapshot`) is under development. Courtesy redirects cover the high-traffic `/v4-0-1-snapshot/*` paths (#2827)
 - CLI path normalisation now lives in a single, unit-tested `Helpers.normalizePath()`; `Module.$normalizePath()` (added in #2835 to fix the Windows `Resource provider [c]` crash) delegates to it instead of carrying a private copy, so the regression coverage exercises the real bootstrap path rather than a decoy. The CLI installation guide also gains a Windows troubleshooting entry for the original `there is no Resource provider available with the name [c]` error (#2841)
 
