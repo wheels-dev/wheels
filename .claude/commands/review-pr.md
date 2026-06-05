@@ -15,13 +15,20 @@ below. Highlights for this command:
 ## Args
 
 - `<pr-number>` — the PR to review
+- `<head-sha>` — the commit SHA this review runs against. The workflow
+  captures it once at checkout and passes it here; use it verbatim as the
+  marker SHA. **Do not** re-derive the head with `gh pr view` during the
+  session — it races with pushes that land between checkout and review
+  submission, leaving the marker pointing at the wrong commit (issue #2848).
 
 ## Steps
 
 1. **Idempotency check.** Read existing reviews on the PR with
-   `gh pr view <pr-number> --json reviews,headRefOid --jq '.'`. If any review
-   body contains the marker `<!-- wheels-bot:review-a:<pr>:<sha> -->` for the
-   current head SHA, exit silently — there is nothing to do.
+   `gh pr view <pr-number> --json reviews --jq '.'`. If any review body
+   contains the marker `<!-- wheels-bot:review-a:<pr>:<head-sha> -->` for the
+   `<head-sha>` you were passed, exit silently — there is nothing to do. Use
+   the `<head-sha>` argument as the SHA; do not call `gh pr view` to look up
+   the current head (issue #2848).
 
 2. **Gather context.** Read in this order, then build a mental model:
    - `gh pr view <pr-number>` — title, body, author, base, head, labels
@@ -115,8 +122,9 @@ below. Highlights for this command:
      `### Security` — omit empty sections
    - For each finding, cite the file + line, quote the offending snippet,
      and propose a concrete fix
-   - End with the marker `<!-- wheels-bot:review-a:<pr>:<sha> -->` where
-     `<sha>` is the head SHA you saw at step 2
+   - End with the marker `<!-- wheels-bot:review-a:<pr>:<head-sha> -->` where
+     `<head-sha>` is the SHA passed to this command — never a value re-derived
+     from `gh pr view` during the session (issue #2848)
 
    Submit verdict:
    - `--request-changes` if any **Correctness**, **Cross-engine**, or
