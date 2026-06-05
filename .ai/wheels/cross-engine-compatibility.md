@@ -331,6 +331,40 @@ H2 is the embedded database used by default in tests. Key differences:
 - Some MySQL-specific functions (e.g., `GROUP_CONCAT`) not available
 - Simpler locking model than production databases
 
+### Auto-Derived Property Casing — `$lowerCaseColumnNames()` Adapter Capability
+
+When a model declares no `property()` mappings, Wheels infers its properties from `cfdbinfo` column metadata. The reported column casing varies by database, so the adapter layer carries a capability flag — `$lowerCaseColumnNames()` on `Base.cfc` — that controls whether the derived property name keeps the reported case or is forced to lowercase. Adapters override this when their database folds unquoted identifiers to a non-meaningful default that would otherwise leak into Wheels-side property names.
+
+| Database | Folding behavior | `$lowerCaseColumnNames()` | Resulting property for column `isHidden` |
+|----------|------------------|---------------------------|-------------------------------------------|
+| SQL Server, MySQL, SQLite | Preserves declared case | `false` (Base default) | `isHidden` |
+| PostgreSQL, CockroachDB | Folds unquoted identifiers to lowercase | `false` (Base default) | `ishidden` (database-reported) |
+| Oracle | Folds unquoted identifiers to UPPERCASE | `true` (override) | `ishidden` (lowercased from `ISHIDDEN`) |
+| H2 | Folds unquoted identifiers to UPPERCASE | `true` (override) | `ishidden` (lowercased from `ISHIDDEN`) |
+
+```cfm
+// vendor/wheels/databaseAdapters/Base.cfc
+public boolean function $lowerCaseColumnNames() {
+    return false;   // preserve reported case by default
+}
+
+// vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc — override
+public boolean function $lowerCaseColumnNames() {
+    return true;    // ISHIDDEN → ishidden (Oracle folds to UPPERCASE)
+}
+
+// vendor/wheels/databaseAdapters/H2/H2Model.cfc — override
+public boolean function $lowerCaseColumnNames() {
+    return true;    // ISHIDDEN → ishidden (H2 folds to UPPERCASE)
+}
+```
+
+**When adding a new database adapter**: check whether the database's unquoted-identifier folding rule produces case the Wheels developer actually declared. If it folds to UPPERCASE (Oracle/H2 family), override `$lowerCaseColumnNames()` to return `true`. If it preserves case (SQL Server/MySQL/SQLite) or folds to lowercase (PostgreSQL/CockroachDB), keep the Base default — the reported name is already the right property name.
+
+**Explicit `property(name=..., column=...)` declarations bypass this entirely** — they always win, regardless of the adapter flag. The capability only affects the auto-derived path.
+
+**Reference**: `vendor/wheels/Model.cfc` (auto-derivation site), `vendor/wheels/databaseAdapters/Base.cfc::$lowerCaseColumnNames`, regression spec `vendor/wheels/tests/specs/model/propertyCasePreservationSpec.cfc`, [#2852](https://github.com/wheels-dev/wheels/pull/2852).
+
 ### Migration Date Functions
 
 Use `NOW()` for cross-database compatibility in migrations:

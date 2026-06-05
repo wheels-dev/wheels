@@ -575,7 +575,7 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
 			if (!len(password)) {
-				out("Hint: Set RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
+				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
 			}
 		}
 		return "";
@@ -4522,6 +4522,7 @@ component extends="modules.BaseModule" {
 			port: structKeyExists(options, "port") ? options.port : 8080,
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
+			luceeAdminPassword: generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
@@ -4568,6 +4569,7 @@ component extends="modules.BaseModule" {
 			"appName": appName,
 			"datasourceName": opts.datasource,
 			"reloadPassword": opts.reloadPassword,
+			"luceeAdminPassword": opts.luceeAdminPassword,
 			"port": opts.port,
 			"shutdownPort": opts.port + 1,
 			"openBrowser": opts.openBrowser ? "true" : "false",
@@ -4614,7 +4616,8 @@ component extends="modules.BaseModule" {
 		out("Configuration:", "bold");
 		out("  Port:            #opts.port#");
 		out("  Datasource:      #opts.datasource#");
-		out("  Reload password: #opts.reloadPassword#");
+		out("  Reload password:      #opts.reloadPassword#");
+		out("  Lucee admin password: (see .env — WHEELS_LUCEE_ADMIN_PASSWORD)");
 		if (opts.setupH2) {
 			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
@@ -5521,11 +5524,13 @@ component extends="modules.BaseModule" {
 	 * Detect the reload password from .env or config/settings.cfm
 	 */
 	private string function detectReloadPassword() {
-		// 1. Check .env for RELOAD_PASSWORD
+		// 1. Check .env for WHEELS_RELOAD_PASSWORD (canonical scaffold name) or
+		//    the legacy unprefixed RELOAD_PASSWORD. The optional prefix keeps
+		//    apps generated before the rename working.
 		var envFile = variables.projectRoot & "/.env";
 		if (fileExists(envFile)) {
 			var envContent = fileRead(envFile);
-			var pwMatch = reFindNoCase("RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
+			var pwMatch = reFindNoCase("(?:WHEELS_)?RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
 			if (arrayLen(pwMatch.match) > 1 && len(trim(pwMatch.match[2]))) {
 				return trim(pwMatch.match[2]);
 			}

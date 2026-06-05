@@ -1,6 +1,15 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
+	 * H2 reports unquoted identifiers in uppercase, so lowercase auto-derived
+	 * property names — otherwise models expose `FIRSTNAME` instead of
+	 * `firstname`. See Base.$lowerCaseColumnNames().
+	 */
+	public boolean function $lowerCaseColumnNames() {
+		return true;
+	}
+
+	/**
 	 * Map database types to the ones used in CFML.
 	 */
 	public string function $getType(required string type, string scale, string details) {

@@ -107,8 +107,17 @@ with open('$JUNIT_FILE', 'wb') as f:
     echo "| Errors | ${ERROR} |" >> "$GITHUB_STEP_SUMMARY"
   fi
 
-  TOTAL_FAILURES=$((FAIL + ERROR))
-  if [ "$TOTAL_FAILURES" -gt 0 ]; then
+  # Defense-in-depth against the BDDRunner error-count sentinel (issue #2829):
+  # a negative error total — the legacy -1 "bundle blew up" marker — must never
+  # net-cancel real failures down to <= 0 and yield a false green. Clamp the
+  # error count for the pass/fail decision, and treat any negative raw count as
+  # an explicit failure so the masking can never recur silently.
+  EFFECTIVE_ERROR=$(( ERROR < 0 ? 0 : ERROR ))
+  TOTAL_FAILURES=$((FAIL + EFFECTIVE_ERROR))
+  if [ "$ERROR" -lt 0 ] || [ "$FAIL" -lt 0 ]; then
+    echo "::error::Anomalous negative test count (failed=${FAIL}, errors=${ERROR}) — BDDRunner error-sentinel masking detected; failing the build."
+    CORE_OK=false
+  elif [ "$TOTAL_FAILURES" -gt 0 ]; then
     echo "::error::${TOTAL_FAILURES} test failures/errors"
     # Print failure details
     python3 -c "
@@ -203,8 +212,15 @@ with open('$CLI_JUNIT_FILE', 'wb') as f:
     echo "| Errors | ${CLI_ERROR} |" >> "$GITHUB_STEP_SUMMARY"
   fi
 
-  CLI_TOTAL_FAILURES=$((CLI_FAIL + CLI_ERROR))
-  if [ "$CLI_TOTAL_FAILURES" -gt 0 ]; then
+  # Same sentinel guard as the core gate above (issue #2829): clamp a negative
+  # error total so it can't net-cancel real CLI failures, and fail explicitly on
+  # any negative raw count rather than letting it mask a red suite as green.
+  CLI_EFFECTIVE_ERROR=$(( CLI_ERROR < 0 ? 0 : CLI_ERROR ))
+  CLI_TOTAL_FAILURES=$((CLI_FAIL + CLI_EFFECTIVE_ERROR))
+  if [ "$CLI_ERROR" -lt 0 ] || [ "$CLI_FAIL" -lt 0 ]; then
+    echo "::error::[CLI Tests] Anomalous negative count (failed=${CLI_FAIL}, errors=${CLI_ERROR}) — BDDRunner error-sentinel masking detected; failing the build."
+    CLI_OK=false
+  elif [ "$CLI_TOTAL_FAILURES" -gt 0 ]; then
     echo "::error::[CLI Tests] ${CLI_TOTAL_FAILURES} test failures/errors"
     python3 -c "
 import json

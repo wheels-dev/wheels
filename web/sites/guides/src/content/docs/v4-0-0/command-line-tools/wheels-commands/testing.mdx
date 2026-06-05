@@ -96,7 +96,7 @@ App tests run against your project's configured datasource. To run the same suit
 
 ```cfm {test:compile} title="config/settings.cfm"
 <cfscript>
-set(dataSourceName=application.wo.env("WHEELS_DATASOURCE", "myapp"));
+set(dataSourceName=env("WHEELS_DATASOURCE", "myapp"));
 </cfscript>
 ```
 

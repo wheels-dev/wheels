@@ -20,4 +20,7 @@ component {
 	// resolvable inside the test runner.
 	this.mappings["/modules/wheels"] = local.projectRoot & "cli/lucli/";
 
+	// Test double for LuCLI's modules.BaseModule under TestBox — see #2829 / PR #2831.
+	this.mappings["/modules"] = local.projectRoot & "cli/lucli/tests/_modules/";
+
 }

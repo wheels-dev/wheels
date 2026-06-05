@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - develop
+    types: [opened, edited, synchronize, reopened]
 
 permissions:
   contents: read
@@ -14,21 +15,19 @@ jobs:
     name: Validate Commit Messages
     runs-on: ubuntu-latest
     env:
-      BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
       - run: npm ci
-      - name: Validate commits
-        run: npx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+      - name: Validate PR title
+        run: echo "$PR_TITLE" | npx commitlint --verbose
 
   fast-test:
     name: "Lucee 7 + SQLite (LuCLI)"
+    if: github.event.action != 'edited'
     runs-on: ubuntu-latest
     env:
       LUCLI_VERSION: "0.3.7"
