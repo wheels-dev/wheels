@@ -28,10 +28,16 @@ jobs:
         || github.event.pull_request.draft == false
       )
     steps:
-      - name: Checkout PR head
+      - name: Checkout the reviewed commit
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          # Check out the commit Reviewer A's review was attached to — not the
+          # PR's (possibly newer) head. B critiques A's review of THIS commit,
+          # so it must read exactly what A read, and the marker it emits must
+          # key off the same SHA the skip-check below gates on. commit_id is a
+          # GitHub-generated SHA, immune to head drift from concurrent pushes
+          # (issue #2848).
+          ref: ${{ github.event.review.commit_id }}
           fetch-depth: 0
 
       - name: Generate App token
@@ -47,7 +53,9 @@ jobs:
         with:
           target-type: pr
           target-number: ${{ github.event.pull_request.number }}
-          marker-pattern: 'wheels-bot:review-b:${{ github.event.pull_request.number }}:${{ github.event.pull_request.head.sha }}:'
+          # Key off the reviewed commit (same SHA checked out above and threaded
+          # into the prompt) so the gate and the emitted marker agree (#2848).
+          marker-pattern: 'wheels-bot:review-b:${{ github.event.pull_request.number }}:${{ github.event.review.commit_id }}:'
           github-token: ${{ steps.app-token.outputs.token }}
 
       - name: Run Reviewer B
@@ -62,7 +70,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
-            /review-the-review ${{ github.event.pull_request.number }} ${{ github.event.review.id }}
+            /review-the-review ${{ github.event.pull_request.number }} ${{ github.event.review.id }} ${{ github.event.review.commit_id }}
           claude_args: |
             --model claude-sonnet-4-6
             --max-turns 300

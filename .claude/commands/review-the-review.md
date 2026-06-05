@@ -33,17 +33,24 @@ After your critique, you choose one of three outcomes:
 
 - `<pr-number>` — the PR being reviewed
 - `<review-id>` — the Reviewer A review to critique
+- `<head-sha>` — the commit Reviewer A's review was attached to (the
+  workflow passes `github.event.review.commit_id`). Use it everywhere this
+  prompt writes `<sha>` — the round marker AND the convergence markers.
+  Don't compute the SHA yourself — re-deriving it is the #2848 race;
+  `gh pr view` / `gh pr diff` remain how you read the PR and A's review.
 
 ## Steps
 
-1. **Idempotency + round counting.** Read the PR comments via
-   `gh pr view <pr-number> --json comments,headRefOid`. Count comments
-   whose body matches `wheels-bot:review-b:<pr-number>:<sha>:` (any round).
+1. **Idempotency + round counting.** Throughout this command, `<sha>` means
+   the `<head-sha>` argument you were passed; don't compute it yourself
+   (issue #2848). Read the PR comments via
+   `gh pr view <pr-number> --json comments`. Count comments whose body
+   matches `wheels-bot:review-b:<pr-number>:<head-sha>:` (any round).
 
-   - If the most recent matching comment has the **current head SHA**
-     **AND** the comment count on the current SHA already equals the
+   - If the most recent matching comment has the passed `<head-sha>`
+     **AND** the comment count on that SHA already equals the
      review-id you're processing (a precise dedup), exit silently.
-   - Round number for the current SHA =
+   - Round number for `<head-sha>` =
      (count of B comments on this exact SHA) + 1.
    - **If round > 10**: post the terminal comment and exit. The cap
      exists so the loop terminates when A and B can't align — humans

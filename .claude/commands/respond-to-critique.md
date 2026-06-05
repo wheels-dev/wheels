@@ -20,17 +20,23 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 ## Args
 
 - `<pr-number>` — the PR you're discussing with B
+- `<head-sha>` — the commit SHA this response runs against (the workflow
+  captures it at checkout and passes it here). Use it everywhere this prompt
+  writes `<sha>`. Don't compute the SHA yourself — re-deriving it is the
+  #2848 race; `gh pr view` / `gh pr diff` remain how you read the exchange.
 
 ## Steps
 
-1. **Idempotency check.** Read PR comments + reviews via
-   `gh pr view <pr-number> --json reviews,comments,headRefOid -q '.'`.
+1. **Idempotency check.** Throughout this command, `<sha>` means the
+   `<head-sha>` argument you were passed; don't compute it yourself
+   (issue #2848). Read PR comments + reviews via
+   `gh pr view <pr-number> --json reviews,comments -q '.'`.
    - Find the most recent `wheels-bot[bot]` PR comment whose body
-     contains `wheels-bot:review-b:<pr>:<sha>:<N>` for the current
-     head SHA. That's B's latest round number.
+     contains `wheels-bot:review-b:<pr>:<head-sha>:<N>`. That's B's
+     latest round number.
    - Find your most recent review on this SHA (initial or prior
      response). If its body contains
-     `wheels-bot:review-a-response:<pr>:<sha>:<N>` and N matches B's
+     `wheels-bot:review-a-response:<pr>:<head-sha>:<N>` and N matches B's
      latest round, exit silently — you've already responded to that
      critique.
    - Your response round number = B's latest round number.
