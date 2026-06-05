@@ -341,9 +341,12 @@ component {
 			application.wo.$cache(action = "flush");
 		}
 
-		// Add all public controller / view methods to a list of methods that you should not be allowed to call as a controller action from the url.
-		local.allowedGlobalMethods = "get,set,mapper";
-		application.$wheels.protectedControllerMethods = "";
+		// Build the list of public framework helper methods mixed onto every
+		// controller (from wheels.Global + wheels.controller.* + wheels.view.*).
+		// $callAction() in vendor/wheels/controller/processing.cfc rejects any
+		// request whose action segment matches one of these names so global
+		// helpers like env(), model(), redirectTo() are never URL-invokable.
+		application.$wheels.protectedControllerMethods = application.wo.$buildProtectedControllerMethods();
 
 		// Enable the main GUI Component
 		if (application.$wheels.enablePublicComponent) {

@@ -3929,6 +3929,49 @@ return local.$wheels;
 	}
 
 	/**
+	 * Build the comma-list of public framework helper names that get mixed onto
+	 * every controller (from `wheels.Global` + `wheels.controller.*` +
+	 * `wheels.view.*`). Stored on `application.wheels.protectedControllerMethods`
+	 * and consumed by `$callAction()` to reject URL dispatch to framework
+	 * helpers like `env()`, `model()`, `redirectTo()` (issue ##2844).
+	 *
+	 * Derived from `getMetaData().functions` on each source component, mirroring
+	 * what `$integrateComponents` mixes onto a controller. `$`-prefixed names
+	 * are already gated separately and are excluded here.
+	 */
+	public string function $buildProtectedControllerMethods() {
+		var protectedMethods = "";
+		var sources = ["wheels.Global"];
+		var mixinPaths = ["wheels.controller", "wheels.view"];
+		for (var basePath in mixinPaths) {
+			var folder = ExpandPath("/" & Replace(basePath, ".", "/", "all"));
+			if (!DirectoryExists(folder)) {
+				continue;
+			}
+			var files = DirectoryList(folder, false, "name", "*.cfc");
+			for (var fileName in files) {
+				ArrayAppend(sources, basePath & "." & Replace(fileName, ".cfc", "", "all"));
+			}
+		}
+		for (var componentPath in sources) {
+			var meta = GetMetaData(CreateObject("component", componentPath));
+			if (!StructKeyExists(meta, "functions")) {
+				continue;
+			}
+			for (var fn in meta.functions) {
+				if (
+					StructKeyExists(fn, "access") && fn.access == "public"
+					&& Left(fn.name, 1) != "$"
+					&& !ListFindNoCase(protectedMethods, fn.name)
+				) {
+					protectedMethods = ListAppend(protectedMethods, fn.name);
+				}
+			}
+		}
+		return protectedMethods;
+	}
+
+	/**
 	 * Re-evaluate the given global-includes file into `application.wo`'s
 	 * variables/this scope. Invoked from the bare `?reload=true` soft-reload
 	 * when `$globalIncludesChanged` reports drift (issue ##2792).
