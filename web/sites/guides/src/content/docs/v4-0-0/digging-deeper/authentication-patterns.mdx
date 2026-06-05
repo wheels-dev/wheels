@@ -255,7 +255,7 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
 
     if (!auth.hasStrategy("jwt")) {
         var jwtService = new wheels.auth.JwtService(
-            secretKey=application.wo.env("JWT_SECRET"),
+            secretKey=env("JWT_SECRET"),
             defaultExpiry=3600,
             issuer="myapp"
         );
@@ -265,7 +265,7 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
 }
 ```
 
-The secret lives in the environment (`application.wo.env("JWT_SECRET")`) — never commit it. `defaultExpiry` is seconds; 3600 = one hour. `issuer` is stamped as the `iss` claim and can be used by downstream validators to reject tokens meant for other services.
+The secret lives in the environment (`env("JWT_SECRET")`) — never commit it. `defaultExpiry` is seconds; 3600 = one hour. `issuer` is stamped as the `iss` claim and can be used by downstream validators to reject tokens meant for other services.
 
 ### Issue tokens on login
 
@@ -278,7 +278,7 @@ component extends="Controller" {
     function create() {
         var user = model("User").findOne(where="email = :email", values={email: params.email ?: ""});
         if (IsObject(user) && user.authenticate(params.password ?: "")) {
-            var jwtService = new wheels.auth.JwtService(secretKey=application.wo.env("JWT_SECRET"));
+            var jwtService = new wheels.auth.JwtService(secretKey=env("JWT_SECRET"));
             var token = jwtService.encode({sub: user.id, email: user.email, role: user.role});
             renderWith({token: token, expiresIn: 3600});
         } else {
@@ -322,7 +322,7 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
     var auth = service("authenticator");
 
     if (!auth.hasStrategy("jwt")) {
-        var jwtService = new wheels.auth.JwtService(secretKey=application.wo.env("JWT_SECRET"));
+        var jwtService = new wheels.auth.JwtService(secretKey=env("JWT_SECRET"));
         auth.registerStrategy(name="jwt", strategy=new wheels.auth.JwtStrategy(jwtService=jwtService));
     }
     if (!auth.hasStrategy("session")) {

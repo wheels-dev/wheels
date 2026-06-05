@@ -57,10 +57,10 @@ set(functionName="sendEmail",
     port=587,
     useTLS=true,
     username="smtp-user",
-    password=application.wo.env("SMTP_PASSWORD"));
+    password=env("SMTP_PASSWORD"));
 ```
 
-Every argument `cfmail` accepts is available here: `server`, `port`, `username`, `password`, `useSSL`, `useTLS`, `from`, `replyto`, `failto`, `subject`, and more. Pulling secrets from `application.wo.env()` keeps credentials out of source control.
+Every argument `cfmail` accepts is available here: `server`, `port`, `username`, `password`, `useSSL`, `useTLS`, `from`, `replyto`, `failto`, `subject`, and more. Pulling secrets from `env()` keeps credentials out of source control.
 
 <Aside type="caution">
   Wheels does not define a `mailerSettings` struct. SMTP connection arguments go through the `sendEmail` function defaults (above) or via your CFML engine's mail service configuration. Anything you can pass to `cfmail`, you can set as a `sendEmail` default.
@@ -241,8 +241,8 @@ set(functionName="sendEmail",
     server="smtp.postmarkapp.com",
     port=587,
     useTLS=true,
-    username=application.wo.env("POSTMARK_TOKEN"),
-    password=application.wo.env("POSTMARK_TOKEN"));
+    username=env("POSTMARK_TOKEN"),
+    password=env("POSTMARK_TOKEN"));
 ```
 
 Set the env var once in your deploy config; the same mailer code now routes mail correctly in every environment. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/) for the full per-environment settings pipeline.

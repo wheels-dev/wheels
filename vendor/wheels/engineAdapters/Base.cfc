@@ -52,6 +52,24 @@ component output="false" {
 		return false;
 	}
 
+	/**
+	 * Returns true if the current engine is RustCFML.
+	 */
+	public boolean function isRustCFML() {
+		return false;
+	}
+
+	// --- Capabilities ---
+
+	/**
+	 * Returns true if the engine implements the `cfcache` built-in.
+	 * When false, Wheels degrades its cfcache-backed template/static cache
+	 * to a no-op (the framework still runs, just without that cache layer).
+	 */
+	public boolean function supportsCfcache() {
+		return true;
+	}
+
 	// --- Response / PageContext ---
 
 	/**

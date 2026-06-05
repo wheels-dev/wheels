@@ -257,7 +257,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 					var result = admin.generateAdmin(modelData = modelData, force = true);
 					var routesContent = fileRead(tempRoot & "/config/routes.cfm");
-					expect(routesContent).toInclude('scope(path="admin"');
+					// Admin.injectAdminRoute() emits `.namespace("admin")` (not the
+					// legacy `.scope(path="admin")`) so the named-route prefix is set
+					// — routes resolve to adminUsers/adminUser etc. and don't collide
+					// with same-named non-admin resources. See Admin.cfc.
+					expect(routesContent).toInclude('.namespace("admin")');
 					expect(routesContent).toInclude('.resources("orders")');
 				});
 

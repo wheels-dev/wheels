@@ -109,6 +109,13 @@ component output="false" {
 	public any function $cache() {
 		// If cache is found only the function is aborted, not page. --->
 		variables.$instance.reCache = false;
+		// Engines without the `cfcache` built-in (e.g. RustCFML) can't back
+		// the template/static cache. Degrade to a no-op: leaving reCache=true
+		// means the request still renders normally, just without this layer.
+		if ($hasEngineAdapter() && !$engineAdapter().supportsCfcache()) {
+			variables.$instance.reCache = true;
+			return;
+		}
 		local.args = {};
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
@@ -3016,6 +3023,12 @@ return local.$wheels;
 			local.minimumMinor = "0";
 			local.minimumPatch = "10";
 			local.minimumBuild = "314028";
+		} else if (arguments.engine == "RustCFML") {
+			// RustCFML is a pre-1.0, rapidly evolving experimental engine that
+			// Wheels supports on a best-effort basis. Accept any version (leave
+			// local.rv = "") rather than enforcing a minimum; per-version
+			// divergences are tracked via the RustCFMLAdapter capabilities.
+			local.rv = "";
 		} else {
 			local.rv = false;
 		}
