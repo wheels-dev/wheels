@@ -40,11 +40,11 @@ Development, test, and production usually point at different databases. Keep the
 
 ```cfm {test:compile}
 set(dataSourceName = "myapp_production");
-set(dataSourceUserName = application.wo.env("DB_USER"));
-set(dataSourcePassword = application.wo.env("DB_PASSWORD"));
+set(dataSourceUserName = env("DB_USER"));
+set(dataSourcePassword = env("DB_PASSWORD"));
 ```
 
-Environment-specific settings are loaded after the shared ones, so whatever you set here wins. Read secrets from the environment with `application.wo.env("VAR_NAME")` — never commit credentials into the repo. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/) for the full configuration loading order.
+Environment-specific settings are loaded after the shared ones, so whatever you set here wins. Read secrets from the environment with `env("VAR_NAME")` — never commit credentials into the repo. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/) for the full configuration loading order.
 
 ## Per-model override
 
@@ -67,7 +67,7 @@ The typical legacy case is all three overrides at once: a non-default datasource
 ```cfm {test:compile}
 component extends="Model" {
     function config() {
-        dataSource(datasource="legacy_reporting", username="report_reader", password=application.wo.env("REPORT_DB_PASSWORD"));
+        dataSource(datasource="legacy_reporting", username="report_reader", password=env("REPORT_DB_PASSWORD"));
     }
 }
 ```

@@ -147,6 +147,22 @@ component extends="testbox.system.BaseSpec" {
 					expect(content).notToInclude("{{appName}}");
 				});
 
+				it("env-sources a distinct Lucee admin password, decoupled from the reload password", function() {
+					var lucee = fileRead(variables.targetDir & "/lucee.json");
+					var env = fileRead(variables.targetDir & "/.env");
+					// lucee.json admin password is env-sourced via its OWN var (## escapes the literal # delimiters)
+					expect(lucee).toInclude("##env:WHEELS_LUCEE_ADMIN_PASSWORD##");
+					expect(lucee).notToInclude("WHEELS_RELOAD_PASSWORD");
+					// .env carries the two secrets as separate keys
+					expect(env).toInclude("WHEELS_LUCEE_ADMIN_PASSWORD=");
+					expect(env).toInclude("WHEELS_RELOAD_PASSWORD=");
+					// Parsed values must be distinct — guards against a future regression
+					// where the scaffold collapses back to a single value for both.
+					var reloadVal = reReplaceNoCase(env, "(?s).*WHEELS_RELOAD_PASSWORD=([^\n]+).*", "\1");
+					var adminVal = reReplaceNoCase(env, "(?s).*WHEELS_LUCEE_ADMIN_PASSWORD=([^\n]+).*", "\1");
+					expect(reloadVal).notToBe(adminVal, "Reload and Lucee admin passwords must be distinct");
+				});
+
 				it("leaves no unreplaced {{}} placeholders in any config file", function() {
 					var configFiles = directoryList(
 						variables.targetDir & "/config", false, "path", "*.cfm"
@@ -287,7 +303,8 @@ component extends="testbox.system.BaseSpec" {
 		var context = {
 			"appName": arguments.appName,
 			"datasourceName": lCase(arguments.appName),
-			"reloadPassword": lCase(arguments.appName)
+			"reloadPassword": lCase(arguments.appName),
+			"luceeAdminPassword": lCase(arguments.appName) & "-admin"
 		};
 
 		// Recursively copy template tree with placeholder substitution

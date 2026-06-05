@@ -21,9 +21,9 @@
 		To run with "partial" rewriting, the "cgi.path_info" variable needs to be supported by the web server.
 		To run with rewriting set to "on", you need to apply the necessary rewrite rules on the web server first.
 	*/
-		// Reload your application with ?reload=true&password=changeme
-	// Obviously, change this.
-	set(reloadPassword="changeme");
+	// Reload your application with ?reload=true&password=<your WHEELS_RELOAD_PASSWORD>
+	// The secret is read from .env (git-ignored) so it never lands in version control.
+	set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
 
 	// Your Apps datasource name
 	set(dataSourceName="starterApp");

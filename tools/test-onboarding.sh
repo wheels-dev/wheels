@@ -404,7 +404,7 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
             if curl -fsSL "$SQLITE_JDBC_URL" -o "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"; then
                 pass "sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar dropped into $LUCEE_LIB"
                 # Reload the app so Lucee picks up the new bundle.
-                local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+                local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
                 curl -s -o /dev/null --max-time 60 "http://localhost:$PORT/?reload=true&password=$local_password" || true
                 sleep 3
             else
@@ -484,7 +484,7 @@ CFML
     [ -f "$MIGRATION_FILE" ] && pass "ch02 migration written" || fail "could not write migration"
 
     # Reload so the framework sees the new migration file.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
@@ -560,7 +560,7 @@ seedOnce(modelName="Post", uniqueProperties="title", properties={
 CFML
 
     # Reload so the framework sees the seed file.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
@@ -662,7 +662,7 @@ CFML
     pass "ch02-ch03 model/controller/views/routes written"
 
     # Reload
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
@@ -802,7 +802,7 @@ CFML
     [ -f "$SPEC_FILE" ] && pass "smoke spec written" || fail "could not write smoke spec"
 
     # Reload so the framework sees the new spec.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 1
 
@@ -1046,7 +1046,7 @@ if phase 15 "dev toolbar shows real version (issue #2333)"; then
     # Earlier phases' generate/destroy probes can leave the framework in a
     # half-reloaded state — reload first so the homepage is rendered fresh
     # rather than from a stale-cache state.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
