@@ -243,7 +243,7 @@ with the name [c], available resource providers are [ftp, zip, tar, tgz,
 http, https, ram, s3]
 ```
 
-The cause was mixed-slash paths: `java.io.File.getCanonicalPath()` on Windows returns backslash form (`C:\Users\tim\Projects`), which — when concatenated with a forward-slash suffix — produced a string like `C:\Users\tim\Projects/vendor/wheels`. Lucee's Resource API parsed `c:` as a URI scheme and bailed because no `c` provider is registered. This is fixed in the release that includes #2841. Update to the latest version (`scoop update wheels` for Scoop installs) and the error will not recur. `wheels --version` was unaffected because LuCLI handles that flag before dispatching to the module.
+The cause was mixed-slash paths: `java.io.File.getCanonicalPath()` on Windows returns backslash form (`C:\Users\tim\Projects`), which — when concatenated with a forward-slash suffix — produced a string like `C:\Users\tim\Projects/vendor/wheels`. Lucee's Resource API parsed `c:` as a URI scheme and bailed because no `c` provider is registered. This is fixed in the release that includes #2841. Update to the latest version and the error will not recur — `scoop update wheels` for Scoop installs, or re-fetch the latest Wheels Module (see **Manual JAR install** above) if you wired it up by hand. `wheels --version` was unaffected because LuCLI handles that flag before dispatching to the module.
 
 ## Related commands
 

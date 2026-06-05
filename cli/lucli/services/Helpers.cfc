@@ -126,9 +126,11 @@ component {
 		if (!len(arguments.path)) return "";
 		var rv = replace(arguments.path, "\", "/", "all");
 		// Collapse doubled slashes from naïve concatenation, but preserve a
-		// leading `//` (UNC / network-share prefix on Windows).
+		// leading `//` (UNC / network-share prefix on Windows). Guard the
+		// mid() against a count of 0 (when rv is exactly "//"), which can
+		// trip Lucee 7's string-range handling (cf. CLAUDE.md cross-engine #8).
 		var leading = left(rv, 2) == "//" ? "//" : "";
-		var body = len(leading) ? mid(rv, 3, len(rv) - 2) : rv;
+		var body = len(leading) ? (len(rv) > 2 ? mid(rv, 3, len(rv) - 2) : "") : rv;
 		body = reReplace(body, "/{2,}", "/", "all");
 		return leading & body;
 	}

@@ -147,6 +147,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						.toBe("//server/share");
 				});
 
+				it("handles a bare double-slash root without a mid() range error", () => {
+					// Degenerate UNC root: rv === "//" makes the internal mid()
+					// count 0. Guarded so it can't trip Lucee 7 (cross-engine #8).
+					expect(helpers.normalizePath("//")).toBe("//");
+				});
+
 			});
 
 		});
