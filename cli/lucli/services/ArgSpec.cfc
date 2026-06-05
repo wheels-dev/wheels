@@ -43,23 +43,21 @@ component {
 		string type = "string"
 	) {
 		arrayAppend(variables.positionals, {
-			name = arguments.name,
-			required = arguments.required,
-			default = arguments.default,
-			type = arguments.type
+			"name" = arguments.name,
+			"required" = arguments.required,
+			"default" = arguments.default,
+			"type" = arguments.type
 		});
 		return this;
 	}
 
 	public any function flag(
 		required string name,
-		boolean default = false,
-		string aliases = ""
+		boolean default = false
 	) {
 		variables.named[arguments.name] = {
-			default = arguments.default,
-			type = "boolean",
-			aliases = arguments.aliases
+			"default" = arguments.default,
+			"type" = "boolean"
 		};
 		return this;
 	}
@@ -67,13 +65,11 @@ component {
 	public any function option(
 		required string name,
 		any default = "",
-		string type = "string",
-		string aliases = ""
+		string type = "string"
 	) {
 		variables.named[arguments.name] = {
-			default = arguments.default,
-			type = arguments.type,
-			aliases = arguments.aliases
+			"default" = arguments.default,
+			"type" = arguments.type
 		};
 		return this;
 	}
@@ -83,7 +79,7 @@ component {
 
 		// 1. Seed named defaults so every declared option is present in the result.
 		for (var optName in variables.named) {
-			result[optName] = variables.named[optName].default;
+			result[optName] = variables.named[optName]["default"];
 		}
 
 		// 2. Bind positionals from coll.arg1, arg2, ... in declaration order.
@@ -99,7 +95,7 @@ component {
 					message = "Missing required argument <" & pSpec.name & ">"
 				);
 			} else {
-				result[pSpec.name] = pSpec.default;
+				result[pSpec.name] = pSpec["default"];
 			}
 		}
 
