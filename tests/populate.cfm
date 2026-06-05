@@ -59,11 +59,11 @@
 
 <!--- Drop existing tables --->
 <cftry>
-	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE IF EXISTS c_o_r_e_posts</cfquery>
+	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE<cfif local.db is not "Oracle"> IF EXISTS</cfif> c_o_r_e_posts</cfquery>
 	<cfcatch></cfcatch>
 </cftry>
 <cftry>
-	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE IF EXISTS c_o_r_e_authors</cfquery>
+	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE<cfif local.db is not "Oracle"> IF EXISTS</cfif> c_o_r_e_authors</cfquery>
 	<cfcatch></cfcatch>
 </cftry>
 
