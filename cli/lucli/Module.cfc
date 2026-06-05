@@ -109,6 +109,7 @@ component extends="modules.BaseModule" {
 	 */
 	public array function mcpHiddenTools() {
 		return [
+			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
 			"d",        // alias for destroy
 			"new",      // scaffolds a whole new Wheels project
@@ -180,6 +181,17 @@ component extends="modules.BaseModule" {
 			// fall through
 		}
 		return "";
+	}
+
+	// LuCLI dispatches a bare `wheels` invocation (no subcommand) to a
+	// `main()` function on the module. Without it, picocli surfaces:
+	//   Component [modules.wheels.Module] has no function with name [main]
+	// Delegate to showHelp() so the no-args entry point lands on something useful.
+	/**
+	 * hint: No-args dispatch target — delegates to showHelp()
+	 */
+	public string function main() {
+		return showHelp();
 	}
 
 	// Hand-written replacement for BaseModule's auto-discovered help. Grouped by
