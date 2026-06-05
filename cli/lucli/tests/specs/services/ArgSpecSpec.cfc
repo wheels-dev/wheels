@@ -69,9 +69,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var spec = new cli.lucli.services.ArgSpec()
 						.flag(name = "sqlite", default = true);
 					var out = spec.parse({sqlite: "false"});
-					// This is the #2855 regression surface: the current
-					// argsFromCollection() flatten step DROPS "false" values
-					// and re-emits nothing. ArgSpec must preserve the negation.
+					// This is the #2855 regression surface. argsFromCollection()'s
+					// flatten step originally DROPPED "false" values outright; #2856
+					// patched that by re-emitting "--no-key". ArgSpec removes the
+					// round-trip entirely, so the negation survives structurally.
 					expect(out.sqlite).toBeFalse();
 				});
 
