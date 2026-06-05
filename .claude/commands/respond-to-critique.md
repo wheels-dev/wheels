@@ -22,14 +22,14 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 - `<pr-number>` — the PR you're discussing with B
 - `<head-sha>` — the commit SHA this response runs against (the workflow
   captures it at checkout and passes it here). Use it everywhere this prompt
-  writes `<sha>`. **Do not** re-derive the head with `gh pr view` — it races
-  with new pushes (issue #2848).
+  writes `<sha>`. Don't compute the SHA yourself — re-deriving it is the
+  #2848 race; `gh pr view` / `gh pr diff` remain how you read the exchange.
 
 ## Steps
 
 1. **Idempotency check.** Throughout this command, `<sha>` means the
-   `<head-sha>` argument you were passed — never a value looked up with
-   `gh pr view` (issue #2848). Read PR comments + reviews via
+   `<head-sha>` argument you were passed; don't compute it yourself
+   (issue #2848). Read PR comments + reviews via
    `gh pr view <pr-number> --json reviews,comments -q '.'`.
    - Find the most recent `wheels-bot[bot]` PR comment whose body
      contains `wheels-bot:review-b:<pr>:<head-sha>:<N>`. That's B's

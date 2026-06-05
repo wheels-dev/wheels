@@ -36,14 +36,14 @@ After your critique, you choose one of three outcomes:
 - `<head-sha>` — the commit Reviewer A's review was attached to (the
   workflow passes `github.event.review.commit_id`). Use it everywhere this
   prompt writes `<sha>` — the round marker AND the convergence markers.
-  **Do not** re-derive the head with `gh pr view`; it races with new
-  pushes (issue #2848).
+  Don't compute the SHA yourself — re-deriving it is the #2848 race;
+  `gh pr view` / `gh pr diff` remain how you read the PR and A's review.
 
 ## Steps
 
 1. **Idempotency + round counting.** Throughout this command, `<sha>` means
-   the `<head-sha>` argument you were passed — never a value looked up with
-   `gh pr view` (issue #2848). Read the PR comments via
+   the `<head-sha>` argument you were passed; don't compute it yourself
+   (issue #2848). Read the PR comments via
    `gh pr view <pr-number> --json comments`. Count comments whose body
    matches `wheels-bot:review-b:<pr-number>:<head-sha>:` (any round).
 
