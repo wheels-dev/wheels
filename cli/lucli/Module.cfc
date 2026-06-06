@@ -515,7 +515,7 @@ component extends="modules.BaseModule" {
 	 * shorthand for `--mode=generate`.
 	 */
 	private struct function parseSeedArgs(required struct coll) {
-		var parsed = new cli.lucli.services.ArgSpec()
+		var parsed = new services.ArgSpec()
 			.option(name = "environment", default = "")
 			.option(name = "mode", default = "auto")
 			.flag(name = "generate", default = false)
@@ -879,7 +879,7 @@ component extends="modules.BaseModule" {
 	 * name → error" (GH #2214).
 	 */
 	private struct function parseNewArgs(required struct coll) {
-		var parsed = new cli.lucli.services.ArgSpec()
+		var parsed = new services.ArgSpec()
 			.positional(name = "appName")
 			.option(name = "port", default = 8080, type = "numeric")
 			.option(name = "datasource", default = "")
@@ -1565,7 +1565,7 @@ component extends="modules.BaseModule" {
 	 * target so the "not in a project" guard only fires for the bare form.
 	 */
 	private struct function parseAnalyzeArgs(required struct coll) {
-		var parsed = new cli.lucli.services.ArgSpec()
+		var parsed = new services.ArgSpec()
 			.positional(name = "target", default = "all")
 			.parse(arguments.coll);
 		return {
@@ -1695,7 +1695,7 @@ component extends="modules.BaseModule" {
 	 * migration unchanged — ArgSpec only replaced the hand-rolled token split.
 	 */
 	private struct function parseDestroyArgs(required struct coll) {
-		var parsed = new cli.lucli.services.ArgSpec()
+		var parsed = new services.ArgSpec()
 			.flag(name = "force", default = false)
 			.parse(arguments.coll);
 
@@ -1846,7 +1846,7 @@ component extends="modules.BaseModule" {
 	 * so a short flag arrives as a positional arg<n> value.
 	 */
 	private boolean function parseVerboseFlag(required struct coll) {
-		var parsed = new cli.lucli.services.ArgSpec()
+		var parsed = new services.ArgSpec()
 			.flag(name = "verbose", default = false)
 			.parse(arguments.coll);
 		if (parsed.verbose) {
@@ -2526,7 +2526,7 @@ component extends="modules.BaseModule" {
 	 * consumes them directly.
 	 */
 	private struct function parseNotesArgs(required struct coll) {
-		var parsed = new cli.lucli.services.ArgSpec()
+		var parsed = new services.ArgSpec()
 			.option(name = "annotations", default = "TODO,FIXME,OPTIMIZE")
 			.option(name = "custom", default = "")
 			.parse(arguments.coll);
@@ -2626,7 +2626,7 @@ component extends="modules.BaseModule" {
 	 * bare `--to` to to=true and `--to=x` to to=x — either way the key exists).
 	 */
 	private struct function parseUpgradeArgs(required struct coll) {
-		var parsed = new cli.lucli.services.ArgSpec()
+		var parsed = new services.ArgSpec()
 			.positional(name = "subcommand", default = "")
 			.option(name = "to", default = "")
 			.parse(arguments.coll);
@@ -4556,7 +4556,7 @@ component extends="modules.BaseModule" {
 		var unloadedSpecPaths = [];
 		if (len(arguments.testDirectory)) {
 			try {
-				var runner = new cli.lucli.services.TestRunner(projectRoot = variables.projectRoot);
+				var runner = new services.TestRunner(projectRoot = variables.projectRoot);
 				var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
 				var loadedCount = (structKeyExists(result, "bundleStats") && isArray(result.bundleStats))
 					? arrayLen(result.bundleStats)
