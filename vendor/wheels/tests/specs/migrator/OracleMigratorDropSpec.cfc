@@ -48,6 +48,7 @@ component extends="wheels.WheelsTest" {
 				expect(FindNoCase("IF EXISTS", sql)).toBe(0);
 				expect(FindNoCase("EXECUTE IMMEDIATE", sql) > 0).toBeTrue();
 				expect(FindNoCase("DROP VIEW", sql) > 0).toBeTrue();
+				expect(FindNoCase("-942", sql) > 0).toBeTrue();
 			});
 
 		});
