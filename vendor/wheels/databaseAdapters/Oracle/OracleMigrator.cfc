@@ -87,13 +87,35 @@ component extends="wheels.databaseAdapters.Abstract" {
     /**
 	 * generates sql to drop a table
 	 *
+	 * Oracle only added the `IF EXISTS` DDL modifier in 23c; on 19c/21c
+	 * `DROP TABLE IF EXISTS ...` is a hard parse error (ORA-00933), and the
+	 * `remove-table` migration template re-throws on error, so the whole
+	 * migration fails. We instead wrap the drop in the version-agnostic PL/SQL
+	 * idiom that runs the bare DROP and swallows ORA-00942 ("table or view does
+	 * not exist") — preserving "drop if exists" semantics on every supported
+	 * Oracle version. `$execute` (vendor/wheels/migrator/Base.cfc) never splits
+	 * on `;` and deliberately omits the trailing-semicolon append for Oracle, so
+	 * the anonymous block reaches the driver intact.
+	 *
 	 * CASCADE CONSTRAINTS drops referential integrity constraints that point
 	 * at this table from other tables. Without it, re-running the migrator
 	 * tests collides with ORA-02264 (name already used by an existing
 	 * constraint) because the parent table's incoming FK survives the drop.
 	 */
     public string function dropTable(required string name) {
-		return "DROP TABLE IF EXISTS #objectCase(arguments.name)# CASCADE CONSTRAINTS";
+		return "BEGIN EXECUTE IMMEDIATE 'DROP TABLE #objectCase(arguments.name)# CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;";
+	}
+
+	/**
+	 * generates sql to drop a view
+	 *
+	 * Overrides Abstract.dropView (which emits `DROP VIEW IF EXISTS`) for the
+	 * same Oracle <23c reason as dropTable — wrap the bare DROP VIEW in a PL/SQL
+	 * block that swallows ORA-00942 so a missing view is a no-op on every
+	 * Oracle version. Views have no CASCADE CONSTRAINTS clause.
+	 */
+	public string function dropView(required string name) {
+		return "BEGIN EXECUTE IMMEDIATE 'DROP VIEW #objectCase(arguments.name)#'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;";
 	}
 
     /**
