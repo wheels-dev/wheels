@@ -18,7 +18,7 @@
  *
  * Usage:
  *
- *     var spec = new cli.lucli.services.ArgSpec()
+ *     var spec = new services.ArgSpec()
  *         .positional(name = "appName", required = true)
  *         .flag(name = "sqlite",      default = true)   // --no-sqlite negates
  *         .flag(name = "routes",      default = true)
