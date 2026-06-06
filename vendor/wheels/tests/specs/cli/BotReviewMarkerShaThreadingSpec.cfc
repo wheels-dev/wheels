@@ -23,11 +23,20 @@
  *   - bot-review-a.yml : the `/review-pr` and `/respond-to-critique` commands
  *                        gain `${{ steps.pr.outputs.sha }}` (the SHA that the
  *                        Checkout step already pinned).
- *   - bot-review-b.yml : the checkout ref, the skip-check marker-pattern, and
- *                        the `/review-the-review` command all key off
+ *   - bot-review-b.yml : the skip-check marker-pattern and the
+ *                        `/review-the-review` command key off
  *                        `${{ github.event.review.commit_id }}` — the commit
  *                        Reviewer A's review (which B critiques) was attached
  *                        to — never the PR's drifting `pull_request.head.sha`.
+ *                        The working-tree checkout is the BASE branch (never the
+ *                        reviewed/fork commit): B runs on `pull_request_review`,
+ *                        which carries base-repo secrets + the write token even
+ *                        for fork PRs, and checking out a fork commit before the
+ *                        local `wheels-bot-skip-check` composite action runs
+ *                        would execute fork code with the bot's token (a
+ *                        pwn-request). The reviewed commit's objects are fetched
+ *                        read-only so commit_id still resolves for the review's
+ *                        git commands (security hardening, ##2871).
  *   - review-pr.md / review-the-review.md / respond-to-critique.md : each
  *                        takes a `<head-sha>` argument and emits the marker
  *                        from it instead of from `gh pr view --json headRefOid`.
@@ -48,6 +57,7 @@ component extends="wheels.WheelsTest" {
 
 			var reviewA = repoRoot & "/.github/workflows/bot-review-a.yml";
 			var reviewB = repoRoot & "/.github/workflows/bot-review-b.yml";
+			var reviewAFork = repoRoot & "/.github/workflows/bot-review-a-fork.yml";
 
 			describe("bot-review-a.yml", () => {
 
@@ -104,18 +114,63 @@ component extends="wheels.WheelsTest" {
 
 			describe("bot-review-b.yml", () => {
 
-				it("checks out github.event.review.commit_id, not the drifting head", () => {
+				it("checks out the BASE branch, never the reviewed/fork commit (##2871)", () => {
 					expect(fileExists(reviewB)).toBeTrue("Missing file: " & reviewB);
 					var content = fileRead(reviewB);
+					// SECURITY: B runs on pull_request_review (base-repo secrets + the
+					// write token, even for fork PRs) and then runs the local
+					// wheels-bot-skip-check composite action. Checking out the reviewed
+					// commit (a fork commit on fork PRs) before that action runs would
+					// execute fork code with the bot's token — the classic pwn-request.
+					// The working tree must stay on the trusted base branch.
+					expect(
+						reFindNoCase(
+							"ref:\s*\$\{\{\s*github\.event\.pull_request\.base\.ref\s*\}\}",
+							content
+						) > 0
+					).toBeTrue(
+						"bot-review-b.yml must check out github.event.pull_request.base.ref — B "
+						& "runs the local wheels-bot-skip-check composite action, so the working "
+						& "tree must be trusted base code, never the reviewed/fork commit "
+						& "(pwn-request hardening, issue ##2871)."
+					);
+					expect(reFindNoCase("persist-credentials:\s*false", content) > 0).toBeTrue(
+						"bot-review-b.yml checkout must set persist-credentials: false so no token "
+						& "is left in .git/config under pull_request_review (issue ##2871)."
+					);
+					// The old behavior — checking out the reviewed commit into the working
+					// tree — is now forbidden. commit_id still appears in the marker-pattern
+					// and the /review-the-review command (asserted below); only the checkout
+					// `ref:` must no longer key off it.
 					expect(
 						reFindNoCase(
 							"ref:\s*\$\{\{\s*github\.event\.review\.commit_id\s*\}\}",
 							content
 						) > 0
-					).toBeTrue(
-						"bot-review-b.yml must check out github.event.review.commit_id — "
-						& "the commit Reviewer A's review (which B critiques) was attached "
-						& "to — so B reviews exactly what A reviewed (issue ##2848)."
+					).toBeFalse(
+						"bot-review-b.yml must NOT check out github.event.review.commit_id into the "
+						& "working tree — fork code would run via the local composite action. "
+						& "commit_id is still threaded via with:/prompt (see the marker-pattern and "
+						& "/review-the-review assertions) (issue ##2871, preserving ##2848)."
+					);
+				});
+
+				it("fetches the reviewed commit objects read-only so commit_id still resolves", () => {
+					expect(fileExists(reviewB)).toBeTrue("Missing file: " & reviewB);
+					var content = fileRead(reviewB);
+					// With the base checkout above, commit_id is no longer in the working
+					// tree. B's read-only git commands still need to resolve it, so the PR
+					// head objects are fetched (objects only — nothing executes, the working
+					// tree stays on base).
+					expect(reFindNoCase("git\s+fetch\s+--no-tags\s+origin", content) > 0).toBeTrue(
+						"bot-review-b.yml must fetch the PR head objects read-only "
+						& "(git fetch --no-tags origin refs/pull/<n>/head) so the review's git "
+						& "commands can still resolve github.event.review.commit_id after the "
+						& "base-branch checkout (issue ##2871)."
+					);
+					expect(reFindNoCase("refs/pull/.+/head", content) > 0).toBeTrue(
+						"bot-review-b.yml must fetch refs/pull/<n>/head (the PR head ref) so the "
+						& "reviewed commit's objects are present for git show/diff (issue ##2871)."
 					);
 				});
 
@@ -141,8 +196,8 @@ component extends="wheels.WheelsTest" {
 						reFindNoCase("github\.event\.pull_request\.head\.sha", content) > 0
 					).toBeFalse(
 						"bot-review-b.yml must not reference github.event.pull_request.head.sha — "
-						& "both the checkout ref and the skip-check marker-pattern must key off "
-						& "github.event.review.commit_id instead (issue ##2848)."
+						& "the skip-check marker-pattern and the /review-the-review command must "
+						& "key off github.event.review.commit_id instead (issue ##2848)."
 					);
 				});
 
@@ -157,6 +212,66 @@ component extends="wheels.WheelsTest" {
 					).toBeTrue(
 						"bot-review-b.yml must pass github.event.review.commit_id into the "
 						& "/review-the-review command as the authoritative marker SHA (issue ##2848)."
+					);
+				});
+
+			});
+
+			describe("bot-review-a-fork.yml (fork PR review via pull_request_target)", () => {
+
+				it("checks out the BASE branch, never the fork ref (pwn-request hardening)", () => {
+					expect(fileExists(reviewAFork)).toBeTrue("Missing file: " & reviewAFork);
+					var content = fileRead(reviewAFork);
+					// pull_request_target runs in the base-repo context with secrets +
+					// the write token. The working tree must stay on base so the local
+					// wheels-bot-skip-check composite action is always trusted base code;
+					// checking out the fork ref first is the classic pwn-request.
+					expect(
+						reFindNoCase(
+							"ref:\s*\$\{\{\s*github\.event\.pull_request\.base\.ref\s*\}\}",
+							content
+						) > 0
+					).toBeTrue(
+						"bot-review-a-fork.yml must check out github.event.pull_request.base.ref "
+						& "and never the fork head, so the local wheels-bot-skip-check composite "
+						& "action always resolves to trusted base code (issue ##2871)."
+					);
+					expect(reFindNoCase("persist-credentials:\s*false", content) > 0).toBeTrue(
+						"bot-review-a-fork.yml checkout must set persist-credentials: false under "
+						& "pull_request_target (issue ##2871)."
+					);
+				});
+
+				it("threads the validated head SHA into the /review-pr command (##2848)", () => {
+					expect(fileExists(reviewAFork)).toBeTrue("Missing file: " & reviewAFork);
+					var content = fileRead(reviewAFork);
+					expect(
+						reFindNoCase(
+							"/review-pr\s+\$\{\{\s*steps\.pr\.outputs\.pr_num\s*\}\}\s+\$\{\{\s*steps\.pr\.outputs\.sha\s*\}\}",
+							content
+						) > 0
+					).toBeTrue(
+						"bot-review-a-fork.yml must thread steps.pr.outputs.sha into /review-pr so "
+						& "the fork review emits the marker from the checked-out SHA, matching the "
+						& "internal Reviewer A path (issue ##2848)."
+					);
+				});
+
+				it("is gated on a fork PR carrying the maintainer-applied bot-review label", () => {
+					expect(fileExists(reviewAFork)).toBeTrue("Missing file: " & reviewAFork);
+					var content = fileRead(reviewAFork);
+					expect(
+						reFindNoCase("github\.event\.pull_request\.head\.repo\.fork\s*==\s*true", content) > 0
+					).toBeTrue(
+						"bot-review-a-fork.yml must gate on head.repo.fork == true so it runs only "
+						& "for fork PRs (internal PRs use bot-review-a.yml) (issue ##2871)."
+					);
+					expect(
+						reFindNoCase("contains\(github\.event\.pull_request\.labels\.\*\.name,\s*'bot-review'\)", content) > 0
+					).toBeTrue(
+						"bot-review-a-fork.yml must require the maintainer-applied 'bot-review' "
+						& "label — only write-access users can label, so a human vets the fork diff "
+						& "before the bot runs (issue ##2871)."
 					);
 				});
 
