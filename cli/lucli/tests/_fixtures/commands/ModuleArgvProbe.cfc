@@ -68,4 +68,12 @@ component extends="cli.lucli.Module" {
 		return parseDestroyArgs(arguments.coll);
 	}
 
+	public struct function $parseConsoleArgs(required struct coll) {
+		return parseConsoleArgs(arguments.coll);
+	}
+
+	public struct function $parseTestArgs(required struct coll) {
+		return parseTestArgs(arguments.coll);
+	}
+
 }
