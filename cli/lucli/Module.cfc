@@ -539,60 +539,78 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels test` arguments. `--filter` and its `--directory` alias set
+	 * the spec filter; `--reporter` and `--db` are options (`--db` is also tracked
+	 * as explicit so the runner can tell an implicit default from a chosen one);
+	 * `--verbose`/`--ci`/`--core` are flags; `--no-test-db` (test-db=false) maps to
+	 * useTestDB. A bare positional is the filter, and `-v` arrives as a positional
+	 * (LuCLI only normalizes --x/--no-x) and toggles verbose. The space-separated
+	 * option forms (`--filter x`) are dropped for `--filter=x` — LuCLI delivers the
+	 * space form as a bare flag + a separate positional, not a named value (#2861).
+	 */
+	private struct function parseTestArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "filter",    default = "")
+			.option(name = "directory", default = "")
+			.option(name = "reporter",  default = "simple")
+			.option(name = "db",        default = "sqlite")
+			.flag(name = "verbose", default = false)
+			.flag(name = "ci",      default = false)
+			.flag(name = "core",    default = false)
+			.flag(name = "test-db", default = true)
+			.parse(arguments.coll);
+
+		// `--directory` is a documented alias for `--filter` (tutorial ch. 7).
+		var filter = len(parsed.directory) ? parsed.directory : parsed.filter;
+
+		// Walk positionals in LuCLI's global-index order: `-v` is the short
+		// verbose flag (delivered as a positional, not normalized), and the
+		// first remaining bare token is the filter when no --filter/--directory
+		// option was supplied.
+		var verbose = parsed.verbose;
+		var indices = [];
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				arrayAppend(indices, val(mid(key, 4, len(key))));
+			}
+		}
+		arraySort(indices, "numeric");
+		for (var idx in indices) {
+			var token = trim(arguments.coll["arg" & idx]);
+			if (token == "-v") {
+				verbose = true;
+			} else if (len(token) && left(token, 2) != "--" && !len(filter)) {
+				filter = token;
+			}
+		}
+
+		return {
+			filter = filter,
+			reporter = parsed.reporter,
+			format = "json",
+			verbose = verbose,
+			ci = parsed.ci,
+			core = parsed.core,
+			db = parsed.db,
+			dbExplicit = structKeyExists(arguments.coll, "db"),
+			useTestDB = parsed["test-db"]
+		};
+	}
+
+	/**
 	 * hint: Run test suite with optional filter and reporter
 	 */
 	public string function test() {
-		var args = getArgs(arguments);
-		var filter = "";
-		var reporter = "simple";
-		var format = "json";
-		var verboseOutput = false;
-		var ciMode = false;
-		var coreTests = false;
-		var db = "sqlite";
-		var dbExplicit = false;
-		var useTestDB = true;
-
-		// Parse named arguments from --key=value or --key value
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (arg == "--filter" && i < arrayLen(args)) {
-				filter = args[++i];
-			} else if (reFindNoCase("^--filter=", arg)) {
-				filter = valueAfterEquals(arg);
-			} else if (arg == "--directory" && i < arrayLen(args)) {
-				// `--directory` is an alias for `--filter`. Documented in
-				// chapter 7 of the tutorial and historically referenced in
-				// `wheels test --help`; without this branch it would fall
-				// through to the positional fallback below and be silently
-				// dropped (it starts with `--` so the positional check
-				// excludes it). Onboarding finding #2.
-				filter = args[++i];
-			} else if (reFindNoCase("^--directory=", arg)) {
-				filter = valueAfterEquals(arg);
-			} else if (arg == "--reporter" && i < arrayLen(args)) {
-				reporter = args[++i];
-			} else if (reFindNoCase("^--reporter=", arg)) {
-				reporter = valueAfterEquals(arg);
-			} else if (arg == "--db" && i < arrayLen(args)) {
-				db = args[++i];
-				dbExplicit = true;
-			} else if (reFindNoCase("^--db=", arg)) {
-				db = valueAfterEquals(arg);
-				dbExplicit = true;
-			} else if (arg == "--verbose" || arg == "-v") {
-				verboseOutput = true;
-			} else if (arg == "--ci") {
-				ciMode = true;
-			} else if (arg == "--core") {
-				coreTests = true;
-			} else if (arg == "--no-test-db") {
-				useTestDB = false;
-			} else if (!arg.startsWith("--")) {
-				// Positional arg is the filter directory
-				filter = arg;
-			}
-		}
+		var opts = parseTestArgs(structuredArgs(arguments));
+		var filter = opts.filter;
+		var reporter = opts.reporter;
+		var format = opts.format;
+		var verboseOutput = opts.verbose;
+		var ciMode = opts.ci;
+		var coreTests = opts.core;
+		var db = opts.db;
+		var dbExplicit = opts.dbExplicit;
+		var useTestDB = opts.useTestDB;
 
 		// Default to APP mode unless --core is set explicitly. The previous
 		// auto-detection ("if vendor/wheels/tests/ exists, default to core")
@@ -1202,21 +1220,26 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels console` arguments. Only `--password=<value>` is consumed; an
+	 * empty result lets the command auto-detect the reload password. The legacy
+	 * arg1-gated getArgs() dropped a bare `--password=x` (no positional), silently
+	 * forcing auto-detection — ArgSpec reads the named value directly. The old
+	 * space-separated `--password <value>` form is dropped for `--password=<value>`:
+	 * LuCLI delivers the space form as a bare flag + a positional, never a named
+	 * value (#2861).
+	 */
+	private struct function parseConsoleArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "password", default = "")
+			.parse(arguments.coll);
+		return { password = parsed.password };
+	}
+
+	/**
 	 * hint: Launch interactive CFML console with Wheels app context (model, service, get)
 	 */
 	public string function console() {
-		var args = getArgs(arguments);
-		var password = "";
-
-		// Parse --password=value
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--password=", arg)) {
-				password = valueAfterEquals(arg);
-			} else if (arg == "--password" && i < arrayLen(args)) {
-				password = args[++i];
-			}
-		}
+		var password = parseConsoleArgs(structuredArgs(arguments)).password;
 
 		// Detect server
 		var serverPort = $requireRunningServer([

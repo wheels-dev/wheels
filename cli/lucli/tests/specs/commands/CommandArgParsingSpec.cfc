@@ -267,6 +267,87 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("parseConsoleArgs (named-only — previously dropped)", () => {
+
+			it("defaults password to empty", () => {
+				expect(probe.$parseConsoleArgs({}).password).toBe("");
+			});
+
+			it("reads --password=value", () => {
+				expect(probe.$parseConsoleArgs({password: "s3cret"}).password).toBe("s3cret");
+			});
+
+			it("reads --password with no positional — the latent arg1-gate bug ArgSpec fixes", () => {
+				// `wheels console --password=x` arrives as {password:"x"} with no
+				// arg1, so the legacy arg1-gated getArgs() dropped it and the console
+				// silently fell back to auto-detecting the reload password.
+				expect(probe.$parseConsoleArgs({password: "x"}).password).toBe("x");
+			});
+
+		});
+
+		describe("parseTestArgs", () => {
+
+			it("defaults reporter=simple, db=sqlite, format=json, flags off, useTestDB on", () => {
+				var o = probe.$parseTestArgs({});
+				expect(o.filter).toBe("");
+				expect(o.reporter).toBe("simple");
+				expect(o.db).toBe("sqlite");
+				expect(o.format).toBe("json");
+				expect(o.verbose).toBeFalse();
+				expect(o.ci).toBeFalse();
+				expect(o.core).toBeFalse();
+				expect(o.useTestDB).toBeTrue();
+				expect(o.dbExplicit).toBeFalse();
+			});
+
+			it("reads --filter", () => {
+				expect(probe.$parseTestArgs({filter: "models"}).filter).toBe("models");
+			});
+
+			it("treats --directory as an alias for --filter", () => {
+				expect(probe.$parseTestArgs({directory: "controllers"}).filter).toBe("controllers");
+			});
+
+			it("uses a bare positional as the filter", () => {
+				expect(probe.$parseTestArgs({arg1: "security"}).filter).toBe("security");
+			});
+
+			it("maps --core / --ci / --verbose flags", () => {
+				var o = probe.$parseTestArgs({core: "true", ci: "true", verbose: "true"});
+				expect(o.core).toBeTrue();
+				expect(o.ci).toBeTrue();
+				expect(o.verbose).toBeTrue();
+			});
+
+			it("honors -v delivered as a positional", () => {
+				expect(probe.$parseTestArgs({arg1: "-v"}).verbose).toBeTrue();
+			});
+
+			it("treats --no-test-db (test-db=false) as useTestDB=false", () => {
+				expect(probe.$parseTestArgs({"test-db": "false"}).useTestDB).toBeFalse();
+			});
+
+			it("reads --db and marks it explicit", () => {
+				var o = probe.$parseTestArgs({db: "mysql"});
+				expect(o.db).toBe("mysql");
+				expect(o.dbExplicit).toBeTrue();
+			});
+
+			it("reads --reporter", () => {
+				expect(probe.$parseTestArgs({reporter: "json"}).reporter).toBe("json");
+			});
+
+			it("keeps the filter when -v precedes it (LuCLI index gap)", () => {
+				// `wheels test -v models` arrives as {arg1:"-v", arg2:"models"}: -v
+				// toggles verbose, the remaining positional is the filter.
+				var o = probe.$parseTestArgs({arg1: "-v", arg2: "models"});
+				expect(o.verbose).toBeTrue();
+				expect(o.filter).toBe("models");
+			});
+
+		});
+
 	}
 
 }
