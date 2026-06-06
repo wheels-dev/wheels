@@ -146,6 +146,66 @@ component extends="modules.BaseModule" {
 		return result;
 	}
 
+	/**
+	 * Source the structured argument collection LuCLI handed this command.
+	 *
+	 * LuCLI parses the command line once and invokes the subcommand as
+	 * `module.cmd(argumentCollection = argsMap)`, so the function's `arguments`
+	 * scope already IS the structured map (positionals as `arg1..argN`, named
+	 * options as `key=value`, and `--no-X` normalized to `key=false`). Commands
+	 * migrated to ArgSpec consume that directly — no flatten to argv, no
+	 * re-parse, no lossy `false` round trip (the #2855 root cause, see #2861).
+	 *
+	 * The fallback covers direct invocation where a caller stashed a raw argv
+	 * array in the instance-level `__arguments` (internal delegation such as
+	 * `create` → `new`, and unit tests). That array is reconstructed into the
+	 * same structured shape LuCLI would have produced, so a command behaves
+	 * identically whether LuCLI dispatched it or another command delegated to it.
+	 */
+	private struct function structuredArgs(struct callerArgs = {}) {
+		if (!structIsEmpty(arguments.callerArgs)) {
+			return arguments.callerArgs;
+		}
+		var raw = __arguments ?: [];
+		return argvToCollection(isArray(raw) ? raw : []);
+	}
+
+	/**
+	 * Reconstruct LuCLI's structured argCollection from a raw argv array.
+	 *
+	 * Mirrors LuCLI's own `parseArguments()` normalization so the fallback path
+	 * is indistinguishable from a live dispatch: `--no-X` → `X=false`, bare
+	 * `--X` → `X=true`, `--key=value` → `key=value` (leading dashes stripped),
+	 * and bare tokens → `arg<n>` keyed by their global position (a flag between
+	 * two positionals leaves a numbering gap, exactly as LuCLI produces).
+	 */
+	private struct function argvToCollection(required array argv) {
+		var coll = {};
+		var count = 0;
+		for (var raw in arguments.argv) {
+			count++;
+			if (left(raw, 5) == "--no-" && !find("=", raw) && len(raw) > 5) {
+				coll[mid(raw, 6, len(raw))] = "false";
+			} else if (left(raw, 2) == "--" && !find("=", raw) && len(raw) > 2) {
+				coll[mid(raw, 3, len(raw))] = "true";
+			} else {
+				var eq = find("=", raw);
+				if (eq > 1) {
+					var key = trim(left(raw, eq - 1));
+					if (left(key, 2) == "--") {
+						key = mid(key, 3, len(key));
+					} else if (left(key, 1) == "-") {
+						key = mid(key, 2, len(key));
+					}
+					coll[key] = mid(raw, eq + 1, len(raw));
+				} else {
+					coll["arg" & count] = raw;
+				}
+			}
+		}
+		return coll;
+	}
+
 	// ─────────────────────────────────────────────────
 	//  MCP framework convention — hide CLI-only commands
 	// ─────────────────────────────────────────────────
@@ -448,25 +508,30 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels seed` arguments. All options are named (no positional), so
+	 * before the ArgSpec migration the legacy getArgs() arg1-gate dropped them
+	 * entirely — `wheels seed --environment=production` silently ran with
+	 * defaults. ArgSpec consumes the named keys directly. `--generate` is a
+	 * shorthand for `--mode=generate`.
+	 */
+	private struct function parseSeedArgs(required struct coll) {
+		var parsed = new cli.lucli.services.ArgSpec()
+			.option(name = "environment", default = "")
+			.option(name = "mode", default = "auto")
+			.flag(name = "generate", default = false)
+			.parse(arguments.coll);
+		return {
+			environment = parsed.environment,
+			mode = parsed.generate ? "generate" : parsed.mode
+		};
+	}
+
+	/**
 	 * hint: Run database seeds (convention-based or generated)
 	 */
 	public string function seed() {
-		var args = getArgs(arguments);
-		var environment = "";
-		var mode = "auto";
-
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--environment=", arg)) {
-				environment = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--mode=", arg)) {
-				mode = valueAfterEquals(arg);
-			} else if (arg == "--generate") {
-				mode = "generate";
-			}
-		}
-
-		return runSeed(mode, environment);
+		var opts = parseSeedArgs(structuredArgs(arguments));
+		return runSeed(opts.mode, opts.environment);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -805,12 +870,44 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels new` arguments from LuCLI's structured argCollection.
+	 *
+	 * `--no-sqlite` arrives as `sqlite=false`; the command's `noSQLite` flag is
+	 * its inverse ("skip the default SQLite setup"). `--no-open-browser` arrives
+	 * as `open-browser=false`. Returns the resolved options plus `isEmpty` so
+	 * the command can distinguish "no args → show usage" from "args but no app
+	 * name → error" (GH #2214).
+	 */
+	private struct function parseNewArgs(required struct coll) {
+		var parsed = new cli.lucli.services.ArgSpec()
+			.positional(name = "appName")
+			.option(name = "port", default = 8080, type = "numeric")
+			.option(name = "datasource", default = "")
+			.option(name = "reload-password", default = "")
+			.flag(name = "setup-h2", default = false)
+			.flag(name = "sqlite", default = true)
+			.flag(name = "open-browser", default = true)
+			.parse(arguments.coll);
+
+		return {
+			appName = parsed.appName,
+			port = parsed.port,
+			datasource = parsed.datasource,
+			reloadPassword = parsed["reload-password"],
+			setupH2 = parsed["setup-h2"],
+			noSQLite = !parsed.sqlite,
+			openBrowser = parsed["open-browser"],
+			isEmpty = structIsEmpty(arguments.coll)
+		};
+	}
+
+	/**
 	 * hint: Scaffold a new Wheels project directory
 	 */
 	public string function new() {
-		var args = getArgs(arguments);
+		var opts = parseNewArgs(structuredArgs(arguments));
 
-		if (!arrayLen(args)) {
+		if (opts.isEmpty) {
 			out("Usage: wheels new <appname> [options]", "yellow");
 			out("");
 			out("Creates a new Wheels application in the specified directory.");
@@ -831,41 +928,21 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var appName = "";
+		var appName = opts.appName;
 		var options = {
-			port: 8080,
-			datasource: "",
-			reloadPassword: "",
-			setupH2: false,
-			noSQLite: false,
-			openBrowser: true
+			port: opts.port,
+			datasource: opts.datasource,
+			reloadPassword: opts.reloadPassword,
+			setupH2: opts.setupH2,
+			noSQLite: opts.noSQLite,
+			openBrowser: opts.openBrowser
 		};
-
-		// Parse arguments: first non-flag arg is app name, flags are options
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--port=", arg)) {
-				options.port = val(valueAfterEquals(arg));
-			} else if (reFindNoCase("^--datasource=", arg)) {
-				options.datasource = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--reload-password=", arg)) {
-				options.reloadPassword = valueAfterEquals(arg);
-			} else if (arg == "--setup-h2") {
-				options.setupH2 = true;
-			} else if (arg == "--no-sqlite") {
-				options.noSQLite = true;
-			} else if (arg == "--no-open-browser") {
-				options.openBrowser = false;
-			} else if (!arg.startsWith("--") && !len(appName)) {
-				appName = arg;
-			}
-		}
 
 		if (!len(appName)) {
 			out("Error: app name is required.", "red");
 			out("Usage: wheels new <appname>");
-			// Args were supplied (the zero-args branch above already returned
-			// usage help) but none parsed as an app name — e.g. `wheels new
+			// Args were supplied (the empty branch above already returned usage
+			// help) but none parsed as an app name — e.g. `wheels new
 			// --port=3000`. Throw so LuCLI surfaces a non-zero exit (GH #2214).
 			throw(
 				type="Wheels.InvalidArguments",
@@ -1483,13 +1560,28 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels analyze` arguments. Single positional target (defaults to
+	 * "all"); `hasTarget` distinguishes a bare `wheels analyze` from an explicit
+	 * target so the "not in a project" guard only fires for the bare form.
+	 */
+	private struct function parseAnalyzeArgs(required struct coll) {
+		var parsed = new cli.lucli.services.ArgSpec()
+			.positional(name = "target", default = "all")
+			.parse(arguments.coll);
+		return {
+			target = lCase(parsed.target),
+			hasTarget = structKeyExists(arguments.coll, "arg1")
+		};
+	}
+
+	/**
 	 * hint: Analyze Wheels application code for quality issues, anti-patterns, and complexity metrics
 	 */
 	public string function analyze() {
-		var args = getArgs(arguments);
-		var target = arrayLen(args) ? lCase(args[1]) : "all";
+		var opts = parseAnalyzeArgs(structuredArgs(arguments));
+		var target = opts.target;
 
-		if (!arrayLen(args) && !directoryExists(variables.projectRoot & "/app")) {
+		if (!opts.hasTarget && !directoryExists(variables.projectRoot & "/app")) {
 			out("No app/ directory found. Are you in a Wheels project?", "red");
 			return "";
 		}
@@ -1596,18 +1688,69 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels destroy` arguments. Supports both `<type> <name>` (preferred)
+	 * and the legacy `<name> <type>` orderings (issue #2313 / F16) plus the
+	 * `--force` flag. `positionalCount` lets the command show usage when nothing
+	 * was supplied. The smart reorder is business logic that survives the ArgSpec
+	 * migration unchanged — ArgSpec only replaced the hand-rolled token split.
+	 */
+	private struct function parseDestroyArgs(required struct coll) {
+		var parsed = new cli.lucli.services.ArgSpec()
+			.flag(name = "force", default = false)
+			.parse(arguments.coll);
+
+		// Collect positionals from every arg<n> value in numeric order. LuCLI
+		// numbers positionals by global token index, so a leading `--force`
+		// leaves a gap (arg2, arg3 with no arg1); gathering by sorted index
+		// keeps the <type>/<name> pair intact wherever `--force` sits.
+		var indices = [];
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				arrayAppend(indices, val(mid(key, 4, len(key))));
+			}
+		}
+		arraySort(indices, "numeric");
+		var positional = [];
+		for (var idx in indices) {
+			var token = trim(arguments.coll["arg" & idx]);
+			if (len(token)) arrayAppend(positional, token);
+		}
+
+		var validTypes = "resource,model,controller,view";
+		var name = "";
+		var type = "resource";
+		if (arrayLen(positional) == 1) {
+			name = positional[1];
+		} else if (arrayLen(positional) >= 2) {
+			var firstArg = positional[1];
+			var secondArg = positional[2];
+			if (listFindNoCase(validTypes, firstArg)) {
+				type = lCase(firstArg);
+				name = secondArg;
+			} else if (listFindNoCase(validTypes, secondArg)) {
+				name = firstArg;
+				type = lCase(secondArg);
+			} else {
+				name = firstArg;
+				type = lCase(secondArg);
+			}
+		}
+
+		return {
+			name = name,
+			type = type,
+			force = parsed.force,
+			positionalCount = arrayLen(positional)
+		};
+	}
+
+	/**
 	 * hint: Remove generated components (resource, model, controller, view)
 	 */
 	public string function destroy() {
-		var args = getArgs(arguments);
+		var opts = parseDestroyArgs(structuredArgs(arguments));
 
-		var positional = [];
-		var force = false;
-		for (var a in args) {
-			if (a == "--force") { force = true; }
-			else { arrayAppend(positional, a); }
-		}
-		if (!arrayLen(positional)) {
+		if (!opts.positionalCount) {
 			out("Usage: wheels destroy <type> <name>", "yellow");
 			out("       wheels destroy <name>          (type defaults to 'resource')", "yellow");
 			out("");
@@ -1625,31 +1768,11 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Smart-parse positionals to support both orderings:
-		//   `<type> <name>` — preferred, matches `wheels generate <type> <name>` and v3 docs index
-		//   `<name> [type]` — legacy form documented in earlier CLI builds
-		// Issue #2313 (F16): users following the docs hit "Unknown type: posts" before this.
-		var validTypes = "resource,model,controller,view";
-		var name = "";
-		var type = "resource";
-		if (arrayLen(positional) == 1) {
-			name = trim(positional[1]);
-		} else {
-			var firstArg = trim(positional[1]);
-			var secondArg = trim(positional[2]);
-			if (listFindNoCase(validTypes, firstArg)) {
-				type = lCase(firstArg);
-				name = secondArg;
-			} else if (listFindNoCase(validTypes, secondArg)) {
-				name = firstArg;
-				type = lCase(secondArg);
-			} else {
-				name = firstArg;
-				type = lCase(secondArg);
-			}
-		}
+		var name = opts.name;
+		var type = opts.type;
+		var force = opts.force;
 
-		if (!listFindNoCase(validTypes, type)) {
+		if (!listFindNoCase("resource,model,controller,view", type)) {
 			out("Unknown type: #type#. Valid types: resource, model, controller, view", "red");
 			return "";
 		}
@@ -1717,14 +1840,31 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Resolve the --verbose flag shared by `doctor` and `stats`. Named
+	 * `--verbose` (no positional) was dropped by the legacy arg1-gate; ArgSpec
+	 * reads it directly. `-v` is preserved — LuCLI only normalizes --x / --no-x,
+	 * so a short flag arrives as a positional arg<n> value.
+	 */
+	private boolean function parseVerboseFlag(required struct coll) {
+		var parsed = new cli.lucli.services.ArgSpec()
+			.flag(name = "verbose", default = false)
+			.parse(arguments.coll);
+		if (parsed.verbose) {
+			return true;
+		}
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key) && arguments.coll[key] == "-v") {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * hint: Run health checks on your Wheels application
 	 */
 	public string function doctor() {
-		var args = getArgs(arguments);
-		var verbose = false;
-		for (var arg in args) {
-			if (arg == "--verbose" || arg == "-v") verbose = true;
-		}
+		var verbose = parseVerboseFlag(structuredArgs(arguments));
 
 		var svc = getService("doctor");
 		var results = svc.runChecks();
@@ -2327,11 +2467,7 @@ component extends="modules.BaseModule" {
 	 * hint: Show code statistics for your Wheels application
 	 */
 	public string function stats() {
-		var args = getArgs(arguments);
-		var verbose = false;
-		for (var arg in args) {
-			if (arg == "--verbose" || arg == "-v") verbose = true;
-		}
+		var verbose = parseVerboseFlag(structuredArgs(arguments));
 
 		var svc = getService("stats");
 		var data = svc.getStats();
@@ -2385,21 +2521,25 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels notes` arguments. Named-only (no positional), so the legacy
+	 * getArgs() arg1-gate dropped --annotations / --custom entirely; ArgSpec
+	 * consumes them directly.
+	 */
+	private struct function parseNotesArgs(required struct coll) {
+		var parsed = new cli.lucli.services.ArgSpec()
+			.option(name = "annotations", default = "TODO,FIXME,OPTIMIZE")
+			.option(name = "custom", default = "")
+			.parse(arguments.coll);
+		return { annotations = parsed.annotations, custom = parsed.custom };
+	}
+
+	/**
 	 * hint: Extract TODO, FIXME, and other annotations from your codebase
 	 */
 	public string function notes() {
-		var args = getArgs(arguments);
-		var annotations = "TODO,FIXME,OPTIMIZE";
-		var custom = "";
-
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--annotations=", arg)) {
-				annotations = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--custom=", arg)) {
-				custom = valueAfterEquals(arg);
-			}
-		}
+		var opts = parseNotesArgs(structuredArgs(arguments));
+		var annotations = opts.annotations;
+		var custom = opts.custom;
 
 		var svc = getService("stats");
 		var data = svc.getNotes(annotations, custom);
@@ -2480,6 +2620,25 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels upgrade` arguments. `subcommand` (positional) must be
+	 * "check"; `--to=<version>` selects the target. `sawTo` / `sawDryRun` drive
+	 * the "did you mean" nudge and match both `--to` and `--to=x` (LuCLI maps a
+	 * bare `--to` to to=true and `--to=x` to to=x — either way the key exists).
+	 */
+	private struct function parseUpgradeArgs(required struct coll) {
+		var parsed = new cli.lucli.services.ArgSpec()
+			.positional(name = "subcommand", default = "")
+			.option(name = "to", default = "")
+			.parse(arguments.coll);
+		return {
+			isCheck = lCase(parsed.subcommand) == "check",
+			targetVersion = parsed.to,
+			sawTo = structKeyExists(arguments.coll, "to"),
+			sawDryRun = structKeyExists(arguments.coll, "dry-run")
+		};
+	}
+
+	/**
 	 * hint: Scan your app for breaking changes before upgrading Wheels (read-only)
 	 *
 	 * This command does NOT perform the upgrade. It only scans the current app
@@ -2495,9 +2654,9 @@ component extends="modules.BaseModule" {
 	 *   wheels upgrade check --to=4.0.0      - scan against a specific target version
 	 */
 	public string function upgrade() {
-		var args = getArgs(arguments);
+		var opts = parseUpgradeArgs(structuredArgs(arguments));
 
-		if (!arrayLen(args) || lCase(args[1]) != "check") {
+		if (!opts.isCheck) {
 			var nl = chr(10);
 			var help = "Usage: wheels upgrade check [--to=<version>]" & nl
 				& nl
@@ -2515,17 +2674,11 @@ component extends="modules.BaseModule" {
 				& "  brew upgrade wheels       (macOS / Homebrew)" & nl
 				& "  scoop update wheels       (Windows / Scoop)" & nl;
 
-			// Detect the two common misfires from the legacy help text and
-			// nudge the user toward the right invocation explicitly.
-			var sawDryRun = false;
-			var sawTo = false;
-			for (var a in args) {
-				if (a == "--dry-run") sawDryRun = true;
-				else if (reFindNoCase("^--to(=|$)", a)) sawTo = true;
-			}
-			if (sawDryRun || sawTo) {
+			// Nudge the two common misfires from the legacy help text toward the
+			// right invocation explicitly (detected during parse).
+			if (opts.sawDryRun || opts.sawTo) {
 				help &= nl & "Did you mean: wheels upgrade check"
-					& (sawTo ? " --to=<version>" : "")
+					& (opts.sawTo ? " --to=<version>" : "")
 					& " ?" & nl;
 			}
 
@@ -2533,14 +2686,7 @@ component extends="modules.BaseModule" {
 			return help;
 		}
 
-		var targetVersion = "";
-		for (var i = 2; i <= arrayLen(args); i++) {
-			if (reFindNoCase("^--to=", args[i])) {
-				targetVersion = valueAfterEquals(args[i]);
-			}
-		}
-
-		return runUpgradeCheck(targetVersion);
+		return runUpgradeCheck(opts.targetVersion);
 	}
 
 	// ─────────────────────────────────────────────────

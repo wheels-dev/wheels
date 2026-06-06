@@ -147,6 +147,8 @@ function authenticate() { ... }
 private function authenticate() { ... }
 ```
 
+Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` throws `Wheels.ActionNotAllowed` → 404 for any action whose name matches one. So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it 404s instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
+
 ### 9. Always cfparam View Variables
 Every variable passed from controller to view needs a cfparam at the top of the view file.
 ```cfm
