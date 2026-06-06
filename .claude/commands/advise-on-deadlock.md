@@ -28,18 +28,26 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 ## Args
 
 - `<pr-number>` — the PR with deadlocked A↔B exchange
+- `<head-sha>` — the commit SHA this advice runs against; the workflow
+  resolves it once and checks it out, then passes it here. Use it verbatim as
+  the marker SHA wherever this prompt writes `<sha>`. Don't compute the SHA
+  yourself — re-deriving it mid-session is the #2848 race. This governs only
+  the marker SHA: you still use `gh pr view` / `gh pr diff` normally to read
+  the PR's comments, reviews, and diff.
 
 ## Steps
 
-1. **Idempotency check.** Read PR comments via
-   `gh pr view <pr-number> --json comments,headRefOid`. If any
-   comment contains `wheels-bot:advisor:<pr>:<sha>` for the current
-   head SHA, exit silently — already advised at this SHA.
+1. **Idempotency check.** Throughout this command, `<sha>` means the
+   `<head-sha>` argument you were passed; don't compute it yourself
+   (issue #2848). Read PR comments via
+   `gh pr view <pr-number> --json comments`. If any comment contains
+   `wheels-bot:advisor:<pr>:<head-sha>` for the `<head-sha>` you were
+   passed, exit silently — already advised at this SHA.
 
 2. **Confirm the deadlock.** Look for a comment containing
-   `wheels-bot:review-b:<pr>:<sha>:terminal` for the current head
-   SHA. That's the trigger marker. If no terminal marker is present
-   for the current SHA, exit silently (this command shouldn't have
+   `wheels-bot:review-b:<pr>:<head-sha>:terminal` for the `<head-sha>`
+   you were passed. That's the trigger marker. If no terminal marker is
+   present for `<head-sha>`, exit silently (this command shouldn't have
    fired).
 
 3. **Read the full exchange.**
@@ -47,10 +55,10 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
    - The PR title/body via `gh pr view <pr-number>` for original
      context (and the `Fixes #<issue>` link, if any — the original
      issue's framing matters).
-   - All `wheels-bot[bot]` PR reviews on the current SHA: A's initial
+   - All `wheels-bot[bot]` PR reviews on `<head-sha>`: A's initial
      review and any response reviews
      (`wheels-bot:review-a-response:`).
-   - All `wheels-bot[bot]` PR comments on the current SHA matching
+   - All `wheels-bot[bot]` PR comments on `<head-sha>` matching
      `wheels-bot:review-b:<pr>:<sha>:` — the full B critique chain in
      chronological order.
 
@@ -137,14 +145,16 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
    <if verdict is `approve`, note that the disputed findings should be
    dropped and the PR is fine to merge as-is.>
 
-   <!-- wheels-bot:advisor:<pr>:<sha> -->
+   <!-- wheels-bot:advisor:<pr>:<head-sha> -->
    <CONVERGENCE_MARKER>
    ```
 
-   Where `<CONVERGENCE_MARKER>` is:
-   - `<!-- wheels-bot:converged-approve:<pr>:<sha> -->` if verdict is
+   Build every marker SHA from the `<head-sha>` argument — never a value
+   re-derived during the session (issue #2848). Where `<CONVERGENCE_MARKER>`
+   is:
+   - `<!-- wheels-bot:converged-approve:<pr>:<head-sha> -->` if verdict is
      `approve`
-   - `<!-- wheels-bot:converged-changes:<pr>:<sha> -->` if verdict is
+   - `<!-- wheels-bot:converged-changes:<pr>:<head-sha> -->` if verdict is
      `changes` (triggers `bot-address-review.yml`)
 
 10. **Self-check before posting.**
@@ -155,7 +165,9 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
     - [ ] Verdict is one of `approve` or `changes` — not "kinda
       mostly", not equivocal.
     - [ ] Convergence marker is consistent with the verdict.
-    - [ ] Advisor marker present.
+    - [ ] Advisor and convergence markers present and built from the
+      `<head-sha>` argument — not a SHA re-derived during the session
+      (issue #2848).
 
     If any check fails, fix before posting. The advisor's verdict is
     authoritative within the convergence loop — get it right.
