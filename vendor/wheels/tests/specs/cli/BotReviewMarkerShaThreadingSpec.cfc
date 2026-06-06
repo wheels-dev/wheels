@@ -240,6 +240,21 @@ component extends="wheels.WheelsTest" {
 						"bot-review-a-fork.yml checkout must set persist-credentials: false under "
 						& "pull_request_target (issue ##2871)."
 					);
+					// Negative side (mirrors the bot-review-b.yml block): the checkout
+					// `ref:` must never key off a fork-controlled head ref. head.sha is
+					// referenced elsewhere (the review marker, via env) — this guards only
+					// the checkout ref, the value that lands in the working tree.
+					expect(
+						reFindNoCase(
+							"ref:\s*\$\{\{\s*github\.event\.pull_request\.head\.",
+							content
+						) > 0
+					).toBeFalse(
+						"bot-review-a-fork.yml must NOT check out a fork head ref "
+						& "(ref: ${{ github.event.pull_request.head.* }}) — that would put "
+						& "fork-controlled code in the working tree, where the local "
+						& "wheels-bot-skip-check composite action runs it (issue ##2871)."
+					);
 				});
 
 				it("threads the validated head SHA into the /review-pr command (##2848)", () => {
