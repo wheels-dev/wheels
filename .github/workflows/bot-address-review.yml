@@ -54,7 +54,7 @@ jobs:
           app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
           private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
 
-      - name: Resolve PR head ref
+      - name: Resolve PR head ref + SHA
         id: pr
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -64,12 +64,28 @@ jobs:
             echo "::error::pr-number must be numeric, got: $PR_NUMBER"
             exit 1
           fi
-          ref=$(gh pr view "$PR_NUMBER" --repo wheels-dev/wheels --json headRefName -q '.headRefName')
+          # Resolve the head ref (for the branch checkout below) AND the head
+          # SHA (threaded into the prompt as <head-sha>) in a single `gh pr
+          # view`, so the marker SHA is captured once here instead of being
+          # re-derived by the model mid-session — the #2848 race. Unlike
+          # bot-advisor.yml the checkout stays branch-name-keyed: this stage
+          # commits and pushes back, and a detached-HEAD SHA checkout would
+          # break `git push origin HEAD`. The captured SHA is therefore the
+          # head at run start — exactly the marker's <sha-before> (the head
+          # before this stage's own commit).
+          info=$(gh pr view "$PR_NUMBER" --repo wheels-dev/wheels --json headRefName,headRefOid)
+          ref=$(echo "$info" | python3 -c "import json,sys; print(json.load(sys.stdin)['headRefName'])")
+          sha=$(echo "$info" | python3 -c "import json,sys; print(json.load(sys.stdin)['headRefOid'])")
           if [ -z "$ref" ]; then
             echo "::error::Could not resolve PR head ref for #$PR_NUMBER"
             exit 1
           fi
+          if [ -z "$sha" ]; then
+            echo "::error::Could not resolve PR head SHA for #$PR_NUMBER"
+            exit 1
+          fi
           echo "head=$ref" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Checkout PR branch
         uses: actions/checkout@v6
@@ -111,8 +127,18 @@ jobs:
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
+          # Thread the head SHA resolved in "Resolve PR head ref + SHA" — the
+          # head at run start, before this stage's own commit — into the prompt
+          # as a second argument. The implementer emits its
+          # `wheels-bot:address-review:<pr>:<sha>:` markers from this value
+          # instead of re-deriving it with `gh pr view`, which races with
+          # pushes landing mid-session and left the marker pointing at the
+          # wrong commit (issue #2848). The Run step's Bash allowlist is gh +
+          # read-only git + the test runner (no echo/printenv), so the model
+          # can't read a step env var — the SHA must travel in the prompt text,
+          # the same channel the PR number already uses.
           prompt: |
-            /address-review ${{ env.PR_NUMBER }}
+            /address-review ${{ env.PR_NUMBER }} ${{ steps.pr.outputs.sha }}
           claude_args: |
             --model claude-opus-4-7
             --max-turns 1000

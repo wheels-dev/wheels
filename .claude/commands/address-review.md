@@ -25,14 +25,22 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 ## Args
 
 - `<pr-number>` — the PR with converged-changes markers to address
+- `<head-sha>` — the PR head SHA at the start of this run, captured once by
+  the workflow and passed here. Use it verbatim as the marker SHA — it is the
+  `<sha>` / `<sha-before>` every marker below writes (the head *before* your
+  own commit). Don't compute the SHA yourself — re-deriving it mid-session is
+  the #2848 race. This governs only the marker SHA; you still use `gh pr view`
+  normally to read comments, the consensus, and the head ref name.
 
 ## Steps
 
-1. **Idempotency + outer-loop cap.** Read PR comments via
-   `gh pr view <pr-number> --json comments,headRefOid,headRefName`.
+1. **Idempotency + outer-loop cap.** Throughout this command, the marker SHA
+   — written `<sha>` and `<sha-before>` below — is the `<head-sha>` argument
+   you were passed; don't compute it yourself (issue #2848). Read PR comments
+   via `gh pr view <pr-number> --json comments`.
    - If any comment contains
-     `wheels-bot:address-review:<pr>:<sha>:` for the current head
-     SHA, exit silently — already addressed at this SHA.
+     `wheels-bot:address-review:<pr>:<head-sha>:` for the `<head-sha>`
+     you were passed, exit silently — already addressed at this SHA.
    - Count comments matching `wheels-bot:address-review:<pr>:` for
      ANY SHA on this PR. If count ≥ 5, post:
 
@@ -44,7 +52,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
      either the PR's scope is larger than the bot can resolve, or
      the reviewers are deadlocked on a design call.
 
-     <!-- wheels-bot:address-review:<pr>:<sha>:terminal -->
+     <!-- wheels-bot:address-review:<pr>:<head-sha>:terminal -->
      ```
 
      and exit.
@@ -90,7 +98,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
    change. The PR's reviewer-feedback exchange is preserved above
    for context.
 
-   <!-- wheels-bot:address-held:<pr>:<sha> -->
+   <!-- wheels-bot:address-held:<pr>:<head-sha> -->
    ```
 
    and exit.
@@ -145,7 +153,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
    SHA. Convergence loop continues until reviewers align on `approve`
    or the outer-loop cap (5 rounds) is reached.
 
-   <!-- wheels-bot:address-review:<pr>:<sha-before>:<N> -->
+   <!-- wheels-bot:address-review:<pr>:<head-sha>:<N> -->
    ```
 
 8. **Self-check before posting.**
@@ -153,9 +161,9 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
      allowed paths
    - [ ] For `fix/bot-*`: tests re-run, output cited in the comment
    - [ ] Commit message is conventional, subject ≤ 100 chars
-   - [ ] PR comment includes the marker with the correct
-     `<sha-before>` (the head SHA at the start of this run, not after
-     your commit)
+   - [ ] PR comment includes the marker built from the `<head-sha>`
+     argument (the head SHA at the start of this run, before your
+     commit — never a value you re-derived; issue #2848)
    - [ ] Outer-loop count is correctly reflected in the round number
 
    If any check fails, do not post; investigate and exit non-zero.
