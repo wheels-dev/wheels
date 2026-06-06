@@ -14,9 +14,11 @@
  *
  * Some helpers read the instance-level __arguments fallback. That value lives
  * in the `variables` scope (create() sets it via an unscoped assignment, and
- * the helpers read it unscoped). A spec setting `probe.__arguments` would only
- * touch the `this` scope, which the helpers never see — so the wrappers that
- * exercise the fallback accept it as an argument and seed `variables` directly.
+ * the helpers read it unscoped) — a spec setting `probe.__arguments` would only
+ * touch the `this` scope, which the helpers never see. So the wrappers that
+ * exercise the fallback take it as an argument and seed `variables` directly,
+ * and ALWAYS reset it (defaulting to []) on every call, so this shared probe
+ * never carries a stale __arguments from a prior spec.
  */
 component extends="cli.lucli.Module" {
 
@@ -24,10 +26,8 @@ component extends="cli.lucli.Module" {
 		return argsFromCollection(arguments.coll);
 	}
 
-	public array function $getArgs(struct callerArgs = {}, array underscoreArguments) {
-		if (!isNull(arguments.underscoreArguments)) {
-			variables.__arguments = arguments.underscoreArguments;
-		}
+	public array function $getArgs(struct callerArgs = {}, array underscoreArguments = []) {
+		variables.__arguments = arguments.underscoreArguments;
 		return getArgs(arguments.callerArgs);
 	}
 
@@ -35,10 +35,8 @@ component extends="cli.lucli.Module" {
 		return argvToCollection(arguments.argv);
 	}
 
-	public struct function $structuredArgs(struct callerArgs = {}, array underscoreArguments) {
-		if (!isNull(arguments.underscoreArguments)) {
-			variables.__arguments = arguments.underscoreArguments;
-		}
+	public struct function $structuredArgs(struct callerArgs = {}, array underscoreArguments = []) {
+		variables.__arguments = arguments.underscoreArguments;
 		return structuredArgs(arguments.callerArgs);
 	}
 

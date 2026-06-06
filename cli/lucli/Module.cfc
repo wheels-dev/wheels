@@ -1705,7 +1705,7 @@ component extends="modules.BaseModule" {
 		// keeps the <type>/<name> pair intact wherever `--force` sits.
 		var indices = [];
 		for (var key in arguments.coll) {
-			if (reFindNoCase("^arg[0-9]+$", key)) {
+			if (reFindNoCase("^arg\d+$", key)) {
 				arrayAppend(indices, val(mid(key, 4, len(key))));
 			}
 		}
@@ -2631,7 +2631,6 @@ component extends="modules.BaseModule" {
 			.option(name = "to", default = "")
 			.parse(arguments.coll);
 		return {
-			hasArgs = !structIsEmpty(arguments.coll),
 			isCheck = lCase(parsed.subcommand) == "check",
 			targetVersion = parsed.to,
 			sawTo = structKeyExists(arguments.coll, "to"),

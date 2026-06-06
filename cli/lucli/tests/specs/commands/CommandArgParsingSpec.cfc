@@ -124,6 +124,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(probe.$parseNewArgs({arg1: "myapp"}).isEmpty).toBeFalse();
 			});
 
+			it("treats a flags-only invocation as non-empty (errors instead of usage)", () => {
+				// `wheels new --no-sqlite` (no app name) arrives as {sqlite:"false"} —
+				// non-empty, so isEmpty is false, the usage branch is skipped, and the
+				// command throws "app name required". This is a deliberate delta from
+				// the old getArgs() arg1-gate, which dropped named-only args and fell
+				// through to the usage guide.
+				expect(probe.$parseNewArgs({sqlite: "false"}).isEmpty).toBeFalse();
+			});
+
 		});
 
 		describe("parseSeedArgs (named-only — previously dropped)", () => {
@@ -198,10 +207,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("parseUpgradeArgs", () => {
 
-			it("flags a missing/empty invocation as not-check", () => {
-				var o = probe.$parseUpgradeArgs({});
-				expect(o.isCheck).toBeFalse();
-				expect(o.hasArgs).toBeFalse();
+			it("treats a missing/empty invocation as not-check", () => {
+				expect(probe.$parseUpgradeArgs({}).isCheck).toBeFalse();
 			});
 
 			it("recognizes the check subcommand", () => {
