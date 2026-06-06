@@ -38,6 +38,7 @@ jobs:
       vars.WHEELS_BOT_ENABLED == 'true'
       && (
         (github.event_name == 'pull_request'
+          && github.event.pull_request.user.login != 'dependabot[bot]'
           && (github.event.pull_request.user.login == 'wheels-bot[bot]'
               || github.event.pull_request.draft == false))
         || (github.event_name == 'issue_comment'
