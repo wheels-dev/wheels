@@ -28,16 +28,22 @@ jobs:
         || github.event.pull_request.draft == false
       )
     steps:
-      - name: Checkout the reviewed commit
+      # SECURITY: check out the BASE branch, never the reviewed commit. This
+      # workflow runs on `pull_request_review`, which carries the base repo's
+      # secrets + write token even for fork PRs. Checking out
+      # `github.event.review.commit_id` (a fork commit on fork PRs) and then
+      # running the local `./.github/actions/wheels-bot-skip-check` composite
+      # action below would execute fork-controlled code with the bot's token
+      # (the classic pwn-request). The reviewed commit's objects are fetched
+      # read-only after the token step so the review's git commands still
+      # resolve; nothing from the fork is ever executed. The marker still keys
+      # off review.commit_id (passed via `with:`/prompt, not shell), so the gate
+      # and emitted marker stay aligned with the commit A reviewed (#2848).
+      - name: Checkout BASE branch (trusted — never the reviewed/fork commit)
         uses: actions/checkout@v6
         with:
-          # Check out the commit Reviewer A's review was attached to — not the
-          # PR's (possibly newer) head. B critiques A's review of THIS commit,
-          # so it must read exactly what A read, and the marker it emits must
-          # key off the same SHA the skip-check below gates on. commit_id is a
-          # GitHub-generated SHA, immune to head drift from concurrent pushes
-          # (issue #2848).
-          ref: ${{ github.event.review.commit_id }}
+          ref: ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Generate App token
@@ -46,6 +52,19 @@ jobs:
         with:
           app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
           private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Fetch PR head commit objects (read-only; never checked out)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::PR number is not numeric: $PR_NUMBER"
+            exit 1
+          fi
+          # Objects only — the working tree stays on the trusted base branch.
+          # Best-effort: B reviews A's review via gh, so a fetch miss is non-fatal.
+          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head" || true
 
       - name: Skip check
         id: gate
