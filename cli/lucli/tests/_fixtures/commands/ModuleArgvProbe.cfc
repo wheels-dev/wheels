@@ -1,15 +1,73 @@
 /**
- * Test fixture for Module.cfc's private argv-rebuild helper.
+ * Test fixture for Module.cfc's private argument-handling helpers.
  *
- * Module.cfc's argsFromCollection() reconstructs the CLI argv array from
- * LuCLI's argCollection struct. It is private to keep the LuCLI-dispatch
- * surface tight, so this fixture exposes a thin pass-through so specs can
- * cover the negation-flag handling that issue #2855 surfaced.
+ * Module.cfc keeps its arg-sourcing and per-command parse helpers private to
+ * keep the LuCLI-dispatch surface tight (public functions become CLI
+ * subcommands / MCP tools). This fixture extends Module and exposes thin
+ * public pass-throughs so specs can unit-test the parsing layer without
+ * booting a server or triggering command side effects.
+ *
+ *   - $argsFromCollection : the legacy argv-rebuild shim (issue #2855)
+ *   - $structuredArgs / $argvToCollection : the ArgSpec sourcing layer (#2861)
+ *   - $getArgs : the legacy flat-argv accessor, for regression characterization
+ *   - $parse<Command>Args : per-command parse helpers migrated to ArgSpec
+ *
+ * Some helpers read the instance-level __arguments fallback. That value lives
+ * in the `variables` scope (create() sets it via an unscoped assignment, and
+ * the helpers read it unscoped). A spec setting `probe.__arguments` would only
+ * touch the `this` scope, which the helpers never see — so the wrappers that
+ * exercise the fallback accept it as an argument and seed `variables` directly.
  */
 component extends="cli.lucli.Module" {
 
 	public array function $argsFromCollection(required struct coll) {
 		return argsFromCollection(arguments.coll);
+	}
+
+	public array function $getArgs(struct callerArgs = {}, array underscoreArguments) {
+		if (!isNull(arguments.underscoreArguments)) {
+			variables.__arguments = arguments.underscoreArguments;
+		}
+		return getArgs(arguments.callerArgs);
+	}
+
+	public struct function $argvToCollection(required array argv) {
+		return argvToCollection(arguments.argv);
+	}
+
+	public struct function $structuredArgs(struct callerArgs = {}, array underscoreArguments) {
+		if (!isNull(arguments.underscoreArguments)) {
+			variables.__arguments = arguments.underscoreArguments;
+		}
+		return structuredArgs(arguments.callerArgs);
+	}
+
+	public struct function $parseNewArgs(required struct coll) {
+		return parseNewArgs(arguments.coll);
+	}
+
+	public struct function $parseSeedArgs(required struct coll) {
+		return parseSeedArgs(arguments.coll);
+	}
+
+	public struct function $parseNotesArgs(required struct coll) {
+		return parseNotesArgs(arguments.coll);
+	}
+
+	public struct function $parseAnalyzeArgs(required struct coll) {
+		return parseAnalyzeArgs(arguments.coll);
+	}
+
+	public boolean function $parseVerboseFlag(required struct coll) {
+		return parseVerboseFlag(arguments.coll);
+	}
+
+	public struct function $parseUpgradeArgs(required struct coll) {
+		return parseUpgradeArgs(arguments.coll);
+	}
+
+	public struct function $parseDestroyArgs(required struct coll) {
+		return parseDestroyArgs(arguments.coll);
 	}
 
 }
