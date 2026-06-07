@@ -1,0 +1,96 @@
+/**
+ * Tests Module.cfc::detectServerPort() server-identity gating (issue #2878).
+ *
+ * Without a project-explicit port (lucee.json / .env), the helper used to
+ * silently fall back to a hardcoded common-ports list ([8080, 60000, 3000,
+ * 8500]). When a sibling app's server was running on one of those ports,
+ * `wheels migrate` in a fresh project attached to the wrong instance and
+ * ran migrations against the wrong database.
+ *
+ * The fix exposes two knobs on detectServerPort():
+ *   - `requireProjectConfig` — write-side guard; refuses the common-port
+ *     fallback so write commands can only target a server bound to this
+ *     project's own lucee.json/.env port.
+ *   - `commonPorts` — injectable fallback list so this spec can simulate
+ *     a 'sibling' app squatting a known port deterministically.
+ */
+component extends="wheels.wheelstest.system.BaseSpec" {
+
+	function beforeAll() {
+		variables.testHelper = new cli.lucli.tests.TestHelper();
+		variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
+
+		// Repro state for #2878: a freshly-created project with no
+		// inherited lucee.json or .env port config. scaffoldTempProject
+		// copies repo root files when present, so strip them explicitly.
+		if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+		if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+
+		directoryCreate(tempRoot & "/vendor/wheels", true, true);
+
+		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
+	}
+
+	function afterAll() {
+		testHelper.cleanupTempProject(variables.tempRoot);
+	}
+
+	function run() {
+
+		describe("detectServerPort — server-identity guard (##2878)", () => {
+
+			it("falls back to commonPorts for read-side detection when no project config exists", () => {
+				// Open a ServerSocket on an ephemeral port to simulate a
+				// 'sibling' app. Read-side commands (info, status) are
+				// allowed to attach to it — the fallback is intentional
+				// for non-mutating probes.
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					var detected = mod.detectServerPort(commonPorts = [siblingPort]);
+					expect(detected).toBe(siblingPort);
+				} finally {
+					siblingSocket.close();
+				}
+			});
+
+			it("refuses commonPorts fallback when requireProjectConfig is true", () => {
+				// Same simulated sibling on an open port. Write-side
+				// commands MUST refuse to attach — the #2878 root cause.
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					var detected = mod.detectServerPort(
+						requireProjectConfig = true,
+						commonPorts = [siblingPort]
+					);
+					expect(detected).toBeFalse();
+				} finally {
+					siblingSocket.close();
+				}
+			});
+
+			it("returns the lucee.json port when project config exists and write-side mode is active", () => {
+				// Sanity check: write-side mode still resolves a valid
+				// project-bound port. We point lucee.json at an open
+				// ephemeral socket so isPortOpen() returns true.
+				var ourSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var ourPort = ourSocket.getLocalPort();
+					fileWrite(tempRoot & "/lucee.json", serializeJSON({port: ourPort}));
+
+					var detected = mod.detectServerPort(requireProjectConfig = true);
+					expect(detected).toBe(ourPort);
+				} finally {
+					if (fileExists(tempRoot & "/lucee.json")) {
+						fileDelete(tempRoot & "/lucee.json");
+					}
+					ourSocket.close();
+				}
+			});
+
+		});
+
+	}
+
+}
