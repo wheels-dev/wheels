@@ -9,12 +9,14 @@
  * loop — a round trip that silently dropped `false` values (the root cause
  * of #2855) and could not distinguish `--no-X` from an explicit `--X=false`.
  *
- * `ArgSpec` consumes LuCLI's structured map directly. Each command declares
- * its positionals, flags, and options up front; `.parse(arguments)` returns
- * a typed result struct. No flatten, no re-parse, no lossy `false` round
- * trip. Designed to be adopted incrementally — `getArgs()` and
- * `argsFromCollection()` stay in place as a deprecated shim until every
- * call site is converted.
+ * `ArgSpec` consumes LuCLI's structured map directly. Each command either
+ * declares its positionals, flags, and options up front and calls
+ * `.parse(arguments)` for a typed result struct, or — when it forwards to its
+ * own downstream argv parser (generate, deploy, packages, ...) — calls
+ * `.toArgv(arguments)` for a non-lossy collection->argv reconstruction. Either
+ * way: no per-command flatten, no re-parse, no lossy `false` round trip. The
+ * Module.cfc getArgs()/argsFromCollection() shim this replaced has been removed
+ * now that every call site is converted (#2861).
  *
  * Usage:
  *
@@ -108,6 +110,52 @@ component {
 			}
 			if (structKeyExists(variables.named, key)) {
 				result[key] = $coerce(arguments.coll[key], variables.named[key].type);
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * Reconstruct LuCLI's ordered argv from a structured argCollection.
+	 *
+	 * The inverse of LuCLI's parse: positionals (arg1, arg2, ...) emit first
+	 * in index order, then named keys emit as `--key` (true), `--no-key`
+	 * (false), or `--key=value`. This is the non-lossy passthrough that
+	 * commands with their own downstream argv parsers (generate, create, db,
+	 * browser, deploy, packages, migrate, start) use to forward LuCLI's
+	 * structured handoff to a flat-array parser — replacing the Module.cfc
+	 * getArgs()/argsFromCollection() round trip (#2855, #2861).
+	 *
+	 * Contract dependency: LuCLI's parseArguments() normalizes `--no-X` to
+	 * `X=false` and bare `--X` to `X=true` before dispatch. The `value=="false"`
+	 * arm re-emits `--no-X` so downstream literal-token matchers (e.g.
+	 * `--no-routes`, `--no-migration`) still see the user's negation (#2856).
+	 */
+	public array function toArgv(required struct coll) {
+		var result = [];
+
+		// Positionals in arg1..argN order. Stops at the first index gap,
+		// mirroring the legacy argsFromCollection — dispatchers always pass
+		// the sub-verb as the leading positional, so a gap never elides one.
+		var i = 1;
+		while (structKeyExists(arguments.coll, "arg" & i)) {
+			arrayAppend(result, arguments.coll["arg" & i]);
+			i++;
+		}
+
+		// Named keys, re-prefixed. --no-X for false preserves the negation.
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				continue;
+			}
+			var value = arguments.coll[key];
+			if (isSimpleValue(value) && value == "true") {
+				arrayAppend(result, "--" & key);
+			} else if (isSimpleValue(value) && value == "false") {
+				arrayAppend(result, "--no-" & key);
+			} else if (isSimpleValue(value)) {
+				arrayAppend(result, "--" & key & "=" & value);
 			}
 		}
 

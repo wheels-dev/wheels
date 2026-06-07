@@ -3,16 +3,14 @@
  *
  * These specs exercise Module.cfc's arg-sourcing layer ($structuredArgs /
  * $argvToCollection) and the per-command parse helpers that replaced the
- * hand-rolled getArgs() token loops. They run against the structured
- * argCollection LuCLI actually hands each command — no server, no command
- * side effects — via ModuleArgvProbe.
+ * hand-rolled token loops. They run against the structured argCollection LuCLI
+ * actually hands each command — no server, no command side effects — via
+ * ModuleArgvProbe.
  *
- * Two behavioral facts they pin:
- *   1. The legacy getArgs() arg1-gate silently dropped named-only invocations
- *      (e.g. `wheels seed --environment=x`, `wheels doctor --verbose`) because
- *      those collections carry no positional arg1. ArgSpec consumes the named
- *      keys directly, so the migration fixes that latent drop.
- *   2. `--no-X` negations survive structurally (no flatten/re-parse round trip).
+ * The behavioral fact they pin: `--no-X` negations and named-only invocations
+ * (e.g. `wheels seed --environment=x`, `wheels doctor --verbose`) survive
+ * structurally, because ArgSpec consumes the named keys directly instead of the
+ * old flatten/re-parse round trip that dropped them.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -71,17 +69,6 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var c = probe.$structuredArgs({}, ["myapp", "--no-sqlite"]);
 				expect(c.arg1).toBe("myapp");
 				expect(c.sqlite).toBe("false");
-			});
-
-		});
-
-		describe("regression: legacy getArgs() dropped named-only invocations", () => {
-
-			it("returns [] for a named-only collection (no arg1) — the latent bug ArgSpec fixes", () => {
-				// `wheels seed --environment=x` / `wheels doctor --verbose` arrive as
-				// {environment:"x"} / {verbose:"true"} with no arg1, so the arg1-gated
-				// getArgs() fell through to the empty __arguments fallback.
-				expect(probe.$getArgs({verbose: "true"}, [])).toBeEmpty();
 			});
 
 		});

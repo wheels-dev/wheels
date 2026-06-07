@@ -122,6 +122,52 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("toArgv() — structured collection back to ordered argv (passthrough)", () => {
+
+				it("emits positionals first, in arg1..argN order", () => {
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({arg1: "scaffold", arg2: "Post", arg3: "title:string"});
+					expect(argv[1]).toBe("scaffold");
+					expect(argv[2]).toBe("Post");
+					expect(argv[3]).toBe("title:string");
+				});
+
+				it("re-emits --no-<key> when LuCLI passed <key>=false (issue ##2855 contract)", () => {
+					// Named keys are quoted so their case survives the struct
+					// literal identically on Lucee/Adobe/BoxLang — toArgv emits
+					// the key verbatim, so an unquoted (upper-cased) key would
+					// drift cross-engine.
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({arg1: "User", "routes": "false"});
+					expect(argv).toInclude("--no-routes");
+				});
+
+				it("emits a bare --<key> for boolean-true flags", () => {
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({arg1: "myapp", "setup-h2": "true"});
+					expect(argv).toInclude("--setup-h2");
+				});
+
+				it("emits --<key>=<value> for value options", () => {
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({arg1: "myapp", "port": "3000"});
+					expect(argv).toInclude("--port=3000");
+				});
+
+				it("places positionals before named flags (delegation round-trip order)", () => {
+					var argv = new cli.lucli.services.ArgSpec()
+						.toArgv({arg1: "scaffold", arg2: "Post", "migration": "false"});
+					expect(argv[1]).toBe("scaffold");
+					expect(argv[2]).toBe("Post");
+					expect(argv[3]).toBe("--no-migration");
+				});
+
+				it("returns an empty argv for an empty collection", () => {
+					expect(new cli.lucli.services.ArgSpec().toArgv({})).toBeEmpty();
+				});
+
+			});
+
 		});
 
 	}
