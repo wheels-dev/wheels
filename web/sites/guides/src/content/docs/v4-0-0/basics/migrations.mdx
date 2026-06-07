@@ -25,7 +25,7 @@ Migrations are versioned CFCs that carry your schema forward and back. Each one 
 
 ## Running migrations
 
-Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `wheels_migrator_versions`, so the app has to be running (or at least reachable) for them to work — see [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
+Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `wheels_migrator_versions`, so the app has to be running for them to work — see [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
 wheels --version
@@ -35,6 +35,12 @@ wheels --version
 - `wheels migrate up` — apply exactly one pending migration. Useful when you want to watch the effect of a single file.
 - `wheels migrate down` — roll back the most recently applied migration. Runs the `down()` method of the newest row in `wheels_migrator_versions`.
 - `wheels migrate info` — show which migrations have run and which are still pending. Read-only; safe any time. Orphan versions (rows in the tracking table with no matching file in `app/migrator/migrations/`) are flagged with `[?] <version> <name> (applied <timestamp>)` when the enriched `wheels_migrator_versions.name` / `.applied_at` columns are populated, or `[?] <version> ********** NO FILE **********` (Rails-style) for legacy rows that pre-date the schema enrichment.
+
+<Aside type="caution" title="Write commands require a project-bound server">
+`wheels migrate latest`, `migrate up`, `migrate down`, `migrate forget`, and `migrate pretend` only connect to a server whose port is explicitly configured for this project — via the `port` field in `lucee.json` (written by `wheels start`) or the `PORT` variable in `.env`. They refuse the common-port fallback (8080, etc.) to prevent silently targeting a sibling app's server when you work on multiple projects. If you see `Wheels.ServerNotRunning`, run `wheels start` in this project's directory first.
+
+`wheels migrate info` and `wheels migrate doctor` are read-only and still probe common ports as a fallback, so they work without an explicit port config.
+</Aside>
 
 The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly — the schema either moves fully or not at all.
 
