@@ -364,7 +364,7 @@ component extends="modules.BaseModule" {
 	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, snippets)
 	 */
 	public string function generate() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
@@ -457,7 +457,7 @@ component extends="modules.BaseModule" {
 	 * hint: Run database migrations (latest, up, down, info)
 	 */
 	public string function migrate() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var action = arrayLen(args) ? lCase(args[1]) : "latest";
 
 		switch (action) {
@@ -724,7 +724,7 @@ component extends="modules.BaseModule" {
 	 * hint: Start the Wheels development server via LuCLI
 	 */
 	public string function start() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		// Refuse to start from a non-Wheels-project directory. LuCLI's
 		// `server start` derives the server name from the cwd basename and
@@ -983,7 +983,7 @@ component extends="modules.BaseModule" {
 	 * hint: Create application components (wheels create app <name> [options])
 	 */
 	public string function create() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels create <type> <name> [options]", "yellow");
@@ -1980,7 +1980,7 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy version                  - show version pinning
 	 */
 	public string function deploy() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var opts = $deployArgsToOptions(args);
 		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
 			opts.configPath = expandPath("config/deploy.yml");
@@ -2289,7 +2289,7 @@ component extends="modules.BaseModule" {
 	 *   wheels packages registry info
 	 */
 	public string function packages() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var opts = $packagesArgsToOptions(args);
 		var positional = $packagesStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
@@ -2603,7 +2603,7 @@ component extends="modules.BaseModule" {
 	 * hint: Database management commands (reset, status, version)
 	 */
 	public string function db() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels db <command>", "yellow");
@@ -2720,7 +2720,7 @@ component extends="modules.BaseModule" {
 	 * hint: Browser testing commands (setup, test)
 	 */
 	public string function browser() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels browser <command>", "yellow");
