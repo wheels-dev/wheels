@@ -9,12 +9,14 @@
  * loop — a round trip that silently dropped `false` values (the root cause
  * of #2855) and could not distinguish `--no-X` from an explicit `--X=false`.
  *
- * `ArgSpec` consumes LuCLI's structured map directly. Each command declares
- * its positionals, flags, and options up front; `.parse(arguments)` returns
- * a typed result struct. No flatten, no re-parse, no lossy `false` round
- * trip. Designed to be adopted incrementally — `getArgs()` and
- * `argsFromCollection()` stay in place as a deprecated shim until every
- * call site is converted.
+ * `ArgSpec` consumes LuCLI's structured map directly. Each command either
+ * declares its positionals, flags, and options up front and calls
+ * `.parse(arguments)` for a typed result struct, or — when it forwards to its
+ * own downstream argv parser (generate, deploy, packages, ...) — calls
+ * `.toArgv(arguments)` for a non-lossy collection->argv reconstruction. Either
+ * way: no per-command flatten, no re-parse, no lossy `false` round trip. The
+ * Module.cfc getArgs()/argsFromCollection() shim this replaced has been removed
+ * now that every call site is converted (#2861).
  *
  * Usage:
  *
