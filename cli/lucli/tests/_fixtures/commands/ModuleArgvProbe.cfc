@@ -7,9 +7,7 @@
  * public pass-throughs so specs can unit-test the parsing layer without
  * booting a server or triggering command side effects.
  *
- *   - $argsFromCollection : the legacy argv-rebuild shim (issue #2855)
  *   - $structuredArgs / $argvToCollection : the ArgSpec sourcing layer (#2861)
- *   - $getArgs : the legacy flat-argv accessor, for regression characterization
  *   - $parse<Command>Args : per-command parse helpers migrated to ArgSpec
  *
  * Some helpers read the instance-level __arguments fallback. That value lives
@@ -21,15 +19,6 @@
  * never carries a stale __arguments from a prior spec.
  */
 component extends="cli.lucli.Module" {
-
-	public array function $argsFromCollection(required struct coll) {
-		return argsFromCollection(arguments.coll);
-	}
-
-	public array function $getArgs(struct callerArgs = {}, array underscoreArguments = []) {
-		variables.__arguments = arguments.underscoreArguments;
-		return getArgs(arguments.callerArgs);
-	}
 
 	public struct function $argvToCollection(required array argv) {
 		return argvToCollection(arguments.argv);

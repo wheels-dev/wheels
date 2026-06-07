@@ -84,69 +84,6 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Extract positional arguments from LuCLI's argCollection or __arguments.
-	 *
-	 * LuCLI dispatches module subcommands as:
-	 *   module.subcommand(argumentCollection={arg1:"val1", arg2:"val2", ...})
-	 * where argCollection contains positional args as arg1..argN keys.
-	 *
-	 * Falls back to __arguments (minus the subcommand at index 1) for
-	 * direct CFC invocation in tests.
-	 */
-	private array function getArgs(struct callerArgs = {}) {
-		// Prefer caller's arguments (LuCLI passes argCollection which spreads
-		// positional args as arg1, arg2, ... into the function's arguments scope)
-		if (structKeyExists(callerArgs, "arg1")) {
-			return argsFromCollection(callerArgs);
-		}
-
-		// Fallback: __arguments (direct invocation / tests)
-		var raw = __arguments ?: [];
-		if (isArray(raw) && arrayLen(raw) > 0) {
-			return raw;
-		}
-		return [];
-	}
-
-	/**
-	 * Reconstruct args array from LuCLI's argCollection.
-	 * Positional args are stored as arg1, arg2, ... (order matters).
-	 * Named args (--key=value) are stored as key=value and must be
-	 * re-prefixed with -- so parseGeneratorArgs() can parse them.
-	 */
-	private array function argsFromCollection(required struct coll) {
-		var result = [];
-
-		// Extract positional args in order
-		var i = 1;
-		while (structKeyExists(coll, "arg#i#")) {
-			arrayAppend(result, coll["arg#i#"]);
-			i++;
-		}
-
-		// Re-add named args as --key=value flags
-		for (var key in coll) {
-			if (reFindNoCase("^arg\d+$", key)) continue; // skip positional
-			var value = coll[key];
-			if (isSimpleValue(value) && value == "true") {
-				// Boolean flag: --key
-				arrayAppend(result, "--" & key);
-			} else if (isSimpleValue(value) && value == "false") {
-				// LuCLI converts the user's `--no-key` into key=false on the
-				// argCollection it hands modules. Re-emit `--no-key` so the
-				// downstream literal-token matchers (`wheels new --no-sqlite`,
-				// `wheels g admin --no-routes`, etc.) see the user's negation
-				// instead of silently dropping it. Issue #2855.
-				arrayAppend(result, "--no-" & key);
-			} else if (isSimpleValue(value)) {
-				arrayAppend(result, "--" & key & "=" & value);
-			}
-		}
-
-		return result;
-	}
-
-	/**
 	 * Source the structured argument collection LuCLI handed this command.
 	 *
 	 * LuCLI parses the command line once and invokes the subcommand as
