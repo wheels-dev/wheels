@@ -114,6 +114,52 @@ component {
 		return result;
 	}
 
+	/**
+	 * Reconstruct LuCLI's ordered argv from a structured argCollection.
+	 *
+	 * The inverse of LuCLI's parse: positionals (arg1, arg2, ...) emit first
+	 * in index order, then named keys emit as `--key` (true), `--no-key`
+	 * (false), or `--key=value`. This is the non-lossy passthrough that
+	 * commands with their own downstream argv parsers (generate, create, db,
+	 * browser, deploy, packages, migrate, start) use to forward LuCLI's
+	 * structured handoff to a flat-array parser — replacing the Module.cfc
+	 * getArgs()/argsFromCollection() round trip (#2855, #2861).
+	 *
+	 * Contract dependency: LuCLI's parseArguments() normalizes `--no-X` to
+	 * `X=false` and bare `--X` to `X=true` before dispatch. The `value=="false"`
+	 * arm re-emits `--no-X` so downstream literal-token matchers (e.g.
+	 * `--no-routes`, `--no-migration`) still see the user's negation (#2856).
+	 */
+	public array function toArgv(required struct coll) {
+		var result = [];
+
+		// Positionals in arg1..argN order. Stops at the first index gap,
+		// mirroring the legacy argsFromCollection — dispatchers always pass
+		// the sub-verb as the leading positional, so a gap never elides one.
+		var i = 1;
+		while (structKeyExists(arguments.coll, "arg" & i)) {
+			arrayAppend(result, arguments.coll["arg" & i]);
+			i++;
+		}
+
+		// Named keys, re-prefixed. --no-X for false preserves the negation.
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				continue;
+			}
+			var value = arguments.coll[key];
+			if (isSimpleValue(value) && value == "true") {
+				arrayAppend(result, "--" & key);
+			} else if (isSimpleValue(value) && value == "false") {
+				arrayAppend(result, "--no-" & key);
+			} else if (isSimpleValue(value)) {
+				arrayAppend(result, "--" & key & "=" & value);
+			}
+		}
+
+		return result;
+	}
+
 	private any function $coerce(required any v, required string type) {
 		switch (arguments.type) {
 			case "boolean":
