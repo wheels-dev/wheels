@@ -32,6 +32,31 @@ component extends="wheels.databaseAdapters.Abstract" {
 	}
 
 	/**
+	 * generates sql for foreign key options
+	 *
+	 * PostgreSQL uses standard table-level constraint syntax —
+	 * `FOREIGN KEY (col) REFERENCES tbl (refCol)` — the same shape as the MySQL
+	 * and Microsoft SQL Server adapters. Identifiers are routed through this
+	 * adapter's quoteColumnName / quoteTableName so the references honour the
+	 * `migratorObjectCase` setting and match how the columns are declared in the
+	 * same CREATE TABLE statement (PostgreSQL folds unquoted identifiers to
+	 * lower case). The inline createTable path supplies only `column`,
+	 * `referenceTable` and `referenceColumn` (see wheels.migrator.ForeignKeyDefinition).
+	 * CockroachDBMigrator extends this adapter and inherits this method.
+	 */
+	public string function addForeignKeyOptions(required string sql, struct options = {}) {
+		arguments.sql = arguments.sql & " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
+		if (StructKeyExists(arguments.options, "referenceTable")) {
+			if (StructKeyExists(arguments.options, "referenceColumn")) {
+				arguments.sql = arguments.sql & " REFERENCES ";
+				arguments.sql = arguments.sql & quoteTableName(arguments.options.referenceTable);
+				arguments.sql = arguments.sql & " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
+			}
+		}
+		return arguments.sql;
+	}
+
+	/**
 	 * PostgreSQL alter column statements use extended SQL
 	 */
 	public string function addColumnOptions(
