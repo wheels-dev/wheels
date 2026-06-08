@@ -5651,13 +5651,18 @@ component extends="modules.BaseModule" {
 	 * target the server bound to this project's own config, never a
 	 * sibling app squatting 8080 (issue #2878).
 	 *
-	 * `commonPorts` is exposed for the same reason the probe exists at
-	 * all — a test seam. Production callers always get the historical
-	 * fallback list.
+	 * `commonPorts` is a test seam — the spec injects a known port to
+	 * simulate a sibling app deterministically. Production callers always
+	 * get the historical fallback list.
 	 *
-	 * Public for testability; treat as internal API.
+	 * Kept `private`: LuCLI auto-exposes every public, non-hidden Module
+	 * function on the MCP `tools/list` and as a CLI subcommand (see
+	 * metadataGetFunctions.cfs + McpCommand BASE_MODULE_INTERNALS +
+	 * mcpHiddenTools()), so this internal probe must not be public. The
+	 * spec reaches it through TestBox `makePublic()` — see
+	 * cli/lucli/tests/specs/services/ServerDetectionSpec.cfc (#2878 review).
 	 */
-	public any function detectServerPort(
+	private any function detectServerPort(
 		boolean requireProjectConfig = false,
 		array commonPorts = [8080, 60000, 3000, 8500]
 	) {
@@ -5718,6 +5723,10 @@ component extends="modules.BaseModule" {
 		if (serverPort) return serverPort;
 
 		out("No running Wheels server detected.", "red");
+		// Fallback hints used only when a caller passes none. Every current
+		// write-side caller passes explicit `hints`, so the requireProjectConfig
+		// arm below is defensive — it keeps the guidance correct for any future
+		// caller that relies on the default.
 		var defaultHints = arguments.requireProjectConfig
 			? [
 				"Write commands refuse to attach to a server not bound to this project.",

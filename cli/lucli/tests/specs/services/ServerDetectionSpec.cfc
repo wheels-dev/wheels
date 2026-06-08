@@ -7,12 +7,15 @@
  * `wheels migrate` in a fresh project attached to the wrong instance and
  * ran migrations against the wrong database.
  *
- * The fix exposes two knobs on detectServerPort():
+ * The fix adds two parameters to the (still-private) detectServerPort():
  *   - `requireProjectConfig` — write-side guard; refuses the common-port
  *     fallback so write commands can only target a server bound to this
  *     project's own lucee.json/.env port.
  *   - `commonPorts` — injectable fallback list so this spec can simulate
  *     a 'sibling' app squatting a known port deterministically.
+ *
+ * detectServerPort() stays `private` so it is not auto-exposed on the MCP
+ * tools/list or as a CLI subcommand; the spec reaches it via makePublic().
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -29,6 +32,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		directoryCreate(tempRoot & "/vendor/wheels", true, true);
 
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
+
+		// detectServerPort() is private so it never leaks onto the MCP
+		// tools/list or the CLI subcommand surface (see Module.cfc). Expose
+		// it on this instance only so the spec can call it directly — same
+		// pattern as vendor/wheels mapper UtilsSpec / MatchingSpec.
+		prepareMock(variables.mod);
+		makePublic(variables.mod, "detectServerPort");
 	}
 
 	function afterAll() {
