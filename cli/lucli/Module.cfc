@@ -619,7 +619,17 @@ component extends="modules.BaseModule" {
 	 * issue #2477 and `deployment/security-hardening.mdx`.
 	 */
 	public string function reload() {
-		var serverPort = $requireRunningServer();
+		// Project-config gated (#2878 / #2879): reload mutates the running
+		// app's state, so it must target the server bound to THIS project —
+		// never a sibling app squatting a common port. Without lucee.json/.env
+		// port config we refuse the common-port fallback and error loudly.
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Reload requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		var password = detectReloadPassword();
 
@@ -3198,10 +3208,19 @@ component extends="modules.BaseModule" {
 			if (arguments.args[i] == "--no-routes") noRoutes = true;
 		}
 
-		var serverPort = $requireRunningServer([
-			"Admin generation requires a running server for model introspection.",
-			"Start one with: wheels start"
-		]);
+		// Project-config gated (#2878 / #2879): admin generation introspects
+		// this project's schema over the server, then writes the generated
+		// controller/views into cwd. Attaching to a sibling app on a common
+		// port would scaffold admin from the WRONG schema into the right
+		// project — the #2878 failure mode for a non-migration command. Refuse
+		// the common-port fallback when no project-bound port is configured.
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Admin generation introspects this project's schema — it requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		// Introspect the model via the server
 		out("Introspecting model: #modelName#...", "cyan");

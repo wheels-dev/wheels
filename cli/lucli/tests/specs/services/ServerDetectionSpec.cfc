@@ -16,6 +16,11 @@
  *
  * detectServerPort() stays `private` so it is not auto-exposed on the MCP
  * tools/list or as a CLI subcommand; the spec reaches it via makePublic().
+ *
+ * The final describe block extends the guard to two more write-side
+ * callers — `reload` and `generate admin` — verifying they opt into
+ * requireProjectConfig=true so they refuse the common-port fallback too
+ * (follow-up to #2879, which gated migrate/seed/reconcile).
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -39,6 +44,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// pattern as vendor/wheels mapper UtilsSpec / MatchingSpec.
 		prepareMock(variables.mod);
 		makePublic(variables.mod, "detectServerPort");
+		// generateAdmin() is private (read-via-server + writes to cwd);
+		// reload() is already public. Expose generateAdmin so the
+		// call-site gating tests below can drive it directly.
+		makePublic(variables.mod, "generateAdmin");
 	}
 
 	function afterAll() {
@@ -97,6 +106,36 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					}
 					ourSocket.close();
 				}
+			});
+
+		});
+
+		describe("write-side command gating — reload + generate admin (##2878 follow-up)", () => {
+
+			// reload() and generate-admin both reach the project's own server
+			// — reload to reset app state, generate-admin to introspect the
+			// schema before scaffolding files into cwd. Attaching to a sibling
+			// app squatting a common port reloads the wrong app / generates
+			// admin from the wrong schema (the #2878 failure mode applied to
+			// non-migration commands). Both now pass requireProjectConfig=true,
+			// so with no project-bound port they refuse the common-port probe
+			// and throw Wheels.ServerNotRunning instead of silently attaching.
+			//
+			// These drive the real command functions (not detectServerPort
+			// directly) so the assertion proves the call sites actually opt
+			// into the guard. Each test re-strips lucee.json/.env to stay
+			// isolated from the lucee.json the detectServerPort suite writes.
+
+			it("reload() refuses the common-port fallback when no project config exists", () => {
+				if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+				if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				expect(() => mod.reload()).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+			it("generate admin refuses the common-port fallback when no project config exists", () => {
+				if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+				if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				expect(() => mod.generateAdmin(["Post"])).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
 		});
