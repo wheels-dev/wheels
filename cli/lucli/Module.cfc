@@ -717,6 +717,26 @@ component extends="modules.BaseModule" {
 			registry.clean(serverName);
 		}
 
+		// Defense in depth for the IPv4-blind port check. LuCLI's own
+		// LuceeServerConfig.isPortAvailable() probes with a wildcard ServerSocket
+		// that binds IPv6 on a dual-stack JVM, so it never sees a port held by an
+		// IPv4-only listener (python http.server, Django runserver on 8000,
+		// 127.0.0.1-bound databases) and `wheels start` would boot on top of it.
+		// That is fixed upstream, but older LuCLI binaries still ship the bug, so
+		// when lucee.json pins a port we connect-probe it (both address families)
+		// and warn before delegating. We only reach here when our own server is
+		// NOT already running (the reg.alive early-return above), so an in-use
+		// pinned port is a genuine foreign collision.
+		var pinnedPort = $readPinnedPort(variables.projectRoot);
+		if (pinnedPort > 0 && getService("portProbe").portInUse(pinnedPort)) {
+			out("");
+			out("Warning: port " & pinnedPort & " (configured in lucee.json) is already in use", "yellow");
+			out("by another process. The server may fail to start, or silently share the port", "yellow");
+			out("(IPv4 clients reaching the other process while localhost reaches Wheels).", "yellow");
+			out("Fix: stop the other process, or change the 'port' in lucee.json.", "yellow");
+			out("");
+		}
+
 		out("Starting Wheels server...", "cyan");
 
 		// Stage required JDBC drivers into the Lucee Express lib/ext/ before
@@ -5152,6 +5172,26 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Read the HTTP port pinned in the project's lucee.json, or 0 if there is no
+	 * lucee.json, no "port" key, or the file can't be parsed. LuCLI writes this
+	 * file on first start and honours its port on subsequent starts, so it is the
+	 * deterministic port to pre-check for a collision before delegating.
+	 */
+	private numeric function $readPinnedPort(required string projectRoot) {
+		var configFile = arguments.projectRoot & "/lucee.json";
+		if (!fileExists(configFile)) return 0;
+		try {
+			var config = deserializeJSON(fileRead(configFile));
+			if (isStruct(config) && structKeyExists(config, "port") && isNumeric(config.port)) {
+				return config.port;
+			}
+		} catch (any e) {
+			// Malformed lucee.json — let LuCLI surface its own parse error.
+		}
+		return 0;
+	}
+
+	/**
 	 * Wipe the per-server Lucee compiled-class cache so the next request
 	 * recompiles every CFC from source. Called from `wheels reload` because
 	 * Lucee's default `inspectTemplate=once` setting prevents source-edit
@@ -6026,6 +6066,9 @@ component extends="modules.BaseModule" {
 					variables.services.serverRegistry = new services.ServerRegistry(
 						lucliHome = $resolveLucliHome()
 					);
+					break;
+				case "portProbe":
+					variables.services.portProbe = new services.PortProbe();
 					break;
 				default:
 					throw("Unknown service: #name#");
