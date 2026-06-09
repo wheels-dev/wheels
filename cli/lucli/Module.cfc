@@ -4364,6 +4364,8 @@ component extends="modules.BaseModule" {
 			out("Scope: #filter#", "cyan");
 		}
 
+		var testsFailed = false;
+
 		try {
 			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
 			// App tests default to running against the <appname>_test
@@ -4401,6 +4403,11 @@ component extends="modules.BaseModule" {
 					default:
 						displayTestResults(result, verboseOutput, resolvedDir);
 				}
+
+				// Record failure so the command can exit non-zero AFTER the output
+				// is flushed. Throwing here would be swallowed by the catch below.
+				// testing.mdx documents a non-zero exit on failure. CLI audit H6.
+				testsFailed = ((result.totalFail ?: 0) + (result.totalError ?: 0)) > 0;
 			} else {
 				// Could be an HTML error page
 				if (reFindNoCase("<html", httpResult)) {
@@ -4413,6 +4420,13 @@ component extends="modules.BaseModule" {
 			}
 		} catch (any e) {
 			out("Test execution failed: #e.message#", "red");
+		}
+
+		// Exit non-zero when specs failed/errored so CI and shells can detect it.
+		// Previously runTests always returned "" → `wheels test` exited 0 even when
+		// tests failed, silently green-lighting broken builds. CLI audit H6.
+		if (testsFailed) {
+			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
 		}
 
 		return "";
@@ -4445,7 +4459,11 @@ component extends="modules.BaseModule" {
 					name: sp.name ?: "(unnamed)",
 					status: sp.status ?: "Failed",
 					failMessage: sp.failMessage ?: "",
-					failOrigin: sp.failOrigin ?: "",
+					// failOrigin can be an array of stack-frame structs, not a
+					// string. Coerce to a string here so the YAML emitter below
+					// (tapEscapeYaml) never receives an array and crashes the
+					// whole TAP run on the first failing spec. See CLI audit H6.
+					failOrigin: $tapOriginString(sp.failOrigin ?: ""),
 					skipped: (sp.status ?: "") == "Skipped"
 				});
 			}
@@ -4505,6 +4523,35 @@ component extends="modules.BaseModule" {
 		v = replace(v, chr(13), " ", "all");
 		v = replace(v, "'", "''", "all");
 		return "'" & v & "'";
+	}
+
+	/**
+	 * Coerce a TestBox failOrigin into a single string for the TAP YAML block.
+	 * TestBox reports failOrigin as an array of stack-frame structs (Raw_Trace /
+	 * template+line), but the TAP emitter needs a scalar — passing the array to
+	 * tapEscapeYaml() throws "Cannot cast Array to string" and aborts the run.
+	 * See CLI audit H6.
+	 */
+	private string function $tapOriginString(required any origin) {
+		if (isSimpleValue(arguments.origin)) {
+			return arguments.origin;
+		}
+		if (isArray(arguments.origin) && arrayLen(arguments.origin)) {
+			var first = arguments.origin[1];
+			if (isSimpleValue(first)) {
+				return first;
+			}
+			if (isStruct(first)) {
+				if (structKeyExists(first, "Raw_Trace") && len(first.Raw_Trace)) {
+					return first.Raw_Trace;
+				}
+				var tmpl = first.template ?: "";
+				if (len(tmpl)) {
+					return tmpl & (structKeyExists(first, "line") ? ":" & first.line : "");
+				}
+			}
+		}
+		return "";
 	}
 
 	private void function displayTestResults(
