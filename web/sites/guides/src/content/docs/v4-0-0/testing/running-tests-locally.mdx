@@ -198,7 +198,7 @@ These are the errors you'll actually hit. Fix-ups first, diagnosis second.
 - **`JAVA_HOME` unset** — LuCLI's preflight refuses to start and prints a pointer to Adoptium. Set `JAVA_HOME` in your shell profile and re-source.
 - **Docker daemon not running** — `docker compose up` fails with `Cannot connect to the Docker daemon`. Start Docker Desktop (macOS, Windows) or `systemctl start docker` (Linux).
 - **Port already in use** — `docker compose up` fails with `bind: address already in use` or a local `wheels start` is already on the port. Find the holder with `lsof -i :60007` and stop it.
-- **Playwright JARs missing** — browser specs skip with `this.browserTestSkipped = true` instead of failing, so the suite stays green. Run `wheels browser install` once to install the JARs and Chromium.
+- **Playwright JARs missing** — browser specs skip with `this.browserTestSkipped = true` instead of failing, so the suite stays green. Run `wheels browser setup` once to install the JARs and Chromium.
 - **Populate SQL errors** — read the error. "Table already exists" means a stale table from a previous engine-specific run; add a `DROP TABLE IF EXISTS` first. "Syntax error near CURRENT_TIMESTAMP" means cross-engine SQL drift; use `NOW()` — it works on every supported engine.
 - **Flaky `wheels new` in parallel harness runs** — a known LuCLI race (framework gap tracker #11). Retry once, or serialize the runs until the fix lands.
 - **Server not responding after `compose up`** — engines need 30–90 seconds to cold-start. `curl -I http://localhost:60007/` returns connection-refused until the engine is ready. If it stays down after two minutes, check `docker compose logs <service>`.
@@ -215,8 +215,8 @@ docker compose down
 # Purge SQLite test databases between runs
 rm -f wheelstestdb.db wheelstestdb_tenant_b.db
 
-# Stop any local LuCLI server the script started
-lucli server stop
+# Stop any local server the script started
+wheels stop
 ```
 
 ## Related guides

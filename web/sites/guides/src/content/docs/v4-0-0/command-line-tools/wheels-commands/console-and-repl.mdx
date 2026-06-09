@@ -59,7 +59,7 @@ Commands at the prompt start with `/`. They're short-circuits for things you'd o
 | Command | Description |
 |---|---|
 | `/help`, `/h` | Print the console help text (commands + example expressions). |
-| `/env` | Print the current environment (development, production, etc.). |
+| `/env` | Print the current environment as a struct (`{environment, dataSourceName, ...}`). |
 | `/models` | List every registered model, sorted alphabetically. |
 | `/routes` | List all routes as `pattern -> controller#action`. |
 | `/version` | Print the Wheels version from `application.wheels.version`. |

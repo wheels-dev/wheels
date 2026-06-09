@@ -28,18 +28,18 @@ wheels new myblog --no-open-browser
 
 ## 2. Start the server
 
-```bash title="illustrative — server runs in foreground"
+```bash title="example"
 cd myblog
 wheels start
 ```
 
-The dev server binds to port `8080` by default and runs in the foreground — it keeps the terminal attached until you stop it with `Ctrl+C` or `wheels stop` from another shell. On first boot the wrapper resolves dependencies and compiles the application; subsequent starts are quick.
+The dev server binds to port `8080` by default and runs in the background — the command returns once the server is up, leaving your terminal free. Stop it later with `wheels stop`. On first boot the wrapper resolves dependencies and compiles the application; subsequent starts are quick.
 
 Override the port with `--port=3000` if `8080` is busy.
 
 ## 3. Generate a scaffold
 
-Open a **second terminal** in the same project directory (the server keeps running in the first), then:
+Back in the same terminal (the server is already running in the background), generate the resource:
 
 ```bash {test:cli cmd="wheels generate scaffold Post title:string body:text" step=2}
 wheels generate scaffold Post title:string body:text
@@ -67,13 +67,13 @@ If you changed the port in step 2, substitute that port instead.
 
 ## 6. Run the scaffold's tests
 
-Still in the second terminal:
+With the server still running in the background:
 
 ```bash title="illustrative — requires running server"
-wheels test --filter=posts
+wheels test posts
 ```
 
-`--filter` scopes the test run to specs whose path matches the filter string. The scaffold generated a `PostsSpec.cfc` under `tests/specs/`, so the filter narrows the run to just that file's specs. Omit the flag to run everything.
+The trailing positional scopes the test run to specs whose path matches the filter string. The scaffold generated a `PostsSpec.cfc` under `tests/specs/`, so the filter narrows the run to just that file's specs. Omit it to run everything. A run with failing or erroring specs exits non-zero; a fully-passing run exits `0`.
 
 ## 7. What's next
 

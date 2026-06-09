@@ -25,6 +25,34 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("CodeGen Service", () => {
 
+			describe("generateTest()", () => {
+
+				it("creates a model spec file", () => {
+					var result = codegen.generateTest(type = "model", name = "Gizmo");
+					expect(result.success).toBeTrue();
+					expect(fileExists(tempRoot & "/tests/specs/models/GizmoSpec.cfc")).toBeTrue();
+				});
+
+				it("refuses to overwrite an existing spec without force (##M4)", () => {
+					codegen.generateTest(type = "model", name = "Widget", force = true);
+					var path = tempRoot & "/tests/specs/models/WidgetSpec.cfc";
+					fileWrite(path, "// SENTINEL");
+					var result = codegen.generateTest(type = "model", name = "Widget");
+					expect(result.success).toBeFalse();
+					expect(fileRead(path)).toInclude("SENTINEL");
+				});
+
+				it("overwrites an existing spec when force=true", () => {
+					codegen.generateTest(type = "model", name = "Doodad");
+					var path = tempRoot & "/tests/specs/models/DoodadSpec.cfc";
+					fileWrite(path, "// SENTINEL");
+					var result = codegen.generateTest(type = "model", name = "Doodad", force = true);
+					expect(result.success).toBeTrue();
+					expect(find("SENTINEL", fileRead(path))).toBe(0);
+				});
+
+			});
+
 			describe("generateModel()", () => {
 
 				it("creates a model CFC with PascalCase name", () => {

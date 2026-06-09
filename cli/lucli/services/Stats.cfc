@@ -232,14 +232,30 @@ component {
 
 		for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
 			var line = lines[lineNum];
+
+			// Only scan the COMMENT portion of the line. Without this, annotations
+			// inside string literals (x = "TODO: ...") and identifiers (methodTODO)
+			// were reported as real notes. Find the earliest line/tag/block comment
+			// marker, or treat a doc-comment continuation line (leading *) as comment.
+			// (Multi-line /* ... */ blocks whose opener is on an earlier line are not
+			// tracked — a known limitation; most annotations sit on //, <!---, or * lines.)
+			var commentStart = 0;
+			for (var marker in ["//", "<!---", "/*"]) {
+				var p = find(marker, line);
+				if (p > 0 && (commentStart == 0 || p < commentStart)) commentStart = p;
+			}
+			if (commentStart == 0 && reFind("^\s*\*", line) > 0) commentStart = 1;
+			if (commentStart == 0) continue;
+			var scanText = mid(line, commentStart, len(line) - commentStart + 1);
+
 			for (var aType in arguments.annotationTypes) {
-				// Match annotation in comment context: // TODO: ..., <!--- FIXME: ... --->, /* OPTIMIZE: ... */
-				var pattern = aType & "[\s:]+(.*)";
-				var match = reFindNoCase(pattern, line, 1, true);
+				// \b so a token isn't matched as the suffix of an identifier (methodTODO).
+				var pattern = "\b" & aType & "[\s:]+(.*)";
+				var match = reFindNoCase(pattern, scanText, 1, true);
 				if (match.pos[1] > 0) {
 					var text = "";
 					if (arrayLen(match.pos) > 1 && match.pos[2] > 0) {
-						text = trim(mid(line, match.pos[2], match.len[2]));
+						text = trim(mid(scanText, match.pos[2], match.len[2]));
 						// Strip trailing comment delimiters
 						text = reReplaceNoCase(text, "\s*--->.*$", "");
 						text = reReplaceNoCase(text, "\s*\*/.*$", "");

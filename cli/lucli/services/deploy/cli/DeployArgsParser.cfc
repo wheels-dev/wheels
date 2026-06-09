@@ -47,6 +47,12 @@ component {
             } else if (a == "--configPath" && i < n) {
                 opts.configPath = arguments.args[i+1];
                 i++;
+            } else if (left(a, 9) == "--config=") {
+                // Alias for --configPath — the deploy guides document --config. CLI audit H9.
+                opts.configPath = mid(a, 10, 99999);
+            } else if (a == "--config" && i < n) {
+                opts.configPath = arguments.args[i+1];
+                i++;
             } else if (a == "--force") {
                 opts.force = true;
             } else if (left(a, 10) == "--service=") {
@@ -101,6 +107,19 @@ component {
             } else if (a == "--tail" && i < n) {
                 opts.tail = arguments.args[i+1];
                 i++;
+            } else if (left(a, 7) == "--role=") {
+                // `deploy app <verb>` role filter; DeployAppCli reads opts.role. CLI audit H9.
+                opts.role = mid(a, 8, 99999);
+            } else if (a == "--role" && i < n) {
+                opts.role = arguments.args[i+1];
+                i++;
+            } else if (left(a, 12) == "--container=") {
+                opts.container = mid(a, 13, 99999);
+            } else if (a == "--container" && i < n) {
+                opts.container = arguments.args[i+1];
+                i++;
+            } else if (a == "--follow") {
+                opts.follow = true;
             }
             i++;
         }

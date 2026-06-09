@@ -223,7 +223,7 @@ Things to notice:
 - The signup form uses plain `<input name="user[email]">` without an id, so the spec targets it by attribute selector instead. Attribute selectors like `input[name='user[email]']` are robust against future form refactors.
 - The fluent DSL chains: `.visitRoute("signup").fill(...).click(...).waitForUrl("**/posts").assertUrlContains("/posts")` is one statement. Each method returns the browser object, so the chain keeps going until you call a terminal like `.assertSee(...)` or let the statement end.
 - `.waitForUrl("**/posts")` and `.waitForText("My first post")` are not optional — they bridge the async gap between `.click()` and the assertion. Submitting a form goes through Turbo Drive's `fetch` + `history.pushState`, which doesn't complete on the same tick as the click. `assertUrlContains` and `assertSee` read state synchronously, so without an explicit wait they'd fire before navigation lands and you'd see `Expected URL to contain '/posts', got 'http://localhost:8080/signup'`. `waitForUrl` accepts Playwright glob patterns; `waitForText` waits for visible text anywhere on the page (handy when a Turbo Stream appends content but the URL doesn't change).
-- `if (this.browserTestSkipped) return;` keeps the spec green on machines without Playwright installed — fresh CI runners before `wheels browser install`, for example. The flag is set by `beforeAll` when the JARs can't be loaded.
+- `if (this.browserTestSkipped) return;` keeps the spec green on machines without Playwright installed — fresh CI runners before `wheels browser setup`, for example. The flag is set by `beforeAll` when the JARs can't be loaded.
 
 ## Run the tests
 

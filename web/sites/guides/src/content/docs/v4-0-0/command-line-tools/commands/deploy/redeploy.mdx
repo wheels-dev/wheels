@@ -12,14 +12,14 @@ Re-run the deploy flow. Equivalent to `wheels deploy` — boots, ships, cuts tra
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy redeploy [--version=<v>] [--destination=<name>] [--dry-run]
+wheels deploy redeploy [--release=<v>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | Version to redeploy. Defaults to current git short sha. |
+| `--release=<v>` | Version to redeploy. Defaults to current git short sha. |
 | `--destination=<name>` | Overlay `deploy.<name>.yml` and `.kamal/secrets.<name>`. |
 | `--dry-run` | Print commands without executing. |
 
@@ -33,5 +33,5 @@ wheels deploy redeploy [--version=<v>] [--destination=<name>] [--dry-run]
 
 ```bash title="illustrative — requires deploy infrastructure"
 wheels deploy redeploy
-wheels deploy redeploy --version=abc1234
+wheels deploy redeploy --release=abc1234
 ```
