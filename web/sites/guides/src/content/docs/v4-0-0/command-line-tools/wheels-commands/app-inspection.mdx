@@ -81,7 +81,7 @@ None. `wheels info` takes no flags — ignore any reference to `--json` or `--qu
 
 #### Output stream
 
-Output is written to **stderr**, not stdout. If you're piping `wheels info` into another tool, redirect with `2>&1` or capture stderr directly. The process exits successfully either way; no non-zero exit is raised when the summary is empty.
+Output is written to **stdout**. If you're piping `wheels info` into another tool, it reads from stdout directly — no `2>` redirection needed. The process exits successfully either way; no non-zero exit is raised when the summary is empty.
 
 #### Example
 

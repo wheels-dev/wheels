@@ -45,20 +45,21 @@ Any flags you pass are forwarded verbatim to `wheels server start`. The common o
 | `-v, --version=<version>` | Lucee version to use (e.g., `6.2.2.91`). |
 | `--env, --environment=<env>` | Environment to use (e.g., `dev`, `staging`, `prod`). |
 | `-c, --config=<file>` | Configuration file to use (defaults to `lucee.json`). |
+| `-f, --force` | Force a restart, replacing any server already running for this project. |
 | `--disable-open-browser` | Don't open a browser after the server starts. |
 | `--dry-run` | Show the resolved configuration without starting the server. |
 | `--sandbox` | Start a transient background server without writing `lucee.json`. |
 
 #### Example
 
-```bash title="illustrative — foreground process, not runnable in CI"
+```bash title="example"
 wheels start
 ```
 
-Prints `Starting Wheels server...` in cyan and hands control off to `wheels server start` in the current project directory. The server runs in the foreground and occupies the terminal until it exits.
+Prints `Starting Wheels server...` in cyan and hands control off to `wheels server start` in the current project directory. The server runs in the background and the command returns once the server is up, leaving your terminal free.
 
-<Aside type="caution" title="Foreground process">
-`wheels start` blocks the terminal. To stop the server, run `wheels stop` from another terminal or press `Ctrl+C` in the terminal that owns the process.
+<Aside type="note" title="Background process">
+`wheels start` returns control to your shell once the server is up — it does not block the terminal. Stop the server with `wheels stop`, and force a restart over an already-running instance with `wheels start -f` (or `--force`).
 </Aside>
 
 ### `wheels stop`
@@ -79,7 +80,7 @@ Resolves the server instance from the project directory and asks LuCLI to stop i
 wheels stop
 ```
 
-Prints `Stopping Wheels server...` in cyan and delegates to `wheels server stop`. Useful from a second terminal when `wheels start` is blocking the first one.
+Prints `Stopping Wheels server...` in cyan and delegates to `wheels server stop`. Run it from the project root to take down the background server that `wheels start` brought up.
 
 <Aside type="tip" title="Stopping by name or all at once">
 To stop a server by explicit name or to stop every running Lucee server on the machine, drop down to the core command: `wheels server stop --name=<name>` or `wheels server stop --all`. See the [`server`](../../core-commands/server/) reference.
@@ -122,10 +123,10 @@ Most CFML source changes are picked up on the next request without a reload. In 
 The three commands compose into a typical inner loop:
 
 ```bash title="illustrative — dev loop example"
-# Terminal 1 — bring the server up and leave it running
+# Bring the server up — it runs in the background and returns control
 wheels start
 
-# Terminal 2 — iterate on your app
+# Iterate on your app
 # For most CFML edits: just save the file and hit refresh.
 # For config/routes/services changes, force a reload:
 wheels reload

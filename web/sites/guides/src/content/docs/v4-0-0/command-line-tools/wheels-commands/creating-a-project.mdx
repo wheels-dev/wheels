@@ -42,7 +42,7 @@ Creates a new application in `<name>/` under the current working directory. SQLi
 
 | Name | Required | Description |
 |---|---|---|
-| `<name>` | yes | Directory and app name. Used as the default datasource name (lowercased) and as the reload password unless overridden. |
+| `<name>` | yes | Directory and app name. Used as the default datasource name (lowercased). The reload password is randomly generated unless you pass `--reload-password`. |
 
 #### Flags
 
@@ -113,7 +113,6 @@ myblog/
     migrator/migrations/
     events/
     global/
-    helpers/
     jobs/
     lib/
     mailers/

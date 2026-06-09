@@ -7,7 +7,7 @@ sidebar:
   order: 5
 ---
 
-Updates are always explicit. There is no auto-update on reload and no implicit upgrade when running `install` on an already-installed package. This is the registry's defense against malicious version-bump attacks — every version change is the user's conscious choice.
+Updates are always explicit. There is no auto-update on reload and no implicit upgrade when running `add` on an already-installed package. This is the registry's defense against malicious version-bump attacks — every version change is the user's conscious choice.
 
 ## Synopsis
 
@@ -32,7 +32,7 @@ wheels packages update --all --yes
 ```sh title="example output"
 $ wheels packages update wheels-sentry --yes
 Installed wheels-sentry@1.1.0 → /Users/me/app/vendor/wheels-sentry
-Run `wheels reload` to activate it.
+Restart the server (`wheels stop && wheels start`) to activate it.
 
 $ wheels packages update --all --yes
 Update report:

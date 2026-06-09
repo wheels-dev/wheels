@@ -59,7 +59,7 @@ For the end-to-end walk, start at [Your First Deploy](/v4-0-0/deployment/first-d
   <LinkCard
     title="wheels deploy server"
     href="/v4-0-0/command-line-tools/commands/deploy/server/"
-    description="Host-level operations: exec, bootstrap."
+    description="Host-level operations. Nested verbs are picocli-shadowed — use the flat aliases: wheels deploy bootstrap and wheels deploy exec."
   />
   <LinkCard
     title="wheels deploy prune"
@@ -74,7 +74,7 @@ For the end-to-end walk, start at [Your First Deploy](/v4-0-0/deployment/first-d
   <LinkCard
     title="wheels deploy secrets"
     href="/v4-0-0/command-line-tools/commands/deploy/secrets/"
-    description="Secret-store integration: fetch, extract, print."
+    description="Secret-store integration. Nested verbs are picocli-shadowed — use the flat aliases: wheels deploy fetch-secrets, extract-secrets, print-secrets."
   />
 </CardGrid>
 
@@ -84,7 +84,7 @@ Every `wheels deploy` verb accepts these:
 
 | Flag | Description |
 |------|-------------|
-| `--config=<path>` | Path to `deploy.yml`. Default `config/deploy.yml`. |
+| `--config=<path>` | Path to `deploy.yml`. Default `config/deploy.yml`. `--configPath=<path>` is an accepted alias. |
 | `--destination=<name>` | Overlay `deploy.<name>.yml` and `.kamal/secrets.<name>`. |
 | `--dry-run` | Print the commands that would run, prefixed by host. No network. |
-| `--version=<v>` | Version label (default: `git rev-parse --short HEAD`). |
+| `--release=<v>` | Version label (default: `git rev-parse --short HEAD`). |

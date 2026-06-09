@@ -24,7 +24,7 @@ Browser tests drive a real Chromium through Playwright. They click buttons, type
 
 ## Install Playwright
 
-Browser tests require Playwright's Java client plus Chromium. The `wheels browser install` command downloads both (~370MB one-time) and verifies SHA-256 hashes.
+Browser tests require Playwright's Java client plus Chromium. The `wheels browser setup` command downloads both (~370MB one-time) and verifies SHA-256 hashes.
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
 wheels --version
@@ -33,10 +33,10 @@ wheels --version
 Then, inside your project:
 
 ```bash title="shell"
-wheels browser install
+wheels browser setup
 ```
 
-The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download, or `--browser=firefox|webkit` to install a different engine (Chromium is the default).
+The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download. Chromium is the only engine the browser DSL wires today — Firefox and WebKit are not yet selectable.
 
 If Playwright isn't installed when a spec runs, `BrowserTest.beforeAll` catches the missing-JAR error, sets `this.browserTestSkipped = true`, and the suite stays green. That's the safety net for CI cold starts and fresh dev machines — but every `it` in a browser spec still needs to check the flag.
 

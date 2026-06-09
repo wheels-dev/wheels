@@ -28,7 +28,7 @@ Apply or roll back migration files in `app/migrator/migrations/`.
 #### Synopsis
 
 ``` title="synopsis"
-wheels migrate [latest|up|down|info]
+wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]
 ```
 
 Running `wheels migrate` with no subcommand defaults to `latest`. Unknown subcommands print `Unknown migration action: <name>` and exit without touching the schema.
@@ -50,6 +50,22 @@ Rolls back the most recently applied migration by calling its `down()` method. U
 ##### `info`
 
 Prints a summary of applied and pending migrations without changing the schema. For the full tabular breakdown — version, description, status, applied-at timestamp — use [`wheels db status`](#wheels-db) instead.
+
+##### `doctor`
+
+Single-command health report for the migration tracking table. Lists orphan tracking rows (versions recorded as applied with no matching file on disk) and pending local migrations. Pure read — it changes nothing.
+
+##### `forget`
+
+Deletes a stale tracking row: `wheels migrate forget <version> --yes`. Dry-run by default; `--yes` is required to mutate. Refuses if a matching local migration file exists, or if the version isn't in the tracking table.
+
+##### `pretend`
+
+Records a version as applied without running its `up()`: `wheels migrate pretend <version> --yes`. Dry-run by default; `--yes` is required to mutate. Refuses if the version is already applied or has no matching file.
+
+##### `rename-system-tables`
+
+Migrates legacy framework bookkeeping tables to their current `wheels_`-prefixed names. Run once when upgrading a project whose system tables predate the current naming.
 
 #### Example
 
