@@ -55,6 +55,7 @@ A bare positional argument is treated as the filter directory — `wheels test m
 | Flag | Description |
 |---|---|
 | `--filter=<dir>` | Substring or path match against spec directories. Narrows the run to a subset (e.g., `models`, `controller`, `browser`). Bare names are auto-prefixed (`models` → `tests.specs.models`). Also accepted as a positional arg. |
+| `--directory=<dir>` | Alias for `--filter` (tutorial chapter 7). When both are supplied, `--directory` wins. |
 | `--db=<engine>` | Database engine for `--core` matrix runs only. Ignored for app tests (with a warning) — see [below](#testing-against-different-engines). |
 | `--reporter=<name>` | `simple` (default, colourful), `json` (raw runner JSON), `tap` (TAP v13 for CI consumers). |
 | `--verbose`, `-v` | Print per-spec output instead of the summary line. |

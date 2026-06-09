@@ -166,7 +166,14 @@ component extends="modules.BaseModule" {
 			"console",  // interactive CFML REPL — not usable over stdio
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
-			"browser"   // multi-step browser testing flow
+			"browser",  // multi-step browser testing flow
+			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
+			// unit-test them directly (the cli/CLAUDE.md "public for specs"
+			// carve-out) — they are not commands and must never surface as MCP
+			// tools. LuCLI matches these case-insensitively (McpCommand lowercases
+			// both the entry and the discovered function name).
+			"$normalizeTestFilter",
+			"$resolveAppTestDataSource"
 		];
 	}
 
@@ -277,6 +284,7 @@ component extends="modules.BaseModule" {
 		help &= "  wheels <command> [options]" & nl & nl;
 		help &= "Getting Started:" & nl;
 		help &= "  new <name>          Scaffold a new Wheels application" & nl;
+		help &= "  create app <name>   Alias for new — scaffold a new Wheels application" & nl;
 		help &= "  start               Start the dev server" & nl;
 		help &= "  stop                Stop the dev server" & nl;
 		help &= "  reload              Reload the running app" & nl & nl;
@@ -297,7 +305,7 @@ component extends="modules.BaseModule" {
 		help &= "  validate            Validate project structure and configuration" & nl;
 		help &= "  analyze             Static analysis of project code" & nl;
 		help &= "  stats               Project statistics (lines of code, model counts, etc.)" & nl;
-		help &= "  notes               Find TODO / FIXME / HACK / OPTIMIZE comments" & nl & nl;
+		help &= "  notes               Find TODO / FIXME / OPTIMIZE comments (--annotations to customize)" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
 		help &= "  upgrade             Scan for breaking changes before upgrading Wheels (read-only)" & nl;
@@ -683,7 +691,11 @@ component extends="modules.BaseModule" {
 			requireProjectConfig = true
 		);
 
-		var password = detectReloadPassword();
+		// Auto-detect the reload password from .env / config, but let an explicit
+		// `--password=<value>` override it (parity with `wheels console`). The
+		// auto-detect default is unchanged when no flag is given.
+		var reloadOpts = parseConsoleArgs(structuredArgs(arguments));
+		var password = len(reloadOpts.password) ? reloadOpts.password : detectReloadPassword();
 
 		// F5 fix: physically wipe the Lucee compiled-class cache before
 		// triggering the framework reload. Lucee Express's default
@@ -1123,14 +1135,24 @@ component extends="modules.BaseModule" {
 		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
 			out("Project:  #variables.projectRoot#");
 
-			// Detect Wheels version from vendor
-			var versionFile = variables.projectRoot & "/vendor/wheels/events/onapplicationstart/settings.cfm";
+			// Detect the framework version from its authoritative manifest,
+			// vendor/wheels/wheels.json. The historical
+			// events/onapplicationstart/settings.cfm path stopped carrying the
+			// version, so this line silently never rendered. We read the project's
+			// manifest by absolute path (no `wheels` mapping needed) and apply the
+			// same structural placeholder check as wheels.BuildInfo: an unstamped
+			// dev checkout (`@build.version@`) reports as 0.0.0-dev rather than
+			// leaking the raw build token.
+			var versionFile = variables.projectRoot & "/vendor/wheels/wheels.json";
 			if (fileExists(versionFile)) {
 				try {
-					var vContent = fileRead(versionFile);
-					var vMatch = reFindNoCase('version[^"]*"([^"]+)"', vContent, 1, true);
-					if (arrayLen(vMatch.match) > 1) {
-						out("Wheels:   v#vMatch.match[2]#");
+					var manifest = deserializeJSON(fileRead(versionFile));
+					if (isStruct(manifest) && structKeyExists(manifest, "version") && len(manifest.version)) {
+						var fwVersion = manifest.version;
+						if (left(fwVersion, 7) == "@build." && right(fwVersion, 1) == "@") {
+							fwVersion = "0.0.0-dev";
+						}
+						out("Wheels:   v#fwVersion#");
 					}
 				} catch (any e) { /* skip */ }
 			}
@@ -1228,7 +1250,7 @@ component extends="modules.BaseModule" {
 		out('  {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
-		out("  docs/command-line-tools/commands/mcp/mcp-configuration-guide.md");
+		out("  https://guides.wheels.dev/v4-0-0-snapshot/command-line-tools/mcp-integration");
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
 		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");
@@ -1583,10 +1605,10 @@ component extends="modules.BaseModule" {
 		out("  /models         List all registered models");
 		out("  /routes         List all routes");
 		out("  /version        Show Wheels version");
-		out("  /ds             Show current datasource");
+		out("  /ds, /datasource Show current datasource");
 		out("  /reload         Reload the application");
 		out("  /clear          Clear the screen");
-		out("  /exit, /quit    Exit the console");
+		out("  /exit, /quit, /q Exit the console");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');
