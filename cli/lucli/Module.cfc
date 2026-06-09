@@ -2794,6 +2794,10 @@ component extends="modules.BaseModule" {
 				var viewResult = codegen.generateView(name = controllerName, action = action);
 				if (viewResult.success) {
 					printCreated("app/views/#lCase(controllerName)#/#lCase(action)#.cfm");
+				} else {
+					// Warn instead of silently skipping — a controller reporting
+					// success with no views written is misleading. CLI audit M3.
+					out("  skip    app/views/#lCase(controllerName)#/#lCase(action)#.cfm: " & (viewResult.error ?: "generation failed"), "yellow");
 				}
 			}
 		}
@@ -2933,6 +2937,14 @@ component extends="modules.BaseModule" {
 		var resourceRoute = '.resources("' & routeName & '")';
 		if (findNoCase(resourceRoute, content)) {
 			out("Route already exists: #resourceRoute#", "yellow");
+			return "";
+		}
+		// Also detect the named-arg form (e.g. .resources(name="posts", only="...")),
+		// which updateRoutes() treats as a duplicate. Without this, an existing
+		// named-arg route was misreported as "Could not find insertion point". M5.
+		var namedArgPattern = "\.resources\s*\([^)]*name\s*=\s*[""']" & routeName & "[""']";
+		if (reFindNoCase(namedArgPattern, content)) {
+			out("Route already exists: .resources(name=""#routeName#"", ...)", "yellow");
 			return "";
 		}
 

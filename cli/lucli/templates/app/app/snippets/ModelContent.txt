@@ -6,6 +6,7 @@
 		{{hasManyRelationships}}
 		{{hasOneRelationships}}
 		{{validations}}
+		{{enums}}
 	}
 
 }

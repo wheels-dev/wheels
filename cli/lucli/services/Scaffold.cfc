@@ -127,6 +127,11 @@ component {
 					if (viewResult.success) {
 						arrayAppend(results.generated, {type: "view", path: viewResult.path});
 						arrayAppend(results.rollback, viewResult.path);
+					} else {
+						// Surface the failure instead of silently producing a
+						// "complete" scaffold with no views (e.g. unbundled
+						// templates, #1944). CLI audit M3.
+						arrayAppend(results.skipped, "view " & action & ": " & (viewResult.error ?: "generation failed"));
 					}
 				}
 			}

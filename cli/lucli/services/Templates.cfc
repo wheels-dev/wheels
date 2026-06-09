@@ -103,6 +103,13 @@ component {
 		}
 		processed = reReplace(processed, "\{\{validations\}\}", validationCode, "all");
 
+		// Process {{enums}} placeholder. Mirrors {{validations}}: CodeGen.generateModel
+		// pre-builds an `enums` code string of enum(property=..., values=...) lines for
+		// any name:enum:a,b,c properties. Explicit (not just the generic {{key}} loop)
+		// so it's substituted even when empty. CLI audit M2.
+		var enumCode = (structKeyExists(arguments.context, "enums") && isSimpleValue(arguments.context.enums)) ? arguments.context.enums : "";
+		processed = reReplace(processed, "\{\{enums\}\}", enumCode, "all");
+
 		// Process actions for controllers
 		if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
 			var actionsCode = generateActionsCode(arguments.context.actions);

@@ -87,8 +87,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(opts.role).toBe("web");
             });
 
+            it("parses '--role value' (space-separated) into opts.role", () => {
+                var opts = parser.parse(["--role", "workers"]);
+                expect(opts.role).toBe("workers");
+            });
+
             it("parses --container into opts.container", () => {
                 var opts = parser.parse(["--container=app-web-v1"]);
+                expect(opts.container).toBe("app-web-v1");
+            });
+
+            it("parses '--container value' (space-separated) into opts.container", () => {
+                var opts = parser.parse(["--container", "app-web-v1"]);
                 expect(opts.container).toBe("app-web-v1");
             });
 
