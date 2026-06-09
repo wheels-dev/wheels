@@ -21,11 +21,20 @@ component {
 		variables.timer          = isNull(arguments.timer)
 			? { "start": function(){}, "stop": function(){} }
 			: arguments.timer;
+		// Record out()/err() messages so specs can assert on emitted warnings
+		// without an `out()` hook on the production Module. Exposed via `this`
+		// so external test code can read `mod.__captured`.
+		variables.__captured = [];
+		this.__captured      = variables.__captured;
 		return this;
 	}
 
-	void function out(any message, string colour = "", string style = "") {}
-	void function err(any message) {}
+	void function out(any message, string colour = "", string style = "") {
+		arrayAppend(variables.__captured, arguments.message);
+	}
+	void function err(any message) {
+		arrayAppend(variables.__captured, arguments.message);
+	}
 
 	function getEnv(string envKeyName, string defaultValue = "") {
 		if (structKeyExists(variables.envVars, arguments.envKeyName)) {

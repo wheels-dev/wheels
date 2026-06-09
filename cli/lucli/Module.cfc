@@ -2942,7 +2942,10 @@ component extends="modules.BaseModule" {
 		// Also detect the named-arg form (e.g. .resources(name="posts", only="...")),
 		// which updateRoutes() treats as a duplicate. Without this, an existing
 		// named-arg route was misreported as "Could not find insertion point". M5.
-		var namedArgPattern = "\.resources\s*\([^)]*name\s*=\s*[""']" & routeName & "[""']";
+		// Escape regex metacharacters in routeName so a name containing `.`, `+`,
+		// etc. is matched literally and can't alter the pattern.
+		var safeRouteName = reReplace(routeName, "([\.\+\*\?\(\)\[\]\{\}\^\$\|\\])", "\\\1", "all");
+		var namedArgPattern = "\.resources\s*\([^)]*name\s*=\s*[""']" & safeRouteName & "[""']";
 		if (reFindNoCase(namedArgPattern, content)) {
 			out("Route already exists: .resources(name=""#routeName#"", ...)", "yellow");
 			return "";

@@ -130,8 +130,10 @@ component {
 					} else {
 						// Surface the failure instead of silently producing a
 						// "complete" scaffold with no views (e.g. unbundled
-						// templates, #1944). CLI audit M3.
-						arrayAppend(results.skipped, "view " & action & ": " & (viewResult.error ?: "generation failed"));
+						// templates, #1944). CLI audit M3. Include the full
+						// app/views path so the skip message matches the
+						// direct `generate controller` output and is actionable.
+						arrayAppend(results.skipped, "app/views/" & lCase(pluralName) & "/" & action & ".cfm: " & (viewResult.error ?: "generation failed"));
 					}
 				}
 			}

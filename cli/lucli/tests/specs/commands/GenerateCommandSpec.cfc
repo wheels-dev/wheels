@@ -118,6 +118,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(fileExists(tempRoot & "/app/controllers/Static.cfc")).toBeTrue();
 				});
 
+				it("warns when view generation fails for a controller action", () => {
+					// Pre-create the view file so generateView() returns
+					// {success: false, error: "View already exists: ..."} without
+					// --force. Module.cfc must surface a "skip" warning that
+					// names the target view path (M3 else-branch).
+					var viewDir = tempRoot & "/app/views/warned";
+					directoryCreate(viewDir, true, true);
+					fileWrite(viewDir & "/index.cfm", "<!--- hand-edited --->");
+
+					arrayClear(mod.__captured);
+					mod.__arguments = ["controller", "Warned", "index"];
+					mod.generate();
+
+					var output = arrayToList(mod.__captured, chr(10));
+					expect(output).toInclude("skip");
+					expect(output).toInclude("app/views/warned/index.cfm");
+				});
+
 			});
 
 			describe("generate view", () => {
@@ -196,6 +214,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 					var content = fileRead(tempRoot & "/config/routes.cfm");
 					expect(content).toInclude("reviews");
+				});
+
+				it("reports 'Route already exists' for a named-arg route duplicate", () => {
+					// Pre-seed routes with the named-arg form. Module.generateRoute()
+					// should early-return without delegating to updateRoutes(),
+					// leaving exactly one .resources line for this name.
+					var routesPath = tempRoot & "/config/routes.cfm";
+					var seeded = "mapper()" & chr(10)
+						& '    .resources(name="namedargdup", only="index")' & chr(10)
+						& ".end();" & chr(10);
+					fileWrite(routesPath, seeded);
+
+					mod.__arguments = ["route", "namedargdup"];
+					mod.generate();
+
+					var content = fileRead(routesPath);
+					var matches = reMatch('\.resources\([^)]*namedargdup', content);
+					expect(arrayLen(matches)).toBe(1);
 				});
 
 			});
