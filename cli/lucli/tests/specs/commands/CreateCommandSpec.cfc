@@ -23,15 +23,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		describe("wheels create", () => {
 
 			it("shows help when called with no arguments", () => {
-				mod.__arguments = [];
 				mod.create();
 				expect(true).toBeTrue();
 			});
 
 			it("throws Wheels.InvalidArguments for an unknown create type", () => {
-				// arg1=... drives the structured caller-collection (the live
-				// dispatch path); structuredArgs() reads `arguments`, not the
-				// instance __arguments, so setting mod.__arguments wouldn't reach it.
+				// arg1= exercises the callerArgs path; __arguments is only the internal-delegation fallback.
 				expect(() => mod.create(arg1 = "nonexistent")).toThrow(type = "Wheels.InvalidArguments");
 			});
 

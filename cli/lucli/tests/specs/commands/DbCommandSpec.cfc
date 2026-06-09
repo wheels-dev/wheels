@@ -29,9 +29,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("throws Wheels.InvalidArguments on an unknown subcommand", () => {
-				// Drive args through the structured caller-collection (arg1=...),
-				// the same path live LuCLI dispatch uses — structuredArgs() reads
-				// the function's `arguments` scope, not the instance __arguments.
+				// arg1= exercises the callerArgs path; __arguments is only the internal-delegation fallback.
 				expect(() => mod.db(arg1 = "invalid")).toThrow(type = "Wheels.InvalidArguments");
 			});
 
