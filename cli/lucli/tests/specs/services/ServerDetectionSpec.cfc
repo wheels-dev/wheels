@@ -16,6 +16,10 @@
  *
  * detectServerPort() stays `private` so it is not auto-exposed on the MCP
  * tools/list or as a CLI subcommand; the spec reaches it via makePublic().
+ *
+ * The final describe block extends the guard to two more write-side
+ * callers — `reload` and `generate admin` — verifying they opt into
+ * requireProjectConfig=true so they refuse the common-port fallback too.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -39,6 +43,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// pattern as vendor/wheels mapper UtilsSpec / MatchingSpec.
 		prepareMock(variables.mod);
 		makePublic(variables.mod, "detectServerPort");
+		// generateAdmin() is private (read-via-server + writes to cwd);
+		// reload() is already public. Expose generateAdmin so the
+		// call-site gating tests below can drive it directly.
+		makePublic(variables.mod, "generateAdmin");
 	}
 
 	function afterAll() {
@@ -97,6 +105,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					}
 					ourSocket.close();
 				}
+			});
+
+		});
+
+		describe("write-side command gating — reload + generate admin", () => {
+
+			// Drive the real callers (not detectServerPort) to prove the call
+			// sites opt into requireProjectConfig=true.
+
+			it("reload() refuses the common-port fallback when no project config exists", () => {
+				if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+				if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				expect(() => mod.reload()).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+			it("generate admin refuses the common-port fallback when no project config exists", () => {
+				if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+				if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				expect(() => mod.generateAdmin(["Post"])).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
 		});
