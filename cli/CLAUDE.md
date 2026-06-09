@@ -1,68 +1,85 @@
-# CLAUDE.md
+# CLAUDE.md — Wheels CLI (`cli/`)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file guides Claude Code when working in the Wheels CLI directory.
 
-## Project Overview
-This is the Wheels CLI, a CommandBox module that provides command-line tools for Wheels framework applications.
+## What This Is
 
-## Commands
-- **Test**: `wheels test [type] [servername] [reload] [debug]`
-  - Types: core, app, plugin
-- **Run Application**: Use CommandBox's server start functionality
-- **Initialize**: `wheels init [name] [path] [reload] [version] [createFolders]`
+The Wheels CLI is the **LuCLI runtime rebranded as `wheels`** — it is NOT a CommandBox
+module. There is no separate `lucli` binary on a normal install; `libexec/wheels` IS the
+LuCLI binary, name-routed to the `wheels` module via its `$0` basename (`-Dlucli.binary.name=wheels`).
+Install is via Homebrew / Scoop / apt / yum (see `tools/distribution-drafts/` and the
+sibling distribution repos) — **not** `box install`.
 
-## Code Style Guidelines
-- **Language**: CFML (ColdFusion Markup Language)
-- **Architecture**: Component-based with CFC files inheriting from base.cfc
-- **Naming**: CamelCase for component names, functions, and variables
-- **Organization**:
-  - Commands in /commands directory, grouped by functionality
-  - Templates for code generation in /templates
-- **Error Handling**: Use try/catch blocks with appropriate error messages
-- **Code Generation**: Follow existing template patterns when modifying or creating new templates
+> Anything in older docs mentioning `box`, `CommandBox`, `box install wheels-cli`, `/cli/src/`,
+> `wheels init`, or `wheels g app` predates the LuCLI rebrand and is wrong. Scaffold with
+> `wheels new <name>`.
 
-## Development Notes
-- This is a CommandBox module that integrates with Wheels framework
-- Follow MVC pattern when creating new features
-- Maintain backward compatibility when possible
-- Refer to CLI-IMPROVEMENTS.md for planned enhancements and architectural goals
-- To run the CLI commands we need to launch CommandBox with the `box` command
-- The CLI is installed with `box install wheels-cli` command
-- Then use the `wheels` commands to run a particular CLI command
-- First create an app with the `wheels g app` command.
-- Then start the web server with `server start` commandbox command
+## Code Map
 
-## Monorepo Integration
+```
+cli/lucli/
+  Module.cfc          The CLI itself. Each PUBLIC function is a subcommand
+                      (generate, g, migrate, seed, test, reload, start, stop, new,
+                      create, routes, info, mcp, console, analyze, validate, destroy, d,
+                      doctor, deploy, packages, stats, notes, db, upgrade, browser,
+                      version, showHelp). Private functions are internal helpers.
+  module.json         Module manifest (name=wheels, main=Module.cfc).
+  ARCHITECTURE.md     Deep architectural reference — read this first.
+  services/           Service objects the subcommands delegate to:
+                        ArgSpec.cfc        typed, declarative argument/flag parser
+                        Scaffold.cfc       generate/scaffold/api-resource
+                        CodeGen.cfc        model/controller/view/test generation
+                        Templates.cfc      template rendering
+                        MigrationRunner.cfc, Analysis.cfc, Doctor.cfc, Stats.cfc,
+                        Destroy.cfc, ServerRegistry.cfc, ReleaseChannel.cfc,
+                        UpdateChecker.cfc, Helpers.cfc, SemVer.cfc, …
+                        deploy/            Kamal-compatible deploy port (DeployMainCli +
+                                           App/Proxy/Build/Registry/Lock/Prune/Secrets/Server CLIs,
+                                           config/, secrets/ adapters)
+                        packages/          package registry/install (Installer, Registry, …)
+  templates/          Code-generation templates (app scaffold, codegen, app tests).
+  tests/specs/        CLI test suite (commands/, services/, integration/, deploy/, packages/).
+```
 
-The Wheels CLI is part of a larger monorepo ecosystem:
+## Argument Parsing
 
-### CLI's Role in the Ecosystem
-- **Source**: `/cli/src/` contains CLI source code (commands, models, templates)
-- **Build**: `tools/build/scripts/build-cli.sh` packages CLI for distribution
-- **Distribution**: Published to ForgeBox as `wheels-cli` CommandBox module
-- **Integration**: Works with base templates and generates code following framework patterns
+Subcommands parse args via the **ArgSpec service** (`services/ArgSpec.cfc`) — a typed,
+declarative spec builder (`.option()`, `.flag()`, `.parse()`). Build the command's ArgSpec
+to enumerate its real flags/options/defaults. (Historical note: the legacy `getArgs()`
+argv round-trip was removed in the #2861/#2875 ArgSpec migration.)
 
-### Key Dependencies
-- **ForgeBox Integration**: Downloads `wheels-base-template` package from ForgeBox during `wheels g app`
-- **Template Snippets**: Uses base template snippets from `/app/snippets/`
-- **Core Patterns**: Generates code that follows core framework conventions (`$` prefix, `config()` methods)
-- **Version Sync**: Shares version numbers with other monorepo components
+LuCLI reserves some tokens before the module sees them: `--help`/`-h`, bare `help`,
+`--verbose`/`-v`, `--version`, and verbs like `run`/`install`/`mcp` and nested `server`/`secrets`.
+Be aware these can be intercepted by the runtime/launcher rather than reaching `Module.cfc`.
 
-### Development Workflow
-1. Modify CLI source in `/cli/src/`
-2. Test in monorepo `/workspace/` directory
-3. Reload CommandBox: `box reload` after changes
-4. Build process handles packaging and ForgeBox distribution via GitHub Actions
+## Running & Testing
 
-### Package Structure
-- `ModuleConfig.cfc` - CommandBox module configuration
-- `commands/wheels/` - Hierarchical command structure extending `base.cfc`
-- `models/` - Business logic with WireBox dependency injection
-- `templates/` - Code generation templates using `{{variable}}` syntax
-- `box.json` - Package metadata with `type: "commandbox-modules"`
+- Run a command against a checkout: the CLI loads the module from `$LUCLI_HOME/modules/wheels`.
+- CLI test suite: `bash tools/test-cli-local.sh` (boots a server, hits `/wheels/cli/tests`),
+  or the in-server endpoint `/wheels/cli/tests?format=json`. End-to-end lifecycle smoke:
+  `tools/test-cli-e2e.sh`. Deploy verb smoke (dry-run): `tools/deploy-verb-smoke.sh`.
+- Build/distribution: `tools/build/scripts/build-cli.sh` packages the module; the Homebrew/
+  Scoop/apt launchers stage `libexec/wheels` + the module zip and generate the `wheels` wrapper.
 
-For complete monorepo architecture details, see the main repository's `CLAUDE.md` file.
+## Code Style
+
+- **Language**: CFML. Components, CamelCase names. Internal helpers use a `$` prefix and
+  must be `public` only when they need to be reachable as mixins/specs — otherwise keep them
+  `private` so they don't surface as MCP tools.
+- **Cross-engine**: the CLI runs on the bundled Lucee; still avoid the engine traps in the
+  root `CLAUDE.md` (e.g. `(.+)` matching newlines in `reFind` — use `[^\r\n]+`).
+- **Error handling**: try/catch with actionable messages; throw typed errors for usage
+  failures so the runtime maps them to a non-zero exit.
+- **Code generation**: follow existing template patterns; strip CFML comments before any
+  source-scanning (anti-pattern #14).
+
+## MCP
+
+`wheels mcp wheels` launches the stdio MCP server. Tools are auto-discovered from `Module.cfc`
+public functions; stateful/interactive commands are hidden via `mcpHiddenTools()`. There is
+no `wheels mcp setup` command — write `.mcp.json` manually. See the root `CLAUDE.md`
+"CLI / MCP" section and `web/.../command-line-tools/mcp-integration` for details.
 
 ## Things to remember
-- Don't add the Claude signature to commit messages
-- Don't add the Claude signature to PR reviews
+- Don't add the Claude signature to commit messages.
+- Don't add the Claude signature to PR reviews.
