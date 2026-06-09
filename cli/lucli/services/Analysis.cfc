@@ -354,8 +354,10 @@ component {
 			});
 		}
 
-		// Check mixed argument styles (uses same pattern as analyze)
-		if (reFindNoCase(variables.MIXED_ARGS_PATTERN, content)) {
+		// Check mixed argument styles (uses same pattern as analyze).
+		// Scan comment-stripped content so a commented-out association with
+		// mixed args doesn't false-positive (anti-pattern #14).
+		if (reFindNoCase(variables.MIXED_ARGS_PATTERN, activeContent)) {
 			arrayAppend(issues, {
 				file: arguments.path,
 				severity: "error",
@@ -393,7 +395,9 @@ component {
 
 	private array function validateRoutes(required string path) {
 		var issues = [];
-		var content = fileRead(arguments.path);
+		// Strip comments first so commented-out mapper()/.end()/.wildcard()/
+		// .resources() lines don't skew the balance/order checks (anti-pattern #14).
+		var content = $stripCfmlComments(fileRead(arguments.path));
 
 		// Check for balanced mapper/end
 		var mapperCount = 0;
@@ -443,10 +447,13 @@ component {
 		// Skip layouts and partials
 		if (fileName == "layout.cfm" || left(fileName, 1) == "_") return issues;
 
-		// Check for variable usage without cfparam
+		// Check for variable usage without cfparam. Scan comment-stripped
+		// content so a view whose only # / cfparam / cfset lives inside a
+		// CFML comment doesn't warn (or falsely appear protected) — #14.
+		var activeContent = $stripCfmlComments(content);
 		var hashChar = chr(35);
 		var cfsetTag = chr(60) & "cfset";
-		if (findNoCase(hashChar, content) && !findNoCase("cfparam", content) && !findNoCase(cfsetTag, content)) {
+		if (findNoCase(hashChar, activeContent) && !findNoCase("cfparam", activeContent) && !findNoCase(cfsetTag, activeContent)) {
 			arrayAppend(issues, {
 				file: arguments.path,
 				severity: "warning",

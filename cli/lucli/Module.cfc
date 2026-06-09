@@ -161,6 +161,7 @@ component extends="modules.BaseModule" {
 			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
 			"d",        // alias for destroy
+			"g",        // alias for generate
 			"new",      // scaffolds a whole new Wheels project
 			"console",  // interactive CFML REPL — not usable over stdio
 			"start",    // dev server lifecycle (stateful)
@@ -266,7 +267,7 @@ component extends="modules.BaseModule" {
 		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
 		help &= "  destroy (or d)      Remove generated files" & nl & nl;
 		help &= "Database:" & nl;
-		help &= "  migrate             Run database migrations (latest, up, down, info, rename-system-tables)" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
@@ -391,7 +392,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Run database migrations (latest, up, down, info)
+	 * hint: Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)
 	 */
 	public string function migrate() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
@@ -871,7 +872,7 @@ component extends="modules.BaseModule" {
 			out("Options:", "bold");
 			out("  --port=<number>           Server port (default: 8080)");
 			out("  --datasource=<name>       Datasource name (default: app name)");
-			out("  --reload-password=<pw>    Reload password (default: app name)");
+			out("  --reload-password=<pw>    Reload password (default: random)");
 			out("  --no-sqlite               Skip default SQLite database setup");
 			out("  --setup-h2                Use H2 embedded database instead of SQLite");
 			out("  --no-open-browser         Don't open browser on server start");
@@ -1086,7 +1087,10 @@ component extends="modules.BaseModule" {
 			// Count routes
 			var routesFile = variables.projectRoot & "/config/routes.cfm";
 			if (fileExists(routesFile)) {
-				var routeContent = fileRead(routesFile);
+				// Strip comments first so a commented-out .resources(...) isn't
+				// counted (anti-pattern #14 — commented code must not satisfy
+				// substring scans). Mirrors the datasource block above.
+				var routeContent = stripCfmlComments(fileRead(routesFile));
 				var resourceCount = 0;
 				var pos = 1;
 				while (pos > 0) {
@@ -1792,7 +1796,14 @@ component extends="modules.BaseModule" {
 	 * hint: Alias for destroy
 	 */
 	public string function d() {
-		return destroy();
+		return destroy(argumentCollection = arguments);
+	}
+
+	/**
+	 * hint: Alias for generate
+	 */
+	public string function g() {
+		return generate(argumentCollection = arguments);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2825,19 +2836,14 @@ component extends="modules.BaseModule" {
 
 		ensureDirectory(migrationDir);
 
-		// Use the DBMigrate template if available, otherwise inline
-		var templates = getService("templates");
-		var result = templates.generateFromTemplate(
-			template = "dbmigrate/blank.txt",
-			destination = "app/migrator/migrations/#fileName#",
-			context = {migrationName: migrationName}
-		);
-
-		if (!result.success) {
-			// Fallback to inline empty migration
-			var content = buildEmptyMigration(migrationName);
-			fileWrite(filePath, content);
-		}
+		// Always build the migration inline. The shipped codegen template
+		// dbmigrate/blank.txt carries |DBMigrateExtends|/|DBMigrateDescription|
+		// tokens that Templates.cfc never substitutes, so on packaged installs
+		// (where that template resolves) `generate migration` produced an
+		// uncompilable file (literal extends="|DBMigrateExtends|"). The inline
+		// builder emits a correct extends="wheels.migrator.Migration" body and
+		// was already the path every dev-checkout install used. See CLI audit H4.
+		fileWrite(filePath, buildEmptyMigration(migrationName));
 
 		printCreated("app/migrator/migrations/#fileName#");
 		return "";
@@ -3371,7 +3377,7 @@ component extends="modules.BaseModule" {
 			"seed-data": {
 				name: "Seed Data",
 				description: "Database seeding template with seedOnce() examples",
-				hint: "Run seeds with: wheels db:seed.",
+				hint: "Run seeds with: wheels seed.",
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
@@ -3798,7 +3804,7 @@ component extends="modules.BaseModule" {
 			out("Migration Status", "bold");
 			out(repeatString("=", 70));
 
-			var fmt = "%-16s %-30s %-10s %s";
+			var fmt = "%-16s %-30s %-10s %-19s";
 			out(sprintf(fmt, "Version", "Description", "Status", "Applied"));
 			out(repeatString("-", 70));
 
@@ -5755,7 +5761,7 @@ component extends="modules.BaseModule" {
 		var envFile = variables.projectRoot & "/.env";
 		if (fileExists(envFile)) {
 			var envContent = fileRead(envFile);
-			var pwMatch = reFindNoCase("(?:WHEELS_)?RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
+			var pwMatch = reFindNoCase("(?:WHEELS_)?RELOAD_PASSWORD\s*=\s*([^\r\n]+)", envContent, 1, true);
 			if (arrayLen(pwMatch.match) > 1 && len(trim(pwMatch.match[2]))) {
 				return trim(pwMatch.match[2]);
 			}

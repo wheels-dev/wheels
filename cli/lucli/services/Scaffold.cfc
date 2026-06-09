@@ -437,8 +437,12 @@ component {
 				}
 			}
 
-			// 5. Update routes with API namespace
-			updateApiRoutes(arguments.name);
+			// 5. Update routes with API namespace.
+			// Use the PLURAL name so the route matches the plural controller
+			// (api/Products.cfc) and table (products) — mirrors updateRoutes(pluralName)
+			// on the non-api scaffold path. Passing singular arguments.name mapped
+			// /api/product and never reached the plural controller.
+			updateApiRoutes(pluralName);
 
 		} catch (any e) {
 			results.success = false;
