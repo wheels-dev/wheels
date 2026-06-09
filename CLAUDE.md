@@ -614,7 +614,7 @@ wheels seed --environment=production
 wheels seed --generate                 # legacy: random test data
 ```
 
-To scaffold the seed files themselves, use the snippet generator: `wheels generate snippets seed-data` (writes `app/snippets/seeds*.cfm`). There is no `wheels generate seed` generator.
+To scaffold seed templates, use: `wheels generate snippets seed-data` (writes `app/snippets/seeds*.cfm` — copy or move to `app/db/` to activate them). There is no `wheels generate seed` generator.
 
 `seedOnce()`: idempotent — checks `uniqueProperties` via `findOne()`, creates only if not found. Execution: `seeds.cfm` → `seeds/<environment>.cfm`, wrapped in a transaction. Programmatic: `application.wheels.seeder.runSeeds()`. (Note: `wheels db:seed` is NOT a valid command — it errors. Use `wheels seed`.)
 
