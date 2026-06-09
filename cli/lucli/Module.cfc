@@ -1250,7 +1250,7 @@ component extends="modules.BaseModule" {
 		out('  {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
-		out("  https://guides.wheels.dev/v4-0-0-snapshot/command-line-tools/mcp-integration");
+		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
 		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");

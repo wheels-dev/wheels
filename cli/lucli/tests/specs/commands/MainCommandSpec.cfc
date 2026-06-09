@@ -70,11 +70,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("hides main() from MCP tools/list", () => {
 				// main() is a CLI-only no-args dispatch target. It would be noise
 				// as an MCP tool — hide it via mcpHiddenTools(), same convention
-				// as `mcp`, `start`, `stop`, etc.
+				// as `mcp`, `start`, `stop`, etc. Window sized to cover the full
+				// returned-array literal including the $-prefixed spec-only
+				// entries past the comment block.
 				var startIdx = reFindNoCase("(?m)^[ \t]*public\s+array\s+function\s+mcpHiddenTools\s*\(", variables.source);
 				expect(startIdx).toBeGT(0);
-				var body = mid(variables.source, startIdx, 800);
+				var body = mid(variables.source, startIdx, 1500);
 				expect(body).toInclude("""main""");
+				expect(body).toInclude("""$normalizeTestFilter""");
+				expect(body).toInclude("""$resolveAppTestDataSource""");
 			});
 
 		});
