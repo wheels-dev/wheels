@@ -2951,15 +2951,20 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function generateTest(required array args) {
-		if (arrayLen(args) < 2) {
-			out("Usage: wheels generate test <type> <Name>", "yellow");
+		// Pull --force out of the positional args so it can appear anywhere.
+		var force = false;
+		var pos = [];
+		for (var a in args) { if (a == "--force") { force = true; } else { arrayAppend(pos, a); } }
+
+		if (arrayLen(pos) < 2) {
+			out("Usage: wheels generate test <type> <Name> [--force]", "yellow");
 			out("  Types: model, controller");
 			out("  Example: wheels generate test model User");
 			return "";
 		}
 
-		var testType = lCase(args[1]);
-		var testName = capitalize(args[2]);
+		var testType = lCase(pos[1]);
+		var testName = capitalize(pos[2]);
 
 		if (!listFindNoCase("model,controller", testType)) {
 			out("Unknown test type: #testType#. Use 'model' or 'controller'.", "red");
@@ -2967,7 +2972,7 @@ component extends="modules.BaseModule" {
 		}
 
 		var codegen = getService("codegen");
-		var result = codegen.generateTest(type = testType, name = testName);
+		var result = codegen.generateTest(type = testType, name = testName, force = force);
 
 		if (result.success) {
 			var relPath = listLast(result.path, "/\");

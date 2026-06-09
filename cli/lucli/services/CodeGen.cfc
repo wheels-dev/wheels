@@ -213,7 +213,8 @@ component {
 	 */
 	public struct function generateTest(
 		required string type,
-		required string name
+		required string name,
+		boolean force = false
 	) {
 		var testName = arguments.name;
 		var testDir = "tests/specs/";
@@ -238,6 +239,12 @@ component {
 		testName &= suffix;
 
 		var fileName = testName & ".cfc";
+		// Refuse to clobber an existing spec unless --force (mirrors generateHelper).
+		// Previously generateTest silently overwrote and still printed "create".
+		var existingPath = variables.projectRoot & "/" & testDir & fileName;
+		if (fileExists(existingPath) && !arguments.force) {
+			return {success: false, error: "Test already exists: #testDir##fileName# (pass --force to overwrite)", path: existingPath};
+		}
 		var destDir = variables.projectRoot & "/" & testDir;
 		if (!directoryExists(destDir)) {
 			directoryCreate(destDir, true);
