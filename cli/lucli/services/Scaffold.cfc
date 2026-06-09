@@ -27,6 +27,7 @@ component {
 		required array properties,
 		string belongsTo = "",
 		string hasMany = "",
+		string hasOne = "",
 		boolean api = false,
 		boolean tests = true,
 		boolean force = false
@@ -58,6 +59,7 @@ component {
 				properties = props,
 				belongsTo = arguments.belongsTo,
 				hasMany = arguments.hasMany,
+				hasOne = arguments.hasOne,
 				force = arguments.force
 			);
 			if (modelResult.success) {
@@ -369,6 +371,7 @@ component {
 		required array properties,
 		string belongsTo = "",
 		string hasMany = "",
+		string hasOne = "",
 		boolean tests = true,
 		boolean force = false
 	) {
@@ -397,6 +400,7 @@ component {
 				properties = props,
 				belongsTo = arguments.belongsTo,
 				hasMany = arguments.hasMany,
+				hasOne = arguments.hasOne,
 				force = arguments.force
 			);
 			if (modelResult.success) {

@@ -142,6 +142,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude("hasMany");
 				});
 
+				it("includes hasOne associations in model", () => {
+					var result = scaffold.generateScaffold(
+						name = "Employee",
+						properties = [{name: "name", type: "string"}],
+						hasOne = "Profile",
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/app/models/Employee.cfc");
+					expect(content).toInclude("hasOne");
+				});
+
 				it("show.cfm heading uses first string column, not id (F4)", () => {
 					// Scaffolding a model with a string column should put that
 					// column in the <h1> heading instead of the numeric primary
@@ -299,6 +311,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				it("does not generate view files for API resource", () => {
 					expect(directoryExists(tempRoot & "/app/views/tokens")).toBeFalse();
+				});
+
+				it("threads hasOne association into the model", () => {
+					var result = scaffold.generateApiResource(
+						name = "Account",
+						properties = [{name: "balance", type: "decimal"}],
+						hasOne = "Wallet"
+					);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/app/models/Account.cfc");
+					expect(content).toInclude("hasOne");
 				});
 
 			});
