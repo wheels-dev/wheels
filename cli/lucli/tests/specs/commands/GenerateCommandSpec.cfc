@@ -272,8 +272,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			describe("unknown type handling", () => {
 
 				it("throws Wheels.InvalidArguments for an unknown generator type", () => {
-					mod.__arguments = ["nonexistent"];
-					expect(() => mod.generate()).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => mod.generate(arg1 = "nonexistent")).toThrow(type = "Wheels.InvalidArguments");
 				});
 
 			});

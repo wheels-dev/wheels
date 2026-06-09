@@ -29,8 +29,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("throws Wheels.InvalidArguments for an unknown create type", () => {
-				mod.__arguments = ["nonexistent"];
-				expect(() => mod.create()).toThrow(type = "Wheels.InvalidArguments");
+				// arg1=... drives the structured caller-collection (the live
+				// dispatch path); structuredArgs() reads `arguments`, not the
+				// instance __arguments, so setting mod.__arguments wouldn't reach it.
+				expect(() => mod.create(arg1 = "nonexistent")).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 		});

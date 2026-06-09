@@ -60,8 +60,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("throws Wheels.InvalidArguments on an unknown action", () => {
-				mod.__arguments = ["invalid"];
-				expect(() => mod.migrate()).toThrow(type = "Wheels.InvalidArguments");
+				expect(() => mod.migrate(arg1 = "invalid")).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 		});
