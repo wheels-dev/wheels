@@ -434,7 +434,8 @@ component extends="modules.BaseModule" {
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
-				return "";
+				// throw maps to non-zero exit; return "" would silently succeed.
+				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #type#");
 		}
 	}
 
@@ -458,14 +459,15 @@ component extends="modules.BaseModule" {
 					return runMigration(action);
 				} catch (MigrationError e) {
 					out("Migration failed: #e.message#", "red");
-					return "";
+					// rethrow maps to non-zero exit; return "" would silently succeed.
+					rethrow;
 				}
 			case "doctor":
 				try {
 					return runMigration("doctor");
 				} catch (MigrationError e) {
 					out("Doctor failed: #e.message#", "red");
-					return "";
+					rethrow;
 				}
 			case "forget":
 				return runForgetOrPretend("forgetVersion", args);
@@ -483,12 +485,12 @@ component extends="modules.BaseModule" {
 					return runRenameSystemTables(dryRun);
 				} catch (MigrationError e) {
 					out("Rename failed: #e.message#", "red");
-					return "";
+					rethrow;
 				}
 			default:
 				out("Unknown migration action: #action#", "red");
 				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]");
-				return "";
+				throw(type = "Wheels.InvalidArguments", message = "Unknown migration action: #action#");
 		}
 	}
 
@@ -1026,7 +1028,7 @@ component extends="modules.BaseModule" {
 			default:
 				out("Unknown create type: #type#", "red");
 				out("Run 'wheels create' for available types.");
-				return "";
+				throw(type = "Wheels.InvalidArguments", message = "Unknown create type: #type#");
 		}
 	}
 
@@ -1054,12 +1056,12 @@ component extends="modules.BaseModule" {
 			} catch (any jsonErr) {
 				out("Failed to parse routes response", "red");
 				verbose(httpResult);
-				return "";
+				throw(type = "Wheels.RoutesFailed", message = "Failed to parse routes response");
 			}
 
 			if (!structKeyExists(result, "success") || !result.success) {
 				out("Failed to fetch routes: #result.message ?: 'unknown error'#", "red");
-				return "";
+				throw(type = "Wheels.RoutesFailed", message = "Failed to fetch routes: #result.message ?: 'unknown error'#");
 			}
 
 			if (!structKeyExists(result, "routes") || !arrayLen(result.routes)) {
@@ -1104,7 +1106,11 @@ component extends="modules.BaseModule" {
 			out("");
 			out("#arrayLen(result.routes)# route(s)", "cyan");
 		} catch (any e) {
-			out("Failed to fetch routes: #e.message#", "red");
+			// Inner Wheels.RoutesFailed paths already printed a diagnostic; only HTTP/unexpected errors need one here.
+			if (e.type != "Wheels.RoutesFailed") {
+				out("Failed to fetch routes: #e.message#", "red");
+			}
+			rethrow;
 		}
 		return "";
 	}
@@ -2663,7 +2669,7 @@ component extends="modules.BaseModule" {
 			default:
 				out("Unknown db command: #subcommand#", "red");
 				out("Valid commands: reset, status, version");
-				return "";
+				throw(type = "Wheels.InvalidArguments", message = "Unknown db command: #subcommand#");
 		}
 	}
 

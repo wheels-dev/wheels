@@ -59,10 +59,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(true).toBeTrue();
 			});
 
-			it("rejects unknown action without throwing", () => {
-				mod.__arguments = ["invalid"];
-				mod.migrate();
-				expect(true).toBeTrue();
+			it("throws Wheels.InvalidArguments on an unknown action", () => {
+				expect(() => mod.migrate(arg1 = "invalid")).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 		});
