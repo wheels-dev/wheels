@@ -22,34 +22,38 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	function run() {
 		describe("PortProbe.portInUse", () => {
 
+			// NOTE: the listener var must NOT be named `server` — that is a CFML
+			// reserved scope (anti-pattern #11) and would shadow our ServerSocket
+			// with the `server` scope struct, so `.bind()`/`.close()` would fail
+			// with "function does not exist in the Struct".
 			it("reports a port held by an IPv4-only (127.0.0.1) listener as in use", () => {
-				var server = createObject("java", "java.net.ServerSocket").init();
+				var listener = createObject("java", "java.net.ServerSocket").init();
 				try {
-					server.setReuseAddress(false);
-					server.bind(
+					listener.setReuseAddress(false);
+					listener.bind(
 						createObject("java", "java.net.InetSocketAddress").init(
 							createObject("java", "java.net.InetAddress").getByName("127.0.0.1"),
 							javaCast("int", 0)
 						)
 					);
-					var port = server.getLocalPort();
+					var port = listener.getLocalPort();
 					expect(probe.portInUse(port)).toBeTrue();
 				} finally {
-					server.close();
+					listener.close();
 				}
 			});
 
 			it("reports a free port (nothing listening) as not in use", () => {
 				// Bind then immediately release to obtain a port we know is free.
-				var server = createObject("java", "java.net.ServerSocket").init();
-				server.bind(
+				var listener = createObject("java", "java.net.ServerSocket").init();
+				listener.bind(
 					createObject("java", "java.net.InetSocketAddress").init(
 						createObject("java", "java.net.InetAddress").getByName("127.0.0.1"),
 						javaCast("int", 0)
 					)
 				);
-				var port = server.getLocalPort();
-				server.close();
+				var port = listener.getLocalPort();
+				listener.close();
 
 				expect(probe.portInUse(port)).toBeFalse();
 			});
