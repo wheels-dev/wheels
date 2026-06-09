@@ -125,6 +125,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).notToInclude("validatesFormatOf");
 				});
 
+				it("emits enum() for enum-typed properties (##M2)", () => {
+					codegen.generateModel(
+						name = "Ticket",
+						properties = [{name: "status", type: "enum", values: "open,pending,closed"}],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/Ticket.cfc");
+					expect(content).toInclude('enum(property="status", values="open,pending,closed")');
+				});
+
+				it("leaves no stray enums placeholder when there are no enum properties (##M2)", () => {
+					codegen.generateModel(name = "NoEnum", properties = [{name: "title", type: "string"}], force = true);
+					var content = fileRead(tempRoot & "/app/models/NoEnum.cfc");
+					expect(content).notToInclude("{" & "{enums}}");
+					expect(content).notToInclude("enum(");
+				});
+
 				it("produces no orphan whitespace-only lines (##2329)", () => {
 					codegen.generateModel(
 						name = "Layout",
