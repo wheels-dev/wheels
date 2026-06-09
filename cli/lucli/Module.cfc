@@ -434,8 +434,7 @@ component extends="modules.BaseModule" {
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
-				// Throw so LuCLI exits non-zero — a typo'd type is a user error
-				// CI / scripts must be able to detect, not a silent success.
+				// throw maps to non-zero exit; return "" would silently succeed.
 				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #type#");
 		}
 	}
@@ -460,8 +459,7 @@ component extends="modules.BaseModule" {
 					return runMigration(action);
 				} catch (MigrationError e) {
 					out("Migration failed: #e.message#", "red");
-					// Propagate so LuCLI exits non-zero — a failed migration must
-					// be detectable by CI / deploy scripts, not swallowed to exit 0.
+					// rethrow maps to non-zero exit; return "" would silently succeed.
 					rethrow;
 				}
 			case "doctor":
@@ -1108,10 +1106,7 @@ component extends="modules.BaseModule" {
 			out("");
 			out("#arrayLen(result.routes)# route(s)", "cyan");
 		} catch (any e) {
-			// Inner failure paths already printed a specific diagnostic and
-			// threw Wheels.RoutesFailed; only a genuine HTTP/unexpected error
-			// needs a message here. Either way, propagate non-zero — a failed
-			// routes fetch is an error CI / scripts must detect, not exit 0.
+			// Inner Wheels.RoutesFailed paths already printed a diagnostic; only HTTP/unexpected errors need one here.
 			if (e.type != "Wheels.RoutesFailed") {
 				out("Failed to fetch routes: #e.message#", "red");
 			}
