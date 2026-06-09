@@ -132,8 +132,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// global banner — guarded by `if (len(sub))`.
 				var startIdx = reFindNoCase("(?m)^[ \t]*public\s+string\s+function\s+showHelp\s*\(", variables.source);
 				expect(startIdx).toBeGT(0);
-				var body = mid(variables.source, startIdx, 600);
-				expect(body).toInclude("structuredArgs(arguments).arg1");
+				// Window widened to 900 to cover the expanded dispatch-contract comment.
+				var body = mid(variables.source, startIdx, 900);
+				expect(body).toInclude("structuredArgs(arguments)");
+				expect(body).toInclude("coll.arg1");
+				// CFML positional key "1" fallback for the direct-invocation path.
+				expect(body).toInclude("""1""");
 				expect(reFindNoCase("if\s*\(\s*len\s*\(\s*sub\s*\)\s*\)", body)).toBeGT(0);
 			});
 
