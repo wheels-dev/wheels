@@ -252,8 +252,25 @@ component extends="modules.BaseModule" {
 	 * hint: Show this help
 	 */
 	public string function showHelp() {
-		var v = super.version();
 		var nl = chr(10);
+
+		// Per-subcommand help. LuCLI (>= bpamiri/LuCLI#5) forwards
+		// `wheels <cmd> --help` as `showHelp <cmd>`, which arrives as the raw
+		// __arguments argv (`arg1`) — the same dispatch every other command uses.
+		// Read `arg1` first; fall back to the CFML positional key "1" so a direct
+		// function invocation (showHelp("migrate")) also resolves it. Unknown
+		// commands fall through to the global listing below (also the bare
+		// `wheels help` / `wheels --help` path, where there is no subcommand).
+		var coll = structuredArgs(arguments);
+		var sub = coll.arg1 ?: (coll["1"] ?: "");
+		if (len(sub)) {
+			var cmdHelp = $commandHelp(sub);
+			if (len(cmdHelp)) {
+				return cmdHelp;
+			}
+		}
+
+		var v = super.version();
 		var help = "Wheels CLI " & v & nl;
 		help &= "  CFML MVC framework — code generation, migrations, testing, server management" & nl & nl;
 		help &= "Usage:" & nl;
@@ -290,6 +307,40 @@ component extends="modules.BaseModule" {
 		help &= "  version             Show Wheels CLI version" & nl;
 		help &= "  help                Show this help" & nl & nl;
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
+		help &= "More info: https://guides.wheels.dev";
+		return help;
+	}
+
+	/**
+	 * Render per-command help for `wheels <cmd> --help` from the command function's
+	 * metadata hint. Returns "" for an unknown command so showHelp() falls back to
+	 * the global listing. Private so it isn't exposed as an MCP tool.
+	 */
+	private string function $commandHelp(required string subcommand) {
+		var nl = chr(10);
+		// Resolve aliases to the implementing function.
+		var fnName = lCase(trim(arguments.subcommand));
+		if (fnName == "g") { fnName = "generate"; }
+		if (fnName == "d") { fnName = "destroy"; }
+
+		var hint = "";
+		var meta = getMetaData(this);
+		for (var fn in (meta.functions ?: [])) {
+			if (lCase(fn.name ?: "") == fnName && (fn.access ?: "public") == "public") {
+				hint = trim(fn.hint ?: "");
+				// The `/** hint: ... */` convention surfaces the value with the
+				// literal "hint:" key prefix on Lucee — strip it for clean output.
+				hint = trim(reReplaceNoCase(hint, "^hint\s*:\s*", ""));
+				break;
+			}
+		}
+		if (!len(hint)) {
+			return "";
+		}
+
+		var help = "wheels " & lCase(trim(arguments.subcommand)) & nl & nl;
+		help &= "  " & hint & nl & nl;
+		help &= "Run 'wheels help' for the full command list." & nl;
 		help &= "More info: https://guides.wheels.dev";
 		return help;
 	}
