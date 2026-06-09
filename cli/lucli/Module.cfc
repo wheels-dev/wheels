@@ -254,11 +254,15 @@ component extends="modules.BaseModule" {
 	public string function showHelp() {
 		var nl = chr(10);
 
-		// Per-subcommand help. LuCLI (>= the per-command-help fix) forwards
-		// `wheels <cmd> --help` as showHelp(<cmd>); render command-specific help
-		// from the function's hint. Unknown commands fall through to the global
-		// listing below (also the bare `wheels help` / `wheels --help` path).
-		var sub = structuredArgs(arguments).arg1 ?: "";
+		// Per-subcommand help. LuCLI (>= bpamiri/LuCLI#5) forwards
+		// `wheels <cmd> --help` as `showHelp <cmd>`, which arrives as the raw
+		// __arguments argv (`arg1`) — the same dispatch every other command uses.
+		// Read `arg1` first; fall back to the CFML positional key "1" so a direct
+		// function invocation (showHelp("migrate")) also resolves it. Unknown
+		// commands fall through to the global listing below (also the bare
+		// `wheels help` / `wheels --help` path, where there is no subcommand).
+		var coll = structuredArgs(arguments);
+		var sub = coll.arg1 ?: (coll["1"] ?: "");
 		if (len(sub)) {
 			var cmdHelp = $commandHelp(sub);
 			if (len(cmdHelp)) {
