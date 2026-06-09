@@ -28,10 +28,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(true).toBeTrue();
 			});
 
-			it("handles unknown subcommand without throwing", () => {
+			it("throws Wheels.InvalidArguments on an unknown subcommand", () => {
 				mod.__arguments = ["invalid"];
-				mod.db();
-				expect(true).toBeTrue();
+				expect(() => mod.db()).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 			it("accepts status subcommand", () => {
