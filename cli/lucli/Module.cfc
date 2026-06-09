@@ -2969,6 +2969,7 @@ component extends="modules.BaseModule" {
 			properties = parsed.properties,
 			belongsTo = arrayToList(parsed.belongsTo),
 			hasMany = arrayToList(parsed.hasMany),
+			hasOne = arrayToList(parsed.hasOne),
 			force = force
 		);
 
@@ -3157,7 +3158,8 @@ component extends="modules.BaseModule" {
 			name = modelName,
 			properties = parsed.properties,
 			belongsTo = arrayToList(parsed.belongsTo),
-			hasMany = arrayToList(parsed.hasMany)
+			hasMany = arrayToList(parsed.hasMany),
+			hasOne = arrayToList(parsed.hasOne)
 		);
 
 		if (results.success) {
