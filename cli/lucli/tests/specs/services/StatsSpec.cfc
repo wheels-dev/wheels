@@ -137,6 +137,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(data.annotations["XYZNONEXISTENT"]).toBeEmpty();
 				});
 
+				it("ignores annotations in string literals and identifier suffixes — only comments count (##M11)", () => {
+					var testFile = tempRoot & "/app/models/NotesFalsePositive.cfc";
+					directoryCreate(getDirectoryFromPath(testFile), true, true);
+					fileWrite(testFile,
+						'component {' & chr(10)
+						& '	// QUIRK: this is a real annotation' & chr(10)
+						& '	var note = "QUIRK: fake one inside a string literal";' & chr(10)
+						& '	var methodQUIRK = 1;' & chr(10)
+						& '}'
+					);
+
+					// Scan only QUIRK so other fixture files don't interfere. Only the
+					// real `// QUIRK` comment must count — not the string literal, not
+					// the `methodQUIRK` identifier suffix.
+					var data = stats.getNotes(annotations = "QUIRK");
+					expect(arrayLen(data.annotations["QUIRK"])).toBe(1);
+					expect(data.annotations["QUIRK"][1].text).toInclude("real");
+				});
+
 			});
 
 		});
