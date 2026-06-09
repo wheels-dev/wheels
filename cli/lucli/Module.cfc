@@ -3504,10 +3504,13 @@ component extends="modules.BaseModule" {
 	// ── Migration Execution ──────────────────────────
 
 	private string function runMigration(required string action) {
-		var serverPort = $requireRunningServer([
-			"Migrations require a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Migrations require a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out("Running migration: #action#...", "cyan");
 
@@ -3586,10 +3589,13 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var serverPort = $requireRunningServer([
-			"Migration reconciliation requires a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Migration reconciliation requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out("Running #verb# for version #version#...", "cyan");
 
@@ -3623,10 +3629,13 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function runRenameSystemTables(boolean dryRun = false) {
-		var serverPort = $requireRunningServer([
-			"Renaming system tables requires a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Renaming system tables requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out(arguments.dryRun ? "Previewing system-table rename..." : "Renaming legacy c_o_r_e_* system tables to wheels_*...", "cyan");
 
@@ -3688,10 +3697,13 @@ component extends="modules.BaseModule" {
 	// ── Seed Execution ──────────────────────────────
 
 	private string function runSeed(string mode = "auto", string environment = "") {
-		var serverPort = $requireRunningServer([
-			"Seeding requires a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Seeding requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out("Running database seeds...", "cyan");
 
@@ -5631,9 +5643,29 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Detect the port of a running Wheels dev server.
-	 * Checks lucee.json, .env, and common default ports.
+	 *
+	 * Resolves in priority order: lucee.json `port` field, `.env` PORT
+	 * variable, then a hardcoded common-port probe. When
+	 * `requireProjectConfig` is true the common-port probe is skipped —
+	 * write-side commands (migrate, seed, reconciliation) must only ever
+	 * target the server bound to this project's own config, never a
+	 * sibling app squatting 8080 (issue #2878).
+	 *
+	 * `commonPorts` is a test seam — the spec injects a known port to
+	 * simulate a sibling app deterministically. Production callers always
+	 * get the historical fallback list.
+	 *
+	 * Kept `private`: LuCLI auto-exposes every public, non-hidden Module
+	 * function on the MCP `tools/list` and as a CLI subcommand (see
+	 * metadataGetFunctions.cfs + McpCommand BASE_MODULE_INTERNALS +
+	 * mcpHiddenTools()), so this internal probe must not be public. The
+	 * spec reaches it through TestBox `makePublic()` — see
+	 * cli/lucli/tests/specs/services/ServerDetectionSpec.cfc (#2878 review).
 	 */
-	private any function detectServerPort() {
+	private any function detectServerPort(
+		boolean requireProjectConfig = false,
+		array commonPorts = [8080, 60000, 3000, 8500]
+	) {
 		// 1. Check lucee.json
 		var luceeJson = variables.projectRoot & "/lucee.json";
 		if (fileExists(luceeJson)) {
@@ -5658,10 +5690,17 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		// 3. Try common ports
-		var commonPorts = [8080, 60000, 3000, 8500];
-		for (var port in commonPorts) {
-			if (isPortOpen(port)) return port;
+		// 3. Refuse the common-port fallback for write-side callers — see
+		//    #2878. Without an explicit project-bound port we cannot prove
+		//    the server on 8080 belongs to this project, and silently
+		//    attaching can run a migration against the wrong database.
+		if (arguments.requireProjectConfig) {
+			return false;
+		}
+
+		// 4. Try common ports (read-side only).
+		for (var fallbackPort in arguments.commonPorts) {
+			if (isPortOpen(fallbackPort)) return fallbackPort;
 		}
 
 		return false;
@@ -5673,19 +5712,36 @@ component extends="modules.BaseModule" {
 	 * and throws `Wheels.ServerNotRunning` on failure, so LuCLI's Picocli
 	 * ExecutionExceptionHandler surfaces a non-zero exit instead of the
 	 * previous silent `return ""` (GH #2229).
+	 *
+	 * `requireProjectConfig=true` switches to the strict server-identity
+	 * mode introduced in #2878: write-side commands refuse the common-port
+	 * fallback, so a freshly-scaffolded project without lucee.json/.env
+	 * port config errors loudly instead of attaching to a sibling app.
 	 */
-	private numeric function $requireRunningServer(array hints = []) {
-		var serverPort = detectServerPort();
+	private numeric function $requireRunningServer(array hints = [], boolean requireProjectConfig = false) {
+		var serverPort = detectServerPort(requireProjectConfig = arguments.requireProjectConfig);
 		if (serverPort) return serverPort;
 
 		out("No running Wheels server detected.", "red");
-		var hintList = arrayLen(arguments.hints) ? arguments.hints : ["Start one with: wheels start"];
+		// Fallback hints used only when a caller passes none. Every current
+		// write-side caller passes explicit `hints`, so the requireProjectConfig
+		// arm below is defensive — it keeps the guidance correct for any future
+		// caller that relies on the default.
+		var defaultHints = arguments.requireProjectConfig
+			? [
+				"Write commands refuse to attach to a server not bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			]
+			: ["Start one with: wheels start"];
+		var hintList = arrayLen(arguments.hints) ? arguments.hints : defaultHints;
 		for (var hint in hintList) {
 			out(hint, "yellow");
 		}
 		throw(
 			type="Wheels.ServerNotRunning",
-			message="No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
+			message=arguments.requireProjectConfig
+				? "No running Wheels server detected for this project (set 'port' in lucee.json or PORT in .env, then start with: wheels start)"
+				: "No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
 		);
 	}
 
