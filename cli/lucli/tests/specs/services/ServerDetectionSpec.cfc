@@ -19,8 +19,7 @@
  *
  * The final describe block extends the guard to two more write-side
  * callers — `reload` and `generate admin` — verifying they opt into
- * requireProjectConfig=true so they refuse the common-port fallback too
- * (follow-up to #2879, which gated migrate/seed/reconcile).
+ * requireProjectConfig=true so they refuse the common-port fallback too.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
