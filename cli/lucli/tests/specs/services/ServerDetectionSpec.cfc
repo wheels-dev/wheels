@@ -110,21 +110,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("write-side command gating — reload + generate admin (##2878 follow-up)", () => {
+		describe("write-side command gating — reload + generate admin", () => {
 
-			// reload() and generate-admin both reach the project's own server
-			// — reload to reset app state, generate-admin to introspect the
-			// schema before scaffolding files into cwd. Attaching to a sibling
-			// app squatting a common port reloads the wrong app / generates
-			// admin from the wrong schema (the #2878 failure mode applied to
-			// non-migration commands). Both now pass requireProjectConfig=true,
-			// so with no project-bound port they refuse the common-port probe
-			// and throw Wheels.ServerNotRunning instead of silently attaching.
-			//
-			// These drive the real command functions (not detectServerPort
-			// directly) so the assertion proves the call sites actually opt
-			// into the guard. Each test re-strips lucee.json/.env to stay
-			// isolated from the lucee.json the detectServerPort suite writes.
+			// Drive the real callers (not detectServerPort) to prove the call
+			// sites opt into requireProjectConfig=true.
 
 			it("reload() refuses the common-port fallback when no project config exists", () => {
 				if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
