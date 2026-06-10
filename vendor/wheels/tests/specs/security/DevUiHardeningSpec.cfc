@@ -10,7 +10,9 @@
  *
  * 2. /wheels/public/docs/core.cfm included "layouts/<format>.cfm" with an
  *    unvalidated, user-controllable format param — the same traversal class
- *    $getRequestFormat() was hardened against (#2900 sibling).
+ *    $getRequestFormat() was hardened against (#2900 sibling). The format is
+ *    now routed through the unit-testable Public.$resolveDocFormat() helper
+ *    (alphanumeric allowlist, html fallback).
  */
 component extends="wheels.WheelsTest" {
 
@@ -50,6 +52,54 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("$resolveDocFormat()", () => {
+
+				it("accepts plain alphanumeric formats", () => {
+					var publicCfc = createObject("component", "wheels.Public").$init();
+					expect(publicCfc.$resolveDocFormat("html")).toBe("html");
+					expect(publicCfc.$resolveDocFormat("json")).toBe("json");
+				});
+
+				it("falls back to html for empty input", () => {
+					var publicCfc = createObject("component", "wheels.Public").$init();
+					expect(publicCfc.$resolveDocFormat("")).toBe("html");
+				});
+
+				it("rejects path traversal payloads and falls back to html", () => {
+					var publicCfc = createObject("component", "wheels.Public").$init();
+					var traversal = [
+						"../views/info",
+						"../../etc/passwd",
+						"..\..\windows",
+						"html/../../config",
+						"layouts/html",
+						"html.cfm"
+					];
+					for (var payload in traversal) {
+						expect(publicCfc.$resolveDocFormat(payload)).toBe(
+							"html",
+							"Expected `" & payload & "` to be rejected by $resolveDocFormat() and fall back to html."
+						);
+					}
+				});
+
+				it("rejects payloads with non-alphanumeric characters", () => {
+					var publicCfc = createObject("component", "wheels.Public").$init();
+					// Chr(0) is stripped by Lucee somewhere along the parameter-passing
+					// chain, so it isn't a useful probe here — the traversal-payload
+					// test above already covers slash, dot, and backslash. The remaining
+					// payloads exercise other classes of non-alphanumeric chars.
+					var bad = ["html json", "html&json", "html;json", "html.cfm", "html-extra"];
+					for (var payload in bad) {
+						expect(publicCfc.$resolveDocFormat(payload)).toBe(
+							"html",
+							"Expected `" & payload & "` (non-alphanumeric) to fall back to html."
+						);
+					}
+				});
+
+			});
+
 			describe("Source coverage", () => {
 
 				it("info.cfm JSON branch serializes the whitelisted metadata, not the raw struct", () => {
@@ -67,9 +117,14 @@ component extends="wheels.WheelsTest" {
 
 				it("core.cfm validates the format param before the layout include", () => {
 					var source = FileRead(ExpandPath("/wheels/public/docs/core.cfm"));
-					expect(Find("^[A-Za-z0-9]+$", source) > 0).toBeTrue(
-						"core.cfm must reject non-alphanumeric format values (with an html fallback) "
-						& "before interpolating the value into the layouts/ include path."
+					expect(Find("$resolveDocFormat", source) > 0).toBeTrue(
+						"core.cfm must route the `format` request parameter through $resolveDocFormat() "
+						& "before interpolating it into the layouts/<format>.cfm include path."
+					);
+					expect(Find('include "layouts/##request.wheels.params.format##.cfm"', source)).toBe(
+						0,
+						"core.cfm must not interpolate the unvalidated `format` request parameter into "
+						& "the include path — same LFI traversal class $getRequestFormat was hardened against."
 					);
 				});
 

@@ -4,13 +4,6 @@
 param name="request.wheels.params.type" default="core";
 param name="request.wheels.params.format" default="html";
 
-// Security: the format value is interpolated into the layouts/ include path at
-// the bottom of this template — reject anything but plain alphanumeric names
-// and fall back to html (same hardening as $getRequestFormat, issue #2974).
-if (!ReFind("^[A-Za-z0-9]+$", request.wheels.params.format)) {
-	request.wheels.params.format = "html";
-}
-
 if (StructKeyExists(application.wheels, "docs")) {
 	docs = application.wheels.docs;
 } else {
@@ -81,5 +74,11 @@ if (StructKeyExists(application.wheels, "docs")) {
 	application.wheels.docs = docs;
 }
 
-include "layouts/#request.wheels.params.format#.cfm";
+// Validate `format` against an alphanumeric allowlist before interpolating
+// it into the include path. Without this, `format=../views/info` would
+// climb out of layouts/ — same LFI traversal class $getRequestFormat was
+// hardened against (issue #2974). Unscoped on purpose: this template runs
+// both at template level (views/docs.cfm) and inside a UDF (views/ai.cfm).
+docFormat = $resolveDocFormat(request.wheels.params.format);
+include "layouts/#docFormat#.cfm";
 </cfscript>
