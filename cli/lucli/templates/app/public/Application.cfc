@@ -84,6 +84,17 @@ component output="false" {
 		performVariableInterpolation(this.env);
 	}
 
+	// Harden the session cookie: httpOnly blocks JavaScript access and sameSite=lax
+	// limits cross-site sends. The secure flag (HTTPS-only cookie) turns on
+	// automatically in production. Override in config/app.cfm if your setup differs,
+	// e.g. `this.sessionCookie.secure = true;` when non-production environments are
+	// also served over HTTPS.
+	this.sessionCookie = {
+		httpOnly: true,
+		sameSite: "lax",
+		secure: structKeyExists(variables, "currentEnv") && currentEnv == "production"
+	};
+
 	function onServerStart() {}
 
 	include "../config/app.cfm";
@@ -215,7 +226,10 @@ component output="false" {
 			&& (
 				!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "reloadPassword")
 				|| !Len(application.wheels.reloadPassword)
-				|| (StructKeyExists(url, "password") && url.password == application.wheels.reloadPassword)
+				// Case-sensitive, constant-time compare — same gate as the environment switch
+				// in wheels/events/onapplicationstart.cfc (CFML == is case-insensitive and
+				// exits early, which leaks timing information).
+				|| (StructKeyExists(url, "password") && application.wo.$secureCompare(url.password, application.wheels.reloadPassword))
 			)
 		) {
 			application.wo.$debugPoint("total,reload");

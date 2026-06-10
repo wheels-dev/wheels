@@ -80,6 +80,28 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("Shared $secureCompare helper (used by both reload gates)", function() {
+
+				it("returns true for an exact match", function() {
+					expect(application.wo.$secureCompare("testSecret123", "testSecret123")).toBeTrue();
+				});
+
+				it("is case-sensitive, unlike the CFML == operator", function() {
+					// The restart gate previously used ==, which treats "TESTSECRET123"
+					// and "testSecret123" as equal and reduces the password keyspace.
+					expect(application.wo.$secureCompare("TESTSECRET123", "testSecret123")).toBeFalse();
+				});
+
+				it("returns false for a non-matching value", function() {
+					expect(application.wo.$secureCompare("wrongPassword", "testSecret123")).toBeFalse();
+				});
+
+				it("returns false for an empty candidate", function() {
+					expect(application.wo.$secureCompare("", "testSecret123")).toBeFalse();
+				});
+
+			});
+
 		});
 
 	}

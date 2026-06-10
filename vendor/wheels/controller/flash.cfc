@@ -203,7 +203,9 @@ component {
 					// through a request-scoped slot instead.
 					request.$testCookieFlash = SerializeJSON(arguments.flash);
 				} else {
-					cookie.flash = SerializeJSON(arguments.flash);
+					// Write through an attribute collection so the cookie carries
+					// httpOnly / secure / sameSite flags (mirrors the CSRF cookie).
+					cookie["flash"] = $flashCookieAttributeCollection(SerializeJSON(arguments.flash));
 				}
 			} else if ($getFlashStorage() == "session") {
 				session.flash = arguments.flash;
@@ -222,6 +224,23 @@ component {
 	 */
 	public boolean function $inTestHarness() {
 		return StructKeyExists(request, "$wheelsTestRun") && request.$wheelsTestRun;
+	}
+
+	/**
+	 * Internal function.
+	 * Builds the attribute collection used when writing the flash cookie so it is
+	 * flagged httpOnly / secure / sameSite (mirrors $csrfCookieAttributeCollection).
+	 */
+	public struct function $flashCookieAttributeCollection(required string value) {
+		local.cookieStruct = {
+			value = arguments.value,
+			httpOnly = application.wheels.flashCookieHttpOnly,
+			secure = application.wheels.flashCookieSecure
+		};
+		if (Len(application.wheels.flashCookieSameSite)) {
+			local.cookieStruct.sameSite = application.wheels.flashCookieSameSite;
+		}
+		return local.cookieStruct;
 	}
 
 	/**

@@ -1,7 +1,32 @@
 <cfscript>
 		// CSRF protection settings.
 		application.$wheels.csrfStore = "session";
+		// Prefer AES/GCM/NoPadding (authenticated encryption) — bare "AES" resolves to
+		// insecure ECB mode. Not every engine supports GCM through Encrypt()/Decrypt()
+		// (Lucee builds an IvParameterSpec internally, which the JDK GCM cipher rejects
+		// with "AlgorithmParameterSpec not of GCMParameterSpec"), so probe at startup
+		// and fall back to AES/CBC/PKCS5Padding (random-IV CBC), then to legacy bare
+		// "AES" as a last resort. Cookies written under the legacy bare "AES" default
+		// remain readable via the decrypt fallback in csrf.cfc's $decryptCsrfCookieValue().
 		application.$wheels.csrfCookieEncryptionAlgorithm = "AES";
+		local.csrfCipherProbeKey = GenerateSecretKey("AES");
+		for (local.csrfCipherCandidate in ["AES/GCM/NoPadding", "AES/CBC/PKCS5Padding"]) {
+			try {
+				if (
+					Decrypt(
+						Encrypt("wheels", local.csrfCipherProbeKey, local.csrfCipherCandidate, "Base64"),
+						local.csrfCipherProbeKey,
+						local.csrfCipherCandidate,
+						"Base64"
+					) == "wheels"
+				) {
+					application.$wheels.csrfCookieEncryptionAlgorithm = local.csrfCipherCandidate;
+					break;
+				}
+			} catch (any e) {
+				// Engine can't run this transformation through Encrypt()/Decrypt(); try the next one.
+			}
+		}
 		application.$wheels.csrfCookieEncryptionSecretKey = "";
 		application.$wheels.csrfCookieEncryptionEncoding = "Base64";
 		application.$wheels.csrfCookieName = "_wheels_authenticity";
