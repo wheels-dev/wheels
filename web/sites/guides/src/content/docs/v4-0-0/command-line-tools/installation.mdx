@@ -37,6 +37,8 @@ brew tap wheels-dev/wheels
 brew install wheels
 ```
 
+Homebrew 5.1+ asks you to trust third-party taps on first use — run `brew trust wheels-dev/wheels` once if prompted.
+
 The formula (`wheels-dev/wheels`) pins a specific LuCLI release and a matching Wheels Module tarball. At install time, Homebrew downloads both and stages the module under `$(brew --prefix)/opt/wheels/share/wheels/module/`. It does not copy the module into your home directory yet — that happens on first run.
 
 The first time you invoke `wheels`, the wrapper:
