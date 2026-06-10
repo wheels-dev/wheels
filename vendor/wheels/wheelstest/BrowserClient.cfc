@@ -245,22 +245,55 @@ component {
     // ─── Waiting ─────────────────────────────────────────────────────
 
     /**
+     * Builds a Playwright wait-options object of the given class honoring a
+     * custom timeout. Returns "" when the default timeout (30s, Playwright's
+     * own default) is requested so callers can use the no-options overload.
+     * Throws Wheels.BrowserTimeoutUnavailable when a custom timeout is
+     * requested but no launcher is wired (manual init() without launcher=) —
+     * option objects are built through the launcher's URLClassLoader, and
+     * silently falling back to 30s would discard the caller's timeout.
+     *
+     * Public (with $ prefix indicating "internal but accessible") so the
+     * no-launcher error path is directly testable.
+     */
+    public any function $waitOptions(
+        required string className,
+        required numeric seconds
+    ) {
+        if (arguments.seconds == 30) {
+            return "";
+        }
+        if (!isObject(variables.$launcher)) {
+            throw(
+                type="Wheels.BrowserTimeoutUnavailable",
+                message="Cannot honor the custom timeout of " & arguments.seconds
+                    & "s: this BrowserClient was initialized without a launcher. "
+                    & "Pass launcher= to init() (BrowserTest does this automatically) "
+                    & "or use the default 30s timeout."
+            );
+        }
+        return variables.$launcher.$buildOption(
+            className=arguments.className,
+            setterMap={setTimeout: arguments.seconds * 1000}
+        );
+    }
+
+    /**
      * Waits for a selector to become visible. Default timeout is 30s
-     * (Playwright's default). When a non-default timeout is specified and
-     * a launcher is available, builds Locator$WaitForOptions via
-     * $buildOption to honor the custom timeout. Uses .first() so selectors
-     * that match multiple elements resolve to the first one.
+     * (Playwright's default); custom timeouts are honored via $waitOptions.
+     * Uses .first() so selectors that match multiple elements resolve to
+     * the first one.
      */
     public BrowserClient function waitFor(
         required string selector,
         numeric seconds = 30
     ) {
+        var opts = $waitOptions(
+            className="com.microsoft.playwright.Locator$WaitForOptions",
+            seconds=arguments.seconds
+        );
         var loc = $locator(arguments.selector).first();
-        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
-            var opts = variables.$launcher.$buildOption(
-                className="com.microsoft.playwright.Locator$WaitForOptions",
-                setterMap={setTimeout: arguments.seconds * 1000}
-            );
+        if (isObject(opts)) {
             loc.waitFor(opts);
         } else {
             loc.waitFor();
@@ -270,19 +303,18 @@ component {
 
     /**
      * Waits for visible text to appear anywhere on the page. Default timeout
-     * is 30s. When a non-default timeout is specified and a launcher is
-     * available, builds Locator$WaitForOptions via $buildOption.
+     * is 30s; custom timeouts are honored via $waitOptions.
      */
     public BrowserClient function waitForText(
         required string text,
         numeric seconds = 30
     ) {
+        var opts = $waitOptions(
+            className="com.microsoft.playwright.Locator$WaitForOptions",
+            seconds=arguments.seconds
+        );
         var loc = variables.page.getByText(arguments.text).first();
-        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
-            var opts = variables.$launcher.$buildOption(
-                className="com.microsoft.playwright.Locator$WaitForOptions",
-                setterMap={setTimeout: arguments.seconds * 1000}
-            );
+        if (isObject(opts)) {
             loc.waitFor(opts);
         } else {
             loc.waitFor();
@@ -292,17 +324,18 @@ component {
 
     /**
      * Waits for the page URL to match the given pattern. Supports exact
-     * strings and glob patterns (Playwright native).
+     * strings and glob patterns (Playwright native). Default timeout is 30s;
+     * custom timeouts are honored via $waitOptions.
      */
     public BrowserClient function waitForUrl(
         required string url,
         numeric seconds = 30
     ) {
-        if (arguments.seconds != 30 && isObject(variables.$launcher)) {
-            var opts = variables.$launcher.$buildOption(
-                className="com.microsoft.playwright.Page$WaitForURLOptions",
-                setterMap={setTimeout: arguments.seconds * 1000}
-            );
+        var opts = $waitOptions(
+            className="com.microsoft.playwright.Page$WaitForURLOptions",
+            seconds=arguments.seconds
+        );
+        if (isObject(opts)) {
             variables.page.waitForURL(arguments.url, opts);
         } else {
             variables.page.waitForURL(arguments.url);
@@ -942,9 +975,11 @@ component {
     }
 
     /**
-     * Registers a one-shot Consumer<Dialog> listener on the page. Called
-     * by dialog-aware interaction methods (click, press, keys) when
-     * $pendingDialogAction is set.
+     * Registers a Consumer<Dialog> listener on the page. Called by
+     * dialog-aware interaction methods (click, press, keys) when
+     * $pendingDialogAction is set. The listener is NOT one-shot —
+     * Playwright keeps it attached until offDialog() — so
+     * $clearDialogListener() must detach it after the interaction.
      */
     public void function $registerDialogListener() {
         if (!isStruct(variables.$pendingDialogAction)) return;
@@ -962,13 +997,26 @@ component {
     }
 
     /**
-     * Cleans up after a dialog interaction. Copies the dialog message to
-     * $lastDialogMessage and resets pending state. Called by dialog-aware
-     * interaction methods after the Playwright action completes.
+     * Cleans up after a dialog interaction. Detaches the listener from the
+     * Playwright Page, copies the dialog message to $lastDialogMessage, and
+     * resets pending state. Called by dialog-aware interaction methods after
+     * the Playwright action completes. Without the offDialog() call each
+     * dialog-armed interaction would stack another live listener, and a
+     * later dialog in the same `it` block would be handled by the stale
+     * first listener with the old action.
      */
     public void function $clearDialogListener() {
         if (isStruct(variables.$dialogState)) {
             variables.$lastDialogMessage = variables.$dialogState.lastMessage ?: "";
+        }
+        if (isObject(variables.$dialogProxy)) {
+            try {
+                variables.page.offDialog(variables.$dialogProxy);
+            } catch (any e) {
+                // Best-effort: the page may already be closed (crash, context
+                // teardown). The CFML refs are cleared below regardless, and
+                // a closed page takes its listeners with it.
+            }
         }
         variables.$pendingDialogAction = "";
         variables.$dialogProxy = "";

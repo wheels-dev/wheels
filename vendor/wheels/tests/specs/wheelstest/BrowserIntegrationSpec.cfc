@@ -52,6 +52,24 @@ component extends="wheels.WheelsTest" {
                 var result = c.init(baseUrl="http://x");
                 expect(result).toBe(c);
             });
+
+            it("waitFor() with a custom timeout but no launcher surfaces BrowserTimeoutUnavailable", () => {
+                // A client init'd without launcher= (the manual-use path) used
+                // to silently discard the custom timeout and fall back to 30s.
+                var c = new wheels.wheelstest.BrowserClient()
+                    .init(baseUrl="http://localhost");
+                expect(() => {
+                    c.waitFor(selector="##never", seconds=5);
+                }).toThrow(type="Wheels.BrowserTimeoutUnavailable");
+            });
+
+            it("waitForUrl() with a custom timeout but no launcher surfaces BrowserTimeoutUnavailable", () => {
+                var c = new wheels.wheelstest.BrowserClient()
+                    .init(baseUrl="http://localhost");
+                expect(() => {
+                    c.waitForUrl(url="**/never", seconds=5);
+                }).toThrow(type="Wheels.BrowserTimeoutUnavailable");
+            });
         });
 
         describe("BrowserClient — launcher wiring", () => {
