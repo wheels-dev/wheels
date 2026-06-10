@@ -61,6 +61,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & "public/miscellaneous/Application.cfc")).toBeTrue();
 			});
 
+			it("hardens tests/populate.cfm so a failed migration fails the test run loudly", () => {
+				// Migrator.cfc::migrateTo() swallows per-migration exceptions
+				// into its returned string ("Error migrating to <version>...")
+				// instead of rethrowing. A template that discards the return
+				// value leaves a silently half-migrated test database — and
+				// app-runner.cfm skips populate.cfm on every subsequent run
+				// because the migrator-versions table exists after the partial
+				// run, so all later `wheels test` runs hit the broken schema
+				// with zero signal. The template must capture the result, drop
+				// the versions table on failure (so the next run re-enters
+				// populate and stays loud), and Throw so app-runner's populate
+				// catch returns a structured 500.
+				var content = fileRead(templateRoot & "tests/populate.cfm");
+				expect(content).toInclude("migrateToLatest()");
+				expect(content).toInclude("Error migrating");
+				expect(content).toInclude("application.wheels.migratorTableName");
+				expect(content).toInclude("PopulateCfm.MigrationFailed");
+			});
+
 			it("ships .gitkeep files in tests/specs subfolders so empty dirs survive git", () => {
 				// Templates check — confirms the .gitkeep files exist on disk
 				// in the template tree. Their copying into the scaffolded app
