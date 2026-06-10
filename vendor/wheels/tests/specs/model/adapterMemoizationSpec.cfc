@@ -10,7 +10,7 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
-		g = application.wo
+		g = application.wo;
 
 		describe("$assignAdapter per-datasource memoization (DA15)", () => {
 
