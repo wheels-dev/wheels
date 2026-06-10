@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+# [Unreleased]
+
+### Performance
+
+- `model()` and `controller()` (global helpers in `vendor/wheels/Global.cfc`) now take a lock-free warm fast path on cache hits — a direct `StructKeyExists` lookup against `application.wheels.models` / `application.wheels.controllers` returns the cached class before `$doubleCheckedLock` (and its `$invoke` reflective `cfinvoke` dispatch) is consulted. Issue #2897 noted these as the framework's hottest warm-path calls, taking two reflective dispatches per association / per validation / per row just to evaluate a one-line cache predicate. The slow path is unchanged; cold-path bootstrap, `?reload=true` cache invalidation, and `controller(name, params)` calling `$createControllerObject(params)` on the cached class are all preserved. Two new internal helpers — `$cachedModelLookup(name)` and `$cachedControllerLookup(name)` — embody the guarded lookup, defending against early-bootstrap windows where `application.wheels.models` may not yet exist. Stages 2–4 from #2897 (mixin-integration memoization, shared `PluginObj`, `$resolveInitArguments` memoization) are deferred to follow-ups.
+
+----
+
 # [4.0.3](https://github.com/wheels-dev/wheels/releases/tag/v4.0.3) => 2026-06-09
 
 > **Wheels 4.0.3** — third patch on the 4.0 line. Completes the CLI argument-parsing overhaul (`ArgSpec` consumes LuCLI's structured arguments in every command — `--no-*` negations and named-only flags now reach their parsers, and user-error paths exit non-zero) and lands the fixes from a full 24-command CLI audit; write-side commands (`migrate`, `seed`, `reload`, `generate admin`) now refuse to attach to a sibling project's server instead of running against the wrong database; PostgreSQL/CockroachDB foreign-key migrations and pre-23c Oracle `DROP TABLE`/`DROP VIEW` work again; framework helpers can no longer be invoked as controller actions from a URL; auto-derived model properties preserve database column casing; and scaffolded apps keep their reload password out of source control (`WHEELS_RELOAD_PASSWORD` in `.env`). ~45 PRs since the 4.0.2 GA (2026-05-27).
