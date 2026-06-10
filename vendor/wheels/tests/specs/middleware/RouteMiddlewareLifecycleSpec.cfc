@@ -27,8 +27,15 @@ component extends="wheels.WheelsTest" {
 		describe("Route-scoped middleware caching", () => {
 
 			beforeEach(() => {
-				_savedMiddleware = StructKeyExists(application.wheels, "middleware")
-					? Duplicate(application.wheels.middleware) : [];
+				// Shallow-copy the middleware array so the restore preserves the
+				// original CFC instance references. `Duplicate()` deep-clones CFCs
+				// inside arrays on Adobe CF (CLAUDE.md cross-engine invariant #6),
+				// which would replace `application.wheels.middleware` with clones on
+				// restore and silently desynchronize the global Dispatch pipeline.
+				// Length-guarded slice because `ArraySlice(arr, 1)` on an empty
+				// array errors on Adobe CF.
+				_savedMiddleware = (StructKeyExists(application.wheels, "middleware") && ArrayLen(application.wheels.middleware))
+					? ArraySlice(application.wheels.middleware, 1) : [];
 				_savedCache = StructKeyExists(application.wheels, "$middlewareInstanceCache")
 					? application.wheels.$middlewareInstanceCache : "";
 				_savedRoutes = Duplicate(application.wheels.routes);
@@ -121,8 +128,12 @@ component extends="wheels.WheelsTest" {
 		describe("Preflight-capability caching", () => {
 
 			beforeEach(() => {
-				_savedMiddleware = StructKeyExists(application.wheels, "middleware")
-					? Duplicate(application.wheels.middleware) : [];
+				// Shallow-copy: see the corresponding note in the caching describe
+				// block above. Adobe CF's `Duplicate()` would clone CFC instances
+				// inside the array, so the restore would replace the live pipeline's
+				// registered middleware with deep clones.
+				_savedMiddleware = (StructKeyExists(application.wheels, "middleware") && ArrayLen(application.wheels.middleware))
+					? ArraySlice(application.wheels.middleware, 1) : [];
 			});
 
 			afterEach(() => {

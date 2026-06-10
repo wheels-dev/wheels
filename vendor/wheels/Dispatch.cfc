@@ -76,20 +76,37 @@ component output="false" extends="wheels.Global"{
 	 * middleware survives across requests (#2954). The cache lives under
 	 * `application[$appKey()].$middlewareInstanceCache` and is cleared whenever
 	 * `applicationStop()` runs (the password-gated reload path).
+	 *
+	 * Concurrency: cache population uses double-checked locking via a named
+	 * `cflock` (matching the pattern in `wheels.middleware.RateLimiter`) so two
+	 * threads racing on the first request for the same component path cannot
+	 * each instantiate their own copy and silently drop the loser's state
+	 * mutations. The fast path is a lock-free struct read once the slot is
+	 * populated; the slow path takes an exclusive lock and re-checks before
+	 * creating the instance.
 	 */
 	public any function $resolveMiddlewareInstance(required any middleware) {
 		if (!IsSimpleValue(arguments.middleware)) {
 			return arguments.middleware;
 		}
 		local.appKey = $appKey();
-		if (!StructKeyExists(application[local.appKey], "$middlewareInstanceCache")) {
-			application[local.appKey].$middlewareInstanceCache = {};
+		// Fast path: once the slot is populated, the struct read is safe without a lock.
+		if (
+			StructKeyExists(application[local.appKey], "$middlewareInstanceCache")
+			&& StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)
+		) {
+			return application[local.appKey].$middlewareInstanceCache[arguments.middleware];
 		}
-		local.cache = application[local.appKey].$middlewareInstanceCache;
-		if (!StructKeyExists(local.cache, arguments.middleware)) {
-			local.cache[arguments.middleware] = CreateObject("component", arguments.middleware).init();
+		// Slow path: exclusive lock guards the check-then-create against concurrent first-touch races.
+		cflock(name = "wheels.middlewareCache.#local.appKey#", type = "exclusive", timeout = 10) {
+			if (!StructKeyExists(application[local.appKey], "$middlewareInstanceCache")) {
+				application[local.appKey].$middlewareInstanceCache = {};
+			}
+			if (!StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)) {
+				application[local.appKey].$middlewareInstanceCache[arguments.middleware] = CreateObject("component", arguments.middleware).init();
+			}
 		}
-		return local.cache[arguments.middleware];
+		return application[local.appKey].$middlewareInstanceCache[arguments.middleware];
 	}
 
 	/**
