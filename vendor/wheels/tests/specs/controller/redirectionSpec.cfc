@@ -285,6 +285,38 @@ component extends="wheels.WheelsTest" {
 				expect(r.url).toBe("//" & request.cgi.server_name & "/page")
 			})
 
+			it("throws on redirectTo url with slash-backslash external domain", () => {
+				// Browsers normalize "/\" to "//" and navigate off-site.
+				expect(function(){
+					_controller.redirectTo(url = "/\evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with backslash-slash external domain", () => {
+				expect(function(){
+					_controller.redirectTo(url = "\/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with double-backslash external domain", () => {
+				expect(function(){
+					_controller.redirectTo(url = "\\evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with single-slash scheme external domain", () => {
+				// Browsers normalize "https:/evil.com" to "https://evil.com".
+				expect(function(){
+					_controller.redirectTo(url = "https:/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with javascript scheme", () => {
+				expect(function(){
+					_controller.redirectTo(url = "javascript:alert(1)")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
 			it("allows external redirect when allowExternalRedirects is true", () => {
 				application.wheels.allowExternalRedirects = true;
 				try {
