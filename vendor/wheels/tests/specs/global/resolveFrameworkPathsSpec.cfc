@@ -77,6 +77,7 @@ component extends="wheels.WheelsTest" {
 
 				expect(rv.webPath).toBe("/")
 				expect(rv.rootPath).toBe("/")
+				expect(rv.rootcomponentPath).toBe("")
 				expect(rv.wheelsComponentPath).toBe("wheels")
 			})
 
