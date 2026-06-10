@@ -18,7 +18,9 @@ component extends="Controller" {
 	 * Process login
 	 */
 	function create() {
-		var user = model("User").findOne(where="username='#params.username#'");
+		// Use the injection-safe query builder — never interpolate user input
+		// into a where string (a quote in the username would rewrite the SQL).
+		var user = model("User").where("username", params.username).first();
 		if (IsObject(user) && user.authenticate(params.password)) {
 			session.currentUserId = user.key();
 			flashInsert(success="Logged in successfully.");

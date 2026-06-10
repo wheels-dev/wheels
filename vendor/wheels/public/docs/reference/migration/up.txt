@@ -1,5 +1,6 @@
 // 1. Create a new table (typical migration forward)
 function up() {
+	var state = {};
 	transaction {
 		try {
 			t = createTable(name="posts");
@@ -9,15 +10,15 @@ function up() {
 			t.timestamps();
 			t.create();
 		} catch (any e) {
-			local.exception = e;
+			state.exception = e;
 		}
 
-		if (structKeyExists(local, "exception")) {
+		if (structKeyExists(state, "exception")) {
 			transaction action="rollback";
 			throw(
 				errorCode = "1",
-				detail    = local.exception.detail,
-				message   = local.exception.message,
+				detail    = state.exception.detail,
+				message   = state.exception.message,
 				type      = "any"
 			);
 		} else {
@@ -28,19 +29,20 @@ function up() {
 
 // 2. Add a column to an existing table
 function up() {
+	var state = {};
 	transaction {
 		try {
 			addColumn(table="users", columnType="string", columnName="avatarUrl", limit=500, allowNull=true);
 		} catch (any e) {
-			local.exception = e;
+			state.exception = e;
 		}
 
-		if (structKeyExists(local, "exception")) {
+		if (structKeyExists(state, "exception")) {
 			transaction action="rollback";
 			throw(
 				errorCode = "1",
-				detail    = local.exception.detail,
-				message   = local.exception.message,
+				detail    = state.exception.detail,
+				message   = state.exception.message,
 				type      = "any"
 			);
 		} else {
@@ -51,20 +53,21 @@ function up() {
 
 // 3. Run raw SQL and seed initial data in the same migration
 function up() {
+	var state = {};
 	transaction {
 		try {
 			execute("ALTER TABLE products ADD COLUMN sku VARCHAR(50)");
 			addRecord(table="settings", key="maintenance_mode", value="false");
 		} catch (any e) {
-			local.exception = e;
+			state.exception = e;
 		}
 
-		if (structKeyExists(local, "exception")) {
+		if (structKeyExists(state, "exception")) {
 			transaction action="rollback";
 			throw(
 				errorCode = "1",
-				detail    = local.exception.detail,
-				message   = local.exception.message,
+				detail    = state.exception.detail,
+				message   = state.exception.message,
 				type      = "any"
 			);
 		} else {

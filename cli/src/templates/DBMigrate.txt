@@ -1,16 +1,17 @@
 component extends="wheels.migrator.Migration" hint="|DBMigrateHINT|" {
 
 	function up() {
+		var state = {};
 		transaction {
 			try {
 				|DBMigrateUP|
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
 
-			if (StructKeyExists(local, "exception")) {
+			if (StructKeyExists(state, "exception")) {
 				transaction action="rollback";
-				throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
+				throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");
 			} else {
 				transaction action="commit";
 			}
@@ -18,16 +19,17 @@ component extends="wheels.migrator.Migration" hint="|DBMigrateHINT|" {
 	}
 
 	function down() {
+		var state = {};
 		transaction {
 		  try {
 				|DBMigrateDOWN|
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
 
-			if (StructKeyExists(local, "exception")) {
+			if (StructKeyExists(state, "exception")) {
 				transaction action="rollback";
-				throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
+				throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");
 			} else {
 				transaction action="commit";
 			}

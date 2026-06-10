@@ -1,20 +1,22 @@
 component extends="wheels.migrator.Migration" hint="Migration: {{className}}" {
 
 	function up() {
+		var state = {};
 		transaction {
 			try {
 				dropTable(tableName="{{tableName}}");
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
-			if (StructKeyExists(local, "exception")) {
+			if (StructKeyExists(state, "exception")) {
 				transaction action="rollback";
-				throw(object=local.exception);
+				throw(object=state.exception);
 			}
 		}
 	}
 
 	function down() {
+		var state = {};
 		transaction {
 			try {
 				// Re-create the table manually if needed
@@ -22,11 +24,11 @@ component extends="wheels.migrator.Migration" hint="Migration: {{className}}" {
 				// t.timestamps();
 				// t.create();
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
-			if (StructKeyExists(local, "exception")) {
+			if (StructKeyExists(state, "exception")) {
 				transaction action="rollback";
-				throw(object=local.exception);
+				throw(object=state.exception);
 			}
 		}
 	}
