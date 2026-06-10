@@ -235,7 +235,7 @@ component {
 
 		for (local.row in local.jobs) {
 			local.jobResult = $processJob(local.row);
-			if (StructKeyExists(local.jobResult, "skipped") && local.jobResult.skipped) {
+			if (local.jobResult.skipped) {
 				// Another worker claimed the job between our SELECT and the claim UPDATE
 				local.result.skipped++;
 				continue;

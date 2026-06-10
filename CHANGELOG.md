@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+# [Unreleased]
+
+### Fixed
+
+- `Job.processQueue()`'s private `$processJob` now guards the claim `UPDATE` with `AND status = 'pending'` and verifies the affected-row count via the `queryExecute` `result` option on the same statement, mirroring the matrix-proven `JobWorker.cfc::$claimJob` idiom (a separate verification `SELECT` breaks on BoxLang + PostgreSQL when the connection pool hands out a different connection that cannot see the uncommitted UPDATE). Pre-fix, two concurrent claimers — overlapping `processQueue()` callers, or `processQueue` racing the CLI worker — could both claim the same job and both run `perform()` (duplicate emails/charges, with `attempts` double-incremented). A lost claim now early-returns `{success = false, skipped = true}` before job instantiation, tenant-context setup, and `perform()`; `processQueue()` counts lost claims under a new additive `skipped` result key (#2899)
+
+----
+
 # [4.0.3](https://github.com/wheels-dev/wheels/releases/tag/v4.0.3) => 2026-06-09
 
 > **Wheels 4.0.3** — third patch on the 4.0 line. Completes the CLI argument-parsing overhaul (`ArgSpec` consumes LuCLI's structured arguments in every command — `--no-*` negations and named-only flags now reach their parsers, and user-error paths exit non-zero) and lands the fixes from a full 24-command CLI audit; write-side commands (`migrate`, `seed`, `reload`, `generate admin`) now refuse to attach to a sibling project's server instead of running against the wrong database; PostgreSQL/CockroachDB foreign-key migrations and pre-23c Oracle `DROP TABLE`/`DROP VIEW` work again; framework helpers can no longer be invoked as controller actions from a URL; auto-derived model properties preserve database column casing; and scaffolded apps keep their reload password out of source control (`WHEELS_RELOAD_PASSWORD` in `.env`). ~45 PRs since the 4.0.2 GA (2026-05-27).

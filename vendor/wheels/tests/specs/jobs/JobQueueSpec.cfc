@@ -176,6 +176,11 @@ component extends="wheels.WheelsTest" {
 				catch (any e) { /* table may not exist */ }
 			});
 
+			afterEach(function() {
+				try { queryExecute("DELETE FROM wheels_jobs WHERE queue = 'test_claim_guard'", {}, {datasource = application.wheels.dataSourceName}); }
+				catch (any e) { /* table may not exist */ }
+			});
+
 			it("does not execute a job already claimed by another worker", function() {
 				// Enqueue using a concrete subclass so jobClass resolves correctly
 				local.testJob = new app.jobs.ProcessOrdersJob();
@@ -218,13 +223,6 @@ component extends="wheels.WheelsTest" {
 				);
 				expect(local.row.status).toBe("processing");
 				expect(local.row.attempts).toBe(0);
-
-				// Clean up
-				queryExecute(
-					"DELETE FROM wheels_jobs WHERE queue = 'test_claim_guard'",
-					{},
-					{datasource = application.wheels.dataSourceName}
-				);
 			});
 		});
 
