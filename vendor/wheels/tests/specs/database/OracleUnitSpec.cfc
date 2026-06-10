@@ -33,6 +33,22 @@ component extends="wheels.WheelsTest" {
 					expect(rv.lastId).toBe("42");
 				});
 
+				it("uses a numeric result.rowid directly (ACF surface)", () => {
+					var result = {
+						sql = "INSERT INTO users (firstname) VALUES ('test')",
+						rowid = "42"
+					};
+					var rv = adapter.$identitySelect(
+						queryAttributes = {},
+						result = result,
+						primaryKey = "id",
+						returningIdentity = ""
+					);
+					expect(rv).toBeStruct();
+					expect(rv).toHaveKey("lastId");
+					expect(rv.lastId).toBe("42");
+				});
+
 				it("uses the first value when result.generatedKey is a numeric list", () => {
 					var result = {
 						sql = "INSERT INTO users (firstname) VALUES ('test')",
