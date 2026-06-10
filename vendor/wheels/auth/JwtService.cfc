@@ -50,8 +50,9 @@ component output="false" {
 		variables.issuer = arguments.issuer;
 		variables.allowedClockSkew = arguments.allowedClockSkew;
 
-		// Cache the Java class handle used on the per-request decode path
+		// Cache the Java class handles used on the per-request encode/decode paths
 		variables.messageDigest = CreateObject("java", "java.security.MessageDigest");
+		variables.javaSystem = CreateObject("java", "java.lang.System");
 
 		return this;
 	}
@@ -307,9 +308,14 @@ component output="false" {
 
 	/**
 	 * Get current time as Unix epoch seconds (UTC).
+	 *
+	 * Uses the cached java.lang.System handle: currentTimeMillis() is guaranteed wall-clock
+	 * epoch time on every engine, unlike GetTickCount(), whose contract only promises a
+	 * relative millisecond clock (JVM uptime on some engines) — unusable for RFC 7519
+	 * iat/exp/nbf claims.
 	 */
 	private numeric function $epochSeconds() {
-		return Int(GetTickCount() / 1000);
+		return Int(variables.javaSystem.currentTimeMillis() / 1000);
 	}
 
 }

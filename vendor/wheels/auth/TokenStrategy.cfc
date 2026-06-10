@@ -38,7 +38,7 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 	 * Creates a new TokenStrategy instance.
 	 *
 	 * @validator Callback function that receives a token string and returns a principal struct on success or false on failure.
-	 * @tokens Static struct mapping token strings to principal structs. Used when no validator is provided. Matched case-sensitively.
+	 * @tokens Static struct mapping token strings to principal structs. Used when no validator is provided. Matched case-sensitively. Always quote the keys (e.g. {"AbC-123": {id: 1}}): Adobe CF uppercases unquoted struct-literal keys, so an unquoted mixed-case key would never match its token.
 	 * @queryParam Name of the query parameter to check for a token. Empty string (the default) disables query-string tokens; set a name (e.g. "api_key") to opt in.
 	 * @headerName Name of the HTTP header to check (default "authorization"). Set to empty string to disable.
 	 * @scheme Expected scheme prefix in the header value (default "Bearer"). Case-insensitive.
