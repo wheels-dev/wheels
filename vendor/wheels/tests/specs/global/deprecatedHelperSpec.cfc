@@ -7,19 +7,24 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
+		// Shared carrier struct: sibling closures (beforeEach/afterEach) must not
+		// share state through bare unscoped names (CLAUDE.md anti-pattern 10) —
+		// they read the outer struct reference and mutate its fields instead.
+		var state = {hadOriginalWarnings = false, originalWarnings = []}
+
 		describe("$deprecated shared helper", () => {
 
 			beforeEach(() => {
-				hadOriginalWarnings = StructKeyExists(application.wheels, "deprecationWarnings")
-				if (hadOriginalWarnings) {
-					originalWarnings = application.wheels.deprecationWarnings
+				state.hadOriginalWarnings = StructKeyExists(application.wheels, "deprecationWarnings")
+				if (state.hadOriginalWarnings) {
+					state.originalWarnings = application.wheels.deprecationWarnings
 				}
 				application.wheels.deprecationWarnings = []
 			})
 
 			afterEach(() => {
-				if (hadOriginalWarnings) {
-					application.wheels.deprecationWarnings = originalWarnings
+				if (state.hadOriginalWarnings) {
+					application.wheels.deprecationWarnings = state.originalWarnings
 				} else {
 					StructDelete(application.wheels, "deprecationWarnings")
 				}

@@ -169,6 +169,9 @@ component output="false" extends="wheels.Global"{
 					&& !$hasPluginManifest(local.pluginKey)
 				) {
 					local.warning = 'Plugin "#local.pluginKey#" uses legacy mixin injection without a plugin.json manifest or ServiceProvider.cfc. Legacy plugins are deprecated as of Wheels 4.0 and will be removed in Wheels 5.0 — migrate it to a package installed under vendor/.';
+					// Intentional dual registration: this per-instance array feeds the public
+					// getDeprecationWarnings() accessor (existing tooling/test surface), while
+					// $deprecated() below owns app-wide warn-once logging and the debug panel.
 					ArrayAppend(variables.$class.deprecationWarnings, {
 						plugin = local.pluginKey,
 						message = local.warning

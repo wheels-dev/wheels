@@ -2956,7 +2956,13 @@ return local.$wheels;
 	 * wheels log and registers the warning in
 	 * application[appKey].deprecationWarnings so running apps can surface it
 	 * (debug panel, tooling). Subsequent calls for the same feature are no-ops,
-	 * making the helper safe to call from per-request code paths.
+	 * making the helper safe to call from per-request code paths. The dedup
+	 * check, registration, and log write run atomically under an exclusive
+	 * lock so concurrent first callers (e.g. parallel first requests hitting a
+	 * deprecated per-request helper) register and log exactly once. If the
+	 * Wheels application struct does not exist yet, the helper is a silent
+	 * no-op: with no registry to dedup against, logging would fire on every
+	 * call, and all framework callers run after the struct is established.
 	 *
 	 * @feature Stable identifier for the deprecated feature (e.g. "plugins-directory", "paginationLinks").
 	 * @message Human-readable message: what is deprecated, what replaces it, and when it goes away.
@@ -2966,30 +2972,40 @@ return local.$wheels;
 		try {
 			local.appKey = $appKey();
 			if (StructKeyExists(application, local.appKey)) {
-				if (!StructKeyExists(application[local.appKey], "deprecationWarnings")) {
-					application[local.appKey].deprecationWarnings = [];
-				}
-				for (local.existing in application[local.appKey].deprecationWarnings) {
-					if (local.existing.feature == arguments.feature) {
-						return;
+				// One app-wide lock (rather than per-feature) also serializes the lazy
+				// creation of the registry array itself; contention is a non-issue at
+				// once-per-feature-per-application frequency.
+				lock name="wheels_deprecated_registry" type="exclusive" timeout="5" {
+					if (!StructKeyExists(application[local.appKey], "deprecationWarnings")) {
+						application[local.appKey].deprecationWarnings = [];
+					}
+					for (local.existing in application[local.appKey].deprecationWarnings) {
+						if (local.existing.feature == arguments.feature) {
+							return;
+						}
+					}
+					ArrayAppend(application[local.appKey].deprecationWarnings, {
+						feature = arguments.feature,
+						message = arguments.message,
+						url = arguments.docUrl
+					});
+					// Log if-and-only-if the registration above just succeeded; the
+					// registry is what enforces the warn-once policy for the log too.
+					try {
+						local.text = "[Wheels] Deprecation: " & arguments.message;
+						if (Len(arguments.docUrl)) {
+							local.text &= " See: " & arguments.docUrl;
+						}
+						WriteLog(type = "warning", text = local.text, file = "wheels");
+					} catch (any e) {
+						// Logging is best-effort; the registry entry above already records the warning.
 					}
 				}
-				ArrayAppend(application[local.appKey].deprecationWarnings, {
-					feature = arguments.feature,
-					message = arguments.message,
-					url = arguments.docUrl
-				});
 			}
 		} catch (any e) {
-			// Registration is best-effort; never let a deprecation notice break the caller.
+			// Best-effort by design (including lock timeouts); never let a
+			// deprecation notice break the caller.
 		}
-		local.text = "[Wheels] Deprecation: " & arguments.message;
-		if (Len(arguments.docUrl)) {
-			local.text &= " See: " & arguments.docUrl;
-		}
-		try {
-			WriteLog(type = "warning", text = local.text, file = "wheels");
-		} catch (any e) {}
 	}
 
 	// Returns the running framework version. Delegates to BuildInfo.cfc, which

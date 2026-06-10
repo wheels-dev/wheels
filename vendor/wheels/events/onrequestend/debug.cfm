@@ -409,7 +409,14 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 				</div>
 			</cfif>
 		</cfif>
-		<!--- Deprecation warnings collected via the shared $deprecated() helper --->
+		<!---
+			Deprecation warnings collected via the shared $deprecated() helper.
+			application.wheels (not $appKey()) is correct here: application.$wheels only
+			exists during onapplicationstart, and its final line reassigns the same struct
+			reference to application.wheels — so init-time registrations are already
+			visible under application.wheels by the time any onrequestend runs.
+		--->
+
 		<cfif StructKeyExists(application.wheels, "deprecationWarnings") AND ArrayLen(application.wheels.deprecationWarnings)>
 			<div class="wdb-section">
 				<div class="wdb-section-title" style="color:##f9e2af;">Deprecations</div>

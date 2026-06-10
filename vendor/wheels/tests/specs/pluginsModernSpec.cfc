@@ -178,27 +178,31 @@ component extends="wheels.WheelsTest" {
 				var marker = {value = "original"}
 				application.$wheelstestSharedRef = marker
 
-				var config = {
-					path = "wheels",
-					fileName = "Plugins",
-					method = "$init",
-					pluginPath = "/wheels/tests/_assets/plugins/lifecycle",
-					deletePluginDirectories = false,
-					overwritePlugins = false,
-					loadIncompatiblePlugins = true
+				// try/finally so a failing assertion can't leak $wheelstestSharedRef
+				// (or the mutated pluginComponentPath) into subsequent tests.
+				try {
+					var config = {
+						path = "wheels",
+						fileName = "Plugins",
+						method = "$init",
+						pluginPath = "/wheels/tests/_assets/plugins/lifecycle",
+						deletePluginDirectories = false,
+						overwritePlugins = false,
+						loadIncompatiblePlugins = true
+					}
+					application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/lifecycle"
+
+					PluginObj = $pluginObj(config)
+
+					// Mutating through the pre-load reference must be visible through
+					// the application scope — they are the same struct.
+					marker.value = "mutated"
+					expect(application.$wheelstestSharedRef.value).toBe("mutated")
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath
+					StructDelete(application, "$wheelstestSharedRef")
+					StructDelete(application, "$wheelstestLifecycleLog")
 				}
-				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/lifecycle"
-
-				PluginObj = $pluginObj(config)
-
-				// Mutating through the pre-load reference must be visible through
-				// the application scope — they are the same struct.
-				marker.value = "mutated"
-				expect(application.$wheelstestSharedRef.value).toBe("mutated")
-
-				application.wheels.pluginComponentPath = originalPluginComponentPath
-				StructDelete(application, "$wheelstestSharedRef")
-				StructDelete(application, "$wheelstestLifecycleLog")
 			})
 
 			it("does not inject lifecycle hooks as mixins", function() {
