@@ -80,8 +80,15 @@ if (request.wheels.params.format == "json") {
 // Anti-CSRF token for the migrator command endpoint. Generated once per
 // application and echoed back by the page's XHRs in the X-Wheels-Csrf-Token
 // header, which ../migrator/command.cfm requires before running any command.
+// Double-checked lock: two concurrent first-time page loads must not each
+// write their own token, or whichever browser loaded first would 403 on every
+// command XHR until reload.
 if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
-	application.wheels.$migratorCsrfToken = LCase(Hash(GenerateSecretKey("AES") & CreateUUID(), "SHA-512"));
+	cflock(scope="application", type="exclusive", timeout=5) {
+		if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
+			application.wheels.$migratorCsrfToken = LCase(Hash(GenerateSecretKey("AES") & CreateUUID(), "SHA-512"));
+		}
+	}
 }
 migratorCsrfToken = application.wheels.$migratorCsrfToken;
 </cfscript>
