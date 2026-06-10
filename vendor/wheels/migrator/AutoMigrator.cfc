@@ -179,6 +179,16 @@ component extends="wheels.migrator.Base" {
 			? arguments.options.heuristicThreshold
 			: 0.7;
 
+		// Validate the threshold up front: when it's out of range every per-model
+		// diff() throws, and the catch below would swallow all of them — silently
+		// reporting "no drift" instead of surfacing the configuration error.
+		if (local.threshold < 0 || local.threshold > 1) {
+			Throw(
+				type = "Wheels.InvalidThreshold",
+				message = "heuristicThreshold must be between 0 and 1, got " & local.threshold
+			);
+		}
+
 		if (StructKeyExists(application[local.appKey], "models")) {
 			for (local.modelName in application[local.appKey].models) {
 				try {
@@ -208,7 +218,18 @@ component extends="wheels.migrator.Base" {
 						local.results[local.modelName] = local.diffResult;
 					}
 				} catch (any e) {
-					// Skip models that fail to load (e.g. missing tables)
+					// Skip models that fail to load (e.g. missing tables) — but
+					// deliberate validation throws (bad rename hints, type-mismatch
+					// hints, out-of-range thresholds) must surface to the caller
+					// instead of silently dropping the model from the results.
+					if (
+						ListFindNoCase(
+							"Wheels.InvalidThreshold,Wheels.InvalidRenameHint,Wheels.DuplicateRenameHint,Wheels.RenameHintTypeMismatch",
+							e.type
+						)
+					) {
+						rethrow;
+					}
 					continue;
 				}
 			}

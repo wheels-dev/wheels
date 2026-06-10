@@ -115,6 +115,26 @@ component extends="wheels.WheelsTest" {
 				expect(aliasAccepted).toBeTrue();
 			});
 
+			it("addIndex accepts the columnName alias without an explicit indexName", () => {
+				// Regression guard: the indexName parameter default used to
+				// dereference arguments.columnNames BEFORE $combineArguments had
+				// resolved the columnName alias, throwing an undefined-key error
+				// on the documented columnName path. Use dry-run capture so no
+				// DDL actually runs.
+				request.$wheelsDebugSQL = true;
+				request.$wheelsDebugSQLResult = [];
+				try {
+					variables.migration.addIndex(table = "dbm_cmd_addidx_test", columnName = "email");
+					expect(ArrayLen(request.$wheelsDebugSQLResult)).toBe(1);
+					var capturedSql = request.$wheelsDebugSQLResult[1];
+					// Default index name = table + underscore + first column name.
+					expect(FindNoCase("dbm_cmd_addidx_test_email", capturedSql)).toBeGT(0);
+				} finally {
+					StructDelete(request, "$wheelsDebugSQL");
+					StructDelete(request, "$wheelsDebugSQLResult");
+				}
+			});
+
 		});
 
 		describe("Migration.cfc — required-arg regression guards", () => {
