@@ -1,9 +1,11 @@
 /**
  * Token-based authentication strategy for API keys and bearer tokens.
  *
- * Extracts a token from the `Authorization: Bearer <token>` header or
- * a configurable query parameter (default `api_key`). Validates the
- * token using either a validator callback or a static lookup struct.
+ * Extracts a token from the `Authorization: Bearer <token>` header or,
+ * when explicitly enabled via `queryParam`, a query parameter (disabled
+ * by default — query strings leak into access logs, browser history, and
+ * Referer headers). Validates the token using either a validator callback
+ * or a static lookup struct.
  *
  * Validator callback signature:
  *   function(required string token) returns struct or false
@@ -36,15 +38,15 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 	 * Creates a new TokenStrategy instance.
 	 *
 	 * @validator Callback function that receives a token string and returns a principal struct on success or false on failure.
-	 * @tokens Static struct mapping token strings to principal structs. Used when no validator is provided.
-	 * @queryParam Name of the query parameter to check for a token (default "api_key"). Set to empty string to disable.
+	 * @tokens Static struct mapping token strings to principal structs. Used when no validator is provided. Matched case-sensitively.
+	 * @queryParam Name of the query parameter to check for a token. Empty string (the default) disables query-string tokens; set a name (e.g. "api_key") to opt in.
 	 * @headerName Name of the HTTP header to check (default "authorization"). Set to empty string to disable.
 	 * @scheme Expected scheme prefix in the header value (default "Bearer"). Case-insensitive.
 	 */
 	public TokenStrategy function init(
 		any validator = "",
 		struct tokens = {},
-		string queryParam = "api_key",
+		string queryParam = "",
 		string headerName = "authorization",
 		string scheme = "Bearer"
 	) {
@@ -54,6 +56,8 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 		variables.headerName = LCase(arguments.headerName);
 		variables.scheme = arguments.scheme;
 		variables.authResult = new wheels.auth.AuthResult();
+		// Cache the Java class handle used for constant-time token comparison
+		variables.messageDigest = CreateObject("java", "java.security.MessageDigest");
 		return this;
 	}
 
@@ -223,10 +227,17 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 			return {};
 		}
 
-		// Static token lookup
+		// Static token lookup — struct key lookups are case-insensitive, so iterate
+		// the keys and compare each one case-sensitively and in constant time
 		if (!StructIsEmpty(variables.tokens)) {
-			if (StructKeyExists(variables.tokens, arguments.token)) {
-				local.principal = variables.tokens[arguments.token];
+			local.matchedKey = "";
+			for (local.candidate in variables.tokens) {
+				if ($secureCompare(local.candidate, arguments.token)) {
+					local.matchedKey = local.candidate;
+				}
+			}
+			if (Len(local.matchedKey)) {
+				local.principal = variables.tokens[local.matchedKey];
 				if (IsStruct(local.principal)) {
 					return local.principal;
 				}
@@ -236,6 +247,20 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 
 		// No validator and no tokens configured — reject
 		return {};
+	}
+
+	/**
+	 * Compare two strings case-sensitively in constant time to prevent timing attacks.
+	 *
+	 * @candidate The configured token to compare against.
+	 * @actual The token supplied by the request.
+	 * @return True when both strings are byte-for-byte identical.
+	 */
+	private boolean function $secureCompare(required string candidate, required string actual) {
+		return variables.messageDigest.isEqual(
+			arguments.candidate.getBytes("UTF-8"),
+			arguments.actual.getBytes("UTF-8")
+		);
 	}
 
 }

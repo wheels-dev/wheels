@@ -5,7 +5,7 @@
  * Used standalone or by JwtStrategy for request authentication.
  *
  * Usage:
- *   var jwt = new wheels.auth.JwtService(secretKey="my-secret-key");
+ *   var jwt = new wheels.auth.JwtService(secretKey="a-random-secret-of-at-least-32-bytes");
  *   var token = jwt.encode({sub=42, role="admin"});
  *   var claims = jwt.decode(token);
  *   var refreshed = jwt.refresh(token);
@@ -18,9 +18,9 @@ component output="false" {
 	/**
 	 * Creates a new JwtService instance.
 	 *
-	 * @secretKey The HMAC-SHA256 signing key.
+	 * @secretKey The HMAC-SHA256 signing key. Must be at least 32 bytes (256 bits) per RFC 7518 Section 3.2; construction throws otherwise.
 	 * @defaultExpiry Default token lifetime in seconds (default 3600 = 1 hour).
-	 * @issuer Default issuer claim (iss). Empty string means no iss claim added.
+	 * @issuer Default issuer claim (iss). Empty string means no iss claim added and no iss validation on decode.
 	 * @allowedClockSkew Seconds of clock skew tolerance for expiry checks (default 0).
 	 */
 	public JwtService function init(
@@ -29,10 +29,29 @@ component output="false" {
 		string issuer = "",
 		numeric allowedClockSkew = 0
 	) {
+		// Fail fast on missing or weak secrets — a short HMAC key makes every issued token brute-forceable
+		if (!Len(arguments.secretKey)) {
+			Throw(
+				type = "Wheels.Auth.JWT.InvalidSecretKey",
+				message = "JWT secret key cannot be empty.",
+				extendedInfo = "Provide a random secret of at least 32 bytes (256 bits) as required for HMAC-SHA256 by RFC 7518 Section 3.2."
+			);
+		}
+		if (Len(CharsetDecode(arguments.secretKey, "UTF-8")) < 32) {
+			Throw(
+				type = "Wheels.Auth.JWT.WeakSecretKey",
+				message = "JWT secret key is too short.",
+				extendedInfo = "HMAC-SHA256 requires a secret of at least 32 bytes (256 bits) per RFC 7518 Section 3.2. Generate a random secret of 32 or more bytes and store it outside source control."
+			);
+		}
+
 		variables.secretKey = arguments.secretKey;
 		variables.defaultExpiry = arguments.defaultExpiry;
 		variables.issuer = arguments.issuer;
 		variables.allowedClockSkew = arguments.allowedClockSkew;
+
+		// Cache the Java class handle used on the per-request decode path
+		variables.messageDigest = CreateObject("java", "java.security.MessageDigest");
 
 		return this;
 	}
@@ -78,8 +97,9 @@ component output="false" {
 	/**
 	 * Decode and validate a JWT token, returning the claims struct.
 	 *
-	 * Verifies the signature and checks expiry/nbf claims.
-	 * Throws on invalid token, bad signature, or expired token.
+	 * Verifies the signature and checks expiry/nbf claims. When an issuer was
+	 * configured, the iss claim must be present and match it (case-sensitive).
+	 * Throws on invalid token, bad signature, wrong issuer, or expired token.
 	 *
 	 * @token The JWT token string to decode.
 	 * @ignoreExpiry If true, skip expiry validation (used for refresh). Default false.
@@ -111,7 +131,7 @@ component output="false" {
 		local.signingInput = local.parts[1] & "." & local.parts[2];
 		local.expectedSig = $sign(local.signingInput);
 
-		if (!CreateObject("java", "java.security.MessageDigest").isEqual(
+		if (!variables.messageDigest.isEqual(
 			local.expectedSig.getBytes("UTF-8"),
 			local.parts[3].getBytes("UTF-8")
 		)) {
@@ -124,6 +144,19 @@ component output="false" {
 		// Decode payload
 		local.payloadJson = $base64UrlDecode(local.parts[2]);
 		local.claims = DeserializeJSON(local.payloadJson);
+
+		// Validate issuer when one was configured (case-sensitive, hence Compare instead of EQ)
+		if (Len(variables.issuer)) {
+			if (
+				!StructKeyExists(local.claims, "iss")
+				|| Compare(ToString(local.claims.iss), variables.issuer) != 0
+			) {
+				throw(
+					type = "Wheels.Auth.JWT.InvalidIssuer",
+					message = "JWT issuer validation failed"
+				);
+			}
+		}
 
 		// Validate time-based claims
 		if (!arguments.ignoreExpiry) {
@@ -276,7 +309,7 @@ component output="false" {
 	 * Get current time as Unix epoch seconds (UTC).
 	 */
 	private numeric function $epochSeconds() {
-		return Int(CreateObject("java", "java.lang.System").currentTimeMillis() / 1000);
+		return Int(GetTickCount() / 1000);
 	}
 
 }
