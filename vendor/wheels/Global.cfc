@@ -2950,6 +2950,48 @@ return local.$wheels;
 		return local.rv;
 	}
 
+	/**
+	 * Internal function. Records a deprecation warning through a single shared
+	 * policy: the first call for a given feature logs a warning to the standard
+	 * wheels log and registers the warning in
+	 * application[appKey].deprecationWarnings so running apps can surface it
+	 * (debug panel, tooling). Subsequent calls for the same feature are no-ops,
+	 * making the helper safe to call from per-request code paths.
+	 *
+	 * @feature Stable identifier for the deprecated feature (e.g. "plugins-directory", "paginationLinks").
+	 * @message Human-readable message: what is deprecated, what replaces it, and when it goes away.
+	 * @docUrl Optional URL of the migration guide, appended to the logged message.
+	 */
+	public void function $deprecated(required string feature, required string message, string docUrl = "") {
+		try {
+			local.appKey = $appKey();
+			if (StructKeyExists(application, local.appKey)) {
+				if (!StructKeyExists(application[local.appKey], "deprecationWarnings")) {
+					application[local.appKey].deprecationWarnings = [];
+				}
+				for (local.existing in application[local.appKey].deprecationWarnings) {
+					if (local.existing.feature == arguments.feature) {
+						return;
+					}
+				}
+				ArrayAppend(application[local.appKey].deprecationWarnings, {
+					feature = arguments.feature,
+					message = arguments.message,
+					url = arguments.docUrl
+				});
+			}
+		} catch (any e) {
+			// Registration is best-effort; never let a deprecation notice break the caller.
+		}
+		local.text = "[Wheels] Deprecation: " & arguments.message;
+		if (Len(arguments.docUrl)) {
+			local.text &= " See: " & arguments.docUrl;
+		}
+		try {
+			WriteLog(type = "warning", text = local.text, file = "wheels");
+		} catch (any e) {}
+	}
+
 	// Returns the running framework version. Delegates to BuildInfo.cfc, which
 	// is the authoritative version source. The historical box.json-reading
 	// implementation (with monorepo / wheels-base-template fallback chain)

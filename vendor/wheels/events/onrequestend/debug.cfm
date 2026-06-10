@@ -409,6 +409,22 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 				</div>
 			</cfif>
 		</cfif>
+		<!--- Deprecation warnings collected via the shared $deprecated() helper --->
+		<cfif StructKeyExists(application.wheels, "deprecationWarnings") AND ArrayLen(application.wheels.deprecationWarnings)>
+			<div class="wdb-section">
+				<div class="wdb-section-title" style="color:##f9e2af;">Deprecations</div>
+				<div style="color:##f9e2af;font-size:12px;">
+					<cfloop array="#application.wheels.deprecationWarnings#" index="local.dw">
+						<p>
+							#EncodeForHTML(local.dw.message)#
+							<cfif StructKeyExists(local.dw, "url") AND Len(local.dw.url)>
+								<a href="#EncodeForHTMLAttribute(local.dw.url)#" style="color:##89b4fa;" target="_blank" rel="noopener">Migration guide</a>
+							</cfif>
+						</p>
+					</cfloop>
+				</div>
+			</div>
+		</cfif>
 	</div>
 </div>
 

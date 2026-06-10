@@ -4099,7 +4099,7 @@ component extends="modules.BaseModule" {
 				pattern: "",
 				checkType: "directory",
 				path: "app/plugins",
-				fix: "Migrate to packages/ + vendor/ activation model"
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
 			});
 			arrayAppend(checks, {
 				description: "Old test base class (wheels.Test)",
@@ -4114,11 +4114,11 @@ component extends="modules.BaseModule" {
 		// 3.x -> 4.x
 		if (currentMajor <= 3 && targetMajor >= 4) {
 			arrayAppend(checks, {
-				description: "Legacy plugin directory (deprecated in 4.x)",
+				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
 				pattern: "",
 				checkType: "directory",
 				path: "plugins",
-				fix: "Migrate to packages/ + vendor/ system"
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
 			});
 			arrayAppend(checks, {
 				description: "Old test base class (wheels.Test)",
