@@ -295,6 +295,21 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return formatSettingOutput(get(arguments.settingName));
 	}
 
+	/**
+	 * Resolves the docs-viewer `format` request parameter to a safe layout
+	 * filename. Falls back to `"html"` for empty input or anything that isn't
+	 * a bare alphanumeric token — matching the LFI hardening shipped for
+	 * $getRequestFormat() so `vendor/wheels/public/docs/core.cfm` can't be
+	 * tricked into including arbitrary files via the `layouts/<format>.cfm`
+	 * interpolation.
+	 */
+	public string function $resolveDocFormat(required string format) {
+		if (ReFind("^[A-Za-z0-9]+$", arguments.format)) {
+			return arguments.format;
+		}
+		return "html";
+	}
+
 	/*
 	This is just a proof of concept
 	*/

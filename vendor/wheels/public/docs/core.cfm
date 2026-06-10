@@ -74,5 +74,10 @@ if (StructKeyExists(application.wheels, "docs")) {
 	application.wheels.docs = docs;
 }
 
-include "layouts/#request.wheels.params.format#.cfm";
+// Validate `format` against an alphanumeric allowlist before interpolating
+// it into the include path. Without this, `format=../views/info` would
+// climb out of layouts/ — same LFI traversal class $getRequestFormat was
+// hardened against (issue #2974).
+local.docFormat = $resolveDocFormat(request.wheels.params.format);
+include "layouts/#local.docFormat#.cfm";
 </cfscript>

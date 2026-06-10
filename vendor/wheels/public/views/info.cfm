@@ -151,7 +151,14 @@ if (request.wheels.params.format == "json") {
 		"timestamp": now(),
 		"application": {
 			"name": application.applicationName,
-			"metadata": applicationMeta
+			// Whitelist applicationMeta keys safe for serialization. Dumping
+			// the whole struct leaks datasource definitions (with credentials)
+			// and broader application config; the HTML branch only renders the
+			// mappings table, so the JSON branch mirrors that surface (issue
+			// #2974, deferred from #2909).
+			"metadata": {
+				"mappings": StructKeyExists(applicationMeta, "mappings") ? applicationMeta.mappings : {}
+			}
 		},
 		"server": {
 			"cfmlEngine": get("serverName") & " " & get("serverVersion"),
