@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+### Performance
+
+- `URLFor()` controller/action route lookup is now memoized in application scope with negative caching, instead of a per-request memo that only cached matches. The previous memo was rebuilt on every request and was never written on a miss, so wildcard-`[controller]` apps — where `$addRoute` strips the `controller` key, guaranteeing no match — re-scanned the entire route table for every `linkTo` / `urlFor` / `redirectTo` call, on every request. The new `application.wheels.urlForCache` survives across requests and caches both hits and misses (empty-string sentinel) for O(1) lookup. Invalidation is plumbed through both `$lockedLoadRoutes` (route reload) and `$addRoute` (any mutation, including test-suite manipulation), so a previously negative-cached `(controller, action)` pair that a newly-added route now matches can never serve a stale miss (#2955)
+
 ### Fixed
 
 - Dispatch now caches resolved route-scoped string middleware as application-scope singletons keyed by component path, so stateful middleware (e.g. an in-memory `RateLimiter` registered on a `.scope(path="/api", middleware=[...])`) accumulates state across requests instead of getting a fresh, empty instance per request. `$copyRouteForRequest` shallow-copies the route's `middleware` array instead of `Duplicate()`-ing it so Adobe CF (which clones CFCs inside arrays) doesn't silently reset the cached instances. The preflight-capability boolean is now computed once at `$init` and stored on the Dispatch instance, replacing the per-OPTIONS-request `IsInstanceOf` scan over the global pipeline. Documents the singleton lifecycle contract: middleware components must be safe to share across concurrent requests, which every built-in middleware already is (#2954)

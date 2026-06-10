@@ -231,6 +231,14 @@ component output="false" {
 		ArrayAppend(variables.routes, local.routeStruct);
 		ArrayAppend(application[$appKey()].routes, local.routeStruct);
 
+		// Invalidate the URLFor controller/action memo on every mutation.
+		// A previous lookup might have negative-cached a (controller, action)
+		// pair that this new route now matches — keeping the old empty-string
+		// sentinel would silently break link helpers until the next reload.
+		if (StructKeyExists(application[$appKey()], "urlForCache")) {
+			StructClear(application[$appKey()].urlForCache);
+		}
+
 		// Build static route index for O(1) lookup of routes with no variables.
 		if (local.routeStruct.isStatic) {
 			if (!StructKeyExists(application[$appKey()], "staticRoutes")) {
