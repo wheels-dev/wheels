@@ -14,8 +14,9 @@ Create `changelog.d/<slug>.<type>.md`:
 - **`<slug>`** — short kebab-case description, unique enough to avoid
   collisions (the issue/PR number works too: `2971-ratelimiter.fixed.md`).
 - **`<type>`** — one of `added`, `changed`, `deprecated`, `removed`,
-  `fixed`, `security`, `performance`. This selects the `### Type` heading
-  the entry lands under.
+  `performance`, `fixed`, `security` (the order they appear under in the
+  promoted release section). This selects the `### Type` heading the entry
+  lands under.
 
 File content is one or more **complete markdown bullet lines**, exactly as
 they should appear in `CHANGELOG.md`:

@@ -140,14 +140,20 @@ if not args:
 fragments = read_fragments()
 
 if args[0] == "--preview":
-    if not fragments:
-        print("No fragments in changelog.d/.")
+    if CHANGELOG.exists():
+        text = CHANGELOG.read_text(encoding="utf-8")
+        _, existing, _ = parse_unreleased(text)
+    else:
+        existing = []
+    merged = merged_sections(existing, fragments)
+    if not merged:
+        print("Nothing to promote: no fragments and [Unreleased] is empty.")
         sys.exit(0)
-    for heading in CANONICAL:
-        if heading in fragments:
+    for heading, bullets in merged:
+        if heading is not None:
             print(f"### {heading}\n")
-            print("\n".join(fragments[heading]))
-            print()
+        print("\n".join(bullets))
+        print()
     sys.exit(0)
 
 version = args[0]
