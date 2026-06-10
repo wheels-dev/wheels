@@ -463,113 +463,12 @@ try {
 				break;
 
 			case "dbSeed":
-				local.mode = structKeyExists(request.wheels.params, "mode") ? request.wheels.params.mode : "auto";
-				local.environment = structKeyExists(request.wheels.params, "environment") ? request.wheels.params.environment : get("environment");
-				data.success = true;
-				data.mode = local.mode;
-
-				try {
-					// Determine seed mode: convention files vs generated test data
-					local.useConvention = false;
-					if (local.mode == "convention") {
-						local.useConvention = true;
-					} else if (local.mode == "generate") {
-						local.useConvention = false;
-					} else {
-						// Auto-detect: use convention if seed files exist
-						if (structKeyExists(application.wheels, "seeder") && application.wheels.seeder.hasSeedFiles()) {
-							local.useConvention = true;
-						}
-					}
-
-					if (local.useConvention) {
-						// Run convention-based seed files (app/db/seeds.cfm + environment)
-						data.mode = "convention";
-						local.seeder = application.wheels.seeder;
-						local.seedResult = local.seeder.runSeeds(environment = local.environment);
-						data.success = local.seedResult.success;
-						data.message = local.seedResult.message;
-						data.environment = local.environment;
-						data.totalCreated = local.seedResult.totalCreated;
-						data.totalSkipped = local.seedResult.totalSkipped;
-						data.results = local.seedResult.results;
-						if (structKeyExists(local.seedResult, "detail")) {
-							data.detail = local.seedResult.detail;
-						}
-					} else {
-						// Generate random test data (legacy behavior)
-						data.mode = "generate";
-						local.count = structKeyExists(request.wheels.params, "count") ? val(request.wheels.params.count) : 10;
-						local.models = structKeyExists(request.wheels.params, "models") ? request.wheels.params.models : "";
-						data.seeded = [];
-
-						// Get all model files if no specific models requested
-						local.modelList = [];
-						if (len(local.models)) {
-							local.modelList = listToArray(local.models);
-						} else {
-							local.modelPath = expandPath("/app/models");
-							if (directoryExists(local.modelPath)) {
-								local.modelFiles = directoryList(local.modelPath, false, "name", "*.cfc");
-								for (local.file in local.modelFiles) {
-									if (left(local.file, 1) != "_") {
-										arrayAppend(local.modelList, listFirst(local.file, "."));
-									}
-								}
-							}
-						}
-
-						// Seed each model with generated data
-						for (local.modelName in local.modelList) {
-							try {
-								local.model = model(local.modelName);
-								local.seededCount = 0;
-
-								local.properties = [];
-								if (structKeyExists(local.model, "$classData") && structKeyExists(local.model.$classData(), "properties")) {
-									local.properties = local.model.$classData().properties;
-								}
-
-								for (local.i = 1; local.i <= local.count; local.i++) {
-									local.record = {};
-									for (local.prop in local.properties) {
-										if (local.prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", local.prop.name)) {
-											local.record[local.prop.name] = generateTestData(local.prop.name, local.prop.type, local.i);
-										}
-									}
-									local.newRecord = local.model.new(local.record);
-									if (local.newRecord.save()) {
-										local.seededCount++;
-									}
-								}
-
-								arrayAppend(data.seeded, {
-									model = local.modelName,
-									count = local.seededCount,
-									success = true
-								});
-							} catch (any modelError) {
-								arrayAppend(data.seeded, {
-									model = local.modelName,
-									count = 0,
-									success = false,
-									error = modelError.message
-								});
-							}
-						}
-
-						local.totalSeeded = 0;
-						for (local.result in data.seeded) {
-							if (local.result.success) {
-								local.totalSeeded += local.result.count;
-							}
-						}
-						data.message = "Database seeding completed. Created #local.totalSeeded# records across #arrayLen(data.seeded)# models.";
-					}
-				} catch (any e) {
-					data.success = false;
-					data.message = "Error during database seeding: " & e.message;
-				}
+				// The seed orchestration lives in the page-level
+				// runDbSeed() UDF (defined alongside generateTestData
+				// below). Extracted so `dbSetup` can compose seeding
+				// without re-entering the dispatcher (issue ##2959).
+				local.seedResult = runDbSeed(request.wheels.params);
+				StructAppend(data, local.seedResult, true);
 				break;
 				
 			case "routes":
@@ -695,23 +594,31 @@ try {
 				// Setup database (create + migrate + seed)
 				data.success = true;
 				data.message = "Database setup: ";
-				
-				// Run migrations to latest
+
 				try {
 					local.migrateResult = migrator.migrateToLatest();
 					data.message &= "Migrations completed. ";
-					
-					// Run seeding if requested
+
 					if (structKeyExists(request.wheels.params, "seed") && request.wheels.params.seed) {
-						// Use the dbSeed logic
-						request.wheels.params.command = "dbSeed";
-						local.seedCount = structKeyExists(request.wheels.params, "seedCount") ? val(request.wheels.params.seedCount) : 10;
-						request.wheels.params.count = local.seedCount;
-						
-						// Re-run this switch for dbSeed
-						data.command = "dbSeed";
-						include "/wheels/public/views/cli.cfm";
-						abort;
+						// Compose seeding through a direct UDF call —
+						// the legacy path mutated `request.wheels.params`
+						// and re-included `cli.cfm`, which rebuilt the
+						// envelope from scratch and silently discarded
+						// the "Migrations completed." string we just set
+						// (issue ##2959). Merge the seed result on top
+						// of `data` while preserving the dbSetup envelope
+						// (command, prefixed message, combined success).
+						local.seedParams = Duplicate(request.wheels.params);
+						local.seedParams.count = StructKeyExists(request.wheels.params, "seedCount")
+							? val(request.wheels.params.seedCount) : 10;
+						local.seedResult = runDbSeed(local.seedParams);
+						local.setupMessage = data.message;
+						StructAppend(data, local.seedResult, true);
+						data.command = "dbSetup";
+						data.message = local.setupMessage & local.seedResult.message;
+						if (!local.seedResult.success) {
+							data.success = false;
+						}
 					}
 				} catch (any e) {
 					data.success = false;
@@ -942,7 +849,121 @@ try {
 	}
 } catch (any e) {
 	data.success = false;
-	data.messages = e.message & ': ' & e.detail;
+	// Envelope consistency: per-command catches surface their failure via
+	// `data.message` (singular); the outer catch historically only set
+	// `data.messages` (plural), so a CLI client reading either name in
+	// isolation missed half the failure modes (issue ##2959). Mirror the
+	// error on both keys so the plural stays backward-compatible while
+	// the singular matches every other code path.
+	data.message = e.message & ': ' & e.detail;
+	data.messages = data.message;
+}
+
+// Seed orchestration extracted from the `dbSeed` switch case so that
+// `dbSetup` can compose seeding through a direct call instead of the
+// legacy recursive cfinclude (issue ##2959). Returns a struct with
+// {success, mode, message, ...mode-specific fields} that the caller
+// merges into the response envelope via StructAppend.
+function runDbSeed(struct seedParams = {}) {
+	var result = {success = true, mode = "auto", message = ""};
+	var sp = arguments.seedParams;
+	var requestedMode = structKeyExists(sp, "mode") ? sp.mode : "auto";
+	var environment = structKeyExists(sp, "environment") ? sp.environment : get("environment");
+	result.mode = requestedMode;
+
+	try {
+		var useConvention = false;
+		if (requestedMode == "convention") {
+			useConvention = true;
+		} else if (requestedMode == "generate") {
+			useConvention = false;
+		} else if (structKeyExists(application.wheels, "seeder") && application.wheels.seeder.hasSeedFiles()) {
+			useConvention = true;
+		}
+
+		if (useConvention) {
+			result.mode = "convention";
+			var seeder = application.wheels.seeder;
+			var conventionResult = seeder.runSeeds(environment = environment);
+			result.success = conventionResult.success;
+			result.message = conventionResult.message;
+			result.environment = environment;
+			result.totalCreated = conventionResult.totalCreated;
+			result.totalSkipped = conventionResult.totalSkipped;
+			result.results = conventionResult.results;
+			if (structKeyExists(conventionResult, "detail")) {
+				result.detail = conventionResult.detail;
+			}
+		} else {
+			result.mode = "generate";
+			var count = structKeyExists(sp, "count") ? val(sp.count) : 10;
+			var modelsArg = structKeyExists(sp, "models") ? sp.models : "";
+			result.seeded = [];
+
+			var modelList = [];
+			if (len(modelsArg)) {
+				modelList = listToArray(modelsArg);
+			} else {
+				var modelPath = expandPath("/app/models");
+				if (directoryExists(modelPath)) {
+					var modelFiles = directoryList(modelPath, false, "name", "*.cfc");
+					for (var file in modelFiles) {
+						if (left(file, 1) != "_") {
+							arrayAppend(modelList, listFirst(file, "."));
+						}
+					}
+				}
+			}
+
+			for (var modelName in modelList) {
+				try {
+					var modelInstance = model(modelName);
+					var seededCount = 0;
+					var properties = [];
+					if (structKeyExists(modelInstance, "$classData") && structKeyExists(modelInstance.$classData(), "properties")) {
+						properties = modelInstance.$classData().properties;
+					}
+					for (var i = 1; i <= count; i++) {
+						var record = {};
+						for (var prop in properties) {
+							if (prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", prop.name)) {
+								record[prop.name] = generateTestData(prop.name, prop.type, i);
+							}
+						}
+						var newRecord = modelInstance.new(record);
+						if (newRecord.save()) {
+							seededCount++;
+						}
+					}
+					arrayAppend(result.seeded, {
+						model = modelName,
+						count = seededCount,
+						success = true
+					});
+				} catch (any modelError) {
+					arrayAppend(result.seeded, {
+						model = modelName,
+						count = 0,
+						success = false,
+						error = modelError.message
+					});
+				}
+			}
+
+			var totalSeeded = 0;
+			for (var seedEntry in result.seeded) {
+				if (seedEntry.success) {
+					totalSeeded += seedEntry.count;
+				}
+			}
+			result.message = "Database seeding completed. Created #totalSeeded# records across #arrayLen(result.seeded)# models.";
+		}
+	} catch (any e) {
+		result.success = false;
+		result.message = "Error during database seeding: " & e.message;
+	}
+
+	return result;
 }
 
 // Helper function to generate test data based on property name and type
