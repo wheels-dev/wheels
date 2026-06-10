@@ -247,6 +247,17 @@ component extends="wheels.WheelsTest" {
 
 				expect(actual).toBe(expected)
 			})
+
+			it("does not corrupt attribute values containing the text wheelsid when renaming the id attribute", () => {
+				StructDelete(args, "class")
+				args.source = "http://www.wheels.dev/images/wheels-logo.png"
+				args.alt = "my wheelsid logo"
+				args.id = "logoid"
+				r = '<img alt="my wheelsid logo" src="#args.source#" id="logoid">'
+				e = _controller.imageTag(argumentcollection = args)
+
+				expect(e).toBe(r)
+			})
 		})
 
 		describe("Tests that javascriptIncludeTag", () => {

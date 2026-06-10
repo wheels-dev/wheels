@@ -31,9 +31,10 @@ component {
 			application.$wheels.reloadPassword = local.oldReloadPassword;
 		}
 
-
 		// Check and store server engine name, throw error if using a version that we don't support.
-		else if (StructKeyExists(server, "boxlang")) {
+		// Note: this must NOT be chained to the reloadPassword carryover above with `else` —
+		// engine detection has to run unconditionally or serverVersion is never set.
+		if (StructKeyExists(server, "boxlang")) {
 			application.$wheels.serverName = "BoxLang";
 			application.$wheels.serverVersion = server.boxlang.version;
 		} else if (StructKeyExists(server, "lucee")) {

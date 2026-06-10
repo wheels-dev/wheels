@@ -139,7 +139,9 @@ component {
 
 	/**
 	 * Reads and caches the Vite manifest.json file. The manifest is cached in the application
-	 * scope for the lifetime of the application (cleared on reload).
+	 * scope for the lifetime of the application (cleared on reload). A missing manifest is also
+	 * cached (as an empty struct) when not throwing, so opted-out production apps don't re-hit
+	 * the file system on every call.
 	 */
 	public struct function $viteManifest() {
 		local.appKey = $appKey();
@@ -149,26 +151,30 @@ component {
 		) {
 			return application[local.appKey].viteManifestCache;
 		}
+		lock name="viteManifest#application.applicationName#" timeout="30" {
+			// Double-check inside the lock since another thread may have populated the cache while we waited.
+			if (
+				!StructKeyExists(application[local.appKey], "viteManifestCache")
+				|| !IsStruct(application[local.appKey].viteManifestCache)
+			) {
+				local.manifestPath = $viteManifestPath();
+				if (!FileExists(local.manifestPath)) {
+					if ($get("showErrorInformation")) {
+						Throw(
+							type="Wheels.ViteManifestNotFound",
+							message="Vite manifest not found at '#local.manifestPath#'.",
+							extendedInfo="Run your Vite build (e.g. `npx vite build`) to generate the manifest, or check the `viteBuildPath` and `viteManifestFile` settings."
+						);
+					}
 
-		local.manifestPath = $viteManifestPath();
-		if (!FileExists(local.manifestPath)) {
-			if ($get("showErrorInformation")) {
-				Throw(
-					type="Wheels.ViteManifestNotFound",
-					message="Vite manifest not found at '#local.manifestPath#'.",
-					extendedInfo="Run your Vite build (e.g. `npx vite build`) to generate the manifest, or check the `viteBuildPath` and `viteManifestFile` settings."
-				);
+					// Cache the negative result so subsequent calls skip the file system check.
+					application[local.appKey].viteManifestCache = {};
+				} else {
+					application[local.appKey].viteManifestCache = DeserializeJSON(FileRead(local.manifestPath));
+				}
 			}
-			return {};
 		}
-
-		local.manifestContent = FileRead(local.manifestPath);
-		local.manifest = DeserializeJSON(local.manifestContent);
-
-		// Cache in application scope
-		application[local.appKey].viteManifestCache = local.manifest;
-
-		return local.manifest;
+		return application[local.appKey].viteManifestCache;
 	}
 
 	/**

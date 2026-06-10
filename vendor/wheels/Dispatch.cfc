@@ -154,13 +154,13 @@ component output="false" extends="wheels.Global"{
 		if (StructKeyExists(application.wheels, "staticRoutes")) {
 			local.staticKey = local.methodKey & ":/" & arguments.path;
 			if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
-				local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
+				local.rv = $copyRouteForRequest(application.wheels.staticRoutes[local.staticKey]);
 			}
 			// Also try the root path.
 			if (!StructKeyExists(local, "rv") && !Len(arguments.path)) {
 				local.staticKey = local.methodKey & ":/";
 				if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
-					local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
+					local.rv = $copyRouteForRequest(application.wheels.staticRoutes[local.staticKey]);
 				}
 			}
 		}
@@ -180,8 +180,13 @@ component output="false" extends="wheels.Global"{
 				}
 
 				// If route matches regular expression, set it for return.
-				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
-					local.rv = Duplicate(local.route);
+				// Run the regex once with sub-expressions and stash the result on the
+				// per-request copy so $mergeRoutePattern can reuse it instead of
+				// re-executing the same regex against the same path.
+				local.match = ReFindNoCase(local.route.regex, arguments.path, 1, true);
+				if (local.match.pos[1] > 0 || (!Len(arguments.path) && local.route.pattern == "/")) {
+					local.rv = $copyRouteForRequest(local.route);
+					local.rv.regexMatch = local.match;
 					break;
 				}
 			}
@@ -222,6 +227,23 @@ component output="false" extends="wheels.Global"{
 			}
 		}
 
+		return local.rv;
+	}
+
+	/**
+	 * Returns a per-request copy of a matched route struct. Top-level keys are shallow-copied
+	 * and any non-simple members (constraints, middleware, etc.) are duplicated so request
+	 * code (middleware reading request.wheels.currentRoute, for example) can never mutate
+	 * the shared route table through the copy. Used by both the static fast path and the
+	 * regex fallback in $findMatchingRoute so the two paths share identical copy semantics.
+	 */
+	public struct function $copyRouteForRequest(required struct route) {
+		local.rv = StructCopy(arguments.route);
+		for (local.key in local.rv) {
+			if (!IsSimpleValue(local.rv[local.key])) {
+				local.rv[local.key] = Duplicate(local.rv[local.key]);
+			}
+		}
 		return local.rv;
 	}
 
@@ -482,7 +504,14 @@ component output="false" extends="wheels.Global"{
 	 */
 	public struct function $mergeRoutePattern(required struct params, required struct route, required string path) {
 		local.rv = arguments.params;
-		local.matches = ReFindNoCase(arguments.route.regex, arguments.path, 1, true);
+		// Reuse the match result stashed by $findMatchingRoute when present so the route
+		// regex only executes once per request. Fall back to a fresh match for routes that
+		// did not go through the regex fallback (static fast path or direct calls).
+		if (StructKeyExists(arguments.route, "regexMatch")) {
+			local.matches = arguments.route.regexMatch;
+		} else {
+			local.matches = ReFindNoCase(arguments.route.regex, arguments.path, 1, true);
+		}
 
 		// Bound the loop by the number of route variables. Constraint patterns are
 		// normalized to non-capturing groups at draw time, but this guard ensures an
@@ -519,7 +548,10 @@ component output="false" extends="wheels.Global"{
 	/**
 	 * Resolves a model instance from params.key when route model binding is enabled.
 	 * The resolved model is stored in params under the singularized controller name (e.g., params.user).
-	 * Throws Wheels.RecordNotFound if the record doesn't exist. Silently skips if the model class doesn't exist.
+	 * Throws Wheels.RecordNotFound if the record doesn't exist. Convention-derived bindings skip
+	 * silently (with a negative cache, cleared on reload) when the model class can't be resolved;
+	 * explicit bindings (binding="BlogPost") rethrow resolution failures since they indicate a
+	 * configuration error. Query errors from the finder always propagate.
 	 */
 	public struct function $resolveRouteModelBinding(required struct params, required struct route) {
 		local.rv = arguments.params;
@@ -546,7 +578,8 @@ component output="false" extends="wheels.Global"{
 		}
 
 		// Derive the model name.
-		if (IsSimpleValue(local.binding) && !IsBoolean(local.binding) && Len(local.binding)) {
+		local.explicitBinding = IsSimpleValue(local.binding) && !IsBoolean(local.binding) && Len(local.binding);
+		if (local.explicitBinding) {
 			// Explicit model name override (e.g., binding="BlogPost").
 			local.modelName = local.binding;
 		} else {
@@ -562,13 +595,50 @@ component output="false" extends="wheels.Global"{
 			local.modelName = capitalize(singularize(local.controllerName));
 		}
 
-		// Attempt to resolve the model instance.
-		try {
-			local.instance = model(local.modelName).findByKey(local.rv.key);
-		} catch (any e) {
-			// Model class doesn't exist — silently skip (don't break non-model routes).
+		// Negative cache: a conventional binding that previously failed to resolve is skipped
+		// without re-acquiring the app-wide model lock and re-running the model bootstrap
+		// (including its DB metadata query) on every request. Lives in the application.wheels
+		// struct so it's cleared on reload.
+		local.appKey = $appKey();
+		if (
+			!local.explicitBinding
+			&& StructKeyExists(application[local.appKey], "unresolvableRouteBindings")
+			&& StructKeyExists(application[local.appKey].unresolvableRouteBindings, local.modelName)
+		) {
 			return local.rv;
 		}
+
+		// Resolve the model class in its own try so only class/bootstrap resolution failures
+		// are handled here.
+		try {
+			local.modelClass = model(local.modelName);
+		} catch (any e) {
+			// An explicit binding name (binding="BlogPost") that fails to resolve is a
+			// configuration error — surface it instead of silently skipping.
+			if (local.explicitBinding) {
+				rethrow;
+			}
+			// Conventional binding against a non-model-backed controller: skip silently so
+			// non-model routes keep working, but negative-cache the miss so the failed
+			// bootstrap doesn't repeat on every request, and leave a dev-mode breadcrumb.
+			if (!StructKeyExists(application[local.appKey], "unresolvableRouteBindings")) {
+				application[local.appKey].unresolvableRouteBindings = {};
+			}
+			application[local.appKey].unresolvableRouteBindings[local.modelName] = true;
+			if ($get("environment") != "production") {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Route model binding could not resolve model `#local.modelName#` (#e.type#: #e.message#). Binding is skipped for this model until reload."
+				);
+			}
+			return local.rv;
+		}
+
+		// Run the finder outside the try so query errors (DB connection failures, missing
+		// tables at query time, SQL errors) propagate instead of being masked as a missing
+		// model class.
+		local.instance = local.modelClass.findByKey(local.rv.key);
 
 		// If no record was found, throw a 404.
 		if (IsBoolean(local.instance) && !local.instance) {
@@ -745,6 +815,7 @@ component output="false" extends="wheels.Global"{
 			StructDelete(local.rv, local.key & "($hour)");
 			StructDelete(local.rv, local.key & "($minute)");
 			StructDelete(local.rv, local.key & "($second)");
+			StructDelete(local.rv, local.key & "($ampm)");
 		}
 		return local.rv;
 	}

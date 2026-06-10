@@ -140,7 +140,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 	<!--- Request tab --->
 	<button class="wdb-tab" onclick="wdbToggle('request')" id="wdb-tab-request" title="Request">
 		<svg viewBox="0 0 512 512"><path d="M256 512A256 256 0 10256 0a256 256 0 000 512zm-24-176h24V272h-24c-13.3 0-24-10.7-24-24s10.7-24 24-24h48c13.3 0 24 10.7 24 24v88h8c13.3 0 24 10.7 24 24s-10.7 24-24 24h-80c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 110 64 32 32 0 010-64z"/></svg>
-		#request.wheels.params.controller#.#request.wheels.params.action#
+		#EncodeForHTML(request.wheels.params.controller)#.#EncodeForHTML(request.wheels.params.action)#
 	</button>
 
 	<!--- Timing tab --->
@@ -186,7 +186,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 
 	<!--- Reload button --->
 	<cfif NOT Len($get("reloadPassword"))>
-		<a href="#local.baseReloadURL#true" class="wdb-tab" title="Reload Application" style="color:##f9e2af;">
+		<a href="#EncodeForHTMLAttribute(local.baseReloadURL)#true" class="wdb-tab" title="Reload Application" style="color:##f9e2af;">
 			<svg viewBox="0 0 512 512" style="width:13px;height:13px;fill:##f9e2af;"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H352c-17.7 0-32 14.3-32 32s14.3 32 32 32h127.9c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v35.2L430.6 81.9c-87.5-87.5-229.3-87.5-316.8 0C85.7 109.9 61 143.5 44.5 180.2l60.6 22.4z"/></svg>
 		</a>
 	</cfif>
@@ -207,20 +207,20 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 		<dl class="wdb-kv">
 			<cfif StructKeyExists(request.wheels.params, "route")>
 				<dt>Route</dt>
-				<dd><code>#request.wheels.params.route#</code></dd>
+				<dd><code>#EncodeForHTML(request.wheels.params.route)#</code></dd>
 			</cfif>
 			<dt>Controller</dt>
-			<dd><code>#request.wheels.params.controller#</code></dd>
+			<dd><code>#EncodeForHTML(request.wheels.params.controller)#</code></dd>
 			<dt>Action</dt>
-			<dd><code>#request.wheels.params.action#</code></dd>
+			<dd><code>#EncodeForHTML(request.wheels.params.action)#</code></dd>
 			<cfif StructKeyExists(request.wheels.params, "key")>
 				<dt>Key</dt>
-				<dd><code>#request.wheels.params.key#</code></dd>
+				<dd><code>#EncodeForHTML(request.wheels.params.key)#</code></dd>
 			</cfif>
 			<dt>HTTP Method</dt>
 			<dd><code>#UCase(cgi.request_method)#</code></dd>
 			<dt>URL</dt>
-			<dd><code>#cgi.server_name##cgi.path_info#<cfif Len(cgi.query_string)>?#cgi.query_string#</cfif></code></dd>
+			<dd><code>#EncodeForHTML(cgi.server_name)##EncodeForHTML(cgi.path_info)#<cfif Len(cgi.query_string)>?#EncodeForHTML(cgi.query_string)#</cfif></code></dd>
 			<dt>Application</dt>
 			<dd>#application.applicationName#</dd>
 			<dt>Data Source</dt>
@@ -274,7 +274,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 				<tbody>
 				<cfloop from="1" to="#ArrayLen(local.paramsList)#" index="local.pIdx">
 					<tr>
-						<td><code>#local.paramsList[local.pIdx].name#</code></td>
+						<td><code>#EncodeForHTML(local.paramsList[local.pIdx].name)#</code></td>
 						<td style="font-family:monospace;max-width:500px;overflow:hidden;text-overflow:ellipsis;">#EncodeForHTML(local.paramsList[local.pIdx].value)#</td>
 						<td><span class="wdb-badge wdb-badge-blue">#local.paramsList[local.pIdx].type#</span></td>
 					</tr>
@@ -306,7 +306,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 						&mdash;
 						<cfloop list="#local.environments#" index="local.ei">
 							<cfif $get("environment") IS NOT local.ei>
-								<a href="#local.baseReloadURL##local.ei#" style="color:##89b4fa;font-size:11px;margin-left:4px;">#capitalize(local.ei)#</a>
+								<a href="#EncodeForHTMLAttribute(local.baseReloadURL & local.ei)#" style="color:##89b4fa;font-size:11px;margin-left:4px;">#capitalize(local.ei)#</a>
 							</cfif>
 						</cfloop>
 					</cfif>

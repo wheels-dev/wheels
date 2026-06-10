@@ -102,7 +102,7 @@ set(middleware = [
 </cfscript>
 ```
 
-The middleware auto-creates a `wheels_rate_limits` table on first use (via `CREATE TABLE IF NOT EXISTS`). All nodes read and write to the same table, so the budget is shared. Database storage is slower per request than memory — use it only when you need shared state.
+The middleware auto-creates a `wheels_rate_limits` table on first use (it probes for the table and creates it with engine-appropriate DDL when missing). All nodes read and write to the same table, so the budget is shared. Database storage is slower per request than memory — use it only when you need shared state.
 
 ## Custom key function
 

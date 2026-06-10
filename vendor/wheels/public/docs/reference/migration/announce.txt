@@ -2,11 +2,11 @@
 function up() {
 	transaction {
 		try {
-			createTable(name="articles", force=true) {
-				t.string(columnNames="title", null=false);
-				t.text("body");
-				t.timestamps();
-			};
+			t = createTable(name="articles", force=true);
+			t.string(columnNames="title", allowNull=false);
+			t.text(columnNames="body");
+			t.timestamps();
+			t.create();
 			announce("Created articles table");
 		} catch (any e) {
 			local.exception = e;
@@ -25,7 +25,7 @@ function up() {
 function up() {
 	transaction {
 		try {
-			addColumn(table="users", columnType="string", columnName="apiKey", limit=64, null=true);
+			addColumn(table="users", columnType="string", columnName="apiKey", limit=64, allowNull=true);
 			announce("Added apiKey column to users");
 
 			addIndex(table="users", columnNames="apiKey", unique=true);

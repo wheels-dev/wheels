@@ -327,7 +327,10 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	public string function $getRequestFormat() {
 		local.rv = "html";
 		if (StructKeyExists(url, "format")) {
-			local.rv = url.format;
+			// Security: reject non-alphanumeric url.format to prevent LFI via the error-template include path in $runOnError.
+			if (ReFind("^[A-Za-z0-9]+$", url.format)) {
+				local.rv = url.format;
+			}
 		} else if ((StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "http_accept"))){
 			local.httpAccept = request.cgi.http_accept;
 			local.formats = $get("formats");
