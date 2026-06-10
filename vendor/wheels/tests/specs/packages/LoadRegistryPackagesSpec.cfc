@@ -35,6 +35,18 @@ component extends="wheels.WheelsTest" {
 				});
 			});
 
+			it("returns empty packages and no error in staging (gate allows development only)", () => {
+				// 2026-06-09 review (S2/SEC-1): the old denylist only matched
+				// "production", so any other non-development environment name
+				// reached the registry. The gate is now an allowlist.
+				$withEnv("staging", () => {
+					var pub = $newPublic();
+					var result = pub.$loadRegistryPackages(registry = $fakeRegistry(packages = [{name = "should-not-appear"}]));
+					expect(result.packages).toBe([]);
+					expect(result.error).toBe("");
+				});
+			});
+
 			it("returns packages from the registry in development", () => {
 				$withEnv("development", () => {
 					var pub = $newPublic();
