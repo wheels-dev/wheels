@@ -402,7 +402,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 						</cfif>
 						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>
 							<cfloop array="#application.wheels.mixinCollisions#" index="local.ci">
-								<p>Method <strong>#local.ci.method#</strong> on <strong>#local.ci.target#</strong>: <strong>#local.ci.existingPlugin#</strong> overridden by <strong>#local.ci.overridingPlugin#</strong></p>
+								<p>Method <strong>#local.ci.method#</strong> on <strong>#local.ci.target#</strong>: <strong>#local.ci.firstProvider#</strong> overridden by <strong>#local.ci.secondProvider#</strong></p>
 							</cfloop>
 						</cfif>
 					</div>
