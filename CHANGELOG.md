@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Security
+
+- `$isSafeRedirectUrl()` rejects backslash-containing URLs (`/\evil.com`, `\/evil.com`, `\\evil.com`) and schemeless-authority URLs (`https:/evil.com`, `javascript:alert(1)`) instead of returning them as safe. Browsers normalize backslashes to forward slashes and single-slash schemes to authority form, so any of those vectors smuggled past the previous check would navigate off-site after `redirectTo()`. Scheme detection now uses the RFC 3986 grammar (`ReFindNoCase("^[a-z][a-z0-9+.-]*:")`) and runs before the relative-URL fast path; backslashes are rejected up front, so the same-domain `ListFirst` no longer needs to treat `\` as a delimiter. Same-origin absolute URLs and genuine relative paths remain allowed (#2898)
+
+----
+
 # [4.0.3](https://github.com/wheels-dev/wheels/releases/tag/v4.0.3) => 2026-06-09
 
 > **Wheels 4.0.3** — third patch on the 4.0 line. Completes the CLI argument-parsing overhaul (`ArgSpec` consumes LuCLI's structured arguments in every command — `--no-*` negations and named-only flags now reach their parsers, and user-error paths exit non-zero) and lands the fixes from a full 24-command CLI audit; write-side commands (`migrate`, `seed`, `reload`, `generate admin`) now refuse to attach to a sibling project's server instead of running against the wrong database; PostgreSQL/CockroachDB foreign-key migrations and pre-23c Oracle `DROP TABLE`/`DROP VIEW` work again; framework helpers can no longer be invoked as controller actions from a URL; auto-derived model properties preserve database column casing; and scaffolded apps keep their reload password out of source control (`WHEELS_RELOAD_PASSWORD` in `.env`). ~45 PRs since the 4.0.2 GA (2026-05-27).
