@@ -47,8 +47,14 @@ component {
 				if (StructCount(local.layout) eq StructCount(arguments)) {
 					local.oneKeyIsDifferent = false;
 					for (local.key in arguments) {
-						// Compare key presence first since an equal key count does not guarantee the same key set (e.g. one declaration using `only` and another using `except`).
-						if (!StructKeyExists(local.layout, local.key) || local.layout[local.key] neq arguments[local.key]) {
+						// Iterating the arguments scope can yield declared-but-unset keys (null-valued on Lucee / Adobe), for which StructKeyExists() returns false.
+						// Treat a key as equal when it is unset on both sides, and as different when it is set on only one side (e.g. one declaration using `only` and another using `except`) or when both are set with different values.
+						local.keyInArguments = StructKeyExists(arguments, local.key);
+						local.keyInLayout = StructKeyExists(local.layout, local.key);
+						if (
+							local.keyInArguments neq local.keyInLayout
+							|| (local.keyInArguments && local.layout[local.key] neq arguments[local.key])
+						) {
 							local.oneKeyIsDifferent = true;
 							break;
 						}
