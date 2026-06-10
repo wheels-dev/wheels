@@ -275,25 +275,56 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
 			local.startPar = Find("(", local.sql) + 1;
 			local.endPar = Find(")", local.sql);
-			local.columnList = ReplaceList(
-				Mid(local.sql, local.startPar, (local.endPar - local.startPar)),
-				"#Chr(10)#,#Chr(13)#, ",
-				",,"
-			);
+			local.columnList = "";
+			if (local.endPar) {
+				local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
+
+				// BoxLang compatibility fix - ReplaceList behaves differently
+				if (StructKeyExists(server, "boxlang")) {
+					// For BoxLang, use regex to properly parse column names
+					local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
+					local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
+					local.columnList = Trim(local.columnList);
+				} else {
+					// Original Lucee/ACF behavior
+					local.columnList = ReplaceList(
+						local.rawColumns,
+						"#Chr(10)#,#Chr(13)#, ",
+						",,"
+					);
+				}
+			}
 			// Strip identifier quotes from column list for comparison
 			local.columnList = $stripIdentifierQuotes(local.columnList);
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 
-				// Use @@IDENTITY instead of SCOPE_IDENTITY() for BoxLang compatibility
-				// SCOPE_IDENTITY() returns empty values in BoxLang with SQL Server
+				// Prefer the driver-supplied generated key: mssql-jdbc retrieves it in the
+				// insert's own batch, so it is both scope-safe and trigger-safe — a trigger
+				// that inserts into another identity table cannot leak its key in here.
+				// StructKeyExists is case-insensitive, so Lucee's lowercase `generatedkey`
+				// result key matches. ListFirst because multi-row inserts can return a list.
+				if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
+					local.rv[$generatedKey()] = ListFirst(arguments.result.generatedKey);
+					return local.rv;
+				}
+
+				// Last resort — only runs when the driver supplied no generated key
+				// (currently BoxLang + SQL Server). @@IDENTITY is session-scoped and can
+				// return a trigger-generated identity instead of ours. The order is NOT
+				// flipped to prefer SCOPE_IDENTITY() because a standalone
+				// `SELECT SCOPE_IDENTITY()` executes in its own scope (a batch is a scope)
+				// and returns NULL — the documented BoxLang empty-value behavior — so the
+				// reorder would just add a wasted round-trip per insert and still resolve
+				// via @@IDENTITY. Same-batch retrieval for this fallback is tracked in a
+				// follow-up issue.
 				query = $query(sql = "SELECT @@IDENTITY AS lastId", argumentCollection = arguments.queryAttributes);
-				
-				// Fallback to SCOPE_IDENTITY() if @@IDENTITY fails (for other CFML engines)
-				if (!len(query.lastId)) {
+
+				// Fallback to SCOPE_IDENTITY() if @@IDENTITY returned nothing (other CFML engines).
+				if (!Len(query.lastId)) {
 					query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
 				}
-				
+
 				local.rv[$generatedKey()] = query.lastId;
 				return local.rv;
 			}
