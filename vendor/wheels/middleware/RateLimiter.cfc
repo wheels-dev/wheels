@@ -40,6 +40,15 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @failOpen When true, requests are allowed through if the rate limiter lock times out.
 	 *   Default false (fail-closed, secure by default). Set to true if availability
 	 *   is more important than strict rate enforcement.
+	 * @evictionSampleSize Maximum number of random keys sampled per eviction round when the
+	 *   in-memory store exceeds maxStoreSize after expired-entry removal. Bounds the
+	 *   request-thread work to O(K log K) per round instead of an O(N log N) full-store
+	 *   sort. Only applies when storage="memory". Default: 64.
+	 * @maxKeysScannedPerCleanup Maximum number of keys $maybeCleanup will scan in a single
+	 *   throttle window. Bounds the per-request cleanup cost so the unlucky request that
+	 *   triggers the cleanup pass cannot be stuck scanning the entire store. Successive
+	 *   cleanups continue from a different point in the ConcurrentHashMap's iteration
+	 *   order, so the whole store still gets visited over time. Default: 5000.
 	 */
 	public RateLimiter function init(
 		numeric maxRequests = 60,
@@ -53,7 +62,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		numeric maxStoreSize = 100000,
 		numeric maxTimestampsPerKey = 0,
 		numeric maxKeyLength = 128,
-		boolean failOpen = false
+		boolean failOpen = false,
+		numeric evictionSampleSize = 64,
+		numeric maxKeysScannedPerCleanup = 5000
 	) {
 		if (!ListFindNoCase("fixedWindow,slidingWindow,tokenBucket", arguments.strategy)) {
 			throw(
@@ -90,6 +101,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
+		if (arguments.evictionSampleSize <= 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter evictionSampleSize: #arguments.evictionSampleSize#. Must be a positive number — eviction needs at least one key per sampling round to make progress."
+			);
+		}
+
+		if (arguments.maxKeysScannedPerCleanup <= 0) {
+			throw(
+				type = "Wheels.RateLimiter.InvalidConfiguration",
+				message = "Invalid rate limiter maxKeysScannedPerCleanup: #arguments.maxKeysScannedPerCleanup#. Must be a positive number — a cap of zero would skip cleanup entirely and let the store grow unbounded."
+			);
+		}
+
 		variables.maxRequests = arguments.maxRequests;
 		variables.windowSeconds = arguments.windowSeconds;
 		variables.strategy = arguments.strategy;
@@ -102,6 +127,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.maxTimestampsPerKey = arguments.maxTimestampsPerKey > 0 ? arguments.maxTimestampsPerKey : arguments.maxRequests * 3;
 		variables.maxKeyLength = arguments.maxKeyLength;
 		variables.failOpen = arguments.failOpen;
+		variables.evictionSampleSize = arguments.evictionSampleSize;
+		variables.maxKeysScannedPerCleanup = arguments.maxKeysScannedPerCleanup;
 
 		// In-memory store using ConcurrentHashMap for thread safety.
 		if (variables.storage == "memory") {
@@ -139,8 +166,19 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		if (variables.storage == "memory") {
 			$maybeCleanup(local.now);
 			// Emergency eviction if store is at capacity and this is a new key.
+			// Double-checked locking: only one concurrent request runs the eviction;
+			// the rest re-check inside the lock and find the store has been trimmed.
 			if (variables.store.size() >= variables.maxStoreSize && !variables.store.containsKey(local.clientKey)) {
-				$evictOldest(local.now);
+				try {
+					cflock(name = "wheels-ratelimit-cleanup", type = "exclusive", timeout = 1) {
+						if (variables.store.size() >= variables.maxStoreSize && !variables.store.containsKey(local.clientKey)) {
+							$evictOldest(local.now);
+						}
+					}
+				} catch (any e) {
+					// Lock timeout — another request is already evicting; this request
+					// proceeds and is permitted to insert past maxStoreSize for one cycle.
+				}
 			}
 		}
 
@@ -448,8 +486,14 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				local.currentWindowId = Int(arguments.now / variables.windowSeconds);
 				local.keysToRemove = [];
 				local.keys = variables.store.keySet().toArray();
+				local.scanLimit = Min(ArrayLen(local.keys), variables.maxKeysScannedPerCleanup);
+				local.scanned = 0;
 
 				for (local.key in local.keys) {
+					if (local.scanned >= local.scanLimit) {
+						break;
+					}
+					local.scanned++;
 					local.value = "";
 					if (variables.store.containsKey(local.key)) {
 						local.value = variables.store.get(local.key);
@@ -554,15 +598,41 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				return;
 			}
 
-			// Second pass: sort remaining entries by age and evict oldest.
+			// Second pass: bounded-sample LRU. Sample K random keys per round, sort that
+			// small sample, evict the oldest. K is bounded by evictionSampleSize, so each
+			// round is O(K log K). Replaces the previous full-store O(N log N) sort that
+			// ran on the request thread.
 			local.remainingToEvict = local.toEvict - local.expiredCount;
-			local.keys = variables.store.keySet().toArray();
-			local.entries = [];
-			for (local.key in local.keys) {
-				local.age = 0;
-				if (variables.store.containsKey(local.key)) {
-					local.value = variables.store.get(local.key);
+			local.evicted = 0;
+			// Iteration cap: at minimum one eviction per round, so remainingToEvict + 2
+			// rounds covers the worst case (e.g. when sampling repeatedly picks already-removed keys).
+			local.maxIterations = local.remainingToEvict + 2;
+			local.iteration = 0;
 
+			while (local.evicted < local.remainingToEvict && local.iteration < local.maxIterations) {
+				local.iteration++;
+				local.keys = variables.store.keySet().toArray();
+				if (ArrayLen(local.keys) == 0) {
+					break;
+				}
+				local.sampleCount = Min(variables.evictionSampleSize, ArrayLen(local.keys));
+				local.entries = [];
+				local.usedIndexes = {};
+				local.attempts = 0;
+				local.maxAttempts = local.sampleCount * 3;
+				while (ArrayLen(local.entries) < local.sampleCount && local.attempts < local.maxAttempts) {
+					local.attempts++;
+					local.idx = RandRange(1, ArrayLen(local.keys));
+					if (StructKeyExists(local.usedIndexes, local.idx)) {
+						continue;
+					}
+					local.usedIndexes[local.idx] = true;
+					local.key = local.keys[local.idx];
+					if (!variables.store.containsKey(local.key)) {
+						continue;
+					}
+					local.value = variables.store.get(local.key);
+					local.age = 0;
 					if (variables.strategy == "fixedWindow" && Find(":", local.key)) {
 						local.windowId = Val(ListLast(local.key, ":"));
 						local.age = local.currentWindowId - local.windowId;
@@ -571,23 +641,25 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					} else if (variables.strategy == "tokenBucket" && IsStruct(local.value) && StructKeyExists(local.value, "lastRefill")) {
 						local.age = arguments.now - local.value.lastRefill;
 					}
+					ArrayAppend(local.entries, {key: local.key, age: local.age});
 				}
-				ArrayAppend(local.entries, {key: local.key, age: local.age});
-			}
 
-			// Sort by age descending (oldest first).
-			ArraySort(local.entries, function(a, b) {
-				return (b.age < a.age) ? -1 : ((b.age > a.age) ? 1 : 0);
-			});
-
-			// Evict the oldest entries.
-			local.evicted = 0;
-			for (local.entry in local.entries) {
-				if (local.evicted >= local.remainingToEvict) {
+				if (ArrayLen(local.entries) == 0) {
 					break;
 				}
-				variables.store.remove(local.entry.key);
-				local.evicted++;
+
+				// Sort the small sample by age descending (oldest first). Bounded by K, not N.
+				ArraySort(local.entries, function(a, b) {
+					return (b.age < a.age) ? -1 : ((b.age > a.age) ? 1 : 0);
+				});
+
+				for (local.entry in local.entries) {
+					if (local.evicted >= local.remainingToEvict) {
+						break;
+					}
+					variables.store.remove(local.entry.key);
+					local.evicted++;
+				}
 			}
 		} catch (any e) {
 			// Best-effort eviction — don't let errors propagate.

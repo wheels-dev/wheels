@@ -1011,6 +1011,75 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("RateLimiter bounded eviction and cleanup (##2971)", function() {
+
+			it("rejects evictionSampleSize = 0 as a framework-shaped configuration error", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, evictionSampleSize = 0);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("rejects negative evictionSampleSize", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, evictionSampleSize = -10);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("rejects maxKeysScannedPerCleanup = 0 as a framework-shaped configuration error", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, maxKeysScannedPerCleanup = 0);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("rejects negative maxKeysScannedPerCleanup", function() {
+				expect(function() {
+					new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, maxKeysScannedPerCleanup = -100);
+				}).toThrow("Wheels.RateLimiter.InvalidConfiguration");
+			});
+
+			it("accepts a small evictionSampleSize and remains functional when flooded far past maxStoreSize", function() {
+				// Flood ratio 25x with sample size 8 exercises the bounded-sample LRU path
+				// many times — full-store sorting on the request thread would be 25x O(N log N).
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1000,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					maxStoreSize = 20,
+					evictionSampleSize = 8
+				);
+				var nextFn = function(req) { return "ok"; };
+
+				for (var i = 1; i <= 500; i++) {
+					limiter.handle(request = {remoteAddr = "flood-#i#"}, next = nextFn);
+				}
+
+				var result = limiter.handle(request = {remoteAddr = "after-flood"}, next = nextFn);
+				expect(result).toBe("ok");
+			});
+
+			it("accepts a small maxKeysScannedPerCleanup and remains functional under cleanup pressure", function() {
+				// Small per-cleanup scan cap exercises the bounded-scan path. The limiter
+				// must still function correctly when the inline cleanup can only scan a
+				// fraction of the store per call.
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1000,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					maxStoreSize = 50,
+					maxKeysScannedPerCleanup = 10
+				);
+				var nextFn = function(req) { return "ok"; };
+
+				for (var i = 1; i <= 200; i++) {
+					limiter.handle(request = {remoteAddr = "scan-#i#"}, next = nextFn);
+				}
+
+				var result = limiter.handle(request = {remoteAddr = "after-scan"}, next = nextFn);
+				expect(result).toBe("ok");
+			});
+
+		});
+
 	}
 
 }
