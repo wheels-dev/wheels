@@ -6,7 +6,7 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(function() {
 				jwtService = new wheels.auth.JwtService(
-					secretKey = "test-secret-for-strategy-specs",
+					secretKey = "test-secret-for-strategy-specs-padded-to-32",
 					defaultExpiry = 3600
 				);
 				strategy = new wheels.auth.JwtStrategy(jwtService = jwtService);
@@ -109,7 +109,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("fails with an invalid signature", function() {
-					var otherService = new wheels.auth.JwtService(secretKey = "wrong-key");
+					var otherService = new wheels.auth.JwtService(secretKey = "wrong-key-padded-to-at-least-32-bytes");
 					var token = otherService.encode(claims = {sub = 1});
 					var req = {headers = {authorization = "Bearer " & token}};
 					var result = strategy.authenticate(req);
@@ -192,7 +192,7 @@ component extends="wheels.WheelsTest" {
 					);
 
 					// Send an invalid JWT so the JWT strategy fails
-					var otherService = new wheels.auth.JwtService(secretKey = "wrong-key");
+					var otherService = new wheels.auth.JwtService(secretKey = "wrong-key-padded-to-at-least-32-bytes");
 					var badToken = otherService.encode(claims = {sub = 1});
 					var req = {headers = {authorization = "Bearer " & badToken}};
 					var result = auth.authenticate(request = req);

@@ -29,7 +29,7 @@ Wheels ships four auth components under `wheels.auth.*`:
 |-----------|------|
 | `Authenticator` | Registry that tries registered strategies in order and returns the first success. |
 | `SessionStrategy` | Reads a principal struct from the `session` scope. Handles login/logout. |
-| `TokenStrategy` | Validates an `Authorization: Bearer <token>` header (or `?api_key=`) against a validator callback or a static token map. |
+| `TokenStrategy` | Validates an `Authorization: Bearer <token>` header (or an opt-in query parameter) against a validator callback or a static token map. |
 | `JwtStrategy` | Validates a signed JWT (`Authorization: Bearer <jwt>`) via `JwtService`. |
 
 Each strategy implements a small interface (`getName()`, `supports(request)`, `authenticate(request)`). The authenticator picks the first strategy whose `supports()` returns true, runs its `authenticate()`, and returns a result struct:
@@ -184,7 +184,7 @@ component extends="Model" {
 
 ## Token auth with `TokenStrategy`
 
-`TokenStrategy` extracts a bearer token from `Authorization: Bearer <token>` (or a `?api_key=` query parameter) and validates it against either a **validator callback** — typical for database-backed API keys — or a **static token map** — useful for tests and seeded dev keys.
+`TokenStrategy` extracts a bearer token from `Authorization: Bearer <token>` (or, when explicitly enabled via `queryParam`, a query parameter) and validates it against either a **validator callback** — typical for database-backed API keys — or a **static token map** — useful for tests and seeded dev keys. Static tokens are matched case-sensitively and compared in constant time.
 
 ### Validator callback (database-backed)
 
@@ -265,7 +265,7 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
 }
 ```
 
-The secret lives in the environment (`env("JWT_SECRET")`) — never commit it. `defaultExpiry` is seconds; 3600 = one hour. `issuer` is stamped as the `iss` claim and can be used by downstream validators to reject tokens meant for other services.
+The secret lives in the environment (`env("JWT_SECRET")`) — never commit it, and make it at least 32 random bytes (`JwtService` throws at construction for empty or shorter secrets, per RFC 7518 §3.2). `defaultExpiry` is seconds; 3600 = one hour. `issuer` is stamped as the `iss` claim, and `decode()` rejects tokens whose `iss` is missing or doesn't match it.
 
 ### Issue tokens on login
 
@@ -361,7 +361,8 @@ You don't have to. `Authenticator`, `SessionStrategy`, `TokenStrategy`, and `Jwt
 - **Timing-safe comparison.** The stopgap `authenticate()` uses `==` to compare hashes, which is not timing-safe. Under load an attacker can measure response times to recover the hash byte-by-byte. Swap for a constant-time comparator (`Compare()` in CFML is not guaranteed constant-time either — use a dedicated Java helper) when you ship bcrypt.
 - **Secret rotation.** `JwtService` takes a single `secretKey`. Rotating it invalidates every outstanding token. For gradual rotation, validate against a list of current + previous secrets during the cutover window; the shipped `JwtService` doesn't do this natively, so you'll need to wrap it.
 - **JWT revocation.** JWTs are stateless by design — you cannot revoke an issued token before it expires unless you maintain a server-side deny-list and check it on every request. Keep token expiry short (minutes, not days) and use a refresh-token flow if you need long sessions.
-- **Token leakage in URLs.** `TokenStrategy` accepts `?api_key=` by default. Query strings show up in access logs, referer headers, and browser history. Prefer headers; set `queryParam=""` on `TokenStrategy` init to disable query-string auth entirely.
+- **Token leakage in URLs.** Query-string tokens are disabled by default on both `TokenStrategy` and `JwtStrategy` (`queryParam=""`). Query strings show up in access logs, referer headers, and browser history — prefer the `Authorization` header, and only set `queryParam` if you must support URL-based keys.
+- **Weak JWT secrets.** `JwtService` refuses to construct with an empty secret (`Wheels.Auth.JWT.InvalidSecretKey`) or one shorter than 32 bytes (`Wheels.Auth.JWT.WeakSecretKey`), per RFC 7518 §3.2 — HMAC-SHA256 needs at least 256 bits of key material. Generate a random 32+ byte secret and load it from the environment.
 
 ## Related guides
 

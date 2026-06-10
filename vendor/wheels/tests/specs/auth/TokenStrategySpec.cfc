@@ -21,8 +21,14 @@ component extends="wheels.WheelsTest" {
 					expect(strategy.supports(req)).toBeTrue();
 				});
 
-				it("returns true when query param api_key is present", function() {
+				it("does not read query param tokens by default", function() {
 					var strategy = new wheels.auth.TokenStrategy();
+					var req = {params = {api_key = "abc-123"}};
+					expect(strategy.supports(req)).toBeFalse();
+				});
+
+				it("returns true when query param is present and explicitly enabled", function() {
+					var strategy = new wheels.auth.TokenStrategy(queryParam = "api_key");
 					var req = {params = {api_key = "abc-123"}};
 					expect(strategy.supports(req)).toBeTrue();
 				});
@@ -80,13 +86,25 @@ component extends="wheels.WheelsTest" {
 					expect(result.statusCode).toBe(200);
 				});
 
-				it("succeeds with a valid token from query param", function() {
+				it("succeeds with a valid token from an explicitly enabled query param", function() {
+					var qpStrategy = new wheels.auth.TokenStrategy(
+						tokens = {"valid-key-2" = {id = 2, role = "reader"}},
+						queryParam = "api_key"
+					);
 					var req = {params = {api_key = "valid-key-2"}};
-					var result = strategy.authenticate(req);
+					var result = qpStrategy.authenticate(req);
 
 					expect(result.success).toBeTrue();
 					expect(result.principal.id).toBe(2);
 					expect(result.principal.role).toBe("reader");
+				});
+
+				it("ignores query param tokens by default", function() {
+					var req = {params = {api_key = "valid-key-2"}};
+					var result = strategy.authenticate(req);
+
+					expect(result.success).toBeFalse();
+					expect(result.error).toBe("No token provided");
 				});
 
 				it("fails with an invalid token", function() {
@@ -109,11 +127,44 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("prefers header token over query param", function() {
+					var qpStrategy = new wheels.auth.TokenStrategy(
+						tokens = {
+							"valid-key-1" = {id = 1, role = "admin"},
+							"valid-key-2" = {id = 2, role = "reader"}
+						},
+						queryParam = "api_key"
+					);
 					var req = {
 						headers = {authorization = "Bearer valid-key-1"},
 						params = {api_key = "valid-key-2"}
 					};
-					var result = strategy.authenticate(req);
+					var result = qpStrategy.authenticate(req);
+
+					expect(result.success).toBeTrue();
+					expect(result.principal.id).toBe(1);
+				});
+
+			});
+
+			describe("static token case sensitivity", function() {
+
+				it("rejects a token that differs from the configured key only in case", function() {
+					var caseStrategy = new wheels.auth.TokenStrategy(
+						tokens = {"AbC-123" = {id = 1, role = "admin"}}
+					);
+					var req = {headers = {authorization = "Bearer abc-123"}};
+					var result = caseStrategy.authenticate(req);
+
+					expect(result.success).toBeFalse();
+					expect(result.statusCode).toBe(401);
+				});
+
+				it("accepts a token with the exact configured case", function() {
+					var caseStrategy = new wheels.auth.TokenStrategy(
+						tokens = {"AbC-123" = {id = 1, role = "admin"}}
+					);
+					var req = {headers = {authorization = "Bearer AbC-123"}};
+					var result = caseStrategy.authenticate(req);
 
 					expect(result.success).toBeTrue();
 					expect(result.principal.id).toBe(1);
@@ -337,9 +388,9 @@ component extends="wheels.WheelsTest" {
 					expect(strategy.supports(req)).toBeFalse();
 				});
 
-				it("reads from urlParams as fallback for query param", function() {
+				it("reads from urlParams as fallback for an enabled query param", function() {
 					var tokenMap = {"url-token" = {id = 7}};
-					var strategy = new wheels.auth.TokenStrategy(tokens = tokenMap);
+					var strategy = new wheels.auth.TokenStrategy(tokens = tokenMap, queryParam = "api_key");
 
 					var req = {urlParams = {api_key = "url-token"}};
 					var result = strategy.authenticate(req);
