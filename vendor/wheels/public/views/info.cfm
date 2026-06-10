@@ -151,7 +151,9 @@ if (request.wheels.params.format == "json") {
 		"timestamp": now(),
 		"application": {
 			"name": application.applicationName,
-			"metadata": applicationMeta
+			// Whitelisted subset only: the full getApplicationMetadata() struct
+			// carries datasource definitions and arbitrary app config (issue #2974).
+			"metadata": $safeApplicationMetadata(applicationMeta)
 		},
 		"server": {
 			"cfmlEngine": get("serverName") & " " & get("serverVersion"),
