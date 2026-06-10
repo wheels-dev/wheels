@@ -1457,6 +1457,14 @@ return local.$wheels;
 		if (StructKeyExists(application[local.appKey], "staticRoutes")) {
 			StructClear(application[local.appKey].staticRoutes);
 		}
+		// Drop the URLFor controller/action memo so cached lookups from the
+		// previous route set (including negative-cached misses) can't leak
+		// across a reload. `$addRoute` also clears the memo, but doing it
+		// here guarantees a freshly-reloaded app starts with an empty cache
+		// even before the first `$addRoute` call runs.
+		if (StructKeyExists(application[local.appKey], "urlForCache")) {
+			StructClear(application[local.appKey].urlForCache);
+		}
 		// load wheels internal gui routes
 		// TODO skip this if mode != development|testing?
 		$include(template = "/wheels/public/routes.cfm");
@@ -1558,27 +1566,36 @@ return local.$wheels;
 
 		// Look up actual route paths instead of providing default Wheels path generation.
 		// Loop over all routes to find matching one, break the loop on first match.
-		// If the route is already in the cache we get it from there instead.
+		// The (controller, action) → route-name memo lives in application scope and
+		// negative-caches misses (empty string sentinel) so wildcard-`[controller]`
+		// apps — where `$addRoute` strips the `controller` key, guaranteeing no
+		// match — don't re-scan the route table for every link helper. The cache
+		// is invalidated by `$addRoute` and `$lockedLoadRoutes`.
 		if (!Len(arguments.route) && Len(arguments.action)) {
 			if (!Len(arguments.controller)) {
 				arguments.controller = local.params.controller;
 			}
+			local.appKey = $appKey();
+			if (!StructKeyExists(application[local.appKey], "urlForCache")) {
+				application[local.appKey].urlForCache = {};
+			}
+			local.cache = application[local.appKey].urlForCache;
 			local.key = arguments.controller & "##" & arguments.action;
-			local.cache = request.wheels.urlForCache;
 			if (!StructKeyExists(local.cache, local.key)) {
-				local.iEnd = ArrayLen(application.wheels.routes);
+				local.found = "";
+				local.iEnd = ArrayLen(application[local.appKey].routes);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.route = application.wheels.routes[local.i];
+					local.route = application[local.appKey].routes[local.i];
 					local.controllerMatch = StructKeyExists(local.route, "controller") && local.route.controller == arguments.controller;
 					local.actionMatch = StructKeyExists(local.route, "action") && local.route.action == arguments.action;
 					if (local.controllerMatch && local.actionMatch) {
-						arguments.route = local.route.name;
-						local.cache[local.key] = arguments.route;
+						local.found = local.route.name;
 						break;
 					}
 				}
+				local.cache[local.key] = local.found;
 			}
-			if (StructKeyExists(local.cache, local.key)) {
+			if (Len(local.cache[local.key])) {
 				arguments.route = local.cache[local.key];
 			}
 		}
