@@ -369,6 +369,26 @@ component extends="wheels.Testbox" {
 				expect(ArrayLen(local.matches.pos)).toBe(3)
 			})
 
+			it("leaves parentheses inside character classes untouched", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="wikiPage", pattern="wiki/[slug]", to="wiki##show")
+						.whereMatch("slug", "[\w()-]+")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+
+				// Parens inside a character class are literal characters, not capturing
+				// groups, so wiki-style slugs containing them must keep matching.
+				expect("wiki/page(draft)").toMatch(local.route.regex)
+
+				// A naive "(" to "(?:" rewrite inside the class would silently widen it
+				// to also match "?" and ":".
+				expect("wiki/why?not").notToMatch(local.route.regex)
+				expect("wiki/a:b").notToMatch(local.route.regex)
+			})
+
 			it("throws error when no routes exist", function() {
 				mapper = $mapper().$draw()
 

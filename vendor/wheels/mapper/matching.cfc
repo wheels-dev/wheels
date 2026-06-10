@@ -551,12 +551,25 @@ component {
 	public struct function whereIn(required string variableName, required string values) {
 		// The values are literal strings, not regex source: trim each item and escape regex
 		// metacharacters so values like "readme.txt" match exactly instead of widening the
-		// constraint (an unescaped "." would match any character).
+		// constraint (an unescaped "." would match any character). The escaping is done with
+		// a character scan rather than ReReplace because backslash handling in regex
+		// replacement strings differs across CFML engines (Lucee 7 turns a `\\` replacement
+		// into two literal backslashes, producing a constraint that never matches).
+		local.metaChars = "\^$.|?*+()[]{}";
 		local.escaped = [];
 		for (local.item in ListToArray(arguments.values)) {
 			local.item = Trim(local.item);
 			if (Len(local.item)) {
-				ArrayAppend(local.escaped, ReReplace(local.item, "([\\\^\$\.\|\?\*\+\(\)\[\]\{\}])", "\\\1", "all"));
+				local.escapedItem = "";
+				local.itemLength = Len(local.item);
+				for (local.i = 1; local.i <= local.itemLength; local.i++) {
+					local.char = Mid(local.item, local.i, 1);
+					if (Find(local.char, local.metaChars)) {
+						local.escapedItem &= "\";
+					}
+					local.escapedItem &= local.char;
+				}
+				ArrayAppend(local.escaped, local.escapedItem);
 			}
 		}
 		return $applyConstraintToLastRoute(arguments.variableName, "(?:#ArrayToList(local.escaped, "|")#)");
