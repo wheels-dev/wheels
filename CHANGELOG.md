@@ -18,14 +18,6 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
-# [Unreleased]
-
-### Security
-
-- The HTML branch of `/wheels/info` no longer renders `csrfCookieEncryptionSecretKey` in plaintext. The HTML branch had been routing every setting through `outputSetting() -> formatSettingOutput(get(...))`, which read and rendered the live CSRF cookie encryption key into the page; the JSON branch already omitted it via a hardcoded one-off compare, so the two branches could drift. A shared predicate `$isProtectedSetting()` and display helper `$settingDisplayValue()` on `wheels.Public` now serve as the single source of truth for both branches — secret-shaped setting names (`secret|password|passphrase|privatekey|apikey|credential|token`) render as `<em>[redacted]</em>` without ever being read, so an unset key cannot throw and the value never reaches the output buffer. `accessControlAllowCredentials` is exempt (it mirrors the boolean `Access-Control-Allow-Credentials` CORS response header, not a credential value); without the exemption it would have been redacted in HTML and silently dropped from the JSON `cors` collection. Reachability of `/wheels/info` is gated by `$blockInProduction()` independently — this change only narrows what leaks when the page is reachable. Verified red→green on Lucee 7 + SQLite (#2909)
-
-----
-
 # [4.0.3](https://github.com/wheels-dev/wheels/releases/tag/v4.0.3) => 2026-06-09
 
 > **Wheels 4.0.3** — third patch on the 4.0 line. Completes the CLI argument-parsing overhaul (`ArgSpec` consumes LuCLI's structured arguments in every command — `--no-*` negations and named-only flags now reach their parsers, and user-error paths exit non-zero) and lands the fixes from a full 24-command CLI audit; write-side commands (`migrate`, `seed`, `reload`, `generate admin`) now refuse to attach to a sibling project's server instead of running against the wrong database; PostgreSQL/CockroachDB foreign-key migrations and pre-23c Oracle `DROP TABLE`/`DROP VIEW` work again; framework helpers can no longer be invoked as controller actions from a URL; auto-derived model properties preserve database column casing; and scaffolded apps keep their reload password out of source control (`WHEELS_RELOAD_PASSWORD` in `.env`). ~45 PRs since the 4.0.2 GA (2026-05-27).
