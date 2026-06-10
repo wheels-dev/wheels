@@ -578,8 +578,20 @@ component {
 			if (StructKeyExists(arguments, local.item) && Len(arguments[local.item])) {
 				local.key = local.item & "Evaluated";
 				try {
-        	local[local.key] = $evaluateConditionString(arguments[local.item]);
+					local[local.key] = $evaluateConditionString(arguments[local.item]);
 				} catch (any e) {
+					if ($get("showErrorInformation")) {
+						Throw(
+							type = "Wheels.InvalidValidationCondition",
+							message = "The `#local.item#` expression `#arguments[local.item]#` could not be evaluated: #e.message#",
+							extendedInfo = "Supported forms: `this.property`, `this.method()`, bare `method()` (optionally negated with `!`), and binary comparisons using eq/neq/lt/lte/gt/gte or ==/!=/</<=/>/>=."
+						);
+					}
+					cflog(
+						text = "Wheels: validation `#local.item#` expression `#arguments[local.item]#` could not be evaluated (#e.message#); validation skipped.",
+						type = "error",
+						file = "wheels-errors"
+					);
 					return false;
 				}
 			}
@@ -838,23 +850,30 @@ component {
 	 * Normalizes symbolic comparison operators to their CFML string equivalents.
 	 */
 	public string function $normalizeConditionOperators(required string condition) {
-		local.rv = ReplaceList(arguments.condition, "==,!=,<,<=,>,>=", "eq,neq,lt,lte,gt,gte");
-		return Replace(local.rv, "  ", " ", "all");
+		// Replace two-character operators first so the single-character "<" and ">"
+		// replacements cannot mangle "<=" and ">=" into "lt=" and "gt=".
+		local.rv = Replace(arguments.condition, "==", " eq ", "all");
+		local.rv = Replace(local.rv, "!=", " neq ", "all");
+		local.rv = Replace(local.rv, "<=", " lte ", "all");
+		local.rv = Replace(local.rv, ">=", " gte ", "all");
+		local.rv = Replace(local.rv, "<", " lt ", "all");
+		local.rv = Replace(local.rv, ">", " gt ", "all");
+		return Trim(REReplace(local.rv, "\s+", " ", "all"));
 	}
 
 	/**
-	 * Splits a normalized condition on the last matching comparison operator.
+	 * Splits a normalized condition on the first whitespace-delimited comparison operator.
 	 * Returns {expression} always, plus {operator, rightOperand} when an operator is found.
 	 */
 	public struct function $splitConditionOnOperator(required string condition) {
 		local.rv = {expression: arguments.condition};
-		for (local.op in ListToArray("eq,neq,lt,lte,gt,gte")) {
-			local.position = FindNoCase(local.op, arguments.condition);
-			if (local.position) {
-				local.rv.expression = Trim(Mid(arguments.condition, 1, local.position - 1));
-				local.rv.operator = local.op;
-				local.rv.rightOperand = Trim(Mid(arguments.condition, local.position + Len(local.op), Len(arguments.condition)));
-			}
+		local.padded = " " & arguments.condition & " ";
+		local.match = REFindNoCase("\s(neq|lte|gte|eq|lt|gt)\s", local.padded, 1, true);
+		if (local.match.pos[1] > 0) {
+			local.rv.expression = Trim(Mid(local.padded, 1, local.match.pos[2] - 1));
+			// LCase keeps the operator compatible with the case-sensitive switch in $resolveOperator on Adobe CF.
+			local.rv.operator = LCase(Mid(local.padded, local.match.pos[2], local.match.len[2]));
+			local.rv.rightOperand = Trim(Mid(local.padded, local.match.pos[2] + local.match.len[2], Len(local.padded)));
 		}
 		return local.rv;
 	}
