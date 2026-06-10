@@ -2,7 +2,7 @@
 title: 'Wheels 4.0.3: rebuilt CLI argument parsing, honest exit codes, and wrong-database guardrails'
 slug: wheels-4-0-3-released
 publishedAt: '2026-06-10T00:00:00.000Z'
-updatedAt: '2026-06-10T11:47:37.000Z'
+updatedAt: '2026-06-10T20:56:50.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
