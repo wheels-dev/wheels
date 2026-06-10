@@ -229,6 +229,95 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("toInputSchema() — typed MCP tool input schema", () => {
+
+				// #2963 / wave-2 §5.2: MCP tool input schemas. Auto-discovered
+				// tools in Module.cfc advertise empty `properties` so MCP
+				// clients can't discover parameters. The fix derives the
+				// per-tool schema from the same ArgSpec the command already
+				// declares (FastMCP / Symfony JsonDescriptor pattern) — one
+				// source of truth, no hand-written drift.
+
+				it("returns a JSON-Schema-compatible object envelope", () => {
+					var schema = new cli.lucli.services.ArgSpec().toInputSchema();
+					expect(schema.type).toBe("object");
+					expect(structKeyExists(schema, "properties")).toBeTrue();
+					expect(structKeyExists(schema, "required")).toBeTrue();
+					// Hostile clients sending an unknown key shouldn't be
+					// silently tolerated — match the existing hidden-tool
+					// pattern (additionalProperties:false).
+					expect(schema.additionalProperties).toBeFalse();
+				});
+
+				it("emits one property per declared positional, flag, and option", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName", required = true, description = "App folder name")
+						.flag(name = "sqlite", default = true, description = "Use SQLite datasource")
+						.option(name = "datasource", default = "", description = "Datasource name")
+						.toInputSchema();
+					expect(structKeyExists(schema.properties, "appName")).toBeTrue();
+					expect(structKeyExists(schema.properties, "sqlite")).toBeTrue();
+					expect(structKeyExists(schema.properties, "datasource")).toBeTrue();
+				});
+
+				it("lists required positionals in the required array", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName", required = true)
+						.positional(name = "templateName", required = false, default = "default")
+						.toInputSchema();
+					expect(schema.required).toInclude("appName");
+					expect(schema.required).notToInclude("templateName");
+				});
+
+				it("maps positional type=string to JSON Schema type 'string'", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName", required = true)
+						.toInputSchema();
+					expect(schema.properties.appName.type).toBe("string");
+				});
+
+				it("maps option type=numeric to JSON Schema type 'number'", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.option(name = "port", default = 3000, type = "numeric")
+						.toInputSchema();
+					expect(schema.properties.port.type).toBe("number");
+				});
+
+				it("maps flag to JSON Schema type 'boolean'", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.flag(name = "sqlite", default = true)
+						.toInputSchema();
+					expect(schema.properties.sqlite.type).toBe("boolean");
+				});
+
+				it("includes the description on each property when supplied", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName", required = true, description = "App folder name")
+						.flag(name = "sqlite", default = true, description = "Use SQLite datasource")
+						.option(name = "datasource", default = "", description = "Datasource name")
+						.toInputSchema();
+					expect(schema.properties.appName.description).toBe("App folder name");
+					expect(schema.properties.sqlite.description).toBe("Use SQLite datasource");
+					expect(schema.properties.datasource.description).toBe("Datasource name");
+				});
+
+				it("includes the declared default in each property", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.flag(name = "sqlite", default = true)
+						.option(name = "datasource", default = "wheelsapp")
+						.toInputSchema();
+					expect(schema.properties.sqlite.default).toBeTrue();
+					expect(schema.properties.datasource.default).toBe("wheelsapp");
+				});
+
+				it("returns an empty schema (no properties, no required) when nothing is declared", () => {
+					var schema = new cli.lucli.services.ArgSpec().toInputSchema();
+					expect(structIsEmpty(schema.properties)).toBeTrue();
+					expect(arrayLen(schema.required)).toBe(0);
+				});
+
+			});
+
 		});
 
 	}
