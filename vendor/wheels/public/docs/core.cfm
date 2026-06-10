@@ -40,7 +40,7 @@ if (StructKeyExists(application.wheels, "docs")) {
 	ArrayAppend(documentScope, {"name" = "model", "scope" = modelInstance});
 	
 	ArrayAppend(documentScope, {"name" = "mapper", "scope" = application.wheels.mapper});
-	if (application.wheels.enablePluginsComponent) {
+	if (application.wheels.enableMigratorComponent) {
 		ArrayAppend(documentScope, {"name" = "migrator", "scope" = application.wheels.migrator});
 		ArrayAppend(
 			documentScope,
