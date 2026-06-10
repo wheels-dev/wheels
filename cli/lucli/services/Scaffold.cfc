@@ -572,6 +572,13 @@ component {
 		var nl = chr(10);
 		var t = chr(9);
 
+		// processRequest() takes a params STRUCT (with the route NAME inside it,
+		// not a URL path) and needs returnAs="struct" for the result to expose
+		// `status`. Routes added by updateApiRoutes() live in .namespace("api"),
+		// which prefixes child route names: apiProducts / apiProduct.
+		var collectionRoute = "api" & variables.helpers.capitalize(plural);
+		var memberRoute = "api" & variables.helpers.capitalize(singular);
+
 		var c = 'component extends="wheels.WheelsTest" {' & nl & nl;
 		c &= t & 'function run() {' & nl;
 		c &= t & t & 'describe("API #arguments.controllerName# Controller", () => {' & nl & nl;
@@ -579,24 +586,24 @@ component {
 		c &= t & t & t & t & '// Setup test data' & nl;
 		c &= t & t & t & '})' & nl & nl;
 		c &= t & t & t & 'it("GET /api/#plural# returns JSON list", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#", method="get", params={format: "json"});' & nl;
+		c &= t & t & t & t & 'result = processRequest(params={route: "#collectionRoute#", format: "json"}, method="get", returnAs="struct");' & nl;
 		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
 		c &= t & t & t & t & 'expect(result.status).toBe(200);' & nl;
 		c &= t & t & t & '})' & nl & nl;
 		c &= t & t & t & 'it("GET /api/#plural#/:key returns JSON record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#/1", method="get", params={format: "json"});' & nl;
+		c &= t & t & t & t & 'result = processRequest(params={route: "#memberRoute#", key: 1, format: "json"}, method="get", returnAs="struct");' & nl;
 		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
 		c &= t & t & t & '})' & nl & nl;
 		c &= t & t & t & 'it("POST /api/#plural# creates record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#", method="post", params={format: "json", #singular#: {}});' & nl;
+		c &= t & t & t & t & 'result = processRequest(params={route: "#collectionRoute#", format: "json", #singular#: {}}, method="post", returnAs="struct");' & nl;
 		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
 		c &= t & t & t & '})' & nl & nl;
 		c &= t & t & t & 'it("PUT /api/#plural#/:key updates record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#/1", method="put", params={format: "json", #singular#: {}});' & nl;
+		c &= t & t & t & t & 'result = processRequest(params={route: "#memberRoute#", key: 1, format: "json", #singular#: {}}, method="put", returnAs="struct");' & nl;
 		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
 		c &= t & t & t & '})' & nl & nl;
 		c &= t & t & t & 'it("DELETE /api/#plural#/:key deletes record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(route="/api/#plural#/1", method="delete", params={format: "json"});' & nl;
+		c &= t & t & t & t & 'result = processRequest(params={route: "#memberRoute#", key: 1, format: "json"}, method="delete", returnAs="struct");' & nl;
 		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
 		c &= t & t & t & '})' & nl & nl;
 		c &= t & t & '})' & nl;
@@ -635,8 +642,13 @@ component {
 		var t = chr(9);
 		var c = "";
 
+		// Failure tracking uses a struct field (state.exception), NOT local.X:
+		// `local.X = ...` inside a catch body does not persist on BoxLang
+		// (Cross-Engine Invariant #11), which silently turned failed
+		// migrations into committed "successes".
 		c &= 'component extends="wheels.migrator.Migration" hint="Migration: #arguments.className#" {' & nl & nl;
 		c &= t & 'function up() {' & nl;
+		c &= t & t & 'var state = {};' & nl;
 		c &= t & t & 'transaction {' & nl;
 		c &= t & t & t & 'try {' & nl;
 		c &= t & t & t & t & "t = createTable(name='#arguments.tableName#', force='false', id='true', primaryKey='#arguments.primaryKey#');" & nl;
@@ -662,11 +674,11 @@ component {
 		c &= t & t & t & t & "t.timestamps();" & nl;
 		c &= t & t & t & t & "t.create();" & nl;
 		c &= t & t & t & '} catch (any e) {' & nl;
-		c &= t & t & t & t & 'local.exception = e;' & nl;
+		c &= t & t & t & t & 'state.exception = e;' & nl;
 		c &= t & t & t & '}' & nl & nl;
-		c &= t & t & t & 'if (StructKeyExists(local, "exception")) {' & nl;
+		c &= t & t & t & 'if (StructKeyExists(state, "exception")) {' & nl;
 		c &= t & t & t & t & 'transaction action="rollback";' & nl;
-		c &= t & t & t & t & 'Throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");' & nl;
+		c &= t & t & t & t & 'Throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");' & nl;
 		c &= t & t & t & '} else {' & nl;
 		c &= t & t & t & t & 'transaction action="commit";' & nl;
 		c &= t & t & t & '}' & nl;
@@ -674,15 +686,16 @@ component {
 		c &= t & '}' & nl & nl;
 
 		c &= t & 'function down() {' & nl;
+		c &= t & t & 'var state = {};' & nl;
 		c &= t & t & 'transaction {' & nl;
 		c &= t & t & t & 'try {' & nl;
 		c &= t & t & t & t & "dropTable('#arguments.tableName#');" & nl;
 		c &= t & t & t & '} catch (any e) {' & nl;
-		c &= t & t & t & t & 'local.exception = e;' & nl;
+		c &= t & t & t & t & 'state.exception = e;' & nl;
 		c &= t & t & t & '}' & nl & nl;
-		c &= t & t & t & 'if (StructKeyExists(local, "exception")) {' & nl;
+		c &= t & t & t & 'if (StructKeyExists(state, "exception")) {' & nl;
 		c &= t & t & t & t & 'transaction action="rollback";' & nl;
-		c &= t & t & t & t & 'Throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");' & nl;
+		c &= t & t & t & t & 'Throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");' & nl;
 		c &= t & t & t & '} else {' & nl;
 		c &= t & t & t & t & 'transaction action="commit";' & nl;
 		c &= t & t & t & '}' & nl;

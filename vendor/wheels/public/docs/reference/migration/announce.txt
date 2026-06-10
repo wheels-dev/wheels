@@ -1,5 +1,6 @@
 // 1. Log a custom message during a migration's up() step
 function up() {
+	var state = {};
 	transaction {
 		try {
 			t = createTable(name="articles", force=true);
@@ -9,12 +10,12 @@ function up() {
 			t.create();
 			announce("Created articles table");
 		} catch (any e) {
-			local.exception = e;
+			state.exception = e;
 		}
 
-		if (StructKeyExists(local, "exception")) {
+		if (StructKeyExists(state, "exception")) {
 			transaction action="rollback";
-			throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
+			throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");
 		} else {
 			transaction action="commit";
 		}
@@ -23,6 +24,7 @@ function up() {
 
 // 2. Announce multiple steps to provide granular feedback
 function up() {
+	var state = {};
 	transaction {
 		try {
 			addColumn(table="users", columnType="string", columnName="apiKey", limit=64, allowNull=true);
@@ -31,12 +33,12 @@ function up() {
 			addIndex(table="users", columnNames="apiKey", unique=true);
 			announce("Added unique index on users.apiKey");
 		} catch (any e) {
-			local.exception = e;
+			state.exception = e;
 		}
 
-		if (StructKeyExists(local, "exception")) {
+		if (StructKeyExists(state, "exception")) {
 			transaction action="rollback";
-			throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
+			throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");
 		} else {
 			transaction action="commit";
 		}

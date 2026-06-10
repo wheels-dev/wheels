@@ -29,18 +29,19 @@
 component extends="[extends]" hint="[description]" {
 
 	function up() {
+		var state = {};
 		transaction {
 			try {
 				t = createTable(name = 'tableName');
 				t.timestamps();
 				t.create();
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
 
-			if (StructKeyExists(local, "exception")) {
+			if (StructKeyExists(state, "exception")) {
 				transaction action="rollback";
-				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+				Throw(errorCode = "1", detail = state.exception.detail, message = state.exception.message, type = "any");
 			} else {
 				transaction action="commit";
 			}
@@ -48,16 +49,17 @@ component extends="[extends]" hint="[description]" {
 	}
 
 	function down() {
+		var state = {};
 		transaction {
 			try {
 				dropTable('tableName');
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
 
-			if (StructKeyExists(local, "exception")) {
+			if (StructKeyExists(state, "exception")) {
 				transaction action="rollback";
-				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+				Throw(errorCode = "1", detail = state.exception.detail, message = state.exception.message, type = "any");
 			} else {
 				transaction action="commit";
 			}
