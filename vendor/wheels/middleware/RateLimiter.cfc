@@ -90,22 +90,6 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
-		// A non-positive window is nonsensical and divides by zero in the fixedWindow / tokenBucket math.
-		if (arguments.windowSeconds <= 0) {
-			throw(
-				type = "Wheels.RateLimiter.InvalidConfiguration",
-				message = "Invalid rate limiter windowSeconds: #arguments.windowSeconds#. Must be a positive number of seconds."
-			);
-		}
-
-		// maxRequests = 0 is a legitimate kill-switch (block everything); negative values are not.
-		if (arguments.maxRequests < 0) {
-			throw(
-				type = "Wheels.RateLimiter.InvalidConfiguration",
-				message = "Invalid rate limiter maxRequests: #arguments.maxRequests#. Must be zero or greater."
-			);
-		}
-
 		variables.maxRequests = arguments.maxRequests;
 		variables.windowSeconds = arguments.windowSeconds;
 		variables.strategy = arguments.strategy;
@@ -130,6 +114,16 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 		// Track whether DB table has been verified.
 		variables.tableVerified = false;
+
+		// Datasource for database storage is resolved lazily (see $queryOptions()) because
+		// middleware is typically constructed in config/settings.cfm, before
+		// application.wheels.dataSourceName is guaranteed to exist.
+		variables.datasourceResolved = false;
+		variables.resolvedDatasource = "";
+
+		// Throttle markers for database housekeeping (epoch seconds via GetTickCount() / 1000).
+		variables.lastDbPurge = 0;
+		variables.lastTableAttempt = 0;
 
 		return this;
 	}
@@ -606,14 +600,20 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 	/**
 	 * Database-backed fixed window increment.
+	 * Uses an UPDATE-first algorithm: increment the existing counter row, and only INSERT
+	 * when no row exists yet. This enforces correctly on every engine, with or without a
+	 * unique index, and against tables created by older framework versions.
 	 */
 	private struct function $dbIncrement(required string clientKey, required string storeKey, required numeric resetAt) {
-		$ensureTable();
+		if (!$ensureTable()) {
+			local.err = $handleError("table unavailable", arguments.clientKey);
+			return {allowed: local.err.allowed, remaining: local.err.remaining, resetAt: arguments.resetAt};
+		}
 
 		// Kill-switch: maxRequests = 0 blocks every request. Short-circuit before the
 		// INSERT path, which would otherwise allow the first request per window through
 		// because local.allowed is initialised to true and the counter > maxRequests
-		// check (line below) only fires from the UPDATE branch on subsequent requests.
+		// check (line below) only fires once a counter row exists.
 		if (variables.maxRequests == 0) {
 			return {allowed: false, remaining: 0, resetAt: arguments.resetAt};
 		}
@@ -622,61 +622,109 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		local.remaining = variables.maxRequests;
 
 		try {
-			// Try to insert a new row.
-			QueryExecute(
-				"INSERT INTO wheels_rate_limits (store_key, counter, expires_at) VALUES (:storeKey, 1, :expiresAt)",
-				{storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"}, expiresAt: {value: DateAdd("s", variables.windowSeconds, Now()), cfsqltype: "cf_sql_timestamp"}}
-			);
-			local.remaining = variables.maxRequests - 1;
-		} catch (any e) {
-			// Row exists — update the counter.
-			try {
-				local.qUpdate = QueryExecute(
-					"UPDATE wheels_rate_limits SET counter = counter + 1 WHERE store_key = :storeKey",
-					{storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"}}
-				);
-				// Read current count.
-				local.qCount = QueryExecute(
-					"SELECT counter FROM wheels_rate_limits WHERE store_key = :storeKey",
-					{storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"}}
-				);
-				if (local.qCount.recordCount && local.qCount.counter > variables.maxRequests) {
-					local.allowed = false;
-					local.remaining = 0;
-				} else if (local.qCount.recordCount) {
-					local.remaining = variables.maxRequests - local.qCount.counter;
+			$dbPurgeExpired();
+
+			local.count = $dbUpdateAndCount(arguments.storeKey);
+			if (local.count == -1) {
+				// No counter row for this window yet — create it.
+				if ($dbTryInsert(arguments.storeKey)) {
+					local.count = 1;
+				} else {
+					// Lost the first-insert race to a concurrent request — re-read once.
+					local.count = $dbUpdateAndCount(arguments.storeKey);
 				}
-			} catch (any e2) {
-				local.err = $handleError("DB error", arguments.clientKey);
-				local.allowed = local.err.allowed;
-				local.remaining = local.err.remaining;
 			}
+			if (local.count == -1) {
+				// Still no row — surface as a DB error via the catch below.
+				throw(
+					type = "Wheels.RateLimiter.StoreUnavailable",
+					message = "The wheels_rate_limits counter row could not be created or read."
+				);
+			}
+
+			if (local.count > variables.maxRequests) {
+				local.allowed = false;
+				local.remaining = 0;
+			} else {
+				local.remaining = variables.maxRequests - local.count;
+			}
+		} catch (any e) {
+			local.err = $handleError("DB error", arguments.clientKey);
+			local.allowed = local.err.allowed;
+			local.remaining = local.err.remaining;
 		}
 
 		return {allowed: local.allowed, remaining: local.remaining, resetAt: arguments.resetAt};
 	}
 
 	/**
+	 * Increment the counter for a store key and return the resulting count.
+	 * Returns -1 when no counter row exists yet (MAX() over zero rows returns a single
+	 * row with NULL, so IsNumeric — not recordCount — is the reliable "no row" signal).
+	 */
+	private numeric function $dbUpdateAndCount(required string storeKey) {
+		QueryExecute(
+			"UPDATE wheels_rate_limits SET counter = counter + 1 WHERE store_key = :storeKey",
+			{storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"}},
+			$queryOptions()
+		);
+		local.qCount = QueryExecute(
+			"SELECT MAX(counter) AS counter FROM wheels_rate_limits WHERE store_key = :storeKey",
+			{storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"}},
+			$queryOptions()
+		);
+		if (!IsNumeric(local.qCount.counter)) {
+			return -1;
+		}
+		return local.qCount.counter;
+	}
+
+	/**
+	 * Insert the first counter row for a store key.
+	 * Returns false when the insert fails (e.g. losing a race against a concurrent
+	 * request when a unique index exists) so the caller can re-read instead.
+	 */
+	private boolean function $dbTryInsert(required string storeKey) {
+		try {
+			QueryExecute(
+				"INSERT INTO wheels_rate_limits (store_key, counter, expires_at) VALUES (:storeKey, 1, :expiresAt)",
+				{storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"}, expiresAt: {value: DateAdd("s", variables.windowSeconds, Now()), cfsqltype: "cf_sql_timestamp"}},
+				$queryOptions()
+			);
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
 	 * Database-backed sliding window check.
 	 */
 	private struct function $dbSlidingWindow(required string clientKey, required numeric now, required numeric windowStart, required numeric resetAt) {
-		$ensureTable();
+		if (!$ensureTable()) {
+			local.err = $handleError("table unavailable", arguments.clientKey);
+			return {allowed: local.err.allowed, remaining: local.err.remaining, resetAt: arguments.resetAt};
+		}
 
 		local.allowed = true;
 		local.remaining = variables.maxRequests;
 		local.expiresAt = DateAdd("s", variables.windowSeconds, Now());
 
 		try {
+			$dbPurgeExpired();
+
 			// Clean expired entries for this client.
 			QueryExecute(
 				"DELETE FROM wheels_rate_limits WHERE store_key = :clientKey AND expires_at < :now",
-				{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}, now: {value: Now(), cfsqltype: "cf_sql_timestamp"}}
+				{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}, now: {value: Now(), cfsqltype: "cf_sql_timestamp"}},
+				$queryOptions()
 			);
 
 			// Count current entries.
 			local.qCount = QueryExecute(
 				"SELECT COUNT(*) AS cnt FROM wheels_rate_limits WHERE store_key = :clientKey",
-				{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}}
+				{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}},
+				$queryOptions()
 			);
 
 			if (local.qCount.cnt >= variables.maxRequests) {
@@ -686,7 +734,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				// Insert a new timestamp entry.
 				QueryExecute(
 					"INSERT INTO wheels_rate_limits (store_key, counter, expires_at) VALUES (:clientKey, 1, :expiresAt)",
-					{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}, expiresAt: {value: local.expiresAt, cfsqltype: "cf_sql_timestamp"}}
+					{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}, expiresAt: {value: local.expiresAt, cfsqltype: "cf_sql_timestamp"}},
+					$queryOptions()
 				);
 				local.remaining = variables.maxRequests - local.qCount.cnt - 1;
 			}
@@ -703,15 +752,21 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Database-backed token bucket check.
 	 */
 	private struct function $dbTokenBucket(required string clientKey, required numeric now, required numeric refillRate, required numeric resetAt) {
-		$ensureTable();
+		if (!$ensureTable()) {
+			local.err = $handleError("table unavailable", arguments.clientKey);
+			return {allowed: local.err.allowed, remaining: local.err.remaining, resetAt: arguments.resetAt};
+		}
 
 		local.allowed = true;
 		local.remaining = variables.maxRequests;
 
 		try {
+			$dbPurgeExpired();
+
 			local.qBucket = QueryExecute(
 				"SELECT counter, expires_at FROM wheels_rate_limits WHERE store_key = :clientKey",
-				{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}}
+				{clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}},
+				$queryOptions()
 			);
 
 			if (local.qBucket.recordCount) {
@@ -732,7 +787,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 							tokens: {value: Int(local.currentTokens), cfsqltype: "cf_sql_integer"},
 							now: {value: Now(), cfsqltype: "cf_sql_timestamp"},
 							clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"}
-						}
+						},
+						$queryOptions()
 					);
 				}
 			} else {
@@ -744,7 +800,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 						clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"},
 						tokens: {value: local.remaining, cfsqltype: "cf_sql_integer"},
 						now: {value: Now(), cfsqltype: "cf_sql_timestamp"}
-					}
+					},
+					$queryOptions()
 				);
 			}
 		} catch (any e) {
@@ -757,29 +814,167 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	}
 
 	/**
-	 * Auto-create the wheels_rate_limits table if it doesn't exist.
+	 * Resolve query options for database storage. The Wheels datasource is resolved
+	 * lazily (not in init()) because middleware is constructed in config/settings.cfm
+	 * before application.wheels.dataSourceName may be set. Apps relying on a default
+	 * datasource (this.datasource in Application.cfc) keep working: when nothing
+	 * resolves, an empty options struct preserves the previous behavior.
 	 */
-	private void function $ensureTable() {
-		if (variables.tableVerified) {
+	private struct function $queryOptions() {
+		if (!variables.datasourceResolved) {
+			try {
+				if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
+					variables.resolvedDatasource = application.wheels.dataSourceName;
+					variables.datasourceResolved = true;
+				}
+			} catch (any e) {
+				// No application scope available — fall through to the default datasource.
+			}
+		}
+		if (Len(variables.resolvedDatasource)) {
+			return {datasource: variables.resolvedDatasource};
+		}
+		return {};
+	}
+
+	/**
+	 * Detect the database type from the actual datasource via JDBC metadata.
+	 * Returns: "oracle", "postgresql", "h2", "mysql", "sqlserver", "sqlite", or "default".
+	 */
+	private string function $detectDatabaseType() {
+		try {
+			local.options = $queryOptions();
+			if (StructKeyExists(local.options, "datasource")) {
+				cfdbinfo(type = "version", datasource = "#local.options.datasource#", name = "local.info");
+			} else {
+				cfdbinfo(type = "version", name = "local.info");
+			}
+			local.product = local.info.database_productname;
+			if (FindNoCase("oracle", local.product)) return "oracle";
+			if (FindNoCase("postgre", local.product)) return "postgresql";
+			if (FindNoCase("h2", local.product)) return "h2";
+			if (FindNoCase("mysql", local.product) || FindNoCase("mariadb", local.product)) return "mysql";
+			if (FindNoCase("sql server", local.product)) return "sqlserver";
+			if (FindNoCase("sqlite", local.product)) return "sqlite";
+		} catch (any e) {
+			// cfdbinfo not available — fall through to default
+		}
+		return "default";
+	}
+
+	/**
+	 * Throttled global purge of expired rows so the table doesn't grow without bound.
+	 * The cutoff trails Now() by windowSeconds because the token bucket strategy stores
+	 * its last-refill time in expires_at: a bucket idle longer than windowSeconds is
+	 * fully refilled, so deleting it is semantically a no-op, while purging at Now()
+	 * would wipe live buckets. For fixed/sliding window rows the extra lag is harmless.
+	 */
+	private void function $dbPurgeExpired() {
+		local.nowSeconds = GetTickCount() / 1000;
+		if ((local.nowSeconds - variables.lastDbPurge) < variables.cleanupThrottleSeconds) {
 			return;
 		}
+		variables.lastDbPurge = local.nowSeconds;
 
 		try {
 			QueryExecute(
-				"CREATE TABLE IF NOT EXISTS wheels_rate_limits (
-					id INT AUTO_INCREMENT PRIMARY KEY,
-					store_key VARCHAR(255) NOT NULL,
-					counter INT DEFAULT 1,
-					expires_at TIMESTAMP,
-					INDEX idx_store_key (store_key),
-					INDEX idx_expires_at (expires_at)
-				)"
+				"DELETE FROM wheels_rate_limits WHERE expires_at < :cutoff",
+				{cutoff: {value: DateAdd("s", -variables.windowSeconds, Now()), cfsqltype: "cf_sql_timestamp"}},
+				$queryOptions()
 			);
 		} catch (any e) {
-			// Table may already exist or DB doesn't support IF NOT EXISTS — that's fine.
+			// Best-effort purge — never block the rate limit check.
+		}
+	}
+
+	/**
+	 * Auto-create the wheels_rate_limits table if it doesn't exist, using
+	 * database-appropriate column types. Returns true only when the table is
+	 * verified to exist (pre-existing tables from older framework versions are
+	 * accepted as-is). Failed creation attempts are throttled so a permanently
+	 * broken configuration doesn't run DDL on every request, but the limiter can
+	 * still recover once the database becomes available.
+	 *
+	 * NOTE: store_key intentionally has a plain (non-unique) index — the sliding
+	 * window strategy stores one row per request under the same store_key.
+	 */
+	private boolean function $ensureTable() {
+		if (variables.tableVerified) {
+			return true;
 		}
 
-		variables.tableVerified = true;
+		// Throttle re-attempts after a failure so a broken configuration doesn't
+		// probe and run DDL on every request.
+		local.nowSeconds = GetTickCount() / 1000;
+		if (variables.lastTableAttempt > 0 && (local.nowSeconds - variables.lastTableAttempt) < variables.cleanupThrottleSeconds) {
+			return false;
+		}
+
+		// Probe for an existing table. This also accepts tables created by older
+		// framework versions (extra columns like the legacy id column are fine).
+		try {
+			QueryExecute("SELECT counter FROM wheels_rate_limits WHERE 1=0", {}, $queryOptions());
+			variables.tableVerified = true;
+			return true;
+		} catch (any e) {
+			// Table doesn't exist (or isn't reachable) — try to create it below.
+		}
+
+		variables.lastTableAttempt = local.nowSeconds;
+
+		try {
+			// Use database-appropriate types (same map as wheels.Job's wheels_jobs table).
+			// SQL Server must get DATETIME — TIMESTAMP means rowversion there and
+			// rejects explicit inserts.
+			local.dbType = $detectDatabaseType();
+			if (local.dbType == "oracle") {
+				local.varcharType = "VARCHAR2";
+				local.datetimeType = "TIMESTAMP";
+			} else if (local.dbType == "postgresql") {
+				local.varcharType = "VARCHAR";
+				local.datetimeType = "TIMESTAMP";
+			} else if (local.dbType == "h2") {
+				local.varcharType = "VARCHAR";
+				local.datetimeType = "TIMESTAMP";
+			} else {
+				local.varcharType = "VARCHAR";
+				local.datetimeType = "DATETIME";
+			}
+
+			QueryExecute("
+				CREATE TABLE wheels_rate_limits (
+					store_key #local.varcharType#(255) NOT NULL,
+					counter INT,
+					expires_at #local.datetimeType#
+				)
+			", {}, $queryOptions());
+
+			// Indexes are optional — don't fail table creation if they can't be created.
+			try {
+				QueryExecute("CREATE INDEX idx_wrl_store_key ON wheels_rate_limits (store_key)", {}, $queryOptions());
+				QueryExecute("CREATE INDEX idx_wrl_expires_at ON wheels_rate_limits (expires_at)", {}, $queryOptions());
+			} catch (any indexError) {
+			}
+
+			writeLog(text = "Auto-created wheels_rate_limits table", type = "information", file = "wheels_ratelimiter");
+			variables.tableVerified = true;
+			return true;
+		} catch (any createError) {
+			// A concurrent node or thread may have created the table between our probe
+			// and the CREATE — re-probe once before reporting failure.
+			try {
+				QueryExecute("SELECT counter FROM wheels_rate_limits WHERE 1=0", {}, $queryOptions());
+				variables.tableVerified = true;
+				return true;
+			} catch (any reprobeError) {
+			}
+			writeLog(
+				text = "Failed to auto-create wheels_rate_limits table: #createError.message#",
+				type = "error",
+				file = "wheels_ratelimiter"
+			);
+			return false;
+		}
 	}
 
 }

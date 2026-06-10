@@ -1,0 +1,8 @@
+{
+	"name": "wheels-failregister",
+	"version": "1.0.0",
+	"description": "Test fixture: ServiceProvider whose register() throws — exercises per-provider isolation.",
+	"provides": {
+		"mixins": "none"
+	}
+}

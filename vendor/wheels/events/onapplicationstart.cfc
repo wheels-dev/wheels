@@ -31,9 +31,10 @@ component {
 			application.$wheels.reloadPassword = local.oldReloadPassword;
 		}
 
-
 		// Check and store server engine name, throw error if using a version that we don't support.
-		else if (StructKeyExists(server, "boxlang")) {
+		// Note: this must NOT be chained to the reloadPassword carryover above with `else` —
+		// engine detection has to run unconditionally or serverVersion is never set.
+		if (StructKeyExists(server, "boxlang")) {
 			application.$wheels.serverName = "BoxLang";
 			application.$wheels.serverVersion = server.boxlang.version;
 		} else if (StructKeyExists(server, "lucee")) {
@@ -103,12 +104,10 @@ component {
 		}
 		application.$wheels.controllers = {};
 		application.$wheels.models = {};
-		application.$wheels.existingHelperFiles = "";
-		application.$wheels.existingLayoutFiles = "";
-		application.$wheels.existingObjectFiles = "";
-		application.$wheels.nonExistingHelperFiles = "";
-		application.$wheels.nonExistingLayoutFiles = "";
-		application.$wheels.nonExistingObjectFiles = "";
+		application.$wheels.helperFileCache = {};
+		application.$wheels.layoutFileCache = {};
+		application.$wheels.existingObjectFiles = {};
+		application.$wheels.nonExistingObjectFiles = {};
 		application.$wheels.directoryFiles = {};
 		application.$wheels.routes = [];
 		application.$wheels.middleware = [];
@@ -168,10 +167,7 @@ component {
 			&& StructKeyExists(application.$wheels, "reloadPassword")
 			&& Len(application.$wheels.reloadPassword)
 			&& StructKeyExists(URL, "password")
-			&& CreateObject("java", "java.security.MessageDigest").isEqual(
-				Hash(URL.password, "SHA-256").getBytes("UTF-8"),
-				Hash(application.$wheels.reloadPassword, "SHA-256").getBytes("UTF-8")
-			)
+			&& application.wo.$secureCompare(URL.password, application.$wheels.reloadPassword)
 		) {
 			local.reloadPasswordMatched = true;
 			application.$wheels.environment = URL.reload;

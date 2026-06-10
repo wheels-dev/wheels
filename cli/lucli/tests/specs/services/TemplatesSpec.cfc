@@ -139,6 +139,71 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("shipped migration templates (CLI-D4)", () => {
+
+				// `local.X = ...` inside a catch body does not persist on BoxLang
+				// (Cross-Engine Invariant #11): the old local.exception idiom made
+				// a failed migration take the COMMIT branch and get recorded as
+				// applied. Every shipped template must use the struct-field pattern.
+				it("never use local.X-in-catch failure tracking", () => {
+					var templateFiles = [];
+					var templateDirs = [
+						{path: expandPath("/cli/src/templates/dbmigrate"), filter: "*.txt"},
+						{path: expandPath("/vendor/wheels/migrator/templates"), filter: "*.cfc"},
+						{path: expandPath("/cli/lucli/templates/migrations"), filter: "*.txt"},
+						{path: expandPath("/app/snippets/dbmigrate"), filter: "*.txt"}
+					];
+					for (var dirSpec in templateDirs) {
+						if (directoryExists(dirSpec.path)) {
+							templateFiles.append(directoryList(dirSpec.path, false, "path", dirSpec.filter), true);
+						}
+					}
+					var singleFiles = [
+						expandPath("/cli/src/templates/DBMigrate.txt"),
+						expandPath("/cli/lucli/templates/app/app/snippets/DBMigrate.txt"),
+						expandPath("/app/snippets/DBMigrate.txt")
+					];
+					for (var singleFile in singleFiles) {
+						if (fileExists(singleFile)) {
+							templateFiles.append(singleFile);
+						}
+					}
+					expect(arrayLen(templateFiles)).toBeGTE(30);
+
+					for (var templateFile in templateFiles) {
+						var content = fileRead(templateFile);
+						expect(content).notToInclude("local.exception", "local.X-in-catch found in #templateFile#");
+						expect(content).notToInclude('StructKeyExists(local, "exception")', "local.X-in-catch found in #templateFile#");
+						if (find("state.exception", content)) {
+							expect(content).toInclude("var state = {};", "state struct never declared in #templateFile#");
+						}
+					}
+				});
+
+			});
+
+			describe("shipped snippets (CLI-D6/D7)", () => {
+
+				it("auth sessions snippet uses the injection-safe builder, not where-string interpolation", () => {
+					var content = fileRead(expandPath("/cli/lucli/templates/snippets/auth-sessions-controller.txt"));
+					expect(content).toInclude('.where("username", params.username).first()');
+					// Interpolating params into a where string lets a quoted
+					// username rewrite the WHERE clause (condition injection).
+					expect(content).notToInclude("findOne(where=");
+				});
+
+				it("soft-delete snippets pass allowNull (null= is silently ignored by the migrator)", () => {
+					var migration = fileRead(expandPath("/cli/lucli/templates/snippets/soft-delete-migration.txt"));
+					expect(migration).toInclude("allowNull=true");
+					expect(migration).notToInclude(", null=true");
+
+					var mixin = fileRead(expandPath("/cli/lucli/templates/snippets/soft-delete-mixin.txt"));
+					expect(mixin).toInclude("allowNull=true");
+					expect(mixin).notToInclude(", null=true");
+				});
+
+			});
+
 		});
 
 	}

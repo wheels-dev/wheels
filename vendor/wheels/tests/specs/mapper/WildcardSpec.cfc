@@ -76,6 +76,35 @@ component extends="wheels.WheelsTest" {
 
             });
 
+            it("wildcard with an empty method generates routes for all verbs", function() {
+                m.$draw()
+                    .wildcard(method = "")
+                    .end();
+
+                    r = m.getRoutes();
+
+                // 5 verbs x 2 patterns.
+                expect(r).toBeArray().toHaveLength(10);
+
+                verbsFound = {};
+                for (loc.route in r) {
+                    verbsFound[loc.route.methods] = true;
+                }
+                expect(StructCount(verbsFound)).toBe(5);
+            });
+
+            it("wildcard methods argument takes precedence over method", function() {
+                m.$draw()
+                    .wildcard(method = "get", methods = "post,delete")
+                    .end();
+
+                    r = m.getRoutes();
+
+                expect(r).toBeArray().toHaveLength(4);
+                expect(r[1].methods).toBe("post");
+                expect(r[3].methods).toBe("delete");
+            });
+
             it("controller scoped wildcard produces routes", function() {
                 m.$draw()
                     .controller("cats")

@@ -2,13 +2,19 @@ component output="false" displayName="MCP Session Manager" {
 
 	property name="sessions" type="struct";
 
-	public any function init() {
+	public any function init(numeric sessionTimeout = 3600) {
 		variables.sessions = {};
-		variables.sessionTimeout = 3600; // 1 hour timeout
+		variables.sessionTimeout = arguments.sessionTimeout; // seconds; 1 hour by default
 		return this;
 	}
 
 	public string function createSession() {
+		// Purge expired sessions on the request path: this manager is an
+		// app-scoped singleton and createSession() runs once per connection,
+		// while getActiveSessions()/getSessionStats() (the only other cleanup
+		// triggers) are never called by the transport — without this the
+		// session store grows unbounded and the timeout is dead config.
+		cleanupExpiredSessions();
 		local.sessionId = "mcp-" & LCase(CreateObject("java", "java.util.UUID").randomUUID().toString());
 		variables.sessions[local.sessionId] = {
 			"id": local.sessionId,

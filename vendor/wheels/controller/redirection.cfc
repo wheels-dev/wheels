@@ -112,7 +112,8 @@ component {
 					local.params = $constructParams(params = arguments.params, encode = arguments.encode);
 					if (Find("?", request.cgi.http_referer)) {
 						local.params = Replace(local.params, "?", "&");
-					} else if (Left(local.params, 1) == "&" && !Find(request.cgi.http_referer, "?")) {
+					} else if (Left(local.params, 1) == "&") {
+						// The referrer has no query string (checked above) so turn the leading "&" into a "?".
 						local.params = Replace(local.params, "&", "?", "one");
 					}
 					local.url &= local.params;
@@ -173,27 +174,44 @@ component {
 	 * [category: Miscellaneous Functions]
 	 */
 	public boolean function $isSafeRedirectUrl(required string url, required string serverName) {
-		// Relative URLs (starting with "/" but not "//") are always safe.
-		if (Left(arguments.url, 1) == "/" && (Len(arguments.url) == 1 || Left(arguments.url, 2) != "//")) {
+		// Reject any URL containing a backslash outright. Browsers normalize backslashes to forward
+		// slashes ("/\evil.com", "\/evil.com" and "\\evil.com" all navigate to evil.com), so a
+		// backslash anywhere makes the URL unsafe. Literal backslashes in legitimate URLs should be
+		// percent-encoded (matches the $generateIncludeTemplatePath precedent).
+		if (Find(Chr(92), arguments.url)) {
+			return false;
+		}
+
+		// Protocol-relative URL (//hostname/path): only safe when the hostname matches the current
+		// server name exactly.
+		if (Left(arguments.url, 2) == "//") {
+			local.afterScheme = Mid(arguments.url, 3, Len(arguments.url) - 2);
+			local.refererHost = ListFirst(local.afterScheme, ":/?##");
+			return CompareNoCase(local.refererHost, arguments.serverName) == 0;
+		}
+
+		// Relative URLs (starting with a single "/") are always safe.
+		if (Left(arguments.url, 1) == "/") {
 			return true;
 		}
 
-		// Extract the hostname from the URL for exact comparison.
-		if (Left(arguments.url, 2) == "//") {
-			// Protocol-relative URL: //hostname/path
-			local.afterScheme = Mid(arguments.url, 3, Len(arguments.url) - 2);
-		} else {
-			local.schemeEnd = Find("://", arguments.url);
-			if (local.schemeEnd == 0) {
-				// No scheme and doesn't start with "/" — treat as relative path (e.g. "page", "dir/page").
-				return true;
-			}
-			// Absolute URL: scheme://hostname/path
-			local.afterScheme = Mid(arguments.url, local.schemeEnd + 3, Len(arguments.url) - local.schemeEnd - 2);
+		// No scheme (RFC 3986: ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) followed by ":") and not
+		// "/"-rooted: a genuine relative path (e.g. "page", "dir/page").
+		if (ReFindNoCase("^[a-z][a-z0-9+.-]*:", arguments.url) == 0) {
+			return true;
 		}
 
+		// The URL has a scheme: it is only safe when it is a same-domain scheme://hostname/... URL.
+		// Schemes without a "//" authority (javascript:, mailto:, data:, "https:/evil.com") are
+		// rejected because browsers normalize or execute them in ways that escape the current domain.
+		local.schemeEnd = Find("://", arguments.url);
+		if (local.schemeEnd == 0) {
+			return false;
+		}
+		local.afterScheme = Mid(arguments.url, local.schemeEnd + 3, Len(arguments.url) - local.schemeEnd - 2);
+
 		// Extract hostname before any port, path, query, or fragment delimiter.
-		local.refererHost = ListFirst(local.afterScheme, ":/?\##");
+		local.refererHost = ListFirst(local.afterScheme, ":/?##");
 
 		return CompareNoCase(local.refererHost, arguments.serverName) == 0;
 	}

@@ -34,10 +34,25 @@ component output="false" {
 				// The downstream SQL builder ($whereClause) will re-extract these via RESQLWhere
 				// regex and convert them into cfqueryparam parameters for true parameterized execution.
 				if (StructKeyExists(local.spec, "whereParams") && IsArray(local.spec.whereParams)) {
-					for (local.p in local.spec.whereParams) {
-						local.quotedVal = "'" & variables.modelReference.$escapeSqlValue(ToString(local.p.value)) & "'";
-						local.resolvedWhere = Replace(local.resolvedWhere, "?", local.quotedVal, "one");
+					// Split on the original placeholders once and rejoin with the quoted values so a
+					// substituted value that itself contains a literal "?" can't absorb the next
+					// placeholder and shift the remaining parameters.
+					local.parts = ListToArray(local.resolvedWhere, "?", true);
+					local.paramCount = ArrayLen(local.spec.whereParams);
+					local.rebuilt = local.parts[1];
+					local.iEnd = ArrayLen(local.parts);
+					for (local.i = 2; local.i <= local.iEnd; local.i++) {
+						if (local.i - 1 <= local.paramCount) {
+							local.quotedVal = "'" & variables.modelReference.$escapeSqlValue(ToString(local.spec.whereParams[local.i - 1].value)) & "'";
+							local.rebuilt &= local.quotedVal;
+						} else {
+							// More placeholders than parameters: leave the extra "?" in place (matches
+							// the previous behavior of only resolving as many "?" as there are params).
+							local.rebuilt &= "?";
+						}
+						local.rebuilt &= local.parts[local.i];
 					}
+					local.resolvedWhere = local.rebuilt;
 				}
 				if (StructKeyExists(local.merged, "where") && Len(local.merged.where)) {
 					local.merged.where = "(#local.merged.where#) AND (#local.resolvedWhere#)";

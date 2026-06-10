@@ -114,6 +114,17 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
+	 * Oracle does not support LIMIT/OFFSET — use the OFFSET/FETCH syntax (12c+) instead.
+	 */
+	public string function $limitOffsetClause(required numeric limit, required numeric offset) {
+		if (arguments.offset) {
+			return "OFFSET " & arguments.offset & " ROWS" & Chr(13) & Chr(10) & "FETCH NEXT " & arguments.limit & " ROWS ONLY";
+		}
+		return "FETCH FIRST " & arguments.limit & " ROWS ONLY";
+	}
+
+	/**
+	 * Override Base adapter's function.
 	 */
 	public string function $generatedKey() {
 		return "lastId";
@@ -133,16 +144,72 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
 			local.startPar = Find("(", local.sql) + 1;
 			local.endPar = Find(")", local.sql);
-			local.columnList = ReplaceList(
-				Mid(local.sql, local.startPar, (local.endPar - local.startPar)),
-				"#Chr(10)#,#Chr(13)#, ",
-				",,"
-			);
+			local.columnList = "";
+			if (local.endPar) {
+				local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
+
+				// BoxLang compatibility fix - ReplaceList behaves differently
+				if (StructKeyExists(server, "boxlang")) {
+					// For BoxLang, use regex to properly parse column names
+					local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
+					local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
+					local.columnList = Trim(local.columnList);
+				} else {
+					// Original Lucee/ACF behavior
+					local.columnList = ReplaceList(
+						local.rawColumns,
+						"#Chr(10)#,#Chr(13)#, ",
+						",,"
+					);
+				}
+			}
 			// Strip identifier quotes from column list for comparison
 			local.columnList = $stripIdentifierQuotes(local.columnList);
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
+
+				// Resolve a driver-supplied key first. CFML engines set
+				// Statement.RETURN_GENERATED_KEYS on INSERTs (see $bulkInsertSQL), so the
+				// Oracle JDBC driver returns the inserted row's ROWID. Lucee surfaces it
+				// as result.generatedKey (StructKeyExists is case-insensitive so the
+				// lowercase `generatedkey` key matches); ACF surfaces it as result.rowid.
+				// ListFirst because multi-row inserts can return a list.
+				local.generated = "";
+				if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
+					local.generated = ListFirst(arguments.result.generatedKey);
+				} else if (StructKeyExists(arguments.result, "rowid") && Len(arguments.result.rowid)) {
+					local.generated = arguments.result.rowid;
+				}
+				if (Len(local.generated)) {
+					// Some driver/engine combos return the identity value itself.
+					if (IsNumeric(local.generated)) {
+						local.rv[$generatedKey()] = local.generated;
+						return local.rv;
+					}
+					// Standard extended ROWID: 18 base-64 chars. The value originates from
+					// the JDBC driver — not user input — but $query has no parameter
+					// binding, so gate strictly before interpolating; UROWIDs and anything
+					// unexpected fall through to the legacy query below. This exact-row
+					// lookup targets OUR insert, so it is race-free under concurrent
+					// inserts (unlike MAX(ROWID)).
+					if (REFind("^[A-Za-z0-9/+]{18}$", local.generated) == 1) {
+						query = $query(
+							sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = CHARTOROWID('#local.generated#')",
+							argumentCollection = arguments.queryAttributes
+						);
+						if (query.recordCount && Len(query.lastId)) {
+							local.rv[$generatedKey()] = query.lastId;
+							return local.rv;
+						}
+					}
+				}
+
+				// Legacy heuristic, kept only for engines that surface no generated key
+				// (e.g. current BoxLang). ROWID is physical location, not insertion order,
+				// so MAX(ROWID) races under concurrent inserts and can return another
+				// session's row. Replacing this with CURRVAL on the identity sequence is
+				// tracked in a follow-up issue.
 				query = $query(
 					sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = (SELECT MAX(ROWID) FROM #local.tbl#)",
 					argumentCollection = arguments.queryAttributes

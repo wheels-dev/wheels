@@ -69,7 +69,9 @@
 
         // CSRF
         application.wheels.csrfCookieName = "_wheels_test_authenticity"
-        application.wheels.csrfCookieEncryptionAlgorithm = "AES"
+        // csrfCookieEncryptionAlgorithm is intentionally not overridden here — tests run
+        // against the engine-aware framework default resolved in events/init/security.cfm
+        // (AES/GCM/NoPadding where the engine supports it, random-IV CBC otherwise).
         application.wheels.csrfCookieEncryptionSecretKey = GenerateSecretKey("AES")
         application.wheels.csrfCookieEncryptionEncoding = "Base64"
 

@@ -29,6 +29,11 @@ component {
 		}
 
 		local.phraseArray = ListToArray(arguments.phrase, arguments.delimiter);
+
+		// Initialize here so the unchanged text is returned when the phrase list collapses
+		// to an empty array (e.g. phrase=",") and the loop below never runs.
+		local.newText = local.text;
+
 		local.iEnd = ArrayLen(local.phraseArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.newText = "";
@@ -130,7 +135,12 @@ component {
 			local.item = local.flashKeysArray[local.i];
 			local.class = LCase(local.item) & "-message";
 			local.attributes = {class = local.class};
-			if (!StructKeyExists(arguments, "key") || arguments.key == local.item) {
+			// Guard against requested keys that were never flashed ($readFlash() returns {} when
+			// the Flash is empty, so an unguarded read would throw for e.g. flashMessages(key="error")).
+			if (
+				StructKeyExists(local.flash, local.item)
+				&& (!StructKeyExists(arguments, "key") || arguments.key == local.item)
+			) {
 				local.content = local.flash[local.item];
 				// Do we have an array of values or a simple value?
 				if (IsArray(local.content)) {
@@ -365,6 +375,30 @@ component {
 	}
 
 	/**
+	 * Internal function. HTML-encodes the listed prepend / append style keys on a helper's
+	 * argument struct (in place, the struct is passed by reference) when the helper's `encode`
+	 * argument and the global `encodeHtmlTags` setting are both enabled. Centralizes the block
+	 * previously duplicated (with drift) across the form, error, and pagination helpers.
+	 */
+	public void function $encodeArgsForHtml(required struct args, required string keys) {
+		if (
+			StructKeyExists(arguments.args, "encode")
+			&& IsBoolean(arguments.args.encode)
+			&& arguments.args.encode
+			&& $get("encodeHtmlTags")
+		) {
+			local.keysArray = ListToArray(arguments.keys);
+			local.iEnd = ArrayLen(local.keysArray);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.key = local.keysArray[local.i];
+				if (StructKeyExists(arguments.args, local.key) && Len(arguments.args[local.key])) {
+					arguments.args[local.key] = EncodeForHTML($canonicalize(arguments.args[local.key]));
+				}
+			}
+		}
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public string function $tag(
@@ -395,8 +429,12 @@ component {
 		if(structKeyExists(arguments.attributes, 'addClass')) {
 			if(structKeyExists(arguments.attributes, 'class')) {
 				arguments.attributes.class = arguments.attributes.class & ' ' & arguments.attributes.addClass;
-				structDelete(arguments.attributes, 'addClass');
+			} else {
+				// No default class present: use the addClass value as the class attribute instead
+				// of letting the key fall through and render as a literal addclass="..." attribute.
+				arguments.attributes.class = arguments.attributes.addClass;
 			}
+			structDelete(arguments.attributes, 'addClass');
 		}
 
 		// add the names of the attributes and their values to the output string with a space in between (class="something" name="somethingelse" etc)
@@ -719,22 +757,37 @@ component {
 	 * @variableScope The scope from which to resolve the path from.
 	 */
 	public any function $getValueByDynamicPath(required string path, required struct variableScope) {
-		// Extract keys and indexes using a regular expression
-		local.pattern = "[a-zA-Z0-9_]+|\\['[^\\]]+'\\]";
+		// Extract keys and indexes using a regular expression.
+		// Bracket-quoted segments (e.g. obj['my-key']) are matched as a whole so keys containing
+		// non-word characters tokenize correctly; the brackets and quotes are stripped below.
+		local.pattern = "\['[^']+'\]|[a-zA-Z0-9_]+";
 		local.matches = REMatchNoCase(local.pattern, arguments.path);
 
 		// Prepare the starting object
 		local.currentObject = arguments.variableScope;
 
-		for (key in local.matches) {
-			// Dynamically navigate the object structures
-			if (IsArray(local.currentObject) && IsNumeric(key)) {
-				local.currentObject = local.currentObject[val(key)];
-			}else if (StructKeyExists(local.currentObject, key)) {
-				local.currentObject = local.currentObject[key];
+		for (local.key in local.matches) {
+			// Strip the brackets and quotes off bracket-quoted segments.
+			if (Left(local.key, 2) == "['") {
+				local.key = Mid(local.key, 3, Len(local.key) - 4);
 			}
-			else {
-				return invoke(local.currentObject, key);
+
+			// Dynamically navigate the object structures
+			if (IsArray(local.currentObject) && IsNumeric(local.key)) {
+				local.currentObject = local.currentObject[Val(local.key)];
+			} else if (StructKeyExists(local.currentObject, local.key)) {
+				local.currentObject = local.currentObject[local.key];
+			} else if (IsObject(local.currentObject)) {
+				// Fall back to invoking a method with the segment's name (e.g. a model's dynamic
+				// association method) and keep navigating any remaining path segments.
+				local.currentObject = invoke(local.currentObject, local.key);
+			} else {
+				// Unresolvable segment on a struct or array: throw instead of falling through
+				// to arbitrary method execution.
+				Throw(
+					type = "Wheels.ObjectNotFound",
+					message = "The path `#arguments.path#` could not be resolved because the segment `#local.key#` does not exist."
+				);
 			}
 		}
 

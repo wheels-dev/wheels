@@ -1214,12 +1214,20 @@ component {
 			local.classAssociations[local.name].columnStruct = local.associatedClass.$classData().columnStruct;
 			local.classAssociations[local.name].propertyStruct = local.associatedClass.$classData().propertyStruct;
 
-			// create the join string if it hasn't already been done
-			if (!StructKeyExists(local.classAssociations[local.name], "join")) {
+			// the JOIN string depends on the calling context (soft-delete handling and whether the
+			// table needs to be aliased), so memoize it per context variant instead of globally
+			local.aliasJoin = ListFindNoCase(local.tables, local.classAssociations[local.name].tableName) > 0;
+			local.joinVariantKey = "sd" & (arguments.includeSoftDeletes ? 1 : 0) & "_alias" & (local.aliasJoin ? 1 : 0);
+
+			// create the join string if it hasn't already been done for this context variant
+			if (
+				!StructKeyExists(local.classAssociations[local.name], "joinVariants")
+				|| !StructKeyExists(local.classAssociations[local.name].joinVariants, local.joinVariantKey)
+			) {
 				local.joinType = UCase(ReplaceNoCase(local.classAssociations[local.name].joinType, "outer", "left outer", "one"));
 				local.join = local.joinType & " JOIN " & variables.wheels.class.adapter.$quoteIdentifier(local.classAssociations[local.name].tableName);
 				// alias the table as the association name when joining to itself
-				if (ListFindNoCase(local.tables, local.classAssociations[local.name].tableName)) {
+				if (local.aliasJoin) {
 					local.join = variables.wheels.class.adapter.$tableAlias(
 						local.join,
 						local.classAssociations[local.name].pluralizedName
@@ -1253,9 +1261,8 @@ component {
 
 					// alias the table as the association name when joining to itself
 					local.tableName = local.classAssociations[local.name].tableName;
-					if (ListFindNoCase(local.tables, local.classAssociations[local.name].tableName)) {
+					if (local.aliasJoin) {
 						local.tableName = local.classAssociations[local.name].pluralizedName;
-						;
 					}
 					local.toAppend = ListAppend(
 						local.toAppend,
@@ -1283,7 +1290,20 @@ component {
 					);
 				}
 
-				local.classAssociations[local.name].join = local.join & Replace(local.toAppend, ",", " AND ", "all");
+				// store the built string under a double-checked named lock so a concurrent first hit
+				// for another context cannot poison the shared application-scoped association struct;
+				// the lock is only taken on memo miss so the hot path stays lock-free
+				lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
+					if (!StructKeyExists(local.classAssociations[local.name], "joinVariants")) {
+						local.classAssociations[local.name].joinVariants = {};
+					}
+					local.classAssociations[local.name].joinVariants[local.joinVariantKey] = local.join & Replace(
+						local.toAppend,
+						",",
+						" AND ",
+						"all"
+					);
+				}
 			}
 
 			// loop over each character in the delimiter sequence and move up / down the levels as appropriate
@@ -1300,8 +1320,12 @@ component {
 			// add table name to the list of used ones so we know to alias it when used a second time
 			local.tables = ListAppend(local.tables, local.classAssociations[local.name].tableName);
 
-			// add info to the array that we will return
-			ArrayAppend(local.rv, local.classAssociations[local.name]);
+			// add info to the array that we will return; use a per-call shallow copy carrying the
+			// context-correct join so callers are immune to concurrent re-memoization of other variants
+			local.entry = StructCopy(local.classAssociations[local.name]);
+			local.entry.join = local.classAssociations[local.name].joinVariants[local.joinVariantKey];
+			StructDelete(local.entry, "joinVariants");
+			ArrayAppend(local.rv, local.entry);
 		}
 		return local.rv;
 	}

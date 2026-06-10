@@ -11,8 +11,8 @@ t.float("latitude,longitude");
 t.float(columnNames="score", allowNull=false);
 
 // 5. Use float() within a createTable migration
-createTable("measurements") {
-    t.float("temperature");
-    t.float(columnNames="humidity,pressure", default="0.0");
-    t.timestamps();
-};
+t = createTable("measurements");
+t.float("temperature");
+t.float(columnNames="humidity,pressure", default="0.0");
+t.timestamps();
+t.create();

@@ -1,0 +1,8 @@
+{
+	"name": "wheels-goodsp",
+	"version": "1.0.0",
+	"description": "Test fixture: healthy ServiceProvider — proves a broken sibling provider didn't abort the lifecycle.",
+	"provides": {
+		"mixins": "none"
+	}
+}

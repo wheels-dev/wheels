@@ -11,18 +11,15 @@ component extends="wheels.wheelstest.BrowserTest" {
         browserDescribe("BrowserTest lifecycle", () => {
 
             it("this.browser is populated before each it block", () => {
-                if (this.browserTestSkipped) return;
                 expect(isObject(this.browser)).toBeTrue();
             });
 
             it("this.browser exposes the full DSL (has getBaseUrl etc.)", () => {
-                if (this.browserTestSkipped) return;
                 // getBaseUrl / visit / assertSee etc. are the DSL API surface
                 expect(this.browser.getBaseUrl()).toBeTypeOf("string");
             });
 
             it("each it gets a fresh Page (window globals don't leak)", () => {
-                if (this.browserTestSkipped) return;
                 // Data URLs disable localStorage/cookies, but window globals
                 // work within a page. A fresh Page per it means fresh window.
                 this.browser.visitUrl("data:text/html,<h1>set</h1>");
@@ -31,13 +28,11 @@ component extends="wheels.wheelstest.BrowserTest" {
             });
 
             it("window global from previous it is not visible here", () => {
-                if (this.browserTestSkipped) return;
                 this.browser.visitUrl("data:text/html,<h1>check</h1>");
                 expect(this.browser.script("() => window.myLeakProbe || 'clean'")).toBe("clean");
             });
 
             it("getBrowserLauncher() exposes the shared process-scoped launcher", () => {
-                if (this.browserTestSkipped) return;
                 var launcher = getBrowserLauncher();
                 expect(isObject(launcher)).toBeTrue();
                 expect(launcher.getState()).toBe("ready");
@@ -47,7 +42,6 @@ component extends="wheels.wheelstest.BrowserTest" {
         browserDescribe("viewport config", () => {
 
             it("applies mobile viewport preset when this.browserViewport is set", () => {
-                if (this.browserTestSkipped) return;
                 var original = this.browserViewport ?: "";
                 this.browserViewport = "mobile";
 
@@ -64,7 +58,6 @@ component extends="wheels.wheelstest.BrowserTest" {
             });
 
             it("applies custom viewport dimensions from struct", () => {
-                if (this.browserTestSkipped) return;
                 var original = this.browserViewport ?: "";
                 this.browserViewport = {width: 800, height: 600};
 
@@ -85,7 +78,6 @@ component extends="wheels.wheelstest.BrowserTest" {
         browserDescribe("auto-screenshot on failure", () => {
 
             it("$captureFailureArtifacts writes screenshot and HTML", () => {
-                if (this.browserTestSkipped) return;
                 this.browser.visitUrl("data:text/html,<h1>Capture Me</h1>");
 
                 var testDir = expandPath("/tests/_output/browser_capture_test");
@@ -110,7 +102,6 @@ component extends="wheels.wheelstest.BrowserTest" {
             });
 
             it("respects browserScreenshotOnFailure=false", () => {
-                if (this.browserTestSkipped) return;
                 this.browser.visitUrl("data:text/html,<h1>No Capture</h1>");
 
                 var testDir = expandPath("/tests/_output/browser_optout_test");

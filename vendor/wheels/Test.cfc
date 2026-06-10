@@ -760,7 +760,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 							return invoke(variables, local.functionName[1], variables[local.args[2]]);
 						} else {
 							// Use the Evaluate function to run Built-in functions
-							return Evaluate("expression");
+							return Evaluate(arguments.expression);
 						}
 					}
 				}

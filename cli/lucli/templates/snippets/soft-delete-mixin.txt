@@ -1,7 +1,7 @@
 <!---
 	Soft Delete Pattern
 	Requires: deletedAt (datetime, nullable) column on the table.
-	Migration: t.datetime(columnNames="deletedAt", null=true, default="NULL");
+	Migration: t.datetime(columnNames="deletedAt", allowNull=true, default="NULL");
 
 	Usage in your model config():
 		beforeDelete("softDelete");

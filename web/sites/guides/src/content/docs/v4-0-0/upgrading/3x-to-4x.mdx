@@ -248,6 +248,8 @@ component extends="wheels.WheelsTest" {
 
 See the [Testing guide](/v4-0-0/testing/) for matchers and the phantom-matcher list.
 
+There is also a `wheels.Testbox` shim — a pure alias of `wheels.WheelsTest` retained for specs written before the rename. It adds no behavior. Deprecated since 4.0 with a removal target of 5.0; `wheels upgrade check` flags `extends="wheels.Testbox"` alongside `wheels.Test`, and both should migrate to `wheels.WheelsTest`.
+
 ### 9. Tests directory renamed: `tests/specs/functions/` → `tests/specs/functional/`
 
 **CHANGELOG:** `Breaking: Tests directory tests/specs/functions/ renamed to tests/specs/functional/` (#1872).
@@ -387,6 +389,8 @@ brew install wheels-dev/wheels/wheels
 wheels upgrade check
 brew upgrade wheels
 ```
+
+Homebrew 5.1+ asks you to trust third-party taps on first use — run `brew trust wheels-dev/wheels` once if prompted.
 
 ### Browser-test fixture routes (`/_browser/*`) moved into the framework
 

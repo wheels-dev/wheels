@@ -6,7 +6,7 @@
  * claims as the authentication principal.
  *
  * Registration:
- *   var jwtService = new wheels.auth.JwtService(secretKey="my-secret");
+ *   var jwtService = new wheels.auth.JwtService(secretKey="a-random-secret-of-at-least-32-bytes");
  *   var jwtStrategy = new wheels.auth.JwtStrategy(jwtService=jwtService);
  *   authenticator.registerStrategy(name="jwt", strategy=jwtStrategy);
  *

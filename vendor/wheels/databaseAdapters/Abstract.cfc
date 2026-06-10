@@ -126,13 +126,13 @@ component extends="wheels.migrator.Base"{
 		}
 		if (
 			StructKeyExists(arguments.options, 'type') && ListFindNoCase(
-				"binary,date,datetime,time,timestamp",
+				"binary,char,date,datetime,time,timestamp,text,string",
 				arguments.options.type
 			)
 		) {
-			arguments.value = "'#arguments.value#'";
-		} else if (StructKeyExists(arguments.options, 'type') && ListFindNoCase("text,string", arguments.options.type)) {
-			arguments.value = "'#ReplaceNoCase(arguments.value, "'", "''")#'";
+			// Escape every embedded single quote (not just the first) so the
+			// generated DDL stays balanced for values like "O'Brien's".
+			arguments.value = "'#Replace(arguments.value, "'", "''", "all")#'";
 		}
 		return arguments.value;
 	}

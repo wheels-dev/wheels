@@ -91,7 +91,9 @@ function outputSetting(array setting) {
 		local.rv &= '<tr><td class="four wide">';
 		local.rv &= ReReplace(ReReplace(arguments.setting[i], "(^[a-z])", "\u\1"), "([A-Z])", " \1", "all");
 		local.rv &= '</td><td class="eight wide">';
-		local.rv &= formatSettingOutput(get(arguments.setting[i]));
+		// Resolves on wheels.Public (outputSetting is only invoked from info.cfm
+		// inside Public.cfc::info()) and redacts secret-shaped settings.
+		local.rv &= $settingDisplayValue(arguments.setting[i]);
 		local.rv &= '</td></tr>';
 	}
 	return local.rv;

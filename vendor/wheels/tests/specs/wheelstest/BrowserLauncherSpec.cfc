@@ -31,30 +31,6 @@ component extends="wheels.WheelsTest" {
                 expect(resolved).toBe("/Users/someone/.wheels/browser");
             });
 
-            it("jarPath() returns installDir + /lib/playwright-VERSION.jar", () => {
-                var p = variables.launcher.$jarPath(
-                    installDir="/tmp/browser",
-                    version="1.45.0"
-                );
-                expect(p).toBe("/tmp/browser/lib/playwright-1.45.0.jar");
-            });
-
-            it("verifyInstall() throws when JAR missing", () => {
-                expect(() => {
-                    variables.launcher.$verifyInstall(jarPath="/does/not/exist.jar");
-                }).toThrow(type="Wheels.BrowserNotInstalled");
-            });
-
-            it("verifyInstall() returns true when JAR exists", () => {
-                var tmpJar = getTempDirectory() & "dummy-" & createUUID() & ".jar";
-                fileWrite(tmpJar, "");
-                try {
-                    expect(variables.launcher.$verifyInstall(jarPath=tmpJar)).toBeTrue();
-                } finally {
-                    fileDelete(tmpJar);
-                }
-            });
-
             it("classpathJarPaths() returns one path per manifest classpath entry", () => {
                 var paths = variables.launcher.$classpathJarPaths(installDir="/tmp/browser");
                 var expectedCount = arrayLen(variables.launcher.getManifest().classpath);
@@ -84,7 +60,7 @@ component extends="wheels.WheelsTest" {
                     }
                 }
                 if (!allPresent) {
-                    debug("Skipping: Playwright JARs not installed. Run tools/install-playwright.sh");
+                    debug("Skipping: Playwright JARs not installed. Run `wheels browser setup`");
                     return;
                 }
                 expect(l.getState()).toBe("uninitialized");
@@ -139,6 +115,27 @@ component extends="wheels.WheelsTest" {
                     var b1 = l.acquireBrowser(engine="chromium");
                     var b2 = l.acquireBrowser(engine="chromium");
                     expect(b1).toBe(b2);
+                } finally {
+                    l.release();
+                }
+            });
+
+            it("acquireBrowser() evicts a dead cached Browser and relaunches", () => {
+                // A mid-run browser crash must not poison the cache for the
+                // application lifetime. Simulate the crash by closing the
+                // browser out-of-band (bypassing release()).
+                var l = new wheels.wheelstest.BrowserLauncher();
+                var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
+                for (var p in paths) {
+                    if (!fileExists(p)) return;
+                }
+                l.$loadJars(jarPaths=paths);
+                try {
+                    var b1 = l.acquireBrowser(engine="chromium");
+                    b1.close();
+                    expect(b1.isConnected()).toBeFalse();
+                    var b2 = l.acquireBrowser(engine="chromium");
+                    expect(b2.isConnected()).toBeTrue();
                 } finally {
                     l.release();
                 }

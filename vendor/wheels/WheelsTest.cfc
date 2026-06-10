@@ -60,14 +60,74 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
-     * Auto-detect the base URL of the running test server.
+     * Auto-detect the base URL of the running test server. Resolved through
+     * a layered lookup mirroring BrowserTest.$resolveBaseUrl, so HTTPS,
+     * non-localhost, and vhosted setups target the right origin instead of
+     * a hardcoded http://localhost. Precedence, highest first:
+     *
+     *   1. this.testClientBaseUrl             — per-spec override
+     *   2. get("testClientBaseUrl")           — Wheels setting
+     *   3. -Dwheels.testClient.baseUrl=...    — JVM system property
+     *   4. WHEELS_TEST_CLIENT_BASE_URL env    — CI / shell
+     *   5. $detectTestBaseUrlFromCgi(cgi)     — scheme/host/port of the
+     *                                            in-flight test-runner request
+     *   6. "http://localhost:8080" default    — bare LuCLI port
      */
     private string function $getTestBaseUrl() {
-        var port = CGI.SERVER_PORT;
-        if (!Len(port) || port == 0) {
-            port = 8080;
+        if (len(this.testClientBaseUrl ?: "")) {
+            return this.testClientBaseUrl;
         }
-        return "http://localhost:" & port;
+
+        try {
+            var setting = get(name = "testClientBaseUrl");
+            if (len(setting ?: "")) {
+                return setting;
+            }
+        } catch (any e) {
+            // Setting not registered — fall through to the next layer.
+        }
+
+        try {
+            var sys = createObject("java", "java.lang.System");
+            var prop = sys.getProperty("wheels.testClient.baseUrl");
+            if (!isNull(prop) && len(prop)) {
+                return prop;
+            }
+            var envValue = sys.getenv("WHEELS_TEST_CLIENT_BASE_URL");
+            if (!isNull(envValue) && len(envValue)) {
+                return envValue;
+            }
+        } catch (any e) {
+            // Best-effort: a SecurityManager could deny system access.
+        }
+
+        try {
+            var detected = $detectTestBaseUrlFromCgi(cgi);
+            if (len(detected)) {
+                return detected;
+            }
+        } catch (any e) {
+            // cgi scope unavailable (rare; e.g. background thread) — fall
+            // through to the hardcoded default.
+        }
+
+        return "http://localhost:8080";
+    }
+
+    /**
+     * Derive the test base URL from the in-flight test-runner request,
+     * preserving scheme (https) and host instead of assuming
+     * http://localhost. Mirrors BrowserTest.$detectBaseUrlFromCgi.
+     */
+    public string function $detectTestBaseUrlFromCgi(required any cgiScope) {
+        if (!structKeyExists(arguments.cgiScope, "server_port") || !val(arguments.cgiScope.server_port ?: 0)) {
+            return "";
+        }
+        var port = val(arguments.cgiScope.server_port);
+        var host = len(arguments.cgiScope.server_name ?: "") ? arguments.cgiScope.server_name : "localhost";
+        var scheme = (arguments.cgiScope.https ?: "off") == "on" ? "https" : "http";
+        var isCanonicalPort = (scheme == "http" && port == 80) || (scheme == "https" && port == 443);
+        return scheme & "://" & host & (isCanonicalPort ? "" : ":" & port);
     }
 
 }

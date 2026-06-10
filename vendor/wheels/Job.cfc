@@ -148,41 +148,27 @@ component {
 		local.now = $now();
 
 		try {
-			queryExecute(
-				"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
-				VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
-				{
-					id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-					jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
-					queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
-					data = {value = local.serializedData, cfsqltype = "cf_sql_longvarchar"},
-					priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
-					maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
-					runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
-					createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-					updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-				},
-				{datasource = variables.$datasource}
+			$insertJobRow(
+				id = local.id,
+				jobClass = arguments.jobClass,
+				queue = arguments.queue,
+				serializedData = local.serializedData,
+				priority = arguments.priority,
+				runAt = arguments.runAt,
+				enqueuedAt = local.now
 			);
 		} catch (any e) {
 			// Auto-create table on first use and retry
 			if ($ensureJobTable()) {
 				try {
-					queryExecute(
-						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
-						VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
-						{
-							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-							jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
-							queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
-							data = {value = local.serializedData, cfsqltype = "cf_sql_longvarchar"},
-							priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
-							maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
-							runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
-							createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-							updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-						},
-						{datasource = variables.$datasource}
+					$insertJobRow(
+						id = local.id,
+						jobClass = arguments.jobClass,
+						queue = arguments.queue,
+						serializedData = local.serializedData,
+						priority = arguments.priority,
+						runAt = arguments.runAt,
+						enqueuedAt = local.now
 					);
 				} catch (any e2) {
 					writeLog(text = "Job enqueue failed after table creation: #e2.message#", type = "error", file = "wheels_jobs");
@@ -204,12 +190,43 @@ component {
 	}
 
 	/**
+	 * Internal: Execute the wheels_jobs INSERT for a new pending job.
+	 * Shared by the first-attempt and table-create-retry paths in $enqueueJob.
+	 */
+	private void function $insertJobRow(
+		required string id,
+		required string jobClass,
+		required string queue,
+		required string serializedData,
+		required numeric priority,
+		required date runAt,
+		required date enqueuedAt
+	) {
+		queryExecute(
+			"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+			VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
+			{
+				id = {value = arguments.id, cfsqltype = "cf_sql_varchar"},
+				jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
+				queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
+				data = {value = arguments.serializedData, cfsqltype = "cf_sql_longvarchar"},
+				priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
+				maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
+				runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
+				createdAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"},
+				updatedAt = {value = arguments.enqueuedAt, cfsqltype = "cf_sql_timestamp"}
+			},
+			{datasource = variables.$datasource}
+		);
+	}
+
+	/**
 	 * Process pending jobs from the queue. Call this from a scheduled task or controller action.
 	 * @queue Queue name to process. Default processes all queues.
 	 * @limit Maximum number of jobs to process in this batch.
 	 */
 	public struct function processQueue(string queue = "", numeric limit = 10) {
-		local.result = {processed = 0, failed = 0, errors = []};
+		local.result = {processed = 0, failed = 0, skipped = 0, errors = []};
 		local.params = {
 			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
@@ -235,6 +252,11 @@ component {
 
 		for (local.row in local.jobs) {
 			local.jobResult = $processJob(local.row);
+			if (local.jobResult.skipped) {
+				// Another worker claimed the job between our SELECT and the claim UPDATE
+				local.result.skipped++;
+				continue;
+			}
 			if (local.jobResult.success) {
 				local.result.processed++;
 			} else {
@@ -250,48 +272,61 @@ component {
 	 * Internal: Process a single job row.
 	 */
 	private struct function $processJob(required struct jobRow) {
-		local.result = {success = false, error = ""};
+		local.result = {success = false, skipped = false, error = ""};
 
-		// Mark as processing
+		// Mark as processing using optimistic locking: the status guard ensures only
+		// one concurrent worker can claim the job. Use the result option to get the
+		// affected-row count from the same connection that executed the UPDATE. A
+		// separate verification SELECT can fail on BoxLang + PostgreSQL when the
+		// connection pool hands out a different connection that cannot see the
+		// uncommitted UPDATE.
 		try {
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
-				WHERE id = :id",
+				WHERE id = :id AND status = 'pending'",
 				{
 					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 				},
-				{datasource = variables.$datasource}
+				{datasource = variables.$datasource, result = "local.updateResult"}
 			);
+			if ((local.updateResult.recordCount ?: 0) == 0) {
+				// Another worker already claimed this job — skip without executing
+				local.result.skipped = true;
+				return local.result;
+			}
 		} catch (any e) {
 			local.result.error = "Failed to lock job #arguments.jobRow.id#: #e.message#";
 			return local.result;
 		}
 
+		// Initialized before the try: the catch below also handles instantiation and
+		// deserialization failures, and the tenant cleanup after it must not read an
+		// undefined variable (which would escape $processJob and abort the whole batch,
+		// masking the real job failure).
+		local.hasTenantContext = false;
+
+		// Backoff settings for retry scheduling. Defaults come from this processing
+		// instance; overridden from the failing job's own class once it instantiates,
+		// mirroring JobWorker.$scheduleRetry so both paths share one retry schedule.
+		local.backoffBaseDelay = this.baseDelay;
+		local.backoffMaxDelay = this.maxDelay;
+
 		try {
 			// Instantiate and execute the job
 			local.jobInstance = CreateObject("component", arguments.jobRow.jobClass);
+			if (StructKeyExists(local.jobInstance, "baseDelay")) {
+				local.backoffBaseDelay = local.jobInstance.baseDelay;
+			}
+			if (StructKeyExists(local.jobInstance, "maxDelay")) {
+				local.backoffMaxDelay = local.jobInstance.maxDelay;
+			}
 			local.jobData = DeserializeJSON(arguments.jobRow.data);
 
-			// Restore tenant context if the job was enqueued within a tenant scope
-			local.hasTenantContext = false;
-			if (StructKeyExists(local.jobData, "$wheelsTenantContext") && IsStruct(local.jobData["$wheelsTenantContext"])) {
-				local.tenantCtx = local.jobData["$wheelsTenantContext"];
-				if (StructKeyExists(local.tenantCtx, "dataSource") && Len(local.tenantCtx.dataSource)) {
-					if (!StructKeyExists(request, "wheels")) {
-						request.wheels = {};
-					}
-					request.wheels.tenant = {
-						id = StructKeyExists(local.tenantCtx, "id") ? local.tenantCtx.id : "",
-						dataSource = local.tenantCtx.dataSource,
-						config = StructKeyExists(local.tenantCtx, "config") ? local.tenantCtx.config : {}
-					};
-					local.hasTenantContext = true;
-				}
-				// Remove internal key before passing data to perform()
-				StructDelete(local.jobData, "$wheelsTenantContext");
-			}
+			// Restore tenant context if the job was enqueued within a tenant scope and
+			// strip the internal $wheelsTenantContext key before passing data to perform()
+			local.hasTenantContext = $restoreTenantContext(local.jobData);
 
 			local.jobInstance.perform(data = local.jobData);
 
@@ -322,8 +357,10 @@ component {
 			local.maxRetries = Val(arguments.jobRow.maxRetries);
 
 			if (local.currentAttempts < local.maxRetries) {
-				// Schedule retry with configurable exponential backoff, capped at maxDelay
-				local.backoffSeconds = Min(this.baseDelay * (2 ^ local.currentAttempts), this.maxDelay);
+				// Schedule retry with configurable exponential backoff, capped at maxDelay.
+				// Settings were captured from the failing job's class above so subclass
+				// overrides apply (the base instance defaults are only the fallback).
+				local.backoffSeconds = Min(local.backoffBaseDelay * (2 ^ local.currentAttempts), local.backoffMaxDelay);
 				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 				queryExecute(
@@ -376,11 +413,48 @@ component {
 		}
 
 		// Clean up tenant context after job execution
-		if (local.hasTenantContext && StructKeyExists(request, "wheels")) {
-			StructDelete(request.wheels, "tenant");
+		if (local.hasTenantContext) {
+			$clearTenantContext();
 		}
 
 		return local.result;
+	}
+
+	/**
+	 * Restore tenant context from job data when the job was enqueued within a tenant
+	 * scope, and strip the internal $wheelsTenantContext key from the passed data
+	 * struct (by reference) before it reaches perform(). Returns true when a tenant
+	 * context was restored — the caller must $clearTenantContext() after execution.
+	 * Public with $ prefix so JobWorker's worker path shares the exact same logic.
+	 */
+	public boolean function $restoreTenantContext(required struct jobData) {
+		local.restored = false;
+		if (StructKeyExists(arguments.jobData, "$wheelsTenantContext") && IsStruct(arguments.jobData["$wheelsTenantContext"])) {
+			local.tenantCtx = arguments.jobData["$wheelsTenantContext"];
+			if (StructKeyExists(local.tenantCtx, "dataSource") && Len(local.tenantCtx.dataSource)) {
+				if (!StructKeyExists(request, "wheels")) {
+					request.wheels = {};
+				}
+				request.wheels.tenant = {
+					id = StructKeyExists(local.tenantCtx, "id") ? local.tenantCtx.id : "",
+					dataSource = local.tenantCtx.dataSource,
+					config = StructKeyExists(local.tenantCtx, "config") ? local.tenantCtx.config : {}
+				};
+				local.restored = true;
+			}
+			// Remove internal key before passing data to perform()
+			StructDelete(arguments.jobData, "$wheelsTenantContext");
+		}
+		return local.restored;
+	}
+
+	/**
+	 * Remove a previously restored tenant context from the request scope.
+	 */
+	public void function $clearTenantContext() {
+		if (StructKeyExists(request, "wheels")) {
+			StructDelete(request.wheels, "tenant");
+		}
 	}
 
 	/**
@@ -474,8 +548,9 @@ component {
 	 * Auto-create the wheels_jobs table if it doesn't exist.
 	 * Uses database-agnostic SQL compatible with MySQL, PostgreSQL, SQL Server, H2, and SQLite.
 	 * Returns true if the table was created or already exists, false if creation failed.
+	 * Public with $ prefix so JobWorker can bootstrap the table on a fresh database.
 	 */
-	private boolean function $ensureJobTable() {
+	public boolean function $ensureJobTable() {
 		try {
 			// Check if table already exists by querying it
 			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
@@ -558,8 +633,9 @@ component {
 	/**
 	 * Detect the database type from the actual datasource via JDBC metadata.
 	 * Returns: "oracle", "postgresql", "h2", "mysql", "sqlserver", "sqlite", or "default".
+	 * Public with $ prefix so JobWorker can pick database-appropriate SQL syntax.
 	 */
-	private string function $detectDatabaseType() {
+	public string function $detectDatabaseType() {
 		try {
 			cfdbinfo(type = "version", datasource = "#variables.$datasource#", name = "local.info");
 			local.product = local.info.database_productname;

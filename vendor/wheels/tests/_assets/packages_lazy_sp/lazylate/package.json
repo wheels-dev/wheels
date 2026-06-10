@@ -1,0 +1,9 @@
+{
+	"name": "wheels-lazylate",
+	"version": "1.0.0",
+	"description": "Test fixture: lazy ServiceProvider WITHOUT a services hint — stays lazy through boot; register()/boot() must run on late instantiation.",
+	"lazy": true,
+	"provides": {
+		"mixins": "none"
+	}
+}

@@ -254,6 +254,10 @@ component {
 
 				if (local.events.recordCount > 0) {
 					for (local.row = 1; local.row <= local.events.recordCount; local.row++) {
+						// Advance the cursor before filtering so non-matching events are
+						// not re-fetched and re-filtered on every subsequent poll
+						local.currentLastId = local.events.id[local.row];
+
 						// Filter by event type if specified
 						if (ArrayLen(arguments.eventFilter) && !ArrayFind(arguments.eventFilter, local.events.event[local.row])) {
 							continue;
@@ -265,7 +269,6 @@ component {
 							event = local.events.event[local.row],
 							id = local.events.id[local.row]
 						);
-						local.currentLastId = local.events.id[local.row];
 					}
 					local.lastHeartbeat = local.now;
 				}

@@ -310,7 +310,7 @@ component {
 				local.parts = ListToArray(local.rv.value, "/-");
 				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
 					try {
-						local.rv.value = $engineAdapter().parseAmbiguousSlashDate(local.parts[1], local.parts[2], local.parts[3]);
+						local.rv.value = $parseSlashDate(d1 = local.parts[1], d2 = local.parts[2], year = local.parts[3]);
 					} catch (any e) {
 						local.rv.value = CreateDate(local.parts[3], local.parts[1], local.parts[2]);
 					}
@@ -373,5 +373,41 @@ component {
 	 */
 	public void function $timestampProperty(required string property) {
 		this[arguments.property] = $timestamp(variables.wheels.class.timeStampMode);
+	}
+
+	/**
+	 * Internal function. Single shared implementation of the timestamp stamping rules used by
+	 * both `$create` and `$update` so the two write paths can't drift apart (the update path
+	 * once copy-pasted the create-only `setUpdatedAtOnCreate` gate from the create path).
+	 * Stamps the configured create or update timestamp property unless stamping is gated off
+	 * via `enabled` or the property was explicitly assigned while `allowExplicitTimestamps` is
+	 * enabled on the object. The explicit-assignment check uses the global setting name while
+	 * stamping targets the class-level property, mirroring the original inline logic (the two
+	 * can differ when the class-level property is overridden at runtime).
+	 *
+	 * @event Which timestamp to stamp: "create" or "update".
+	 * @enabled Whether stamping is enabled for this write path (class-level timestamping
+	 *          config combined with any path-specific gates).
+	 */
+	public void function $stampTimestampProperty(required string event, required boolean enabled) {
+		if (!arguments.enabled) {
+			return;
+		}
+		if (arguments.event == "create") {
+			local.settingName = "timeStampOnCreateProperty";
+		} else {
+			local.settingName = "timeStampOnUpdateProperty";
+		}
+		// Allow explicit assignment of the timestamp property if allowExplicitTimestamps is true.
+		if (
+			StructKeyExists(this, "allowExplicitTimestamps")
+			&& this.allowExplicitTimestamps
+			&& StructKeyExists(this, $get(local.settingName))
+			&& Len(this[$get(local.settingName)])
+		) {
+			// Leave the explicitly assigned value unmolested.
+			return;
+		}
+		$timestampProperty(property = variables.wheels.class[local.settingName]);
 	}
 }

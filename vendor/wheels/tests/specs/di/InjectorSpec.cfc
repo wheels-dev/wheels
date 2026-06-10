@@ -55,6 +55,53 @@ component extends="wheels.WheelsTest" {
 					expect(first).toBe(second);
 				});
 
+				it("keys the singleton cache by mapping name, so two singleton aliases to one path get distinct instances", () => {
+					di.map("singletonAliasA").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					di.map("singletonAliasB").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					var a1 = di.getInstance("singletonAliasA");
+					// Mark the cached instance so reference identity can be
+					// verified without relying on object-equality semantics.
+					a1.setMarker("aliasA");
+					var a2 = di.getInstance("singletonAliasA");
+					expect(a2.getMarker()).toBe("aliasA");
+					// Each singleton MAPPING gets its own instance — previously
+					// the cache was keyed by component path, so both aliases
+					// silently shared one instance.
+					var b = di.getInstance("singletonAliasB");
+					expect(b.getMarker()).toBe("");
+				});
+
+				it("does not give a transient alias the singleton instance of a shared component path", () => {
+					di.map("sharedSingleton").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					di.map("sharedTransient").to("wheels.tests._assets.di.SimpleService");
+					var s1 = di.getInstance("sharedSingleton");
+					s1.setMarker("singleton");
+					var s2 = di.getInstance("sharedSingleton");
+					expect(s2.getMarker()).toBe("singleton");
+					var t = di.getInstance("sharedTransient");
+					expect(t.getMarker()).toBe("");
+				});
+
+				it("invalidates a cached singleton when the alias is re-bound to a different component path", () => {
+					di.map("rebindable").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					var before = di.getInstance("rebindable");
+					expect(before.greet()).toBe("hello");
+					// Re-bind to a different implementation: the stale cached
+					// instance must not keep being served.
+					di.map("rebindable").to("wheels.tests._assets.di.OptionalDependentService").asSingleton();
+					var after = di.getInstance("rebindable");
+					expect(structKeyExists(after, "hasDependency")).toBeTrue();
+				});
+
+				it("keeps the cached singleton when the alias is re-registered with the same path (dev-reload pattern)", () => {
+					di.map("stableSingleton").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					var before = di.getInstance("stableSingleton");
+					before.setMarker("stable");
+					di.map("stableSingleton").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					var after = di.getInstance("stableSingleton");
+					expect(after.getMarker()).toBe("stable");
+				});
+
 				it("creates new transient instances each call", () => {
 					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
 					var first = di.getInstance("simpleService");
@@ -169,6 +216,40 @@ component extends="wheels.WheelsTest" {
 					var manual = new wheels.tests._assets.di.SimpleService();
 					var svc = di.getInstance(name="dependentService", initArguments={simpleService: manual});
 					expect(svc.getSimpleService()).toBe(manual);
+				});
+
+				it("auto-wires an inherited init() found via the extends chain", () => {
+					// InheritedDependentService declares no init() of its own;
+					// the inherited init(simpleService) lives under the extends
+					// node of the metadata. Previously only top-level functions
+					// were scanned, so resolution called bare init() and threw
+					// a missing-required-argument error.
+					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
+					di.map("inheritedDependentService").to("wheels.tests._assets.di.InheritedDependentService");
+					var svc = di.getInstance("inheritedDependentService");
+					expect(svc.delegateGreet()).toBe("hello");
+					expect(svc.shout()).toBe("HELLO");
+				});
+
+				it("memoized init metadata still auto-wires on repeated transient resolutions", () => {
+					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
+					di.map("dependentService").to("wheels.tests._assets.di.DependentService");
+					var first = di.getInstance("dependentService");
+					var second = di.getInstance("dependentService");
+					expect(first.delegateGreet()).toBe("hello");
+					expect(second.delegateGreet()).toBe("hello");
+				});
+
+				it("matches cached init() parameter names against live mappings (late registration)", () => {
+					// Only the parameter NAMES are memoized — a mapping
+					// registered after the component's first resolution must
+					// still be injected on the next resolution.
+					di.map("optionalDependentService").to("wheels.tests._assets.di.OptionalDependentService");
+					var before = di.getInstance("optionalDependentService");
+					expect(before.hasDependency()).toBeFalse();
+					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
+					var after = di.getInstance("optionalDependentService");
+					expect(after.hasDependency()).toBeTrue();
 				});
 
 				it("throws on circular dependency", () => {

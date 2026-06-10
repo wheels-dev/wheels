@@ -633,10 +633,14 @@ return local.$wheels;
 		// Multi-tenant config override: per-tenant settings take precedence
 		// over application-level settings (non-function settings only).
 		// Security-sensitive settings cannot be overridden per-tenant.
-		// Use IsDefined() for safe nested scope traversal during app startup.
+		// Use a StructKeyExists chain for safe nested scope traversal during app
+		// startup (IsDefined string-parses its dotted-path argument on every call
+		// and $get runs on every settings read so it's too expensive here).
 		if (
 			!Len(arguments.functionName)
-			&& IsDefined("request.wheels.tenant.config")
+			&& StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "tenant")
+			&& StructKeyExists(request.wheels.tenant, "config")
 			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
 			&& !ListFindNoCase(
 				"encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls",
@@ -786,6 +790,20 @@ return local.$wheels;
 
 	/**
 	 * Internal function.
+	 * Case-sensitive, constant-time string comparison. Both values are hashed with
+	 * SHA-256 before being compared via MessageDigest.isEqual so the comparison
+	 * neither leaks length information nor exits early on the first differing byte.
+	 * Used by the reload/restart password gate and the environment-switch gate.
+	 */
+	public boolean function $secureCompare(required string candidate, required string comparedValue) {
+		return CreateObject("java", "java.security.MessageDigest").isEqual(
+			Hash(arguments.candidate, "SHA-256").getBytes("UTF-8"),
+			Hash(arguments.comparedValue, "SHA-256").getBytes("UTF-8")
+		);
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public any function $timeSpanForCache(
 		required any cache,
@@ -818,29 +836,44 @@ return local.$wheels;
 		numeric time = application.wheels.defaultCacheTime,
 		string category = "main"
 	) {
+		local.currentCount = $cacheCount();
 		if (
 			application.wheels.cacheCullPercentage > 0
 			&& application.wheels.cacheLastCulledAt < DateAdd("n", -application.wheels.cacheCullInterval, Now())
-			&& $cacheCount() >= application.wheels.maximumItemsToCache
+			&& local.currentCount >= application.wheels.maximumItemsToCache
 		) {
-			// cache is full so flush out expired items from this cache to make more room if possible
+			// the cache is full so flush out expired items to make more room if possible
+			// (the maximum applies to the cache as a whole so we cull across all categories,
+			// otherwise a write to a small category would free nothing and get dropped)
 			local.deletedItems = 0;
-			local.cacheCount = $cacheCount();
-			for (local.key in application.wheels.cache[arguments.category]) {
-				if (Now() > application.wheels.cache[arguments.category][local.key].expiresAt) {
-					$removeFromCache(key = local.key, category = arguments.category);
-					if (application.wheels.cacheCullPercentage < 100) {
+			if (application.wheels.cacheCullPercentage < 100) {
+				local.maxItemsToDelete = Ceiling(local.currentCount * application.wheels.cacheCullPercentage / 100);
+			} else {
+				local.maxItemsToDelete = local.currentCount;
+			}
+			local.now = Now();
+			local.categories = StructKeyArray(application.wheels.cache);
+			local.iEnd = ArrayLen(local.categories);
+			for (local.i = 1; local.i <= local.iEnd && local.deletedItems < local.maxItemsToDelete; local.i++) {
+				local.cacheCategory = local.categories[local.i];
+				// snapshot the keys so we never delete from the struct we are iterating over
+				local.cacheKeys = StructKeyArray(application.wheels.cache[local.cacheCategory]);
+				local.jEnd = ArrayLen(local.cacheKeys);
+				for (local.j = 1; local.j <= local.jEnd && local.deletedItems < local.maxItemsToDelete; local.j++) {
+					local.cacheKey = local.cacheKeys[local.j];
+					if (
+						StructKeyExists(application.wheels.cache[local.cacheCategory], local.cacheKey)
+						&& local.now > application.wheels.cache[local.cacheCategory][local.cacheKey].expiresAt
+					) {
+						$removeFromCache(key = local.cacheKey, category = local.cacheCategory);
 						local.deletedItems++;
-						local.percentageDeleted = (local.deletedItems / local.cacheCount) * 100;
-						if (local.percentageDeleted >= application.wheels.cacheCullPercentage) {
-							break;
-						}
 					}
 				}
 			}
+			local.currentCount -= local.deletedItems;
 			application.wheels.cacheLastCulledAt = Now();
 		}
-		if ($cacheCount() < application.wheels.maximumItemsToCache) {
+		if (local.currentCount < application.wheels.maximumItemsToCache) {
 			local.cacheItem = {};
 			local.cacheItem.expiresAt = DateAdd(application.wheels.cacheDatePart, arguments.time, Now());
 			if (IsSimpleValue(arguments.value)) {
@@ -1043,17 +1076,19 @@ return local.$wheels;
 		// by default we return Model or Controller so that the base component gets loaded
 		local.rv = capitalize(arguments.type);
 
-		// we are going to store the full controller / model path in the
-		// existing / non-existing lists so we can have controllers / models
-		// in multiple places
+		// we are going to memoize the full controller / model path in the
+		// existing / non-existing structs so we can have controllers / models
+		// in multiple places (structs give O(1) lookups and atomic writes where
+		// the comma lists used previously were O(n) scans per materialized object
+		// and lost entries to unlocked concurrent ListAppend calls)
 		//
 		// The name coming into $objectFileName could have dot notation due to
 		// nested controllers so we need to change delims here on the name
 		local.fullObjectPath = arguments.objectPath & "/" & ListChangeDelims(arguments.name, '/', '.');
 
 		if (
-			!ListFindNoCase(application.wheels.existingObjectFiles, local.fullObjectPath)
-			&& !ListFindNoCase(application.wheels.nonExistingObjectFiles, local.fullObjectPath)
+			!StructKeyExists(application.wheels.existingObjectFiles, local.fullObjectPath)
+			&& !StructKeyExists(application.wheels.nonExistingObjectFiles, local.fullObjectPath)
 		) {
 			// we have not yet checked if this file exists or not so let's do that
 			// here (the function below will return the file name with the correct
@@ -1063,28 +1098,20 @@ return local.$wheels;
 			if (IsBoolean(local.file) && !local.file) {
 				// no file exists, let's store that if caching is on so we don't have to check it again
 				if (application.wheels.cacheFileChecking) {
-					application.wheels.nonExistingObjectFiles = ListAppend(
-						application.wheels.nonExistingObjectFiles,
-						local.fullObjectPath
-					);
+					application.wheels.nonExistingObjectFiles[local.fullObjectPath] = false;
 				}
 			} else {
 				// the file exists, let's store the proper case of the file if caching is turned on
 				local.file = SpanExcluding(local.file, ".");
-				local.fullObjectPath = ListSetAt(local.fullObjectPath, ListLen(local.fullObjectPath, "/"), local.file, "/");
 				if (application.wheels.cacheFileChecking) {
-					application.wheels.existingObjectFiles = ListAppend(
-						application.wheels.existingObjectFiles,
-						local.fullObjectPath
-					);
+					application.wheels.existingObjectFiles[local.fullObjectPath] = local.file;
 				}
 			}
 		}
 
 		// if the file exists we return the file name in its proper case
-		local.pos = ListFindNoCase(application.wheels.existingObjectFiles, local.fullObjectPath);
-		if (local.pos) {
-			local.file = ListLast(ListGetAt(application.wheels.existingObjectFiles, local.pos), "/");
+		if (StructKeyExists(application.wheels.existingObjectFiles, local.fullObjectPath)) {
+			local.file = application.wheels.existingObjectFiles[local.fullObjectPath];
 		}
 
 		// we've found a file so we'll need to send back the corrected name
@@ -1473,9 +1500,13 @@ return local.$wheels;
 	 */
 	public void function $lockedLoadRoutes() {
 		local.appKey = $appKey();
-		// clear out the route info
+		// clear out the route info (including the static-route index so a reload
+		// can't serve stale first-write-wins entries from the previous route set)
 		ArrayClear(application[local.appKey].routes);
 		StructClear(application[local.appKey].namedRoutePositions);
+		if (StructKeyExists(application[local.appKey], "staticRoutes")) {
+			StructClear(application[local.appKey].staticRoutes);
+		}
 		// load wheels internal gui routes
 		// TODO skip this if mode != development|testing?
 		$include(template = "/wheels/public/routes.cfm");
@@ -2662,6 +2693,25 @@ return local.$wheels;
 
 	/**
 	 * Internal function.
+	 * Disambiguates a D1/D2/YYYY slash date: a component greater than 12 cannot
+	 * be a month so the format is unambiguous; otherwise the engine adapter's
+	 * locale preference decides (MM/DD/YYYY on Lucee / Adobe, DD/MM/YYYY on
+	 * BoxLang). All slash-date parsing should funnel through this helper.
+	 */
+	public date function $parseSlashDate(required numeric d1, required numeric d2, required numeric year) {
+		if (arguments.d1 > 12) {
+			// the first component cannot be a month so it must be the day (DD/MM/YYYY)
+			return CreateDate(arguments.year, arguments.d2, arguments.d1);
+		} else if (arguments.d2 > 12) {
+			// the second component cannot be a month so it must be the day (MM/DD/YYYY)
+			return CreateDate(arguments.year, arguments.d1, arguments.d2);
+		} else {
+			return $engineAdapter().parseAmbiguousSlashDate(arguments.d1, arguments.d2, arguments.year);
+		}
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $convertToString(required any value, string type = "") {
 		// Normalize inputs
@@ -2733,7 +2783,8 @@ return local.$wheels;
 				arguments.value
 			)
 		) {
-			// Manually parse DD/MM/YYYY format to avoid engine-specific interpretation
+			// Manually parse the slash date to avoid engine-specific interpretation,
+			// disambiguating day/month through $parseSlashDate()
 			local.parts = ListToArray(arguments.value, " ");
 			local.datePart = local.parts[1];
 			local.timePart = local.parts[2];
@@ -2742,9 +2793,11 @@ return local.$wheels;
 			local.dateComponents = ListToArray(local.datePart, "/");
 			local.timeComponents = ListToArray(local.timePart, ":");
 
-			local.day = Val(local.dateComponents[1]); // First = day (DD/MM/YYYY)
-			local.month = Val(local.dateComponents[2]); // Second = month
-			local.year = Val(local.dateComponents[3]);
+			local.parsedDate = $parseSlashDate(
+				d1 = Val(local.dateComponents[1]),
+				d2 = Val(local.dateComponents[2]),
+				year = Val(local.dateComponents[3])
+			);
 			local.hour = Val(local.timeComponents[1]);
 			local.minute = Val(local.timeComponents[2]);
 
@@ -2753,7 +2806,14 @@ return local.$wheels;
 			} else if (local.amPm == "AM" && local.hour == 12) {
 				local.hour = 0;
 			}
-			val = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+			val = CreateDateTime(
+				Year(local.parsedDate),
+				Month(local.parsedDate),
+				Day(local.parsedDate),
+				local.hour,
+				local.minute,
+				0
+			);
 			detectedType = "datetime";
 		}
 
@@ -2823,30 +2883,16 @@ return local.$wheels;
 							}
 						}
 
-						// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — prefer DD/MM/YYYY if BoxLang or if day>12
-						if (ReFind("^\\d{1,2}/\\d{1,2}/\\d{4}", local.s2)) {
+						// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — disambiguated by $parseSlashDate()
+						if (ReFind("^\d{1,2}/\d{1,2}/\d{4}", local.s2)) {
 							local.comps = ListToArray(local.s2, "/");
-							local.d1 = Val(local.comps[1]);
-							local.d2 = Val(local.comps[2]);
-							local.y = Val(local.comps[3]);
-
-							// Heuristic: if day part > 12 then it's DD/MM/YYYY
-							if (d1 > 12) {
-								local.day = d1;
-								local.month = d2;
-							} else if (d2 > 12) {
-								// likely MM/DD/YYYY
-								local.month = d1;
-								local.day = d2;
-							} else {
-								// ambiguous -> use adapter to determine date format preference
-								local.ambiguousDate = $engineAdapter().parseAmbiguousSlashDate(d1, d2, y);
-								local.month = Month(local.ambiguousDate);
-								local.day = Day(local.ambiguousDate);
-							}
-							local.dt = CreateDate(y, local.month, local.day);
+							local.dt = $parseSlashDate(
+								d1 = Val(local.comps[1]),
+								d2 = Val(local.comps[2]),
+								year = Val(local.comps[3])
+							);
 							// if time exists in same string, try to parse it using ParseDateTime
-							if (ReFind("\\d{1,2}:\\d{2}", local.s2)) {
+							if (ReFind("\d{1,2}:\d{2}", local.s2)) {
 								try {
 									local.dt2 = ParseDateTime(local.s2);
 									if (IsDate(local.dt2)) {
@@ -3000,6 +3046,64 @@ return local.$wheels;
 		return local.rv;
 	}
 
+	/**
+	 * Internal function. Records a deprecation warning through a single shared
+	 * policy: the first call for a given feature logs a warning to the standard
+	 * wheels log and registers the warning in
+	 * application[appKey].deprecationWarnings so running apps can surface it
+	 * (debug panel, tooling). Subsequent calls for the same feature are no-ops,
+	 * making the helper safe to call from per-request code paths. The dedup
+	 * check, registration, and log write run atomically under an exclusive
+	 * lock so concurrent first callers (e.g. parallel first requests hitting a
+	 * deprecated per-request helper) register and log exactly once. If the
+	 * Wheels application struct does not exist yet, the helper is a silent
+	 * no-op: with no registry to dedup against, logging would fire on every
+	 * call, and all framework callers run after the struct is established.
+	 *
+	 * @feature Stable identifier for the deprecated feature (e.g. "plugins-directory", "paginationLinks").
+	 * @message Human-readable message: what is deprecated, what replaces it, and when it goes away.
+	 * @docUrl Optional URL of the migration guide, appended to the logged message.
+	 */
+	public void function $deprecated(required string feature, required string message, string docUrl = "") {
+		try {
+			local.appKey = $appKey();
+			if (StructKeyExists(application, local.appKey)) {
+				// One app-wide lock (rather than per-feature) also serializes the lazy
+				// creation of the registry array itself; contention is a non-issue at
+				// once-per-feature-per-application frequency.
+				lock name="wheels_deprecated_registry" type="exclusive" timeout="5" {
+					if (!StructKeyExists(application[local.appKey], "deprecationWarnings")) {
+						application[local.appKey].deprecationWarnings = [];
+					}
+					for (local.existing in application[local.appKey].deprecationWarnings) {
+						if (local.existing.feature == arguments.feature) {
+							return;
+						}
+					}
+					ArrayAppend(application[local.appKey].deprecationWarnings, {
+						feature = arguments.feature,
+						message = arguments.message,
+						url = arguments.docUrl
+					});
+					// Log if-and-only-if the registration above just succeeded; the
+					// registry is what enforces the warn-once policy for the log too.
+					try {
+						local.text = "[Wheels] Deprecation: " & arguments.message;
+						if (Len(arguments.docUrl)) {
+							local.text &= " See: " & arguments.docUrl;
+						}
+						WriteLog(type = "warning", text = local.text, file = "wheels");
+					} catch (any e) {
+						// Logging is best-effort; the registry entry above already records the warning.
+					}
+				}
+			}
+		} catch (any e) {
+			// Best-effort by design (including lock timeouts); never let a
+			// deprecation notice break the caller.
+		}
+	}
+
 	// Returns the running framework version. Delegates to BuildInfo.cfc, which
 	// is the authoritative version source. The historical box.json-reading
 	// implementation (with monorepo / wheels-base-template fallback chain)
@@ -3057,22 +3161,16 @@ return local.$wheels;
 			local.minimumMinor = "3";
 			local.minimumPatch = "2";
 			local.minimumBuild = "77";
+			// per-major-release floor consumed by the `StructKeyExists(local, local.major)`
+			// check below (keyed by the running engine's major version number)
 			local.5 = {minimumMinor = 2, minimumPatch = 1, minimumBuild = 9};
 		} else if (arguments.engine == "Adobe ColdFusion") {
-			local.minimumMajor = "11";
-			local.minimumMinor = "0";
-			local.minimumPatch = "18";
-			local.minimumBuild = "314030";
-		} else if (arguments.engine == "Adobe ColdFusion") {
-			local.minimumMajor = "2016";
-			local.minimumMinor = "0";
-			local.minimumPatch = "10";
-			local.minimumBuild = "314028";
-		} else if (arguments.engine == "Adobe ColdFusion") {
+			// Adobe ColdFusion 2018 is the oldest supported Adobe engine
+			// (CF 11 / 2016 are end-of-life and no longer supported)
 			local.minimumMajor = "2018";
 			local.minimumMinor = "0";
-			local.minimumPatch = "10";
-			local.minimumBuild = "314028";
+			local.minimumPatch = "0";
+			local.minimumBuild = "";
 		} else if (arguments.engine == "RustCFML") {
 			// RustCFML is a pre-1.0, rapidly evolving experimental engine that
 			// Wheels supports on a best-effort basis. Accept any version (leave
@@ -3114,6 +3212,32 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Normalizes mixin-collision records to a single
+	 * shared shape: {target, method, firstProvider, secondProvider,
+	 * acknowledged, source}. Plugins.cfc emits legacy-shaped records
+	 * ({existingPlugin, overridingPlugin}) while PackageLoader.cfc and the
+	 * cross-system merge in $loadPackages emit the shared shape directly;
+	 * all of them end up in the same application.wheels.mixinCollisions
+	 * array, which /wheels/plugins and the development debug footer consume
+	 * unconditionally — a mixed-shape array crashes those surfaces with a
+	 * "key doesn't exist" error.
+	 */
+	public array function $normalizeMixinCollisions(required array collisions) {
+		local.rv = [];
+		for (local.c in arguments.collisions) {
+			ArrayAppend(local.rv, {
+				target = local.c.target,
+				method = local.c.method,
+				firstProvider = StructKeyExists(local.c, "firstProvider") ? local.c.firstProvider : local.c.existingPlugin,
+				secondProvider = StructKeyExists(local.c, "secondProvider") ? local.c.secondProvider : local.c.overridingPlugin,
+				acknowledged = StructKeyExists(local.c, "acknowledged") ? local.c.acknowledged : false,
+				source = StructKeyExists(local.c, "source") ? local.c.source : "plugin"
+			});
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $loadPlugins() {
@@ -3135,7 +3259,14 @@ return local.$wheels;
 		application[local.appKey].incompatiblePlugins = application[local.appKey].PluginObj.getIncompatiblePlugins();
 		application[local.appKey].dependantPlugins = application[local.appKey].PluginObj.getDependantPlugins();
 		application[local.appKey].versionMismatchPlugins = application[local.appKey].PluginObj.getVersionMismatchPlugins();
-		application[local.appKey].mixinCollisions = application[local.appKey].PluginObj.getMixinCollisions();
+		// Plugins.cfc emits legacy-shaped collision records ({existingPlugin,
+		// overridingPlugin}); normalize them to the shared shape at the merge
+		// point so package- and cross-system records (which already use
+		// {firstProvider, secondProvider}) can live in the same array without
+		// crashing the consumers (/wheels/plugins and the debug footer).
+		application[local.appKey].mixinCollisions = $normalizeMixinCollisions(
+			application[local.appKey].PluginObj.getMixinCollisions()
+		);
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
 		application[local.appKey].pluginMiddleware = application[local.appKey].PluginObj.getPluginMiddleware();
 		// Invoke register(container) on ServiceProviderInterface plugins before activation
@@ -3169,41 +3300,6 @@ return local.$wheels;
 		application[local.appKey].packages = application[local.appKey].PackageLoaderObj.getPackages();
 		application[local.appKey].packageMeta = application[local.appKey].PackageLoaderObj.getPackageMeta();
 		application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
-
-		// Surface an aggregate summary when any packages failed to load. Without
-		// this, PackageLoader records each failure in variables.failedPackages and
-		// emits per-package WriteLog calls — but a developer who hits a downstream
-		// "No matching function [BASECOATINCLUDES]" error has no obvious place to
-		// look. Logging a single high-visibility WARN to wheels.log + a stronger
-		// one to wheels-errors.log gives a clear breadcrumb back to the root cause.
-		if (ArrayLen(application[local.appKey].failedPackages)) {
-			local.failNames = "";
-			local.failDetail = "";
-			for (local.fp in application[local.appKey].failedPackages) {
-				local.failNames = ListAppend(local.failNames, local.fp.name);
-				local.failDetail &= "  - " & local.fp.name & ": " & local.fp.error & Chr(10);
-			}
-			try {
-				writeLog(
-					file = "wheels",
-					type = "warning",
-					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
-						& " package(s) failed to load: " & local.failNames
-						& ". Helpers / services these packages provide will be unavailable —"
-						& " calling code typically surfaces this as 'No matching function [...]"
-						& "' or 'No service registered with the name [...]'."
-						& " Per-package detail in wheels-errors.log."
-				);
-				writeLog(
-					file = "wheels-errors",
-					type = "error",
-					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
-						& " package(s) failed to load:" & Chr(10) & local.failDetail
-				);
-			} catch (any e) {
-				// Logging is best-effort during application start.
-			}
-		}
 
 		// Ensure mixinCollisions exists (unset when no plugins loaded before packages)
 		if (!StructKeyExists(application[local.appKey], "mixinCollisions")) {
@@ -3266,10 +3362,59 @@ return local.$wheels;
 			ArrayAppend(application[local.appKey].pluginMiddleware, local.mw);
 		}
 
-		// Invoke ServiceProvider register/boot if DI container exists
-		if (IsDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PackageLoaderObj.getServiceProviders())) {
+		// Invoke ServiceProvider register/boot if DI container exists. The
+		// gate asks the loader (not just getServiceProviders()) because lazy
+		// service-hinted packages aren't instantiated yet at this point —
+		// $invokeServiceProviderRegister pulls them into the lifecycle, so a
+		// vendor tree containing only lazy service packages still needs the
+		// lifecycle invoked.
+		if (IsDefined("application.wheelsdi") && application[local.appKey].PackageLoaderObj.$hasServiceProviderWork()) {
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderRegister(application.wheelsdi);
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderBoot(application[local.appKey]);
+			// Re-sync the application-scope copy so register()/boot() failure
+			// records are visible there too. Adobe CF copies arrays by value on
+			// assignment, so the copy taken above (pre-invoke) never receives
+			// lifecycle-phase entries on those engines — only Lucee/BoxLang share
+			// the reference. Re-assigning is harmless on Lucee/BoxLang (same
+			// reference) and required on Adobe (fresh copy including new entries).
+			application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
+		}
+
+		// Surface an aggregate summary when any packages failed to load. Without
+		// this, PackageLoader records each failure in variables.failedPackages and
+		// emits per-package WriteLog calls — but a developer who hits a downstream
+		// "No matching function [BASECOATINCLUDES]" error has no obvious place to
+		// look. Logging a single high-visibility WARN to wheels.log + a stronger
+		// one to wheels-errors.log gives a clear breadcrumb back to the root cause.
+		// Runs after the ServiceProvider lifecycle invoke so register()/boot()
+		// failures appear in the same summary as load-phase failures.
+		if (ArrayLen(application[local.appKey].failedPackages)) {
+			local.failNames = "";
+			local.failDetail = "";
+			for (local.fp in application[local.appKey].failedPackages) {
+				local.failNames = ListAppend(local.failNames, local.fp.name);
+				local.failDetail &= "  - " & local.fp.name & ": " & local.fp.error & Chr(10);
+			}
+			try {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
+						& " package(s) failed to load: " & local.failNames
+						& ". Helpers / services these packages provide will be unavailable —"
+						& " calling code typically surfaces this as 'No matching function [...]"
+						& "' or 'No service registered with the name [...]'."
+						& " Per-package detail in wheels-errors.log."
+				);
+				writeLog(
+					file = "wheels-errors",
+					type = "error",
+					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
+						& " package(s) failed to load:" & Chr(10) & local.failDetail
+				);
+			} catch (any e) {
+				// Logging is best-effort during application start.
+			}
 		}
 	}
 

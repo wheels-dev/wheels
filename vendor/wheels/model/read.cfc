@@ -50,7 +50,8 @@ component {
 		string dataSource = variables.wheels.class.dataSource,
 		numeric $limit = "0",
 		numeric $offset = "0",
-		boolean $forUpdate = "false"
+		boolean $forUpdate = "false",
+		boolean $useRequestCache = "true"
 	) {
 		$args(name = "findAll", args = arguments);
 		$setDebugName(name = "findAll", args = arguments);
@@ -155,7 +156,8 @@ component {
 						$debugName = arguments.$debugName,
 						includeSoftDeletes = arguments.includeSoftDeletes,
 						dataSource = arguments.dataSource,
-						callbacks = false
+						callbacks = false,
+						$useRequestCache = arguments.$useRequestCache
 					);
 					if (local.values.RecordCount) {
 						local.paginationWhere = "";
@@ -230,8 +232,12 @@ component {
 			local.originalWhere = arguments.where;
 			arguments.where = ReReplace(arguments.where, variables.wheels.class.RESQLWhere, "\1?\8", "all");
 
-			// get info from cache when available, otherwise create the generic select, from, where and order by clause
-			local.queryShellKey = $hashedKey(variables.wheels.class.modelName, arguments);
+			// get info from cache when available, otherwise create the generic select, from, where and order by clause.
+			// $useRequestCache governs request-level caching only — it doesn't change the generated SQL — so strip it from the shell-key args; otherwise the application-scoped SQL cache fragments into two entries (batch vs non-batch) for every model that uses both.
+			// A shallow StructCopy is sufficient (and cheaper than Duplicate) since we only remove a top-level key and $hashedKey doesn't mutate the struct.
+			local.shellKeyArgs = StructCopy(arguments);
+			StructDelete(local.shellKeyArgs, "$useRequestCache");
+			local.queryShellKey = $hashedKey(variables.wheels.class.modelName, local.shellKeyArgs);
 			local.sql = $getFromCache(local.queryShellKey, "sql");
 			if (!IsArray(local.sql)) {
 				local.sql = [];
@@ -296,15 +302,22 @@ component {
 				parameterize = arguments.parameterize
 			);
 
-			// Create a struct in the request scope to store cached queries.
-			if (!StructKeyExists(request.wheels, variables.wheels.class.modelName)) {
-				request.wheels[variables.wheels.class.modelName] = {};
+			// Determine whether the request-level query cache should be used for this call.
+			// Batch finders (findEach / findInBatches) opt out via $useRequestCache so their per-page results don't accumulate in the request scope for the remainder of the request.
+			local.useRequestCache = application.wheels.cacheQueriesDuringRequest && arguments.$useRequestCache;
+			if (local.useRequestCache) {
+				// Create a struct in the request scope to store cached queries.
+				if (!StructKeyExists(request.wheels, variables.wheels.class.modelName)) {
+					request.wheels[variables.wheels.class.modelName] = {};
+				}
+
+				// Derive the request cache key from the SQL shell key computed above (it already encodes the model name and the full arguments struct) so we don't have to serialize all arguments a second time.
+				local.queryKey = $hashedKey(local.queryShellKey, local.originalWhere);
 			}
 
 			// return existing query result if it has been run already in current request, otherwise pass off the sql array to the query
-			local.queryKey = $hashedKey(variables.wheels.class.modelName, arguments, local.originalWhere);
 			if (
-				application.wheels.cacheQueriesDuringRequest
+				local.useRequestCache
 				&& !arguments.reload
 				&& StructKeyExists(request.wheels[variables.wheels.class.modelName], local.queryKey)
 			) {
@@ -338,7 +351,10 @@ component {
 					}
 				}
 				local.findAll = variables.wheels.class.adapter.$querySetup(argumentCollection = local.finderArgs);
-				request.wheels[variables.wheels.class.modelName][local.queryKey] = local.findAll; // <- store in request cache so we never run the exact same query twice in the same request
+				if (local.useRequestCache) {
+					// Store in request cache so we never run the exact same query twice in the same request.
+					request.wheels[variables.wheels.class.modelName][local.queryKey] = local.findAll;
+				}
 			}
 
 			// return using the native cfml query returntype if the argument is present
@@ -648,6 +664,15 @@ component {
 			arguments.order = primaryKey() & " ASC";
 		}
 
+		// Run the COUNT query once up front and pass the total to every page request below so each batch doesn't re-run it.
+		local.totalRecords = $countForBatching(argumentCollection = arguments);
+
+		// Nothing matches so there is nothing to iterate.
+		// Returning here also avoids a redundant second COUNT (findAll only honors its `count` argument when it's greater than zero, so passing 0 would make the first page query re-run the COUNT itself).
+		if (local.totalRecords == 0) {
+			return;
+		}
+
 		local.page = 1;
 		local.keepGoing = true;
 
@@ -660,6 +685,9 @@ component {
 			local.finderArgs.page = local.page;
 			local.finderArgs.perPage = arguments.batchSize;
 			local.finderArgs.includeSoftDeletes = arguments.includeSoftDeletes;
+			local.finderArgs.count = local.totalRecords;
+			// Opt out of the request-level query cache so the per-batch results don't accumulate in memory for the remainder of the request (which would defeat the purpose of batched processing).
+			local.finderArgs.$useRequestCache = false;
 			if (arguments.returnAs == "struct") {
 				local.finderArgs.returnAs = "structs";
 			} else {
@@ -719,6 +747,15 @@ component {
 			arguments.order = primaryKey() & " ASC";
 		}
 
+		// Run the COUNT query once up front and pass the total to every page request below so each batch doesn't re-run it.
+		local.totalRecords = $countForBatching(argumentCollection = arguments);
+
+		// Nothing matches so there is nothing to iterate.
+		// Returning here also avoids a redundant second COUNT (findAll only honors its `count` argument when it's greater than zero, so passing 0 would make the first page query re-run the COUNT itself).
+		if (local.totalRecords == 0) {
+			return;
+		}
+
 		local.page = 1;
 		local.keepGoing = true;
 
@@ -732,6 +769,9 @@ component {
 			local.finderArgs.perPage = arguments.batchSize;
 			local.finderArgs.returnAs = arguments.returnAs;
 			local.finderArgs.includeSoftDeletes = arguments.includeSoftDeletes;
+			local.finderArgs.count = local.totalRecords;
+			// Opt out of the request-level query cache so the per-batch results don't accumulate in memory for the remainder of the request (which would defeat the purpose of batched processing).
+			local.finderArgs.$useRequestCache = false;
 			if (StructKeyExists(arguments, "parameterize")) {
 				local.finderArgs.parameterize = arguments.parameterize;
 			}
@@ -764,5 +804,25 @@ component {
 				local.keepGoing = false;
 			}
 		}
+	}
+
+	/**
+	 * Runs the COUNT query used by the batch finders (findEach / findInBatches) once up front.
+	 * The result is passed to findAll's `count` argument for every page so the COUNT isn't re-run per batch.
+	 */
+	public numeric function $countForBatching(
+		string where = "",
+		string include = "",
+		boolean includeSoftDeletes = false,
+		any parameterize
+	) {
+		local.countArgs = {};
+		local.countArgs.where = arguments.where;
+		local.countArgs.include = arguments.include;
+		local.countArgs.includeSoftDeletes = arguments.includeSoftDeletes;
+		if (StructKeyExists(arguments, "parameterize")) {
+			local.countArgs.parameterize = arguments.parameterize;
+		}
+		return this.count(argumentCollection = local.countArgs);
 	}
 }

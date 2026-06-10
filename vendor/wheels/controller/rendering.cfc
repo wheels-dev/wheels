@@ -705,28 +705,14 @@ component {
 			$template = arguments.$name
 		);
 		local.rv = false;
-		if (
-			!ListFindNoCase(variables.$class.formats.existingTemplates, arguments.$name)
-			&& !ListFindNoCase(variables.$class.formats.nonExistingTemplates, arguments.$name)
-		) {
+		if (!StructKeyExists(variables.$class.formats.templateCache, arguments.$name)) {
 			if (FileExists(ExpandPath(local.templatePath))) {
 				local.rv = true;
 			}
 			if ($get("cacheFileChecking")) {
-				if (local.rv) {
-					variables.$class.formats.existingTemplates = ListAppend(
-						variables.$class.formats.existingTemplates,
-						arguments.$name
-					);
-				} else {
-					variables.$class.formats.nonExistingTemplates = ListAppend(
-						variables.$class.formats.nonExistingTemplates,
-						arguments.$name
-					);
-				}
+				variables.$class.formats.templateCache[arguments.$name] = local.rv;
 			}
-		}
-		if (!local.rv && ListFindNoCase(variables.$class.formats.existingTemplates, arguments.$name)) {
+		} else if (variables.$class.formats.templateCache[arguments.$name]) {
 			local.rv = true;
 		}
 		return local.rv;
@@ -878,10 +864,10 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public string function $acceptableFormats() {
+	public string function $acceptableFormats(string action = "") {
 		local.rv = variables.$class.formats.default;
-		if (StructKeyExists(variables.$class.formats, arguments.action)) {
-			local.rv = variables.$class.formats[arguments.action];
+		if (Len(arguments.action) && StructKeyExists(variables.$class.formats.actions, arguments.action)) {
+			local.rv = variables.$class.formats.actions[arguments.action];
 		}
 		return local.rv;
 	}

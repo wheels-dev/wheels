@@ -12,5 +12,5 @@ t.change(addColumns=true);
 
 // 3. Add a foreign key reference column to an existing table
 t = changeTable(name='orders');
-	t.references(referenceNames='customer', allowNull=false);
+	t.references(columnNames='customer', allowNull=false);
 t.change(addColumns=true);

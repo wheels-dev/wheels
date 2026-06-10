@@ -84,6 +84,17 @@ component output="false" {
 		performVariableInterpolation(this.env);
 	}
 
+	// Harden the session cookie: httpOnly blocks JavaScript access and sameSite=lax
+	// limits cross-site sends. The secure flag (HTTPS-only cookie) turns on
+	// automatically in production. Override in config/app.cfm if your setup differs,
+	// e.g. `this.sessionCookie.secure = true;` when non-production environments are
+	// also served over HTTPS.
+	this.sessionCookie = {
+		httpOnly: true,
+		sameSite: "lax",
+		secure: structKeyExists(variables, "currentEnv") && currentEnv == "production"
+	};
+
 	function onServerStart() {}
 
 	include "../config/app.cfm";
@@ -100,6 +111,18 @@ component output="false" {
 	}
 
 	public void function onApplicationEnd( struct ApplicationScope ) {
+		// Release the application-scoped browser-test launcher (headless browser,
+		// node driver process, URLClassLoader handles on the Playwright JARs)
+		// before the scope is discarded. CFML has no destructors, so without this
+		// every applicationStop() reload cycle would orphan those processes.
+		if (StructKeyExists(arguments.applicationScope, "$wheelsBrowserLauncher")) {
+			try {
+				arguments.applicationScope.$wheelsBrowserLauncher.release();
+			} catch (any e) {
+				// Best-effort cleanup — never block application shutdown.
+			}
+		}
+
 		application.wo.$include(
 			template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
 			argumentCollection = arguments
@@ -168,7 +191,18 @@ component output="false" {
 			application.wheels.environment != "development" &&
 			(application.wheels.allowIPBasedDebugAccess)
 		) {
-			local.clientIP = CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR;
+			// Client IP comes from the socket address. X-Forwarded-For is client-controlled
+			// and trivially spoofed, so it is only consulted when the app explicitly opts in
+			// via set(debugAccessTrustProxy=true) behind a trusted reverse proxy.
+			local.clientIP = Trim(CGI.REMOTE_ADDR);
+			if (
+				StructKeyExists(application.wheels, "debugAccessTrustProxy")
+				&& application.wheels.debugAccessTrustProxy
+				&& Len(Trim(CGI.HTTP_X_FORWARDED_FOR))
+			) {
+				// Rightmost entry is the one appended by the trusted proxy nearest the app.
+				local.clientIP = Trim(ListLast(CGI.HTTP_X_FORWARDED_FOR));
+			}
 			local.allowedIPs = application.wheels.debugAccessIPs;
 
 			if (arrayContains(local.allowedIPs, local.clientIP)) {
@@ -192,7 +226,10 @@ component output="false" {
 			&& (
 				!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "reloadPassword")
 				|| !Len(application.wheels.reloadPassword)
-				|| (StructKeyExists(url, "password") && url.password == application.wheels.reloadPassword)
+				// Case-sensitive, constant-time compare — same gate as the environment switch
+				// in wheels/events/onapplicationstart.cfc (CFML == is case-insensitive and
+				// exits early, which leaks timing information).
+				|| (StructKeyExists(url, "password") && application.wo.$secureCompare(url.password, application.wheels.reloadPassword))
 			)
 		) {
 			application.wo.$debugPoint("total,reload");

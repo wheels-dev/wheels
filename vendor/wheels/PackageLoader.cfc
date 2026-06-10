@@ -42,6 +42,13 @@ component output="false" {
 		variables.loadOrder = [];
 		variables.lazyPackages = {};
 		variables.mixinCollisions = [];
+		// ServiceProvider lifecycle state. The container/app references are
+		// captured when Global.cfc invokes the lifecycle so a lazy provider
+		// instantiated AFTER boot can still have register()/boot() invoked
+		// (see $instantiateLazyPackage).
+		variables.lifecycleContainer = "";
+		variables.lifecycleApp = {};
+		variables.lifecycleBooted = false;
 		// Per-package CFML mapping registry: alias → absolute package directory.
 		// Populated during load so each installed package gets a static, identifier-
 		// safe alias usable in `new <alias>.Sibling()` even when the on-disk dir
@@ -672,6 +679,33 @@ component output="false" {
 			type = "information",
 			file = "wheels"
 		);
+
+		// A ServiceProvider instantiated after the boot lifecycle already ran
+		// would otherwise never have register()/boot() invoked — its services
+		// would be silently missing with no failedPackages entry. Invoke the
+		// lifecycle now using the references captured at boot. Boot-time
+		// instantiation (from $invokeServiceProviderRegister) does not hit
+		// this branch because lifecycleBooted is still false there; those
+		// providers run through the normal register/boot loops instead.
+		if (variables.lifecycleBooted && ArrayFind(variables.serviceProviders, arguments.dirName) > 0) {
+			try {
+				variables.packages[arguments.dirName].register(variables.lifecycleContainer);
+				variables.packages[arguments.dirName].boot(variables.lifecycleApp);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#arguments.dirName#' ServiceProvider lifecycle failed on lazy instantiation: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				ArrayAppend(variables.failedPackages, {
+					name = arguments.dirName,
+					error = "ServiceProvider lifecycle failed on lazy instantiation: " & e.message,
+					detail = StructKeyExists(e, "detail") ? e.detail : ""
+				});
+				$rollbackPackage(arguments.dirName);
+				Rethrow;
+			}
+		}
 	}
 
 	/**
@@ -849,21 +883,144 @@ component output="false" {
 	}
 
 	/**
+	 * Returns true when a manifest declares service entries under
+	 * provides.services. Used to pull lazy service-only packages into the
+	 * ServiceProvider lifecycle at boot — such a package exists to register
+	 * services, which must happen during register()/boot() or the services
+	 * are silently missing.
+	 */
+	private boolean function $hintsServices(required struct manifest) {
+		return StructKeyExists(arguments.manifest, "provides")
+			&& IsStruct(arguments.manifest.provides)
+			&& StructKeyExists(arguments.manifest.provides, "services")
+			&& IsArray(arguments.manifest.provides.services)
+			&& ArrayLen(arguments.manifest.provides.services) > 0;
+	}
+
+	/**
+	 * Returns true when the ServiceProvider lifecycle has work to do: either
+	 * eagerly loaded packages already registered as providers, or lazy
+	 * packages whose manifest hints services (these are instantiated into
+	 * the lifecycle by $invokeServiceProviderRegister). Global.cfc uses this
+	 * as the gate for invoking the lifecycle so a vendor tree containing
+	 * ONLY lazy service-only packages still gets register()/boot() invoked.
+	 */
+	public boolean function $hasServiceProviderWork() {
+		if (ArrayLen(variables.serviceProviders) > 0) {
+			return true;
+		}
+		for (local.lazyKey in variables.lazyPackages) {
+			if ($hintsServices(variables.lazyPackages[local.lazyKey].manifest)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Invokes register(container) on all packages that implement ServiceProviderInterface.
 	 * Also triggers instantiation of lazy ServiceProvider packages.
+	 *
+	 * Each provider is invoked with the same per-package error isolation the
+	 * loader applies everywhere else: a throwing register() is logged, recorded
+	 * in failedPackages, and rolled back via $rollbackPackage — which also
+	 * removes the key from variables.serviceProviders so the boot phase skips
+	 * it — and the remaining providers still run. Mixins/middleware this
+	 * package contributed are unwound from the loader registries by the
+	 * rollback, but copies already merged into the application scope by
+	 * Global.cfc::$loadPackages are intentionally NOT unwound here: that merge
+	 * happens before this lifecycle invoke.
 	 */
 	public void function $invokeServiceProviderRegister(required any container) {
-		for (local.pkgKey in variables.serviceProviders) {
-			variables.packages[local.pkgKey].register(arguments.container);
+		// Capture the container so a lazy provider instantiated after boot
+		// can still have its lifecycle invoked (see $instantiateLazyPackage).
+		variables.lifecycleContainer = arguments.container;
+
+		// Lazy packages whose manifest hints services join the lifecycle
+		// here: lazy loading defers CFC instantiation past discovery and
+		// mixin collection, but a package that exists to register services
+		// must be live before the register() phase runs — otherwise its
+		// services are silently missing (no failedPackages entry, just a
+		// Wheels.DI.ServiceNotFound on some later request).
+		local.lazyKeys = StructKeyArray(variables.lazyPackages);
+		for (local.lazyKey in local.lazyKeys) {
+			if (!$hintsServices(variables.lazyPackages[local.lazyKey].manifest)) {
+				continue;
+			}
+			try {
+				$instantiateLazyPackage(local.lazyKey);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#local.lazyKey#' failed to instantiate for the ServiceProvider lifecycle: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				ArrayAppend(variables.failedPackages, {
+					name = local.lazyKey,
+					error = "Lazy ServiceProvider instantiation failed: " & e.message,
+					detail = StructKeyExists(e, "detail") ? e.detail : ""
+				});
+				$rollbackPackage(local.lazyKey);
+			}
+		}
+
+		// Iterate a snapshot: $rollbackPackage deletes from
+		// variables.serviceProviders, and mutating the array mid-iteration
+		// would skip the provider after a failing one.
+		local.providerKeys = Duplicate(variables.serviceProviders);
+		for (local.pkgKey in local.providerKeys) {
+			try {
+				variables.packages[local.pkgKey].register(arguments.container);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#local.pkgKey#' ServiceProvider register() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				ArrayAppend(variables.failedPackages, {
+					name = local.pkgKey,
+					error = "ServiceProvider register() failed: " & e.message,
+					detail = StructKeyExists(e, "detail") ? e.detail : ""
+				});
+				$rollbackPackage(local.pkgKey);
+			}
 		}
 	}
 
 	/**
 	 * Invokes boot(app) on all packages that implement ServiceProviderInterface.
+	 *
+	 * Same per-provider isolation as $invokeServiceProviderRegister: a throwing
+	 * boot() is logged, recorded in failedPackages, and rolled back so the
+	 * remaining providers still boot. Services the failing provider already
+	 * registered in the DI container during register() cannot be unwound — the
+	 * Injector has no per-package tracking.
 	 */
 	public void function $invokeServiceProviderBoot(required struct app) {
-		for (local.pkgKey in variables.serviceProviders) {
-			variables.packages[local.pkgKey].boot(arguments.app);
+		// Capture the app reference and mark the lifecycle complete so a lazy
+		// provider instantiated after this point can have register()/boot()
+		// invoked late (see $instantiateLazyPackage).
+		variables.lifecycleApp = arguments.app;
+		variables.lifecycleBooted = true;
+
+		// Iterate a snapshot: $rollbackPackage deletes from variables.serviceProviders.
+		local.providerKeys = Duplicate(variables.serviceProviders);
+		for (local.pkgKey in local.providerKeys) {
+			try {
+				variables.packages[local.pkgKey].boot(arguments.app);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#local.pkgKey#' ServiceProvider boot() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				ArrayAppend(variables.failedPackages, {
+					name = local.pkgKey,
+					error = "ServiceProvider boot() failed: " & e.message,
+					detail = StructKeyExists(e, "detail") ? e.detail : ""
+				});
+				$rollbackPackage(local.pkgKey);
+			}
 		}
 	}
 

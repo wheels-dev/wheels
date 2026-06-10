@@ -12,6 +12,9 @@ component extends="wheels.WheelsTest" {
 		if (StructKeyExists(application.wheels, "enablePublicComponent")) {
 			variables.originalEnablePublicComponent = application.wheels.enablePublicComponent;
 		}
+		if (StructKeyExists(application.wheels, "debugAccessTrustProxy")) {
+			variables.originalDebugAccessTrustProxy = application.wheels.debugAccessTrustProxy;
+		}
 	}
 
 	function afterAll() {
@@ -25,6 +28,9 @@ component extends="wheels.WheelsTest" {
 		}
 		if (StructKeyExists(variables, "originalEnablePublicComponent")) {
 			application.wheels.enablePublicComponent = variables.originalEnablePublicComponent;
+		}
+		if (StructKeyExists(variables, "originalDebugAccessTrustProxy")) {
+			application.wheels.debugAccessTrustProxy = variables.originalDebugAccessTrustProxy;
 		}
 	}
 
@@ -167,6 +173,113 @@ component extends="wheels.WheelsTest" {
 				}
 				
 				expect(application.wheels.enablePublicComponent).toBeTrue();
+			});
+		});
+
+		describe("Debug Access Trust Proxy Default", () => {
+
+			it("debugAccessTrustProxy defaults to false", () => {
+				expect(StructKeyExists(application.wheels, "debugAccessTrustProxy")).toBeTrue(
+					"events/init/security.cfm should set a debugAccessTrustProxy default so apps can opt in to X-Forwarded-For resolution behind a trusted proxy."
+				);
+				expect(application.wheels.debugAccessTrustProxy).toBeFalse(
+					"debugAccessTrustProxy must default to false: X-Forwarded-For is client-controlled and must never be trusted without explicit opt-in."
+				);
+			});
+
+			it("resolves the client IP from REMOTE_ADDR when trust proxy is disabled, ignoring X-Forwarded-For", () => {
+				// Mirrors the gated resolution logic in public/Application.cfc onRequestStart.
+				var remoteAddr = "10.0.0.5";
+				var forwardedFor = "203.0.113.99"; // attacker-controlled header value
+				var trustProxy = false;
+				var clientIP = Trim(remoteAddr);
+				if (trustProxy && Len(Trim(forwardedFor))) {
+					clientIP = Trim(ListLast(forwardedFor));
+				}
+				expect(clientIP).toBe("10.0.0.5");
+			});
+
+			it("resolves the client IP from the rightmost X-Forwarded-For entry when trust proxy is enabled", () => {
+				// Rightmost entry is the one appended by the trusted proxy nearest the app;
+				// earlier entries are client-supplied and spoofable.
+				var remoteAddr = "10.0.0.5";
+				var forwardedFor = "203.0.113.99, 198.51.100.7";
+				var trustProxy = true;
+				var clientIP = Trim(remoteAddr);
+				if (trustProxy && Len(Trim(forwardedFor))) {
+					clientIP = Trim(ListLast(forwardedFor));
+				}
+				expect(clientIP).toBe("198.51.100.7");
+			});
+		});
+
+		describe("Debug Access Client IP Source Regression", () => {
+
+			// Source-scan regression: the debug-access allowlist must not match
+			// attacker-controlled X-Forwarded-For input. CGI keys always exist
+			// (empty string), so `CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR`
+			// handed header input straight to the allowlist. Plain find()/
+			// findNoCase() only (no regex) per the Lucee 7 global-regex gotcha.
+			// Repo-root resolution prior art: specs/cli/UpgradeCheckCoverageSpec.cfc.
+
+			it("public/Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
+				var filePath = expandPath("/wheels/../..") & "/public/Application.cfc";
+				expect(fileExists(filePath)).toBeTrue("Missing: " & filePath);
+				var src = fileRead(filePath);
+				expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
+					0,
+					"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
+				);
+				expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
+					"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
+				);
+			});
+
+			it("CLI app template Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
+				var filePath = expandPath("/wheels/../..") & "/cli/lucli/templates/app/public/Application.cfc";
+				expect(fileExists(filePath)).toBeTrue("Missing: " & filePath);
+				var src = fileRead(filePath);
+				expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
+					0,
+					"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
+				);
+				expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
+					"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
+				);
+			});
+
+			it("starter-app example Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
+				var filePath = expandPath("/wheels/../..") & "/examples/starter-app/public/Application.cfc";
+				// Example trees may be pruned from some distributions; only assert when present.
+				if (fileExists(filePath)) {
+					var src = fileRead(filePath);
+					expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
+						0,
+						"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
+					);
+					expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
+						"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
+					);
+				} else {
+					expect(true).toBeTrue();
+				}
+			});
+
+			it("tweet example Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
+				var filePath = expandPath("/wheels/../..") & "/examples/tweet/public/Application.cfc";
+				// Example trees may be pruned from some distributions; only assert when present.
+				if (fileExists(filePath)) {
+					var src = fileRead(filePath);
+					expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
+						0,
+						"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
+					);
+					expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
+						"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
+					);
+				} else {
+					expect(true).toBeTrue();
+				}
 			});
 		});
 	}

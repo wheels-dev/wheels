@@ -37,11 +37,7 @@ component {
 	public function $runCsrfProtection(string action) {
 		if (StructKeyExists(variables.$class, "csrf")) {
 			local.csrf = variables.$class.csrf;
-			if (
-				(!Len(local.csrf.only) && !Len(local.csrf.except))
-				|| (Len(local.csrf.only) && ListFindNoCase(local.csrf.only, arguments.action))
-				|| (Len(local.csrf.except) && !ListFindNoCase(local.csrf.except, arguments.action))
-			) {
+			if ($appliesToAction(action = arguments.action, only = local.csrf.only, except = local.csrf.except)) {
 				$storeAuthenticityToken();
 				$flagRequestAsProtected();
 				$setAuthenticityToken();
@@ -181,7 +177,9 @@ component {
 		// If cookie doesn't yet exist, create it.
 		if (!Len(local.authenticityToken)) {
 			local.encryptionKey = $ensureCsrfCookieEncryptionKey();
-			local.authenticityToken = GenerateSecretKey(application.wheels.csrfCookieEncryptionAlgorithm);
+			// GenerateSecretKey() expects a bare cipher name ("AES"), not a full
+			// transformation string ("AES/GCM/NoPadding"), so strip mode/padding.
+			local.authenticityToken = GenerateSecretKey(ListFirst(application.wheels.csrfCookieEncryptionAlgorithm, "/"));
 			local.value = SerializeJSON({sessionId = CreateUUID(), authenticityToken = local.authenticityToken});
 			local.value = Encrypt(
 				local.value,
@@ -218,19 +216,15 @@ component {
 
 		try {
 			local.encryptionKey = $ensureCsrfCookieEncryptionKey();
-			local.cookieAttrs = Decrypt(
-				local.cookie,
-				local.encryptionKey,
-				application.wheels.csrfCookieEncryptionAlgorithm,
-				application.wheels.csrfCookieEncryptionEncoding
-			);
 		} catch (any e) {
-			// When cookie is corrupted, return empty string.
+			// When no usable encryption key is available, treat the cookie as unreadable.
 			return "";
 		}
 
-		// If we don't have cookie attr from above for some strange reason, fail.
-		if (!StructKeyExists(local, "cookieAttrs")) {
+		local.cookieAttrs = $decryptCsrfCookieValue(local.cookie, local.encryptionKey);
+
+		// When cookie is corrupted (or encrypted with an unknown key/algorithm), fail.
+		if (!Len(local.cookieAttrs)) {
 			return "";
 		}
 
@@ -248,6 +242,42 @@ component {
 		}
 
 		return local.cookieAttrs.authenticityToken;
+	}
+
+	/**
+	 * Internal function.
+	 * Decrypts an encrypted CSRF cookie value using the configured algorithm, falling
+	 * back to the legacy bare "AES" (ECB) algorithm so cookies issued before the
+	 * engine-aware IV-based default (AES/GCM/NoPadding or AES/CBC/PKCS5Padding, see
+	 * events/init/security.cfm) remain readable across the upgrade. Returns an empty
+	 * string when the value cannot be decrypted with either algorithm.
+	 */
+	public string function $decryptCsrfCookieValue(required string encryptedValue, required string encryptionKey) {
+		// State lives in a struct because local assignments made inside catch blocks
+		// do not persist after the catch on BoxLang.
+		local.state = {decrypted = ""};
+		try {
+			local.state.decrypted = Decrypt(
+				arguments.encryptedValue,
+				arguments.encryptionKey,
+				application.wheels.csrfCookieEncryptionAlgorithm,
+				application.wheels.csrfCookieEncryptionEncoding
+			);
+		} catch (any e) {
+			if (application.wheels.csrfCookieEncryptionAlgorithm != "AES") {
+				try {
+					local.state.decrypted = Decrypt(
+						arguments.encryptedValue,
+						arguments.encryptionKey,
+						"AES",
+						application.wheels.csrfCookieEncryptionEncoding
+					);
+				} catch (any legacyDecryptError) {
+					// Undecryptable with either algorithm — treat as a corrupted cookie.
+				}
+			}
+		}
+		return local.state.decrypted;
 	}
 
 	/**

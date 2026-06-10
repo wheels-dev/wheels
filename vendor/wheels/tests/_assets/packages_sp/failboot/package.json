@@ -1,0 +1,8 @@
+{
+	"name": "wheels-failboot",
+	"version": "1.0.0",
+	"description": "Test fixture: ServiceProvider whose boot() throws — exercises per-provider isolation in the boot phase.",
+	"provides": {
+		"mixins": "none"
+	}
+}

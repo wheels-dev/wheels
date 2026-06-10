@@ -14,9 +14,9 @@ t.text(columnNames="content", size="mediumtext");
 t.text(columnNames="rawHtml", size="longtext");
 
 // 6. Full migration example using text() inside createTable
-createTable("articles") {
-	t.string("title");
-	t.text("body");
-	t.text(columnNames="excerpt", allowNull=true);
-	t.timestamps();
-};
+t = createTable("articles");
+t.string("title");
+t.text("body");
+t.text(columnNames="excerpt", allowNull=true);
+t.timestamps();
+t.create();

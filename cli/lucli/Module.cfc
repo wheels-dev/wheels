@@ -98,12 +98,20 @@ component extends="modules.BaseModule" {
 	 * `create` → `new`, and unit tests). That array is reconstructed into the
 	 * same structured shape LuCLI would have produced, so a command behaves
 	 * identically whether LuCLI dispatched it or another command delegated to it.
+	 *
+	 * `__arguments` is consume-once: it is cleared on every call so a stale
+	 * stash can never replay. One-shot CLI runs hid the leak, but the stdio
+	 * MCP server (`wheels mcp wheels`) is a persistent process — after any
+	 * delegating call (create/generate app → new) a later zero-arg tool call
+	 * (e.g. wheels_test()) would otherwise re-parse the stale argv and turn
+	 * into a completely different invocation.
 	 */
 	private struct function structuredArgs(struct callerArgs = {}) {
+		var raw = __arguments ?: [];
+		__arguments = [];
 		if (!structIsEmpty(arguments.callerArgs)) {
 			return arguments.callerArgs;
 		}
-		var raw = __arguments ?: [];
 		return argvToCollection(isArray(raw) ? raw : []);
 	}
 
@@ -1728,11 +1736,15 @@ component extends="modules.BaseModule" {
 	public string function validate() {
 		if (!directoryExists(variables.projectRoot & "/app")) {
 			out("No app/ directory found. Are you in a Wheels project?", "red");
-			return "";
+			// throw maps to non-zero exit; return "" would silently succeed.
+			throw(type = "Wheels.InvalidArguments", message = "No app/ directory found — run wheels validate from a Wheels project root.");
 		}
 
 		out("Validating...", "cyan");
 		out("");
+
+		var validationFailed = false;
+		var issueCount = 0;
 
 		try {
 			var analysis = getService("analysis");
@@ -1749,8 +1761,19 @@ component extends="modules.BaseModule" {
 				var severity = issue.severity == "error" ? "red" : "yellow";
 				out("  [#uCase(issue.severity)#] #fileName# — #issue.message#", severity);
 			}
+
+			// Capture before try ends; throwing inside would be swallowed by the catch.
+			validationFailed = !results.valid;
+			issueCount = results.totalIssues;
 		} catch (any e) {
 			out("Validation failed: #e.message#", "red");
+			// rethrow maps to non-zero exit; an analyzer crash must not exit 0.
+			rethrow;
+		}
+
+		// Throw after the full report flushes — errors exit non-zero, warnings stay green.
+		if (validationFailed) {
+			throw(type = "Wheels.ValidationFailed", message = "Validation found #issueCount# issue(s) — see the report above.");
 		}
 
 		return "";
@@ -2709,10 +2732,12 @@ component extends="modules.BaseModule" {
 		var parsed = new services.ArgSpec()
 			.positional(name = "subcommand", default = "")
 			.option(name = "to", default = "")
+			.option(name = "format", default = "")
 			.parse(arguments.coll);
 		return {
 			isCheck = lCase(parsed.subcommand) == "check",
 			targetVersion = parsed.to,
+			format = parsed.format,
 			sawTo = structKeyExists(arguments.coll, "to"),
 			sawDryRun = structKeyExists(arguments.coll, "dry-run")
 		};
@@ -2729,9 +2754,14 @@ component extends="modules.BaseModule" {
 	 * Despite occasional appearances in older help output, `--dry-run` is not
 	 * supported — the command is already read-only by design.
 	 *
+	 * Breaking findings throw Wheels.UpgradeCheckFailed after the report is
+	 * printed, so the command exits non-zero and can gate CI. Advisory
+	 * (opt-in recommendation) findings never affect the exit code.
+	 *
 	 * Examples:
-	 *   wheels upgrade check                 - scan against the latest stable release
-	 *   wheels upgrade check --to=4.0.0      - scan against a specific target version
+	 *   wheels upgrade check                       - scan against the latest stable release
+	 *   wheels upgrade check --to=4.0.0            - scan against a specific target version
+	 *   wheels upgrade check --format=json         - machine-readable report (CI pipelines)
 	 */
 	public string function upgrade() {
 		var opts = parseUpgradeArgs(structuredArgs(arguments));
@@ -2745,6 +2775,10 @@ component extends="modules.BaseModule" {
 				& nl
 				& "Options:" & nl
 				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
+				& "  --format=json     Emit a machine-readable JSON report" & nl
+				& nl
+				& "Exit status:" & nl
+				& "  Non-zero when breaking changes are found (advisories never fail the check)." & nl
 				& nl
 				& "Unsupported flags:" & nl
 				& "  --dry-run is not supported — the command is already read-only," & nl
@@ -2766,7 +2800,7 @@ component extends="modules.BaseModule" {
 			return help;
 		}
 
-		return runUpgradeCheck(opts.targetVersion);
+		return runUpgradeCheck(opts.targetVersion, opts.format);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -3667,9 +3701,14 @@ component extends="modules.BaseModule" {
 
 		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
 
+		// latest/up/down change the schema — the framework's /wheels/cli
+		// bridge requires POST + the reload password for state-changing
+		// commands. info/doctor are read-only and stay on GET.
+		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
+
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(migrateUrl);
+			httpResult = mutatingAction ? makeBridgePost(migrateUrl) : makeHttpRequest(migrateUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3747,9 +3786,10 @@ component extends="modules.BaseModule" {
 		// spurious query parameters before reaching that point.
 		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
 
+		// forget/pretend mutate the tracking table — POST + reload password.
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(reconcileUrl);
+			httpResult = makeBridgePost(reconcileUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3784,9 +3824,11 @@ component extends="modules.BaseModule" {
 		var renameUrl = "http://localhost:#serverPort#/wheels/cli?command=renameSystemTables&format=json"
 			& (arguments.dryRun ? "&dryRun=true" : "");
 
+		// renameSystemTables alters tables — POST + reload password (the
+		// dry-run preview rides the same gated command).
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(renameUrl);
+			httpResult = makeBridgePost(renameUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3854,9 +3896,10 @@ component extends="modules.BaseModule" {
 			seedUrl &= "&environment=#environment#";
 		}
 
+		// dbSeed writes data — POST + reload password.
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(seedUrl);
+			httpResult = makeBridgePost(seedUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "SeedError",
@@ -4024,8 +4067,15 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Scan app for breaking changes between current and target version.
+	 *
+	 * Breaking findings throw Wheels.UpgradeCheckFailed after the report is
+	 * flushed (same pattern as validate()'s Wheels.ValidationFailed), so the
+	 * command exits non-zero and can gate CI. Advisory findings never affect
+	 * the exit code. `format="json"` replaces the human report with a single
+	 * JSON document for pipelines.
 	 */
-	private string function runUpgradeCheck(string targetVersion = "") {
+	private string function runUpgradeCheck(string targetVersion = "", string format = "") {
+		var jsonMode = lCase(arguments.format) == "json";
 		// Detect current version. Prefer wheels.json (post-rename) and fall back
 		// to box.json so apps with pre-rename vendor/wheels/ committed in their
 		// repo still work. The fallback can be removed two releases after the
@@ -4051,21 +4101,24 @@ component extends="modules.BaseModule" {
 				var releaseData = deserializeJSON(response);
 				target = replace(releaseData.tag_name, "v", "");
 			} catch (any e) {
-				out("Could not fetch latest version. Use --to=<version> to specify.", "yellow");
+				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
+				out(jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
 				return "";
 			}
 		}
 
-		out("Current version: #currentVersion#", "bold");
-		out("Target version:  #target#", "bold");
-		out("");
+		if (!jsonMode) {
+			out("Current version: #currentVersion#", "bold");
+			out("Target version:  #target#", "bold");
+			out("");
+		}
 
 		// Compare major versions
 		var currentMajor = val(listFirst(currentVersion, "."));
 		var targetMajor = val(listFirst(target, "."));
 		var sameMajor = (currentMajor == targetMajor);
 
-		if (sameMajor) {
+		if (sameMajor && !jsonMode) {
 			out("Same major version — no known breaking changes.", "green");
 			out("Scanning for opt-in recommendations...", "green");
 			out("");
@@ -4079,16 +4132,23 @@ component extends="modules.BaseModule" {
 
 		// 2.x -> 3.x
 		if (currentMajor <= 2 && targetMajor >= 3) {
+			// 2.x plugins lived at the webroot's /plugins (the previous
+			// `app/plugins` path never existed in any Wheels layout, so the
+			// check was dead). The 3.x -> 4.x block adds an identical root
+			// /plugins check, so skip this one on a 2.x -> 4.x jump to avoid
+			// reporting the same directory twice.
+			if (targetMajor < 4) {
+				arrayAppend(checks, {
+					description: "Legacy plugin directory",
+					pattern: "",
+					checkType: "directory",
+					path: "plugins",
+					fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
+				});
+			}
 			arrayAppend(checks, {
-				description: "Legacy plugin directory",
-				pattern: "",
-				checkType: "directory",
-				path: "app/plugins",
-				fix: "Migrate to packages/ + vendor/ activation model"
-			});
-			arrayAppend(checks, {
-				description: "Old test base class (wheels.Test)",
-				pattern: 'extends\s*=\s*"wheels\.Test"',
+				description: "Old test base class (wheels.Test / wheels.Testbox)",
+				pattern: 'extends\s*=\s*["'']wheels\.Test(box)?["'']',
 				checkType: "grep",
 				scanDir: "tests",
 				extensions: "cfc",
@@ -4099,27 +4159,74 @@ component extends="modules.BaseModule" {
 		// 3.x -> 4.x
 		if (currentMajor <= 3 && targetMajor >= 4) {
 			arrayAppend(checks, {
-				description: "Legacy plugin directory (deprecated in 4.x)",
+				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
 				pattern: "",
 				checkType: "directory",
 				path: "plugins",
-				fix: "Migrate to packages/ + vendor/ system"
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
 			});
+			// Matches both quote styles and the silent wheels.Testbox shim
+			// (deprecated alias of wheels.WheelsTest, removal target 5.0) —
+			// the previous double-quote-only wheels.Test pattern missed both.
 			arrayAppend(checks, {
-				description: "Old test base class (wheels.Test)",
-				pattern: 'extends\s*=\s*"wheels\.Test"',
+				description: "Old test base class (wheels.Test / wheels.Testbox)",
+				pattern: 'extends\s*=\s*["'']wheels\.Test(box)?["'']',
 				checkType: "grep",
 				scanDir: "tests",
 				extensions: "cfc",
 				fix: 'Change to extends="wheels.WheelsTest"'
 			});
+			// application.wirebox → application.wheelsdi (guide item 10). The
+			// hardest real-world case is a root Application.cfc bootstrap that
+			// calls `new wirebox.system.ioc.Injector(...)` — the WireBox
+			// package no longer ships in vendor/wheels/ — so scan the root
+			// Application.cfc and config/ in addition to app/.
 			arrayAppend(checks, {
-				description: "Direct WireBox references",
-				pattern: "application\.wirebox",
+				description: "Direct WireBox references (application.wirebox / wirebox.system.ioc)",
+				pattern: "application\.wirebox|wirebox\.system\.ioc",
 				checkType: "grep",
 				scanDir: "app",
 				extensions: "cfc,cfm",
-				fix: "Use service() or inject() from the DI container instead"
+				scanTargets: [
+					{path: "Application.cfc"},
+					{path: "config", extensions: "cfm,cfc", recurse: true}
+				],
+				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector()`. The legacy adapter does NOT shim this item."
+			});
+			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
+			// the optional wheels-legacy-adapter package, but unshimmed apps
+			// throw at first render.
+			arrayAppend(checks, {
+				description: "Removed renderPage()/renderPageToString() helpers",
+				pattern: "renderPage(ToString)?\s*\(",
+				checkType: "grep",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				fix: 'Replace renderPage() with renderView() and renderPageToString() with renderView(returnAs="string"), or install the soft-landing shim: wheels packages add wheels-legacy-adapter'
+			});
+			// HSTS defaults on in production (guide item 2, ##2081). Advisory:
+			// fires on SecurityHeaders usage so proxied/LB setups know the
+			// header now emits by default.
+			arrayAppend(checks, {
+				description: "SecurityHeaders middleware — HSTS defaults on in production in 4.0 (advisory)",
+				severity: "advisory",
+				pattern: "new\s+wheels\.middleware\.SecurityHeaders",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: "4.0 emits Strict-Transport-Security (max-age=31536000; includeSubDomains) by default in production. Pass hsts=false to the middleware if your load balancer already sets it."
+			});
+			// CSRF cookie now sets SameSite (guide item 6, ##2035). Advisory:
+			// fires on CSRF protection usage — same-site flows are unaffected,
+			// but cross-site POSTs from third-party frames will break.
+			arrayAppend(checks, {
+				description: "CSRF cookie sets SameSite in 4.0 (advisory: review cross-site POST flows)",
+				severity: "advisory",
+				pattern: "protectsFromForgery",
+				checkType: "grep",
+				scanDir: "app",
+				extensions: "cfc",
+				fix: "The CSRF cookie now sets the SameSite attribute. Cross-site POSTs from third-party frames that relied on the missing attribute will break; same-site app flows are unaffected."
 			});
 			// CORS default flip — wildcard "*" → deny-all (#2039). A bare
 			// `new wheels.middleware.Cors()` accepts no requests in 4.0.
@@ -4329,18 +4436,21 @@ component extends="modules.BaseModule" {
 				}
 
 				if (structKeyExists(check, "scanTargets") && isArray(check.scanTargets)) {
-					for (var target in check.scanTargets) {
-						var targetPath = variables.projectRoot & "/" & target.path;
+					// `scanTarget`, not `target` — the function-level `target`
+					// above holds the target VERSION string and a same-named
+					// loop var would shadow (then clobber) it.
+					for (var scanTarget in check.scanTargets) {
+						var targetPath = variables.projectRoot & "/" & scanTarget.path;
 						if (fileExists(targetPath)) {
 							arrayAppend(filesToScan, targetPath);
 						} else if (directoryExists(targetPath)) {
-							var recurse = structKeyExists(target, "recurse") ? target.recurse : true;
+							var recurse = structKeyExists(scanTarget, "recurse") ? scanTarget.recurse : true;
 							// Avoid Elvis `?:` on `check.extensions` — Adobe CF
 							// throws when the key is absent. The `wheels snippets`
 							// check has no top-level `extensions`, so this branch
 							// is reached on every Adobe CF run when a target is a
 							// directory without its own `extensions` key.
-							var exts = structKeyExists(target, "extensions") ? target.extensions
+							var exts = structKeyExists(scanTarget, "extensions") ? scanTarget.extensions
 								: (structKeyExists(check, "extensions") ? check.extensions : "");
 							for (var ext in listToArray(exts)) {
 								var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
@@ -4403,44 +4513,79 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		// Output — three sections in priority order: Breaking → Recommended → All Clear
+		// The version-appropriate guide + the soft-landing adapter, surfaced
+		// whenever breaking findings are reported (and always in JSON output).
+		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
+			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+
+		// JSON mode — one machine-readable document, no human report. The
+		// breaking-findings throw below still fires so pipelines can gate on
+		// the exit code without parsing stdout.
+		if (jsonMode) {
+			out(serializeJSON({
+				"currentVersion": currentVersion,
+				"targetVersion": target,
+				"success": arrayLen(issues) == 0,
+				"breaking": issues,
+				"advisories": advisories,
+				"passed": passed,
+				"guide": guideUrl
+			}));
+		} else {
+			// Output — three sections in priority order: Breaking → Recommended → All Clear
+			if (arrayLen(issues)) {
+				out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
+				for (var issue in issues) {
+					out("  ! #issue.description#", "yellow");
+					for (var match in issue.matches) {
+						out("    #match#");
+					}
+					out("    -> #issue.fix#", "cyan");
+					out("");
+				}
+				out("Upgrade guide: #guideUrl#", "cyan");
+				if (targetMajor >= 4) {
+					out("Soft landing: wheels packages add wheels-legacy-adapter (shims renderPage()/renderPageToString() while you migrate)", "cyan");
+				}
+				out("");
+			}
+
+			if (arrayLen(advisories)) {
+				out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
+				for (var advisory in advisories) {
+					out("  ~ #advisory.description#", "cyan");
+					for (var match in advisory.matches) {
+						out("    #match#");
+					}
+					// Advisory fix lines are intentionally uncolored so the
+					// section header and description carry the cyan accent and
+					// opt-in items read lighter than breaking-change fixes
+					// (which use cyan on the fix line for stronger emphasis).
+					out("    -> #advisory.fix#");
+					out("");
+				}
+			}
+
+			if (arrayLen(passed)) {
+				out("All Clear (#arrayLen(passed)# checks):", "green");
+				for (var p in passed) {
+					out("  + #p#", "green");
+				}
+			}
+
+			out("");
+			out("Upgrade with: brew upgrade wheels");
+		}
+
+		// Throw after the full report flushes — breaking findings exit
+		// non-zero (CI gate), advisories and all-clear exit 0. Mirrors
+		// validate()'s Wheels.ValidationFailed convention.
 		if (arrayLen(issues)) {
-			out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
-			for (var issue in issues) {
-				out("  ! #issue.description#", "yellow");
-				for (var match in issue.matches) {
-					out("    #match#");
-				}
-				out("    -> #issue.fix#", "cyan");
-				out("");
-			}
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(issues)# breaking change(s) — see the report above."
+			);
 		}
-
-		if (arrayLen(advisories)) {
-			out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
-			for (var advisory in advisories) {
-				out("  ~ #advisory.description#", "cyan");
-				for (var match in advisory.matches) {
-					out("    #match#");
-				}
-				// Advisory fix lines are intentionally uncolored so the
-				// section header and description carry the cyan accent and
-				// opt-in items read lighter than breaking-change fixes
-				// (which use cyan on the fix line for stronger emphasis).
-				out("    -> #advisory.fix#");
-				out("");
-			}
-		}
-
-		if (arrayLen(passed)) {
-			out("All Clear (#arrayLen(passed)# checks):", "green");
-			for (var p in passed) {
-				out("  + #p#", "green");
-			}
-		}
-
-		out("");
-		out("Upgrade with: brew upgrade wheels");
 
 		return "";
 	}
@@ -6127,6 +6272,39 @@ component extends="modules.BaseModule" {
 		conn.setRequestMethod("GET");
 		conn.setConnectTimeout(5000);
 		conn.setReadTimeout(120000);
+
+		var responseCode = conn.getResponseCode();
+		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
+		var response = "";
+		while (scanner.hasNextLine()) {
+			response &= scanner.nextLine() & chr(10);
+		}
+		scanner.close();
+		return trim(response);
+	}
+
+	/**
+	 * POST to a /wheels/cli bridge URL. State-changing bridge commands
+	 * (migrate, seed, forget/pretend, rename-system-tables, ...) require
+	 * POST + the reload password — the framework rejects them over GET so
+	 * they cannot be CSRF-fired from a browser. The password is
+	 * auto-detected from .env / config/settings.cfm and sent as a form
+	 * field to keep it out of the URL and access logs.
+	 */
+	private string function makeBridgePost(required string requestUrl) {
+		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
+		var conn = javaUrl.openConnection();
+		conn.setRequestMethod("POST");
+		conn.setConnectTimeout(5000);
+		conn.setReadTimeout(120000);
+		conn.setDoOutput(true);
+		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+
+		var writer = createObject("java", "java.io.OutputStreamWriter").init(conn.getOutputStream(), "UTF-8");
+		writer.write("password=" & urlEncodedFormat(detectReloadPassword()));
+		writer.flush();
+		writer.close();
 
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
