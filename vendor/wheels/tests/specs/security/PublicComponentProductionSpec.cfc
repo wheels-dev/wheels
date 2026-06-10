@@ -1,9 +1,12 @@
 /**
  * Locks down `/wheels/*` dispatch so the internal GUI / migrator / test-runner /
- * consoleeval surface cannot be reached in `production`, even if a developer
- * has explicitly set `enablePublicComponent=true`.
+ * consoleeval surface cannot be reached outside `development`, even if a
+ * developer has explicitly set `enablePublicComponent=true`.
  *
- * See issue #2233 (Bucket A8 in the v4 GA architectural review).
+ * The gate is an allowlist (block unless development, fail closed), matching
+ * the environment checks in consoleeval.cfm and mcp.cfm. See issue #2233
+ * (Bucket A8 in the v4 GA architectural review) and the 2026-06-09 framework
+ * review (finding S2/SEC-1).
  */
 component extends="wheels.WheelsTest" {
 
@@ -35,22 +38,47 @@ component extends="wheels.WheelsTest" {
 					expect(publicCfc.$shouldBlockInProduction()).toBeFalse();
 				});
 
-				it("returns false in testing", () => {
+				it("returns true in testing (allowlist: only development passes)", () => {
 					application.wheels.environment = "testing";
 					var publicCfc = createObject("component", "wheels.Public").$init();
-					expect(publicCfc.$shouldBlockInProduction()).toBeFalse();
+					expect(publicCfc.$shouldBlockInProduction()).toBeTrue();
 				});
 
-				it("returns false in maintenance", () => {
+				it("returns true in maintenance (allowlist: only development passes)", () => {
 					application.wheels.environment = "maintenance";
 					var publicCfc = createObject("component", "wheels.Public").$init();
-					expect(publicCfc.$shouldBlockInProduction()).toBeFalse();
+					expect(publicCfc.$shouldBlockInProduction()).toBeTrue();
 				});
 
-				it("returns false in design", () => {
+				it("returns true in design (allowlist: only development passes)", () => {
 					application.wheels.environment = "design";
 					var publicCfc = createObject("component", "wheels.Public").$init();
-					expect(publicCfc.$shouldBlockInProduction()).toBeFalse();
+					expect(publicCfc.$shouldBlockInProduction()).toBeTrue();
+				});
+
+				// Attack-shaped cases from the 2026-06-09 review (S2/SEC-1): a
+				// denylist matching only the literal "production" let any other
+				// environment name straight through to the REPL/migrator/test
+				// surface. The predicate must be an allowlist instead.
+				var nonDevEnvironments = ["staging", "qa", "uat", "prod", "production-1"];
+				for (var envName in nonDevEnvironments) {
+					(function(blockedEnv) {
+						it("returns true for arbitrary non-development environment '#blockedEnv#'", () => {
+							application.wheels.environment = blockedEnv;
+							var publicCfc = createObject("component", "wheels.Public").$init();
+							expect(publicCfc.$shouldBlockInProduction()).toBeTrue();
+						});
+					})(envName);
+				}
+
+				it("fails closed when application.wheels.environment is missing", () => {
+					// Instantiate before deleting the key so component setup
+					// can't trip over the missing environment; the predicate
+					// itself must treat a missing key as "block".
+					var publicCfc = createObject("component", "wheels.Public").$init();
+					StructDelete(application.wheels, "environment");
+					expect(publicCfc.$shouldBlockInProduction()).toBeTrue();
+					// afterEach restores application.wheels.environment.
 				});
 
 			});

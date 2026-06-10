@@ -9,23 +9,29 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
-	 * Returns true when the current application environment is `production`.
+	 * Returns true unless the current application environment is `development`
+	 * (fail closed: a missing `application.wheels` struct or `environment` key
+	 * also blocks). This is an allowlist matching the environment checks in
+	 * consoleeval.cfm and mcp.cfm; the name is historical from issue #2233,
+	 * when the gate only matched `production`.
 	 *
 	 * The public GUI exposes routes, env info, a CFML REPL, test runners, and
 	 * a migration UI. Even if a developer overrides `enablePublicComponent` to
-	 * true in production (documented historical behavior for ad-hoc
-	 * debugging), these surfaces must stay gated. See issue #2233.
+	 * true outside development (documented historical behavior for ad-hoc
+	 * debugging), these surfaces must stay gated.
 	 */
 	public boolean function $shouldBlockInProduction() {
-		return StructKeyExists(application, "wheels")
-		&& StructKeyExists(application.wheels, "environment")
-		&& application.wheels.environment == "production";
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "environment")) {
+			return true;
+		}
+		return application.wheels.environment != "development";
 	}
 
 	/**
-	 * Defense-in-depth: if the current environment is production, short-circuit
-	 * the handler with a 404 response before any view is included. Called as
-	 * the first statement of every non-`index` handler in this component.
+	 * Defense-in-depth: unless the current environment is `development`,
+	 * short-circuit the handler with a 404 response before any view is
+	 * included. Called as the first statement of every non-`index` handler in
+	 * this component.
 	 */
 	public void function $blockInProduction() {
 		if ($shouldBlockInProduction()) {
