@@ -38,10 +38,6 @@ component output="false" {
 		// placeholder for return value
 		variables.routes = [];
 
-		// Performance index for faster route matching.
-		// staticRoutes: maps "METHOD:/path" -> route struct for routes with no variables (O(1) lookup).
-		variables.staticRoutes = {};
-
 		return this;
 	}
 

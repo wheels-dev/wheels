@@ -105,10 +105,10 @@ component {
 		application.$wheels.models = {};
 		application.$wheels.existingHelperFiles = "";
 		application.$wheels.existingLayoutFiles = "";
-		application.$wheels.existingObjectFiles = "";
+		application.$wheels.existingObjectFiles = {};
 		application.$wheels.nonExistingHelperFiles = "";
 		application.$wheels.nonExistingLayoutFiles = "";
-		application.$wheels.nonExistingObjectFiles = "";
+		application.$wheels.nonExistingObjectFiles = {};
 		application.$wheels.directoryFiles = {};
 		application.$wheels.routes = [];
 		application.$wheels.middleware = [];
