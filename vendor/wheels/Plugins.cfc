@@ -157,7 +157,18 @@ component output="false" extends="wheels.Global"{
 			}
 			if ($shouldLoadPlugin(local.compatVersion, local.wheelsVersion, variables.$class.loadIncompatiblePlugins)) {
 				variables.$class.plugins[local.pluginKey] = local.plugin;
-				$invokeOnPluginLoad(local.pluginKey, local.plugin);
+				// Per-plugin isolation (same log-and-skip pattern as the
+				// ServiceProvider register/boot phases): a throwing
+				// onPluginLoad must not prevent sibling plugins from loading.
+				try {
+					$invokeOnPluginLoad(local.pluginKey, local.plugin);
+				} catch (any e) {
+					WriteLog(
+						text = "[Wheels] Plugin '#local.pluginKey#' onPluginLoad failed: #e.message#",
+						type = "error",
+						file = "wheels"
+					);
+				}
 				// Track plugins that implement ServiceProviderInterface
 				if ($isServiceProvider(local.plugin)) {
 					ArrayAppend(variables.$class.serviceProviders, local.pluginKey);
@@ -502,13 +513,23 @@ component output="false" extends="wheels.Global"{
 	/**
 	 * Invokes the onPluginActivate lifecycle hook on all loaded plugins.
 	 * Called after all plugins are loaded, mixins processed, and data stored in the application scope.
+	 * A throwing hook is logged and skipped (same per-plugin isolation as the
+	 * ServiceProvider register/boot phases) so sibling plugins still activate.
 	 */
 	public void function $invokeOnPluginActivate() {
 		local.pluginKeys = $sortedPluginKeys();
 		for (local.iPlugin in local.pluginKeys) {
 			local.plugin = variables.$class.plugins[local.iPlugin];
 			if (StructKeyExists(local.plugin, "onPluginActivate") && IsCustomFunction(local.plugin.onPluginActivate)) {
-				local.plugin.onPluginActivate(application);
+				try {
+					local.plugin.onPluginActivate(application);
+				} catch (any e) {
+					WriteLog(
+						text = "[Wheels] Plugin '#local.iPlugin#' onPluginActivate failed: #e.message#",
+						type = "error",
+						file = "wheels"
+					);
+				}
 			}
 		}
 	}

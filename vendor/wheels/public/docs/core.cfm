@@ -77,7 +77,8 @@ if (StructKeyExists(application.wheels, "docs")) {
 // Validate `format` against an alphanumeric allowlist before interpolating
 // it into the include path. Without this, `format=../views/info` would
 // climb out of layouts/ — same LFI traversal class $getRequestFormat was
-// hardened against (issue #2974).
-local.docFormat = $resolveDocFormat(request.wheels.params.format);
-include "layouts/#local.docFormat#.cfm";
+// hardened against (issue #2974). Unscoped on purpose: this template runs
+// both at template level (views/docs.cfm) and inside a UDF (views/ai.cfm).
+docFormat = $resolveDocFormat(request.wheels.params.format);
+include "layouts/#docFormat#.cfm";
 </cfscript>

@@ -151,14 +151,9 @@ if (request.wheels.params.format == "json") {
 		"timestamp": now(),
 		"application": {
 			"name": application.applicationName,
-			// Whitelist applicationMeta keys safe for serialization. Dumping
-			// the whole struct leaks datasource definitions (with credentials)
-			// and broader application config; the HTML branch only renders the
-			// mappings table, so the JSON branch mirrors that surface (issue
-			// #2974, deferred from #2909).
-			"metadata": {
-				"mappings": StructKeyExists(applicationMeta, "mappings") ? applicationMeta.mappings : {}
-			}
+			// Whitelisted subset only: the full getApplicationMetadata() struct
+			// carries datasource definitions and arbitrary app config (issue #2974).
+			"metadata": $safeApplicationMetadata(applicationMeta)
 		},
 		"server": {
 			"cfmlEngine": get("serverName") & " " & get("serverVersion"),

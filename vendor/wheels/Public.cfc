@@ -228,8 +228,9 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 
 	/**
 	 * Returns a struct { packages: [...], error: "" } populated from the
-	 * wheels-packages registry. Short-circuits in production (defense in
-	 * depth — the handler is already $blockInProduction()-gated). Captures
+	 * wheels-packages registry. Short-circuits outside development (defense in
+	 * depth — the handler is already $blockInProduction()-gated, which since
+	 * #2903 is a development-only allowlist). Captures
 	 * any registry error into the `error` field so the view can render a
 	 * friendly banner instead of a stack trace.
 	 *
@@ -293,6 +294,24 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			return "<em>[redacted]</em>";
 		}
 		return formatSettingOutput(get(arguments.settingName));
+	}
+
+	/**
+	 * Returns the whitelisted subset of getApplicationMetadata() that the JSON
+	 * branch of /wheels/info may serialize. The full metadata struct carries
+	 * datasource definitions (credentials), ORM settings, and arbitrary
+	 * application config, so anything not explicitly listed here is dropped
+	 * (issue #2974).
+	 */
+	public struct function $safeApplicationMetadata(required struct metadata) {
+		local.whitelist = ListToArray("applicationTimeout,mappings,name,sessionManagement,sessionTimeout,setClientCookies");
+		local.rv = {};
+		for (local.metaKey in local.whitelist) {
+			if (StructKeyExists(arguments.metadata, local.metaKey)) {
+				local.rv[local.metaKey] = arguments.metadata[local.metaKey];
+			}
+		}
+		return local.rv;
 	}
 
 	/**

@@ -119,12 +119,18 @@ is enforced by code, so don't skip steps.
    Confirm the spec now passes. Also confirm no other tests in the layer
    regressed. If something else broke, fix it before proceeding.
 
-9. **Add a CHANGELOG entry.** Append one line to `CHANGELOG.md` under
-   `[Unreleased]` (present tense, no PR number — humans add the link on
-   merge). **Do not touch MDX guides, `.ai/wheels/`, or `CLAUDE.md`** —
-   those are handled separately by the `bot-update-docs.yml` workflow,
-   which runs after this PR opens. The bot's scope here is failing-spec →
-   implementation → passing-spec → CHANGELOG → PR.
+9. **Add a changelog fragment.** Write a new file
+   `changelog.d/<slug>.<type>.md` (type: `added`, `changed`, `fixed`,
+   `security`, `performance`, `deprecated`, or `removed`) containing one
+   markdown bullet line describing the change (present tense, reference
+   the issue number in parentheses). Do NOT edit `CHANGELOG.md` directly —
+   fragments are assembled into it at release promotion, and direct edits
+   recreate the `[Unreleased]`-anchor merge conflicts the fragment system
+   exists to remove (see `changelog.d/README.md`). **Do not touch MDX
+   guides, `.ai/wheels/`, or `CLAUDE.md`** — those are handled separately
+   by the `bot-update-docs.yml` workflow, which runs after this PR opens.
+   The bot's scope here is failing-spec → implementation → passing-spec →
+   changelog fragment → PR.
 
 10. **Stage, commit, and prepare the PR.**
 
@@ -146,7 +152,13 @@ is enforced by code, so don't skip steps.
 11. **Open the draft PR.** Use `gh pr create --draft --base develop`. The
     PR body must:
     - Open with one paragraph naming what changed and why
-    - Include `Fixes #<issue-number>`
+    - Include `Fixes #<issue-number>` — **but only when the PR ships the
+      issue's complete scope.** If the PR is a stage, a partial fix, or
+      defers any of the issue's acceptance criteria to follow-ups, write
+      `Refs #<issue-number>` instead so the merge does not auto-close the
+      tracking issue. (Three multi-stage issues were silently orphaned
+      this way during the 2026-06 remediation campaign — #2897, #2959,
+      #2963 — each auto-closed by its Stage-1 PR.)
     - **If a research comment was used**: include
       `Recommended path from research: <link to research comment>`
     - Fill the `.github/pull_request_template.md` checklist honestly:
