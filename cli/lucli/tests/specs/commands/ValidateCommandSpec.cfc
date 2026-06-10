@@ -4,8 +4,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	function beforeAll() {
 		variables.roots = [];
 
-		// Project whose model is missing extends="Model" → severity "error"
-		// from Analysis.validateModel → results.valid = false.
+		// Missing extends="Model" → Analysis.validateModel error → results.valid = false.
 		variables.errorRoot = $makeProject();
 		fileWrite(variables.errorRoot & "/app/models/Bad.cfc", "component { function config() {} }");
 		variables.errorMod = new cli.lucli.Module(cwd = variables.errorRoot);
@@ -14,9 +13,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		variables.cleanRoot = $makeProject();
 		variables.cleanMod = new cli.lucli.Module(cwd = variables.cleanRoot);
 
-		// Project whose only issue is a warning: a view that uses ## without
-		// any cfparam/cfset (Analysis.validateView severity "warning").
-		// results.valid stays true, so validate must NOT throw.
+		// Hash without cfparam → validateView warning; results.valid stays true.
 		variables.warningRoot = $makeProject();
 		directoryCreate(variables.warningRoot & "/app/views/things", true, true);
 		fileWrite(variables.warningRoot & "/app/views/things/index.cfm", "<p>##foo##</p>");
