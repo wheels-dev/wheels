@@ -957,6 +957,27 @@ return local.$wheels;
 
 	/**
 	 * Internal function.
+	 *
+	 * Lock-free warm fast-path lookup used by `model()` to bypass
+	 * `$doubleCheckedLock` and its `$invoke` reflective dispatch on cache
+	 * hits. The full `StructKeyExists` chain guards early-bootstrap and
+	 * post-`?reload=true` windows where `application.wheels.models` may
+	 * not yet exist. Returns the cached class on hit, `false` on miss
+	 * (callers fall through to the slow path).
+	 */
+	public any function $cachedModelLookup(required string name) {
+		if (
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "models")
+			&& StructKeyExists(application.wheels.models, arguments.name)
+		) {
+			return application.wheels.models[arguments.name];
+		}
+		return false;
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public any function $cachedControllerClassExists(required string name) {
 		local.rv = false;
@@ -964,6 +985,23 @@ return local.$wheels;
 			local.rv = application.wheels.controllers[arguments.name];
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 *
+	 * Lock-free warm fast-path lookup used by `controller()`. Same
+	 * shape and bootstrap guards as `$cachedModelLookup`.
+	 */
+	public any function $cachedControllerLookup(required string name) {
+		if (
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "controllers")
+			&& StructKeyExists(application.wheels.controllers, arguments.name)
+		) {
+			return application.wheels.controllers[arguments.name];
+		}
+		return false;
 	}
 
 	/**
@@ -1169,16 +1207,22 @@ return local.$wheels;
 	 * @params The params struct (combination of form and URL variables).
 	 */
 	public any function controller(required string name, struct params = {}) {
-		local.args = {};
-		local.args.name = arguments.name;
-
-		local.rv = $doubleCheckedLock(
-			condition = "$cachedControllerClassExists",
-			conditionArgs = local.args,
-			execute = "$createControllerClass",
-			executeArgs = local.args,
-			name = "controllerLock#application.applicationName#"
-		);
+		// Lock-free warm fast path: skip $doubleCheckedLock + $invoke
+		// reflective dispatch on cache hits (issue #2897, Stage 1). Returns
+		// the cached *class*; the params branch below still creates an
+		// instance when params is non-empty.
+		local.rv = $cachedControllerLookup(name = arguments.name);
+		if (IsBoolean(local.rv) && !local.rv) {
+			local.args = {};
+			local.args.name = arguments.name;
+			local.rv = $doubleCheckedLock(
+				condition = "$cachedControllerClassExists",
+				conditionArgs = local.args,
+				execute = "$createControllerClass",
+				executeArgs = local.args,
+				name = "controllerLock#application.applicationName#"
+			);
+		}
 		if (!StructIsEmpty(arguments.params)) {
 			local.rv = local.rv.$createControllerObject(arguments.params);
 		}
@@ -1194,13 +1238,19 @@ return local.$wheels;
 	 * @name Name of the model to get a reference to.
 	 */
 	public any function model(required string name) {
-		return $doubleCheckedLock(
-			condition = "$cachedModelClassExists",
-			conditionArgs = arguments,
-			execute = "$createModelClass",
-			executeArgs = arguments,
-			name = "modelLock#application.applicationName#"
-		);
+		// Lock-free warm fast path: skip $doubleCheckedLock + $invoke
+		// reflective dispatch on cache hits (issue #2897, Stage 1).
+		local.rv = $cachedModelLookup(name = arguments.name);
+		if (IsBoolean(local.rv) && !local.rv) {
+			return $doubleCheckedLock(
+				condition = "$cachedModelClassExists",
+				conditionArgs = arguments,
+				execute = "$createModelClass",
+				executeArgs = arguments,
+				name = "modelLock#application.applicationName#"
+			);
+		}
+		return local.rv;
 	}
 
 	/**
