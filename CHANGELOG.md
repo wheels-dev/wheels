@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Security
+
+- `$shouldBlockInProduction()` is now a fail-closed allowlist: the `/wheels/*` dev-UI handlers (routes, env info, CFML REPL, test runner, migrator UI, MCP) 404 unless `application.wheels.environment == "development"` — case-insensitive, matching the gates in `consoleeval.cfm` and `mcp.cfm` — and also when `application.wheels` or its `environment` key is missing. Previously the predicate matched only the literal `"production"`, so any other environment name (`staging`, `qa`, `testing`, `maintenance`, `design`, ...) bypassed the gate when `enablePublicComponent=true` was set, exposing RCE-grade surfaces. `index()` stays ungated per #2233 and `$loadRegistryPackages()` inherits the stricter gate. **Behavioral change:** operators who set `enablePublicComponent=true` in a non-development environment for ad-hoc debugging will now receive 404s on the Tools links — set `environment="development"` (and `enablePublicComponent=true`) to reach them (#2903)
+
+----
+
 # [4.0.3](https://github.com/wheels-dev/wheels/releases/tag/v4.0.3) => 2026-06-09
 
 > **Wheels 4.0.3** — third patch on the 4.0 line. Completes the CLI argument-parsing overhaul (`ArgSpec` consumes LuCLI's structured arguments in every command — `--no-*` negations and named-only flags now reach their parsers, and user-error paths exit non-zero) and lands the fixes from a full 24-command CLI audit; write-side commands (`migrate`, `seed`, `reload`, `generate admin`) now refuse to attach to a sibling project's server instead of running against the wrong database; PostgreSQL/CockroachDB foreign-key migrations and pre-23c Oracle `DROP TABLE`/`DROP VIEW` work again; framework helpers can no longer be invoked as controller actions from a URL; auto-derived model properties preserve database column casing; and scaffolded apps keep their reload password out of source control (`WHEELS_RELOAD_PASSWORD` in `.env`). ~45 PRs since the 4.0.2 GA (2026-05-27).
