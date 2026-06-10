@@ -319,6 +319,22 @@ component extends="wheels.WheelsTest" {
 				expect(data).toInclude("xml template content")
 			})
 
+			it("falls back to html when onlyProvides excludes the requested format", () => {
+				params.format = "xml"
+				_controller = application.wo.controller("test", params)
+				_controller.provides("xml")
+				_controller.onlyProvides(formats = "json", action = "test")
+				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
+				data = _controller.renderWith(data = user, layout = false, returnAs = "string")
+
+				// Clean up before asserting: controller class data is cached in the
+				// application scope and shared by reference across specs.
+				StructDelete(_controller.$getControllerClassData().formats.actions, "test")
+
+				expect(data).notToInclude("xml template content")
+				expect(data).toInclude("view template content")
+			})
+
 			it("renders current action as xml with template", () => {
 				params.format = "xml"
 				_controller = application.wo.controller("test", params)

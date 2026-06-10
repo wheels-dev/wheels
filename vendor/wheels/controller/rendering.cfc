@@ -878,10 +878,10 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public string function $acceptableFormats() {
+	public string function $acceptableFormats(string action = "") {
 		local.rv = variables.$class.formats.default;
-		if (StructKeyExists(variables.$class.formats, arguments.action)) {
-			local.rv = variables.$class.formats[arguments.action];
+		if (Len(arguments.action) && StructKeyExists(variables.$class.formats.actions, arguments.action)) {
+			local.rv = variables.$class.formats.actions[arguments.action];
 		}
 		return local.rv;
 	}

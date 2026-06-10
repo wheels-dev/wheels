@@ -125,7 +125,30 @@ component extends="wheels.WheelsTest" {
 				_controller.onlyProvides(formats = "html")
 
 				expect(_controller.$getControllerClassData().formats.actions.dummy).toBe(formats)
-				
+
+			})
+
+			it("acceptable formats honors an onlyProvides restriction for the action", () => {
+				_controller.onlyProvides(formats = "json", action = "dummy")
+				result = _controller.$acceptableFormats(action = "dummy")
+
+				// Clean up before asserting: controller class data is cached in the
+				// application scope and shared by reference across specs.
+				StructDelete(_controller.$getControllerClassData().formats.actions, "dummy")
+
+				expect(result).toBe("json")
+			})
+
+			it("acceptable formats falls back to the controller default for unrestricted actions", () => {
+				_controller.onlyProvides(formats = "json", action = "dummy")
+				result = _controller.$acceptableFormats(action = "someOtherAction")
+				StructDelete(_controller.$getControllerClassData().formats.actions, "dummy")
+
+				expect(result).toBe(_controller.$getControllerClassData().formats.default)
+			})
+
+			it("acceptable formats returns the default when no action is passed", () => {
+				expect(_controller.$acceptableFormats()).toBe(_controller.$getControllerClassData().formats.default)
 			})
 		})
 	}
