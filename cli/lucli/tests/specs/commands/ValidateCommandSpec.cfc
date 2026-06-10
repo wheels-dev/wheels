@@ -1,16 +1,4 @@
-/**
- * Tests the validate command's exit-code behaviour via Module.cfc.
- *
- * `wheels validate` must exit non-zero when validation finds errors so CI
- * can gate on it (framework review H5). LuCLI maps an uncaught throw to a
- * non-zero exit, so these specs use toThrow as the exit-code proxy — the
- * same convention as the migrate/db/generate exit-code fixes (#2890) and
- * the runTests Wheels.TestsFailed throw (CLI audit H6).
- *
- * Each case gets its own minimal temp project and Module instance so the
- * fixtures can't contaminate each other (the analysis service is cached
- * per Module with its projectRoot baked in).
- */
+// Covers all four validate() exit paths; each case gets its own temp project.
 component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function beforeAll() {
@@ -47,11 +35,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		}
 	}
 
-	/**
-	 * Build a minimal temp project. The vendor/wheels stub anchors
-	 * resolveProjectRoot so the Module treats the temp dir itself as the
-	 * project root instead of walking up to the repo checkout.
-	 */
+	// vendor/wheels stub anchors resolveProjectRoot to the temp dir.
 	private string function $makeProject(boolean includeApp = true) {
 		var root = getTempDirectory() & "wheels-cli-validate-" & createUUID();
 		directoryCreate(root & "/vendor/wheels", true, true);
