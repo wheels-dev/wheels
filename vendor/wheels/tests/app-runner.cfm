@@ -31,6 +31,12 @@
     // passes useTestDB=true by default for `wheels test`; users opt out
     // via --no-test-db. See finding #10 in
     // docs/superpowers/plans/2026-04-29-fresh-vm-onboarding-findings.md.
+    // The swap goes through TestDbResolver.applyDataSource(), which also
+    // clears the cached model classes (application.wheels.models). Model.cfc
+    // captures the datasource at class init, so without the cache clear any
+    // model already initialized by a dev request keeps writing to the dev
+    // database for the whole test run — spec teardowns can wipe real dev data.
+    local.dbResolver = new wheels.tests._assets.dispatch.TestDbResolver();
     local.originalDataSource = application.wheels.dataSourceName;
     local.targetDataSource = local.originalDataSource;
     local.swappedDataSource = false;
@@ -39,7 +45,10 @@
         local.registered = GetApplicationMetaData().datasources;
         if (StructKeyExists(local.registered, local.candidate)) {
             local.targetDataSource = local.candidate;
-            application.wheels.dataSourceName = local.candidate;
+            local.dbResolver.applyDataSource(
+                wheelsScope = application.wheels,
+                name = local.candidate
+            );
             local.swappedDataSource = true;
         }
     }
@@ -130,9 +139,15 @@
         }
     } finally {
         // Restore the original datasource so subsequent requests see the
-        // dev DB again. Runs even if a spec throws or `abort` fires.
+        // dev DB again. Runs even if a spec throws or `abort` fires. Goes
+        // through applyDataSource() so the model classes cached during the
+        // test run (bound to the test datasource) are invalidated too —
+        // otherwise post-test dev requests silently hit the test database.
         if (local.swappedDataSource) {
-            application.wheels.dataSourceName = local.originalDataSource;
+            local.dbResolver.applyDataSource(
+                wheelsScope = application.wheels,
+                name = local.originalDataSource
+            );
         }
     }
 </cfscript>
