@@ -8,6 +8,22 @@
  */
 component extends="wheels.WheelsTest" {
 
+	function beforeAll() {
+		// Snapshot the shared cache so a mid-spec assertion failure can't leave
+		// the rest of the suite running against a cold (or half-built) cache.
+		if (StructKeyExists(application.wheels, "adapterCache")) {
+			variables.$priorAdapterCache = Duplicate(application.wheels.adapterCache);
+		}
+	}
+
+	function afterAll() {
+		if (StructKeyExists(variables, "$priorAdapterCache")) {
+			application.wheels.adapterCache = variables.$priorAdapterCache;
+		} else {
+			StructDelete(application.wheels, "adapterCache");
+		}
+	}
+
 	function run() {
 
 		g = application.wo;
