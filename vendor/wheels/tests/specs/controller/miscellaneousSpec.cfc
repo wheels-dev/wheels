@@ -167,6 +167,47 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.FileNotFound")
 			})
 
+			it("rejects path traversal in the file argument", () => {
+				args.file = "../../../../config/settings.cfm"
+
+				expect(function() {
+					_controller.sendFile(argumentCollection = args)
+				}).toThrow("Wheels.InvalidPath")
+			})
+
+			it("rejects url-encoded path traversal in the file argument", () => {
+				args.file = "%2e%2e/%2e%2e/%2e%2e/config/settings.cfm"
+
+				expect(function() {
+					_controller.sendFile(argumentCollection = args)
+				}).toThrow("Wheels.InvalidPath")
+			})
+
+			it("rejects backslash path traversal in the file argument", () => {
+				args.file = ".." & Chr(92) & ".." & Chr(92) & ".." & Chr(92) & "config" & Chr(92) & "settings.cfm"
+
+				expect(function() {
+					_controller.sendFile(argumentCollection = args)
+				}).toThrow("Wheels.InvalidPath")
+			})
+
+			it("rejects path traversal in the directory argument", () => {
+				args.directory = "/wheels/tests/_assets/files/../../../../config"
+				args.file = "settings.cfm"
+
+				expect(function() {
+					_controller.sendFile(argumentCollection = args)
+				}).toThrow("Wheels.InvalidPath")
+			})
+
+			it("sanitizes the download display name", () => {
+				args.file = "/wheels/tests/_assets/files/wheels-logo.png"
+				args.name = 'we"ird' & Chr(13) & Chr(10) & 'name.png'
+				r = _controller.sendFile(argumentCollection = args)
+
+				expect(r.name).toBe("weirdname.png")
+			})
+
 			it("is specifying a directory", () => {
 				// Skip this test temporarily to debug in CI
 				skip("Temporarily skipping to debug path issues in CI");
@@ -203,6 +244,7 @@ component extends="wheels.WheelsTest" {
 				oldArgs = application.wheels.functions.sendEmail
 				textBody = "dummy plain email body"
 				HTMLBody = "<p>dummy html email body</p>"
+				bracketsBody = "dummy code email body where a < b < c < d < e"
 				filePath = ExpandPath(application.wheels.filePath) & "/" & "emailcontent.txt"
 			})
 
@@ -348,6 +390,96 @@ component extends="wheels.WheelsTest" {
 
 				expect(fileContent).toInclude(HTMLBody)
 				expect(fileContent).toInclude(textBody)
+			})
+
+			it("separates text and html bodies with a blank line when using writetofile", () => {
+				args.templates = "HTMLEmailTemplate,plainEmailTemplate"
+				args.writeToFile = filePath
+				if (FileExists(filePath)) {
+					FileDelete(filePath)
+				}
+				_controller.sendEmail(argumentCollection = args)
+				fileContent = FileRead(filePath)
+				FileDelete(filePath)
+
+				expect(fileContent).toInclude(textBody & Chr(13) & Chr(10) & Chr(13) & Chr(10) & HTMLBody)
+			})
+
+			it("sends single template email when layout is an empty string", () => {
+				args.template = "plainEmailTemplate"
+				args.layout = ""
+				result = _controller.sendEmail(argumentCollection = args)
+
+				expect(result.type).toBe("text")
+				expect(result.text).toBe(textBody)
+			})
+
+			it("throws a friendly error when more than two templates are passed in", () => {
+				args.templates = "plainEmailTemplate,HTMLEmailTemplate,plainEmailTemplate"
+
+				expect(function() {
+					_controller.sendEmail(argumentCollection = args)
+				}).toThrow("Wheels.IncorrectArguments")
+			})
+
+			it("defaults to text when multipart detection is off and no type is passed in", () => {
+				args.template = "plainEmailTemplate"
+				args.detectMultipart = false
+				result = _controller.sendEmail(argumentCollection = args)
+
+				expect(result.type).toBe("text")
+				expect(result.text).toBe(textBody)
+			})
+
+			it("preserves template order when multipart detection is off", () => {
+				args.templates = "bracketsEmailTemplate,HTMLEmailTemplate"
+				args.detectMultipart = false
+				result = _controller.sendEmail(argumentCollection = args)
+
+				expect(result.mailparts[1].type).toBe("text")
+				expect(result.mailparts[1].tagContent).toBe(bracketsBody)
+				expect(result.mailparts[2].type).toBe("html")
+				expect(result.mailparts[2].tagContent).toBe(HTMLBody)
+			})
+
+			it("does not leak custom view arguments into the controller after sending", () => {
+				args.template = "plainEmailTemplate"
+				leakArgs = Duplicate(args)
+				leakArgs.customArgument = "IShouldNotLeakIntoLaterRenders"
+				_controller.sendEmail(argumentCollection = leakArgs)
+
+				result = _controller.sendEmail(argumentCollection = args)
+				expect(result.text).toBe(textBody)
+			})
+
+			it("does not leak custom view arguments into the controller when rendering throws", () => {
+				args.template = "plainEmailTemplate"
+				leakArgs = Duplicate(args)
+				leakArgs.template = "aTemplateThatDoesNotExist"
+				leakArgs.customArgument = "IShouldNotLeakWhenRenderingThrows"
+
+				expect(function() {
+					_controller.sendEmail(argumentCollection = leakArgs)
+				}).toThrow()
+
+				result = _controller.sendEmail(argumentCollection = args)
+				expect(result.text).toBe(textBody)
+			})
+
+			it("passes smime signing attributes through to the mail tag", () => {
+				args.template = "plainEmailTemplate"
+				args.sign = true
+				args.keystore = "/path/to/keystore"
+				args.keystorepassword = "keystorepass"
+				args.keyalias = "mailkey"
+				args.keypassword = "keypass"
+				result = _controller.sendEmail(argumentCollection = args)
+
+				expect(result).toHaveKey("sign")
+				expect(result).toHaveKey("keystore")
+				expect(result).toHaveKey("keyalias")
+				expect(result.keystorepassword).toBe("keystorepass")
+				expect(result.keypassword).toBe("keypass")
 			})
 		})
 	}
