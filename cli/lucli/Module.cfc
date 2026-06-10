@@ -163,9 +163,20 @@ component extends="modules.BaseModule" {
 	 * interactive (console), meta (mcp), alias (d), or don't translate to
 	 * single-call MCP semantics (browser). Read by LuCLI >= 0.3.4 per the
 	 * mcpHiddenTools() convention.
+	 *
+	 * Defense-in-depth (#2963 / wave-2 §5.2): every public function whose
+	 * name starts with `$` is appended structurally via `getMetaData(this)`.
+	 * These are the "public for specs" carve-out helpers documented in
+	 * cli/CLAUDE.md — kept public only so TestBox can reach them — and must
+	 * never appear in MCP `tools/list`. Without this structural sweep, a
+	 * future `$publicHelperFour` added without a denylist update would leak
+	 * as a callable tool. The literal `$normalizeTestFilter` /
+	 * `$resolveAppTestDataSource` entries below are retained for clarity
+	 * and the case where LuCLI consults the list before metadata is fully
+	 * populated; the structural pass de-duplicates and catches additions.
 	 */
 	public array function mcpHiddenTools() {
-		return [
+		var hidden = [
 			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
 			"d",        // alias for destroy
@@ -183,6 +194,32 @@ component extends="modules.BaseModule" {
 			"$normalizeTestFilter",
 			"$resolveAppTestDataSource"
 		];
+
+		// Structural sweep — discover every $-prefixed PUBLIC function on
+		// this module via getMetaData(this).functions and add anything not
+		// already listed. Defense-in-depth so a future $-helper added without
+		// a denylist update can't accidentally leak as an MCP tool.
+		try {
+			var meta = getMetaData(this);
+			if (structKeyExists(meta, "functions") && isArray(meta.functions)) {
+				for (var fn in meta.functions) {
+					if (
+						structKeyExists(fn, "name")
+						&& structKeyExists(fn, "access")
+						&& fn.access == "public"
+						&& left(fn.name, 1) == "$"
+						&& !arrayContainsNoCase(hidden, fn.name)
+					) {
+						arrayAppend(hidden, fn.name);
+					}
+				}
+			}
+		} catch (any e) {
+			// Reflection failure: fall through to the literal denylist.
+			// The hard-coded $-entries above still cover the two known cases.
+		}
+
+		return hidden;
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2733,11 +2770,17 @@ component extends="modules.BaseModule" {
 			.positional(name = "subcommand", default = "")
 			.option(name = "to", default = "")
 			.option(name = "format", default = "")
+			.flag(name = "strict", default = false)
 			.parse(arguments.coll);
 		return {
 			isCheck = lCase(parsed.subcommand) == "check",
 			targetVersion = parsed.to,
 			format = parsed.format,
+			// #2963: --strict escalates advisory findings to a hard failure
+			// (throws Wheels.UpgradeCheckFailed) so CI can gate on opt-in
+			// recommendations, not just breaking changes. Mirrors Django
+			// --fail-level WARNING / Mix --warnings-as-errors.
+			strict = parsed.strict,
 			sawTo = structKeyExists(arguments.coll, "to"),
 			sawDryRun = structKeyExists(arguments.coll, "dry-run")
 		};
@@ -2768,7 +2811,7 @@ component extends="modules.BaseModule" {
 
 		if (!opts.isCheck) {
 			var nl = chr(10);
-			var help = "Usage: wheels upgrade check [--to=<version>]" & nl
+			var help = "Usage: wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
 				& nl
 				& "Scans your app for breaking changes between Wheels versions." & nl
 				& "This command is read-only — it does not modify vendor/wheels/." & nl
@@ -2776,9 +2819,12 @@ component extends="modules.BaseModule" {
 				& "Options:" & nl
 				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
 				& "  --format=json     Emit a machine-readable JSON report" & nl
+				& "  --strict          Treat advisory findings (recommended improvements) as failures." & nl
+				& "                    Useful for CI — opt-in convention changes will gate the build." & nl
 				& nl
 				& "Exit status:" & nl
-				& "  Non-zero when breaking changes are found (advisories never fail the check)." & nl
+				& "  Non-zero when breaking changes are found. With --strict, advisory findings" & nl
+				& "  also fail the check; without --strict, advisories never affect the exit code." & nl
 				& nl
 				& "Unsupported flags:" & nl
 				& "  --dry-run is not supported — the command is already read-only," & nl
@@ -2800,7 +2846,7 @@ component extends="modules.BaseModule" {
 			return help;
 		}
 
-		return runUpgradeCheck(opts.targetVersion, opts.format);
+		return runUpgradeCheck(opts.targetVersion, opts.format, opts.strict);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -4074,7 +4120,7 @@ component extends="modules.BaseModule" {
 	 * the exit code. `format="json"` replaces the human report with a single
 	 * JSON document for pipelines.
 	 */
-	private string function runUpgradeCheck(string targetVersion = "", string format = "") {
+	private string function runUpgradeCheck(string targetVersion = "", string format = "", boolean strict = false) {
 		var jsonMode = lCase(arguments.format) == "json";
 		// Detect current version. Prefer wheels.json (post-rename) and fall back
 		// to box.json so apps with pre-rename vendor/wheels/ committed in their
@@ -4584,6 +4630,19 @@ component extends="modules.BaseModule" {
 			throw(
 				type = "Wheels.UpgradeCheckFailed",
 				message = "Upgrade check found #arrayLen(issues)# breaking change(s) — see the report above."
+			);
+		}
+
+		// #2963: --strict escalates advisory findings to the same hard-fail
+		// path. Reuses Wheels.UpgradeCheckFailed so CI pipelines that already
+		// filter on the breaking-case type pick the strict case up too. The
+		// breaking branch above already returned, so this fires only when
+		// strict mode is on AND at least one advisory matched but no
+		// breaking finding did.
+		if (arguments.strict && arrayLen(advisories)) {
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(advisories)# advisory finding(s) and --strict is set — see the report above."
 			);
 		}
 

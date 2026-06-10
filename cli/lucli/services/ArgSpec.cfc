@@ -42,24 +42,28 @@ component {
 		required string name,
 		boolean required = false,
 		any default = "",
-		string type = "string"
+		string type = "string",
+		string description = ""
 	) {
 		arrayAppend(variables.positionals, {
 			"name" = arguments.name,
 			"required" = arguments.required,
 			"default" = arguments.default,
-			"type" = arguments.type
+			"type" = arguments.type,
+			"description" = arguments.description
 		});
 		return this;
 	}
 
 	public any function flag(
 		required string name,
-		boolean default = false
+		boolean default = false,
+		string description = ""
 	) {
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
-			"type" = "boolean"
+			"type" = "boolean",
+			"description" = arguments.description
 		};
 		return this;
 	}
@@ -67,11 +71,13 @@ component {
 	public any function option(
 		required string name,
 		any default = "",
-		string type = "string"
+		string type = "string",
+		string description = ""
 	) {
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
-			"type" = arguments.type
+			"type" = arguments.type,
+			"description" = arguments.description
 		};
 		return this;
 	}
@@ -167,6 +173,84 @@ component {
 		}
 
 		return result;
+	}
+
+	/**
+	 * Emit a JSON-Schema-compatible input schema describing this spec.
+	 *
+	 * The auto-discovered MCP tools in Module.cfc currently advertise empty
+	 * `properties` so clients can't discover parameters (#2963). Per the
+	 * cross-framework research (FastMCP, MCP TypeScript SDK, Symfony
+	 * JsonDescriptor): derive the schema from the same typed declaration
+	 * the command already uses. One source of truth, no hand-written drift.
+	 *
+	 * Result shape (matches MCP `tools/list[].inputSchema`):
+	 *
+	 *     {
+	 *       "type": "object",
+	 *       "properties": {
+	 *         "appName":    {"type": "string",  "description": "...", "default": ""},
+	 *         "sqlite":     {"type": "boolean", "description": "...", "default": true},
+	 *         "datasource": {"type": "string",  "description": "...", "default": ""}
+	 *       },
+	 *       "required": ["appName"],
+	 *       "additionalProperties": false
+	 *     }
+	 *
+	 * Type mapping follows CFML/ArgSpec coercion: positional/option strings
+	 * become JSON Schema "string"; numeric-typed options become "number";
+	 * flags become "boolean". `additionalProperties: false` matches the
+	 * mcpHiddenTools surface convention — unknown keys are rejected at the
+	 * MCP client.
+	 */
+	public struct function toInputSchema() {
+		var properties = {};
+		var required = [];
+
+		for (var p in variables.positionals) {
+			properties[p.name] = $toSchemaProperty(p.type, p["default"], p.description);
+			if (p.required) {
+				arrayAppend(required, p.name);
+			}
+		}
+
+		for (var optName in variables.named) {
+			var spec = variables.named[optName];
+			properties[optName] = $toSchemaProperty(spec.type, spec["default"], spec.description);
+		}
+
+		return {
+			"type" = "object",
+			"properties" = properties,
+			"required" = required,
+			"additionalProperties" = false
+		};
+	}
+
+	private struct function $toSchemaProperty(
+		required string type,
+		required any default,
+		string description = ""
+	) {
+		var prop = {
+			"type" = $toJsonSchemaType(arguments.type),
+			"default" = arguments.default
+		};
+		if (len(arguments.description)) {
+			prop["description"] = arguments.description;
+		}
+		return prop;
+	}
+
+	private string function $toJsonSchemaType(required string cfmlType) {
+		switch (arguments.cfmlType) {
+			case "boolean":
+				return "boolean";
+			case "numeric":
+				return "number";
+			default:
+				return "string";
+		}
 	}
 
 	/**
