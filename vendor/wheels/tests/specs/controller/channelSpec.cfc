@@ -253,10 +253,11 @@ component extends="wheels.WheelsTest" {
 				// MockBox writes its generated method stubs to /testbox/system/stubs
 				// (webroot-relative) and removes them after mixing in — make sure the
 				// directory exists
+				// DirectoryCreate(path, true) is Lucee-only (issue ##2567);
+				// java.io.File.mkdirs() recurses parents on every engine and
+				// is a no-op when the directory already exists.
 				var stubDir = ExpandPath("/testbox/system/stubs");
-				if (!DirectoryExists(stubDir)) {
-					DirectoryCreate(stubDir, true);
-				}
+				CreateObject("java", "java.io.File").init(stubDir).mkdirs();
 
 				// First poll returns two events whose type does NOT match the filter;
 				// second poll must resume after the newest of them, not re-fetch them
