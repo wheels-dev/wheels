@@ -6417,6 +6417,12 @@ component extends="modules.BaseModule" {
 
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		// getErrorStream() returns Java null on a bodiless 4xx/5xx response;
+		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
+		// error message (#2947 review, #2977). No body — return empty.
+		if (isNull(inputStream)) {
+			return "";
+		}
 		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {
@@ -6450,6 +6456,12 @@ component extends="modules.BaseModule" {
 
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		// getErrorStream() returns Java null on a bodiless 4xx/5xx response;
+		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
+		// error message (#2947 review, #2977). No body — return empty.
+		if (isNull(inputStream)) {
+			return "";
+		}
 		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {
@@ -6480,6 +6492,12 @@ component extends="modules.BaseModule" {
 		// Read response (handle both success and error streams)
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		// getErrorStream() returns Java null on a bodiless 4xx/5xx response;
+		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
+		// error message (#2947 review, #2977). No body — return empty.
+		if (isNull(inputStream)) {
+			return "";
+		}
 		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {

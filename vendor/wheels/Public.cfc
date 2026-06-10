@@ -228,8 +228,9 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 
 	/**
 	 * Returns a struct { packages: [...], error: "" } populated from the
-	 * wheels-packages registry. Short-circuits in production (defense in
-	 * depth — the handler is already $blockInProduction()-gated). Captures
+	 * wheels-packages registry. Short-circuits outside development (defense in
+	 * depth — the handler is already $blockInProduction()-gated, which since
+	 * #2903 is a development-only allowlist). Captures
 	 * any registry error into the `error` field so the view can render a
 	 * friendly banner instead of a stack trace.
 	 *
