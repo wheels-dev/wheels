@@ -489,6 +489,7 @@ wheels packages add <name> --force    # overwrite existing
 wheels packages update <name> --yes
 wheels packages update --all --yes
 wheels packages remove <name>
+wheels packages registry info         # registry source + cache age
 wheels packages registry refresh      # bust 24h cache
 ```
 

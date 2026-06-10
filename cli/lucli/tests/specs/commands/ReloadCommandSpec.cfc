@@ -21,6 +21,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(moduleSource).toInclude("wheels stop && wheels start");
 			});
 
+			it("honors an explicit --password override before falling back to auto-detect", () => {
+				// reload() parses --password via parseConsoleArgs and only
+				// auto-detects when no override is supplied (parity with
+				// `wheels console`). Source-scanned for the same reason as above:
+				// reload() makes a live HTTP call, so we assert the wiring rather
+				// than exercise it. Window the reload() body and confirm the
+				// override-wins-then-fallback shape.
+				var moduleSource = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				var startIdx = reFindNoCase("(?m)^[ \t]*public\s+string\s+function\s+reload\s*\(", moduleSource);
+				expect(startIdx).toBeGT(0);
+				var body = mid(moduleSource, startIdx, 1200);
+				expect(body).toInclude("parseConsoleArgs(structuredArgs(arguments))");
+				expect(body).toInclude("detectReloadPassword()");
+				expect(reFindNoCase("len\(\s*reloadOpts\.password\s*\)\s*\?", body)).toBeGT(0);
+			});
+
 		});
 
 	}
