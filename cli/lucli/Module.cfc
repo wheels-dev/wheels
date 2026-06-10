@@ -1728,11 +1728,15 @@ component extends="modules.BaseModule" {
 	public string function validate() {
 		if (!directoryExists(variables.projectRoot & "/app")) {
 			out("No app/ directory found. Are you in a Wheels project?", "red");
-			return "";
+			// throw maps to non-zero exit; return "" would silently succeed.
+			throw(type = "Wheels.InvalidArguments", message = "No app/ directory found — run wheels validate from a Wheels project root.");
 		}
 
 		out("Validating...", "cyan");
 		out("");
+
+		var validationFailed = false;
+		var issueCount = 0;
 
 		try {
 			var analysis = getService("analysis");
@@ -1749,8 +1753,19 @@ component extends="modules.BaseModule" {
 				var severity = issue.severity == "error" ? "red" : "yellow";
 				out("  [#uCase(issue.severity)#] #fileName# — #issue.message#", severity);
 			}
+
+			// Capture before try ends; throwing inside would be swallowed by the catch.
+			validationFailed = !results.valid;
+			issueCount = results.totalIssues;
 		} catch (any e) {
 			out("Validation failed: #e.message#", "red");
+			// rethrow maps to non-zero exit; an analyzer crash must not exit 0.
+			rethrow;
+		}
+
+		// Throw after the full report flushes — errors exit non-zero, warnings stay green.
+		if (validationFailed) {
+			throw(type = "Wheels.ValidationFailed", message = "Validation found #issueCount# issue(s) — see the report above.");
 		}
 
 		return "";
