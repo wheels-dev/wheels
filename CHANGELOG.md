@@ -18,11 +18,15 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
-# [Unreleased]
+## [Unreleased]
 
 ### Fixed
 
 - `Job.processQueue()`'s private `$processJob` now guards the claim `UPDATE` with `AND status = 'pending'` and verifies the affected-row count via the `queryExecute` `result` option on the same statement, mirroring the matrix-proven `JobWorker.cfc::$claimJob` idiom (a separate verification `SELECT` breaks on BoxLang + PostgreSQL when the connection pool hands out a different connection that cannot see the uncommitted UPDATE). Pre-fix, two concurrent claimers — overlapping `processQueue()` callers, or `processQueue` racing the CLI worker — could both claim the same job and both run `perform()` (duplicate emails/charges, with `attempts` double-incremented). A lost claim now early-returns `{success = false, skipped = true}` before job instantiation, tenant-context setup, and `perform()`; `processQueue()` counts lost claims under a new additive `skipped` result key (#2899)
+
+### Security
+
+- `$isSafeRedirectUrl()` rejects backslash-containing URLs (`/\evil.com`, `\/evil.com`, `\\evil.com`) and schemeless-authority URLs (`https:/evil.com`, `javascript:alert(1)`) instead of returning them as safe. Browsers normalize backslashes to forward slashes and single-slash schemes to authority form, so any of those vectors smuggled past the previous check would navigate off-site after `redirectTo()`. Scheme detection now uses the RFC 3986 grammar (`ReFindNoCase("^[a-z][a-z0-9+.-]*:")`) and runs before the relative-URL fast path; backslashes are rejected up front, so the same-domain `ListFirst` no longer needs to treat `\` as a delimiter. Same-origin absolute URLs and genuine relative paths remain allowed (#2898)
 
 ----
 
