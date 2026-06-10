@@ -43,6 +43,190 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
+	 * Returns true when a /wheels/cli bridge command changes state — DB
+	 * schema/data mutations (migrations, seeds, resets, job processing) or
+	 * file writes (migration generators, dump output). These commands must
+	 * pass $cliMutationGateCheck() before running; read-only commands stay
+	 * reachable over plain GET for the CLI and the legacy GUI bridge.
+	 *
+	 * `diff` is read-only analysis unless asked to write migration files,
+	 * so the caller passes that flag separately (2026-06-09 review SEC-4).
+	 */
+	public boolean function $cliCommandIsMutating(required string command, boolean writesFiles = false) {
+		local.mutating = "createMigration,migrateTo,migrateToLatest,migrateUp,migrateDown,renameSystemTables,"
+			& "redoMigration,forgetVersion,pretendVersion,dbRollback,dbSeed,dbCreate,dbReset,dbSetup,dbDump,"
+			& "jobsProcessNext,jobsRetry,jobsPurge";
+		if (ListFindNoCase(local.mutating, arguments.command)) {
+			return true;
+		}
+		return CompareNoCase(arguments.command, "diff") == 0 && arguments.writesFiles;
+	}
+
+	/**
+	 * Gate for state-changing /wheels/cli commands (2026-06-09 review SEC-4):
+	 * the request must be a POST, from a loopback address (with no
+	 * non-loopback X-Forwarded-For hop), carrying the reload password. A
+	 * plain GET was CSRF-reachable — `<img src=".../wheels/cli?command=dbReset">`
+	 * on any page a developer visits would silently drop every table.
+	 *
+	 * Inputs arrive as arguments (instead of reading cgi directly) so the
+	 * policy is unit-testable. Returns {allowed, statusCode, error}. Fails
+	 * closed when no reload password is configured, matching consoleeval.cfm.
+	 */
+	public struct function $cliMutationGateCheck(
+		required string requestMethod,
+		required string remoteAddr,
+		string forwardedFor = "",
+		string password = ""
+	) {
+		if (arguments.requestMethod != "POST") {
+			return {
+				allowed = false,
+				statusCode = 405,
+				error = "This command changes state and must be sent as a POST request with the reload password. Upgrade the wheels CLI if it still sends GET."
+			};
+		}
+		if (!$isLoopbackAddress(arguments.remoteAddr)) {
+			return {allowed = false, statusCode = 403, error = "State-changing CLI commands are restricted to localhost."};
+		}
+		if (Len(Trim(arguments.forwardedFor))) {
+			for (local.ip in ListToArray(arguments.forwardedFor)) {
+				if (!$isLoopbackAddress(Trim(local.ip))) {
+					return {allowed = false, statusCode = 403, error = "State-changing CLI commands are restricted to localhost."};
+				}
+			}
+		}
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "reloadPassword")
+			|| !Len(Trim(application.wheels.reloadPassword))
+		) {
+			return {
+				allowed = false,
+				statusCode = 403,
+				error = "State-changing CLI commands require a reload password. Set WHEELS_RELOAD_PASSWORD in .env or reloadPassword in config/settings.cfm."
+			};
+		}
+		if (!$cliSecureCompare(arguments.password, application.wheels.reloadPassword)) {
+			return {allowed = false, statusCode = 403, error = "Invalid reload password."};
+		}
+		return {allowed = true, statusCode = 200, error = ""};
+	}
+
+	/**
+	 * True when the supplied IP address (or hostname) resolves to a loopback
+	 * address. Empty input and unresolvable input both fail closed.
+	 */
+	public boolean function $isLoopbackAddress(required string ipAddress) {
+		if (!Len(Trim(arguments.ipAddress))) {
+			return false;
+		}
+		try {
+			return CreateObject("java", "java.net.InetAddress").getByName(Trim(arguments.ipAddress)).isLoopbackAddress();
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Constant-time string comparison (hash both sides, compare digests via
+	 * MessageDigest.isEqual) to prevent timing attacks on the reload
+	 * password. Same construction as consoleeval.cfm / onapplicationstart.cfc.
+	 */
+	public boolean function $cliSecureCompare(required string input, required string expected) {
+		return CreateObject("java", "java.security.MessageDigest").isEqual(
+			Hash(arguments.input, "SHA-256").getBytes("UTF-8"),
+			Hash(arguments.expected, "SHA-256").getBytes("UTF-8")
+		);
+	}
+
+	/**
+	 * Resolves the dbDump `output` parameter to a canonical absolute path
+	 * and confines it to the application's web root — the same
+	 * canonicalize-and-confine pattern guideImage() uses. Returns "" when
+	 * the path is empty or escapes the root via `../` traversal
+	 * (2026-06-09 review SEC-5).
+	 */
+	public string function $cliResolveDumpPath(required string output) {
+		if (!Len(Trim(arguments.output))) {
+			return "";
+		}
+		try {
+			local.canonicalRoot = CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath();
+			// Treat the requested path as web-root-relative. The old raw
+			// ExpandPath() resolved bare relative paths against the current
+			// template directory and let `../` climb out of the application
+			// entirely; java.io.File(parent, child) keeps absolute child
+			// paths contained too, and getCanonicalPath() collapses any
+			// remaining traversal before the confinement check below.
+			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.canonicalRoot, arguments.output).getCanonicalPath();
+		} catch (any e) {
+			return "";
+		}
+		local.separator = CreateObject("java", "java.io.File").separator;
+		if (Right(local.canonicalRoot, 1) != local.separator) {
+			local.canonicalRoot &= local.separator;
+		}
+		if (CompareNoCase(Left(local.canonicalTarget, Len(local.canonicalRoot)), local.canonicalRoot) != 0) {
+			return "";
+		}
+		return local.canonicalTarget;
+	}
+
+	/**
+	 * Returns the migrator adapter name for the application datasource,
+	 * memoized in the application scope — $getDBType() costs a $dbinfo
+	 * round-trip on every call and the driver behind a datasource cannot
+	 * change without a reload (which rebuilds application.wheels and so
+	 * clears this cache). Keyed by datasource name so a datasource swap
+	 * re-probes (2026-06-09 review P10).
+	 */
+	public string function $cliDatabaseType() {
+		local.dsName = application.wheels.dataSourceName;
+		if (!StructKeyExists(application.wheels, "$cliDbTypeCache")) {
+			application.wheels["$cliDbTypeCache"] = {};
+		}
+		if (!StructKeyExists(application.wheels.$cliDbTypeCache, local.dsName)) {
+			application.wheels.$cliDbTypeCache[local.dsName] = CreateObject("component", "wheels.migrator.Base").$getDBType();
+		}
+		return application.wheels.$cliDbTypeCache[local.dsName];
+	}
+
+	/**
+	 * Formats the migrator's discovery list for the /wheels/cli dbStatus
+	 * command, mapping the migrator's own status field ("migrated" or "")
+	 * to applied/pending. The previous version-comparison heuristic
+	 * (version <= currentVersion → "applied") misclassified out-of-sequence
+	 * pending migrations as applied — the exact shared-dev-DB drift
+	 * `migrate doctor` exists to surface (2026-06-09 review P3).
+	 */
+	public struct function $cliFormatMigrationStatus(required array migrations) {
+		local.rv = {migrations = [], summary = {total = 0, applied = 0, pending = 0}};
+		for (local.migration in arguments.migrations) {
+			local.isApplied = local.migration.status == "migrated";
+			// getAvailableMigrations() does not track per-row apply
+			// timestamps; keep the key for CLI display compatibility
+			// (the CLI prints "-" when empty).
+			ArrayAppend(
+				local.rv.migrations,
+				{
+					version = local.migration.version,
+					description = local.migration.name,
+					status = local.isApplied ? "applied" : "pending",
+					appliedAt = ""
+				}
+			);
+			if (local.isApplied) {
+				local.rv.summary.applied++;
+			} else {
+				local.rv.summary.pending++;
+			}
+		}
+		local.rv.summary.total = ArrayLen(local.rv.migrations);
+		return local.rv;
+	}
+
+	/**
 	 * Returns a struct { packages: [...], error: "" } populated from the
 	 * wheels-packages registry. Short-circuits in production (defense in
 	 * depth — the handler is already $blockInProduction()-gated). Captures

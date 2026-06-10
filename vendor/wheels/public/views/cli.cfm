@@ -1,16 +1,57 @@
 <!--- CLI & GUI Uses this file to talk to wheels via JSON when in maintenance/testing/development mode --->
 <cfscript>
-baseCfc = createObject("wheels.migrator.Base");
 setting showDebugOutput="no";
 migrator = application.wheels.migrator;
 try {
+	local.cliCommand = StructKeyExists(request.wheels.params, "command") ? request.wheels.params.command : "";
+
+	// ── Security gate (2026-06-09 review SEC-4) ─────────────────────────
+	// State-changing commands must arrive as POST from loopback carrying
+	// the reload password — a plain GET here was CSRF-reachable (an <img>
+	// tag on any page a developer visits could drop every table via
+	// dbReset). Read-only commands stay on GET for the CLI and legacy GUI.
+	local.writesMigrationFiles = StructKeyExists(request.wheels.params, "write") && request.wheels.params.write == "true";
+	if (Len(local.cliCommand) && $cliCommandIsMutating(local.cliCommand, local.writesMigrationFiles)) {
+		local.gate = $cliMutationGateCheck(
+			requestMethod = cgi.request_method,
+			remoteAddr = cgi.remote_addr,
+			forwardedFor = cgi.http_x_forwarded_for,
+			password = StructKeyExists(request.wheels.params, "password") ? request.wheels.params.password : ""
+		);
+		if (!local.gate.allowed) {
+			cfheader(statuscode = local.gate.statusCode);
+			cfcontent(type = "application/json");
+			WriteOutput(
+				SerializeJSON({
+					"success" = false,
+					"command" = local.cliCommand,
+					"message" = local.gate.error,
+					"messages" = local.gate.error
+				})
+			);
+			abort;
+		}
+	}
+
+	// ── Lazy migration discovery (2026-06-09 review P10) ────────────────
+	// getAvailableMigrations() instantiates every migration CFC (a $dbinfo
+	// round-trip each) and $getDBType() costs another probe, so only the
+	// commands that actually consume them pay — `routes`, `introspect`, and
+	// the jobs* commands job workers poll every few seconds skip discovery
+	// entirely. An empty command keeps the full legacy ping payload.
+	local.needsMigrations = !Len(local.cliCommand)
+		|| ListFindNoCase("info,migrateUp,migrateDown,redoMigration,dbStatus,dbRollback", local.cliCommand) > 0;
+	local.needsVersion = local.needsMigrations || CompareNoCase(local.cliCommand, "dbVersion") == 0;
+	local.needsDbType = !Len(local.cliCommand)
+		|| ListFindNoCase("info,doctor,dbSchema,dbCreate,dbReset,dbDump,dbRestore,dbShell", local.cliCommand) > 0;
+
 	"data" = {};
 	data["success"] = true;
 	data["datasource"] = application.wheels.dataSourceName;
 	data["wheelsVersion"] = application.wheels.version;
-	data["currentVersion"] = migrator.getCurrentMigrationVersion();
-	data["databaseType"] = baseCfc.$getDBType();
-	data["migrations"] = migrator.getAvailableMigrations();
+	data["currentVersion"] = local.needsVersion ? migrator.getCurrentMigrationVersion() : "";
+	data["databaseType"] = local.needsDbType ? $cliDatabaseType() : "";
+	data["migrations"] = local.needsMigrations ? migrator.getAvailableMigrations() : [];
 	data["lastVersion"] = 0;
 	data["message"] = "";
 	data["messages"] = "";
@@ -20,9 +61,9 @@ try {
 		data.lastVersion = data.migrations[ArrayLen(data.migrations)].version;
 	}
 
-	if (StructKeyExists(request.wheels.params, "command")) {
-		data.command = request.wheels.params.command;
-		switch (request.wheels.params.command) {
+	if (Len(local.cliCommand)) {
+		data.command = local.cliCommand;
+		switch (local.cliCommand) {
 			case "createMigration":
 				if (StructKeyExists(request.wheels.params, "migrationPrefix") && Len(request.wheels.params.migrationPrefix)) {
 					data.message = migrator.createMigration(
@@ -252,42 +293,15 @@ try {
 
 			// Database commands
 			case "dbStatus":
-				// Return migration status
+				// Return migration status straight from the migrator's own
+				// status field — see Public.cfc::$cliFormatMigrationStatus()
+				// for why the old version-comparison heuristic was wrong.
+				// Reuses the list discovered in the preamble instead of
+				// running discovery a second time.
+				local.statusReport = $cliFormatMigrationStatus(data.migrations);
 				data.success = true;
-				data.currentVersion = data.currentVersion;
-				data.migrations = [];
-				
-				// Format migrations for CLI consumption
-				for (local.migration in migrator.getAvailableMigrations()) {
-					local.migrationInfo = {
-						version = local.migration.version,
-						description = local.migration.name,
-						status = local.migration.status,
-						appliedAt = local.migration.loadedAt ?: ""
-					};
-					if (local.migration.version <= data.currentVersion) {
-						local.migrationInfo.status = "applied";
-					} else {
-						local.migrationInfo.status = "pending";
-					}
-					arrayAppend(data.migrations, local.migrationInfo);
-				}
-				
-				// Add summary
-				local.applied = 0;
-				local.pending = 0;
-				for (local.m in data.migrations) {
-					if (local.m.status == "applied") {
-						local.applied++;
-					} else {
-						local.pending++;
-					}
-				}
-				data.summary = {
-					total = arrayLen(data.migrations),
-					applied = local.applied,
-					pending = local.pending
-				};
+				data.migrations = local.statusReport.migrations;
+				data.summary = local.statusReport.summary;
 				break;
 				
 			case "dbVersion":
@@ -302,9 +316,10 @@ try {
 				local.steps = structKeyExists(request.wheels.params, "steps") ? request.wheels.params.steps : 1;
 				local.targetVersion = "";
 				
-				// Find target version based on steps
+				// Find target version based on steps. Reuses the list
+				// discovered in the preamble instead of re-discovering.
 				local.appliedMigrations = [];
-				for (local.migration in migrator.getAvailableMigrations()) {
+				for (local.migration in data.migrations) {
 					if (local.migration.version <= data.currentVersion) {
 						arrayAppend(local.appliedMigrations, local.migration);
 					}
@@ -727,11 +742,19 @@ try {
 						data.dump = local.sqlDump;
 						data.message = "Database dump generated successfully. Use --output parameter to save to file.";
 						
-						// If output file specified, save it
+						// If output file specified, save it. The path is
+						// canonicalized and confined to the application root
+						// (2026-06-09 review SEC-5) — `../` traversal would
+						// otherwise make this an arbitrary-location file write.
 						if (structKeyExists(request.wheels.params, "output")) {
-							local.outputFile = expandPath(request.wheels.params.output);
-							fileWrite(local.outputFile, local.sqlDump);
-							data.message = "Database dump saved to: " & request.wheels.params.output;
+							local.outputFile = $cliResolveDumpPath(request.wheels.params.output);
+							if (Len(local.outputFile)) {
+								fileWrite(local.outputFile, local.sqlDump);
+								data.message = "Database dump saved to: " & request.wheels.params.output;
+							} else {
+								data.success = false;
+								data.message = "Invalid output path: the dump file must resolve inside the application root.";
+							}
 						}
 						
 					} catch (any e) {
@@ -805,21 +828,14 @@ try {
 					data.message &= chr(10) & "Option 2: Command Line" & chr(10);
 					data.message &= "java -cp [path-to-h2.jar] org.h2.tools.Shell" & chr(10);
 
-					// If command parameter provided, execute it
-					if (structKeyExists(request.wheels.params, "command")) {
-						try {
-							local.shellQuery = new Query();
-							local.shellQuery.setDatasource(application.wheels.dataSourceName);
-							local.shellQuery.setSQL(request.wheels.params.command);
-							local.shellResult = local.shellQuery.execute().getResult();
-
-							data.success = true;
-							data.result = local.shellResult;
-							data.message = "Command executed successfully.";
-						} catch (any e) {
-							data.message = "Error executing command: " & e.message;
-						}
-					}
+					// NOTE: an earlier revision tried to execute
+					// request.wheels.params.command as SQL here, but that
+					// param is always the literal dispatch value "dbShell",
+					// so the branch executed "dbShell" as SQL, always threw,
+					// and clobbered the help text above with an error
+					// (2026-06-09 review P1). An SQL pass-through would also
+					// need the POST + reload-password gate; use the console
+					// (`wheels console`) for ad-hoc statements instead.
 				} else {
 					// Provide database-specific guidance
 					data.message = "Database shell access requires command-line tools. ";

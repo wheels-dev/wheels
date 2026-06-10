@@ -85,6 +85,11 @@ component {
 
 	/**
 	 * Run via HTTP to a running server (Phase 2-3 fallback).
+	 *
+	 * State-changing commands (latest/up/down) are sent as POST with the
+	 * reload password — the framework's /wheels/cli bridge rejects them
+	 * over GET so they cannot be CSRF-fired from a browser. Read-only
+	 * commands like info stay on GET.
 	 */
 	public struct function runViaHttp(required numeric serverPort, required string action) {
 		var command = "";
@@ -96,8 +101,12 @@ component {
 			default:       command = action;
 		}
 
-		var url = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
-		var httpService = new http(url=url, method="GET", timeout=120);
+		var mutating = listFindNoCase("migrateToLatest,migrateUp,migrateDown", command) > 0;
+		var bridgeUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
+		var httpService = new http(url=bridgeUrl, method=(mutating ? "POST" : "GET"), timeout=120);
+		if (mutating) {
+			httpService.addParam(type="formfield", name="password", value=detectReloadPassword());
+		}
 		var httpResult = httpService.send().getPrefix();
 
 		if (httpResult.statusCode contains "200" && isJSON(httpResult.fileContent)) {
@@ -119,6 +128,33 @@ component {
 		} catch (any e) {
 			return { success: false, message: e.message, detail: e.detail ?: "" };
 		}
+	}
+
+	/**
+	 * Detect the reload password from .env or config/settings.cfm — the
+	 * framework requires it for state-changing /wheels/cli commands.
+	 * Mirrors Module.cfc::detectReloadPassword().
+	 */
+	private string function detectReloadPassword() {
+		var envFile = variables.projectRoot & "/.env";
+		if (fileExists(envFile)) {
+			var envContent = fileRead(envFile);
+			var pwMatch = reFindNoCase("(?:WHEELS_)?RELOAD_PASSWORD\s*=\s*([^\r\n]+)", envContent, 1, true);
+			if (arrayLen(pwMatch.match) > 1 && len(trim(pwMatch.match[2]))) {
+				return trim(pwMatch.match[2]);
+			}
+		}
+
+		var settingsFile = variables.projectRoot & "/config/settings.cfm";
+		if (fileExists(settingsFile)) {
+			var settingsContent = fileRead(settingsFile);
+			var settingsMatch = reFindNoCase('reloadPassword\s*[=,]\s*"([^"]*)"', settingsContent, 1, true);
+			if (arrayLen(settingsMatch.match) > 1) {
+				return settingsMatch.match[2];
+			}
+		}
+
+		return "";
 	}
 
 	private void function ensureContext() {
