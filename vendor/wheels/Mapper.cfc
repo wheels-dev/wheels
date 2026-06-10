@@ -163,14 +163,32 @@ component output="false" {
 				local.rv &= local.char;
 				continue;
 			}
-			if (
-				!local.escaped
-				&& local.char == "("
-				&& local.charClassDepth == 0
-				&& (local.i == local.length || Mid(arguments.pattern, local.i + 1, 1) != "?")
-			) {
-				// Unescaped capturing group outside any character class: make it non-capturing.
-				local.rv &= "(?:";
+			if (!local.escaped && local.char == "(" && local.charClassDepth == 0) {
+				if (local.i == local.length || Mid(arguments.pattern, local.i + 1, 1) != "?") {
+					// Unescaped capturing group outside any character class: make it non-capturing.
+					local.rv &= "(?:";
+				} else {
+					// `(?` opens a non-capturing construct ((?:, (?=, (?!, (?<=, (?<!)
+					// — EXCEPT a Java named capturing group `(?<name>`, which still
+					// counts in the positional group arithmetic $mergeRoutePattern
+					// relies on (and which legacy CFML regex engines reject outright).
+					// Normalize the whole `(?<name>` opener to `(?:`; lookbehinds have
+					// `=` or `!` after `(?<` and are left untouched (issue #2976).
+					// A constraint that also backreferences the name (`\k<name>`)
+					// fails fast at draw time via $compileRegex.
+					local.namedGroup = ReFind(
+						"^\(\?<[A-Za-z][A-Za-z0-9]*>",
+						Mid(arguments.pattern, local.i, local.length - local.i + 1),
+						1,
+						true
+					);
+					if (local.namedGroup.pos[1] == 1) {
+						local.rv &= "(?:";
+						local.i += local.namedGroup.len[1] - 1;
+					} else {
+						local.rv &= local.char;
+					}
+				}
 			} else {
 				local.rv &= local.char;
 			}
