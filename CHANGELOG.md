@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Fixed
+
+- `$expandedAssociations()` no longer poisons the shared application-scoped association struct with the first caller's JOIN context, so subsequent callers see the JOIN built for their own context instead of the one cached on first hit. Two related bugs are fixed in the same memo: (1) when an `include` that passed `includeSoftDeletes=true` ran first, the built JOIN string (without the `IS NULL` soft-delete predicate) was reused for every later default-context call, silently dropping the soft-delete filter and returning soft-deleted rows; (2) when a nested self-referential `include` with an alias ran first, the aliased JOIN was reused at the top level (and vice versa), producing the wrong table/alias on later includes of the same association. The memo is now keyed per context variant (soft-delete flag + alias flag, written `sd0_alias0` / `sd1_alias0` / etc. with a `1/0` ternary so the key stays engine-stable across Adobe CF's `YES`/`NO` boolean stringification), and the memo write happens under a double-checked named lock taken only on memo miss so the steady-state hot path stays lock-free. Callers receive a per-call shallow copy carrying the context-correct join, immune to concurrent re-memoization of other variants. **Plugin-compatibility note:** the legacy `join` key is no longer written to the shared `$classData().associations[name]` struct (no framework reader exists outside the returned arrays); any community plugin reading that key directly will find it absent and should read the join off the returned association entries instead (#2910)
+
+----
+
 # [4.0.3](https://github.com/wheels-dev/wheels/releases/tag/v4.0.3) => 2026-06-09
 
 > **Wheels 4.0.3** — third patch on the 4.0 line. Completes the CLI argument-parsing overhaul (`ArgSpec` consumes LuCLI's structured arguments in every command — `--no-*` negations and named-only flags now reach their parsers, and user-error paths exit non-zero) and lands the fixes from a full 24-command CLI audit; write-side commands (`migrate`, `seed`, `reload`, `generate admin`) now refuse to attach to a sibling project's server instead of running against the wrong database; PostgreSQL/CockroachDB foreign-key migrations and pre-23c Oracle `DROP TABLE`/`DROP VIEW` work again; framework helpers can no longer be invoked as controller actions from a URL; auto-derived model properties preserve database column casing; and scaffolded apps keep their reload password out of source control (`WHEELS_RELOAD_PASSWORD` in `.env`). ~45 PRs since the 4.0.2 GA (2026-05-27).
