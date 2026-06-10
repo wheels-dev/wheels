@@ -129,10 +129,6 @@ component output="false" {
 	 * groups (`(?:`). Route variables are extracted from the compiled route regex by group
 	 * position, so a capturing group inside a constraint (e.g., `whereMatch("size", "[0-9]+(px|em)")`)
 	 * would shift every subsequent variable to the wrong value or crash param extraction.
-	 * Java named capture groups (`(?<name>...)`) are also capturing — they too shift positions —
-	 * so they are normalized to `(?:...)`. The `<name>` token is stripped because positional
-	 * extraction in $mergeRoutePattern doesn't consult group names. Lookbehind shapes
-	 * `(?<=...)` and `(?<!...)` start with `(?<` but are non-capturing and are left alone.
 	 * Parentheses inside character classes (e.g., `[\w()-]+`) are literal characters, not
 	 * groups, so the scanner tracks unescaped bracket depth and leaves them untouched
 	 * (rewriting them would silently widen the class to also match `?` and `:`).
@@ -168,27 +164,30 @@ component output="false" {
 				continue;
 			}
 			if (!local.escaped && local.char == "(" && local.charClassDepth == 0) {
-				local.nextChar = local.i < local.length ? Mid(arguments.pattern, local.i + 1, 1) : "";
-				if (local.nextChar != "?") {
+				if (local.i == local.length || Mid(arguments.pattern, local.i + 1, 1) != "?") {
 					// Unescaped capturing group outside any character class: make it non-capturing.
 					local.rv &= "(?:";
 				} else {
-					// `(?...)` flavor. The only capturing flavor is Java named capture `(?<name>...)`.
-					// Disambiguate from lookbehinds: `(?<=...)` / `(?<!...)` have `=` or `!` after `<`.
-					local.afterQ = local.i + 1 < local.length ? Mid(arguments.pattern, local.i + 2, 1) : "";
-					local.afterBracket = local.i + 2 < local.length ? Mid(arguments.pattern, local.i + 3, 1) : "";
-					if (local.afterQ == "<" && local.afterBracket != "=" && local.afterBracket != "!" && Len(local.afterBracket)) {
-						local.closeIdx = Find(">", arguments.pattern, local.i + 3);
-						if (local.closeIdx > 0) {
-							// Consume the `(?<name>` prefix and emit `(?:` in its place.
-							local.rv &= "(?:";
-							local.i = local.closeIdx;
-							local.classJustOpened = false;
-							continue;
-						}
+					// `(?` opens a non-capturing construct ((?:, (?=, (?!, (?<=, (?<!)
+					// — EXCEPT a Java named capturing group `(?<name>`, which still
+					// counts in the positional group arithmetic $mergeRoutePattern
+					// relies on (and which legacy CFML regex engines reject outright).
+					// Normalize the whole `(?<name>` opener to `(?:`; lookbehinds have
+					// `=` or `!` after `(?<` and are left untouched (issue #2976).
+					// A constraint that also backreferences the name (`\k<name>`)
+					// fails fast at draw time via $compileRegex.
+					local.namedGroup = ReFind(
+						"^\(\?<[A-Za-z][A-Za-z0-9]*>",
+						Mid(arguments.pattern, local.i, local.length - local.i + 1),
+						1,
+						true
+					);
+					if (local.namedGroup.pos[1] == 1) {
+						local.rv &= "(?:";
+						local.i += local.namedGroup.len[1] - 1;
+					} else {
+						local.rv &= local.char;
 					}
-					// Any other `(?...)` flavor is already non-capturing or a lookaround — leave it alone.
-					local.rv &= local.char;
 				}
 			} else {
 				local.rv &= local.char;

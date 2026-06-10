@@ -234,6 +234,68 @@ component extends="wheels.WheelsTest" {
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 				StructDelete(application, "$wheelstestLifecycleLog")
 			})
+
+			it("isolates an onPluginLoad failure so sibling plugins still load", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				StructDelete(application, "$wheelstestLifecycleLog")
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/lifecyclefailing",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/lifecyclefailing"
+
+				try {
+					// Must complete without throwing even though
+					// TestLifecycleFailingA's onPluginLoad throws (sorted order
+					// runs the failing plugin's hook first).
+					PluginObj = $pluginObj(config)
+
+					expect(PluginObj.getPlugins()).toHaveKey("TestLifecycleFailingA")
+					expect(PluginObj.getPlugins()).toHaveKey("TestLifecycleWorkingB")
+					expect(ArrayFind(application.$wheelstestLifecycleLog, "B:onPluginLoad")).toBeGT(0)
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath
+					StructDelete(application, "$wheelstestLifecycleLog")
+				}
+			})
+
+			it("isolates an onPluginActivate failure so sibling plugins still activate", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				StructDelete(application, "$wheelstestLifecycleLog")
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/lifecyclefailing",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/lifecyclefailing"
+
+				try {
+					PluginObj = $pluginObj(config)
+					// Reset the log so the assertion below can only be satisfied
+					// by the activate phase, not the load phase above.
+					StructDelete(application, "$wheelstestLifecycleLog")
+
+					// Must complete without throwing even though
+					// TestLifecycleFailingA's onPluginActivate throws first.
+					PluginObj.$invokeOnPluginActivate()
+
+					expect(ArrayFind(application.$wheelstestLifecycleLog, "B:onPluginActivate")).toBeGT(0)
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath
+					StructDelete(application, "$wheelstestLifecycleLog")
+				}
+			})
 		})
 
 		describe("Tests that plugin middleware registration", function() {

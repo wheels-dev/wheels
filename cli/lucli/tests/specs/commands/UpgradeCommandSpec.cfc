@@ -68,10 +68,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			// recommended improvements as breaking" for CI runs. Mirrors
 			// Django's `--fail-level WARNING` / Mix's --warnings-as-errors.
 
-			it("declares the --strict flag in parseUpgradeArgs", () => {
-				// Source-level: parseUpgradeArgs must declare a `strict` flag
-				// alongside `to` and `format` so LuCLI surfaces it.
-				var startIdx = reFindNoCase("(?m)^[ \t]*private\s+struct\s+function\s+parseUpgradeArgs\s*\(", variables.moduleSource);
+			it("declares the --strict flag in upgrade's ArgSpec builder", () => {
+				// Source-level: the upgrade ArgSpec (shared by parseUpgradeArgs
+				// and mcpToolSpecs() since #2963's registry refactor) must
+				// declare a `strict` flag alongside `to` and `format` so LuCLI
+				// surfaces it on both the CLI and MCP surfaces.
+				var startIdx = reFindNoCase("(?m)^[ \t]*private\s+any\s+function\s+upgradeArgSpec\s*\(", variables.moduleSource);
 				expect(startIdx).toBeGT(0);
 				var body = mid(variables.moduleSource, startIdx, 800);
 				expect(body).toInclude("strict");

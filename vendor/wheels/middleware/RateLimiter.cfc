@@ -111,6 +111,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Throttle cleanup interval in seconds.
 		variables.cleanupThrottleSeconds = 10;
 		variables.lastCleanup = 0;
+		// Bounded cleanup scan (#2971): at most cleanupMaxScanKeys keys are
+		// examined per cleanup pass, starting at a rotating cursor so
+		// successive passes cover the whole store.
+		variables.cleanupCursor = 0;
+		variables.cleanupMaxScanKeys = 1000;
 
 		// Track whether DB table has been verified.
 		variables.tableVerified = false;
@@ -139,8 +144,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		if (variables.storage == "memory") {
 			$maybeCleanup(local.now);
 			// Emergency eviction if store is at capacity and this is a new key.
+			// Routed through the maintenance lock: concurrent requests racing
+			// an unguarded $evictOldest() each evicted their own 25% headroom,
+			// purging far more entries than intended (#2971).
 			if (variables.store.size() >= variables.maxStoreSize && !variables.store.containsKey(local.clientKey)) {
-				$evictOldest(local.now);
+				$lockedEvictOldest(local.now, local.clientKey);
 			}
 		}
 
@@ -438,7 +446,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		try {
-			cflock(name = "wheels-ratelimit-cleanup", type = "exclusive", timeout = 1) {
+			// Shared maintenance lock: periodic cleanup and emergency eviction
+			// ($lockedEvictOldest) serialize on the same name so only one
+			// thread mutates the store's bookkeeping at a time (#2971).
+			cflock(name = "wheels-ratelimit-maintenance", type = "exclusive", timeout = 1) {
 				// Double-check after acquiring lock.
 				if ((arguments.now - variables.lastCleanup) < variables.cleanupThrottleSeconds) {
 					return;
@@ -448,8 +459,16 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				local.currentWindowId = Int(arguments.now / variables.windowSeconds);
 				local.keysToRemove = [];
 				local.keys = variables.store.keySet().toArray();
+				local.keyCount = ArrayLen(local.keys);
 
-				for (local.key in local.keys) {
+				// Bounded scan (#2971): examine at most cleanupMaxScanKeys keys
+				// per pass, starting at a rotating cursor so successive passes
+				// cover the whole store — the unlucky request that triggers
+				// cleanup no longer pays a full-store scan at high cardinality.
+				local.scanLimit = Min(local.keyCount, variables.cleanupMaxScanKeys);
+
+				for (local.offset = 0; local.offset < local.scanLimit; local.offset++) {
+					local.key = local.keys[((variables.cleanupCursor + local.offset) % local.keyCount) + 1];
 					local.value = "";
 					if (variables.store.containsKey(local.key)) {
 						local.value = variables.store.get(local.key);
@@ -486,6 +505,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 					}
 				}
 
+				variables.cleanupCursor = local.keyCount > 0
+					? (variables.cleanupCursor + local.scanLimit) % local.keyCount
+					: 0;
+
 				for (local.key in local.keysToRemove) {
 					variables.store.remove(local.key);
 				}
@@ -497,6 +520,39 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			}
 		} catch (any e) {
 			// Lock timeout or error — skip cleanup this time.
+		}
+	}
+
+	/**
+	 * Internal probe. Public ONLY so specs can assert the store-bound
+	 * invariant ($storeSize() <= maxStoreSize) without reaching into the
+	 * variables scope. Returns 0 for non-memory storage.
+	 */
+	public numeric function $storeSize() {
+		return variables.storage == "memory" ? variables.store.size() : 0;
+	}
+
+	/**
+	 * Emergency eviction entry point for handle(): re-checks capacity under
+	 * the shared maintenance lock before evicting, so concurrent requests
+	 * that all saw a full store don't each purge their own 25% headroom
+	 * (the pre-#2971 unguarded path). A lock timeout skips eviction — the
+	 * ConcurrentHashMap stays consistent and the next request retries.
+	 */
+	private void function $lockedEvictOldest(required numeric now, required string clientKey) {
+		try {
+			cflock(name = "wheels-ratelimit-maintenance", type = "exclusive", timeout = 1) {
+				// Double-check: a concurrent evictor may have created headroom
+				// (or another thread already stored this key) while we waited.
+				if (
+					variables.store.size() >= variables.maxStoreSize
+					&& !variables.store.containsKey(arguments.clientKey)
+				) {
+					$evictOldest(arguments.now);
+				}
+			}
+		} catch (any e) {
+			// Lock timeout — skip; the store remains internally consistent.
 		}
 	}
 
@@ -554,44 +610,70 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				return;
 			}
 
-			// Second pass: sort remaining entries by age and evict oldest.
+			// Second pass: approximated oldest-first eviction via bounded
+			// random sampling (Redis-style). The previous implementation built
+			// an entries array for the ENTIRE remaining store and ran a full
+			// closure-comparator sort on the request thread — O(n log n) at
+			// exactly the moment the store is at its largest. Sampling caps
+			// the per-eviction work at a small constant while still strongly
+			// preferring idle entries (#2971).
 			local.remainingToEvict = local.toEvict - local.expiredCount;
 			local.keys = variables.store.keySet().toArray();
-			local.entries = [];
-			for (local.key in local.keys) {
-				local.age = 0;
-				if (variables.store.containsKey(local.key)) {
-					local.value = variables.store.get(local.key);
-
-					if (variables.strategy == "fixedWindow" && Find(":", local.key)) {
-						local.windowId = Val(ListLast(local.key, ":"));
-						local.age = local.currentWindowId - local.windowId;
-					} else if (variables.strategy == "slidingWindow" && IsArray(local.value) && ArrayLen(local.value) > 0) {
-						local.age = arguments.now - local.value[1];
-					} else if (variables.strategy == "tokenBucket" && IsStruct(local.value) && StructKeyExists(local.value, "lastRefill")) {
-						local.age = arguments.now - local.value.lastRefill;
+			local.keyCount = ArrayLen(local.keys);
+			if (local.keyCount == 0) {
+				return;
+			}
+			local.sampleSize = 8;
+			local.evicted = 0;
+			// Attempt bound: repeated samples can land on already-evicted keys,
+			// so cap total iterations to keep the worst case bounded too.
+			local.maxAttempts = local.remainingToEvict * 4;
+			local.attempts = 0;
+			while (local.evicted < local.remainingToEvict && local.attempts < local.maxAttempts) {
+				local.attempts++;
+				local.bestKey = "";
+				local.bestAge = -1;
+				for (local.s = 1; local.s <= local.sampleSize; local.s++) {
+					local.candidate = local.keys[RandRange(1, local.keyCount)];
+					if (!variables.store.containsKey(local.candidate)) {
+						continue;
+					}
+					local.age = $entryAge(local.candidate, arguments.now, local.currentWindowId);
+					if (local.age > local.bestAge) {
+						local.bestAge = local.age;
+						local.bestKey = local.candidate;
 					}
 				}
-				ArrayAppend(local.entries, {key: local.key, age: local.age});
-			}
-
-			// Sort by age descending (oldest first).
-			ArraySort(local.entries, function(a, b) {
-				return (b.age < a.age) ? -1 : ((b.age > a.age) ? 1 : 0);
-			});
-
-			// Evict the oldest entries.
-			local.evicted = 0;
-			for (local.entry in local.entries) {
-				if (local.evicted >= local.remainingToEvict) {
-					break;
+				if (Len(local.bestKey)) {
+					variables.store.remove(local.bestKey);
+					local.evicted++;
 				}
-				variables.store.remove(local.entry.key);
-				local.evicted++;
 			}
 		} catch (any e) {
 			// Best-effort eviction — don't let errors propagate.
 		}
+	}
+
+	/**
+	 * Age score for an in-memory store entry (higher = older / more idle).
+	 * Entries whose age cannot be determined score 0 (youngest), so they are
+	 * evicted last — same semantics the pre-sampling sort used.
+	 */
+	private numeric function $entryAge(required string storeKey, required numeric now, required numeric currentWindowId) {
+		local.age = 0;
+		local.value = variables.store.get(arguments.storeKey);
+		if (IsNull(local.value)) {
+			return local.age;
+		}
+		if (variables.strategy == "fixedWindow" && Find(":", arguments.storeKey)) {
+			local.windowId = Val(ListLast(arguments.storeKey, ":"));
+			local.age = arguments.currentWindowId - local.windowId;
+		} else if (variables.strategy == "slidingWindow" && IsArray(local.value) && ArrayLen(local.value) > 0) {
+			local.age = arguments.now - local.value[1];
+		} else if (variables.strategy == "tokenBucket" && IsStruct(local.value) && StructKeyExists(local.value, "lastRefill")) {
+			local.age = arguments.now - local.value.lastRefill;
+		}
+		return local.age;
 	}
 
 	// ---------------------------------------------------------------------------
