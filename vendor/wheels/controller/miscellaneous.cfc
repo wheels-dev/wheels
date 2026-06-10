@@ -78,43 +78,39 @@ component {
 		local.templateArray = ListToArray(arguments.template);
 		local.layoutArray = ListToArray(arguments.layout);
 		local.iEnd = ArrayLen(local.templateArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			// Include the email template and return it,
-			local.item = local.templateArray[local.i];
-			local.content = $renderView($template = local.item, $layout = local.layoutArray[local.i]);
+		try {
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				// Include the email template and return it,
+				local.item = local.templateArray[local.i];
+				local.content = $renderView($template = local.item, $layout = local.layoutArray[local.i]);
 
-			local.mailpart = {};
-			local.mailpart.tagContent = local.content;
-			if (ArrayIsEmpty(arguments.mailparts)) {
-				ArrayAppend(arguments.mailparts, local.mailpart);
-			} else {
-				if (arguments.detectMultipart) {
-					// Make sure the text version is the first one in the array.
-					local.existingContentCount = ListLen(arguments.mailparts[1].tagContent, "<");
-					local.newContentCount = ListLen(local.content, "<");
-					if (local.newContentCount < local.existingContentCount) {
-						ArrayPrepend(arguments.mailparts, local.mailpart);
+				local.mailpart = {};
+				local.mailpart.tagContent = local.content;
+				if (ArrayIsEmpty(arguments.mailparts)) {
+					ArrayAppend(arguments.mailparts, local.mailpart);
+				} else {
+					if (arguments.detectMultipart) {
+						// Make sure the text version is the first one in the array.
+						local.existingContentCount = ListLen(arguments.mailparts[1].tagContent, "<");
+						local.newContentCount = ListLen(local.content, "<");
+						if (local.newContentCount < local.existingContentCount) {
+							ArrayPrepend(arguments.mailparts, local.mailpart);
+						} else {
+							ArrayAppend(arguments.mailparts, local.mailpart);
+						}
 					} else {
+						// When multipart detection is turned off we preserve the order that the templates were passed in (text version first).
 						ArrayAppend(arguments.mailparts, local.mailpart);
 					}
-				} else {
-					// When multipart detection is turned off we preserve the order that the templates were passed in (text version first).
-					ArrayAppend(arguments.mailparts, local.mailpart);
+					arguments.mailparts[1].type = "text";
+					arguments.mailparts[2].type = "html";
 				}
-				arguments.mailparts[1].type = "text";
-				arguments.mailparts[2].type = "html";
 			}
-		}
-
-		// Restore the controller's `variables` scope now that the email templates have been rendered.
-		local.iEnd = ArrayLen(local.customViewVariables);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.key = local.customViewVariables[local.i];
-			if (StructKeyExists(local.shadowedVariables, local.key)) {
-				variables[local.key] = local.shadowedVariables[local.key];
-			} else {
-				StructDelete(variables, local.key);
-			}
+		} finally {
+			// Restore the controller's `variables` scope now that the email templates have been rendered.
+			// This runs in a `finally` block so the scope is cleaned up even when rendering throws (e.g. a missing template file), otherwise the custom arguments would remain injected for the rest of the request (including any `onError` rendering).
+			// The restore loop lives in a helper function because Lucee 7 miscompiles `for` loops that use `local` (or `var`) variables inside `finally` blocks ("variable [local] doesn't exist" at runtime).
+			$restoreEmailViewVariables(local.customViewVariables, local.shadowedVariables);
 		}
 
 		// Return a struct containing mailpart content using type as the key.
@@ -198,16 +194,33 @@ component {
 	}
 
 	/**
+	 * Internal function. Restores the controller's `variables` scope after the email view templates have been rendered by `sendEmail`.
+	 * Shadowed values are put back and keys that did not exist before are deleted.
+	 * Kept as a separate function (rather than inline in `sendEmail`'s `finally` block) because Lucee 7 miscompiles `for` loops that use `local` or `var` variables inside `finally` blocks.
+	 */
+	public void function $restoreEmailViewVariables(required array customViewVariables, required struct shadowedVariables) {
+		local.iEnd = ArrayLen(arguments.customViewVariables);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.key = arguments.customViewVariables[local.i];
+			if (StructKeyExists(arguments.shadowedVariables, local.key)) {
+				variables[local.key] = arguments.shadowedVariables[local.key];
+			} else {
+				StructDelete(variables, local.key);
+			}
+		}
+	}
+
+	/**
 	 * Sends a file to the user (from the `files` folder or a path relative to it by default).
 	 *
 	 * [section: Controller]
 	 * [category: Miscellaneous Functions]
 	 *
-	 * @file The file to send to the user.
+	 * @file The file to send to the user. Values containing the `..` character sequence anywhere (even as part of a legitimate file name) are rejected to prevent path traversal.
 	 * @name The file name to show in the browser download dialog box.
 	 * @type The HTTP content type to deliver the file as.
 	 * @disposition Set to `inline` to have the browser handle the opening of the file (possibly inline in the browser) or set to `attachment` to force a download dialog box.
-	 * @directory Directory outside of the web root where the file exists. Must be a full path.
+	 * @directory Directory outside of the web root where the file exists. Must be a full path. Values containing the `..` character sequence are rejected to prevent path traversal.
 	 * @deleteFile Pass in `true` to delete the file on the server after sending it.
 	 * @deliver When set to `false`, the file will not be sent to the browser (used for testing).
 	 */
@@ -231,8 +244,8 @@ component {
 		) {
 			Throw(
 				type = "Wheels.InvalidPath",
-				message = "The `file` or `directory` argument passed to `sendFile` contains invalid path characters.",
-				extendedInfo = "These arguments must not contain `..` (including URL-encoded variants) so that files outside the intended folder cannot be accessed."
+				message = "The `file` or `directory` argument passed to `sendFile` contains the `..` character sequence, which is not allowed.",
+				extendedInfo = "To prevent access to files outside the intended folder, these arguments must not contain two consecutive dots anywhere in their value (including URL-encoded and backslash variants). This also rejects otherwise legitimate file names such as `report..final.pdf`; rename such files before serving them with `sendFile`."
 			);
 		}
 

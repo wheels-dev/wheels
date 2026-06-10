@@ -183,6 +183,14 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.InvalidPath")
 			})
 
+			it("rejects backslash path traversal in the file argument", () => {
+				args.file = ".." & Chr(92) & ".." & Chr(92) & ".." & Chr(92) & "config" & Chr(92) & "settings.cfm"
+
+				expect(function() {
+					_controller.sendFile(argumentCollection = args)
+				}).toThrow("Wheels.InvalidPath")
+			})
+
 			it("rejects path traversal in the directory argument", () => {
 				args.directory = "/wheels/tests/_assets/files/../../../../config"
 				args.file = "settings.cfm"
@@ -439,6 +447,20 @@ component extends="wheels.WheelsTest" {
 				leakArgs = Duplicate(args)
 				leakArgs.customArgument = "IShouldNotLeakIntoLaterRenders"
 				_controller.sendEmail(argumentCollection = leakArgs)
+
+				result = _controller.sendEmail(argumentCollection = args)
+				expect(result.text).toBe(textBody)
+			})
+
+			it("does not leak custom view arguments into the controller when rendering throws", () => {
+				args.template = "plainEmailTemplate"
+				leakArgs = Duplicate(args)
+				leakArgs.template = "aTemplateThatDoesNotExist"
+				leakArgs.customArgument = "IShouldNotLeakWhenRenderingThrows"
+
+				expect(function() {
+					_controller.sendEmail(argumentCollection = leakArgs)
+				}).toThrow()
 
 				result = _controller.sendEmail(argumentCollection = args)
 				expect(result.text).toBe(textBody)
