@@ -21,7 +21,12 @@
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
-		variables.source = FileRead(ExpandPath("/wheels/middleware/RateLimiter.cfc"));
+		// Strip CFML comments before structural scans so a future comment
+		// like `// the old code used ArraySort here` can't flip the negative
+		// assertion below to a spurious failure (CLAUDE.md anti-pattern ##14).
+		variables.source = $stripCfmlComments(
+			FileRead(ExpandPath("/wheels/middleware/RateLimiter.cfc"))
+		);
 	}
 
 	function run() {
@@ -81,6 +86,14 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	private string function $stripCfmlComments(required string source) {
+		var stripped = arguments.source;
+		stripped = reReplace(stripped, "<!---[\s\S]*?--->", "", "all");
+		stripped = reReplace(stripped, "/\*[\s\S]*?\*/", "", "all");
+		stripped = reReplace(stripped, "(?m)//[^\n]*", "", "all");
+		return stripped;
 	}
 
 }
