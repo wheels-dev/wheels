@@ -56,6 +56,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cli.extract({key: "", from: "FOO=bar"})).toBe("");
             });
 
+            it("extract skips malformed lines that start with '='", () => {
+                // left(line, 0) on a keyless '=...' line crashes Lucee 7
+                // (Cross-Engine Invariant 8); such lines must be skipped.
+                var cli = new cli.lucli.services.deploy.cli.DeploySecretsCli();
+                var block = "=stray-value" & chr(10) & "FOO=bar";
+                expect(cli.extract({key: "FOO", from: block})).toBe("bar");
+            });
+
             it("resolves 1password and op as the same adapter", () => {
                 var cli = new cli.lucli.services.deploy.cli.DeploySecretsCli();
                 var stub = new cli.lucli.tests.specs.deploy.secrets._stubs.StubOnePasswordAdapter();

@@ -65,7 +65,9 @@ component {
         if (!len(key)) return "";
         for (var line in listToArray(text, chr(10), false)) {
             var eq = find("=", line);
-            if (eq > 0 && left(line, eq - 1) == key) {
+            // eq > 1, not > 0: a line starting with '=' has no key, and
+            // left(line, 0) crashes Lucee 7 (Cross-Engine Invariant 8).
+            if (eq > 1 && left(line, eq - 1) == key) {
                 return mid(line, eq + 1, 99999);
             }
         }

@@ -3,10 +3,26 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Returns itself (the Dispatch object).
+	 *
+	 * Middleware lifecycle contract (see #2954):
+	 *   - Global middleware is resolved once here and reused for every request.
+	 *   - Route-scoped string middleware is resolved on first encounter and
+	 *     cached in `application[$appKey()].$middlewareInstanceCache` keyed by
+	 *     component path so subsequent requests reuse the same instance. The
+	 *     cache lives in application scope so a hard reload (which calls
+	 *     `applicationStop()`) clears it alongside `application.wheels.*`.
+	 *   - The preflight-capability boolean is computed once here and stored
+	 *     on `variables.$preflightCapable` instead of being re-scanned per
+	 *     OPTIONS request.
+	 *
+	 * Implication: middleware components must be safe to share across
+	 * concurrent requests (mutate only via thread-safe state, e.g. CFML
+	 * locks). All built-in middleware already follow this contract.
 	 */
 	public any function $init() {
 		// Initialize the middleware pipeline from application settings.
 		variables.$middlewarePipeline = $buildMiddlewarePipeline();
+		variables.$preflightCapable = $computePreflightCapable(variables.$middlewarePipeline.getMiddleware());
 		return this;
 	}
 
@@ -55,12 +71,42 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Resolve a middleware item: instantiate from component path string, or return as-is if already an object.
+	 *
+	 * String paths resolve to cached singletons keyed by the path so route-scoped
+	 * middleware survives across requests (#2954). The cache lives under
+	 * `application[$appKey()].$middlewareInstanceCache` and is cleared whenever
+	 * `applicationStop()` runs (the password-gated reload path).
+	 *
+	 * Concurrency: cache population uses double-checked locking via a named
+	 * `cflock` (matching the pattern in `wheels.middleware.RateLimiter`) so two
+	 * threads racing on the first request for the same component path cannot
+	 * each instantiate their own copy and silently drop the loser's state
+	 * mutations. The fast path is a lock-free struct read once the slot is
+	 * populated; the slow path takes an exclusive lock and re-checks before
+	 * creating the instance.
 	 */
-	private any function $resolveMiddlewareInstance(required any middleware) {
-		if (IsSimpleValue(arguments.middleware)) {
-			return CreateObject("component", arguments.middleware).init();
+	public any function $resolveMiddlewareInstance(required any middleware) {
+		if (!IsSimpleValue(arguments.middleware)) {
+			return arguments.middleware;
 		}
-		return arguments.middleware;
+		local.appKey = $appKey();
+		// Fast path: once the slot is populated, the struct read is safe without a lock.
+		if (
+			StructKeyExists(application[local.appKey], "$middlewareInstanceCache")
+			&& StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)
+		) {
+			return application[local.appKey].$middlewareInstanceCache[arguments.middleware];
+		}
+		// Slow path: exclusive lock guards the check-then-create against concurrent first-touch races.
+		cflock(name = "wheels.middlewareCache.#local.appKey#", type = "exclusive", timeout = 10) {
+			if (!StructKeyExists(application[local.appKey], "$middlewareInstanceCache")) {
+				application[local.appKey].$middlewareInstanceCache = {};
+			}
+			if (!StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)) {
+				application[local.appKey].$middlewareInstanceCache[arguments.middleware] = CreateObject("component", arguments.middleware).init();
+			}
+		}
+		return application[local.appKey].$middlewareInstanceCache[arguments.middleware];
 	}
 
 	/**
@@ -232,14 +278,31 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Returns a per-request copy of a matched route struct. Top-level keys are shallow-copied
-	 * and any non-simple members (constraints, middleware, etc.) are duplicated so request
+	 * and any non-simple members (constraints, etc.) are duplicated so request
 	 * code (middleware reading request.wheels.currentRoute, for example) can never mutate
 	 * the shared route table through the copy. Used by both the static fast path and the
 	 * regex fallback in $findMatchingRoute so the two paths share identical copy semantics.
+	 *
+	 * The `middleware` key is intentionally exempted from the Duplicate pass — instances
+	 * registered there are singletons under the dispatch lifecycle contract (see #2954),
+	 * and Adobe CF's Duplicate() of an array containing CFCs clones the instances, which
+	 * would silently reset any state the middleware holds across requests. The array itself
+	 * is shallow-copied so callers can append/replace entries without mutating the route
+	 * table; the instance references inside the new array are preserved.
 	 */
 	public struct function $copyRouteForRequest(required struct route) {
 		local.rv = StructCopy(arguments.route);
 		for (local.key in local.rv) {
+			if (local.key == "middleware") {
+				if (IsArray(local.rv[local.key])) {
+					local.copy = [];
+					for (local.mw in local.rv[local.key]) {
+						ArrayAppend(local.copy, local.mw);
+					}
+					local.rv[local.key] = local.copy;
+				}
+				continue;
+			}
 			if (!IsSimpleValue(local.rv[local.key])) {
 				local.rv[local.key] = Duplicate(local.rv[local.key]);
 			}
@@ -389,9 +452,22 @@ component output="false" extends="wheels.Global"{
 	 * instance capable of handling an OPTIONS preflight short-circuit. Used to
 	 * preserve the legacy `allowCorsRequests=true` short-circuit semantics in
 	 * the new middleware pipeline. See issue #2703.
+	 *
+	 * The boolean is computed once at `$init` from the pipeline snapshot and
+	 * stored on `variables.$preflightCapable`; this method is a single struct
+	 * read on the dispatch hot path instead of an `IsInstanceOf` scan per
+	 * OPTIONS request (#2954).
 	 */
-	private boolean function $hasPreflightCapableMiddleware() {
-		for (local.mw in variables.$middlewarePipeline.getMiddleware()) {
+	public boolean function $hasPreflightCapableMiddleware() {
+		return variables.$preflightCapable;
+	}
+
+	/**
+	 * Internal: scan the given middleware array for a CORS instance. Called
+	 * once at `$init` to compute the cached preflight-capability boolean.
+	 */
+	private boolean function $computePreflightCapable(required array middleware) {
+		for (local.mw in arguments.middleware) {
 			if (IsObject(local.mw) && IsInstanceOf(local.mw, "wheels.middleware.Cors")) {
 				return true;
 			}
@@ -401,9 +477,12 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Resolve route-scoped middleware from the matched route's `middleware` property.
-	 * Returns an array of instantiated middleware components.
+	 * Returns an array of instantiated middleware components. String paths resolve
+	 * to cached singletons via `$resolveMiddlewareInstance` so route-scoped
+	 * stateful middleware (e.g. an in-memory RateLimiter) survives across requests
+	 * (#2954).
 	 */
-	private array function $getRouteMiddleware(required struct params) {
+	public array function $getRouteMiddleware(required struct params) {
 		local.instances = [];
 		// The matched route is stored on request.wheels.currentRoute during $findMatchingRoute.
 		if (!StructKeyExists(request.wheels, "currentRoute") || !StructKeyExists(request.wheels.currentRoute, "middleware")) {
