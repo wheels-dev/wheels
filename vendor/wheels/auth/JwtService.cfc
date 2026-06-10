@@ -31,14 +31,14 @@ component output="false" {
 	) {
 		// Fail fast on missing or weak secrets — a short HMAC key makes every issued token brute-forceable
 		if (!Len(arguments.secretKey)) {
-			Throw(
+			throw(
 				type = "Wheels.Auth.JWT.InvalidSecretKey",
 				message = "JWT secret key cannot be empty.",
 				extendedInfo = "Provide a random secret of at least 32 bytes (256 bits) as required for HMAC-SHA256 by RFC 7518 Section 3.2."
 			);
 		}
 		if (Len(CharsetDecode(arguments.secretKey, "UTF-8")) < 32) {
-			Throw(
+			throw(
 				type = "Wheels.Auth.JWT.WeakSecretKey",
 				message = "JWT secret key is too short.",
 				extendedInfo = "HMAC-SHA256 requires a secret of at least 32 bytes (256 bits) per RFC 7518 Section 3.2. Generate a random secret of 32 or more bytes and store it outside source control."
@@ -121,7 +121,7 @@ component output="false" {
 		local.header = DeserializeJSON(local.headerJson);
 		if (!StructKeyExists(local.header, "alg") || local.header.alg != "HS256") {
 			local.claimedAlg = StructKeyExists(local.header, "alg") ? local.header.alg : "none";
-			Throw(
+			throw(
 				type = "Wheels.Auth.JWT.InvalidAlgorithm",
 				message = "JWT algorithm mismatch.",
 				extendedInfo = "Expected algorithm HS256 but token header specifies '#EncodeForHTML(local.claimedAlg)#'. This may indicate an algorithm substitution attack."
