@@ -285,23 +285,7 @@ component {
 		}
 
 		// Encode all prepend / append type arguments if specified.
-		if (IsBoolean(arguments.encode) && arguments.encode && $get("encodeHtmlTags")) {
-			if (Len(arguments.prepend)) {
-				arguments.prepend = EncodeForHTML($canonicalize(arguments.prepend));
-			}
-			if (Len(arguments.prependToPage)) {
-				arguments.prependToPage = EncodeForHTML($canonicalize(arguments.prependToPage));
-			}
-			if (Len(arguments.append)) {
-				arguments.append = EncodeForHTML($canonicalize(arguments.append));
-			}
-			if (Len(arguments.appendToPage)) {
-				arguments.appendToPage = EncodeForHTML($canonicalize(arguments.appendToPage));
-			}
-			if (Len(arguments.anchorDivider)) {
-				arguments.anchorDivider = EncodeForHTML($canonicalize(arguments.anchorDivider));
-			}
-		}
+		$encodeArgsForHtml(args = arguments, keys = "prepend,prependToPage,append,appendToPage,anchorDivider");
 
 		if (arguments.showSinglePage || local.totalPages > 1) {
 			// Strip event handlers from appendToPage (parallel to prependToPage sanitization in the loop)

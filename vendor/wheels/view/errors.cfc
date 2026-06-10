@@ -85,14 +85,7 @@ component {
 		local.rv = "";
 		if (!ArrayIsEmpty(local.error)) {
 			// Encode all prepend / append type arguments if specified.
-			if (arguments.encode && $get("encodeHtmlTags")) {
-				if (Len(arguments.prependText)) {
-					arguments.prependText = EncodeForHTML($canonicalize(arguments.prependText));
-				}
-				if (Len(arguments.appendText)) {
-					arguments.appendText = EncodeForHTML($canonicalize(arguments.appendText));
-				}
-			}
+			$encodeArgsForHtml(args = arguments, keys = "prependText,appendText");
 
 			local.prepend = Len(arguments.prependText) ? arguments.prependText & (Right(arguments.prependText, 1) != " " ? " " : "") : "";
 			local.append  = Len(arguments.appendText)  ? (Left(arguments.appendText, 1) != " " ? " " : "") & arguments.appendText : "";
