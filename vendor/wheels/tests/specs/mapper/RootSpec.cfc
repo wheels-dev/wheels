@@ -62,6 +62,15 @@ component extends="wheels.WheelsTest" {
                expect(r[1].methods).toBe("post");
 			});
 
+            it("Root without to= defaults to GET", function(){
+               m.$draw()
+               .root()
+               .end();
+               r = m.getRoutes();
+               expect(r[1]).toHaveKey("methods");
+               expect(r[1].methods).toBe("get");
+			});
+
 		});
 	}
 
