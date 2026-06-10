@@ -38,7 +38,10 @@ component {
 			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
 
-		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
+		// The candidate SELECT deliberately excludes the data column: at backlog scale
+		// dragging every pending row's payload across the wire per poll is expensive.
+		// The claimed job's payload is fetched by id after the claim succeeds.
+		local.sql = "SELECT id, jobClass, queue, attempts, maxRetries
 			FROM wheels_jobs
 			WHERE status = 'pending' AND runAt <= :runAt";
 
@@ -55,10 +58,24 @@ component {
 
 		local.sql &= " ORDER BY priority DESC, runAt ASC";
 
-		// Fetch candidates for optimistic locking.
-		// NOTE: Avoid maxrows option — BoxLang + PostgreSQL throws when setMaxRows()
-		// is called on the JDBC PreparedStatement with certain parameter combinations.
-		// The for-loop below processes only the first successful claim anyway.
+		// Bound the candidate scan in SQL text so the database never materializes the
+		// whole pending backlog. A handful of candidates is enough — the loop below
+		// claims the first one it wins and the rest only matter when claims are lost
+		// to concurrent workers.
+		// NOTE: Avoid the maxrows option — BoxLang + PostgreSQL throws when setMaxRows()
+		// is called on the JDBC PreparedStatement with certain parameter combinations,
+		// and maxrows only truncates client-side after the driver fetched everything.
+		local.candidateLimit = 25;
+		local.dbType = $dbType();
+		if (ListFindNoCase("mysql,postgresql,sqlite,h2", local.dbType)) {
+			local.sql &= " LIMIT #local.candidateLimit#";
+		} else if (local.dbType == "sqlserver") {
+			local.sql &= " OFFSET 0 ROWS FETCH NEXT #local.candidateLimit# ROWS ONLY";
+		} else if (local.dbType == "oracle") {
+			local.sql &= " FETCH FIRST #local.candidateLimit# ROWS ONLY";
+		}
+		// Unknown database type: leave unbounded rather than risk a syntax error.
+
 		try {
 			local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
@@ -76,8 +93,16 @@ component {
 		for (local.row in local.candidates) {
 			local.claimed = $claimJob(local.row.id);
 			if (local.claimed) {
-				// We claimed it — now process
-				local.processResult = $executeJob(local.row);
+				// We claimed it — fetch the payload for just this job, then process
+				local.jobRow = {
+					id = local.row.id,
+					jobClass = local.row.jobClass,
+					queue = local.row.queue,
+					data = $fetchJobData(local.row.id),
+					attempts = local.row.attempts,
+					maxRetries = local.row.maxRetries
+				};
+				local.processResult = $executeJob(local.jobRow);
 				local.result.jobId = local.row.id;
 				local.result.jobClass = local.row.jobClass;
 
@@ -332,15 +357,18 @@ component {
 		}
 
 		try {
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			// DML recordCount is unreliable across CFML engines; count via SELECT
-			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'pending'";
+			// DML recordCount is unreliable across CFML engines; count the rows we are
+			// about to reset BEFORE the UPDATE. Counting status='pending' afterwards
+			// would also include unrelated jobs that were already pending.
+			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'failed'";
 			local.countParams = {};
 			if (Len(arguments.queue)) {
 				local.countSql &= " AND queue = :queue";
 				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
 			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
+
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			return local.countResult.cnt ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -415,9 +443,21 @@ component {
 	 */
 	private struct function $executeJob(required struct jobRow) {
 		local.result = {success = false, error = ""};
+
+		// Initialized before the try so the cleanup below never reads an undefined
+		// variable when instantiation/deserialization fails inside the try.
+		local.hasTenantContext = false;
+
 		try {
 			local.jobInstance = CreateObject("component", arguments.jobRow.jobClass);
 			local.jobData = DeserializeJSON(arguments.jobRow.data);
+
+			// Restore tenant context if the job was enqueued within a tenant scope and
+			// strip the internal $wheelsTenantContext key before passing data to
+			// perform() — shared with Job.$processJob so both processing paths run
+			// tenant jobs against the correct tenant datasource.
+			local.hasTenantContext = $jobBridge().$restoreTenantContext(local.jobData);
+
 			local.jobInstance.perform(data = local.jobData);
 
 			// Mark completed
@@ -442,6 +482,12 @@ component {
 		} catch (any e) {
 			local.result.error = Left(e.message, 1000);
 		}
+
+		// Clean up tenant context after job execution
+		if (local.hasTenantContext) {
+			$jobBridge().$clearTenantContext();
+		}
+
 		return local.result;
 	}
 
@@ -537,15 +583,61 @@ component {
 	}
 
 	/**
-	 * Ensure the wheels_jobs table exists. Delegates to Job.cfc's implementation.
+	 * Ensure the wheels_jobs table exists. Delegates to Job.cfc's real table bootstrap —
+	 * merely instantiating wheels.Job performs no database work, so on a fresh database
+	 * the worker could previously never create the table. Guarded so the many catch
+	 * paths that call this don't re-probe once the table has been verified.
 	 */
 	private boolean function $ensureJobTable() {
-		try {
-			local.job = new wheels.Job();
+		if (StructKeyExists(variables, "$tableVerified")) {
 			return true;
+		}
+		try {
+			if ($jobBridge().$ensureJobTable()) {
+				variables.$tableVerified = true;
+				return true;
+			}
+			return false;
 		} catch (any e) {
 			return false;
 		}
+	}
+
+	/**
+	 * Fetch a single job's data payload by id. Called only for the job this worker
+	 * actually claimed, so the candidate scan doesn't transfer every pending payload.
+	 */
+	private string function $fetchJobData(required string jobId) {
+		local.dataRow = queryExecute(
+			"SELECT data FROM wheels_jobs WHERE id = :id",
+			{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
+			{datasource = variables.$datasource}
+		);
+		if (local.dataRow.recordCount) {
+			return local.dataRow.data;
+		}
+		return "";
+	}
+
+	/**
+	 * Database type for SQL syntax selection, detected once per worker instance.
+	 */
+	private string function $dbType() {
+		if (!StructKeyExists(variables, "$dbTypeCached")) {
+			variables.$dbTypeCached = $jobBridge().$detectDatabaseType();
+		}
+		return variables.$dbTypeCached;
+	}
+
+	/**
+	 * Lazily instantiate the wheels.Job bridge used to share framework job helpers
+	 * (tenant context handling, table bootstrap, database type detection).
+	 */
+	private any function $jobBridge() {
+		if (!StructKeyExists(variables, "$jobBridgeInstance")) {
+			variables.$jobBridgeInstance = new wheels.Job();
+		}
+		return variables.$jobBridgeInstance;
 	}
 
 }
