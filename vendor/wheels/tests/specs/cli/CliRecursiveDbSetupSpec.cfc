@@ -2,13 +2,13 @@
  * Regression for issue #2959 — dev-UI delivery refactor (wave 2 review
  * remediation, P2 Medium).
  *
- * `vendor/wheels/public/views/cli.cfm` ships a 1,000+ line `<cfswitch>`
+ * `vendor/wheels/public/views/cli.cfm` ships a 1,000+ line `cfswitch`
  * over 44 commands plus an in-page UDF for test-data generation. Two
  * structural defects need addressing without expanding the wave-2
  * `cli.cfm` hardening PR:
  *
  *   1. The `dbSetup` case re-enters the dispatcher via a recursive
- *      `<cfinclude>` of `cli.cfm` itself (mutating `request.wheels.params`
+ *      `cfinclude` of `cli.cfm` itself (mutating `request.wheels.params`
  *      mid-flight to fake a `dbSeed` call). The recursive include rebuilds
  *      `data` from scratch, discarding the "Migrations completed." string
  *      so the final JSON envelope reports the seed message only — the
@@ -31,6 +31,13 @@
  * style — `OnErrorFallbackGuardSpec.cfc`, `PackagesCommandHelpSpec.cfc`)
  * because cli.cfm runs under a full HTTP request context that the spec
  * runner does not synthesize.
+ *
+ * NOTE: tag names in this file are deliberately written WITHOUT angle
+ * brackets, and the cfinclude regex below is built via Chr(60)
+ * concatenation. Lucee's pre-compile tag scanner parses literal tag text
+ * even inside comments and strings; a bracketed cfswitch/cfinclude here
+ * crashes the entire core bundle with "attribute [expression] is required
+ * for tag [cfswitch]" (CLAUDE.md "Lucee Tag Scanner" gotcha).
  */
 component extends="wheels.WheelsTest" {
 
@@ -51,17 +58,18 @@ component extends="wheels.WheelsTest" {
 				var raw = fileRead(ctx.cliViewPath);
 				var content = $stripCfmlComments(raw);
 
-				// A `<cfinclude>` or scripted `include` of `cli.cfm` from
+				// A `cfinclude` tag or scripted `include` of `cli.cfm` from
 				// inside `cli.cfm` is the recursive-dispatch anti-pattern.
 				// The fix replaces it with a direct call to the extracted
 				// seed-orchestration helper, so no remaining include of
-				// `cli.cfm` should survive in the source.
+				// `cli.cfm` should survive in the source. (Chr(60) keeps the
+				// literal tag text out of this source file — see header NOTE.)
 				var recursiveCfinclude = reFindNoCase(
-					"<cfinclude[^>]+template\s*=\s*[""'][^""']*cli\.cfm[""']",
+					Chr(60) & "cfinclude[^>]+template\s*=\s*[""'][^""']*cli\.cfm[""']",
 					content
 				);
 				expect(recursiveCfinclude == 0).toBeTrue(
-					"cli.cfm still contains a `<cfinclude>` of cli.cfm itself — that's the "
+					"cli.cfm still contains a `cfinclude` of cli.cfm itself — that's the "
 					& "recursive-dispatch anti-pattern (issue ##2959): the second include "
 					& "rebuilds `data` from scratch and discards the `Migrations completed.` "
 					& "string the outer dbSetup run set. Replace with a direct call to the "

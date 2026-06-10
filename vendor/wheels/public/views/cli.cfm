@@ -861,7 +861,7 @@ try {
 
 // Seed orchestration extracted from the `dbSeed` switch case so that
 // `dbSetup` can compose seeding through a direct call instead of the
-// legacy recursive <cfinclude> (issue ##2959). Returns a struct with
+// legacy recursive cfinclude (issue ##2959). Returns a struct with
 // {success, mode, message, ...mode-specific fields} that the caller
 // merges into the response envelope via StructAppend.
 function runDbSeed(struct seedParams = {}) {
