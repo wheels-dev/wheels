@@ -617,11 +617,13 @@ component extends="wheels.WheelsTest" {
 				_controller = g.controller(name="dummy")
 				_origBuildPath = application.wheels.viteBuildPath
 				_origManifestFile = application.wheels.viteManifestFile
+				_origShowErr = application.wheels.showErrorInformation
 			})
 
 			afterEach(() => {
 				application.wheels.viteBuildPath = _origBuildPath
 				application.wheels.viteManifestFile = _origManifestFile
+				application.wheels.showErrorInformation = _origShowErr
 				var appKey = application.wo.$appKey()
 				StructDelete(application[appKey], "viteManifestCache")
 			})
@@ -646,6 +648,35 @@ component extends="wheels.WheelsTest" {
 				expect(function() {
 					_controller.$viteManifest()
 				}).toThrow("Wheels.ViteManifestNotFound")
+			})
+
+			it("caches the missing-manifest result when showErrorInformation is false", () => {
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
+				application.wheels.showErrorInformation = false
+				application.wheels.viteBuildPath = "nonexistent_build_path"
+				application.wheels.viteManifestFile = "nonexistent_manifest.json"
+
+				e = _controller.$viteManifest()
+
+				expect(e).toBeTypeOf("struct")
+				expect(StructCount(e)).toBe(0)
+				expect(StructKeyExists(application[appKey], "viteManifestCache")).toBeTrue()
+				expect(IsStruct(application[appKey].viteManifestCache)).toBeTrue()
+				expect(StructCount(application[appKey].viteManifestCache)).toBe(0)
+			})
+
+			it("does not cache anything when the missing manifest throws", () => {
+				var appKey = application.wo.$appKey()
+				StructDelete(application[appKey], "viteManifestCache")
+				application.wheels.showErrorInformation = true
+				application.wheels.viteBuildPath = "nonexistent_build_path"
+				application.wheels.viteManifestFile = "nonexistent_manifest.json"
+
+				expect(function() {
+					_controller.$viteManifest()
+				}).toThrow("Wheels.ViteManifestNotFound")
+				expect(StructKeyExists(application[appKey], "viteManifestCache")).toBeFalse()
 			})
 		})
 	}
