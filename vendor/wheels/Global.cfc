@@ -1214,16 +1214,16 @@ return local.$wheels;
 		// Lock-free warm fast path: skip $doubleCheckedLock + $invoke
 		// reflective dispatch on cache hits (issue #2897, Stage 1).
 		local.rv = $cachedModelLookup(name = arguments.name);
-		if (!IsBoolean(local.rv) || local.rv) {
-			return local.rv;
+		if (IsBoolean(local.rv) && !local.rv) {
+			return $doubleCheckedLock(
+				condition = "$cachedModelClassExists",
+				conditionArgs = arguments,
+				execute = "$createModelClass",
+				executeArgs = arguments,
+				name = "modelLock#application.applicationName#"
+			);
 		}
-		return $doubleCheckedLock(
-			condition = "$cachedModelClassExists",
-			conditionArgs = arguments,
-			execute = "$createModelClass",
-			executeArgs = arguments,
-			name = "modelLock#application.applicationName#"
-		);
+		return local.rv;
 	}
 
 	/**
