@@ -160,6 +160,68 @@ component extends="wheels.WheelsTest" {
 				expect(remaining.recordCount).toBe(0);
 			});
 
+			it("publish on a fresh instance does not run an immediate retention sweep", function() {
+				// Ensure the table exists before inserting directly
+				adapter.poll(channel = "test.freshsweep", since = DateAdd("n", -1, Now()));
+
+				// Insert an event older than the retention window
+				queryExecute(
+					"INSERT INTO wheels_events (id, channel, event, data, createdAt)
+					VALUES (:id, :channel, :event, :data, :createdAt)",
+					{
+						id: {value: "fresh-sweep-guard", cfsqltype: "cf_sql_varchar"},
+						channel: {value: "test.freshsweep", cfsqltype: "cf_sql_varchar"},
+						event: {value: "old", cfsqltype: "cf_sql_varchar"},
+						data: {value: "expired", cfsqltype: "cf_sql_longvarchar"},
+						createdAt: {value: DateAdd("h", -2, Now()), cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				// A brand-new adapter's first publish must not block on a retention DELETE
+				var freshAdapter = new wheels.channel.DatabaseAdapter();
+				freshAdapter.publish(channel = "test.freshsweep", event = "e", data = "d");
+
+				var remaining = queryExecute(
+					"SELECT id FROM wheels_events WHERE id = :id",
+					{id: {value: "fresh-sweep-guard", cfsqltype: "cf_sql_varchar"}},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(remaining.recordCount).toBe(1);
+			});
+
+			it("cleanup with maxRows bounds the number of rows deleted per pass", function() {
+				// Ensure the table exists and flush any pre-existing expired rows so the
+				// bounded pass below only sees the five rows inserted here
+				adapter.poll(channel = "test.bounded", since = DateAdd("n", -1, Now()));
+				adapter.cleanup();
+
+				for (var i = 1; i <= 5; i++) {
+					queryExecute(
+						"INSERT INTO wheels_events (id, channel, event, data, createdAt)
+						VALUES (:id, :channel, :event, :data, :createdAt)",
+						{
+							id: {value: "bounded-evt-#i#", cfsqltype: "cf_sql_varchar"},
+							channel: {value: "test.bounded", cfsqltype: "cf_sql_varchar"},
+							event: {value: "old", cfsqltype: "cf_sql_varchar"},
+							data: {value: "expired", cfsqltype: "cf_sql_longvarchar"},
+							createdAt: {value: DateAdd("h", -2, Now()), cfsqltype: "cf_sql_timestamp"}
+						},
+						{datasource: application.wheels.dataSourceName}
+					);
+				}
+
+				var deleted = adapter.cleanup(olderThanMinutes = 60, maxRows = 2);
+				expect(deleted).toBe(2);
+
+				var remaining = queryExecute(
+					"SELECT id FROM wheels_events WHERE channel = :channel",
+					{channel: {value: "test.bounded", cfsqltype: "cf_sql_varchar"}},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(remaining.recordCount).toBe(3);
+			});
+
 			it("auto-creates wheels_events table on first use", function() {
 				// The table should already exist from previous tests,
 				// but verify we can query it
