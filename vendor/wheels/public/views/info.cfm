@@ -167,40 +167,39 @@ if (request.wheels.params.format == "json") {
 		"settings": {}
 	};
 
-	// Collect path settings
+	// Collect path settings (secret-shaped names are omitted via the shared
+	// $isProtectedSetting() predicate, same as the HTML branch's redaction)
 	for (local.path in paths) {
-		if (isDefined("application.wheels." & local.path)) {
+		if (isDefined("application.wheels." & local.path) && !$isProtectedSetting(local.path)) {
 			local.infoData.paths[local.path] = $get(local.path);
 		}
 	}
 
 	// Collect component settings
 	for (local.comp in components) {
-		if (isDefined("application.wheels." & local.comp)) {
+		if (isDefined("application.wheels." & local.comp) && !$isProtectedSetting(local.comp)) {
 			local.infoData.components[local.comp] = $get(local.comp);
 		}
 	}
 
 	// Collect environment settings
 	for (local.env in environment) {
-		if (isDefined("application.wheels." & local.env)) {
+		if (isDefined("application.wheels." & local.env) && !$isProtectedSetting(local.env)) {
 			local.infoData.environment[local.env] = $get(local.env);
 		}
 	}
 
-	// Collect CSRF settings
+	// Collect CSRF settings (secret-shaped names are omitted via the shared
+	// $isProtectedSetting() predicate, same as the HTML branch's redaction)
 	for (local.csrfSetting in csrf) {
-		if (isDefined("application.wheels." & local.csrfSetting)) {
-			// Don't expose secret keys in JSON
-			if (local.csrfSetting != "csrfCookieEncryptionSecretKey") {
-				local.infoData.csrf[local.csrfSetting] = $get(local.csrfSetting);
-			}
+		if (isDefined("application.wheels." & local.csrfSetting) && !$isProtectedSetting(local.csrfSetting)) {
+			local.infoData.csrf[local.csrfSetting] = $get(local.csrfSetting);
 		}
 	}
 
 	// Collect CORS settings
 	for (local.corsSetting in cors) {
-		if (isDefined("application.wheels." & local.corsSetting)) {
+		if (isDefined("application.wheels." & local.corsSetting) && !$isProtectedSetting(local.corsSetting)) {
 			local.infoData.cors[local.corsSetting] = $get(local.corsSetting);
 		}
 	}
@@ -210,7 +209,7 @@ if (request.wheels.params.format == "json") {
 		local.groupName = local.settingGroup.name;
 		local.infoData.settings[local.groupName] = {};
 		for (local.settingName in local.settingGroup.values) {
-			if (isDefined("application.wheels." & local.settingName)) {
+			if (isDefined("application.wheels." & local.settingName) && !$isProtectedSetting(local.settingName)) {
 				local.infoData.settings[local.groupName][local.settingName] = $get(local.settingName);
 			}
 		}
