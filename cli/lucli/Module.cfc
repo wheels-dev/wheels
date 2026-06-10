@@ -3701,9 +3701,14 @@ component extends="modules.BaseModule" {
 
 		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
 
+		// latest/up/down change the schema — the framework's /wheels/cli
+		// bridge requires POST + the reload password for state-changing
+		// commands. info/doctor are read-only and stay on GET.
+		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
+
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(migrateUrl);
+			httpResult = mutatingAction ? makeBridgePost(migrateUrl) : makeHttpRequest(migrateUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3781,9 +3786,10 @@ component extends="modules.BaseModule" {
 		// spurious query parameters before reaching that point.
 		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
 
+		// forget/pretend mutate the tracking table — POST + reload password.
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(reconcileUrl);
+			httpResult = makeBridgePost(reconcileUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3818,9 +3824,11 @@ component extends="modules.BaseModule" {
 		var renameUrl = "http://localhost:#serverPort#/wheels/cli?command=renameSystemTables&format=json"
 			& (arguments.dryRun ? "&dryRun=true" : "");
 
+		// renameSystemTables alters tables — POST + reload password (the
+		// dry-run preview rides the same gated command).
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(renameUrl);
+			httpResult = makeBridgePost(renameUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3888,9 +3896,10 @@ component extends="modules.BaseModule" {
 			seedUrl &= "&environment=#environment#";
 		}
 
+		// dbSeed writes data — POST + reload password.
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(seedUrl);
+			httpResult = makeBridgePost(seedUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "SeedError",
@@ -6263,6 +6272,39 @@ component extends="modules.BaseModule" {
 		conn.setRequestMethod("GET");
 		conn.setConnectTimeout(5000);
 		conn.setReadTimeout(120000);
+
+		var responseCode = conn.getResponseCode();
+		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
+		var response = "";
+		while (scanner.hasNextLine()) {
+			response &= scanner.nextLine() & chr(10);
+		}
+		scanner.close();
+		return trim(response);
+	}
+
+	/**
+	 * POST to a /wheels/cli bridge URL. State-changing bridge commands
+	 * (migrate, seed, forget/pretend, rename-system-tables, ...) require
+	 * POST + the reload password — the framework rejects them over GET so
+	 * they cannot be CSRF-fired from a browser. The password is
+	 * auto-detected from .env / config/settings.cfm and sent as a form
+	 * field to keep it out of the URL and access logs.
+	 */
+	private string function makeBridgePost(required string requestUrl) {
+		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
+		var conn = javaUrl.openConnection();
+		conn.setRequestMethod("POST");
+		conn.setConnectTimeout(5000);
+		conn.setReadTimeout(120000);
+		conn.setDoOutput(true);
+		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+
+		var writer = createObject("java", "java.io.OutputStreamWriter").init(conn.getOutputStream(), "UTF-8");
+		writer.write("password=" & urlEncodedFormat(detectReloadPassword()));
+		writer.flush();
+		writer.close();
 
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
