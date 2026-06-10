@@ -12,6 +12,9 @@ component extends="wheels.WheelsTest" {
 		if (StructKeyExists(application.wheels, "enablePublicComponent")) {
 			variables.originalEnablePublicComponent = application.wheels.enablePublicComponent;
 		}
+		if (StructKeyExists(application.wheels, "debugAccessTrustProxy")) {
+			variables.originalDebugAccessTrustProxy = application.wheels.debugAccessTrustProxy;
+		}
 	}
 
 	function afterAll() {
@@ -25,6 +28,9 @@ component extends="wheels.WheelsTest" {
 		}
 		if (StructKeyExists(variables, "originalEnablePublicComponent")) {
 			application.wheels.enablePublicComponent = variables.originalEnablePublicComponent;
+		}
+		if (StructKeyExists(variables, "originalDebugAccessTrustProxy")) {
+			application.wheels.debugAccessTrustProxy = variables.originalDebugAccessTrustProxy;
 		}
 	}
 
