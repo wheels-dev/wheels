@@ -57,14 +57,22 @@ component extends="wheels.WheelsTest" {
 						"ViewContentInterface",
 						"RouteMapperInterface",
 						"RouteResolverInterface",
-						"EventHandlerInterface",
-						"InjectorInterface"
+						"EventHandlerInterface"
 					];
 					for (var name in bindings) {
 						expect(di.containsInstance(name)).toBeTrue(
 							"Missing DI binding: #name#"
 						);
 					}
+				});
+
+				it("does not register a dead InjectorInterface binding", () => {
+					// The live container self-registers at application.wheelsdi.
+					// A path binding for InjectorInterface could never resolve
+					// (init() requires a binderPath no auto-wire mapping supplies)
+					// and, if it ever did, would clobber the live container.
+					var di = new wheels.Injector(binderPath="wheels.Bindings");
+					expect(di.containsInstance("InjectorInterface")).toBeFalse();
 				});
 
 				it("all interface bindings resolve to real components", () => {
@@ -87,8 +95,7 @@ component extends="wheels.WheelsTest" {
 						"ViewContentInterface",
 						"RouteMapperInterface",
 						"RouteResolverInterface",
-						"EventHandlerInterface",
-						"InjectorInterface"
+						"EventHandlerInterface"
 					];
 					for (var name in bindings) {
 						if (di.containsInstance(name)) {
