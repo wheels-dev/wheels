@@ -510,11 +510,28 @@ component output="false" extends="wheels.Global"{
 	 * Invokes register(container) on all plugins that implement ServiceProviderInterface.
 	 * Called after all plugins are loaded, passing the DI Injector so plugins can register services.
 	 *
+	 * A throwing register() is logged and the plugin is dropped from the
+	 * ServiceProvider registry (so the boot phase skips it too) — the
+	 * remaining providers still run instead of the whole boot aborting.
+	 *
 	 * @container The Wheels DI container (Injector instance)
 	 */
 	public void function $invokeServiceProviderRegister(required any container) {
-		for (local.pluginKey in variables.$class.serviceProviders) {
-			variables.$class.plugins[local.pluginKey].register(arguments.container);
+		// Iterate a snapshot: a failing provider is removed from
+		// variables.$class.serviceProviders below, and mutating the array
+		// mid-iteration would skip the provider after a failing one.
+		local.providerKeys = Duplicate(variables.$class.serviceProviders);
+		for (local.pluginKey in local.providerKeys) {
+			try {
+				variables.$class.plugins[local.pluginKey].register(arguments.container);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Plugin '#local.pluginKey#' ServiceProvider register() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				$dropServiceProvider(local.pluginKey);
+			}
 		}
 	}
 
@@ -523,11 +540,41 @@ component output="false" extends="wheels.Global"{
 	 * Called after ALL register() methods have completed and user services.cfm has been loaded,
 	 * so plugins can safely resolve services from the container.
 	 *
+	 * Same per-plugin isolation as $invokeServiceProviderRegister: a throwing
+	 * boot() is logged and the plugin is dropped from the registry while the
+	 * remaining providers still boot.
+	 *
 	 * @app The Wheels application configuration struct (application.wheels or application.$wheels during init)
 	 */
 	public void function $invokeServiceProviderBoot(required struct app) {
-		for (local.pluginKey in variables.$class.serviceProviders) {
-			variables.$class.plugins[local.pluginKey].boot(arguments.app);
+		// Iterate a snapshot: a failing provider is removed mid-loop below.
+		local.providerKeys = Duplicate(variables.$class.serviceProviders);
+		for (local.pluginKey in local.providerKeys) {
+			try {
+				variables.$class.plugins[local.pluginKey].boot(arguments.app);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Plugin '#local.pluginKey#' ServiceProvider boot() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				$dropServiceProvider(local.pluginKey);
+			}
+		}
+	}
+
+	/**
+	 * Removes a plugin key from the ServiceProvider registry. Called when a
+	 * provider's register()/boot() throws so the remaining lifecycle phases
+	 * skip it. Log-and-skip only: the legacy plugin system has no
+	 * failedPackages registry or rollback machinery to mirror.
+	 *
+	 * @pluginKey The plugin folder key as stored in the registry
+	 */
+	private void function $dropServiceProvider(required string pluginKey) {
+		local.idx = ArrayFind(variables.$class.serviceProviders, arguments.pluginKey);
+		if (local.idx > 0) {
+			ArrayDeleteAt(variables.$class.serviceProviders, local.idx);
 		}
 	}
 

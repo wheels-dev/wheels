@@ -419,6 +419,45 @@ component extends="wheels.WheelsTest" {
 
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
+
+			it("isolates a register() failure so remaining providers still register and boot", function() {
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				StructDelete(request, "$spPluginFailingBootCalled")
+
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/serviceproviderfailing",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/serviceproviderfailing"
+
+				PluginObj = $pluginObj(config)
+				var fakeContainer = CreateObject("component",
+					"wheels.tests._assets.plugins.serviceprovider.FakeContainer").init()
+
+				// Must complete without throwing even though FailingProvider's
+				// register() throws (sorted order loads FailingProvider first).
+				PluginObj.$invokeServiceProviderRegister(fakeContainer)
+
+				// The healthy provider after the failing one still registered.
+				var plugin = PluginObj.getPlugins().WorkingProvider
+				expect(plugin.registerCalled).toBeTrue()
+
+				// The failing provider is dropped from the registry so boot() skips it.
+				expect(ArrayFind(PluginObj.getServiceProviders(), "FailingProvider")).toBe(0)
+				expect(ArrayFind(PluginObj.getServiceProviders(), "WorkingProvider")).toBeGT(0)
+
+				PluginObj.$invokeServiceProviderBoot({environment = "testing"})
+
+				expect(plugin.bootCalled).toBeTrue()
+				expect(StructKeyExists(request, "$spPluginFailingBootCalled")).toBeFalse()
+
+				application.wheels.pluginComponentPath = originalPluginComponentPath
+			})
 		})
 
 		describe("Tests that plugin.json manifest parsing", function() {

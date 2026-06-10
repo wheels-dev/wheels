@@ -851,19 +851,69 @@ component output="false" {
 	/**
 	 * Invokes register(container) on all packages that implement ServiceProviderInterface.
 	 * Also triggers instantiation of lazy ServiceProvider packages.
+	 *
+	 * Each provider is invoked with the same per-package error isolation the
+	 * loader applies everywhere else: a throwing register() is logged, recorded
+	 * in failedPackages, and rolled back via $rollbackPackage — which also
+	 * removes the key from variables.serviceProviders so the boot phase skips
+	 * it — and the remaining providers still run. Mixins/middleware this
+	 * package contributed are unwound from the loader registries by the
+	 * rollback, but copies already merged into the application scope by
+	 * Global.cfc::$loadPackages are intentionally NOT unwound here: that merge
+	 * happens before this lifecycle invoke.
 	 */
 	public void function $invokeServiceProviderRegister(required any container) {
-		for (local.pkgKey in variables.serviceProviders) {
-			variables.packages[local.pkgKey].register(arguments.container);
+		// Iterate a snapshot: $rollbackPackage deletes from
+		// variables.serviceProviders, and mutating the array mid-iteration
+		// would skip the provider after a failing one.
+		local.providerKeys = Duplicate(variables.serviceProviders);
+		for (local.pkgKey in local.providerKeys) {
+			try {
+				variables.packages[local.pkgKey].register(arguments.container);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#local.pkgKey#' ServiceProvider register() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				ArrayAppend(variables.failedPackages, {
+					name = local.pkgKey,
+					error = "ServiceProvider register() failed: " & e.message,
+					detail = StructKeyExists(e, "detail") ? e.detail : ""
+				});
+				$rollbackPackage(local.pkgKey);
+			}
 		}
 	}
 
 	/**
 	 * Invokes boot(app) on all packages that implement ServiceProviderInterface.
+	 *
+	 * Same per-provider isolation as $invokeServiceProviderRegister: a throwing
+	 * boot() is logged, recorded in failedPackages, and rolled back so the
+	 * remaining providers still boot. Services the failing provider already
+	 * registered in the DI container during register() cannot be unwound — the
+	 * Injector has no per-package tracking.
 	 */
 	public void function $invokeServiceProviderBoot(required struct app) {
-		for (local.pkgKey in variables.serviceProviders) {
-			variables.packages[local.pkgKey].boot(arguments.app);
+		// Iterate a snapshot: $rollbackPackage deletes from variables.serviceProviders.
+		local.providerKeys = Duplicate(variables.serviceProviders);
+		for (local.pkgKey in local.providerKeys) {
+			try {
+				variables.packages[local.pkgKey].boot(arguments.app);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Package '#local.pkgKey#' ServiceProvider boot() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				ArrayAppend(variables.failedPackages, {
+					name = local.pkgKey,
+					error = "ServiceProvider boot() failed: " & e.message,
+					detail = StructKeyExists(e, "detail") ? e.detail : ""
+				});
+				$rollbackPackage(local.pkgKey);
+			}
 		}
 	}
 
