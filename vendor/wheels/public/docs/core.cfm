@@ -4,6 +4,13 @@
 param name="request.wheels.params.type" default="core";
 param name="request.wheels.params.format" default="html";
 
+// Security: the format value is interpolated into the layouts/ include path at
+// the bottom of this template — reject anything but plain alphanumeric names
+// and fall back to html (same hardening as $getRequestFormat, issue #2974).
+if (!ReFind("^[A-Za-z0-9]+$", request.wheels.params.format)) {
+	request.wheels.params.format = "html";
+}
+
 if (StructKeyExists(application.wheels, "docs")) {
 	docs = application.wheels.docs;
 } else {

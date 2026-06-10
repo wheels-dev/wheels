@@ -296,6 +296,24 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return formatSettingOutput(get(arguments.settingName));
 	}
 
+	/**
+	 * Returns the whitelisted subset of getApplicationMetadata() that the JSON
+	 * branch of /wheels/info may serialize. The full metadata struct carries
+	 * datasource definitions (credentials), ORM settings, and arbitrary
+	 * application config, so anything not explicitly listed here is dropped
+	 * (issue #2974).
+	 */
+	public struct function $safeApplicationMetadata(required struct metadata) {
+		local.whitelist = ListToArray("applicationTimeout,mappings,name,sessionManagement,sessionTimeout,setClientCookies");
+		local.rv = {};
+		for (local.metaKey in local.whitelist) {
+			if (StructKeyExists(arguments.metadata, local.metaKey)) {
+				local.rv[local.metaKey] = arguments.metadata[local.metaKey];
+			}
+		}
+		return local.rv;
+	}
+
 	/*
 	This is just a proof of concept
 	*/
