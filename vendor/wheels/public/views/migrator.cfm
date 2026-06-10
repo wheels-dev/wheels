@@ -12,11 +12,16 @@ try {
 	datasourceAvailable = false;
 	message = err.message;
 }
-// Get any remaining Missing Migrations
+// Get any remaining Missing Migrations.
+// Unscoped on purpose (like the sibling variables above): this template is
+// included from a CFC method, so a `local.`-scoped array was invisible to the
+// `structKeyExists(variables, ...)` guard in the JSON branch below and
+// `remainingMigrations` never reached the payload the page's JS depends on.
+// Reset unconditionally so a previous request's value cannot go stale.
+remainingMigrations = [];
 if(structKeyExists(variables, "latestVersion") && currentVersion == latestVersion){
-	local.remainingMigrations = [];
 	for(local.migration in availableMigrations){
-		if(local.migration.status != "migrated") arrayAppend(local.remainingMigrations, local.migration);
+		if(local.migration.status != "migrated") arrayAppend(remainingMigrations, local.migration);
 	}
 }
 
@@ -61,10 +66,8 @@ if (request.wheels.params.format == "json") {
 		local.migratorData.migrator.migratedCount = local.migratedCount;
 		local.migratorData.migrator.pendingCount = local.pendingCount;
 		local.migratorData.migrator.outOfSequenceCount = ArrayLen(outOfSequenceMigrations);
-
-		if (structKeyExists(variables, "local") && structKeyExists(local, "remainingMigrations")) {
-			local.migratorData.migrator.remainingMigrations = local.remainingMigrations;
-		}
+		local.migratorData.migrator.outOfSequenceMigrations = outOfSequenceMigrations;
+		local.migratorData.migrator.remainingMigrations = remainingMigrations;
 	} else {
 		local.migratorData.migrator.error = message;
 	}
@@ -73,6 +76,14 @@ if (request.wheels.params.format == "json") {
 	writeOutput(serializeJSON(local.migratorData));
 	abort;
 }
+
+// Anti-CSRF token for the migrator command endpoint. Generated once per
+// application and echoed back by the page's XHRs in the X-Wheels-Csrf-Token
+// header, which ../migrator/command.cfm requires before running any command.
+if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
+	application.wheels.$migratorCsrfToken = LCase(Hash(GenerateSecretKey("AES") & CreateUUID(), "SHA-512"));
+}
+migratorCsrfToken = application.wheels.$migratorCsrfToken;
 </cfscript>
 <cfinclude template="../layout/_header.cfm">
 <!--- cfformat-ignore-start --->
@@ -156,9 +167,9 @@ if (request.wheels.params.format == "json") {
 			latestClass = currentVersion EQ latestVersion ? "disabled" : "performmigration";
 			resetClass = currentVersion EQ 0 ? "disabled" : "performmigration";
 			</cfscript>
-				<cfif structKeyExists(local, "remainingMigrations") && arrayLen(local.remainingMigrations)>
+				<cfif arrayLen(remainingMigrations)>
 					<div class="ui button violet performmigration"
-						data-data-url="#urlFor(route='wheelsMigratorCommand', command="migrateto", version='#local.remainingMigrations[1]["version"]#', params="missingMigFlag=1")#">Migrate Missing Migrations</div>
+						data-data-url="#urlFor(route='wheelsMigratorCommand', command="migrateto", version='#remainingMigrations[1]["version"]#', params="missingMigFlag=1")#">Migrate Missing Migrations</div>
 				<cfelse>
 					<div id="migrateToLatest" class="ui button violet #latestClass#"
 						data-data-url="#urlFor(route='wheelsMigratorCommand', command="migrateto", version='#latestVersion#')#">Migrate To Latest</div>
@@ -366,6 +377,24 @@ if (request.wheels.params.format == "json") {
 <script>
 var resultsCollapsed = false;
 
+// Anti-CSRF token required by the migrator command endpoint (sent in the
+// X-Wheels-Csrf-Token header on every command XHR).
+var wheelsMigratorCsrfToken = '#migratorCsrfToken#';
+
+// urlFor()-generated URL templates so the JS-rebuilt table/banner respect
+// URLRewriting and non-root context paths instead of hardcoding routes.
+var wheelsMigratorUrls = {
+	sql: '#urlFor(route="wheelsMigratorSQL", version="_V_")#',
+	migrateTo: '#urlFor(route="wheelsMigratorCommand", command="migrateto", version="_V_")#',
+	migrateToMissing: '#urlFor(route="wheelsMigratorCommand", command="migrateto", version="_V_", params="missingMigFlag=1")#',
+	migrateIndividual: '#urlFor(route="wheelsMigratorCommand", command="migrateIndividual", version="_V_")#',
+	redoMigration: '#urlFor(route="wheelsMigratorCommand", command="redomigration", version="_V_")#'
+};
+
+function wheelsMigratorUrl(name, version) {
+	return wheelsMigratorUrls[name].replace('_V_', encodeURIComponent(version));
+}
+
 function showResults(html, label) {
 	var container = document.getElementById('migrationResults');
 	var output = document.getElementById('resultsOutput');
@@ -530,7 +559,7 @@ function rebuildMigrationsTable(migrations, currentVersion) {
         } else if (isOutOfSequence) {
             tableHtml += '<svg xmlns="http://www.w3.org/2000/svg" height="15px" width="15px" viewBox="0 0 512 512"><path fill="##f38ba8" d="M256 32c14.2 0 27.3 7.5 34.5 19.8l216 368c7.3 12.4 7.3 27.7 .2 40.1S486.3 480 472 480H40c-14.3 0-27.6-7.7-34.7-20.1s-7-27.8 .2-40.1l216-368C228.7 39.5 241.8 32 256 32zm0 128c-13.3 0-24 10.7-24 24V296c0 13.3 10.7 24 24 24s24-10.7 24-24V184c0-13.3-10.7-24-24-24zm32 224a32 32 0 1 0 -64 0 32 32 0 1 0 64 0z"/></svg>';
         } else {
-            tableHtml += '<div class="ui icon button teal tiny previewsql" data-data-url="/wheels/migrator/sql/' + mig.VERSION + '" data-content="Preview SQL">' +
+            tableHtml += '<div class="ui icon button teal tiny previewsql" data-data-url="' + wheelsMigratorUrl('sql', mig.VERSION) + '" data-content="Preview SQL">' +
                         '<svg xmlns="http://www.w3.org/2000/svg" height="12" width="14" viewBox="0 0 640 512"><path fill="##ffffff" d="M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z"/></svg>' +
                         '</div>';
         }
@@ -564,24 +593,24 @@ function rebuildMigrationsTable(migrations, currentVersion) {
         // Actions column
         tableHtml += '<td>';
         if (isOutOfSequence) {
-            tableHtml += `<div class="ui icon button violet tiny performmigration" data-command="migrateIndividual" data-version="${version}" data-data-url="/wheels/migrator/migrateIndividual/${version}" data-content="Run this migration individually">` +
+            tableHtml += `<div class="ui icon button violet tiny performmigration" data-command="migrateIndividual" data-version="${version}" data-data-url="${wheelsMigratorUrl('migrateIndividual', version)}" data-content="Run this migration individually">` +
                         '<svg xmlns="http://www.w3.org/2000/svg" height="12px" width="12px" viewBox="0 0 384 512"><path fill="##ffffff" d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.8 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg>' +
                         '</div>';
-            tableHtml += `<div class="ui icon button teal tiny previewsql" data-data-url="/wheels/migrator/sql/${version}" data-content="Preview SQL">` +
+            tableHtml += `<div class="ui icon button teal tiny previewsql" data-data-url="${wheelsMigratorUrl('sql', version)}" data-content="Preview SQL">` +
                         '<svg xmlns="http://www.w3.org/2000/svg" height="12" width="14" viewBox="0 0 640 512"><path fill="##ffffff" d="M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z"/></svg>' +
                         '</div>';
         } else if (!hasMigrated) {
-            tableHtml += `<div class="ui icon button violet tiny performmigration" data-data-url="/wheels/migrator/migrateto/${version}" data-content="Migrate To this schema (Up)">` +
+            tableHtml += `<div class="ui icon button violet tiny performmigration" data-data-url="${wheelsMigratorUrl('migrateTo', version)}" data-content="Migrate To this schema (Up)">` +
                         '<svg xmlns="http://www.w3.org/2000/svg" height="12px" width="12px" viewBox="0 0 512 512"><path fill="##ffffff" d="M463.5 224H472c13.3 0 24-10.7 24-24V72c0-9.7-5.8-18.5-14.8-22.2s-19.3-1.7-26.2 5.2L413.4 96.6c-87.6-86.5-228.7-86.2-315.8 1c-87.5 87.5-87.5 229.3 0 316.8s229.3 87.5 316.8 0c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0c-62.5 62.5-163.8 62.5-226.3 0s-62.5-163.8 0-226.3c62.2-62.2 162.7-62.5 225.3-1L327 183c-6.9 6.9-8.9 17.2-5.2 26.2s12.5 14.8 22.2 14.8H463.5z"/></svg>' +
                         '</div>';
         }
         if (hasMigrated) {
             if (version != currentVersion) {
-                tableHtml += `<div class="ui icon button red tiny performmigration" data-data-url="/wheels/migrator/migrateto/${version}" data-content="Migrate To this schema (Down)">` +
+                tableHtml += `<div class="ui icon button red tiny performmigration" data-data-url="${wheelsMigratorUrl('migrateTo', version)}" data-content="Migrate To this schema (Down)">` +
                             '<svg xmlns="http://www.w3.org/2000/svg" height="12px" width="12px" viewBox="0 0 512 512"><path fill="##ffffff" d="M48.5 224H40c-13.3 0-24-10.7-24-24V72c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2L98.6 96.6c87.6-86.5 228.7-86.2 315.8 1c87.5 87.5 87.5 229.3 0 316.8s-229.3 87.5-316.8 0c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0c62.5 62.5 163.8 62.5 226.3 0s62.5-163.8 0-226.3c-62.2-62.2-162.7-62.5-225.3-1L185 183c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8H48.5z"/></svg>' +
                             '</div>';
             }
-            tableHtml += `<div class="ui icon button red tiny performmigration" data-data-url="/wheels/migrator/redomigration/${version}" data-content="Redo This Migration (Down then Up)">` +
+            tableHtml += `<div class="ui icon button red tiny performmigration" data-data-url="${wheelsMigratorUrl('redoMigration', version)}" data-content="Redo This Migration (Down then Up)">` +
                         '<svg xmlns="http://www.w3.org/2000/svg" height="12px" width="12px" viewBox="0 0 512 512"><path fill="##ffffff" d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H352c-17.7 0-32 14.3-32 32s14.3 32 32 32H463.5c0 0 0 0 0 0h.4c17.7 0 32-14.3 32-32V80c0-17.7-14.3-32-32-32s-32 14.3-32 32v35.2L414.4 97.6c-87.5-87.5-229.3-87.5-316.8 0C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5zM39 289.3c-5 1.5-9.8 4.2-13.7 8.2c-4 4-6.7 8.8-8.1 14c-.3 1.2-.6 2.5-.8 3.8c-.3 1.7-.4 3.4-.4 5.1V432c0 17.7 14.3 32 32 32s32-14.3 32-32V396.9l17.6 17.5 0 0c87.5 87.4 229.3 87.4 316.7 0c24.4-24.4 42.1-53.1 52.9-83.7c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0l-.1-.1L125.6 352H160c17.7 0 32-14.3 32-32s-14.3-32-32-32H48.4c-1.6 0-3.2 .1-4.8 .3s-3.1 .5-4.6 1z"/></svg>' +
                         '</div>';
         }
@@ -674,14 +703,14 @@ function updateActionButtons(migratorData) {
         // It's a "Migrate Missing Migrations" button
         var missingVersion = migratorData.REMAININGMIGRATIONS[0].VERSION || migratorData.REMAININGMIGRATIONS[0].version;
         $migrateBtn.text('Migrate Missing Migrations');
-        $migrateBtn.data('data-url', '/wheels/migrator/migrateto/' + missingVersion + '?missingMigFlag=1');
-        $migrateBtn.attr('data-data-url', '/wheels/migrator/migrateto/' + missingVersion + '?missingMigFlag=1');
+        $migrateBtn.data('data-url', wheelsMigratorUrl('migrateToMissing', missingVersion));
+        $migrateBtn.attr('data-data-url', wheelsMigratorUrl('migrateToMissing', missingVersion));
         $migrateBtn.removeClass('disabled');
         $migrateBtn.addClass('performmigration'); // Ensure it has the right class
     } else {
         $migrateBtn.text('Migrate To Latest');
-        $migrateBtn.data('data-url', '/wheels/migrator/migrateto/' + latestVersion);
-        $migrateBtn.attr('data-data-url', '/wheels/migrator/migrateto/' + latestVersion);
+        $migrateBtn.data('data-url', wheelsMigratorUrl('migrateTo', latestVersion));
+        $migrateBtn.attr('data-data-url', wheelsMigratorUrl('migrateTo', latestVersion));
         
         // Disable if already at latest version OR if current version is 0 (after reset, should be enabled to migrate to latest)
         // Actually, after reset (currentVersion = 0), we want to enable the button to migrate to latest
@@ -751,7 +780,7 @@ function updateOutOfSequenceBanner(migratorData) {
                     <div class="ui small button violet performmigration"
                         data-command="migrateIndividual"
                         data-version="${version}"
-                        data-data-url="/wheels/migrator/migrateIndividual/${version}"
+                        data-data-url="${wheelsMigratorUrl('migrateIndividual', version)}"
                         style="margin:0;">
                         Run ${version} &mdash; ${displayName}
                     </div>`;
@@ -796,7 +825,7 @@ function updateOutOfSequenceBanner(migratorData) {
                     <div class="ui small button violet performmigration"
                         data-command="migrateIndividual"
                         data-version="${version}"
-                        data-data-url="/wheels/migrator/migrateIndividual/${version}"
+                        data-data-url="${wheelsMigratorUrl('migrateIndividual', version)}"
                         style="margin:0;">
                         Run ${version} &mdash; ${displayName}
                     </div>
@@ -828,6 +857,7 @@ function runMigrationRequest(url, label) {
 
     var xhr = new XMLHttpRequest();
     xhr.open('#method#', url, true);
+    xhr.setRequestHeader('X-Wheels-Csrf-Token', wheelsMigratorCsrfToken);
     xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
             showResults(xhr.responseText, label);
@@ -958,6 +988,7 @@ $(".runAllOutOfSequence").on("click", function(e) {
 		output.textContent += 'Migration ' + item.version + '...\n';
 		var xhr = new XMLHttpRequest();
 		xhr.open('#method#', item.url, true);
+		xhr.setRequestHeader('X-Wheels-Csrf-Token', wheelsMigratorCsrfToken);
 		xhr.onload = function() {
 			// Parse response for confirm URL
 			var temp = document.createElement('div');
@@ -968,6 +999,7 @@ $(".runAllOutOfSequence").on("click", function(e) {
 				// Execute the confirmed migration
 				var xhr2 = new XMLHttpRequest();
 				xhr2.open('#method#', confirmUrl, true);
+				xhr2.setRequestHeader('X-Wheels-Csrf-Token', wheelsMigratorCsrfToken);
 				xhr2.onload = function() {
 					var temp2 = document.createElement('div');
 					temp2.innerHTML = xhr2.responseText;
