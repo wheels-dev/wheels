@@ -31,15 +31,18 @@ component extends="wheels.WheelsTest" {
 
 			// Slice out the 3.x -> 4.x branch so assertions don't accidentally
 			// match the 2.x -> 3.x checks (which also reference wheels.Test,
-			// the legacy plugin directory, etc.).
+			// the legacy plugin directory, etc.). `fullSource` is kept for
+			// assertions on the scanner's surroundings (exit-code throw,
+			// --format=json plumbing) that live outside the checks block.
 			var block = "";
+			var fullSource = "";
 			if (fileExists(modulePath)) {
-				var moduleSource = fileRead(modulePath);
-				var start = find("currentMajor <= 3 && targetMajor >= 4", moduleSource);
+				fullSource = fileRead(modulePath);
+				var start = find("currentMajor <= 3 && targetMajor >= 4", fullSource);
 				if (start > 0) {
-					var endIdx = find("// Run checks", moduleSource, start);
-					var sliceLen = endIdx > 0 ? endIdx - start : len(moduleSource) - start + 1;
-					block = sliceLen > 0 ? mid(moduleSource, start, sliceLen) : "";
+					var endIdx = find("// Run checks", fullSource, start);
+					var sliceLen = endIdx > 0 ? endIdx - start : len(fullSource) - start + 1;
+					block = sliceLen > 0 ? mid(fullSource, start, sliceLen) : "";
 				}
 			}
 
@@ -91,6 +94,58 @@ component extends="wheels.WheelsTest" {
 			it("scans for deprecated paginationLinks() helper", () => {
 				expect(findNoCase("paginationLinks", block) > 0).toBeTrue(
 					"3.x -> 4.x checks should grep views for paginationLinks( (renamed to paginationNav(), CHANGELOG ##2714)."
+				);
+			});
+
+			it("scans for wirebox.system.ioc bootstraps including the root Application.cfc", () => {
+				expect(findNoCase("wirebox.system.ioc", block) > 0).toBeTrue(
+					"3.x -> 4.x checks should grep for wirebox.system.ioc (the guide's hardest item-10 case is a "
+					& "`new wirebox.system.ioc.Injector(...)` bootstrap in the root Application.cfc)."
+				);
+				expect(findNoCase("Application.cfc", block) > 0).toBeTrue(
+					"The WireBox check must scan the root Application.cfc, not only app/ — the 3.x bootstrap lives at the project root."
+				);
+			});
+
+			it("covers wheels.Testbox and single-quoted extends forms in the test base class grep", () => {
+				expect(findNoCase("wheels\.Test(box)?", block) > 0).toBeTrue(
+					"The test base class grep should match wheels.Testbox (the silent WheelsTest alias, removal target 5.0) "
+					& "and both quote styles via a quote character class, not a hardcoded double quote."
+				);
+			});
+
+			it("scans for removed renderPage()/renderPageToString() helpers", () => {
+				expect(findNoCase("renderPage", block) > 0).toBeTrue(
+					"3.x -> 4.x checks should grep app/ for renderPage()/renderPageToString() — removed in 4.0, "
+					& "shimmed only by the optional wheels-legacy-adapter package."
+				);
+			});
+
+			it("carries an HSTS advisory (SecurityHeaders defaults on in production)", () => {
+				expect(findNoCase("SecurityHeaders", block) > 0).toBeTrue(
+					"3.x -> 4.x checks should carry an advisory for the HSTS default flip (guide item 2, CHANGELOG ##2081)."
+				);
+			});
+
+			it("carries a CSRF SameSite advisory", () => {
+				expect(findNoCase("SameSite", block) > 0).toBeTrue(
+					"3.x -> 4.x checks should carry an advisory for the CSRF cookie SameSite attribute (guide item 6, CHANGELOG ##2035)."
+				);
+				expect(findNoCase("protectsFromForgery", block) > 0).toBeTrue(
+					"The SameSite advisory should key off protectsFromForgery usage so only CSRF-protected apps are flagged."
+				);
+			});
+
+			it("exits non-zero when breaking findings exist (Wheels.UpgradeCheckFailed)", () => {
+				expect(findNoCase("Wheels.UpgradeCheckFailed", fullSource) > 0).toBeTrue(
+					"runUpgradeCheck must throw Wheels.UpgradeCheckFailed after the report flushes so breaking findings "
+					& "gate CI with a non-zero exit (mirrors validate()'s Wheels.ValidationFailed)."
+				);
+			});
+
+			it("supports --format=json for machine-readable CI output", () => {
+				expect(findNoCase("--format=json", fullSource) > 0).toBeTrue(
+					"wheels upgrade check should document/accept --format=json so pipelines can consume the report."
 				);
 			});
 
