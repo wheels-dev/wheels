@@ -371,6 +371,24 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	 * Internal function.
 	 */
 	public any function $assignAdapter() {
+		// Memoize the resolved adapter per datasource: the engine behind a
+		// datasource doesn't change at runtime, so probing the database
+		// ($dbinfo version plus a SELECT version() roundtrip for
+		// PostgreSQL-driver datasources) on every model class init is
+		// redundant. The cache lives in the application scope and is rebuilt
+		// on framework reload.
+		if (!StructKeyExists(application.wheels, "adapterCache")) {
+			application.wheels.adapterCache = {};
+		}
+		if (StructKeyExists(application.wheels.adapterCache, variables.wheels.class.dataSource)) {
+			local.cached = application.wheels.adapterCache[variables.wheels.class.dataSource];
+			$set(adapterName = local.cached.name);
+			return CreateObject("component", "wheels.databaseAdapters.#local.cached.namespace#.#local.cached.name#").$init(
+				dataSource = variables.wheels.class.dataSource,
+				username = variables.wheels.class.username,
+				password = variables.wheels.class.password
+			);
+		}
 		if ($get("showErrorInformation")) {
 			try {
 				local.info = $dbinfo(
@@ -439,6 +457,10 @@ component output="false" displayName="Model" extends="wheels.Global"{
 				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, CockroachDB, Oracle, SQLite or H2."
 			);
 		}
+		application.wheels.adapterCache[variables.wheels.class.dataSource] = {
+			namespace: local.adapterNamespace,
+			name: local.adapterName
+		};
 		$set(adapterName = local.adapterName);
 		return CreateObject("component", "wheels.databaseAdapters.#local.adapterNamespace#.#local.adapterName#").$init(
 			dataSource = variables.wheels.class.dataSource,
