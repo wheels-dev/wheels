@@ -24,18 +24,7 @@ component {
 		return arguments.currentName & "_test";
 	}
 
-	/**
-	 * Point the wheels application scope at a datasource AND invalidate the
-	 * cached model classes. Model.cfc captures dataSourceName at class init
-	 * and the class lives in application.wheels.models for the life of the
-	 * application, so changing dataSourceName alone only affects models that
-	 * have never been touched: any model already initialized by a dev request
-	 * keeps reading and writing the dev database for the entire test run —
-	 * which lets spec teardowns (e.g. a beforeEach deleteAll) destroy real
-	 * dev data. Called by app-runner.cfm for both the swap and the restore;
-	 * the restore matters just as much, otherwise post-test dev requests
-	 * silently run against the test database.
-	 */
+	// Sets the datasource and clears application.wheels.models so cached model classes re-initialize.
 	public void function applyDataSource(
 		required struct wheelsScope,
 		required string name

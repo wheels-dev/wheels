@@ -28,12 +28,7 @@ component extends="wheels.WheelsTest" {
 
 		describe("app-runner datasource application", () => {
 
-			// Regression: swapping application.wheels.dataSourceName alone is not
-			// enough — Model.cfc captures the datasource at class init and the
-			// class is cached in application.wheels.models, so models initialized
-			// by earlier dev requests keep writing to the dev database during a
-			// test run (spec teardowns can wipe real dev data). The swap must
-			// also invalidate the cached model classes.
+			// Regression: the swap must invalidate cached model classes or dev-DB models keep writing to the dev DB during a test run.
 			it("applyDataSource sets the datasource name and clears cached model classes", () => {
 				var resolver = new wheels.tests._assets.dispatch.TestDbResolver();
 				var fakeWheels = {
@@ -61,6 +56,7 @@ component extends="wheels.WheelsTest" {
 				var fakeWheels = { dataSourceName: "myapp" };
 				resolver.applyDataSource(wheelsScope = fakeWheels, name = "myapp_test");
 				expect(fakeWheels.dataSourceName).toBe("myapp_test");
+				expect(StructKeyExists(fakeWheels, "models")).toBeFalse();
 			});
 
 		});
