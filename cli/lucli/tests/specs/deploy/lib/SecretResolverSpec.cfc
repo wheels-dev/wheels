@@ -67,6 +67,48 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(r.has("PRESENT")).toBeTrue();
                 expect(r.has("MISSING")).toBeFalse();
             });
+
+            it("resolves keys that also exist in the parent environment", () => {
+                // HOME is always set in the parent env; the old baseline
+                // subtraction dropped such keys, yielding "" for them.
+                fileWrite(variables.tempRoot & "/.kamal/secrets", "HOME=/tmp/wheels-secret-override");
+                var r = new cli.lucli.services.deploy.lib.SecretResolver({
+                    projectRoot: variables.tempRoot
+                });
+                expect(r.get("HOME")).toBe("/tmp/wheels-secret-override");
+            });
+
+            it("preserves multi-line quoted values like certificates", () => {
+                var cert = "-----BEGIN CERTIFICATE-----" & chr(10)
+                    & "dGVzdA==" & chr(10)
+                    & "-----END CERTIFICATE-----";
+                fileWrite(variables.tempRoot & "/.kamal/secrets", 'CERT="' & cert & '"');
+                var r = new cli.lucli.services.deploy.lib.SecretResolver({
+                    projectRoot: variables.tempRoot
+                });
+                expect(r.get("CERT")).toBe(cert);
+                // base64 continuation lines must not be misparsed as keys
+                expect(r.has("dGVzdA")).toBeFalse();
+            });
+
+            it("preserves values whose continuation lines begin with '='", () => {
+                // A continuation line starting with '=' previously reached
+                // left(line, 0), which crashes Lucee 7 (Cross-Engine Invariant 8).
+                fileWrite(variables.tempRoot & "/.kamal/secrets",
+                    'WEIRD="line1' & chr(10) & '=line2"');
+                var r = new cli.lucli.services.deploy.lib.SecretResolver({
+                    projectRoot: variables.tempRoot
+                });
+                expect(r.get("WEIRD")).toBe("line1" & chr(10) & "=line2");
+            });
+
+            it("supports export-prefixed declarations", () => {
+                fileWrite(variables.tempRoot & "/.kamal/secrets", "export TOKEN=abc123");
+                var r = new cli.lucli.services.deploy.lib.SecretResolver({
+                    projectRoot: variables.tempRoot
+                });
+                expect(r.get("TOKEN")).toBe("abc123");
+            });
         });
     }
 }

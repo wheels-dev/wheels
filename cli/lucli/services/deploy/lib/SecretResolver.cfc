@@ -7,11 +7,24 @@
  * in .kamal/secrets and on load the `op` CLI actually runs. We do the
  * same — no embedded vault, no network adapter, just `bash -c`.
  *
+ * Resolution sources the file in bash (`set -a` exports every assignment
+ * and bash expands $(cmd) substitutions), then prints each key DECLARED
+ * IN THE FILE back as a KEY<US>VALUE<RS> record (US = chr(31), RS =
+ * chr(30)). Reading the declared keys individually — instead of diffing
+ * `env` output against a baseline capture — means:
+ *   - keys that also exist in the parent environment (user exports, CI
+ *     vars) still resolve to the file's value instead of being dropped,
+ *   - multi-line values (TLS certs, SSH keys) survive intact, because
+ *     records are RS-separated rather than newline-separated.
+ *
  * Destination overlay: .kamal/secrets loads first, then
  * .kamal/secrets.<destination> (if destination is set and the file
  * exists) overrides keys.
  *
  * Missing file is a no-op — ALL calls to .get() return empty string.
+ * A present file on a machine where bash can't run throws
+ * SecretResolver.BashUnavailable instead of silently resolving zero
+ * secrets (which would let callers proceed with empty credentials).
  */
 component {
 
@@ -52,65 +65,108 @@ component {
     }
 
     /**
-     * Run the given secrets file through `bash -c 'set -a; source FILE; env'`
-     * and parse the resulting env block. The difference between our new env
-     * and a baseline `env` capture gives us just the keys introduced by the
-     * file (including $() expansions, since bash resolves those during source).
+     * Source the secrets file through bash and read back the value of each
+     * key the file declares, as RS-terminated KEY<US>VALUE records.
      */
     private struct function $resolveFile(required string path) {
         if (!fileExists(arguments.path)) return {};
 
-        // Step 1: capture baseline env so we can subtract it later.
-        var baseline = $runBash("env");
-        var baselineKeys = $parseEnvKeys(baseline);
+        var candidates = $candidateKeys(fileRead(arguments.path, "UTF-8"));
+        if (!arrayLen(candidates)) return {};
 
-        // Step 2: source the file, then emit env. `set -a` exports all vars.
-        var cmd = "set -a; source " & $shellEscape(arguments.path) & "; env";
-        var enriched = $runBash(cmd);
-
-        var out = {};
-        for (var line in listToArray(enriched, chr(10), false)) {
-            var eq = find("=", line);
-            if (eq < 1) continue;
-            var key = left(line, eq - 1);
-            var val = mid(line, eq + 1, 99999);
-            // Only keep keys introduced by the file (not baseline).
-            if (!arrayContainsNoCase(baselineKeys, key)) {
-                out[key] = val;
-            }
+        // `set -a` exports every assignment made while sourcing; the file's
+        // own stdout is discarded so it can't corrupt the record stream.
+        // `${!k+x}` (set-check on the indirected name) filters out candidate
+        // keys bash never actually set — e.g. base64 continuation lines of a
+        // quoted multi-line value that merely look like assignments.
+        // \037 = US (key/value separator), \036 = RS (record terminator).
+        // NUL would be the only byte guaranteed absent from env values, but
+        // Lucee's chr(0) yields an empty string, so it can't be used as a
+        // CFML-side delimiter; RS never appears in realistic secret values.
+        var script = "set -a; source " & $shellEscape(arguments.path) & " >/dev/null; "
+            & "for __wheels_key in " & arrayToList(candidates, " ") & "; do "
+            & "if [ -n ""${!__wheels_key+x}"" ]; then "
+            & "printf '%s\037%s\036' ""$__wheels_key"" ""${!__wheels_key}""; "
+            & "fi; done";
+        var result = $runBash(script);
+        if (result.exitCode != 0) {
+            throw(
+                type = "SecretResolver.ResolutionFailed",
+                message = "Resolving secrets from [" & arguments.path & "] failed (bash exit code " & result.exitCode & ").",
+                detail = result.err
+            );
         }
-        return out;
+        return $parseRecords(result.out);
     }
 
-    private array function $parseEnvKeys(required string envBlock) {
+    /**
+     * Scan raw file content for the env keys it declares: lines shaped
+     * `KEY=...` or `export KEY=...`. Lines inside quoted multi-line values
+     * can produce false candidates; those are filtered by the set-check in
+     * the resolution script because bash never defines them as variables.
+     */
+    private array function $candidateKeys(required string content) {
         var keys = [];
-        for (var line in listToArray(arguments.envBlock, chr(10), false)) {
-            var eq = find("=", line);
-            if (eq > 0) arrayAppend(keys, left(line, eq - 1));
+        for (var line in listToArray(arguments.content, chr(10), false)) {
+            var m = reFind("^[ \t]*(export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=", line, 1, true);
+            if (arrayLen(m.pos) >= 3 && m.pos[3] > 0) {
+                var key = mid(line, m.pos[3], m.len[3]);
+                // Exact-match dedupe (arrayFind is case-sensitive): FOO and
+                // foo are distinct bash variables, so both stay candidates.
+                if (!arrayFind(keys, key)) arrayAppend(keys, key);
+            }
         }
         return keys;
     }
 
-    private string function $runBash(required string cmd) {
+    /**
+     * Parse the KEY<US>VALUE<RS> records emitted by the resolution script.
+     * The RS (chr(30)) terminator doesn't appear in realistic secret values,
+     * so multi-line values pass through intact. The `sep > 1` guard skips
+     * malformed records and avoids Left(str, 0), which crashes Lucee 7
+     * (Cross-Engine Invariant 8).
+     */
+    private struct function $parseRecords(required string blob) {
+        var out = {};
+        for (var rec in listToArray(arguments.blob, chr(30), false)) {
+            var sep = find(chr(31), rec);
+            if (sep <= 1) continue;
+            out[left(rec, sep - 1)] = mid(rec, sep + 1, len(rec));
+        }
+        return out;
+    }
+
+    /**
+     * Run a command through local bash, capturing stdout and stderr
+     * separately. Returns {exitCode, out, err}. Throws
+     * SecretResolver.BashUnavailable when bash can't be started (e.g.
+     * Windows without WSL/Git Bash) — surfacing the failure beats silently
+     * yielding zero secrets.
+     */
+    private struct function $runBash(required string cmd) {
+        var proc = "";
         try {
             var pb = createObject("java", "java.lang.ProcessBuilder").init(["bash", "-c", arguments.cmd]);
-            pb.redirectErrorStream(true);
-            var proc = pb.start();
-            var reader = createObject("java", "java.io.BufferedReader").init(
-                createObject("java", "java.io.InputStreamReader").init(proc.getInputStream(), "UTF-8")
-            );
-            var sb = createObject("java", "java.lang.StringBuilder").init();
-            var line = reader.readLine();
-            while (!isNull(line)) {
-                sb.append(line);
-                sb.append(chr(10));
-                line = reader.readLine();
-            }
-            proc.waitFor();
-            return sb.toString();
+            proc = pb.start();
         } catch (any e) {
-            return "";
+            throw(
+                type = "SecretResolver.BashUnavailable",
+                message = "Unable to launch bash to resolve .kamal/secrets: " & e.message,
+                detail = "Secret resolution requires a local bash for $(cmd) expansion. On Windows, run inside WSL or Git Bash."
+            );
         }
+        var out = $readStream(proc.getInputStream());
+        var err = $readStream(proc.getErrorStream());
+        var exitCode = proc.waitFor();
+        return {exitCode: exitCode, out: out, err: err};
+    }
+
+    private string function $readStream(required any inputStream) {
+        var scanner = createObject("java", "java.util.Scanner").init(arguments.inputStream, "UTF-8");
+        scanner.useDelimiter("\A");
+        var content = scanner.hasNext() ? scanner.next() : "";
+        scanner.close();
+        return content;
     }
 
     private string function $shellEscape(required string path) {
