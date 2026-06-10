@@ -86,6 +86,7 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - `browser` — multi-step browser testing flow with its own subcommand tree.
 - `mcp` — the meta command itself; exposing it would let an agent recursively launch MCP servers.
 - `d` — short alias for `destroy`, excluded to avoid a duplicate tool entry (the canonical `wheels_destroy` is exposed).
+- Any function whose name begins with `$` — internal helpers kept `public` only so unit tests can reach them (a CFML testing carve-out). `mcpHiddenTools()` discovers these structurally via `getMetaData(this)`, so a future `$helper` added to the module cannot accidentally surface as a callable MCP tool without a manual denylist update.
 
 If you need one of these behaviours from an AI IDE, invoke it via a shell tool — don't try to expose it as an MCP tool.
 

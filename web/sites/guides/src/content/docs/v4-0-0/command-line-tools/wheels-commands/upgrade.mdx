@@ -19,7 +19,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 ### Synopsis
 
 ``` title="Synopsis"
-wheels upgrade check [--to=<version>] [--format=json]
+wheels upgrade check [--to=<version>] [--format=json] [--strict]
 ```
 
 Calling `wheels upgrade` with no subcommand (or any subcommand other than `check`) prints usage and exits. The only verb the command currently understands is `check`.
@@ -33,7 +33,7 @@ Calling `wheels upgrade` with no subcommand (or any subcommand other than `check
 3. **Compares major versions.** If current and target share the same major, the command notes "Same major version — no known breaking changes" for the major-transition checks, then still runs its advisory scan for the same-major patterns below.
 4. **Runs breaking-change checks.** Each check is either a directory existence test or a regex grep across a sub-tree of the project. Major-version transitions add their own checks on top of the advisory scan. Hits are printed as issues (yellow); absences are printed as passed checks (green).
 
-**Exit status:** when breaking findings exist the command throws `Wheels.UpgradeCheckFailed` after the report flushes, exiting non-zero so it can gate CI. Advisory findings never affect the exit code. With `--format=json` the human report is replaced by a single JSON document (`currentVersion`, `targetVersion`, `success`, `breaking`, `advisories`, `passed`, `guide`) — the non-zero exit on breaking findings still applies.
+**Exit status:** when breaking findings exist the command throws `Wheels.UpgradeCheckFailed` after the report flushes, exiting non-zero so it can gate CI. Without `--strict`, advisory findings never affect the exit code. With `--strict`, advisory findings escalate to the same hard-fail path — useful for CI pipelines that want to gate on opt-in convention changes, not just breaking ones. With `--format=json` the human report is replaced by a single JSON document (`currentVersion`, `targetVersion`, `success`, `breaking`, `advisories`, `passed`, `guide`) — the non-zero exit on breaking or strict-mode advisory findings still applies.
 
 Nothing in the project is modified. No files are written. The command does not stage, commit, or touch git state.
 
@@ -50,7 +50,8 @@ None that the command enforces — but in practice:
 | Flag | Description |
 |---|---|
 | `--to=<version>` | Target version to scan against (e.g. `--to=4.0.0`). When omitted, the command queries GitHub for the latest release tag. If the GitHub call fails and no `--to=` is given, the command aborts. |
-| `--format=json` | Emit a single machine-readable JSON report instead of the human output — for CI pipelines. Breaking findings still exit non-zero. |
+| `--format=json` | Emit a single machine-readable JSON report instead of the human output — for CI pipelines. Breaking findings (and advisory findings when `--strict` is set) still exit non-zero. |
+| `--strict` | Escalate advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings. The command throws `Wheels.UpgradeCheckFailed` and exits non-zero so CI can gate on opt-in convention changes. Without this flag, advisories are reported but never fail the check. Mirrors Django's `--fail-level WARNING` / Mix's `--warnings-as-errors`. |
 
 That is the complete flag surface. The command does not accept `--force`, `--dry-run`, `--check`, `--backup`, or any apply-style switch — there is nothing to apply.
 
