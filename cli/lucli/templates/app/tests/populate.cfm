@@ -39,6 +39,9 @@
             // fails loudly again (app-runner only includes populate.cfm when the
             // table is absent) — otherwise one failure leaves a silently
             // half-migrated schema. Fix the migration, then just re-run.
+            // Note: `DROP TABLE IF EXISTS` is unsupported on Oracle < 23c, so
+            // the self-healing re-entry loop only latches for one run there;
+            // the loud-failure Throw below still fires on the first failure.
             try {
                 QueryExecute(
                     "DROP TABLE IF EXISTS #application.wheels.migratorTableName#",
@@ -48,7 +51,7 @@
             } catch (any dropErr) {}
             Throw(
                 type = "PopulateCfm.MigrationFailed",
-                message = "Test-db migration did not complete cleanly. Delete db/test.sqlite (or just re-run) after fixing the migration.",
+                message = "Test-db migration did not complete cleanly. Fix the failing migration and re-run (or delete db/test.sqlite if using SQLite).",
                 detail = local.migrateResult
             );
         }
