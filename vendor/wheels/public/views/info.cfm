@@ -189,13 +189,11 @@ if (request.wheels.params.format == "json") {
 		}
 	}
 
-	// Collect CSRF settings
+	// Collect CSRF settings (secret-shaped names are omitted via the shared
+	// $isProtectedSetting() predicate, same as the HTML branch's redaction)
 	for (local.csrfSetting in csrf) {
-		if (isDefined("application.wheels." & local.csrfSetting)) {
-			// Don't expose secret keys in JSON (shared predicate with the HTML branch)
-			if (!$isProtectedSetting(local.csrfSetting)) {
-				local.infoData.csrf[local.csrfSetting] = $get(local.csrfSetting);
-			}
+		if (isDefined("application.wheels." & local.csrfSetting) && !$isProtectedSetting(local.csrfSetting)) {
+			local.infoData.csrf[local.csrfSetting] = $get(local.csrfSetting);
 		}
 	}
 
