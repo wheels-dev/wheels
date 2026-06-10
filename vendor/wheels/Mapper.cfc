@@ -129,6 +129,10 @@ component output="false" {
 	 * groups (`(?:`). Route variables are extracted from the compiled route regex by group
 	 * position, so a capturing group inside a constraint (e.g., `whereMatch("size", "[0-9]+(px|em)")`)
 	 * would shift every subsequent variable to the wrong value or crash param extraction.
+	 * Java named capture groups (`(?<name>...)`) are also capturing — they too shift positions —
+	 * so they are normalized to `(?:...)`. The `<name>` token is stripped because positional
+	 * extraction in $mergeRoutePattern doesn't consult group names. Lookbehind shapes
+	 * `(?<=...)` and `(?<!...)` start with `(?<` but are non-capturing and are left alone.
 	 * Parentheses inside character classes (e.g., `[\w()-]+`) are literal characters, not
 	 * groups, so the scanner tracks unescaped bracket depth and leaves them untouched
 	 * (rewriting them would silently widen the class to also match `?` and `:`).
@@ -163,14 +167,29 @@ component output="false" {
 				local.rv &= local.char;
 				continue;
 			}
-			if (
-				!local.escaped
-				&& local.char == "("
-				&& local.charClassDepth == 0
-				&& (local.i == local.length || Mid(arguments.pattern, local.i + 1, 1) != "?")
-			) {
-				// Unescaped capturing group outside any character class: make it non-capturing.
-				local.rv &= "(?:";
+			if (!local.escaped && local.char == "(" && local.charClassDepth == 0) {
+				local.nextChar = local.i < local.length ? Mid(arguments.pattern, local.i + 1, 1) : "";
+				if (local.nextChar != "?") {
+					// Unescaped capturing group outside any character class: make it non-capturing.
+					local.rv &= "(?:";
+				} else {
+					// `(?...)` flavor. The only capturing flavor is Java named capture `(?<name>...)`.
+					// Disambiguate from lookbehinds: `(?<=...)` / `(?<!...)` have `=` or `!` after `<`.
+					local.afterQ = local.i + 1 < local.length ? Mid(arguments.pattern, local.i + 2, 1) : "";
+					local.afterBracket = local.i + 2 < local.length ? Mid(arguments.pattern, local.i + 3, 1) : "";
+					if (local.afterQ == "<" && local.afterBracket != "=" && local.afterBracket != "!" && Len(local.afterBracket)) {
+						local.closeIdx = Find(">", arguments.pattern, local.i + 3);
+						if (local.closeIdx > 0) {
+							// Consume the `(?<name>` prefix and emit `(?:` in its place.
+							local.rv &= "(?:";
+							local.i = local.closeIdx;
+							local.classJustOpened = false;
+							continue;
+						}
+					}
+					// Any other `(?...)` flavor is already non-capturing or a lookaround — leave it alone.
+					local.rv &= local.char;
+				}
 			} else {
 				local.rv &= local.char;
 			}
