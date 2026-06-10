@@ -194,17 +194,17 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	) {
 		arguments.type = "index";
 		local.index = $dbinfo(argumentCollection = arguments);
-		pkList = "";
-		for (row in local.index) {
-			if (Find('primary_key', row.INDEX_NAME)) {
-				pkList = ListAppend(pkList, row.COLUMN_NAME);
+		local.pkList = "";
+		for (local.row in local.index) {
+			if (Find('primary_key', local.row.INDEX_NAME)) {
+				local.pkList = ListAppend(local.pkList, local.row.COLUMN_NAME);
 			}
 		}
 		arguments.type = "columns";
 		local.columns = $dbinfo(argumentCollection = arguments);
-		for (local.i = 1; i <= local.columns.recordCount; i++) {
-			if (ListFind(pkList, local.columns["COLUMN_NAME"][i])) {
-				QuerySetCell(local.columns, "IS_PRIMARYKEY", "YES", i);
+		for (local.i = 1; local.i <= local.columns.recordCount; local.i++) {
+			if (ListFind(local.pkList, local.columns["COLUMN_NAME"][local.i])) {
+				QuerySetCell(local.columns, "IS_PRIMARYKEY", "YES", local.i);
 			}
 		}
 

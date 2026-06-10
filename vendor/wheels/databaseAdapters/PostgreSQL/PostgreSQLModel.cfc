@@ -193,16 +193,34 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Acquire a PostgreSQL advisory lock using pg_advisory_lock.
-	 * This is a session-level lock that blocks until acquired.
-	 * The lock name is hashed to an integer using hashtext().
+	 * Acquire a PostgreSQL session-level advisory lock by polling
+	 * pg_try_advisory_lock until the timeout expires. The lock name is hashed
+	 * to an integer using hashtext(). Throws `Wheels.AdvisoryLockTimeout` when
+	 * the lock cannot be acquired in time, matching the MySQL adapter's
+	 * contract (a blocking pg_advisory_lock would ignore the timeout and wait
+	 * forever).
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
-		queryExecute(
-			"SELECT pg_advisory_lock(hashtext(?))",
-			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
-		);
+		local.startedAt = GetTickCount();
+		local.timeoutMs = arguments.timeout * 1000;
+		while (true) {
+			local.result = queryExecute(
+				"SELECT pg_try_advisory_lock(hashtext(?)) AS lockresult",
+				[arguments.name],
+				{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			);
+			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
+				return;
+			}
+			if (GetTickCount() - local.startedAt >= local.timeoutMs) {
+				Throw(
+					type = "Wheels.AdvisoryLockTimeout",
+					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+					extendedInfo = "The PostgreSQL pg_try_advisory_lock function kept returning false, indicating another session holds the lock."
+				);
+			}
+			Sleep(250);
+		}
 	}
 
 	/**
