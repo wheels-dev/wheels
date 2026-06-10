@@ -319,6 +319,22 @@ component extends="wheels.WheelsTest" {
 				expect(data).toInclude("xml template content")
 			})
 
+			it("falls back to html when onlyProvides excludes the requested format", () => {
+				params.format = "xml"
+				_controller = application.wo.controller("test", params)
+				_controller.provides("xml")
+				_controller.onlyProvides(formats = "json", action = "test")
+				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
+				data = _controller.renderWith(data = user, layout = false, returnAs = "string")
+
+				// Clean up before asserting: controller class data is cached in the
+				// application scope and shared by reference across specs.
+				StructDelete(_controller.$getControllerClassData().formats.actions, "test")
+
+				expect(data).notToInclude("xml template content")
+				expect(data).toInclude("view template content")
+			})
+
 			it("renders current action as xml with template", () => {
 				params.format = "xml"
 				_controller = application.wo.controller("test", params)
@@ -758,6 +774,33 @@ component extends="wheels.WheelsTest" {
 				// The auto-render block should skip view lookup because
 				// renderWith was attempted.
 				expect(_controller.$renderWithAttempted()).toBeTrue()
+			})
+
+			it("skips view rendering when onlyProvides excludes the requested non-html format", () => {
+				// Closes the gap on processing.cfc:165 — the $callAction auto-render
+				// branch that becomes reachable now that $acceptableFormats reads
+				// the .actions sub-struct. Requesting xml against an action whose
+				// onlyProvides allows only json must NOT fall through to renderView
+				// (and therefore not throw ViewNotFound) — shouldRenderView is set
+				// to false and the response stays empty.
+				params = {controller = "dummy", action = "noViewAction", format = "xml"}
+				_controller = application.wo.controller("dummy", params)
+				_controller.noViewAction = function() {
+					// no-op action; exercises the auto-render path
+				}
+				_controller.onlyProvides(formats = "json", action = "noViewAction")
+
+				captured = ""
+				try {
+					_controller.$callAction(action = "noViewAction")
+					captured = _controller.response()
+				} finally {
+					// Controller class data is cached in the application scope and
+					// shared by reference across specs — clean up either way.
+					StructDelete(_controller.$getControllerClassData().formats.actions, "noViewAction")
+				}
+
+				expect(captured).toBe("")
 			})
 		})
 	}
