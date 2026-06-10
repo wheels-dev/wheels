@@ -28,10 +28,22 @@ jobs:
         || github.event.pull_request.draft == false
       )
     steps:
-      - name: Checkout PR head
+      # SECURITY: check out the BASE branch, never the reviewed commit. This
+      # workflow runs on `pull_request_review`, which carries the base repo's
+      # secrets + write token even for fork PRs. Checking out
+      # `github.event.review.commit_id` (a fork commit on fork PRs) and then
+      # running the local `./.github/actions/wheels-bot-skip-check` composite
+      # action below would execute fork-controlled code with the bot's token
+      # (the classic pwn-request). The reviewed commit's objects are fetched
+      # read-only after the token step so the review's git commands still
+      # resolve; nothing from the fork is ever executed. The marker still keys
+      # off review.commit_id (passed via `with:`/prompt, not shell), so the gate
+      # and emitted marker stay aligned with the commit A reviewed (#2848).
+      - name: Checkout BASE branch (trusted — never the reviewed/fork commit)
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Generate App token
@@ -41,13 +53,28 @@ jobs:
           app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
           private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
 
+      - name: Fetch PR head commit objects (read-only; never checked out)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::PR number is not numeric: $PR_NUMBER"
+            exit 1
+          fi
+          # Objects only — the working tree stays on the trusted base branch.
+          # Best-effort: B reviews A's review via gh, so a fetch miss is non-fatal.
+          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head" || true
+
       - name: Skip check
         id: gate
         uses: ./.github/actions/wheels-bot-skip-check
         with:
           target-type: pr
           target-number: ${{ github.event.pull_request.number }}
-          marker-pattern: 'wheels-bot:review-b:${{ github.event.pull_request.number }}:${{ github.event.pull_request.head.sha }}:'
+          # Key off the reviewed commit (same SHA checked out above and threaded
+          # into the prompt) so the gate and the emitted marker agree (#2848).
+          marker-pattern: 'wheels-bot:review-b:${{ github.event.pull_request.number }}:${{ github.event.review.commit_id }}:'
           github-token: ${{ steps.app-token.outputs.token }}
 
       - name: Run Reviewer B
@@ -62,7 +89,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
-            /review-the-review ${{ github.event.pull_request.number }} ${{ github.event.review.id }}
+            /review-the-review ${{ github.event.pull_request.number }} ${{ github.event.review.id }} ${{ github.event.review.commit_id }}
           claude_args: |
             --model claude-sonnet-4-6
             --max-turns 300

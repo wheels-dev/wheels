@@ -38,6 +38,7 @@ jobs:
       vars.WHEELS_BOT_ENABLED == 'true'
       && (
         (github.event_name == 'pull_request'
+          && github.event.pull_request.user.login != 'dependabot[bot]'
           && (github.event.pull_request.user.login == 'wheels-bot[bot]'
               || github.event.pull_request.draft == false))
         || (github.event_name == 'issue_comment'
@@ -60,6 +61,10 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_FROM_PR_EVENT: ${{ github.event.pull_request.number }}
           PR_FROM_COMMENT_EVENT: ${{ github.event.issue.number }}
+          # Body of the comment that triggered response mode (Reviewer B's
+          # critique). Passed through env — never interpolate event text
+          # straight into the script (injection). Empty on pull_request events.
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
@@ -73,7 +78,21 @@ jobs:
               echo "::error::Invalid PR number from issue context: $pr_num"
               exit 1
             fi
-            sha=$(gh pr view "$pr_num" --repo wheels-dev/wheels --json headRefOid -q '.headRefOid')
+            # Anchor the response to the exact commit Reviewer B critiqued — not
+            # the PR's (possibly newer) head. The triggering comment is B's
+            # critique, whose marker carries that SHA:
+            # `wheels-bot:review-b:<pr>:<sha>:<round>`. Re-deriving the head via
+            # `gh pr view` would float to the current head and diverge from B's
+            # commit_id-anchored marker once a push lands mid-loop, leaving the
+            # response unable to match B's round (#2848). COMMENT_BODY is read
+            # from env, never spliced into the script as a workflow expression.
+            sha=$(printf '%s\n' "$COMMENT_BODY" \
+              | grep -oiP "wheels-bot:review-b:${pr_num}:\K[0-9a-f]{7,40}" \
+              | head -1 || true)
+            if [ -z "$sha" ]; then
+              echo "::error::Could not extract the reviewed SHA from the triggering review-b comment"
+              exit 1
+            fi
             mode="response"
           fi
           echo "pr_num=$pr_num" >> "$GITHUB_OUTPUT"
@@ -103,10 +122,19 @@ jobs:
       - name: Determine prompt
         id: cmd
         run: |
+          # Thread the SHA resolved in "Resolve PR info" — the exact commit the
+          # Checkout step pinned — into the prompt as a second argument. The
+          # model emits the idempotency marker from this value instead of
+          # re-deriving it with `gh pr view`, which races with pushes that land
+          # mid-session and left the marker pointing at the wrong commit
+          # (issue #2848). The Run Reviewer A step's Bash allowlist is gh +
+          # read-only git (no echo/printenv), so the model can't read a step
+          # env var — the SHA must travel in the prompt text, the same channel
+          # the PR number already uses.
           if [ "${{ steps.pr.outputs.mode }}" = "initial" ]; then
-            echo "cmd=/review-pr ${{ steps.pr.outputs.pr_num }}" >> "$GITHUB_OUTPUT"
+            echo "cmd=/review-pr ${{ steps.pr.outputs.pr_num }} ${{ steps.pr.outputs.sha }}" >> "$GITHUB_OUTPUT"
           else
-            echo "cmd=/respond-to-critique ${{ steps.pr.outputs.pr_num }}" >> "$GITHUB_OUTPUT"
+            echo "cmd=/respond-to-critique ${{ steps.pr.outputs.pr_num }} ${{ steps.pr.outputs.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run Reviewer A

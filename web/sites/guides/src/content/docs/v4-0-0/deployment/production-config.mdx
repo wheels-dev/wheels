@@ -35,7 +35,7 @@ In production, read `WHEELS_ENV` from the process instead so the same artifact c
 
 ```cfm {test:compile} title="config/environment.cfm"
 <cfscript>
-    set(environment=application.wo.env("WHEELS_ENV", "production"));
+    set(environment=env("WHEELS_ENV", "production"));
 </cfscript>
 ```
 
@@ -60,18 +60,18 @@ Create `config/production/settings.cfm`. This file is read only when the active 
 ```cfm {test:compile} title="config/production/settings.cfm"
 <cfscript>
     // Real datasource — never H2 or SQLite in production.
-    set(dataSourceName=application.wo.env("WHEELS_DATASOURCE", "myapp_prod"));
-    set(dataSourceUserName=application.wo.env("WHEELS_DB_USER", ""));
-    set(dataSourcePassword=application.wo.env("WHEELS_DB_PASSWORD", ""));
+    set(dataSourceName=env("WHEELS_DATASOURCE", "myapp_prod"));
+    set(dataSourceUserName=env("WHEELS_DB_USER", ""));
+    set(dataSourcePassword=env("WHEELS_DB_PASSWORD", ""));
 
     // Rotate this per-deploy. Empty disables ?reload= entirely.
-    set(reloadPassword=application.wo.env("RELOAD_PASSWORD", ""));
+    set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
 
     // Persistent CSRF encryption key — required when csrfStore="cookie".
-    set(csrfCookieEncryptionSecretKey=application.wo.env("CSRF_KEY", ""));
+    set(csrfCookieEncryptionSecretKey=env("CSRF_KEY", ""));
 
     // Error notifications.
-    set(errorEmailToAddress=application.wo.env("ERROR_EMAIL", "ops@example.com"));
+    set(errorEmailToAddress=env("ERROR_EMAIL", "ops@example.com"));
     set(errorEmailFromAddress="noreply@example.com");
 
     // URL rewriting: "On" when your web server rewrites /foo → /index.cfm/foo.
@@ -96,7 +96,7 @@ Nothing in that block is invented. Each key is defined in `vendor/wheels/events/
 
 ## How Wheels reads environment variables
 
-`application.wo.env("NAME", "default")` is the canonical accessor. It checks `application.env` first, then `server.system.environment`, then returns the default (`vendor/wheels/Global.cfc:410-422`).
+`env("NAME", "default")` is the canonical accessor. It checks `application.env` first, then `server.system.environment`, then returns the default (`vendor/wheels/Global.cfc:597-616`).
 
 `application.env` is populated by the scaffold's `Application.cfc` at `onApplicationStart()`:
 
@@ -113,7 +113,7 @@ WHEELS_ENV=production
 WHEELS_DATASOURCE=myapp_prod
 WHEELS_DB_USER=myapp
 WHEELS_DB_PASSWORD=xxxxxxxxxx
-RELOAD_PASSWORD=rotate-me-per-deploy
+WHEELS_RELOAD_PASSWORD=rotate-me-per-deploy
 CSRF_KEY=base64-aes-key-from-secrets-manager
 ERROR_EMAIL=ops@example.com
 ```
@@ -163,7 +163,7 @@ A few things you might expect to flip, that don't:
 
 - **Routes are not cached.** `config/routes.cfm` is re-evaluated on every reload. There's no "compiled routes" mode — route dispatch is cheap enough that it doesn't matter.
 - **Migrations are not auto-run.** `autoMigrateDatabase` is `false` in every environment (`onapplicationstart.cfc:244`). Run `wheels dbmigrate latest` from your deploy script explicitly.
-- **`.env` files are not required.** If you don't ship one, `application.env` stays empty and `application.wo.env()` falls through to `server.system.environment`. That's fine — it's why systemd `EnvironmentFile=` and Docker `ENV` both work out of the box.
+- **`.env` files are not required.** If you don't ship one, `application.env` stays empty and `env()` falls through to `server.system.environment`. That's fine — it's why systemd `EnvironmentFile=` and Docker `ENV` both work out of the box.
 
 ## Related guides
 

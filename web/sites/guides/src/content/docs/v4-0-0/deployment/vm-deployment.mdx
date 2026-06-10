@@ -111,11 +111,11 @@ Put the production `.env` in `/opt/myapp/shared/.env` and lock its permissions:
 sudo install -m 600 -o lucee -g lucee /dev/stdin /opt/myapp/shared/.env <<'EOF'
 WHEELS_ENV=production
 DB_PASSWORD=...
-RELOAD_PASSWORD=...
+WHEELS_RELOAD_PASSWORD=...
 EOF
 ```
 
-Wheels reads these at boot via `application.wo.env("VAR_NAME")`. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/#secrets-handling) for where that lookup happens.
+Wheels reads these at boot via `env("VAR_NAME")`. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/#secrets-handling) for where that lookup happens.
 
 ## systemd unit
 

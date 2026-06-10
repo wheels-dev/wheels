@@ -371,7 +371,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					"DB_PASSWORD=your_password",
 					"",
 					"## Application Settings",
-					"RELOAD_PASSWORD=your_reload_password",
+					"WHEELS_RELOAD_PASSWORD=your_reload_password",
 					"SECRET_KEY=your_secret_key"
 				];
 				

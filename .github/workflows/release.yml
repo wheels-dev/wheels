@@ -454,8 +454,13 @@ jobs:
           action: softprops/action-gh-release@v2.6.2
           attempt_limit: 3
           attempt_delay: 30000
+          # target_commitish pins the tag to the exact release commit. softprops
+          # otherwise defaults it to the repo default branch (develop), so a
+          # stable tag lands off-main whenever main has diverged from develop at
+          # release time (what happened to v4.0.2). See #2819.
           with: |
             tag_name: v${{ env.WHEELS_VERSION }}
+            target_commitish: ${{ github.sha }}
             name: Wheels ${{ env.WHEELS_VERSION }}
             body_path: release-notes.md
             draft: false
@@ -558,7 +563,7 @@ jobs:
       # Scoop now. See scoop-wheels#4 for the bucket's autoupdate workflow.
       #
       # Requires DOWNSTREAM_DISPATCH_TOKEN — a fine-grained PAT (or app
-      # token) with `metadata: read` + `actions: write` on the two
+      # token) with `metadata: read` + `contents: write` on the two
       # downstream repos. If the secret is unset, this step warns and
       # exits 0 so the release itself isn't blocked; cron will catch up.
       #############################################
@@ -624,7 +629,7 @@ jobs:
       # yum.wheels.dev within minutes. See issue #2605.
       #
       # Requires LINUX_REPO_DISPATCH_TOKEN — a fine-grained PAT with
-      # `actions: write` on the two bucket repos. If the secret is unset
+      # `contents: write` on the two bucket repos. If the secret is unset
       # (which it will be until the bucket repos are created), this step
       # skips silently — releases continue to land on the GitHub Release
       # artifact stream regardless.

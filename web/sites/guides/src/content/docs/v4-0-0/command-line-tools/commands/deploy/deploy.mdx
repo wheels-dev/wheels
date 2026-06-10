@@ -12,17 +12,17 @@ The everyday deploy verb. Runs the full rolling flow: lock, build, push, pull, b
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy [--version=<v>] [--destination=<name>] [--dry-run]
+wheels deploy [--release=<v>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | Version label for the new containers. Defaults to `git rev-parse --short HEAD`. |
+| `--release=<v>` | Version label for the new containers. Defaults to `git rev-parse --short HEAD`. |
 | `--destination=<name>` | Overlay `deploy.<name>.yml` and `.kamal/secrets.<name>`. |
 | `--dry-run` | Print the commands that would run, prefixed by host. No network. |
-| `--config=<path>` | Override `config/deploy.yml`. |
+| `--config=<path>` | Override `config/deploy.yml`. `--configPath=<path>` is an accepted alias. |
 
 ## Behavior
 
@@ -38,6 +38,6 @@ wheels deploy [--version=<v>] [--destination=<name>] [--dry-run]
 
 ```bash title="illustrative — requires live infrastructure"
 wheels deploy
-wheels deploy --version=v1.2.3
+wheels deploy --release=v1.2.3
 wheels deploy --destination=staging --dry-run
 ```

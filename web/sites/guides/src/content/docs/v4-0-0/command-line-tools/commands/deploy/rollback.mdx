@@ -7,23 +7,23 @@ sidebar:
   order: 3
 ---
 
-Revert traffic to a previously-deployed version. Finds the containers tagged with `--version` on every host, starts them, and asks `kamal-proxy` to switch traffic back.
+Revert traffic to a previously-deployed version. Finds the containers tagged with the given version on every host, starts them, and asks `kamal-proxy` to switch traffic back.
 
 ## Synopsis
 
 ``` title="Synopsis"
-wheels deploy rollback --version=<v> [--destination=<name>] [--dry-run]
+wheels deploy rollback <version> [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | **Required.** The version to roll back to. |
+| `<version>` | **Required positional.** The version to roll back to. |
 | `--destination=<name>` | Overlay `deploy.<name>.yml`. |
 | `--dry-run` | Print the commands without executing. |
 
-Omitting `--version` throws `DeployMainCli.MissingVersion`.
+Omitting the version throws `DeployMainCli.MissingVersion`.
 
 ## Behavior
 
@@ -34,6 +34,6 @@ Success requires the target containers to still exist on each host. `retain_cont
 ## Examples
 
 ```bash title="Examples"
-wheels deploy rollback --version=abc1234
-wheels deploy rollback --version=v1.2.3 --destination=production
+wheels deploy rollback abc1234
+wheels deploy rollback v1.2.3 --destination=production
 ```

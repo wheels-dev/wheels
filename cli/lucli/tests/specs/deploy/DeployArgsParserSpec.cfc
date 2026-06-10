@@ -67,6 +67,45 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var opts = parser.parse(["--version"]);
                 expect(structKeyExists(opts, "version")).toBeFalse();
             });
+
+            // CLI audit H9: --config aliases --configPath; the deploy guides
+            // document --config but only --configPath was parsed.
+            it("parses --config=value as an alias for configPath", () => {
+                var opts = parser.parse(["--config=config/deploy.yml"]);
+                expect(opts.configPath).toBe("config/deploy.yml");
+            });
+
+            it("parses '--config value' as an alias for configPath", () => {
+                var opts = parser.parse(["--config", "deploy.prod.yml"]);
+                expect(opts.configPath).toBe("deploy.prod.yml");
+            });
+
+            // CLI audit H9: app-filter flags DeployAppCli reads but the parser
+            // never populated, so `deploy app boot --role=web` booted all roles.
+            it("parses --role into opts.role", () => {
+                var opts = parser.parse(["--role=web"]);
+                expect(opts.role).toBe("web");
+            });
+
+            it("parses '--role value' (space-separated) into opts.role", () => {
+                var opts = parser.parse(["--role", "workers"]);
+                expect(opts.role).toBe("workers");
+            });
+
+            it("parses --container into opts.container", () => {
+                var opts = parser.parse(["--container=app-web-v1"]);
+                expect(opts.container).toBe("app-web-v1");
+            });
+
+            it("parses '--container value' (space-separated) into opts.container", () => {
+                var opts = parser.parse(["--container", "app-web-v1"]);
+                expect(opts.container).toBe("app-web-v1");
+            });
+
+            it("parses --follow as a boolean flag", () => {
+                var opts = parser.parse(["--follow"]);
+                expect(opts.follow).toBeTrue();
+            });
         });
     }
 }

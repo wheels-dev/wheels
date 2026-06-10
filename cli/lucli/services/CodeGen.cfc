@@ -50,6 +50,7 @@ component {
 			hasMany: arguments.hasMany,
 			hasOne: arguments.hasOne,
 			validations: buildModelValidations(arguments.properties),
+			enums: buildModelEnums(arguments.properties),
 			timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
 		};
 
@@ -88,6 +89,25 @@ component {
 		// Join with newline + 2 tabs so subsequent lines align with the template's
 		// `\t\t{{validations}}` placeholder indent. The first line gets its indent
 		// from the placeholder's leading whitespace at fill time.
+		return arrayToList(lines, chr(10) & chr(9) & chr(9));
+	}
+
+	/**
+	 * Build enum() declarations for any `name:enum:a,b,c` properties. Emits one
+	 * `enum(property="name", values="a,b,c")` line per enum property so generated
+	 * models carry the auto-checkers/scopes the framework derives from enum().
+	 * Previously the enum type was parsed but never emitted. CLI audit M2.
+	 */
+	private string function buildModelEnums(required array properties) {
+		var lines = [];
+		for (var prop in arguments.properties) {
+			var propType = structKeyExists(prop, "type") ? lCase(prop.type) : "";
+			if (propType == "enum" && structKeyExists(prop, "values") && len(prop.values)) {
+				arrayAppend(lines, 'enum(property="#prop.name#", values="#prop.values#");');
+			}
+		}
+		// Same newline + 2-tab join as buildModelValidations to align with the
+		// template's `\t\t{{enums}}` placeholder indent.
 		return arrayToList(lines, chr(10) & chr(9) & chr(9));
 	}
 
@@ -213,7 +233,8 @@ component {
 	 */
 	public struct function generateTest(
 		required string type,
-		required string name
+		required string name,
+		boolean force = false
 	) {
 		var testName = arguments.name;
 		var testDir = "tests/specs/";
@@ -238,6 +259,12 @@ component {
 		testName &= suffix;
 
 		var fileName = testName & ".cfc";
+		// Refuse to clobber an existing spec unless --force (mirrors generateHelper).
+		// Previously generateTest silently overwrote and still printed "create".
+		var existingPath = variables.projectRoot & "/" & testDir & fileName;
+		if (fileExists(existingPath) && !arguments.force) {
+			return {success: false, error: "Test already exists: #testDir##fileName# (pass --force to overwrite)", path: existingPath};
+		}
 		var destDir = variables.projectRoot & "/" & testDir;
 		if (!directoryExists(destDir)) {
 			directoryCreate(destDir, true);

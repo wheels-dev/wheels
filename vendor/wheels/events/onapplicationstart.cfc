@@ -39,6 +39,16 @@ component {
 		} else if (StructKeyExists(server, "lucee")) {
 			application.$wheels.serverName = "Lucee";
 			application.$wheels.serverVersion = server.lucee.version;
+		} else if (
+			StructKeyExists(server, "coldfusion")
+			&& StructKeyExists(server.coldfusion, "productName")
+			&& server.coldfusion.productName == "RustCFML"
+		) {
+			// RustCFML reports itself via server.coldfusion.productName (no
+			// server.lucee / server.boxlang), so it must be detected before
+			// the Adobe fallback below or it gets misclassified as Adobe CF.
+			application.$wheels.serverName = "RustCFML";
+			application.$wheels.serverVersion = server.coldfusion.productVersion;
 		} else {
 			application.$wheels.serverName = "Adobe ColdFusion";
 			application.$wheels.serverVersion = server.coldfusion.productVersion;
@@ -50,6 +60,8 @@ component {
 			application.$wheels.engineAdapter = new wheels.engineAdapters.BoxLang.BoxLangAdapter(application.$wheels.serverVersion);
 		} else if (application.$wheels.serverName == "Lucee") {
 			application.$wheels.engineAdapter = new wheels.engineAdapters.Lucee.LuceeAdapter(application.$wheels.serverVersion);
+		} else if (application.$wheels.serverName == "RustCFML") {
+			application.$wheels.engineAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter(application.$wheels.serverVersion);
 		} else {
 			application.$wheels.engineAdapter = new wheels.engineAdapters.Adobe.AdobeAdapter(application.$wheels.serverVersion);
 		}
@@ -329,9 +341,12 @@ component {
 			application.wo.$cache(action = "flush");
 		}
 
-		// Add all public controller / view methods to a list of methods that you should not be allowed to call as a controller action from the url.
-		local.allowedGlobalMethods = "get,set,mapper";
-		application.$wheels.protectedControllerMethods = "";
+		// Build the list of public framework helper methods mixed onto every
+		// controller (from wheels.Global + wheels.controller.* + wheels.view.*).
+		// $callAction() in vendor/wheels/controller/processing.cfc rejects any
+		// request whose action segment matches one of these names so global
+		// helpers like env(), model(), redirectTo() are never URL-invokable.
+		application.$wheels.protectedControllerMethods = application.wo.$buildProtectedControllerMethods();
 
 		// Enable the main GUI Component
 		if (application.$wheels.enablePublicComponent) {

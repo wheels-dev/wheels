@@ -55,7 +55,7 @@ Wheels publishes signed native `apt` and `yum` repositories at **[https://apt.wh
 
 ```bash title="Debian / Ubuntu — stable"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
   | sudo tee /etc/apt/sources.list.d/wheels.list
 sudo apt update && sudo apt install wheels
@@ -72,7 +72,7 @@ The bleeding-edge channel publishes a new package on every merge to `develop`, w
 
 ```bash title="Debian / Ubuntu — bleeding-edge"
 curl -fsSL https://apt.wheels.dev/wheels.gpg \
-  | sudo tee /usr/share/keyrings/wheels.gpg >/dev/null
+  | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
 echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev bleeding-edge main" \
   | sudo tee /etc/apt/sources.list.d/wheels-be.list
 sudo apt update && sudo apt install wheels-be
@@ -86,7 +86,7 @@ sudo dnf install wheels-be
 Each `.deb`/`.rpm` carries its full SemVer version internally (e.g. `4.0.1~snapshot.1700` for snapshots), so `dpkg --compare-versions` and `rpmvercmp` correctly order pre-releases below the next GA. (GitHub Releases rewrites `~` to `.` in uploaded asset filenames, but the URLs you actually fetch from the apt/yum repos already use the canonical `~`-form.)
 
 <Aside type="note" title="GPG signing">
-Both repositories are signed with the Wheels Distribution key — fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`. The public key is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` (byte-identical files). `apt update` verifies the `InRelease` / `Release.gpg` signature on every refresh; `dnf` verifies `repomd.xml.asc` and each per-package signature. The sources.list / `.repo` snippets above wire all of that in automatically.
+Both repositories are signed with the Wheels Distribution key — fingerprint `6872 16C9 32B4 9F03 94E0 9AED 5D89 AF8F 9C9B 8CFB`. The public key is published at `https://apt.wheels.dev/wheels.gpg` and `https://yum.wheels.dev/wheels.gpg` (byte-identical files). `apt update` verifies the `InRelease` / `Release.gpg` signature on every refresh; `dnf` verifies `repomd.xml.asc` and each per-package signature. The sources.list / `.repo` snippets above wire all of that in automatically. The published key is ASCII-armored, so the Debian/Ubuntu snippet runs it through `sudo gpg --dearmor` before writing `/usr/share/keyrings/wheels.gpg`: `apt` requires a binary keyring at a `signed-by=` path and rejects an armored key with an *“unsupported filetype”* warning followed by `NO_PUBKEY`.
 
 For users who want to verify the fingerprint out-of-band before trusting the key, the same fingerprint is committed to [https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/apt-wheels/blob/main/FINGERPRINT) and [https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT](https://github.com/wheels-dev/yum-wheels/blob/main/FINGERPRINT).
 </Aside>
@@ -213,6 +213,8 @@ Java 21.0.8
 
 The three-line format tells you the Wheels Module version, the underlying LuCLI version, and the JVM the wrapper picked up. If any of those lines is missing or reports an unexpected value, jump to troubleshooting below.
 
+Running `wheels` with no arguments is also a quick sanity check — it prints the same Wheels help banner as `wheels --help`. (`wheels help` falls through to LuCLI's own generic help rather than the Wheels banner, so prefer `wheels --help`.) If you see a `Component [modules.wheels.Module] has no function with name [main]` error instead, you are running a build that predates this fix — upgrade to the latest 4.0.x release to restore the expected behavior.
+
 Once the version check passes, `wheels info` inside a Wheels project gives you a deeper sanity check against a real app — datasource connection, environment, route count. See [App Inspection](../wheels-commands/app-inspection/) for the full output and how to read it.
 
 ## Troubleshooting
@@ -230,6 +232,18 @@ On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be 
 ### Conflict with a standalone LuCLI install sharing `~/.lucli/`
 
 The wheels formula deliberately isolates runtime state under `~/.wheels/` (via `LUCLI_HOME`) so a standalone `lucli` install — which uses `~/.lucli/` — stays out of the way. If you previously had LuCLI installed directly and see odd module-resolution errors, check that the wrapper set `LUCLI_HOME` correctly (`wheels system env` will dump the resolved environment) and that `~/.wheels/modules/wheels/` contains a current `Module.cfc` and `.module-version` file.
+
+### Windows: `there is no Resource provider available with the name [c]`
+
+On Windows, `wheels new`, `wheels start`, and most other subcommands crashed before any work could happen with:
+
+```
+lucee.runtime.exp.NativeException: there is no Resource provider available
+with the name [c], available resource providers are [ftp, zip, tar, tgz,
+http, https, ram, s3]
+```
+
+The cause was mixed-slash paths: `java.io.File.getCanonicalPath()` on Windows returns backslash form (`C:\Users\tim\Projects`), which — when concatenated with a forward-slash suffix — produced a string like `C:\Users\tim\Projects/vendor/wheels`. Lucee's Resource API parsed `c:` as a URI scheme and bailed because no `c` provider is registered. This is fixed in the release that includes #2841. Update to the latest version and the error will not recur — `scoop update wheels` for Scoop installs, or re-fetch the latest Wheels Module (see **Manual JAR install** above) if you wired it up by hand. `wheels --version` was unaffected because LuCLI handles that flag before dispatching to the module.
 
 ## Related commands
 

@@ -17,6 +17,7 @@
 		"all"
 	)
 )>
+<cfset local.dbMajorVersion = Val(ListFirst(local.dbinfo.database_version, "."))>
 
 <!--- handle differences in database for identity inserts, column types etc --->
 <cfset local.storageEngine = "">
@@ -59,11 +60,11 @@
 
 <!--- Drop existing tables --->
 <cftry>
-	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE IF EXISTS c_o_r_e_posts</cfquery>
+	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE<cfif local.db IS NOT "oracle" OR (local.db IS "oracle" AND local.dbMajorVersion GTE 23)> IF EXISTS</cfif> c_o_r_e_posts</cfquery>
 	<cfcatch></cfcatch>
 </cftry>
 <cftry>
-	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE IF EXISTS c_o_r_e_authors</cfquery>
+	<cfquery datasource="#application.wheels.dataSourceName#">DROP TABLE<cfif local.db IS NOT "oracle" OR (local.db IS "oracle" AND local.dbMajorVersion GTE 23)> IF EXISTS</cfif> c_o_r_e_authors</cfquery>
 	<cfcatch></cfcatch>
 </cftry>
 

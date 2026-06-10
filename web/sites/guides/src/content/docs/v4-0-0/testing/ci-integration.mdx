@@ -126,7 +126,7 @@ When you do opt in, cache the Playwright install — it's the slowest single ste
 
 - name: Install Playwright
   if: steps.playwright-cache.outputs.cache-hit != 'true'
-  run: wheels browser install
+  run: wheels browser setup
 ```
 
 The cache key hashes `browser-manifest.json` so a Playwright version bump invalidates the cache automatically.
@@ -246,7 +246,7 @@ Each cell runs independently on its own runner with its own LuCLI server — the
 The handful of failures that eat the most CI minutes, with the one-line diagnosis for each:
 
 - **`JAVA_HOME is not set`** — LuCLI's preflight fires an actionable error. Use `actions/setup-java@v4`; it exports `JAVA_HOME` for you. Never set it by hand in a later step.
-- **Playwright JARs missing, browser specs silently skip** — expected when you haven't installed Playwright. If you want browser specs to run, add a `wheels browser install` step and the `actions/cache@v4` block above.
+- **Playwright JARs missing, browser specs silently skip** — expected when you haven't installed Playwright. If you want browser specs to run, add a `wheels browser setup` step and the `actions/cache@v4` block above.
 - **`docker compose` not found** — the `ubuntu-latest` runner includes Docker, but some self-hosted runners don't. Add `docker/setup-buildx-action@v3` if you hit it.
 - **Lucee starts but the test request times out** — the first hit to `/` pays the full Wheels bootstrap cost. Warm the app with `curl -s "http://localhost:PORT/?reload=true&password=..."` before you curl the test endpoint, and raise `--max-time` on the test curl to 600.
 - **Tests pass locally but fail in CI** — almost always a cross-engine gotcha (Adobe's `application` scope, Lucee's struct member functions, closure `this` capture). Reproduce by running the same engine locally via Docker Compose before you debug CI logs.

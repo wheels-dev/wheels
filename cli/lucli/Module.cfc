@@ -24,11 +24,23 @@ component extends="modules.BaseModule" {
 	) {
 		super.init(argumentCollection = arguments);
 
+		// Normalize cwd to forward slashes. Lucee 7 on Windows fails to
+		// distinguish a drive-letter path (e.g. `C:\Users\cy/blog`, where
+		// the backslash came from `user.dir` and the forward slash from
+		// `cwd & "/" & appName`) from a URI like `http:/...`. The mixed-
+		// slash form trips ResourceUtil's scheme-detection regex, which
+		// extracts "c" as the scheme and throws "no Resource provider
+		// available with the name [c]" before any module code runs. All-
+		// forward-slash paths are accepted by both Lucee and the JDK on
+		// every platform, so we normalize once here and again on every
+		// canonical-path concatenation downstream.
+		variables.cwd = $normalizePath(variables.cwd);
+
 		// Resolve project root (where lucee.json / vendor/wheels lives)
-		variables.projectRoot = resolveProjectRoot(arguments.cwd);
+		variables.projectRoot = resolveProjectRoot(variables.cwd);
 
 		// Module root for template resolution
-		variables.moduleRoot = getDirectoryFromPath(getCurrentTemplatePath());
+		variables.moduleRoot = $normalizePath(getDirectoryFromPath(getCurrentTemplatePath()));
 
 		// Lazy-init service instances
 		variables.services = {};
@@ -37,61 +49,98 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Extract positional arguments from LuCLI's argCollection or __arguments.
+	 * Bootstrap-safe wrapper around `Helpers.normalizePath()` — the single
+	 * source of truth for path normalisation (GH #2841). Collapses Windows
+	 * backslashes to forward slashes so a mixed-slash path like
+	 * `C:\Users\cy/blog` can't trip Lucee's Resource API into reading `c:`
+	 * as a URI scheme (see init() comment).
 	 *
-	 * LuCLI dispatches module subcommands as:
-	 *   module.subcommand(argumentCollection={arg1:"val1", arg2:"val2", ...})
-	 * where argCollection contains positional args as arg1..argN keys.
-	 *
-	 * Falls back to __arguments (minus the subcommand at index 1) for
-	 * direct CFC invocation in tests.
+	 * Helpers is instantiated directly rather than via `getService()`
+	 * because `$normalizePath()` runs inside `init()` before
+	 * `variables.services` exists. Helpers is a dependency-free leaf
+	 * utility, so constructing it at bootstrap is cheap and safe.
 	 */
-	private array function getArgs(struct callerArgs = {}) {
-		// Prefer caller's arguments (LuCLI passes argCollection which spreads
-		// positional args as arg1, arg2, ... into the function's arguments scope)
-		if (structKeyExists(callerArgs, "arg1")) {
-			return argsFromCollection(callerArgs);
-		}
-
-		// Fallback: __arguments (direct invocation / tests)
-		var raw = __arguments ?: [];
-		if (isArray(raw) && arrayLen(raw) > 0) {
-			return raw;
-		}
-		return [];
+	private string function $normalizePath(required string p) {
+		return new services.Helpers().normalizePath(arguments.p);
 	}
 
 	/**
-	 * Reconstruct args array from LuCLI's argCollection.
-	 * Positional args are stored as arg1, arg2, ... (order matters).
-	 * Named args (--key=value) are stored as key=value and must be
-	 * re-prefixed with -- so parseGeneratorArgs() can parse them.
+	 * Java-backed directoryExists() — bypasses Lucee's path resolver so
+	 * paths starting with a Windows drive letter (`C:\…`) never reach
+	 * ResourceUtil's scheme detection. The defensive `try/catch` honors
+	 * Lucee's built-in first (in case mappings or symlinks matter) and
+	 * only falls back to `java.io.File.isDirectory()` when Lucee throws.
+	 *
+	 * Use this in any path-existence check that runs early in `wheels
+	 * new` (before the framework source is located) or in any code that
+	 * constructs paths from `variables.cwd` / `File.getCanonicalPath()`.
 	 */
-	private array function argsFromCollection(required struct coll) {
-		var result = [];
-
-		// Extract positional args in order
-		var i = 1;
-		while (structKeyExists(coll, "arg#i#")) {
-			arrayAppend(result, coll["arg#i#"]);
-			i++;
+	private boolean function $safeDirExists(required string p) {
+		try {
+			return directoryExists(arguments.p);
+		} catch (any e) {
+			return createObject("java", "java.io.File").init(arguments.p).isDirectory();
 		}
+	}
 
-		// Re-add named args as --key=value flags
-		for (var key in coll) {
-			if (reFindNoCase("^arg\d+$", key)) continue; // skip positional
-			var value = coll[key];
-			if (isSimpleValue(value) && value == "true") {
-				// Boolean flag: --key
-				arrayAppend(result, "--" & key);
-			} else if (isSimpleValue(value) && value == "false") {
-				// Negated flag: skip (--no-key was already converted)
-			} else if (isSimpleValue(value)) {
-				arrayAppend(result, "--" & key & "=" & value);
+	/**
+	 * Source the structured argument collection LuCLI handed this command.
+	 *
+	 * LuCLI parses the command line once and invokes the subcommand as
+	 * `module.cmd(argumentCollection = argsMap)`, so the function's `arguments`
+	 * scope already IS the structured map (positionals as `arg1..argN`, named
+	 * options as `key=value`, and `--no-X` normalized to `key=false`). Commands
+	 * migrated to ArgSpec consume that directly — no flatten to argv, no
+	 * re-parse, no lossy `false` round trip (the #2855 root cause, see #2861).
+	 *
+	 * The fallback covers direct invocation where a caller stashed a raw argv
+	 * array in the instance-level `__arguments` (internal delegation such as
+	 * `create` → `new`, and unit tests). That array is reconstructed into the
+	 * same structured shape LuCLI would have produced, so a command behaves
+	 * identically whether LuCLI dispatched it or another command delegated to it.
+	 */
+	private struct function structuredArgs(struct callerArgs = {}) {
+		if (!structIsEmpty(arguments.callerArgs)) {
+			return arguments.callerArgs;
+		}
+		var raw = __arguments ?: [];
+		return argvToCollection(isArray(raw) ? raw : []);
+	}
+
+	/**
+	 * Reconstruct LuCLI's structured argCollection from a raw argv array.
+	 *
+	 * Mirrors LuCLI's own `parseArguments()` normalization so the fallback path
+	 * is indistinguishable from a live dispatch: `--no-X` → `X=false`, bare
+	 * `--X` → `X=true`, `--key=value` → `key=value` (leading dashes stripped),
+	 * and bare tokens → `arg<n>` keyed by their global position (a flag between
+	 * two positionals leaves a numbering gap, exactly as LuCLI produces).
+	 */
+	private struct function argvToCollection(required array argv) {
+		var coll = {};
+		var count = 0;
+		for (var raw in arguments.argv) {
+			count++;
+			if (left(raw, 5) == "--no-" && !find("=", raw) && len(raw) > 5) {
+				coll[mid(raw, 6, len(raw))] = "false";
+			} else if (left(raw, 2) == "--" && !find("=", raw) && len(raw) > 2) {
+				coll[mid(raw, 3, len(raw))] = "true";
+			} else {
+				var eq = find("=", raw);
+				if (eq > 1) {
+					var key = trim(left(raw, eq - 1));
+					if (left(key, 2) == "--") {
+						key = mid(key, 3, len(key));
+					} else if (left(key, 1) == "-") {
+						key = mid(key, 2, len(key));
+					}
+					coll[key] = mid(raw, eq + 1, len(raw));
+				} else {
+					coll["arg" & count] = raw;
+				}
 			}
 		}
-
-		return result;
+		return coll;
 	}
 
 	// ─────────────────────────────────────────────────
@@ -109,13 +158,22 @@ component extends="modules.BaseModule" {
 	 */
 	public array function mcpHiddenTools() {
 		return [
+			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
 			"d",        // alias for destroy
+			"g",        // alias for generate
 			"new",      // scaffolds a whole new Wheels project
 			"console",  // interactive CFML REPL — not usable over stdio
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
-			"browser"   // multi-step browser testing flow
+			"browser",  // multi-step browser testing flow
+			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
+			// unit-test them directly (the cli/CLAUDE.md "public for specs"
+			// carve-out) — they are not commands and must never surface as MCP
+			// tools. LuCLI matches these case-insensitively (McpCommand lowercases
+			// both the entry and the discovered function name).
+			"$normalizeTestFilter",
+			"$resolveAppTestDataSource"
 		];
 	}
 
@@ -182,6 +240,17 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	// LuCLI dispatches a bare `wheels` invocation (no subcommand) to a
+	// `main()` function on the module. Without it, picocli surfaces:
+	//   Component [modules.wheels.Module] has no function with name [main]
+	// Delegate to showHelp() so the no-args entry point lands on something useful.
+	/**
+	 * hint: No-args dispatch target — delegates to showHelp()
+	 */
+	public string function main() {
+		return showHelp();
+	}
+
 	// Hand-written replacement for BaseModule's auto-discovered help. Grouped by
 	// task instead of alphabetical, mirrors what `wheels --help` emits from the
 	// wrapper. `wheels help` and `wheels --help` (rewritten by LuCLI's
@@ -190,14 +259,32 @@ component extends="modules.BaseModule" {
 	 * hint: Show this help
 	 */
 	public string function showHelp() {
-		var v = super.version();
 		var nl = chr(10);
+
+		// Per-subcommand help. LuCLI (>= bpamiri/LuCLI#5) forwards
+		// `wheels <cmd> --help` as `showHelp <cmd>`, which arrives as the raw
+		// __arguments argv (`arg1`) — the same dispatch every other command uses.
+		// Read `arg1` first; fall back to the CFML positional key "1" so a direct
+		// function invocation (showHelp("migrate")) also resolves it. Unknown
+		// commands fall through to the global listing below (also the bare
+		// `wheels help` / `wheels --help` path, where there is no subcommand).
+		var coll = structuredArgs(arguments);
+		var sub = coll.arg1 ?: (coll["1"] ?: "");
+		if (len(sub)) {
+			var cmdHelp = $commandHelp(sub);
+			if (len(cmdHelp)) {
+				return cmdHelp;
+			}
+		}
+
+		var v = super.version();
 		var help = "Wheels CLI " & v & nl;
 		help &= "  CFML MVC framework — code generation, migrations, testing, server management" & nl & nl;
 		help &= "Usage:" & nl;
 		help &= "  wheels <command> [options]" & nl & nl;
 		help &= "Getting Started:" & nl;
 		help &= "  new <name>          Scaffold a new Wheels application" & nl;
+		help &= "  create app <name>   Alias for new — scaffold a new Wheels application" & nl;
 		help &= "  start               Start the dev server" & nl;
 		help &= "  stop                Stop the dev server" & nl;
 		help &= "  reload              Reload the running app" & nl & nl;
@@ -205,7 +292,7 @@ component extends="modules.BaseModule" {
 		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
 		help &= "  destroy (or d)      Remove generated files" & nl & nl;
 		help &= "Database:" & nl;
-		help &= "  migrate             Run database migrations (latest, up, down, info, rename-system-tables)" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
@@ -218,7 +305,7 @@ component extends="modules.BaseModule" {
 		help &= "  validate            Validate project structure and configuration" & nl;
 		help &= "  analyze             Static analysis of project code" & nl;
 		help &= "  stats               Project statistics (lines of code, model counts, etc.)" & nl;
-		help &= "  notes               Find TODO / FIXME / HACK / OPTIMIZE comments" & nl & nl;
+		help &= "  notes               Find TODO / FIXME / OPTIMIZE comments (--annotations to customize)" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
 		help &= "  upgrade             Scan for breaking changes before upgrading Wheels (read-only)" & nl;
@@ -232,6 +319,40 @@ component extends="modules.BaseModule" {
 		return help;
 	}
 
+	/**
+	 * Render per-command help for `wheels <cmd> --help` from the command function's
+	 * metadata hint. Returns "" for an unknown command so showHelp() falls back to
+	 * the global listing. Private so it isn't exposed as an MCP tool.
+	 */
+	private string function $commandHelp(required string subcommand) {
+		var nl = chr(10);
+		// Resolve aliases to the implementing function.
+		var fnName = lCase(trim(arguments.subcommand));
+		if (fnName == "g") { fnName = "generate"; }
+		if (fnName == "d") { fnName = "destroy"; }
+
+		var hint = "";
+		var meta = getMetaData(this);
+		for (var fn in (meta.functions ?: [])) {
+			if (lCase(fn.name ?: "") == fnName && (fn.access ?: "public") == "public") {
+				hint = trim(fn.hint ?: "");
+				// The `/** hint: ... */` convention surfaces the value with the
+				// literal "hint:" key prefix on Lucee — strip it for clean output.
+				hint = trim(reReplaceNoCase(hint, "^hint\s*:\s*", ""));
+				break;
+			}
+		}
+		if (!len(hint)) {
+			return "";
+		}
+
+		var help = "wheels " & lCase(trim(arguments.subcommand)) & nl & nl;
+		help &= "  " & hint & nl & nl;
+		help &= "Run 'wheels help' for the full command list." & nl;
+		help &= "More info: https://guides.wheels.dev";
+		return help;
+	}
+
 	// ─────────────────────────────────────────────────
 	//  generate — Code generation
 	// ─────────────────────────────────────────────────
@@ -240,7 +361,7 @@ component extends="modules.BaseModule" {
 	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, snippets)
 	 */
 	public string function generate() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
@@ -321,7 +442,8 @@ component extends="modules.BaseModule" {
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
-				return "";
+				// throw maps to non-zero exit; return "" would silently succeed.
+				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #type#");
 		}
 	}
 
@@ -330,10 +452,10 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Run database migrations (latest, up, down, info)
+	 * hint: Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)
 	 */
 	public string function migrate() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var action = arrayLen(args) ? lCase(args[1]) : "latest";
 
 		switch (action) {
@@ -345,14 +467,15 @@ component extends="modules.BaseModule" {
 					return runMigration(action);
 				} catch (MigrationError e) {
 					out("Migration failed: #e.message#", "red");
-					return "";
+					// rethrow maps to non-zero exit; return "" would silently succeed.
+					rethrow;
 				}
 			case "doctor":
 				try {
 					return runMigration("doctor");
 				} catch (MigrationError e) {
 					out("Doctor failed: #e.message#", "red");
-					return "";
+					rethrow;
 				}
 			case "forget":
 				return runForgetOrPretend("forgetVersion", args);
@@ -370,12 +493,12 @@ component extends="modules.BaseModule" {
 					return runRenameSystemTables(dryRun);
 				} catch (MigrationError e) {
 					out("Rename failed: #e.message#", "red");
-					return "";
+					rethrow;
 				}
 			default:
 				out("Unknown migration action: #action#", "red");
 				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]");
-				return "";
+				throw(type = "Wheels.InvalidArguments", message = "Unknown migration action: #action#");
 		}
 	}
 
@@ -384,25 +507,30 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels seed` arguments. All options are named (no positional), so
+	 * before the ArgSpec migration the legacy getArgs() arg1-gate dropped them
+	 * entirely — `wheels seed --environment=production` silently ran with
+	 * defaults. ArgSpec consumes the named keys directly. `--generate` is a
+	 * shorthand for `--mode=generate`.
+	 */
+	private struct function parseSeedArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "environment", default = "")
+			.option(name = "mode", default = "auto")
+			.flag(name = "generate", default = false)
+			.parse(arguments.coll);
+		return {
+			environment = parsed.environment,
+			mode = parsed.generate ? "generate" : parsed.mode
+		};
+	}
+
+	/**
 	 * hint: Run database seeds (convention-based or generated)
 	 */
 	public string function seed() {
-		var args = getArgs(arguments);
-		var environment = "";
-		var mode = "auto";
-
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--environment=", arg)) {
-				environment = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--mode=", arg)) {
-				mode = valueAfterEquals(arg);
-			} else if (arg == "--generate") {
-				mode = "generate";
-			}
-		}
-
-		return runSeed(mode, environment);
+		var opts = parseSeedArgs(structuredArgs(arguments));
+		return runSeed(opts.mode, opts.environment);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -410,60 +538,78 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels test` arguments. `--filter` and its `--directory` alias set
+	 * the spec filter; `--reporter` and `--db` are options (`--db` is also tracked
+	 * as explicit so the runner can tell an implicit default from a chosen one);
+	 * `--verbose`/`--ci`/`--core` are flags; `--no-test-db` (test-db=false) maps to
+	 * useTestDB. A bare positional is the filter, and `-v` arrives as a positional
+	 * (LuCLI only normalizes --x/--no-x) and toggles verbose. The space-separated
+	 * option forms (`--filter x`) are dropped for `--filter=x` — LuCLI delivers the
+	 * space form as a bare flag + a separate positional, not a named value (#2861).
+	 */
+	private struct function parseTestArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "filter",    default = "")
+			.option(name = "directory", default = "")
+			.option(name = "reporter",  default = "simple")
+			.option(name = "db",        default = "sqlite")
+			.flag(name = "verbose", default = false)
+			.flag(name = "ci",      default = false)
+			.flag(name = "core",    default = false)
+			.flag(name = "test-db", default = true)
+			.parse(arguments.coll);
+
+		// `--directory` is a documented alias for `--filter` (tutorial ch. 7).
+		var filter = len(parsed.directory) ? parsed.directory : parsed.filter;
+
+		// Walk positionals in LuCLI's global-index order: `-v` is the short
+		// verbose flag (delivered as a positional, not normalized), and the
+		// first remaining bare token is the filter when no --filter/--directory
+		// option was supplied.
+		var verbose = parsed.verbose;
+		var indices = [];
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				arrayAppend(indices, val(mid(key, 4, len(key))));
+			}
+		}
+		arraySort(indices, "numeric");
+		for (var idx in indices) {
+			var token = trim(arguments.coll["arg" & idx]);
+			if (token == "-v") {
+				verbose = true;
+			} else if (len(token) && left(token, 2) != "--" && !len(filter)) {
+				filter = token;
+			}
+		}
+
+		return {
+			filter = filter,
+			reporter = parsed.reporter,
+			format = "json",
+			verbose = verbose,
+			ci = parsed.ci,
+			core = parsed.core,
+			db = parsed.db,
+			dbExplicit = structKeyExists(arguments.coll, "db"),
+			useTestDB = parsed["test-db"]
+		};
+	}
+
+	/**
 	 * hint: Run test suite with optional filter and reporter
 	 */
 	public string function test() {
-		var args = getArgs(arguments);
-		var filter = "";
-		var reporter = "simple";
-		var format = "json";
-		var verboseOutput = false;
-		var ciMode = false;
-		var coreTests = false;
-		var db = "sqlite";
-		var dbExplicit = false;
-		var useTestDB = true;
-
-		// Parse named arguments from --key=value or --key value
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (arg == "--filter" && i < arrayLen(args)) {
-				filter = args[++i];
-			} else if (reFindNoCase("^--filter=", arg)) {
-				filter = valueAfterEquals(arg);
-			} else if (arg == "--directory" && i < arrayLen(args)) {
-				// `--directory` is an alias for `--filter`. Documented in
-				// chapter 7 of the tutorial and historically referenced in
-				// `wheels test --help`; without this branch it would fall
-				// through to the positional fallback below and be silently
-				// dropped (it starts with `--` so the positional check
-				// excludes it). Onboarding finding #2.
-				filter = args[++i];
-			} else if (reFindNoCase("^--directory=", arg)) {
-				filter = valueAfterEquals(arg);
-			} else if (arg == "--reporter" && i < arrayLen(args)) {
-				reporter = args[++i];
-			} else if (reFindNoCase("^--reporter=", arg)) {
-				reporter = valueAfterEquals(arg);
-			} else if (arg == "--db" && i < arrayLen(args)) {
-				db = args[++i];
-				dbExplicit = true;
-			} else if (reFindNoCase("^--db=", arg)) {
-				db = valueAfterEquals(arg);
-				dbExplicit = true;
-			} else if (arg == "--verbose" || arg == "-v") {
-				verboseOutput = true;
-			} else if (arg == "--ci") {
-				ciMode = true;
-			} else if (arg == "--core") {
-				coreTests = true;
-			} else if (arg == "--no-test-db") {
-				useTestDB = false;
-			} else if (!arg.startsWith("--")) {
-				// Positional arg is the filter directory
-				filter = arg;
-			}
-		}
+		var opts = parseTestArgs(structuredArgs(arguments));
+		var filter = opts.filter;
+		var reporter = opts.reporter;
+		var format = opts.format;
+		var verboseOutput = opts.verbose;
+		var ciMode = opts.ci;
+		var coreTests = opts.core;
+		var db = opts.db;
+		var dbExplicit = opts.dbExplicit;
+		var useTestDB = opts.useTestDB;
 
 		// Default to APP mode unless --core is set explicitly. The previous
 		// auto-detection ("if vendor/wheels/tests/ exists, default to core")
@@ -535,9 +681,23 @@ component extends="modules.BaseModule" {
 	 * issue #2477 and `deployment/security-hardening.mdx`.
 	 */
 	public string function reload() {
-		var serverPort = $requireRunningServer();
+		// Write-side guard: reload mutates the running app's state, so it must
+		// target the server bound to THIS project — never a sibling app squatting
+		// a common port. Without lucee.json/.env port config we refuse the
+		// common-port fallback and error loudly.
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Reload requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
-		var password = detectReloadPassword();
+		// Auto-detect the reload password from .env / config, but let an explicit
+		// `--password=<value>` override it (parity with `wheels console`). The
+		// auto-detect default is unchanged when no flag is given.
+		var reloadOpts = parseConsoleArgs(structuredArgs(arguments));
+		var password = len(reloadOpts.password) ? reloadOpts.password : detectReloadPassword();
 
 		// F5 fix: physically wipe the Lucee compiled-class cache before
 		// triggering the framework reload. Lucee Express's default
@@ -563,7 +723,7 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
 			if (!len(password)) {
-				out("Hint: Set RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
+				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
 			}
 		}
 		return "";
@@ -577,7 +737,7 @@ component extends="modules.BaseModule" {
 	 * hint: Start the Wheels development server via LuCLI
 	 */
 	public string function start() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		// Refuse to start from a non-Wheels-project directory. LuCLI's
 		// `server start` derives the server name from the cwd basename and
@@ -631,6 +791,26 @@ component extends="modules.BaseModule" {
 		// LuCLI's `server start` doesn't trip its "already exists" prompt.
 		if (reg.exists) {
 			registry.clean(serverName);
+		}
+
+		// Defense in depth for the IPv4-blind port check. LuCLI's own
+		// LuceeServerConfig.isPortAvailable() probes with a wildcard ServerSocket
+		// that binds IPv6 on a dual-stack JVM, so it never sees a port held by an
+		// IPv4-only listener (python http.server, Django runserver on 8000,
+		// 127.0.0.1-bound databases) and `wheels start` would boot on top of it.
+		// That is fixed upstream, but older LuCLI binaries still ship the bug, so
+		// when lucee.json pins a port we connect-probe it (both address families)
+		// and warn before delegating. We only reach here when our own server is
+		// NOT already running (the reg.alive early-return above), so an in-use
+		// pinned port is a genuine foreign collision.
+		var pinnedPort = $readPinnedPort(variables.projectRoot);
+		if (pinnedPort > 0 && getService("portProbe").portInUse(pinnedPort)) {
+			out("");
+			out("Warning: port " & pinnedPort & " (configured in lucee.json) is already in use", "yellow");
+			out("by another process. The server may fail to start, or silently share the port", "yellow");
+			out("(IPv4 clients reaching the other process while localhost reaches Wheels).", "yellow");
+			out("Fix: stop the other process, or change the 'port' in lucee.json.", "yellow");
+			out("");
 		}
 
 		out("Starting Wheels server...", "cyan");
@@ -741,12 +921,44 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels new` arguments from LuCLI's structured argCollection.
+	 *
+	 * `--no-sqlite` arrives as `sqlite=false`; the command's `noSQLite` flag is
+	 * its inverse ("skip the default SQLite setup"). `--no-open-browser` arrives
+	 * as `open-browser=false`. Returns the resolved options plus `isEmpty` so
+	 * the command can distinguish "no args → show usage" from "args but no app
+	 * name → error" (GH #2214).
+	 */
+	private struct function parseNewArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.positional(name = "appName")
+			.option(name = "port", default = 8080, type = "numeric")
+			.option(name = "datasource", default = "")
+			.option(name = "reload-password", default = "")
+			.flag(name = "setup-h2", default = false)
+			.flag(name = "sqlite", default = true)
+			.flag(name = "open-browser", default = true)
+			.parse(arguments.coll);
+
+		return {
+			appName = parsed.appName,
+			port = parsed.port,
+			datasource = parsed.datasource,
+			reloadPassword = parsed["reload-password"],
+			setupH2 = parsed["setup-h2"],
+			noSQLite = !parsed.sqlite,
+			openBrowser = parsed["open-browser"],
+			isEmpty = structIsEmpty(arguments.coll)
+		};
+	}
+
+	/**
 	 * hint: Scaffold a new Wheels project directory
 	 */
 	public string function new() {
-		var args = getArgs(arguments);
+		var opts = parseNewArgs(structuredArgs(arguments));
 
-		if (!arrayLen(args)) {
+		if (opts.isEmpty) {
 			out("Usage: wheels new <appname> [options]", "yellow");
 			out("");
 			out("Creates a new Wheels application in the specified directory.");
@@ -755,7 +967,7 @@ component extends="modules.BaseModule" {
 			out("Options:", "bold");
 			out("  --port=<number>           Server port (default: 8080)");
 			out("  --datasource=<name>       Datasource name (default: app name)");
-			out("  --reload-password=<pw>    Reload password (default: app name)");
+			out("  --reload-password=<pw>    Reload password (default: random)");
 			out("  --no-sqlite               Skip default SQLite database setup");
 			out("  --setup-h2                Use H2 embedded database instead of SQLite");
 			out("  --no-open-browser         Don't open browser on server start");
@@ -767,41 +979,21 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var appName = "";
+		var appName = opts.appName;
 		var options = {
-			port: 8080,
-			datasource: "",
-			reloadPassword: "",
-			setupH2: false,
-			noSQLite: false,
-			openBrowser: true
+			port: opts.port,
+			datasource: opts.datasource,
+			reloadPassword: opts.reloadPassword,
+			setupH2: opts.setupH2,
+			noSQLite: opts.noSQLite,
+			openBrowser: opts.openBrowser
 		};
-
-		// Parse arguments: first non-flag arg is app name, flags are options
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--port=", arg)) {
-				options.port = val(valueAfterEquals(arg));
-			} else if (reFindNoCase("^--datasource=", arg)) {
-				options.datasource = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--reload-password=", arg)) {
-				options.reloadPassword = valueAfterEquals(arg);
-			} else if (arg == "--setup-h2") {
-				options.setupH2 = true;
-			} else if (arg == "--no-sqlite") {
-				options.noSQLite = true;
-			} else if (arg == "--no-open-browser") {
-				options.openBrowser = false;
-			} else if (!arg.startsWith("--") && !len(appName)) {
-				appName = arg;
-			}
-		}
 
 		if (!len(appName)) {
 			out("Error: app name is required.", "red");
 			out("Usage: wheels new <appname>");
-			// Args were supplied (the zero-args branch above already returned
-			// usage help) but none parsed as an app name — e.g. `wheels new
+			// Args were supplied (the empty branch above already returned usage
+			// help) but none parsed as an app name — e.g. `wheels new
 			// --port=3000`. Throw so LuCLI surfaces a non-zero exit (GH #2214).
 			throw(
 				type="Wheels.InvalidArguments",
@@ -824,7 +1016,7 @@ component extends="modules.BaseModule" {
 	 * hint: Create application components (wheels create app <name> [options])
 	 */
 	public string function create() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels create <type> <name> [options]", "yellow");
@@ -848,7 +1040,7 @@ component extends="modules.BaseModule" {
 			default:
 				out("Unknown create type: #type#", "red");
 				out("Run 'wheels create' for available types.");
-				return "";
+				throw(type = "Wheels.InvalidArguments", message = "Unknown create type: #type#");
 		}
 	}
 
@@ -876,12 +1068,12 @@ component extends="modules.BaseModule" {
 			} catch (any jsonErr) {
 				out("Failed to parse routes response", "red");
 				verbose(httpResult);
-				return "";
+				throw(type = "Wheels.RoutesFailed", message = "Failed to parse routes response");
 			}
 
 			if (!structKeyExists(result, "success") || !result.success) {
 				out("Failed to fetch routes: #result.message ?: 'unknown error'#", "red");
-				return "";
+				throw(type = "Wheels.RoutesFailed", message = "Failed to fetch routes: #result.message ?: 'unknown error'#");
 			}
 
 			if (!structKeyExists(result, "routes") || !arrayLen(result.routes)) {
@@ -926,7 +1118,11 @@ component extends="modules.BaseModule" {
 			out("");
 			out("#arrayLen(result.routes)# route(s)", "cyan");
 		} catch (any e) {
-			out("Failed to fetch routes: #e.message#", "red");
+			// Inner Wheels.RoutesFailed paths already printed a diagnostic; only HTTP/unexpected errors need one here.
+			if (e.type != "Wheels.RoutesFailed") {
+				out("Failed to fetch routes: #e.message#", "red");
+			}
+			rethrow;
 		}
 		return "";
 	}
@@ -945,14 +1141,24 @@ component extends="modules.BaseModule" {
 		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
 			out("Project:  #variables.projectRoot#");
 
-			// Detect Wheels version from vendor
-			var versionFile = variables.projectRoot & "/vendor/wheels/events/onapplicationstart/settings.cfm";
+			// Detect the framework version from its authoritative manifest,
+			// vendor/wheels/wheels.json. The historical
+			// events/onapplicationstart/settings.cfm path stopped carrying the
+			// version, so this line silently never rendered. We read the project's
+			// manifest by absolute path (no `wheels` mapping needed) and apply the
+			// same structural placeholder check as wheels.BuildInfo: an unstamped
+			// dev checkout (`@build.version@`) reports as 0.0.0-dev rather than
+			// leaking the raw build token.
+			var versionFile = variables.projectRoot & "/vendor/wheels/wheels.json";
 			if (fileExists(versionFile)) {
 				try {
-					var vContent = fileRead(versionFile);
-					var vMatch = reFindNoCase('version[^"]*"([^"]+)"', vContent, 1, true);
-					if (arrayLen(vMatch.match) > 1) {
-						out("Wheels:   v#vMatch.match[2]#");
+					var manifest = deserializeJSON(fileRead(versionFile));
+					if (isStruct(manifest) && structKeyExists(manifest, "version") && len(manifest.version)) {
+						var fwVersion = manifest.version;
+						if (left(fwVersion, 7) == "@build." && right(fwVersion, 1) == "@") {
+							fwVersion = "0.0.0-dev";
+						}
+						out("Wheels:   v#fwVersion#");
 					}
 				} catch (any e) { /* skip */ }
 			}
@@ -990,7 +1196,10 @@ component extends="modules.BaseModule" {
 			// Count routes
 			var routesFile = variables.projectRoot & "/config/routes.cfm";
 			if (fileExists(routesFile)) {
-				var routeContent = fileRead(routesFile);
+				// Strip comments first so a commented-out .resources(...) isn't
+				// counted (anti-pattern #14 — commented code must not satisfy
+				// substring scans). Mirrors the datasource block above.
+				var routeContent = stripCfmlComments(fileRead(routesFile));
 				var resourceCount = 0;
 				var pos = 1;
 				while (pos > 0) {
@@ -1047,7 +1256,7 @@ component extends="modules.BaseModule" {
 		out('  {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
-		out("  docs/command-line-tools/commands/mcp/mcp-configuration-guide.md");
+		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
 		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");
@@ -1061,21 +1270,26 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels console` arguments. Only `--password=<value>` is consumed; an
+	 * empty result lets the command auto-detect the reload password. The legacy
+	 * arg1-gated getArgs() dropped a bare `--password=x` (no positional), silently
+	 * forcing auto-detection — ArgSpec reads the named value directly. The old
+	 * space-separated `--password <value>` form is dropped for `--password=<value>`:
+	 * LuCLI delivers the space form as a bare flag + a positional, never a named
+	 * value (#2861).
+	 */
+	private struct function parseConsoleArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "password", default = "")
+			.parse(arguments.coll);
+		return { password = parsed.password };
+	}
+
+	/**
 	 * hint: Launch interactive CFML console with Wheels app context (model, service, get)
 	 */
 	public string function console() {
-		var args = getArgs(arguments);
-		var password = "";
-
-		// Parse --password=value
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--password=", arg)) {
-				password = valueAfterEquals(arg);
-			} else if (arg == "--password" && i < arrayLen(args)) {
-				password = args[++i];
-			}
-		}
+		var password = parseConsoleArgs(structuredArgs(arguments)).password;
 
 		// Detect server
 		var serverPort = $requireRunningServer([
@@ -1397,10 +1611,10 @@ component extends="modules.BaseModule" {
 		out("  /models         List all registered models");
 		out("  /routes         List all routes");
 		out("  /version        Show Wheels version");
-		out("  /ds             Show current datasource");
+		out("  /ds, /datasource Show current datasource");
 		out("  /reload         Reload the application");
 		out("  /clear          Clear the screen");
-		out("  /exit, /quit    Exit the console");
+		out("  /exit, /quit, /q Exit the console");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');
@@ -1419,13 +1633,28 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels analyze` arguments. Single positional target (defaults to
+	 * "all"); `hasTarget` distinguishes a bare `wheels analyze` from an explicit
+	 * target so the "not in a project" guard only fires for the bare form.
+	 */
+	private struct function parseAnalyzeArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.positional(name = "target", default = "all")
+			.parse(arguments.coll);
+		return {
+			target = lCase(parsed.target),
+			hasTarget = structKeyExists(arguments.coll, "arg1")
+		};
+	}
+
+	/**
 	 * hint: Analyze Wheels application code for quality issues, anti-patterns, and complexity metrics
 	 */
 	public string function analyze() {
-		var args = getArgs(arguments);
-		var target = arrayLen(args) ? lCase(args[1]) : "all";
+		var opts = parseAnalyzeArgs(structuredArgs(arguments));
+		var target = opts.target;
 
-		if (!arrayLen(args) && !directoryExists(variables.projectRoot & "/app")) {
+		if (!opts.hasTarget && !directoryExists(variables.projectRoot & "/app")) {
 			out("No app/ directory found. Are you in a Wheels project?", "red");
 			return "";
 		}
@@ -1532,18 +1761,69 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels destroy` arguments. Supports both `<type> <name>` (preferred)
+	 * and the legacy `<name> <type>` orderings (issue #2313 / F16) plus the
+	 * `--force` flag. `positionalCount` lets the command show usage when nothing
+	 * was supplied. The smart reorder is business logic that survives the ArgSpec
+	 * migration unchanged — ArgSpec only replaced the hand-rolled token split.
+	 */
+	private struct function parseDestroyArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.flag(name = "force", default = false)
+			.parse(arguments.coll);
+
+		// Collect positionals from every arg<n> value in numeric order. LuCLI
+		// numbers positionals by global token index, so a leading `--force`
+		// leaves a gap (arg2, arg3 with no arg1); gathering by sorted index
+		// keeps the <type>/<name> pair intact wherever `--force` sits.
+		var indices = [];
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				arrayAppend(indices, val(mid(key, 4, len(key))));
+			}
+		}
+		arraySort(indices, "numeric");
+		var positional = [];
+		for (var idx in indices) {
+			var token = trim(arguments.coll["arg" & idx]);
+			if (len(token)) arrayAppend(positional, token);
+		}
+
+		var validTypes = "resource,model,controller,view";
+		var name = "";
+		var type = "resource";
+		if (arrayLen(positional) == 1) {
+			name = positional[1];
+		} else if (arrayLen(positional) >= 2) {
+			var firstArg = positional[1];
+			var secondArg = positional[2];
+			if (listFindNoCase(validTypes, firstArg)) {
+				type = lCase(firstArg);
+				name = secondArg;
+			} else if (listFindNoCase(validTypes, secondArg)) {
+				name = firstArg;
+				type = lCase(secondArg);
+			} else {
+				name = firstArg;
+				type = lCase(secondArg);
+			}
+		}
+
+		return {
+			name = name,
+			type = type,
+			force = parsed.force,
+			positionalCount = arrayLen(positional)
+		};
+	}
+
+	/**
 	 * hint: Remove generated components (resource, model, controller, view)
 	 */
 	public string function destroy() {
-		var args = getArgs(arguments);
+		var opts = parseDestroyArgs(structuredArgs(arguments));
 
-		var positional = [];
-		var force = false;
-		for (var a in args) {
-			if (a == "--force") { force = true; }
-			else { arrayAppend(positional, a); }
-		}
-		if (!arrayLen(positional)) {
+		if (!opts.positionalCount) {
 			out("Usage: wheels destroy <type> <name>", "yellow");
 			out("       wheels destroy <name>          (type defaults to 'resource')", "yellow");
 			out("");
@@ -1561,31 +1841,11 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Smart-parse positionals to support both orderings:
-		//   `<type> <name>` — preferred, matches `wheels generate <type> <name>` and v3 docs index
-		//   `<name> [type]` — legacy form documented in earlier CLI builds
-		// Issue #2313 (F16): users following the docs hit "Unknown type: posts" before this.
-		var validTypes = "resource,model,controller,view";
-		var name = "";
-		var type = "resource";
-		if (arrayLen(positional) == 1) {
-			name = trim(positional[1]);
-		} else {
-			var firstArg = trim(positional[1]);
-			var secondArg = trim(positional[2]);
-			if (listFindNoCase(validTypes, firstArg)) {
-				type = lCase(firstArg);
-				name = secondArg;
-			} else if (listFindNoCase(validTypes, secondArg)) {
-				name = firstArg;
-				type = lCase(secondArg);
-			} else {
-				name = firstArg;
-				type = lCase(secondArg);
-			}
-		}
+		var name = opts.name;
+		var type = opts.type;
+		var force = opts.force;
 
-		if (!listFindNoCase(validTypes, type)) {
+		if (!listFindNoCase("resource,model,controller,view", type)) {
 			out("Unknown type: #type#. Valid types: resource, model, controller, view", "red");
 			return "";
 		}
@@ -1645,7 +1905,14 @@ component extends="modules.BaseModule" {
 	 * hint: Alias for destroy
 	 */
 	public string function d() {
-		return destroy();
+		return destroy(argumentCollection = arguments);
+	}
+
+	/**
+	 * hint: Alias for generate
+	 */
+	public string function g() {
+		return generate(argumentCollection = arguments);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1653,14 +1920,31 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Resolve the --verbose flag shared by `doctor` and `stats`. Named
+	 * `--verbose` (no positional) was dropped by the legacy arg1-gate; ArgSpec
+	 * reads it directly. `-v` is preserved — LuCLI only normalizes --x / --no-x,
+	 * so a short flag arrives as a positional arg<n> value.
+	 */
+	private boolean function parseVerboseFlag(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.flag(name = "verbose", default = false)
+			.parse(arguments.coll);
+		if (parsed.verbose) {
+			return true;
+		}
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key) && arguments.coll[key] == "-v") {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * hint: Run health checks on your Wheels application
 	 */
 	public string function doctor() {
-		var args = getArgs(arguments);
-		var verbose = false;
-		for (var arg in args) {
-			if (arg == "--verbose" || arg == "-v") verbose = true;
-		}
+		var verbose = parseVerboseFlag(structuredArgs(arguments));
 
 		var svc = getService("doctor");
 		var results = svc.runChecks();
@@ -1753,7 +2037,7 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy version                  - show version pinning
 	 */
 	public string function deploy() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var opts = $deployArgsToOptions(args);
 		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
 			opts.configPath = expandPath("config/deploy.yml");
@@ -2062,7 +2346,7 @@ component extends="modules.BaseModule" {
 	 *   wheels packages registry info
 	 */
 	public string function packages() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var opts = $packagesArgsToOptions(args);
 		var positional = $packagesStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
@@ -2263,11 +2547,7 @@ component extends="modules.BaseModule" {
 	 * hint: Show code statistics for your Wheels application
 	 */
 	public string function stats() {
-		var args = getArgs(arguments);
-		var verbose = false;
-		for (var arg in args) {
-			if (arg == "--verbose" || arg == "-v") verbose = true;
-		}
+		var verbose = parseVerboseFlag(structuredArgs(arguments));
 
 		var svc = getService("stats");
 		var data = svc.getStats();
@@ -2321,21 +2601,25 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
+	 * Parse `wheels notes` arguments. Named-only (no positional), so the legacy
+	 * getArgs() arg1-gate dropped --annotations / --custom entirely; ArgSpec
+	 * consumes them directly.
+	 */
+	private struct function parseNotesArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "annotations", default = "TODO,FIXME,OPTIMIZE")
+			.option(name = "custom", default = "")
+			.parse(arguments.coll);
+		return { annotations = parsed.annotations, custom = parsed.custom };
+	}
+
+	/**
 	 * hint: Extract TODO, FIXME, and other annotations from your codebase
 	 */
 	public string function notes() {
-		var args = getArgs(arguments);
-		var annotations = "TODO,FIXME,OPTIMIZE";
-		var custom = "";
-
-		for (var i = 1; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (reFindNoCase("^--annotations=", arg)) {
-				annotations = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--custom=", arg)) {
-				custom = valueAfterEquals(arg);
-			}
-		}
+		var opts = parseNotesArgs(structuredArgs(arguments));
+		var annotations = opts.annotations;
+		var custom = opts.custom;
 
 		var svc = getService("stats");
 		var data = svc.getNotes(annotations, custom);
@@ -2376,7 +2660,7 @@ component extends="modules.BaseModule" {
 	 * hint: Database management commands (reset, status, version)
 	 */
 	public string function db() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels db <command>", "yellow");
@@ -2407,13 +2691,32 @@ component extends="modules.BaseModule" {
 			default:
 				out("Unknown db command: #subcommand#", "red");
 				out("Valid commands: reset, status, version");
-				return "";
+				throw(type = "Wheels.InvalidArguments", message = "Unknown db command: #subcommand#");
 		}
 	}
 
 	// ─────────────────────────────────────────────────
 	//  upgrade — Upgrade assistance
 	// ─────────────────────────────────────────────────
+
+	/**
+	 * Parse `wheels upgrade` arguments. `subcommand` (positional) must be
+	 * "check"; `--to=<version>` selects the target. `sawTo` / `sawDryRun` drive
+	 * the "did you mean" nudge and match both `--to` and `--to=x` (LuCLI maps a
+	 * bare `--to` to to=true and `--to=x` to to=x — either way the key exists).
+	 */
+	private struct function parseUpgradeArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.positional(name = "subcommand", default = "")
+			.option(name = "to", default = "")
+			.parse(arguments.coll);
+		return {
+			isCheck = lCase(parsed.subcommand) == "check",
+			targetVersion = parsed.to,
+			sawTo = structKeyExists(arguments.coll, "to"),
+			sawDryRun = structKeyExists(arguments.coll, "dry-run")
+		};
+	}
 
 	/**
 	 * hint: Scan your app for breaking changes before upgrading Wheels (read-only)
@@ -2431,9 +2734,9 @@ component extends="modules.BaseModule" {
 	 *   wheels upgrade check --to=4.0.0      - scan against a specific target version
 	 */
 	public string function upgrade() {
-		var args = getArgs(arguments);
+		var opts = parseUpgradeArgs(structuredArgs(arguments));
 
-		if (!arrayLen(args) || lCase(args[1]) != "check") {
+		if (!opts.isCheck) {
 			var nl = chr(10);
 			var help = "Usage: wheels upgrade check [--to=<version>]" & nl
 				& nl
@@ -2451,17 +2754,11 @@ component extends="modules.BaseModule" {
 				& "  brew upgrade wheels       (macOS / Homebrew)" & nl
 				& "  scoop update wheels       (Windows / Scoop)" & nl;
 
-			// Detect the two common misfires from the legacy help text and
-			// nudge the user toward the right invocation explicitly.
-			var sawDryRun = false;
-			var sawTo = false;
-			for (var a in args) {
-				if (a == "--dry-run") sawDryRun = true;
-				else if (reFindNoCase("^--to(=|$)", a)) sawTo = true;
-			}
-			if (sawDryRun || sawTo) {
+			// Nudge the two common misfires from the legacy help text toward the
+			// right invocation explicitly (detected during parse).
+			if (opts.sawDryRun || opts.sawTo) {
 				help &= nl & "Did you mean: wheels upgrade check"
-					& (sawTo ? " --to=<version>" : "")
+					& (opts.sawTo ? " --to=<version>" : "")
 					& " ?" & nl;
 			}
 
@@ -2469,14 +2766,7 @@ component extends="modules.BaseModule" {
 			return help;
 		}
 
-		var targetVersion = "";
-		for (var i = 2; i <= arrayLen(args); i++) {
-			if (reFindNoCase("^--to=", args[i])) {
-				targetVersion = valueAfterEquals(args[i]);
-			}
-		}
-
-		return runUpgradeCheck(targetVersion);
+		return runUpgradeCheck(opts.targetVersion);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2487,7 +2777,7 @@ component extends="modules.BaseModule" {
 	 * hint: Browser testing commands (setup, test)
 	 */
 	public string function browser() {
-		var args = getArgs(arguments);
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels browser <command>", "yellow");
@@ -2613,6 +2903,10 @@ component extends="modules.BaseModule" {
 				var viewResult = codegen.generateView(name = controllerName, action = action);
 				if (viewResult.success) {
 					printCreated("app/views/#lCase(controllerName)#/#lCase(action)#.cfm");
+				} else {
+					// Warn instead of silently skipping — a controller reporting
+					// success with no views written is misleading. CLI audit M3.
+					out("  skip    app/views/#lCase(controllerName)#/#lCase(action)#.cfm: " & (viewResult.error ?: "generation failed"), "yellow");
 				}
 			}
 		}
@@ -2655,19 +2949,14 @@ component extends="modules.BaseModule" {
 
 		ensureDirectory(migrationDir);
 
-		// Use the DBMigrate template if available, otherwise inline
-		var templates = getService("templates");
-		var result = templates.generateFromTemplate(
-			template = "dbmigrate/blank.txt",
-			destination = "app/migrator/migrations/#fileName#",
-			context = {migrationName: migrationName}
-		);
-
-		if (!result.success) {
-			// Fallback to inline empty migration
-			var content = buildEmptyMigration(migrationName);
-			fileWrite(filePath, content);
-		}
+		// Always build the migration inline. The shipped codegen template
+		// dbmigrate/blank.txt carries |DBMigrateExtends|/|DBMigrateDescription|
+		// tokens that Templates.cfc never substitutes, so on packaged installs
+		// (where that template resolves) `generate migration` produced an
+		// uncompilable file (literal extends="|DBMigrateExtends|"). The inline
+		// builder emits a correct extends="wheels.migrator.Migration" body and
+		// was already the path every dev-checkout install used. See CLI audit H4.
+		fileWrite(filePath, buildEmptyMigration(migrationName));
 
 		printCreated("app/migrator/migrations/#fileName#");
 		return "";
@@ -2708,6 +2997,7 @@ component extends="modules.BaseModule" {
 			properties = parsed.properties,
 			belongsTo = arrayToList(parsed.belongsTo),
 			hasMany = arrayToList(parsed.hasMany),
+			hasOne = arrayToList(parsed.hasOne),
 			force = force
 		);
 
@@ -2759,6 +3049,14 @@ component extends="modules.BaseModule" {
 			out("Route already exists: #resourceRoute#", "yellow");
 			return "";
 		}
+		// Also detect the named-arg form (e.g. .resources(name="posts", only="...")),
+		// which updateRoutes() treats as a duplicate. Without this, an existing
+		// named-arg route was misreported as "Could not find insertion point". M5.
+		var namedArgPattern = "\.resources\s*\([^)]*name\s*=\s*[""']" & routeName & "[""']";
+		if (reFindNoCase(namedArgPattern, content)) {
+			out("Route already exists: .resources(name=""#routeName#"", ...)", "yellow");
+			return "";
+		}
 
 		// Delegate to Scaffold service for the actual route insertion
 		var scaffold = getService("scaffold");
@@ -2775,15 +3073,20 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function generateTest(required array args) {
-		if (arrayLen(args) < 2) {
-			out("Usage: wheels generate test <type> <Name>", "yellow");
+		// Pull --force out of the positional args so it can appear anywhere.
+		var force = false;
+		var pos = [];
+		for (var a in args) { if (a == "--force") { force = true; } else { arrayAppend(pos, a); } }
+
+		if (arrayLen(pos) < 2) {
+			out("Usage: wheels generate test <type> <Name> [--force]", "yellow");
 			out("  Types: model, controller");
 			out("  Example: wheels generate test model User");
 			return "";
 		}
 
-		var testType = lCase(args[1]);
-		var testName = capitalize(args[2]);
+		var testType = lCase(pos[1]);
+		var testName = capitalize(pos[2]);
 
 		if (!listFindNoCase("model,controller", testType)) {
 			out("Unknown test type: #testType#. Use 'model' or 'controller'.", "red");
@@ -2791,7 +3094,7 @@ component extends="modules.BaseModule" {
 		}
 
 		var codegen = getService("codegen");
-		var result = codegen.generateTest(type = testType, name = testName);
+		var result = codegen.generateTest(type = testType, name = testName, force = force);
 
 		if (result.success) {
 			var relPath = listLast(result.path, "/\");
@@ -2883,7 +3186,8 @@ component extends="modules.BaseModule" {
 			name = modelName,
 			properties = parsed.properties,
 			belongsTo = arrayToList(parsed.belongsTo),
-			hasMany = arrayToList(parsed.hasMany)
+			hasMany = arrayToList(parsed.hasMany),
+			hasOne = arrayToList(parsed.hasOne)
 		);
 
 		if (results.success) {
@@ -3028,10 +3332,18 @@ component extends="modules.BaseModule" {
 			if (arguments.args[i] == "--no-routes") noRoutes = true;
 		}
 
-		var serverPort = $requireRunningServer([
-			"Admin generation requires a running server for model introspection.",
-			"Start one with: wheels start"
-		]);
+		// Write-side guard: admin generation introspects this project's schema
+		// over the server, then writes the generated controller/views into cwd.
+		// Attaching to a sibling app on a common port would scaffold admin
+		// from the WRONG schema into the right project. Refuse the common-port
+		// fallback when no project-bound port is configured.
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Admin generation introspects this project's schema — it requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		// Introspect the model via the server
 		out("Introspecting model: #modelName#...", "cyan");
@@ -3201,7 +3513,7 @@ component extends="modules.BaseModule" {
 			"seed-data": {
 				name: "Seed Data",
 				description: "Database seeding template with seedOnce() examples",
-				hint: "Run seeds with: wheels db:seed.",
+				hint: "Run seeds with: wheels seed.",
 				generate: function(string projectRoot, boolean force) {
 					var created = [];
 
@@ -3334,10 +3646,13 @@ component extends="modules.BaseModule" {
 	// ── Migration Execution ──────────────────────────
 
 	private string function runMigration(required string action) {
-		var serverPort = $requireRunningServer([
-			"Migrations require a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Migrations require a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out("Running migration: #action#...", "cyan");
 
@@ -3416,10 +3731,13 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var serverPort = $requireRunningServer([
-			"Migration reconciliation requires a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Migration reconciliation requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out("Running #verb# for version #version#...", "cyan");
 
@@ -3453,10 +3771,13 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function runRenameSystemTables(boolean dryRun = false) {
-		var serverPort = $requireRunningServer([
-			"Renaming system tables requires a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Renaming system tables requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out(arguments.dryRun ? "Previewing system-table rename..." : "Renaming legacy c_o_r_e_* system tables to wheels_*...", "cyan");
 
@@ -3518,10 +3839,13 @@ component extends="modules.BaseModule" {
 	// ── Seed Execution ──────────────────────────────
 
 	private string function runSeed(string mode = "auto", string environment = "") {
-		var serverPort = $requireRunningServer([
-			"Seeding requires a running server.",
-			"Start one with: wheels start"
-		]);
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Seeding requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
 
 		out("Running database seeds...", "cyan");
 
@@ -3616,7 +3940,7 @@ component extends="modules.BaseModule" {
 			out("Migration Status", "bold");
 			out(repeatString("=", 70));
 
-			var fmt = "%-16s %-30s %-10s %s";
+			var fmt = "%-16s %-30s %-10s %-19s";
 			out(sprintf(fmt, "Version", "Description", "Status", "Applied"));
 			out(repeatString("-", 70));
 
@@ -4176,6 +4500,8 @@ component extends="modules.BaseModule" {
 			out("Scope: #filter#", "cyan");
 		}
 
+		var testsFailed = false;
+
 		try {
 			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
 			// App tests default to running against the <appname>_test
@@ -4213,6 +4539,11 @@ component extends="modules.BaseModule" {
 					default:
 						displayTestResults(result, verboseOutput, resolvedDir);
 				}
+
+				// Record failure so the command can exit non-zero AFTER the output
+				// is flushed. Throwing here would be swallowed by the catch below.
+				// testing.mdx documents a non-zero exit on failure. CLI audit H6.
+				testsFailed = ((result.totalFail ?: 0) + (result.totalError ?: 0)) > 0;
 			} else {
 				// Could be an HTML error page
 				if (reFindNoCase("<html", httpResult)) {
@@ -4225,6 +4556,13 @@ component extends="modules.BaseModule" {
 			}
 		} catch (any e) {
 			out("Test execution failed: #e.message#", "red");
+		}
+
+		// Exit non-zero when specs failed/errored so CI and shells can detect it.
+		// Previously runTests always returned "" → `wheels test` exited 0 even when
+		// tests failed, silently green-lighting broken builds. CLI audit H6.
+		if (testsFailed) {
+			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
 		}
 
 		return "";
@@ -4257,7 +4595,11 @@ component extends="modules.BaseModule" {
 					name: sp.name ?: "(unnamed)",
 					status: sp.status ?: "Failed",
 					failMessage: sp.failMessage ?: "",
-					failOrigin: sp.failOrigin ?: "",
+					// failOrigin can be an array of stack-frame structs, not a
+					// string. Coerce to a string here so the YAML emitter below
+					// (tapEscapeYaml) never receives an array and crashes the
+					// whole TAP run on the first failing spec. See CLI audit H6.
+					failOrigin: $tapOriginString(sp.failOrigin ?: ""),
 					skipped: (sp.status ?: "") == "Skipped"
 				});
 			}
@@ -4319,6 +4661,35 @@ component extends="modules.BaseModule" {
 		return "'" & v & "'";
 	}
 
+	/**
+	 * Coerce a TestBox failOrigin into a single string for the TAP YAML block.
+	 * TestBox reports failOrigin as an array of stack-frame structs (Raw_Trace /
+	 * template+line), but the TAP emitter needs a scalar — passing the array to
+	 * tapEscapeYaml() throws "Cannot cast Array to string" and aborts the run.
+	 * See CLI audit H6.
+	 */
+	private string function $tapOriginString(required any origin) {
+		if (isSimpleValue(arguments.origin)) {
+			return arguments.origin;
+		}
+		if (isArray(arguments.origin) && arrayLen(arguments.origin)) {
+			var first = arguments.origin[1];
+			if (isSimpleValue(first)) {
+				return first;
+			}
+			if (isStruct(first)) {
+				if (structKeyExists(first, "Raw_Trace") && len(first.Raw_Trace)) {
+					return first.Raw_Trace;
+				}
+				var tmpl = first.template ?: "";
+				if (len(tmpl)) {
+					return tmpl & (structKeyExists(first, "line") ? ":" & first.line : "");
+				}
+			}
+		}
+		return "";
+	}
+
 	private void function displayTestResults(
 		required any result,
 		boolean verboseOutput = false,
@@ -4346,7 +4717,7 @@ component extends="modules.BaseModule" {
 		var unloadedSpecPaths = [];
 		if (len(arguments.testDirectory)) {
 			try {
-				var runner = new cli.lucli.services.TestRunner(projectRoot = variables.projectRoot);
+				var runner = new services.TestRunner(projectRoot = variables.projectRoot);
 				var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
 				var loadedCount = (structKeyExists(result, "bundleStats") && isArray(result.bundleStats))
 					? arrayLen(result.bundleStats)
@@ -4493,9 +4864,12 @@ component extends="modules.BaseModule" {
 	// ── New App Scaffolding ──────────────────────────
 
 	private string function scaffoldNewApp(required string appName, struct options = {}) {
+		// variables.cwd is already forward-slash-normalized by init(); the
+		// concat below stays clean on Windows. $safeDirExists is a final
+		// safety net against any cwd that bypasses normalization.
 		var targetDir = variables.cwd & "/" & appName;
 
-		if (directoryExists(targetDir)) {
+		if ($safeDirExists(targetDir)) {
 			out("Directory already exists: #appName#", "red");
 			// Throw so LuCLI exits non-zero instead of silently succeeding and
 			// fooling automation (GH #2214). Done before any files are written.
@@ -4510,6 +4884,7 @@ component extends="modules.BaseModule" {
 			port: structKeyExists(options, "port") ? options.port : 8080,
 			datasource: structKeyExists(options, "datasource") ? options.datasource : lCase(appName),
 			reloadPassword: structKeyExists(options, "reloadPassword") ? options.reloadPassword : generateRandomPassword(),
+			luceeAdminPassword: generateRandomPassword(),
 			setupH2: structKeyExists(options, "setupH2") ? options.setupH2 : false,
 			noSQLite: structKeyExists(options, "noSQLite") ? options.noSQLite : false,
 			openBrowser: structKeyExists(options, "openBrowser") ? options.openBrowser : true
@@ -4556,6 +4931,7 @@ component extends="modules.BaseModule" {
 			"appName": appName,
 			"datasourceName": opts.datasource,
 			"reloadPassword": opts.reloadPassword,
+			"luceeAdminPassword": opts.luceeAdminPassword,
 			"port": opts.port,
 			"shutdownPort": opts.port + 1,
 			"openBrowser": opts.openBrowser ? "true" : "false",
@@ -4602,7 +4978,8 @@ component extends="modules.BaseModule" {
 		out("Configuration:", "bold");
 		out("  Port:            #opts.port#");
 		out("  Datasource:      #opts.datasource#");
-		out("  Reload password: #opts.reloadPassword#");
+		out("  Reload password:      #opts.reloadPassword#");
+		out("  Lucee admin password: (see .env — WHEELS_LUCEE_ADMIN_PASSWORD)");
 		if (opts.setupH2) {
 			out("  Database:        H2 embedded (db/h2/)", "green");
 		} else if (!opts.noSQLite) {
@@ -4964,6 +5341,26 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Read the HTTP port pinned in the project's lucee.json, or 0 if there is no
+	 * lucee.json, no "port" key, or the file can't be parsed. LuCLI writes this
+	 * file on first start and honours its port on subsequent starts, so it is the
+	 * deterministic port to pre-check for a collision before delegating.
+	 */
+	private numeric function $readPinnedPort(required string projectRoot) {
+		var configFile = arguments.projectRoot & "/lucee.json";
+		if (!fileExists(configFile)) return 0;
+		try {
+			var config = deserializeJSON(fileRead(configFile));
+			if (isStruct(config) && structKeyExists(config, "port") && isNumeric(config.port)) {
+				return config.port;
+			}
+		} catch (any e) {
+			// Malformed lucee.json — let LuCLI surface its own parse error.
+		}
+		return 0;
+	}
+
+	/**
 	 * Wipe the per-server Lucee compiled-class cache so the next request
 	 * recompiles every CFC from source. Called from `wheels reload` because
 	 * Lucee's default `inspectTemplate=once` setting prevents source-edit
@@ -5210,8 +5607,8 @@ component extends="modules.BaseModule" {
 		}
 		if (len(trim(override))) {
 			arrayAppend(variables.frameworkSearchPaths, override & "  (from $WHEELS_FRAMEWORK_PATH)");
-			if (directoryExists(override)) {
-				return override;
+			if ($safeDirExists(override)) {
+				return $normalizePath(override);
 			}
 			throw(
 				type="Wheels.FrameworkPathInvalid",
@@ -5224,21 +5621,24 @@ component extends="modules.BaseModule" {
 		if (len(variables.projectRoot)) {
 			var projectCandidate = variables.projectRoot & "/vendor/wheels";
 			arrayAppend(variables.frameworkSearchPaths, projectCandidate);
-			if (directoryExists(projectCandidate)) {
+			if ($safeDirExists(projectCandidate)) {
 				return projectCandidate;
 			}
 		}
 
 		// 3. Module root — if the LuCLI module itself lives inside a wheels
 		//    repo checkout (cli/lucli/), walk up to find vendor/wheels/.
+		//    Normalize each canonical path (Windows: backslashes) to
+		//    forward slashes so concatenation with "/vendor/wheels" stays
+		//    URI-safe — see init().
 		if (len(variables.moduleRoot)) {
 			var File = createObject("java", "java.io.File");
 			var dir = variables.moduleRoot;
 			for (var i = 0; i < 6; i++) {
-				var candidate = File.init(dir).getCanonicalPath();
+				var candidate = $normalizePath(File.init(dir).getCanonicalPath());
 				var frameworkCandidate = candidate & "/vendor/wheels";
 				arrayAppend(variables.frameworkSearchPaths, frameworkCandidate);
-				if (directoryExists(frameworkCandidate)) {
+				if ($safeDirExists(frameworkCandidate)) {
 					return frameworkCandidate;
 				}
 				var parent = File.init(candidate).getParent();
@@ -5429,10 +5829,13 @@ component extends="modules.BaseModule" {
 		var dir = len(trim(cwd)) ? cwd : ".";
 		var File = createObject("java", "java.io.File");
 
-		// Walk up at most 5 levels
+		// Walk up at most 5 levels. Normalize each canonical path to
+		// forward slashes before concatenation — see init() for why mixed
+		// slashes break Lucee 7 on Windows. $safeDirExists guards against
+		// any path that still slips through with a drive-letter scheme.
 		for (var i = 0; i < 5; i++) {
-			var candidate = File.init(dir).getCanonicalPath();
-			if (directoryExists(candidate & "/vendor/wheels")) {
+			var candidate = $normalizePath(File.init(dir).getCanonicalPath());
+			if ($safeDirExists(candidate & "/vendor/wheels")) {
 				return candidate;
 			}
 			// Go up one level
@@ -5442,14 +5845,36 @@ component extends="modules.BaseModule" {
 		}
 
 		// Fallback: use cwd as-is
-		return len(trim(cwd)) ? File.init(cwd).getCanonicalPath() : File.init(".").getCanonicalPath();
+		return $normalizePath(
+			len(trim(cwd)) ? File.init(cwd).getCanonicalPath() : File.init(".").getCanonicalPath()
+		);
 	}
 
 	/**
 	 * Detect the port of a running Wheels dev server.
-	 * Checks lucee.json, .env, and common default ports.
+	 *
+	 * Resolves in priority order: lucee.json `port` field, `.env` PORT
+	 * variable, then a hardcoded common-port probe. When
+	 * `requireProjectConfig` is true the common-port probe is skipped —
+	 * write-side commands (migrate, seed, reconciliation) must only ever
+	 * target the server bound to this project's own config, never a
+	 * sibling app squatting 8080 (issue #2878).
+	 *
+	 * `commonPorts` is a test seam — the spec injects a known port to
+	 * simulate a sibling app deterministically. Production callers always
+	 * get the historical fallback list.
+	 *
+	 * Kept `private`: LuCLI auto-exposes every public, non-hidden Module
+	 * function on the MCP `tools/list` and as a CLI subcommand (see
+	 * metadataGetFunctions.cfs + McpCommand BASE_MODULE_INTERNALS +
+	 * mcpHiddenTools()), so this internal probe must not be public. The
+	 * spec reaches it through TestBox `makePublic()` — see
+	 * cli/lucli/tests/specs/services/ServerDetectionSpec.cfc (#2878 review).
 	 */
-	private any function detectServerPort() {
+	private any function detectServerPort(
+		boolean requireProjectConfig = false,
+		array commonPorts = [8080, 60000, 3000, 8500]
+	) {
 		// 1. Check lucee.json
 		var luceeJson = variables.projectRoot & "/lucee.json";
 		if (fileExists(luceeJson)) {
@@ -5474,10 +5899,17 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		// 3. Try common ports
-		var commonPorts = [8080, 60000, 3000, 8500];
-		for (var port in commonPorts) {
-			if (isPortOpen(port)) return port;
+		// 3. Refuse the common-port fallback for write-side callers — see
+		//    #2878. Without an explicit project-bound port we cannot prove
+		//    the server on 8080 belongs to this project, and silently
+		//    attaching can run a migration against the wrong database.
+		if (arguments.requireProjectConfig) {
+			return false;
+		}
+
+		// 4. Try common ports (read-side only).
+		for (var fallbackPort in arguments.commonPorts) {
+			if (isPortOpen(fallbackPort)) return fallbackPort;
 		}
 
 		return false;
@@ -5489,19 +5921,36 @@ component extends="modules.BaseModule" {
 	 * and throws `Wheels.ServerNotRunning` on failure, so LuCLI's Picocli
 	 * ExecutionExceptionHandler surfaces a non-zero exit instead of the
 	 * previous silent `return ""` (GH #2229).
+	 *
+	 * `requireProjectConfig=true` switches to the strict server-identity
+	 * mode introduced in #2878: write-side commands refuse the common-port
+	 * fallback, so a freshly-scaffolded project without lucee.json/.env
+	 * port config errors loudly instead of attaching to a sibling app.
 	 */
-	private numeric function $requireRunningServer(array hints = []) {
-		var serverPort = detectServerPort();
+	private numeric function $requireRunningServer(array hints = [], boolean requireProjectConfig = false) {
+		var serverPort = detectServerPort(requireProjectConfig = arguments.requireProjectConfig);
 		if (serverPort) return serverPort;
 
 		out("No running Wheels server detected.", "red");
-		var hintList = arrayLen(arguments.hints) ? arguments.hints : ["Start one with: wheels start"];
+		// Fallback hints used only when a caller passes none. Every current
+		// write-side caller passes explicit `hints`, so the requireProjectConfig
+		// arm below is defensive — it keeps the guidance correct for any future
+		// caller that relies on the default.
+		var defaultHints = arguments.requireProjectConfig
+			? [
+				"Write commands refuse to attach to a server not bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			]
+			: ["Start one with: wheels start"];
+		var hintList = arrayLen(arguments.hints) ? arguments.hints : defaultHints;
 		for (var hint in hintList) {
 			out(hint, "yellow");
 		}
 		throw(
 			type="Wheels.ServerNotRunning",
-			message="No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
+			message=arguments.requireProjectConfig
+				? "No running Wheels server detected for this project (set 'port' in lucee.json or PORT in .env, then start with: wheels start)"
+				: "No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
 		);
 	}
 
@@ -5509,11 +5958,13 @@ component extends="modules.BaseModule" {
 	 * Detect the reload password from .env or config/settings.cfm
 	 */
 	private string function detectReloadPassword() {
-		// 1. Check .env for RELOAD_PASSWORD
+		// 1. Check .env for WHEELS_RELOAD_PASSWORD (canonical scaffold name) or
+		//    the legacy unprefixed RELOAD_PASSWORD. The optional prefix keeps
+		//    apps generated before the rename working.
 		var envFile = variables.projectRoot & "/.env";
 		if (fileExists(envFile)) {
 			var envContent = fileRead(envFile);
-			var pwMatch = reFindNoCase("RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
+			var pwMatch = reFindNoCase("(?:WHEELS_)?RELOAD_PASSWORD\s*=\s*([^\r\n]+)", envContent, 1, true);
 			if (arrayLen(pwMatch.match) > 1 && len(trim(pwMatch.match[2]))) {
 				return trim(pwMatch.match[2]);
 			}
@@ -5784,6 +6235,9 @@ component extends="modules.BaseModule" {
 					variables.services.serverRegistry = new services.ServerRegistry(
 						lucliHome = $resolveLucliHome()
 					);
+					break;
+				case "portProbe":
+					variables.services.portProbe = new services.PortProbe();
 					break;
 				default:
 					throw("Unknown service: #name#");

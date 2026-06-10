@@ -30,6 +30,9 @@ component output="false" {
 	// symlink, brew bottle, choco package). See PR #2309 for context.
 	this.mappings["/modules/wheels"] = expandPath("../cli/lucli/");
 
+	// Test double for LuCLI's modules.BaseModule under /wheels/cli/tests — see #2829 / PR #2831.
+	this.mappings["/modules"] = expandPath("../cli/lucli/tests/_modules");
+
 	// We turn on "sessionManagement" by default since the Flash uses it.
 	this.sessionManagement = true;
 

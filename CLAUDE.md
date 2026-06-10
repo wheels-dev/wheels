@@ -25,7 +25,7 @@ plugins/                        DEPRECATED — legacy plugin system; modern pack
 | If you touched | Run | Required? |
 |---|---|---|
 | `vendor/wheels/**` | `bash tools/test-local.sh` (full) or `bash tools/test-local.sh <area>` | Always |
-| `app/**` only | Demo-app specs via `wheels test run` | Always |
+| `app/**` only | Demo-app specs via `wheels test` | Always |
 | `cli/lucli/**` | `bash tools/test-cli-local.sh` | Always |
 | Anything cross-engine-risky (closures, `obj.map()`, reserved scopes, struct literals, mixins) | `tools/test-matrix.sh adobe2023 mysql` AND `tools/test-matrix.sh lucee7 mysql` | If touched code matches any anti-pattern below |
 | Added/changed a migration | `wheels migrate latest && wheels migrate down && wheels migrate up` | Always |
@@ -147,6 +147,8 @@ function authenticate() { ... }
 private function authenticate() { ... }
 ```
 
+Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` throws `Wheels.ActionNotAllowed` → 404 for any action whose name matches one. So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it 404s instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
+
 ### 9. Always cfparam View Variables
 Every variable passed from controller to view needs a cfparam at the top of the view file.
 ```cfm
@@ -169,7 +171,7 @@ items.each(function(i) { result.count++; });
 ### 11. CFML Reserved Scopes Shadow Function Parameters
 **Source:** [#2591](https://github.com/wheels-dev/wheels/pull/2591) — `consoleExec(url, body)` received the URL scope struct in place of the URL string, throwing `Cannot cast Object type [url] to a value of type [string]`.
 
-Reserved scope names in CFML: `url`, `form`, `cgi`, `client`, `session`, `application`, `cookie`, `request`, `server`, `arguments`, `variables`. Naming a function parameter, local var, or argument the same as a scope shadows it but the scope can also win depending on engine and context.
+Reserved scope names in CFML: `url`, `form`, `cgi`, `client`, `session`, `application`, `cookie`, `request`, `server`, `arguments`, `variables`, `local`, `this`. Naming a function parameter, local var, or argument the same as a scope shadows it but the scope can also win depending on engine and context.
 
 ```cfm
 // WRONG
@@ -487,6 +489,7 @@ wheels packages add <name> --force    # overwrite existing
 wheels packages update <name> --yes
 wheels packages update --all --yes
 wheels packages remove <name>
+wheels packages registry info         # registry source + cache age
 wheels packages registry refresh      # bust 24h cache
 ```
 
@@ -586,13 +589,7 @@ var all = am.diffAll({hints: {"User": {renames: {"full_name": "fullName"}}}, heu
 am.writeMigration(d, "rename_name_field");
 ```
 
-```bash
-wheels dbmigrate diff User
-wheels dbmigrate diff User --rename=full_name:fullName
-wheels dbmigrate diff User --write --name=rename_name
-wheels dbmigrate diff --threshold=0.85
-wheels dbmigrate diff --rename=User.full_name:fullName
-```
+_Auto-migration is currently CFC-only (`wheels.migrator.AutoMigrator`, shown above). There is no `wheels dbmigrate diff` CLI command — invoking it errors._
 
 Result struct: `{modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames}`. Limits: PK renames not detected; rename + type change requires separate migrations; calculated properties excluded.
 
@@ -616,11 +613,11 @@ seedOnce(modelName="User", uniqueProperties="email", properties={
 wheels seed                            # auto-detect env (canonical)
 wheels seed --environment=production
 wheels seed --generate                 # legacy: random test data
-wheels generate seed                   # create app/db/seeds.cfm
-wheels generate seed --all             # create seeds.cfm + dev/prod stubs
 ```
 
-`seedOnce()`: idempotent — checks `uniqueProperties` via `findOne()`, creates only if not found. Execution: `seeds.cfm` → `seeds/<environment>.cfm`, wrapped in a transaction. Programmatic: `application.wheels.seeder.runSeeds()`. The legacy `wheels db:seed` is a CommandBox alias — prefer `wheels seed`.
+To scaffold seed templates, use: `wheels generate snippets seed-data` (writes `app/snippets/seeds*.cfm` — copy or move to `app/db/` to activate them). There is no `wheels generate seed` generator.
+
+`seedOnce()`: idempotent — checks `uniqueProperties` via `findOne()`, creates only if not found. Execution: `seeds.cfm` → `seeds/<environment>.cfm`, wrapped in a transaction. Programmatic: `application.wheels.seeder.runSeeds()`. (Note: `wheels db:seed` is NOT a valid command — it errors. Use `wheels seed`.)
 
 ## Background Jobs Quick Reference
 
@@ -706,9 +703,9 @@ Notes:
 {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
 ```
 
-Or run `wheels mcp setup` to generate `.mcp.json` + `.opencode.json`.
+There is no `wheels mcp setup` command — copy the JSON above into `.mcp.json` manually (see the MCP integration guide for OpenCode/Cursor variants).
 
-Tools are auto-discovered from `cli/lucli/Module.cfc` public functions, prefixed with the module name (`wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_reload`, `wheels_seed`, `wheels_analyze`, `wheels_validate`, `wheels_routes`, `wheels_info`, `wheels_destroy`, `wheels_doctor`, `wheels_stats`, `wheels_notes`, `wheels_db`, `wheels_upgrade`, `wheels_create`, `wheels_deploy`). CLI-only tools (`mcp`, `d`, `new`, `console`, `start`, `stop`, `browser`) are hidden via `mcpHiddenTools()`.
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions, prefixed with the module name (`wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_reload`, `wheels_seed`, `wheels_analyze`, `wheels_validate`, `wheels_routes`, `wheels_info`, `wheels_destroy`, `wheels_doctor`, `wheels_stats`, `wheels_notes`, `wheels_db`, `wheels_upgrade`, `wheels_create`, `wheels_deploy`). CLI-only tools (`mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`) are hidden via `mcpHiddenTools()`.
 
 **Deprecated:** the in-dev-server HTTP endpoint at `/wheels/mcp`. Emits a deprecation notice on first request. Migrate to the stdio surface.
 
@@ -723,12 +720,12 @@ Prefer MCP tools when the Wheels MCP server is available. Fall back to CLI other
 | Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
 | Migrate | `wheels_migrate(action="latest\|up\|down\|info\|doctor")` | `wheels migrate latest\|up\|down\|info\|doctor` |
 | Migrator reconciliation | — | `wheels migrate forget\|pretend <version> --yes` (shared dev DB orphan cleanup; see #2780) |
-| Test | `wheels_test()` | `wheels test run` |
+| Test | `wheels_test()` | `wheels test` |
 | Reload | `wheels_reload()` | `?reload=true&password=...` |
-| Server | `wheels_server(action="status")` | `wheels start\|stop\|status` |
+| Server | — | `wheels start\|stop` |
 | Analyze | `wheels_analyze(target="all")` | — |
 | Admin | — | `wheels g admin ModelName` |
-| Seed | — | `wheels seed` (legacy alias: `wheels db:seed`) |
+| Seed | — | `wheels seed` |
 
 ## Reference Docs (verified to exist)
 

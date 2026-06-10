@@ -97,6 +97,64 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("normalizePath()", () => {
+
+				// Regression: GH #2841 — `wheels new`/`wheels start` on Windows
+				// failed with "lucee.runtime.exp.NativeException: there is no
+				// Resource provider available with the name [c]". The CLI
+				// concatenated a Windows-form path (backslashes from
+				// java.io.File.getCanonicalPath()) with "/vendor/wheels" and
+				// fed the mixed-slash result to Lucee's Resource API, which
+				// then parsed "c:" as a URI scheme. Forward-slash normalization
+				// makes the path unambiguous on Windows while being a no-op on
+				// POSIX. Module.$normalizePath() delegates to this method, so
+				// these cases cover the real bootstrap path — not a copy.
+
+				it("converts Windows backslashes to forward slashes", () => {
+					expect(helpers.normalizePath("C:\Users\tim\Projects"))
+						.toBe("C:/Users/tim/Projects");
+				});
+
+				it("leaves POSIX paths unchanged", () => {
+					expect(helpers.normalizePath("/home/runner/work/wheels"))
+						.toBe("/home/runner/work/wheels");
+				});
+
+				it("returns an empty string for empty input", () => {
+					expect(helpers.normalizePath("")).toBe("");
+				});
+
+				it("collapses doubled forward slashes from concatenation", () => {
+					expect(helpers.normalizePath("/a/b//c")).toBe("/a/b/c");
+				});
+
+				it("preserves a Windows drive-letter prefix after normalization", () => {
+					var normalized = helpers.normalizePath("C:\Users\tim\Projects");
+					expect(normalized & "/vendor/wheels")
+						.toBe("C:/Users/tim/Projects/vendor/wheels");
+					// Sanity: no remaining backslash means downstream
+					// directoryExists() won't trip Lucee's scheme parser.
+					expect(find("\", normalized)).toBe(0);
+				});
+
+				it("preserves a UNC network-share prefix", () => {
+					expect(helpers.normalizePath("//server/share/path"))
+						.toBe("//server/share/path");
+				});
+
+				it("collapses doubled slashes inside a UNC path without eating the prefix", () => {
+					expect(helpers.normalizePath("//server//share"))
+						.toBe("//server/share");
+				});
+
+				it("handles a bare double-slash root without a mid() range error", () => {
+					// Degenerate UNC root: rv === "//" makes the internal mid()
+					// count 0. Guarded so it can't trip Lucee 7 (cross-engine #8).
+					expect(helpers.normalizePath("//")).toBe("//");
+				});
+
+			});
+
 		});
 
 	}

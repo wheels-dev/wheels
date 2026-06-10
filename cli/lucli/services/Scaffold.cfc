@@ -27,6 +27,7 @@ component {
 		required array properties,
 		string belongsTo = "",
 		string hasMany = "",
+		string hasOne = "",
 		boolean api = false,
 		boolean tests = true,
 		boolean force = false
@@ -58,6 +59,7 @@ component {
 				properties = props,
 				belongsTo = arguments.belongsTo,
 				hasMany = arguments.hasMany,
+				hasOne = arguments.hasOne,
 				force = arguments.force
 			);
 			if (modelResult.success) {
@@ -127,6 +129,11 @@ component {
 					if (viewResult.success) {
 						arrayAppend(results.generated, {type: "view", path: viewResult.path});
 						arrayAppend(results.rollback, viewResult.path);
+					} else {
+						// Surface the failure instead of silently producing a
+						// "complete" scaffold with no views (e.g. unbundled
+						// templates, #1944). CLI audit M3.
+						arrayAppend(results.skipped, "view " & action & ": " & (viewResult.error ?: "generation failed"));
 					}
 				}
 			}
@@ -364,6 +371,7 @@ component {
 		required array properties,
 		string belongsTo = "",
 		string hasMany = "",
+		string hasOne = "",
 		boolean tests = true,
 		boolean force = false
 	) {
@@ -392,6 +400,7 @@ component {
 				properties = props,
 				belongsTo = arguments.belongsTo,
 				hasMany = arguments.hasMany,
+				hasOne = arguments.hasOne,
 				force = arguments.force
 			);
 			if (modelResult.success) {
@@ -437,8 +446,12 @@ component {
 				}
 			}
 
-			// 5. Update routes with API namespace
-			updateApiRoutes(arguments.name);
+			// 5. Update routes with API namespace.
+			// Use the PLURAL name so the route matches the plural controller
+			// (api/Products.cfc) and table (products) — mirrors updateRoutes(pluralName)
+			// on the non-api scaffold path. Passing singular arguments.name mapped
+			// /api/product and never reached the plural controller.
+			updateApiRoutes(pluralName);
 
 		} catch (any e) {
 			results.success = false;

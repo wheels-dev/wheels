@@ -30,8 +30,8 @@ Calling `wheels upgrade` with no subcommand (or any subcommand other than `check
 
 1. **Reads the current version** from `vendor/wheels/box.json`. If the file is missing or malformed, the version is reported as `unknown` and the comparison below is skipped.
 2. **Resolves the target version.** If you pass `--to=<version>`, that wins. Otherwise the command hits the GitHub releases API (`api.github.com/repos/wheels-dev/wheels/releases/latest`) and strips the leading `v` from the tag name. If the network call fails, the command prints a yellow notice and exits — it will not invent a target.
-3. **Compares major versions.** If current and target share the same major, the command prints "Same major version — no known breaking changes", reminds you of the upgrade command, and exits. No scan runs.
-4. **Runs breaking-change checks** when the major bumps. Each check is either a directory existence test or a regex grep across a sub-tree of the project. Hits are printed as issues (yellow); absences are printed as passed checks (green).
+3. **Compares major versions.** If current and target share the same major, the command notes "Same major version — no known breaking changes" for the major-transition checks, then still runs its advisory scan for the same-major patterns below.
+4. **Runs breaking-change checks.** Each check is either a directory existence test or a regex grep across a sub-tree of the project. Major-version transitions add their own checks on top of the advisory scan. Hits are printed as issues (yellow); absences are printed as passed checks (green).
 
 Nothing in the project is modified. No files are written. The command does not stage, commit, or touch git state.
 
@@ -78,13 +78,14 @@ All Clear (1 checks):
 Upgrade with: brew upgrade wheels
 ```
 
-When current and target share a major version, output collapses to:
+When current and target share a major version, the major-transition note is shown but the advisory scan still runs:
 
 ```text title="illustrative — same-major output"
 Current version: 4.0.0
 Target version:  4.0.1
 
-Same major version — no known breaking changes.
+Same major version — no known breaking changes between majors.
+(advisory scan still runs against the same-major patterns)
 Upgrade with: brew upgrade wheels
 ```
 

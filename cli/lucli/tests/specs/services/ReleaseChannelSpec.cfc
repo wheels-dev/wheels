@@ -38,7 +38,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				});
 
 				it("classifies dev-checkout sentinels as development", () => {
-					expect(rc.classify("@build.version@")).toBe("development");
+					// Assemble the token at runtime so the build's @build.version@
+					// replacer can't clobber this literal (it would become a real
+					// version and classify as stable). Mirrors the production fix. CLI audit H10.
+					expect(rc.classify("@" & "build.version" & "@")).toBe("development");
 					expect(rc.classify("Version not specified")).toBe("development");
 					expect(rc.classify("0.0.0-dev")).toBe("development");
 					expect(rc.classify("")).toBe("development");

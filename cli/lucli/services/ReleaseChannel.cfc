@@ -42,10 +42,18 @@ component {
 	public string function classify(required string moduleVersion) {
 		var v = trim(arguments.moduleVersion);
 
+		// Assemble the sentinel at runtime ("@" & "build.version" & "@") so the
+		// release build's version-token replacer can't clobber this string literal.
+		// If the sentinel were written as the bare literal, the replacer would swap
+		// it for the real version at build time — a stable build would then compare
+		// v against its own version here and misclassify itself as a dev checkout.
+		// (The comment itself avoids the bare token for the same reason.) CLI audit H10.
+		var devToken = "@" & "build.version" & "@";
+
 		// Empty / placeholder / dev-checkout sentinels.
 		if (
 			!len(v)
-			|| v == "@build.version@"
+			|| v == devToken
 			|| v == "Version not specified"
 			|| reFindNoCase("\-dev$", v)
 			|| reFindNoCase("^0\.0\.0", v)

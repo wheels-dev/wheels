@@ -2,6 +2,8 @@
 
 Wheels runs on multiple CFML engines (Lucee 5/6/7, Adobe CF 2018-2025, BoxLang) and databases (H2, MySQL, PostgreSQL, SQL Server, CockroachDB). Each engine has runtime differences that can cause code to pass on one engine but fail on another. This guide documents the known gotchas.
 
+**RustCFML (best-effort, experimental):** [RustCFML](https://github.com/RustCFML/RustCFML) — a young, JVM-free CFML interpreter written in Rust — is recognized as a first-class engine in the adapter layer (`server.coldfusion.productName == "RustCFML"` → `RustCFMLAdapter`), but it is NOT yet part of the CI matrix and cannot fully boot the framework today. The confirmed divergence handled in-framework is the **missing `cfcache` built-in** (the cfcache-backed cache degrades to a no-op via the adapter's `supportsCfcache()=false`). Remaining blockers are tracked upstream — chiefly an argument-scope-fidelity gap (undeclared/`argumentCollection`-forwarded named args lose their names) and no Query-of-Queries — so treat RustCFML support as in-progress.
+
 ## Engine-Specific Gotchas
 
 ### struct.map() Collision (Lucee + Adobe)
@@ -328,6 +330,40 @@ H2 is the embedded database used by default in tests. Key differences:
 - `NOW()` is supported (Wheels normalizes this)
 - Some MySQL-specific functions (e.g., `GROUP_CONCAT`) not available
 - Simpler locking model than production databases
+
+### Auto-Derived Property Casing — `$lowerCaseColumnNames()` Adapter Capability
+
+When a model declares no `property()` mappings, Wheels infers its properties from `cfdbinfo` column metadata. The reported column casing varies by database, so the adapter layer carries a capability flag — `$lowerCaseColumnNames()` on `Base.cfc` — that controls whether the derived property name keeps the reported case or is forced to lowercase. Adapters override this when their database folds unquoted identifiers to a non-meaningful default that would otherwise leak into Wheels-side property names.
+
+| Database | Folding behavior | `$lowerCaseColumnNames()` | Resulting property for column `isHidden` |
+|----------|------------------|---------------------------|-------------------------------------------|
+| SQL Server, MySQL, SQLite | Preserves declared case | `false` (Base default) | `isHidden` |
+| PostgreSQL, CockroachDB | Folds unquoted identifiers to lowercase | `false` (Base default) | `ishidden` (database-reported) |
+| Oracle | Folds unquoted identifiers to UPPERCASE | `true` (override) | `ishidden` (lowercased from `ISHIDDEN`) |
+| H2 | Folds unquoted identifiers to UPPERCASE | `true` (override) | `ishidden` (lowercased from `ISHIDDEN`) |
+
+```cfm
+// vendor/wheels/databaseAdapters/Base.cfc
+public boolean function $lowerCaseColumnNames() {
+    return false;   // preserve reported case by default
+}
+
+// vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc — override
+public boolean function $lowerCaseColumnNames() {
+    return true;    // ISHIDDEN → ishidden (Oracle folds to UPPERCASE)
+}
+
+// vendor/wheels/databaseAdapters/H2/H2Model.cfc — override
+public boolean function $lowerCaseColumnNames() {
+    return true;    // ISHIDDEN → ishidden (H2 folds to UPPERCASE)
+}
+```
+
+**When adding a new database adapter**: check whether the database's unquoted-identifier folding rule produces case the Wheels developer actually declared. If it folds to UPPERCASE (Oracle/H2 family), override `$lowerCaseColumnNames()` to return `true`. If it preserves case (SQL Server/MySQL/SQLite) or folds to lowercase (PostgreSQL/CockroachDB), keep the Base default — the reported name is already the right property name.
+
+**Explicit `property(name=..., column=...)` declarations bypass this entirely** — they always win, regardless of the adapter flag. The capability only affects the auto-derived path.
+
+**Reference**: `vendor/wheels/Model.cfc` (auto-derivation site), `vendor/wheels/databaseAdapters/Base.cfc::$lowerCaseColumnNames`, regression spec `vendor/wheels/tests/specs/model/propertyCasePreservationSpec.cfc`, [#2852](https://github.com/wheels-dev/wheels/pull/2852).
 
 ### Migration Date Functions
 

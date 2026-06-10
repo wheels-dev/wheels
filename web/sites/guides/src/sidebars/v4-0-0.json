@@ -284,7 +284,8 @@
     "link": "/v4-0-0/upgrading/",
     "items": [
       { "label": "Upgrading from 3.x to 4.0", "link": "/v4-0-0/upgrading/3x-to-4x/" },
-      { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0/upgrading/2x-to-3x/" }
+      { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0/upgrading/2x-to-3x/" },
+      { "label": "Reading the Changelog", "link": "/v4-0-0/upgrading/changelog/" }
     ]
   },
   {

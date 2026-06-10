@@ -347,6 +347,46 @@ if phase 2 "wheels new $APP_NAME (covers F3 dup, F4 tree, F1 bundleName)"; then
     else
         fail "vendor/wheels/ missing and no source to bootstrap from"
     fi
+
+    # ──────────────────────────────────────────────────────────────
+    # #2861 / #2855 e2e: `wheels new --no-sqlite` must NOT create a SQLite
+    # datasource. This is the integration assertion the #2856 unit test could
+    # not make — it hand-built {sqlite:"false"} and bypassed LuCLI entirely.
+    # This pins the full chain: real CLI -> LuCLI --no-X normalization ->
+    # ArgSpec -> scaffolder. A regression here means --no-* silently broke.
+    NOSQLITE_APP="${APP_NAME}nosqlite"
+    NOSQLITE_DIR="$TMPDIR/$NOSQLITE_APP"
+    rm -rf "$NOSQLITE_DIR"
+    NOSQLITE_LOG="$TMPDIR/wheels-new-nosqlite.log"
+    if "$WHEELS_CMD" new "$NOSQLITE_APP" --no-sqlite --no-open-browser --port="$PORT" > "$NOSQLITE_LOG" 2>&1; then
+        pass "wheels new --no-sqlite exited 0"
+
+        SQLITE_FILE_COUNT=$(ls "$NOSQLITE_DIR"/db/*.sqlite 2>/dev/null | wc -l | tr -d ' ')
+        if [ "${SQLITE_FILE_COUNT:-0}" -eq 0 ]; then
+            pass "--no-sqlite: no db/*.sqlite files created"
+        else
+            fail "--no-sqlite: ${SQLITE_FILE_COUNT} db/*.sqlite file(s) created — --no-sqlite dropped (#2855/#2861 regression)"
+            ls "$NOSQLITE_DIR"/db/*.sqlite 2>/dev/null | sed 's/^/      /'
+        fi
+
+        NOSQLITE_LJSON="$NOSQLITE_DIR/lucee.json"
+        if [ -f "$NOSQLITE_LJSON" ]; then
+            DS_COUNT=$(python3 -c "import json; print(len(json.load(open('$NOSQLITE_LJSON')).get('configuration',{}).get('datasources',{})))" 2>/dev/null || echo "ERR")
+            if [ "$DS_COUNT" = "0" ]; then
+                pass "--no-sqlite: lucee.json configuration.datasources == {}"
+            elif [ "$DS_COUNT" = "ERR" ]; then
+                skip "--no-sqlite: could not parse lucee.json datasources (python3 missing?)"
+            else
+                fail "--no-sqlite: lucee.json has ${DS_COUNT} datasource(s) — expected 0 (#2855/#2861 regression)"
+            fi
+        else
+            skip "--no-sqlite: lucee.json not present (template change?)"
+        fi
+    else
+        fail "wheels new --no-sqlite failed (see $NOSQLITE_LOG)"
+        tail -20 "$NOSQLITE_LOG" | sed 's/^/      /'
+    fi
+    rm -rf "$NOSQLITE_DIR"
 fi
 
 # ══════════════════════════════════════════════════
@@ -404,7 +444,7 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
             if curl -fsSL "$SQLITE_JDBC_URL" -o "$LUCEE_LIB/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"; then
                 pass "sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar dropped into $LUCEE_LIB"
                 # Reload the app so Lucee picks up the new bundle.
-                local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+                local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
                 curl -s -o /dev/null --max-time 60 "http://localhost:$PORT/?reload=true&password=$local_password" || true
                 sleep 3
             else
@@ -484,7 +524,7 @@ CFML
     [ -f "$MIGRATION_FILE" ] && pass "ch02 migration written" || fail "could not write migration"
 
     # Reload so the framework sees the new migration file.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
@@ -560,7 +600,7 @@ seedOnce(modelName="Post", uniqueProperties="title", properties={
 CFML
 
     # Reload so the framework sees the seed file.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
@@ -662,7 +702,7 @@ CFML
     pass "ch02-ch03 model/controller/views/routes written"
 
     # Reload
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
@@ -802,7 +842,7 @@ CFML
     [ -f "$SPEC_FILE" ] && pass "smoke spec written" || fail "could not write smoke spec"
 
     # Reload so the framework sees the new spec.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 1
 
@@ -1046,7 +1086,7 @@ if phase 15 "dev toolbar shows real version (issue #2333)"; then
     # Earlier phases' generate/destroy probes can leave the framework in a
     # half-reloaded state — reload first so the homepage is rendered fresh
     # rather than from a stale-cache state.
-    local_password=$(grep -E '^RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
+    local_password=$(grep -E '^(WHEELS_)?RELOAD_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "wheels")
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 

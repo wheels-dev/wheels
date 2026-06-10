@@ -63,6 +63,14 @@ jobs:
         run: pnpm --filter @wheels-dev/site-${{ matrix.site }} build
 
       - name: Deploy to Cloudflare Pages
+        # Dependabot-triggered runs can't read repository secrets (they use
+        # the separate Dependabot secrets store), so CLOUDFLARE_API_TOKEN is
+        # empty and wrangler aborts with a non-interactive-auth error — which
+        # red-X'd every Dependabot PR touching web/**. Skip the publish for
+        # Dependabot: the Build step above still runs and validates the bump;
+        # we just don't push a per-PR preview deploy for it. Non-PR events
+        # (push to develop, repository_dispatch) keep deploying as before.
+        if: github.actor != 'dependabot[bot]'
         working-directory: web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -284,6 +292,7 @@ jobs:
       # the non-blog regression is fixed.
       - name: Commit pre-refreshed blog baseline
         if: |
+          github.event_name == 'push' &&
           needs.detect-scope.outputs.blog_content_changed == 'true' &&
           steps.regress.outcome == 'success'
         run: |

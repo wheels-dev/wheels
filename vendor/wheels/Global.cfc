@@ -109,6 +109,13 @@ component output="false" {
 	public any function $cache() {
 		// If cache is found only the function is aborted, not page. --->
 		variables.$instance.reCache = false;
+		// Engines without the `cfcache` built-in (e.g. RustCFML) can't back
+		// the template/static cache. Degrade to a no-op: leaving reCache=true
+		// means the request still renders normally, just without this layer.
+		if ($hasEngineAdapter() && !$engineAdapter().supportsCfcache()) {
+			variables.$instance.reCache = true;
+			return;
+		}
 		local.args = {};
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
@@ -3016,6 +3023,12 @@ return local.$wheels;
 			local.minimumMinor = "0";
 			local.minimumPatch = "10";
 			local.minimumBuild = "314028";
+		} else if (arguments.engine == "RustCFML") {
+			// RustCFML is a pre-1.0, rapidly evolving experimental engine that
+			// Wheels supports on a best-effort basis. Accept any version (leave
+			// local.rv = "") rather than enforcing a minimum; per-version
+			// divergences are tracked via the RustCFMLAdapter capabilities.
+			local.rv = "";
 		} else {
 			local.rv = false;
 		}
@@ -3913,6 +3926,49 @@ return local.$wheels;
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Build the comma-list of public framework helper names that get mixed onto
+	 * every controller (from `wheels.Global` + `wheels.controller.*` +
+	 * `wheels.view.*`). Stored on `application.wheels.protectedControllerMethods`
+	 * and consumed by `$callAction()` to reject URL dispatch to framework
+	 * helpers like `env()`, `model()`, `redirectTo()` (issue ##2844).
+	 *
+	 * Derived from `getMetaData().functions` on each source component, mirroring
+	 * what `$integrateComponents` mixes onto a controller. `$`-prefixed names
+	 * are already gated separately and are excluded here.
+	 */
+	public string function $buildProtectedControllerMethods() {
+		var protectedMethods = "";
+		var sources = ["wheels.Global"];
+		var mixinPaths = ["wheels.controller", "wheels.view"];
+		for (var basePath in mixinPaths) {
+			var folder = ExpandPath("/" & Replace(basePath, ".", "/", "all"));
+			if (!DirectoryExists(folder)) {
+				continue;
+			}
+			var files = DirectoryList(folder, false, "name", "*.cfc");
+			for (var fileName in files) {
+				ArrayAppend(sources, basePath & "." & Replace(fileName, ".cfc", "", "all"));
+			}
+		}
+		for (var componentPath in sources) {
+			var meta = GetMetaData(CreateObject("component", componentPath));
+			if (!StructKeyExists(meta, "functions")) {
+				continue;
+			}
+			for (var fn in meta.functions) {
+				if (
+					StructKeyExists(fn, "access") && fn.access == "public"
+					&& Left(fn.name, 1) != "$"
+					&& !ListFindNoCase(protectedMethods, fn.name)
+				) {
+					protectedMethods = ListAppend(protectedMethods, fn.name);
+				}
+			}
+		}
+		return protectedMethods;
 	}
 
 	/**

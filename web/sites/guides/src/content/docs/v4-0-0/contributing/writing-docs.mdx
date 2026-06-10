@@ -24,7 +24,7 @@ The v4 guides live in `web/sites/guides/` as a Starlight site. Every page is an 
 
 ## Site layout
 
-Every published page lives under a versioned content folder. The v4.0.0 stable docs are at `v4-0-0/`; the next in-development snapshot, `v4-0-1-snapshot/` (cloned from `v4-0-0/` at GA time, diverges as fixes/features land), sits beside it.
+Every published page lives under a versioned content folder. The 4.0 line's docs live at `v4-0-0/`. Because the site deploys from the `develop` branch, in-progress edits for the next 4.0.x patch land directly in that folder and promote to `main` at release — there is no parallel snapshot folder for a patch. A separate `*-snapshot/` folder appears only when a *different* minor or major (e.g. `v4-1-snapshot/`) is under development.
 
 <FileTree>
 - web/sites/guides/

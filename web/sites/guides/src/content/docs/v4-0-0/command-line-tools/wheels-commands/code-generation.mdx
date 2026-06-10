@@ -64,7 +64,7 @@ The other generators (`controller`, `view`, `migration`, `route`, `test`, `helpe
 | `publishedOn:date` | `date` | |
 | `startsAt:time` | `time` | |
 | `payload:binary` | `binary` | |
-| `--belongsTo=author` | — | Adds `belongsTo(name="author")` and an `authorId` FK column. |
+| `--belongsTo=author` | — | Adds `belongsTo("author")` and an `authorId` FK column. |
 | `--hasMany=comments` | — | Adds `hasMany(name="comments")`. Pass multiple names comma-separated. |
 | `--hasOne=profile` | — | Adds `hasOne(name="profile")`. |
 
@@ -186,7 +186,7 @@ wheels generate scaffold Post title body:text publishedAt:datetime --belongsTo=a
 
 Writes:
 
-- `app/models/Post.cfc` with `belongsTo(name="author")`
+- `app/models/Post.cfc` with `belongsTo("author")`
 - `app/migrator/migrations/<timestamp>_create_posts_table.cfc` with `title`, `body`, `publishedAt`, `authorId`, and the `timestamps()` trio
 - `app/controllers/Posts.cfc` with the seven CRUD actions
 - `app/views/posts/index.cfm`, `show.cfm`, `new.cfm`, `edit.cfm`, `_form.cfm`
@@ -395,7 +395,7 @@ Generates the model, migration, controller, views, tests, and route; migrates th
 wheels generate model Comment body:text --belongsTo=post
 ```
 
-Creates `Comment.cfc` with `belongsTo(name="post")`, plus a migration that includes a `postId` foreign-key column. Useful when you want the association wired up but don't need a controller or views yet.
+Creates `Comment.cfc` with `belongsTo("post")`, plus a migration that includes a `postId` foreign-key column. Useful when you want the association wired up but don't need a controller or views yet.
 
 ### A blank migration for a hand-written schema change
 

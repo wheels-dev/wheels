@@ -21,6 +21,24 @@ component extends="wheels.databaseAdapters.Abstract" {
 	}
 
 	/**
+	 * generates sql fragment for inline foreign key constraint definition,
+	 * used by ForeignKeyDefinition.toForeignKeySQL() (which Abstract.createTable()
+	 * splices into the CREATE TABLE body). Without this, any `t.references()`
+	 * or scaffold `--belongsTo=` on PostgreSQL throws at migrate time. See #2876.
+	 */
+	public string function addForeignKeyOptions(required string sql, struct options = {}) {
+		arguments.sql = arguments.sql & " FOREIGN KEY (" & arguments.options.column & ")";
+		if (StructKeyExists(arguments.options, "referenceTable")) {
+			if (StructKeyExists(arguments.options, "referenceColumn")) {
+				arguments.sql = arguments.sql & " REFERENCES ";
+				arguments.sql = arguments.sql & arguments.options.referenceTable;
+				arguments.sql = arguments.sql & " (" & arguments.options.referenceColumn & ")";
+			}
+		}
+		return arguments.sql;
+	}
+
+	/**
 	 * generates sql for primary key options
 	 */
 	public string function addPrimaryKeyOptions(required string sql, struct options = {}) {

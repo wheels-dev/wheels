@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: wheels test and wheels browser install — run the test suite from the command line, filter to specific directories, and install Playwright so browser specs can run.
+description: wheels test and wheels browser setup — run the test suite from the command line, filter to specific directories, and install Playwright so browser specs can run.
 type: reference
 sidebar:
   order: 5
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Two commands cover the testing surface at the CLI level. `wheels test` runs the BDD suite against your chosen engine and database, and `wheels browser install` downloads the Playwright JARs and Chromium needed for browser specs.
+Two commands cover the testing surface at the CLI level. `wheels test` runs the BDD suite against your chosen engine and database, and `wheels browser setup` downloads the Playwright JARs and Chromium needed for browser specs.
 
 **You'll use this for:**
 
@@ -55,6 +55,7 @@ A bare positional argument is treated as the filter directory — `wheels test m
 | Flag | Description |
 |---|---|
 | `--filter=<dir>` | Substring or path match against spec directories. Narrows the run to a subset (e.g., `models`, `controller`, `browser`). Bare names are auto-prefixed (`models` → `tests.specs.models`). Also accepted as a positional arg. |
+| `--directory=<dir>` | Alias for `--filter` (tutorial chapter 7). When both are supplied, `--directory` wins. |
 | `--db=<engine>` | Database engine for `--core` matrix runs only. Ignored for app tests (with a warning) — see [below](#testing-against-different-engines). |
 | `--reporter=<name>` | `simple` (default, colourful), `json` (raw runner JSON), `tap` (TAP v13 for CI consumers). |
 | `--verbose`, `-v` | Print per-spec output instead of the summary line. |
@@ -96,7 +97,7 @@ App tests run against your project's configured datasource. To run the same suit
 
 ```cfm {test:compile} title="config/settings.cfm"
 <cfscript>
-set(dataSourceName=application.wo.env("WHEELS_DATASOURCE", "myapp"));
+set(dataSourceName=env("WHEELS_DATASOURCE", "myapp"));
 </cfscript>
 ```
 
@@ -112,35 +113,36 @@ This mirrors how Rails (`DATABASE_URL=...`), Laravel (`DB_CONNECTION=...`), Symf
 
 For full-matrix CI (every engine × every database), see [`tools/test-matrix.sh`](../../../testing/ci-integration/) — it spins up the engine + DB containers and invokes the test endpoint per cell.
 
-### `wheels browser install`
+### `wheels browser setup`
 
 Download the Playwright Java JARs and a Chromium binary into `.wheels/browser/` so browser specs can run. This is a one-time setup per workspace — roughly 370MB on first install.
 
 #### Synopsis
 
 ``` title="synopsis"
-wheels browser install [--force] [--browser=<name>]
+wheels browser setup [--force]
 ```
 
-`wheels browser` is an umbrella that also exposes a `test` subcommand for running only the browser spec directory. Most users only need `install` at the CLI level and then run browser specs through the normal `wheels test` path.
+`wheels browser` is an umbrella that also exposes a `test` subcommand (`wheels browser test`) for running only the browser spec directory. Most users only need `setup` at the CLI level and then run browser specs through the normal `wheels test` path.
 
 #### Flags
 
 | Flag | Description |
 |---|---|
 | `--force` | Re-download every JAR even if the local SHA-256 matches the manifest. Useful after a manifest bump. |
-| `--browser=<name>` | Which browser engine to install. Defaults to `chromium`, which is the only engine wired into the browser DSL today. |
+
+Chromium is the only engine wired into the browser DSL today; `wheels browser test` does not yet support selecting Firefox or WebKit.
 
 #### Example
 
 ```bash title="example"
-wheels browser install
+wheels browser setup
 ```
 
 Reads `vendor/wheels/browser-manifest.json`, downloads each missing or mismatched JAR, verifies SHA-256, and installs a matching Chromium build. Subsequent runs skip files that already match the manifest.
 
-<Aside type="note" title="When install is required">
-Specs that extend `wheels.wheelstest.BrowserTest` short-circuit gracefully when the JARs aren't present — they mark themselves skipped rather than failing. Run `wheels browser install` once per workspace before you expect browser specs to actually exercise the DSL. The [Browser Tests](../../../testing/browser-tests/) guide covers the `WHEELS_BROWSER_CI_ENABLE` gate that controls the same behavior in CI.
+<Aside type="note" title="When setup is required">
+Specs that extend `wheels.wheelstest.BrowserTest` short-circuit gracefully when the JARs aren't present — they mark themselves skipped rather than failing. Run `wheels browser setup` once per workspace before you expect browser specs to actually exercise the DSL. The [Browser Tests](../../../testing/browser-tests/) guide covers the `WHEELS_BROWSER_CI_ENABLE` gate that controls the same behavior in CI.
 </Aside>
 
 ## Common workflows
@@ -156,7 +158,7 @@ wheels test --filter=models
 wheels test --ci --db=sqlite
 
 # First-time browser setup, then exercise the browser specs
-wheels browser install
+wheels browser setup
 wheels test --filter=browser
 ```
 

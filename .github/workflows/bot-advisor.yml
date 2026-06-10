@@ -98,8 +98,17 @@ jobs:
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
+          # Thread the head SHA resolved in "Resolve PR head ref + SHA" — the
+          # exact commit the Checkout step pinned — into the prompt as a second
+          # argument. The advisor emits its idempotency + convergence markers
+          # from this value instead of re-deriving it with `gh pr view`, which
+          # races with pushes landing mid-session and left the marker pointing
+          # at the wrong commit (issue #2848). The Run step's Bash allowlist is
+          # gh + read-only git (no echo/printenv), so the model can't read a
+          # step env var — the SHA must travel in the prompt text, the same
+          # channel the PR number already uses.
           prompt: |
-            /advise-on-deadlock ${{ env.PR_NUMBER }}
+            /advise-on-deadlock ${{ env.PR_NUMBER }} ${{ steps.pr.outputs.sha }}
           claude_args: |
             --model claude-opus-4-7
             --max-turns 500

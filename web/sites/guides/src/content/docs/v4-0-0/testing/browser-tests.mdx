@@ -24,7 +24,7 @@ Browser tests drive a real Chromium through Playwright. They click buttons, type
 
 ## Install Playwright
 
-Browser tests require Playwright's Java client plus Chromium. The `wheels browser install` command downloads both (~370MB one-time) and verifies SHA-256 hashes.
+Browser tests require Playwright's Java client plus Chromium. The `wheels browser setup` command downloads both (~370MB one-time) and verifies SHA-256 hashes.
 
 ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
 wheels --version
@@ -33,10 +33,10 @@ wheels --version
 Then, inside your project:
 
 ```bash title="shell"
-wheels browser install
+wheels browser setup
 ```
 
-The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download, or `--browser=firefox|webkit` to install a different engine (Chromium is the default).
+The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download. Chromium is the only engine the browser DSL wires today — Firefox and WebKit are not yet selectable.
 
 If Playwright isn't installed when a spec runs, `BrowserTest.beforeAll` catches the missing-JAR error, sets `this.browserTestSkipped = true`, and the suite stays green. That's the safety net for CI cold starts and fresh dev machines — but every `it` in a browser spec still needs to check the flag.
 
@@ -176,7 +176,13 @@ component extends="wheels.wheelstest.BrowserTest" {
 
 ## The DSL — auth fixtures
 
-`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode and sets `session.userId` and `session.userEmail` server-side — no real login form, no password hashing, no redirect handshake. Use it when the spec's intent is "what does an authenticated user see", not "what does the login form do". All `/_browser/*` fixture routes appear under the **Internal** tab in the Routes UI (`/wheels/routes`), not Application — they are framework-owned and do not correspond to files in your app.
+`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode. The default handler writes `session.userId = 1` and `session.userEmail = identifier` — enough for simple apps. If your app stores a richer session shape (e.g. `session.member = { id, email, firstName, lastName }`), add one line to `config/settings.cfm`:
+
+```cfm title="config/settings.cfm"
+set(browserLoginAsHandler = "AuthFixture##loginAs");
+```
+
+The framework dispatches `/_browser/login-as` to that controller##action instead of the built-in one. Your controller is a normal Wheels controller with full access to `params`, `session`, `model()`, and `inject()`. Env-gating is handled by `wheels.middleware.BrowserTestFixtureGuard` on the `/_browser` scope — your handler does not need to re-implement the guard. Remove the setting or set it to an empty string to fall back to the default. No real login form, no password hashing, no redirect handshake. Use `loginAs` when the spec's intent is "what does an authenticated user see", not "what does the login form do". All `/_browser/*` fixture routes appear under the **Internal** tab in the Routes UI (`/wheels/routes`), not Application — they are framework-owned and do not correspond to files in your app.
 
 ```cfm {test:compile} title="tests/specs/browser/AuthenticatedSpec.cfc"
 component extends="wheels.wheelstest.BrowserTest" {
