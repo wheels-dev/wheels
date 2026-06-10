@@ -21,6 +21,8 @@ brew install wheels
 wheels new myapp
 ```
 
+Homebrew 5.1+ asks you to trust third-party taps on first use — run `brew trust wheels-dev/wheels` once if prompted.
+
 The CLI is powered by [LuCLI](https://github.com/cybersonic/LuCLI) — it ships with Lucee and depends only on Java 21, so no CommandBox install is required.
 
 ### Learning Wheels

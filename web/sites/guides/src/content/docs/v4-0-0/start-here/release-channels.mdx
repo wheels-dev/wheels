@@ -58,6 +58,8 @@ brew install wheels
 brew install wheels-be
 ```
 
+Homebrew 5.1+ asks you to trust third-party taps on first use — run `brew trust wheels-dev/wheels` once if prompted (one trust covers both formulas).
+
 The two formulas are mutually exclusive — both expose the `wheels` binary, so Homebrew refuses to install both at once. To switch channels, uninstall one and install the other (see [Switching channels](#switching-channels) below).
 
 </TabItem>
