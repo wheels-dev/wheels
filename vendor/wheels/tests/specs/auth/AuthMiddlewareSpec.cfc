@@ -143,6 +143,45 @@ component extends="wheels.WheelsTest" {
 					expect(result).toBe("OK");
 				});
 
+				it("surfaces a wiring error when restricted to only unregistered strategies", function() {
+					// Regression: the middleware's own strategy loop silently
+					// continued past unregistered names, so a route restricted to a
+					// missing/misspelled strategy yielded a generic 401 instead of
+					// surfacing the wiring error. Filtering is now delegated to the
+					// Authenticator, which names the unknown strategies.
+					var auth = new wheels.auth.Authenticator();
+					auth.registerStrategy(name = "pass", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
+
+					var mw = new wheels.middleware.AuthMiddleware(authenticator = auth, strategies = "nonexistent");
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+
+					var result = pipeline.run(request = {}, coreHandler = function(required struct request) {
+						return "should not reach";
+					});
+
+					var parsed = DeserializeJSON(result);
+					expect(parsed.status).toBe(401);
+					expect(parsed.error).toInclude("nonexistent");
+					expect(parsed.error).toInclude("Registered strategies");
+				});
+
+				it("surfaces the zero-strategies diagnostic on the restricted path", function() {
+					// Regression: the restricted path lacked the Authenticator's
+					// zero-strategies diagnostic, masking wiring bugs as generic 401s.
+					var auth = new wheels.auth.Authenticator();
+
+					var mw = new wheels.middleware.AuthMiddleware(authenticator = auth, strategies = "token");
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+
+					var result = pipeline.run(request = {}, coreHandler = function(required struct request) {
+						return "should not reach";
+					});
+
+					var parsed = DeserializeJSON(result);
+					expect(parsed.status).toBe(401);
+					expect(parsed.error).toInclude("No authentication strategies registered");
+				});
+
 			});
 
 			describe("allowAnonymous mode", function() {

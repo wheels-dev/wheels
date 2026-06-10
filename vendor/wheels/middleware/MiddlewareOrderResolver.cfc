@@ -25,16 +25,14 @@ component output="false" {
 			return arguments.entries;
 		}
 
-		// 1. Normalize: assign name and priority to each entry.
+		// 1. Normalize: assign a unique name and priority to each entry
+		//    (duplicate names are warned about and suffixed).
 		local.named = $normalizeEntries(arguments.entries);
 
-		// 2. Detect duplicate names and warn.
-		$warnDuplicateNames(local.named);
-
-		// 3. Build adjacency list and in-degree map from before/after constraints.
+		// 2. Build adjacency list and in-degree map from before/after constraints.
 		local.graph = $buildGraph(local.named);
 
-		// 4. Topological sort with priority tiebreaker (Kahn's algorithm).
+		// 3. Topological sort with priority tiebreaker (Kahn's algorithm).
 		local.sorted = $topologicalSort(local.named, local.graph);
 
 		return local.sorted;
@@ -42,9 +40,16 @@ component output="false" {
 
 	/**
 	 * Assign a resolved name and numeric priority to each entry.
+	 * Duplicate names are warned about and suffixed so every graph node stays
+	 * unique: duplicates would otherwise collapse into a single node, making
+	 * the topological sort mis-diagnose the unvisited remainder as a circular
+	 * dependency and fall back to priority-only ordering, discarding all
+	 * before/after constraints. Constraints that reference a duplicated name
+	 * apply to the first registration only.
 	 */
 	private array function $normalizeEntries(required array entries) {
 		local.result = [];
+		local.seen = {};
 		for (local.entry in arguments.entries) {
 			local.opts = StructKeyExists(local.entry, "options") ? local.entry.options : {};
 
@@ -58,6 +63,28 @@ component output="false" {
 			} else {
 				local.resolvedName = "middleware_#CreateUUID()#";
 			}
+
+			// Registrant shown in duplicate-name warnings (pluginName may be absent).
+			local.registrant = StructKeyExists(local.entry, "pluginName") && Len(Trim(local.entry.pluginName)) ? local.entry.pluginName : local.resolvedName;
+
+			// Duplicate name: warn and rename this entry to a unique node name.
+			local.dupKey = LCase(local.resolvedName);
+			if (StructKeyExists(local.seen, local.dupKey)) {
+				WriteLog(
+					type = "warning",
+					text = "Wheels middleware ordering: duplicate name '#local.resolvedName#' — "
+						& "registered by '#local.seen[local.dupKey]#' and '#local.registrant#'. "
+						& "Both entries are kept, but before/after constraints referencing "
+						& "'#local.resolvedName#' apply to the first registration only. "
+						& "Use unique names to avoid ambiguous ordering."
+				);
+				local.suffix = 2;
+				while (StructKeyExists(local.seen, LCase(local.resolvedName & "__dup" & local.suffix))) {
+					local.suffix++;
+				}
+				local.resolvedName = local.resolvedName & "__dup" & local.suffix;
+			}
+			local.seen[LCase(local.resolvedName)] = local.registrant;
 
 			// Priority: numeric option or default 10.
 			local.priority = 10;
@@ -95,25 +122,6 @@ component output="false" {
 			return ListToArray(local.val);
 		}
 		return [];
-	}
-
-	/**
-	 * Log warnings for duplicate middleware names.
-	 */
-	private void function $warnDuplicateNames(required array named) {
-		local.seen = {};
-		for (local.item in arguments.named) {
-			local.key = LCase(local.item.name);
-			if (StructKeyExists(local.seen, local.key)) {
-				WriteLog(
-					type = "warning",
-					text = "Wheels middleware ordering: duplicate name '#local.item.name#' — "
-						& "registered by plugin '#local.seen[local.key]#' and '#local.item.entry.pluginName#'. "
-						& "Use unique names to avoid ambiguous ordering."
-				);
-			}
-			local.seen[local.key] = StructKeyExists(local.item.entry, "pluginName") ? local.item.entry.pluginName : local.item.name;
-		}
 	}
 
 	/**

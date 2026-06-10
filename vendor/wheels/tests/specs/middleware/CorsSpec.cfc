@@ -187,6 +187,22 @@ component extends="wheels.WheelsTest" {
 					expect(local.cors.$resolveAllowOrigin("")).toBe("");
 				});
 
+				it("matches origins listed with surrounding whitespace in allowOrigins", function() {
+					// Regression: the raw comma list was matched without trimming, so
+					// "https://a.example, https://b.example" kept the leading space in
+					// the second list element and that origin silently never matched.
+					local.cors = new wheels.middleware.Cors(
+						allowOrigins = "https://a.example, https://b.example"
+					);
+					expect(local.cors.$resolveAllowOrigin("https://b.example")).toBe("https://b.example");
+					expect(local.cors.$resolveAllowOrigin("https://a.example")).toBe("https://a.example");
+				});
+
+				it("matches a single origin configured with surrounding whitespace", function() {
+					local.cors = new wheels.middleware.Cors(allowOrigins = " https://only.example ");
+					expect(local.cors.$resolveAllowOrigin("https://only.example")).toBe("https://only.example");
+				});
+
 			});
 
 			describe("wildcard + credentials validation", function() {
@@ -194,6 +210,12 @@ component extends="wheels.WheelsTest" {
 				it("throws when allowOrigins is wildcard and allowCredentials is true", function() {
 					expect(function() {
 						new wheels.middleware.Cors(allowOrigins = "*", allowCredentials = true);
+					}).toThrow("Wheels.Cors.InvalidConfiguration");
+				});
+
+				it("throws when allowOrigins is wildcard with surrounding whitespace and allowCredentials is true", function() {
+					expect(function() {
+						new wheels.middleware.Cors(allowOrigins = " * ", allowCredentials = true);
 					}).toThrow("Wheels.Cors.InvalidConfiguration");
 				});
 
