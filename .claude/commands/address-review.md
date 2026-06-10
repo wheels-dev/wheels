@@ -18,7 +18,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 - Run tests via `bash tools/test-local.sh` for `fix/bot-*` PRs after
   changes.
 - For `docs/bot-*` PRs, restrict edits to doc paths only —
-  `web/sites/guides/`, `.ai/wheels/`, `CLAUDE.md`, `CHANGELOG.md`.
+  `web/sites/guides/`, `.ai/wheels/`, `CLAUDE.md`, `changelog.d/`.
 - Output is **commits to the PR branch** plus **one comment on the
   PR** summarizing what you addressed.
 
@@ -105,7 +105,8 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 
 4. **Branch-aware scope check.** Read the PR's head ref via
    `gh pr view <pr-number> --json headRefName -q '.headRefName'`:
-   - `fix/bot-*` → may modify code, tests, CHANGELOG
+   - `fix/bot-*` → may modify code, tests, changelog fragments
+     (`changelog.d/<slug>.<type>.md` — never `CHANGELOG.md` directly)
    - `docs/bot-*` → doc paths only. If a consensus finding requires
      touching code, post `address-held` and exit (the PR's scope is
      wrong for that finding).

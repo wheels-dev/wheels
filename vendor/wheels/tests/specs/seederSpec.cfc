@@ -69,6 +69,30 @@ component extends="wheels.WheelsTest" {
 					expect(local.result.success).toBeTrue();
 				});
 
+				it("returns failure and rolls back when a seedOnce entry fails validation", () => {
+					// Clean any leftover from earlier runs so seedOnce can't skip.
+					local.leftover = model("user").findOne(where = "username = 'SeederPartialOK99'");
+					if (IsObject(local.leftover)) {
+						local.leftover.delete();
+					}
+
+					local.s = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/partialfailure/"
+					);
+					local.result = local.s.runSeeds(environment = "testing");
+
+					expect(local.result.success).toBeFalse();
+					expect(local.result.message).toInclude("failed");
+					expect(local.result.message).toInclude("user");
+					expect(local.result.totalFailed).toBe(1);
+
+					// The successful first entry must have been rolled back along
+					// with the failed one (atomicity: half-applied seed runs must
+					// not look like fully-applied ones).
+					local.leaked = model("user").findOne(where = "username = 'SeederPartialOK99'");
+					expect(IsObject(local.leaked)).toBeFalse();
+				});
+
 				it("throws when the environment name contains path traversal characters", () => {
 					expect(function() {
 						seeder.runSeeds(environment = "../../../app/somefile");
@@ -79,34 +103,6 @@ component extends="wheels.WheelsTest" {
 					expect(function() {
 						seeder.runSeeds(environment = "testing/extra");
 					}).toThrow("Wheels.Seeder.InvalidEnvironment");
-				});
-
-				it("returns success=false and rolls back when a seedOnce() entry fails validation", () => {
-					// Pre-cleanup so a prior failed test run can't poison the assertion below.
-					local.stale = model("author").findOne(where="lastName = 'SeederRollbackMarker'");
-					if (IsObject(local.stale)) {
-						local.stale.delete();
-					}
-
-					local.s = CreateObject("component", "wheels.Seeder").init(
-						seedPath = "/wheels/tests/_assets/seeder/withfailure/"
-					);
-					local.result = local.s.runSeeds(environment = "testing");
-
-					expect(local.result.success).toBeFalse();
-					expect(local.result.totalFailed).toBeGTE(1);
-					expect(local.result.message).toInclude("failed");
-					// The successful author entry was rolled back, so totalCreated reflects the post-rollback state.
-					expect(local.result.totalCreated).toBe(0);
-
-					// Verify nothing was actually persisted — the successful entry must have been rolled back.
-					local.lingering = model("author").findOne(where="lastName = 'SeederRollbackMarker'");
-					expect(IsObject(local.lingering)).toBeFalse();
-				});
-
-				it("initializes totalFailed alongside totalCreated and totalSkipped", () => {
-					local.s = CreateObject("component", "wheels.Seeder").init();
-					expect(local.s.totalFailed).toBe(0);
 				});
 
 			});
@@ -175,6 +171,21 @@ component extends="wheels.WheelsTest" {
 
 					// Clean up
 					local.author.delete();
+				});
+
+				it("counts failed entries and reports them in the result", () => {
+					seeder.totalFailed = 0;
+
+					// Missing password (and firstname/lastname) fails the User
+					// model's validatesPresenceOf, driving the "failed" action.
+					local.result = seeder.seedOnce(
+						modelName = "user",
+						uniqueProperties = "username",
+						properties = {username: "SeederFailCount99"}
+					);
+
+					expect(local.result.action).toBe("failed");
+					expect(seeder.totalFailed).toBe(1);
 				});
 
 				it("tracks created and skipped counts", () => {

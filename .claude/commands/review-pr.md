@@ -85,7 +85,9 @@ below. Highlights for this command:
    - `.ai/wheels/<layer>/` updated if behavior changed
    - `web/sites/guides/src/content/docs/v4-0-0-snapshot/` page updated for
      user-facing features
-   - `CHANGELOG.md` `[Unreleased]` entry
+   - Changelog fragment under `changelog.d/` (`<slug>.<type>.md`; a direct
+     `CHANGELOG.md` `[Unreleased]` edit is a finding — it recreates the
+     merge-conflict anchor the fragment system removes)
    - `CLAUDE.md` updated if model/controller/view conventions changed
 
    **Commits**

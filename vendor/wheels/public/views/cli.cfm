@@ -16,7 +16,11 @@ try {
 			requestMethod = cgi.request_method,
 			remoteAddr = cgi.remote_addr,
 			forwardedFor = cgi.http_x_forwarded_for,
-			password = StructKeyExists(request.wheels.params, "password") ? request.wheels.params.password : ""
+			// Form scope ONLY: request.wheels.params merges URL + form, so a
+			// ?password=... query string would satisfy the gate while logging
+			// the reload password in access logs / proxies — contradicting the
+			// SEC-4 design of carrying it as a form field (#2947 review, #2977).
+			password = StructKeyExists(form, "password") ? form.password : ""
 		);
 		if (!local.gate.allowed) {
 			cfheader(statuscode = local.gate.statusCode);
@@ -318,9 +322,14 @@ try {
 				
 				// Find target version based on steps. Reuses the list
 				// discovered in the preamble instead of re-discovering.
+				// Filter on tracked status, not version <= current: on a shared
+				// dev DB a peer-applied version above your latest local file
+				// made the version heuristic count pending/orphan rows as
+				// applied, so `steps=N` rolled back fewer real migrations
+				// (same P3 fix dbStatus got in #2947; #2977).
 				local.appliedMigrations = [];
 				for (local.migration in data.migrations) {
-					if (local.migration.version <= data.currentVersion) {
+					if (local.migration.status == "migrated") {
 						arrayAppend(local.appliedMigrations, local.migration);
 					}
 				}
@@ -890,7 +899,9 @@ function runDbSeed(struct seedParams = {}) {
 			result.environment = environment;
 			result.totalCreated = conventionResult.totalCreated;
 			result.totalSkipped = conventionResult.totalSkipped;
-			result.totalFailed = structKeyExists(conventionResult, "totalFailed") ? conventionResult.totalFailed : 0;
+			if (structKeyExists(conventionResult, "totalFailed")) {
+				result.totalFailed = conventionResult.totalFailed;
+			}
 			result.results = conventionResult.results;
 			if (structKeyExists(conventionResult, "detail")) {
 				result.detail = conventionResult.detail;

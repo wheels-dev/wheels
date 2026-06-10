@@ -174,6 +174,22 @@ component {
 	 * [category: Miscellaneous Functions]
 	 */
 	public boolean function $isSafeRedirectUrl(required string url, required string serverName) {
+		// Per WHATWG URL parsing: browsers strip embedded ASCII tab/CR/LF and trim leading/trailing
+		// ASCII whitespace before navigation. Mirror that normalization here so a URL the browser will
+		// resolve to "//evil.com" cannot pass the same-origin gate via its unstripped form
+		// (e.g. "<TAB>//evil.com" classifies as a relative path pre-strip but navigates off-domain
+		// post-strip). Deferred from #2898.
+		arguments.url = Replace(arguments.url, Chr(9), "", "all");
+		arguments.url = Replace(arguments.url, Chr(10), "", "all");
+		arguments.url = Replace(arguments.url, Chr(13), "", "all");
+		arguments.url = Trim(arguments.url);
+
+		// Reject any URL retaining ASCII C0 control characters (NUL through US, or DEL). Browsers
+		// flag these as validation errors and engine behavior diverges; refuse rather than guess.
+		if (ReFind("[\x00-\x1F\x7F]", arguments.url)) {
+			return false;
+		}
+
 		// Reject any URL containing a backslash outright. Browsers normalize backslashes to forward
 		// slashes ("/\evil.com", "\/evil.com" and "\\evil.com" all navigate to evil.com), so a
 		// backslash anywhere makes the URL unsafe. Literal backslashes in legitimate URLs should be
