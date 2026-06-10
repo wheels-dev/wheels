@@ -76,6 +76,35 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return application.wheels.$packageRegistry;
 	}
 
+	/**
+	 * Returns true when a setting name looks like it holds a secret (keys,
+	 * passwords, passphrases, tokens, credentials). Single source of truth for
+	 * the /wheels/info page so the HTML and JSON branches cannot drift — the
+	 * JSON branch omits matching settings and the HTML branch redacts them.
+	 *
+	 * `accessControlAllowCredentials` (and any future `*allowCredentials` flag)
+	 * is exempt: it mirrors the boolean `Access-Control-Allow-Credentials` CORS
+	 * response header and is not a credential value.
+	 */
+	public boolean function $isProtectedSetting(required string settingName) {
+		if (ReFindNoCase("allowcredentials$", arguments.settingName)) {
+			return false;
+		}
+		return ReFindNoCase("(secret|password|passphrase|privatekey|apikey|credential|token)", arguments.settingName) > 0;
+	}
+
+	/**
+	 * Returns the display-safe HTML value for a setting row on the /wheels/info
+	 * page. Secret-shaped settings are redacted without ever being read, so an
+	 * unset key cannot throw and the raw value never reaches the output buffer.
+	 */
+	public string function $settingDisplayValue(required string settingName) {
+		if ($isProtectedSetting(arguments.settingName)) {
+			return "<em>[redacted]</em>";
+		}
+		return formatSettingOutput(get(arguments.settingName));
+	}
+
 	/*
 	This is just a proof of concept
 	*/
