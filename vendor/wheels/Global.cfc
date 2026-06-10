@@ -786,6 +786,20 @@ return local.$wheels;
 
 	/**
 	 * Internal function.
+	 * Case-sensitive, constant-time string comparison. Both values are hashed with
+	 * SHA-256 before being compared via MessageDigest.isEqual so the comparison
+	 * neither leaks length information nor exits early on the first differing byte.
+	 * Used by the reload/restart password gate and the environment-switch gate.
+	 */
+	public boolean function $secureCompare(required string candidate, required string comparedValue) {
+		return CreateObject("java", "java.security.MessageDigest").isEqual(
+			Hash(arguments.candidate, "SHA-256").getBytes("UTF-8"),
+			Hash(arguments.comparedValue, "SHA-256").getBytes("UTF-8")
+		);
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public any function $timeSpanForCache(
 		required any cache,

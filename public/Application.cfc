@@ -220,7 +220,10 @@ component output="false" {
 			&& (
 				!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "reloadPassword")
 				|| !Len(application.wheels.reloadPassword)
-				|| (StructKeyExists(url, "password") && url.password == application.wheels.reloadPassword)
+				// Case-sensitive, constant-time compare — same gate as the environment switch
+				// in wheels/events/onapplicationstart.cfc (CFML == is case-insensitive and
+				// exits early, which leaks timing information).
+				|| (StructKeyExists(url, "password") && application.wo.$secureCompare(url.password, application.wheels.reloadPassword))
 			)
 		) {
 			application.wo.$debugPoint("total,reload");

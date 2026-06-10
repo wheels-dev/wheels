@@ -1,7 +1,10 @@
 <cfscript>
 		// CSRF protection settings.
 		application.$wheels.csrfStore = "session";
-		application.$wheels.csrfCookieEncryptionAlgorithm = "AES";
+		// AES/GCM/NoPadding (authenticated encryption) — bare "AES" resolves to insecure
+		// ECB mode. Cookies written under the legacy bare "AES" default remain readable
+		// via the decrypt fallback in csrf.cfc's $decryptCsrfCookieValue().
+		application.$wheels.csrfCookieEncryptionAlgorithm = "AES/GCM/NoPadding";
 		application.$wheels.csrfCookieEncryptionSecretKey = "";
 		application.$wheels.csrfCookieEncryptionEncoding = "Base64";
 		application.$wheels.csrfCookieName = "_wheels_authenticity";

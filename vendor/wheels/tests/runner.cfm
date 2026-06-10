@@ -69,7 +69,7 @@
 
         // CSRF
         application.wheels.csrfCookieName = "_wheels_test_authenticity"
-        application.wheels.csrfCookieEncryptionAlgorithm = "AES"
+        application.wheels.csrfCookieEncryptionAlgorithm = "AES/GCM/NoPadding" // mirrors the framework default in events/init/security.cfm
         application.wheels.csrfCookieEncryptionSecretKey = GenerateSecretKey("AES")
         application.wheels.csrfCookieEncryptionEncoding = "Base64"
 

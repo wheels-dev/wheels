@@ -168,10 +168,7 @@ component {
 			&& StructKeyExists(application.$wheels, "reloadPassword")
 			&& Len(application.$wheels.reloadPassword)
 			&& StructKeyExists(URL, "password")
-			&& CreateObject("java", "java.security.MessageDigest").isEqual(
-				Hash(URL.password, "SHA-256").getBytes("UTF-8"),
-				Hash(application.$wheels.reloadPassword, "SHA-256").getBytes("UTF-8")
-			)
+			&& application.wo.$secureCompare(URL.password, application.$wheels.reloadPassword)
 		) {
 			local.reloadPasswordMatched = true;
 			application.$wheels.environment = URL.reload;
