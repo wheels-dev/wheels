@@ -51,8 +51,17 @@ if (
 }
 
 // ── Security: localhost only ────────────────────
+// Use InetAddress.isLoopbackAddress() instead of a literal-string list so
+// every loopback form matches (all of 127.0.0.0/8, ::1, and IPv4-mapped IPv6
+// like ::ffff:127.0.0.1), failing closed when the address cannot be parsed.
 local.remoteAddr = cgi.REMOTE_ADDR;
-if (!listFind("127.0.0.1,::1,0:0:0:0:0:0:0:1", local.remoteAddr)) {
+local.isLocalhost = false;
+try {
+	local.isLocalhost = createObject("java", "java.net.InetAddress").getByName(local.remoteAddr).isLoopbackAddress();
+} catch (any e) {
+	local.isLocalhost = false;
+}
+if (!local.isLocalhost) {
 	cfheader(statusCode="403");
 	cfheader(name="Content-Type", value="application/json");
 	local.errorResponse = {
